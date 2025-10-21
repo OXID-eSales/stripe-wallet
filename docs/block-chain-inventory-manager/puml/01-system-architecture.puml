@@ -1,0 +1,222 @@
+@startuml Blockchain Inventory Management - System Architecture
+
+' Professional Color Palette - Investment Grade
+!define PAYMENT_COLOR #0D47A1
+!define INVENTORY_COLOR #E65100
+!define EVENT_COLOR #1B5E20
+!define INFRA_COLOR #4A148C
+!define BLOCKCHAIN_COLOR #B71C1C
+!define LIGHT_BG #F5F5F5
+!define ACCENT_GOLD #FFB300
+!define ACCENT_BLUE #2196F3
+!define ACCENT_GREEN #4CAF50
+
+skinparam backgroundColor #FAFAFA
+skinparam shadowing false
+skinparam roundcorner 10
+skinparam defaultFontSize 11
+skinparam defaultFontName Arial
+
+title <size:20><color:#0D47A1><b>Blockchain Inventory Management</b></color></size>\n<size:14><color:#424242>Enterprise-Grade System Architecture</color></size>
+
+' Application Layer
+package "<color:white><b>Application Layer</b></color>" as AppLayer #1976D2 {
+
+    package "<color:white><b>Event Handlers</b></color>" as Handlers #0D47A1 {
+        component [ReserveStockHandler] as ReserveHandler ACCENT_GOLD
+        component [ReleaseStockHandler] as ReleaseHandler ACCENT_GOLD
+        component [CommitStockHandler] as CommitHandler ACCENT_GOLD
+        component [ShipStockHandler] as ShipHandler ACCENT_GOLD
+    }
+
+    package "<color:white><b>Commands</b></color>" as Commands ACCENT_BLUE {
+        component [ReserveStockCommand] as ReserveCmd #E3F2FD
+        component [ReleaseStockCommand] as ReleaseCmd #E3F2FD
+        component [TransferStockCommand] as TransferCmd #E3F2FD
+    }
+
+    package "<color:white><b>Queries</b></color>" as Queries ACCENT_GREEN {
+        component [GetStockLevelQuery] as StockQuery #E8F5E9
+        component [GetReservationsQuery] as ReservationQuery #E8F5E9
+        component [GetWarehousesQuery] as WarehouseQuery #E8F5E9
+    }
+}
+
+' Domain Layer
+package "<color:white><b>Domain Layer</b></color>" as DomainLayer #E65100 {
+
+    package "<color:white><b>Aggregates</b></color>" as Aggregates #BF360C {
+        component [InventoryItem] as Item ACCENT_GOLD
+        component [Warehouse] as Warehouse ACCENT_GOLD
+    }
+
+    package "<color:white><b>Entities</b></color>" as Entities #D84315 {
+        component [StockReservation] as Reservation #FFE0B2
+        component [StockLevel] as Level #FFE0B2
+    }
+
+    package "<color:white><b>Value Objects</b></color>" as ValueObjects #EF6C00 {
+        component [SKU] as SKU #FFF3E0
+        component [Quantity] as Quantity #FFF3E0
+        component [Address] as Address #FFF3E0
+    }
+
+    package "<color:white><b>Domain Services</b></color>" as DomainServices #F57C00 {
+        component [InventoryService] as InventoryService ACCENT_GOLD
+        component [WarehouseAllocator] as Allocator ACCENT_GOLD
+    }
+
+    package "<color:white><b>Domain Events</b></color>" as DomainEvents #1B5E20 {
+        component [StockReservedEvent] as ReservedEvent ACCENT_GREEN
+        component [StockReleasedEvent] as ReleasedEvent ACCENT_GREEN
+        component [StockCommittedEvent] as CommittedEvent ACCENT_GREEN
+    }
+}
+
+' Infrastructure Layer
+package "<color:white><b>Infrastructure Layer</b></color>" as InfraLayer #4A148C {
+
+    package "<color:white><b>Repositories</b></color>" as Repos #6A1B9A {
+        component [InventoryItemRepository] as ItemRepo #E1BEE7
+        component [WarehouseRepository] as WarehouseRepo #E1BEE7
+        component [StockReservationRepository] as ReservationRepo #E1BEE7
+    }
+
+    package "<color:white><b>Event Store</b></color>" as EventStore #7B1FA2 {
+        component [InventoryLedger] as Ledger ACCENT_GOLD
+        database "<color:white><b>Event Log</b>\n(Kafka/EventStore)</color>" as EventLog #311B92
+    }
+
+    package "<color:white><b>Cache Layer</b></color>" as Cache #8E24AA {
+        component [L1: Memory Cache] as L1Cache #F3E5F5
+        component [L2: Redis Cache] as L2Cache #F3E5F5
+    }
+
+    package "<color:white><b>Consensus Protocol</b></color>" as Consensus #B71C1C {
+        component [Raft Leader] as Leader ACCENT_GOLD
+        component [Raft Follower 1] as Follower1 #FFCDD2
+        component [Raft Follower 2] as Follower2 #FFCDD2
+    }
+}
+
+' Blockchain Conceptual Layer
+package "<color:white><b>Blockchain Layer</b>\n<size:10>(Conceptual)</size></color>" as BlockchainLayer #880E4F {
+    component [Hash Chain] as HashChain ACCENT_GOLD
+    component [Immutable Ledger] as ImmutableLedger ACCENT_GOLD
+    component [Distributed Consensus] as DistConsensus ACCENT_GOLD
+}
+
+' External Systems
+package "<color:#1976D2><b>External Systems</b></color>" as External #E3F2FD {
+    component [Payment Component] as PaymentComp #1976D2
+    component [Order Management] as OrderMgmt #2E7D32
+    database "<color:white><b>MySQL Database</b></color>" as MySQL #37474F
+}
+
+' Warehouses
+cloud "<color:#37474F><b>Physical Warehouses</b></color>" as Warehouses #ECEFF1 {
+    component [Warehouse A\n(New York)] as WarehouseA #546E7A
+    component [Warehouse B\n(Chicago)] as WarehouseB #546E7A
+    component [Warehouse C\n(Los Angeles)] as WarehouseC #546E7A
+}
+
+' ============================================
+' Relationships
+' ============================================
+
+' Payment Component triggers handlers
+PaymentComp --> ReserveHandler : PaymentAuthorizedEvent
+PaymentComp --> ReleaseHandler : PaymentFailedEvent
+PaymentComp --> CommitHandler : OrderCreatedEvent
+
+' Handlers use domain services
+ReserveHandler --> InventoryService : reserve()
+ReleaseHandler --> InventoryService : release()
+CommitHandler --> InventoryService : commit()
+
+' Domain service uses aggregates
+InventoryService --> Item : reserve()
+InventoryService --> Warehouse : findOptimal()
+InventoryService --> Allocator : calculate()
+
+' Aggregates use entities and VOs
+Item --> Reservation : create
+Item --> Level : update
+Item --> SKU : identify
+Level --> Quantity : track
+
+' Aggregates emit events
+Item --> ReservedEvent : emit
+Item --> ReleasedEvent : emit
+Item --> CommittedEvent : emit
+
+' Events append to ledger
+ReservedEvent --> Ledger : append
+ReleasedEvent --> Ledger : append
+CommittedEvent --> Ledger : append
+
+' Ledger uses consensus
+Ledger --> Leader : replicate
+Leader --> Follower1 : sync
+Leader --> Follower2 : sync
+
+' Ledger persists to event store
+Ledger --> EventLog : persist
+
+' Consensus uses blockchain concepts
+Leader --> HashChain : verify
+Leader --> DistConsensus : coordinate
+
+' Repositories access database
+ItemRepo --> MySQL : CRUD
+WarehouseRepo --> MySQL : CRUD
+ReservationRepo --> MySQL : CRUD
+
+' Cache queries
+StockQuery --> L1Cache : check
+L1Cache --> L2Cache : fallback
+L2Cache --> EventLog : source
+
+' Warehouses tracked by domain
+Warehouse --> WarehouseA : physical
+Warehouse --> WarehouseB : physical
+Warehouse --> WarehouseC : physical
+
+' Notes with professional styling
+note right of Consensus #FFECB3
+  <b><color:#BF360C>Raft Consensus</color></b>
+  ━━━━━━━━━━━━━━━━
+  ✓ Leader serializes writes
+  ✓ Followers replicate log
+  ✓ Election on failure
+  ✓ Linearizability guarantee
+end note
+
+note right of EventStore #E1F5FE
+  <b><color:#0D47A1>Event Sourcing</color></b>
+  ━━━━━━━━━━━━━━━━
+  ✓ Append-only log
+  ✓ Complete audit trail
+  ✓ Time travel queries
+  ✓ Source of truth
+end note
+
+note right of BlockchainLayer #FFEBEE
+  <b><color:#B71C1C>Blockchain Principles</color></b>
+  <size:9>(NOT blockchain technology)</size>
+  ━━━━━━━━━━━━━━━━━━━━━
+  ✓ Immutable ledger
+  ✓ Hash chain integrity
+  ✓ Distributed consensus
+  ✓ Audit transparency
+end note
+
+note left of PaymentComp #F1F8E9
+  <b><color:#33691E>Integration Point</color></b>
+  ━━━━━━━━━━━━━━━━━━
+  Payment contracts trigger
+  inventory reservations via
+  domain events
+end note
+
+@enduml

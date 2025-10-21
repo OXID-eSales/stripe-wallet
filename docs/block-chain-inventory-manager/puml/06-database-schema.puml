@@ -1,0 +1,301 @@
+@startuml Inventory Management Database Schema
+
+!define TABLE_COLOR #E3F2FD
+!define PK_COLOR #FFEB3B
+!define FK_COLOR #81C784
+
+title Blockchain Inventory Management - Database Schema (ER Diagram)
+
+' ============================================
+' Core Inventory Tables
+' ============================================
+
+entity "osc_inventory_item" as InventoryItem TABLE_COLOR {
+    **OXID : CHAR(32)** PK_COLOR
+    --
+    OXSKU : VARCHAR(50) UNIQUE NOT NULL
+    OXNAME : VARCHAR(255) NOT NULL
+    OXDESCRIPTION : TEXT
+    OXCREATED : DATETIME NOT NULL
+    OXUPDATED : DATETIME NOT NULL
+    --
+    UNIQUE INDEX (OXSKU)
+    INDEX (OXCREATED)
+}
+
+entity "osc_inventory_stock_level" as StockLevel TABLE_COLOR {
+    **OXID : CHAR(32)** PK_COLOR
+    --
+    OXINVENTORYITEMID : CHAR(32) FK_COLOR
+    OXWAREHOUSEID : CHAR(32) FK_COLOR
+    OXAVAILABLE : INT NOT NULL DEFAULT 0
+    OXRESERVED : INT NOT NULL DEFAULT 0
+    OXCOMMITTED : INT NOT NULL DEFAULT 0
+    OXUPDATED : DATETIME NOT NULL
+    --
+    UNIQUE INDEX (OXINVENTORYITEMID, OXWAREHOUSEID)
+    FOREIGN KEY (OXINVENTORYITEMID) → osc_inventory_item(OXID)
+    FOREIGN KEY (OXWAREHOUSEID) → osc_inventory_warehouse(OXID)
+}
+
+entity "osc_inventory_warehouse" as Warehouse TABLE_COLOR {
+    **OXID : CHAR(32)** PK_COLOR
+    --
+    OXNAME : VARCHAR(255) NOT NULL
+    OXSTREET : VARCHAR(255)
+    OXCITY : VARCHAR(100)
+    OXSTATE : VARCHAR(50)
+    OXZIP : VARCHAR(20)
+    OXCOUNTRY : VARCHAR(2)
+    OXLATITUDE : DECIMAL(10,8)
+    OXLONGITUDE : DECIMAL(11,8)
+    OXCAPACITY : INT NOT NULL
+    OXCURRENTLOAD : DECIMAL(3,2) DEFAULT 0.0
+    OXOPERATIONAL : TINYINT(1) DEFAULT 1
+    OXREGIONS : JSON
+    OXCREATED : DATETIME NOT NULL
+    OXUPDATED : DATETIME NOT NULL
+    --
+    INDEX (OXOPERATIONAL)
+    INDEX (OXCURRENTLOAD)
+}
+
+entity "osc_inventory_reservation" as Reservation TABLE_COLOR {
+    **OXID : CHAR(32)** PK_COLOR
+    --
+    OXINVENTORYITEMID : CHAR(32) FK_COLOR
+    OXWAREHOUSEID : CHAR(32) FK_COLOR
+    OXCONTRACTID : CHAR(32) FK_COLOR
+    OXORDERID : CHAR(32) FK_COLOR
+    OXSKU : VARCHAR(50) NOT NULL
+    OXQUANTITY : INT NOT NULL
+    OXSTATE : VARCHAR(20) NOT NULL
+    OXCREATED : DATETIME NOT NULL
+    OXEXPIRESAT : DATETIME NOT NULL
+    OXCOMMITTEDAT : DATETIME
+    OXRELEASEDAT : DATETIME
+    --
+    INDEX (OXCONTRACTID)
+    INDEX (OXORDERID)
+    INDEX (OXSTATE)
+    INDEX (OXEXPIRESAT)
+    INDEX (OXSTATE, OXEXPIRESAT)
+    UNIQUE INDEX (OXCONTRACTID, OXSKU)
+    FOREIGN KEY (OXINVENTORYITEMID) → osc_inventory_item(OXID)
+    FOREIGN KEY (OXWAREHOUSEID) → osc_inventory_warehouse(OXID)
+    FOREIGN KEY (OXCONTRACTID) → osc_payment_contract(OXID)
+    FOREIGN KEY (OXORDERID) → oxorder(OXID)
+}
+
+' ============================================
+' Event Sourcing Tables
+' ============================================
+
+entity "osc_inventory_ledger" as Ledger #FFF9C4 {
+    **OXID : BIGINT AUTO_INCREMENT** PK_COLOR
+    --
+    OXEVENTID : CHAR(32) UNIQUE NOT NULL
+    OXEVENTTYPE : VARCHAR(50) NOT NULL
+    OXSKU : VARCHAR(50) NOT NULL
+    OXWAREHOUSEID : CHAR(32) FK_COLOR
+    OXQUANTITY : INT NOT NULL
+    OXCONTRACTID : CHAR(32)
+    OXORDERID : CHAR(32)
+    OXRESERVATIONID : CHAR(32)
+    OXPAYLOAD : JSON NOT NULL
+    OXMETADATA : JSON
+    OXHASH : CHAR(64) NOT NULL
+    OXPREVIOUSHASH : CHAR(64)
+    OXCREATED : DATETIME(6) NOT NULL
+    --
+    INDEX (OXEVENTTYPE)
+    INDEX (OXSKU)
+    INDEX (OXWAREHOUSEID)
+    INDEX (OXCONTRACTID)
+    INDEX (OXORDERID)
+    INDEX (OXCREATED)
+    UNIQUE INDEX (OXEVENTID)
+    UNIQUE INDEX (OXHASH)
+}
+
+entity "osc_inventory_ledger_snapshot" as Snapshot #FFF9C4 {
+    **OXID : BIGINT AUTO_INCREMENT** PK_COLOR
+    --
+    OXINVENTORYITEMID : CHAR(32) FK_COLOR
+    OXWAREHOUSEID : CHAR(32) FK_COLOR
+    OXLASTEVENTID : BIGINT FK_COLOR
+    OXAVAILABLE : INT NOT NULL
+    OXRESERVED : INT NOT NULL
+    OXCOMMITTED : INT NOT NULL
+    OXCREATED : DATETIME NOT NULL
+    --
+    UNIQUE INDEX (OXINVENTORYITEMID, OXWAREHOUSEID)
+    FOREIGN KEY (OXINVENTORYITEMID) → osc_inventory_item(OXID)
+    FOREIGN KEY (OXWAREHOUSEID) → osc_inventory_warehouse(OXID)
+    FOREIGN KEY (OXLASTEVENTID) → osc_inventory_ledger(OXID)
+}
+
+' ============================================
+' Integration with Payment Component
+' ============================================
+
+entity "osc_payment_contract\n(from payment component)" as Contract #E8F5E9 {
+    **OXID : CHAR(32)** PK_COLOR
+    --
+    OXUSERID : CHAR(32) FK_COLOR
+    OXORDERID : CHAR(32) FK_COLOR
+    OXSTATE : VARCHAR(32) NOT NULL
+    OXBASKETDATA : JSON NOT NULL
+    OXCONDITIONS : JSON NOT NULL
+    ...
+}
+
+entity "oxorder\n(OXID core)" as Order #E8F5E9 {
+    **OXID : CHAR(32)** PK_COLOR
+    --
+    OXUSERID : CHAR(32) FK_COLOR
+    OXORDERNR : INT
+    ...
+}
+
+' ============================================
+' Relationships
+' ============================================
+
+InventoryItem ||--o{ StockLevel : "has levels in\nmultiple warehouses"
+InventoryItem ||--o{ Reservation : "tracks\nreservations"
+InventoryItem ||--o{ Ledger : "events recorded"
+
+Warehouse ||--o{ StockLevel : "stores\nstock for items"
+Warehouse ||--o{ Reservation : "fulfills from"
+Warehouse ||--o{ Ledger : "events occur at"
+
+StockLevel }o--|| Snapshot : "snapshot of"
+
+Contract ||--o{ Reservation : "creates\nstock holds"
+Order ||--o{ Reservation : "commits\nreservations"
+
+Reservation }o--|| Ledger : "events track\nreservation lifecycle"
+
+' ============================================
+' Notes
+' ============================================
+
+note top of InventoryItem
+  **Core Aggregate**
+  One record per SKU.
+  Stock levels tracked per warehouse.
+end note
+
+note right of StockLevel
+  **Stock Tracking**
+  - AVAILABLE: Can be reserved
+  - RESERVED: Held for contract (5 min)
+  - COMMITTED: Allocated to order
+
+  **Constraint:**
+  AVAILABLE + RESERVED + COMMITTED = Total Stock
+end note
+
+note right of Warehouse
+  **Physical Locations**
+  - Coordinates for distance calc
+  - Capacity & load tracking
+  - Operational status
+  - Regional policies (JSON)
+end note
+
+note right of Reservation
+  **Temporary Holds**
+  - Links contract to stock
+  - Expires after 5 minutes
+  - State machine: ACTIVE → COMMITTED/RELEASED/EXPIRED
+
+  **Unique Constraint:**
+  One reservation per (contract, SKU)
+end note
+
+note bottom of Ledger
+  **Event Sourcing - Immutable Log**
+  - Append-only (no UPDATE/DELETE)
+  - Complete audit trail
+  - Hash chain integrity (blockchain principle)
+  - Time travel queries possible
+  - Source of truth for reconciliation
+
+  **Event Types:**
+  - STOCK_RESERVED
+  - STOCK_RELEASED
+  - STOCK_COMMITTED
+  - STOCK_SHIPPED
+  - STOCK_RECEIVED
+  - STOCK_TRANSFERRED
+  - STOCK_ADJUSTED
+end note
+
+note bottom of Snapshot
+  **Performance Optimization**
+  Current state snapshot every 10,000 events.
+  Rebuilding state:
+  1. Load snapshot (instant)
+  2. Replay events since snapshot
+  → 100x faster than full replay
+end note
+
+note right of Contract
+  **Smart Contract Pattern**
+  Payment contract includes condition:
+  ContractCondition::TYPE_STOCK_RESERVED
+
+  Stock reservation fulfills this condition.
+end note
+
+' ============================================
+' Data Flow Example
+' ============================================
+
+note as DataFlow
+  **Typical Data Flow**
+
+  1. **Reserve Stock**
+     - INSERT INTO osc_inventory_reservation (state=ACTIVE)
+     - UPDATE osc_inventory_stock_level SET OXRESERVED += qty
+     - INSERT INTO osc_inventory_ledger (type=STOCK_RESERVED)
+     - UPDATE osc_payment_contract conditions (fulfilled)
+
+  2. **Commit (Order Created)**
+     - UPDATE osc_inventory_reservation SET state=COMMITTED, OXORDERID=...
+     - UPDATE osc_inventory_stock_level SET OXRESERVED -= qty, OXCOMMITTED += qty
+     - INSERT INTO osc_inventory_ledger (type=STOCK_COMMITTED)
+
+  3. **Ship**
+     - UPDATE osc_inventory_stock_level SET OXCOMMITTED -= qty
+     - INSERT INTO osc_inventory_ledger (type=STOCK_SHIPPED)
+
+  4. **Release (Payment Failed)**
+     - UPDATE osc_inventory_reservation SET state=RELEASED
+     - UPDATE osc_inventory_stock_level SET OXRESERVED -= qty, OXAVAILABLE += qty
+     - INSERT INTO osc_inventory_ledger (type=STOCK_RELEASED)
+end note
+
+' ============================================
+' Legend
+' ============================================
+
+legend bottom right
+    |= Color |= Meaning |
+    |<TABLE_COLOR>      | Inventory Tables |
+    |<#FFF9C4>          | Event Sourcing Tables |
+    |<#E8F5E9>          | Integration Tables |
+    |<PK_COLOR>         | Primary Key |
+    |<FK_COLOR>         | Foreign Key |
+
+    **Design Principles:**
+    - Non-invasive (no ALTER on oxorder)
+    - FK constraints for integrity
+    - Indexes for performance
+    - JSON for flexibility
+    - Event sourcing for audit
+endlegend
+
+@enduml
