@@ -1,0 +1,575 @@
+@startuml Payment Component Architecture Overview - Smart-Contract Pattern
+
+skinparam backgroundColor #FEFEFE
+skinparam roundcorner 10
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam linetype polyline
+
+title Payment Component Architecture - Smart-Contract Pattern\n(Contract-First | Event-Driven | Multi-Channel | Provider-Agnostic | AI-Ready)
+
+' Define colors for layers
+!define PRESENTATION #E3F2FD
+!define API_LAYER #FFF9C4
+!define SECURITY #FFCDD2
+!define CONTRACT #F3E5F5
+!define SERVICE #FFF3E0
+!define EVENT #E8F5E9
+!define DOMAIN #C8E6C9
+!define DATA #F3E5F5
+!define INFRA #FFEBEE
+!define EXTERNAL #E0F2F1
+
+' =====================================
+' TOP ROW: FRONTEND CLIENTS
+' =====================================
+package "Frontend Clients" as CLIENTS PRESENTATION {
+  component [Traditional\nBrowser] as TRAD
+  component [One-Page\nCheckout (SPA)] as OPC
+  component [Mobile\nApp] as MOBILE
+  component [Third-Party\nERP/API] as API_CLIENT
+  component [MCP Bot\n(AI Agent)] as MCP_BOT
+  component [Admin\nPanel] as ADMIN
+}
+
+' =====================================
+' SECOND ROW: API GATEWAY
+' =====================================
+package "API & Gateway Layer" as API_GATEWAY API_LAYER {
+  component [GraphQL\n/graphql] as GQL #FFEB3B
+  component [MCP\n/mcp/tools] as MCP #FFB300
+  component [Webhook\n/webhook/:provider] as WEBHOOK #FFC107
+  component [Traditional\nControllers] as CTRL_TRAD #FFD54F
+}
+
+' =====================================
+' THIRD ROW: SECURITY & FRAUD
+' =====================================
+package "Security Layer" as SECURITY_PKG SECURITY {
+  component [Client-Side\nEncryption] as ENCRYPT
+  component [JWT/OAuth2\nAuth] as AUTH
+  component [HMAC\nSignature] as HMAC
+  component [PCI-DSS\nCompliance] as PCI
+}
+
+package "Fraud Prevention (AI)" as FRAUD_PKG SECURITY {
+  component [IP Geo\nAnalysis] as IP_GEO
+  component [Device\nFingerprint] as DEVICE
+  component [Behavioral\nAnalysis] as BEHAVIOR
+  component [Velocity\nCheck] as VELOCITY
+  component [AI Risk\nScoring (ML)] as AI_FRAUD
+}
+
+' =====================================
+' FOURTH ROW: EVENT DISPATCHER
+' =====================================
+package "Event System (PSR-14)" as EVENT_SYS EVENT {
+  component [EventDispatcher\n(Central Hub)] as ED #81C784
+}
+
+' =====================================
+' FIFTH ROW: CONTRACT & ORDER EVENTS (NEW!)
+' =====================================
+package "Contract Events (NEW)" as CONTRACT_EVENTS CONTRACT {
+  component [ContractCreated\nEvent] as E_CONTRACT_CREATE
+  component [ConditionsFulfilled\nEvent] as E_CONDITIONS
+  component [ContractCommitted\nEvent] as E_CONTRACT_COMMIT
+  component [ContractFulfilled\nEvent] as E_CONTRACT_FULFILL
+}
+
+package "Payment Events" as PAYMENT_EVENTS EVENT {
+  component [PaymentInitiated\nEvent] as E_PAYMENT
+  component [PaymentCaptured\nEvent] as E_CAPTURE
+  component [RefundRequested\nEvent] as E_REFUND
+  component [FraudDetected\nEvent] as E_FRAUD
+}
+
+' =====================================
+' SIXTH ROW: CONTRACT & PAYMENT HANDLERS
+' =====================================
+package "Contract Handlers (NEW)" as CONTRACT_HANDLERS CONTRACT {
+  component [ContractCreation\nHandler] as H_CONTRACT_CREATE
+  component [ConditionResolver\nHandler] as H_CONDITION
+  component [OrderCreation\nHandler] as H_ORDER_CREATE
+  component [ContractFulfillment\nHandler] as H_CONTRACT_FULFILL
+}
+
+package "Payment Handlers" as PAYMENT_HANDLERS DOMAIN {
+  component [PaymentAuthorization\nHandler] as H_PAYMENT
+  component [Capture\nHandler] as H_CAPTURE
+  component [Refund\nHandler] as H_REFUND
+  component [FraudCheck\nHandler] as H_FRAUD
+}
+
+' =====================================
+' SEVENTH ROW: CONTRACT SERVICE & PAYMENT SERVICES
+' =====================================
+package "Contract Services (NEW)" as CONTRACT_SERVICES CONTRACT {
+  component [Contract\nService] as CONTRACT_SVC
+  component [Condition\nValidator] as CONDITION_SVC
+  component [Contract\nRepository] as CONTRACT_REPO
+}
+
+package "Payment Services" as PAYMENT_SERVICES SERVICE {
+  component [Payment\nService] as PS
+  component [Capture\nService] as CS
+  component [Refund\nService] as RS
+  component [Fraud\nPrevention] as FPS
+}
+
+package "Support Services" as SUPPORT SERVICE {
+  component [Order\nRepository] as OR
+  component [Order\nFactory] as ORDER_FACTORY
+  component [Service\nFactory] as SF
+  component [Request\nCaching] as CACHE_SVC
+}
+
+' =====================================
+' EIGHTH ROW: DOMAIN MODELS & SUBSCRIBERS
+' =====================================
+package "Domain Models (Enhanced)" as MODELS DOMAIN {
+  component [**PaymentContract**\n(Aggregate Root)\nNEW!] as CONTRACT_MODEL #F8BBD0
+  component [ContractCondition\n(Entity)] as CONDITION_MODEL
+  component [Order\nModel] as ORDER_MODEL
+  component [Payment\nTransaction] as TX_MODEL
+}
+
+package "Event Subscribers (Enhanced)" as SUBSCRIBERS DOMAIN {
+  component [Email\nNotifications] as SUB_EMAIL
+  component [Order Status\n(State Machine)] as SUB_STATUS
+  component [**Contract Audit**\n(NEW)] as SUB_CONTRACT_AUDIT
+  component [Audit\nLog] as SUB_LOG
+  component [Inventory\nManagement] as SUB_INV
+  component [Accounting\nRevenue] as SUB_ACC
+}
+
+' =====================================
+' NINTH ROW: DATA & INFRASTRUCTURE
+' =====================================
+package "Data Access (Enhanced)" as DATA_PKG DATA {
+  component [Query\nBuilder] as QB
+  database "Database" as DB {
+    [**osc_payment_contract** NEW!]
+    [osc_payment_transaction]
+    [osc_payment_order_state]
+    [oxorder]
+  }
+}
+
+package "Infrastructure" as INFRA_PKG INFRA {
+  component [Logger\n(PSR-3)] as LOG
+  component [Cache\n(Redis)] as CACHE
+  component [Config\nManager] as CFG
+  component [HTTP\nClient] as HTTP
+  component [Queue\nSystem] as QUEUE
+}
+
+' =====================================
+' BOTTOM ROW: EXTERNAL PROVIDERS
+' =====================================
+package "Payment Providers (Contract-Aware)" as PROVIDERS EXTERNAL {
+  cloud "Stripe\nPaymentIntent" as STRIPE
+  cloud "PayPal\nOrder" as PAYPAL
+  cloud "Adyen\nPayment" as ADYEN
+  cloud "Unzer\nCharge" as UNZER
+}
+
+' =====================================
+' CONNECTIONS: Layer 1 → Layer 2 (Clients → API)
+' =====================================
+TRAD -down-> CTRL_TRAD
+OPC -down-> GQL
+MOBILE -down-> GQL
+API_CLIENT -down-> GQL
+MCP_BOT -down-> MCP
+ADMIN -down-> GQL
+
+' =====================================
+' CONNECTIONS: Layer 2 → Layer 3 (API → Security)
+' =====================================
+GQL -down-> AUTH
+MCP -down-> AUTH
+WEBHOOK -down-> HMAC
+OPC -down-> ENCRYPT
+MOBILE -down-> ENCRYPT
+
+' =====================================
+' CONNECTIONS: Layer 3 → Layer 4 (Security → Events)
+' =====================================
+AUTH -down-> ED
+HMAC -down-> ED
+CTRL_TRAD -down-> ED
+ENCRYPT -down-> PCI
+
+' =====================================
+' CONNECTIONS: Layer 4 → Layer 5 (Dispatcher → Events)
+' =====================================
+ED -down-> E_CONTRACT_CREATE
+ED -down-> E_CONDITIONS
+ED -down-> E_CONTRACT_COMMIT
+ED -down-> E_CONTRACT_FULFILL
+ED -down-> E_PAYMENT
+ED -down-> E_CAPTURE
+ED -down-> E_REFUND
+ED -down-> E_FRAUD
+
+' =====================================
+' CONNECTIONS: Layer 5 → Layer 6 (Events → Handlers)
+' =====================================
+E_CONTRACT_CREATE -down-> H_CONTRACT_CREATE
+E_CONDITIONS -down-> H_CONDITION
+E_CONTRACT_COMMIT -down-> H_ORDER_CREATE
+E_CONTRACT_FULFILL -down-> H_CONTRACT_FULFILL
+
+E_PAYMENT -down-> H_PAYMENT
+E_CAPTURE -down-> H_CAPTURE
+E_REFUND -down-> H_REFUND
+E_FRAUD -down-> H_FRAUD
+
+' =====================================
+' CONNECTIONS: Layer 6 → Layer 7 (Handlers → Services)
+' =====================================
+H_CONTRACT_CREATE -down-> CONTRACT_SVC
+H_CONDITION -down-> CONDITION_SVC
+H_CONDITION -down-> PS
+H_CONDITION -down-> FPS
+H_ORDER_CREATE -down-> ORDER_FACTORY
+H_ORDER_CREATE -down-> CONTRACT_REPO
+H_CONTRACT_FULFILL -down-> CONTRACT_SVC
+
+H_PAYMENT -down-> PS
+H_CAPTURE -down-> CS
+H_REFUND -down-> RS
+H_FRAUD -down-> FPS
+
+' =====================================
+' CONNECTIONS: Contract Services → Payment Services
+' =====================================
+CONTRACT_SVC -right-> CONTRACT_REPO
+CONDITION_SVC -right-> PS
+CONDITION_SVC -right-> FPS
+H_ORDER_CREATE -right-> OR
+
+' =====================================
+' CONNECTIONS: Services → Support Services
+' =====================================
+PS -right-> OR
+CS -right-> OR
+RS -right-> OR
+PS -right-> SF
+CS -right-> SF
+RS -right-> SF
+PS -right-> CACHE_SVC
+
+' =====================================
+' CONNECTIONS: Fraud Prevention
+' =====================================
+PS -right-> FPS
+FPS -down-> IP_GEO
+FPS -down-> DEVICE
+FPS -down-> BEHAVIOR
+FPS -down-> VELOCITY
+FPS -down-> AI_FRAUD
+
+' =====================================
+' CONNECTIONS: Services → Models
+' =====================================
+CONTRACT_SVC -down-> CONTRACT_MODEL
+CONDITION_SVC -down-> CONDITION_MODEL
+ORDER_FACTORY -down-> ORDER_MODEL
+PS -down-> TX_MODEL
+
+' =====================================
+' CONNECTIONS: Handlers → Subscribers (Events)
+' =====================================
+H_CONTRACT_CREATE -down-> SUB_CONTRACT_AUDIT
+H_CONTRACT_FULFILL -down-> SUB_EMAIL
+H_CONTRACT_FULFILL -down-> SUB_STATUS
+H_CONTRACT_FULFILL -down-> SUB_INV
+H_CONTRACT_FULFILL -down-> SUB_ACC
+
+H_PAYMENT -down-> SUB_EMAIL
+H_PAYMENT -down-> SUB_STATUS
+H_CAPTURE -down-> SUB_EMAIL
+H_CAPTURE -down-> SUB_STATUS
+H_REFUND -down-> SUB_INV
+H_REFUND -down-> SUB_ACC
+H_FRAUD -down-> SUB_LOG
+
+' =====================================
+' CONNECTIONS: Data Layer
+' =====================================
+CONTRACT_REPO -down-> QB
+OR -down-> QB
+QB -down-> DB
+CONTRACT_MODEL -down-> DB
+ORDER_MODEL -down-> DB
+TX_MODEL -down-> DB
+
+' =====================================
+' CONNECTIONS: Infrastructure
+' =====================================
+CONTRACT_SVC -down-> LOG
+PS -down-> LOG
+CS -down-> LOG
+RS -down-> LOG
+FPS -down-> LOG
+CACHE_SVC -down-> CACHE
+SF -down-> HTTP
+H_PAYMENT -down-> QUEUE
+
+' =====================================
+' CONNECTIONS: Services → Providers
+' =====================================
+SF -down-> STRIPE
+SF -down-> PAYPAL
+SF -down-> ADYEN
+SF -down-> UNZER
+
+' =====================================
+' CONNECTIONS: Providers → Webhooks (Contract-Aware)
+' =====================================
+STRIPE -up-> WEBHOOK
+PAYPAL -up-> WEBHOOK
+ADYEN -up-> WEBHOOK
+UNZER -up-> WEBHOOK
+
+' =====================================
+' NOTES
+' =====================================
+
+note right of CLIENTS
+  **6 Entry Points:**
+  - Traditional (multi-step)
+  - One-Page (+15-30% conversion)
+  - Mobile Apps (GraphQL)
+  - Third-Party (API)
+  - MCP/AI Agents
+  - Admin Panel
+
+  **All trigger contract creation first!**
+end note
+
+note right of API_GATEWAY
+  **Unified API Layer:**
+  - GraphQL (Queries, Mutations, Subscriptions)
+  - MCP Protocol (AI agent tools)
+  - Webhooks (Provider callbacks)
+  - Traditional (Backward compatibility)
+
+  **All emit ContractCreatedEvent**
+end note
+
+note right of CONTRACT_EVENTS
+  **Contract Lifecycle Events (NEW):**
+
+  1. ContractCreatedEvent
+     → Contract in DRAFT state
+
+  2. ConditionsFulfilledEvent
+     → All preconditions met
+
+  3. ContractCommittedEvent
+     → Order created & linked
+
+  4. ContractFulfilledEvent
+     → Payment captured, complete
+end note
+
+note right of CONTRACT_HANDLERS
+  **Contract-First Architecture (NEW):**
+
+  **ContractCreationHandler:**
+  - Captures basket snapshot
+  - Defines conditions
+  - Saves contract (DRAFT)
+
+  **ConditionResolverHandler:**
+  - Resolves payment_authorized
+  - Resolves fraud_check
+  - Resolves stock_reserved
+
+  **OrderCreationHandler:**
+  - Creates oxorder when ready
+  - Links contract → order
+  - Emits ContractCommittedEvent
+
+  **ContractFulfillmentHandler:**
+  - Marks contract FULFILLED
+  - Updates order to OK
+  - Triggers side effects
+end note
+
+note right of CONTRACT_SERVICES
+  **Contract Services (NEW):**
+
+  **ContractService:**
+  - Create contract (aggregate root)
+  - Transition states
+  - Validate state machine
+
+  **ConditionValidator:**
+  - Add conditions
+  - Fulfill conditions
+  - Check all fulfilled
+
+  **ContractRepository:**
+  - Find by provider order ID (webhooks)
+  - Find by order ID
+  - Save contract
+end note
+
+note right of CONTRACT_MODEL
+  **PaymentContract (Aggregate Root):**
+
+  **State Machine:**
+  DRAFT → PENDING → READY_TO_COMMIT
+    → COMMITTED → FULFILLED
+
+  **Key Properties:**
+  - OXORDERID = NULL (until committed!)
+  - OXBASKETDATA (immutable snapshot)
+  - OXCONDITIONS (fulfillment tracking)
+  - OXPROVIDERORDERID (webhook lookup)
+
+  **Benefits:**
+  - No orphan orders
+  - Complete audit trail
+  - Provider-agnostic
+  - Explicit conditions
+end note
+
+note right of FRAUD_PKG
+  **AI-Driven Fraud Prevention:**
+  - 4 detection layers
+  - ML model (35+ features)
+  - Real-time risk score (0-100)
+  - 80% fraud reduction
+  - €276K annual savings
+
+  **Integrated as condition:**
+  fraud_check condition must
+  be fulfilled before order creation
+end note
+
+note right of ED
+  **Event-Driven Architecture:**
+  - PSR-14 EventDispatcher
+  - Thin controllers → emit events
+  - Fat handlers → business logic
+  - Subscribers → side effects
+  - Decoupled & testable
+
+  **Contract events flow through
+  same dispatcher as payment events**
+end note
+
+note right of SUB_STATUS
+  **Order State Machine (Simplified):**
+  - Contract handles pre-order states
+  - Order only has:
+    • NOT_FINISHED (new)
+    • OK (paid)
+    • ERROR (failed)
+
+  **Cleaner than before:**
+  No 500, 600, 700, 800 states!
+  Contract manages complexity.
+end note
+
+note right of CACHE_SVC
+  **Performance:**
+  - EventContext pattern
+  - 50-70% fewer DB queries
+  - Redis/Memcached
+  - Session-based caching
+
+  **Contract caching:**
+  - Cache by provider order ID
+  - TTL: 24 hours (contract expiry)
+  - Invalidate on state change
+end note
+
+note right of PROVIDERS
+  **Provider-Agnostic (Contract-Aware):**
+  - All providers use contract pattern:
+    • Stripe: PaymentIntent
+    • PayPal: Order
+    • Adyen: Payment
+    • Unzer: Charge
+
+  **Mapping:**
+  Provider contract ID → Our contract ID
+
+  **Webhook processing:**
+  1. Find contract by provider order ID
+  2. Verify contract state = COMMITTED
+  3. Fulfill contract
+  4. Update order
+end note
+
+' =====================================
+' KEY FEATURES SUMMARY
+' =====================================
+note as FEATURES #E1F5FE
+  **Payment Component - Smart-Contract Pattern:**
+
+  ✅ **Contract-First:** Order created only when safe (all conditions met)
+  ✅ **Multi-Channel:** 6 entry points, 1 backend (70% code reuse)
+  ✅ **Event-Driven:** PSR-14, thin controllers, fat handlers
+  ✅ **Provider-Agnostic:** Maps to Stripe/PayPal/Adyen/Unzer contract patterns
+  ✅ **Security:** PCI-DSS, client-side encryption, JWT/OAuth2
+  ✅ **AI Fraud Prevention:** Integrated as contract condition
+  ✅ **Performance:** +50ms overhead, but worth it for cleaner architecture
+  ✅ **State Machine:** Explicit contract states, simpler order states
+  ✅ **Extensibility:** Add new conditions without code changes
+
+  **Benefits:**
+  • No orphan orders (-100% order pollution)
+  • Sequential order numbers (no gaps)
+  • Complete audit trail (basket snapshot + conditions)
+  • Idempotent webhooks (state machine prevents duplicates)
+  • API-first semantics (contract ID → order ID)
+end note
+
+note as COMPARISON #FFF3E0
+  **OLD PATTERN vs NEW PATTERN:**
+
+  **❌ OLD (No Contract):**
+  • Order created immediately
+  • Payment fails → orphan order
+  • Order number gaps
+  • Complex rollback
+  • State pollution (500-800)
+
+  **✅ NEW (With Contract):**
+  • Contract created first
+  • Payment fails → no order
+  • Sequential numbers
+  • Simple cancellation
+  • Clean states (DRAFT→FULFILLED)
+
+  **Cost:**
+  +10-15% storage, +50ms latency
+
+  **Worth It?**
+  YES for API-first, modern commerce!
+end note
+
+legend right
+  |= Layer |= Reusability |= Contract Impact |
+  | Frontend | Multi-channel | None |
+  | API Gateway | 100% | None |
+  | Security | 100% | None |
+  | Event System | 100% | +4 events |
+  | Handlers | 95% | +4 handlers |
+  | Services | 90-100% | +3 services |
+  | Domain | 90-100% | +2 models |
+  | Data Access | 100% | +1 table |
+  | Infrastructure | 100% | None |
+
+  **Average: Still 95%**
+  **New Code: ~15% (contract layer only)**
+endlegend
+
+@enduml

@@ -1,0 +1,693 @@
+@startuml Smart-Contract Payment Flow (Standard)
+
+skinparam backgroundColor #FEFEFE
+skinparam roundcorner 10
+skinparam sequenceMessageAlign center
+
+title Smart-Contract Payment Flow - Standard Pattern\n(Contract-First Architecture with Explicit Conditions)
+
+actor Customer
+participant "PaymentController" as PC #E3F2FD
+participant "OrderController" as OC #E3F2FD
+participant "EventDispatcher" as ED #C5E1A5
+participant "PaymentInitiationHandler" as PIH #FFF3E0
+participant "PaymentAuthHandler" as PAH #FFF3E0
+participant "FraudCheckHandler" as FCH #FFF3E0
+participant "StockReservationHandler" as SRH #FFF3E0
+participant "OrderCreationHandler" as OCH #FFF3E0
+participant "PaymentCaptureHandler" as PCH #FFF3E0
+participant "EventContext\n(Request Cache)" as EC #FFE082
+participant "ContractFactory" as CF #D1C4E9
+participant "ContractRepository" as CR #F8BBD0
+participant "PaymentService" as PS #FFE082
+participant "FraudService" as FS #FFE082
+participant "InventoryService" as IS #FFE082
+participant "OrderFactory" as OF #D1C4E9
+participant "OrderRepository" as OR #FFE082
+participant "Provider API" as API #E0F2F1
+participant "WebhookController" as WC #F3E5F5
+participant "WebhookHandler" as WH #FFF3E0
+database "osc_payment_contract\n(Contract Table)" as ContractDB #FFE0B2
+database "oxorder\n(Order Table)" as OrderDB #B2DFDB
+
+== Payment Method Selection ==
+
+Customer -> PC : Select payment method
+activate PC
+PC -> PC : Validate input:\n- CSRF token\n- User session\n- Payment method
+PC -> PC : Check eligibility:\n- Country, currency\n- Module health
+PC --> Customer : Render payment form
+deactivate PC
+
+== Order Intent & Contract Creation (EVENT-DRIVEN) ==
+
+Customer -> OC : Click "Place Order"
+activate OC
+
+note right of OC
+  **Controller is THIN**
+  Only validates & emits event
+  NO business logic!
+
+  **Key Difference:**
+  Creates CONTRACT, not order!
+end note
+
+OC -> OC : Validate:\n- Basket\n- User auth\n- CSRF token
+
+OC -> EC : Create EventContext
+activate EC
+note right of EC
+  **Request Data Cached Once**
+  - Basket (DB query)
+  - User (DB query)
+  - Session data
+  - Configuration
+
+  Cached for all event handlers
+  50-70% fewer DB queries
+end note
+EC -> OrderDB : Fetch basket, user\n(ONE TIME ONLY)
+activate OrderDB
+OrderDB --> EC : Basket, User
+deactivate OrderDB
+EC --> OC : EventContext ready
+deactivate EC
+
+OC -> ED : **Emit** PaymentInitiatedEvent(context)
+activate ED
+note right of ED
+  **EventDispatcher routes event**
+  (Internal "event bus" mechanism)
+
+  Finds all registered handlers
+  for PaymentInitiatedEvent type
+  and invokes them.
+end note
+
+ED -> PIH : handle(PaymentInitiatedEvent)
+activate PIH
+
+note right of PIH
+  **KEY INNOVATION:**
+  Creates CONTRACT first,
+  NOT oxorder!
+
+  Order created later when
+  all conditions fulfilled.
+end note
+
+PIH -> EC : getBasket() // From cache
+activate EC
+EC --> PIH : Basket (cached)
+deactivate EC
+
+PIH -> EC : getUser() // From cache
+activate EC
+EC --> PIH : User (cached)
+deactivate EC
+
+PIH -> CF : createFromBasket(basket, user)
+activate CF
+
+CF -> CF : Create basket snapshot:\n- Items (frozen)\n- Discounts (frozen)\n- Totals (frozen)\n- Immutable!
+
+CF -> CF : Create PaymentContract\nState: DRAFT
+
+CF -> CF : Add standard conditions:\n- payment_authorized\n- fraud_check\n- stock_reserved
+
+CF -> CF : contract.transitionToPending()
+
+CF --> PIH : PaymentContract\n{state: PENDING, orderId: NULL}
+deactivate CF
+
+note right of PIH
+  **Contract Created:**
+  • Basket snapshot captured
+  • No oxorder yet!
+  • orderId = NULL
+  • Conditions: all pending
+end note
+
+PIH -> CR : save(contract)
+activate CR
+CR -> ContractDB : INSERT INTO\nosc_payment_contract
+activate ContractDB
+note right of ContractDB
+  **Contract Record:**
+  {
+    "OXID": "contract123",
+    "OXSTATE": "PENDING",
+    "OXORDERID": null,  ← No order!
+    "OXBASKETDATA": {...},
+    "OXCONDITIONS": [
+      {type: "payment_authorized",
+       status: "pending"},
+      {type: "fraud_check",
+       status: "pending"},
+      {type: "stock_reserved",
+       status: "pending"}
+    ]
+  }
+end note
+ContractDB --> CR : Saved
+deactivate ContractDB
+CR --> PIH : Contract ID
+deactivate CR
+
+PIH -> ED : **Emit** ContractCreatedEvent(contract)
+activate ED
+note right of ED
+  **Contract created**
+  Now resolve conditions
+  in parallel!
+end note
+ED --> PIH : Event emitted
+deactivate ED
+
+PIH -> PIH : Set contract ID in\nevent result
+
+PIH --> ED : Handler complete
+deactivate PIH
+
+ED --> OC : Event result
+deactivate ED
+
+OC -> OC : Store contract ID\nin session
+
+OC --> Customer : Show "Processing..."\n(contract pending)
+deactivate OC
+
+note right of Customer
+  **Key Difference:**
+  No redirect yet!
+  Conditions being resolved...
+end note
+
+== Condition Resolution - Phase 1: Payment Authorization (PARALLEL) ==
+
+note right of ED
+  **EventDispatcher Routes to Multiple Handlers**
+  (Publish-Subscribe Pattern)
+
+  3 Handlers subscribed to ContractCreatedEvent:
+  1. PaymentAuthHandler
+  2. FraudCheckHandler
+  3. StockReservationHandler
+
+  All invoked in parallel (async processing)
+end note
+
+ED -> PAH : handle(ContractCreatedEvent)
+activate ED
+activate PAH
+
+PAH -> CR : find(contractId)
+activate CR
+CR -> ContractDB : SELECT contract
+activate ContractDB
+ContractDB --> CR : Contract data
+deactivate ContractDB
+CR --> PAH : PaymentContract
+deactivate CR
+
+PAH -> PS : authorize(amount, currency)
+activate PS
+
+PS -> PS : Build authorization request:\n- Amount from basket snapshot\n- Currency\n- Provider order ID
+
+PS -> API : POST /authorize\n(e.g., PaymentIntent, Order, etc.)
+activate API
+API -> API : Authorize payment\nReserve funds\nGenerate auth ID
+API --> PS : Authorization\n{id, status: AUTHORIZED, \nexpires: +7 days}
+deactivate API
+
+PS -> PS : Store provider order ID\nin session
+
+PS --> PAH : AuthorizationResponse
+deactivate PS
+
+PAH -> CR : find(contractId) // Reload
+activate CR
+CR -> ContractDB : SELECT
+activate ContractDB
+ContractDB --> CR : Latest contract
+deactivate ContractDB
+CR --> PAH : PaymentContract
+deactivate CR
+
+PAH -> PAH : contract.fulfillCondition(\n  'payment_authorized',\n  {authorizationId: 'auth_123'}\n)
+
+note right of PAH
+  **Condition Fulfilled:**
+  payment_authorized ✓
+
+  Contract checks:
+  Are all conditions met?
+end note
+
+PAH -> CR : save(contract)
+activate CR
+CR -> ContractDB : UPDATE\nOXCONDITIONS = [...,\n  {type: "payment_authorized",\n   status: "fulfilled", ✓\n   fulfilledAt: "2025-10-20..."}]
+activate ContractDB
+ContractDB --> CR : Updated
+deactivate ContractDB
+CR --> PAH : Saved
+deactivate CR
+
+PAH -> ED : **Emit** ContractConditionFulfilledEvent(\n  type: 'payment_authorized'\n)
+activate ED
+ED --> PAH : Event emitted
+deactivate ED
+
+PAH -> PAH : Check: areAllConditionsFulfilled()?\n→ No (1/3 fulfilled)
+
+PAH --> ED : Handler complete
+deactivate PAH
+
+== Condition Resolution - Phase 2: Fraud Check (PARALLEL) ==
+
+ED -> FCH : handle(ContractCreatedEvent)
+activate FCH
+
+FCH -> CR : find(contractId)
+activate CR
+CR -> ContractDB : SELECT contract
+activate ContractDB
+ContractDB --> CR : Contract
+deactivate ContractDB
+CR --> FCH : PaymentContract
+deactivate CR
+
+FCH -> FS : checkFraud(contract)
+activate FS
+
+FS -> FS : Calculate risk score:\n- User history\n- IP geolocation\n- Velocity checks\n- Device fingerprint
+
+FS --> FCH : FraudResult\n{score: 98, risk: "low"}
+deactivate FS
+
+FCH -> CR : find(contractId) // Reload
+activate CR
+CR -> ContractDB : SELECT
+activate ContractDB
+ContractDB --> CR : Latest contract
+deactivate ContractDB
+CR --> FCH : PaymentContract
+deactivate CR
+
+FCH -> FCH : contract.fulfillCondition(\n  'fraud_check',\n  {score: 98, risk: 'low'}\n)
+
+FCH -> CR : save(contract)
+activate CR
+CR -> ContractDB : UPDATE\nOXCONDITIONS = [...,\n  {type: "fraud_check",\n   status: "fulfilled", ✓\n   fulfilledAt: "2025-10-20..."}]
+activate ContractDB
+ContractDB --> CR : Updated
+deactivate ContractDB
+CR --> FCH : Saved
+deactivate CR
+
+FCH -> ED : **Emit** ContractConditionFulfilledEvent(\n  type: 'fraud_check'\n)
+activate ED
+ED --> FCH : Event emitted
+deactivate ED
+
+FCH -> FCH : Check: areAllConditionsFulfilled()?\n→ No (2/3 fulfilled)
+
+FCH --> ED : Handler complete
+deactivate FCH
+
+== Condition Resolution - Phase 3: Stock Reservation (PARALLEL) ==
+
+ED -> SRH : handle(ContractCreatedEvent)
+activate SRH
+
+SRH -> CR : find(contractId)
+activate CR
+CR -> ContractDB : SELECT contract
+activate ContractDB
+ContractDB --> CR : Contract
+deactivate ContractDB
+CR --> SRH : PaymentContract
+deactivate CR
+
+SRH -> IS : reserveStock(items)
+activate IS
+
+IS -> OrderDB : UPDATE oxarticles\nSET oxstock = oxstock - amount\nWHERE oxid IN (...)
+activate OrderDB
+OrderDB --> IS : Stock reserved
+deactivate OrderDB
+
+IS --> SRH : ReservationResult\n{reservationId: "res_456"}
+deactivate IS
+
+SRH -> CR : find(contractId) // Reload
+activate CR
+CR -> ContractDB : SELECT
+activate ContractDB
+ContractDB --> CR : Latest contract
+deactivate ContractDB
+CR --> SRH : PaymentContract
+deactivate CR
+
+SRH -> SRH : contract.fulfillCondition(\n  'stock_reserved',\n  {reservationId: 'res_456'}\n)
+
+note right of SRH
+  **All Conditions Met!**
+  payment_authorized ✓
+  fraud_check ✓
+  stock_reserved ✓
+
+  → Contract.areAllConditionsFulfilled()
+  → Returns TRUE
+  → Transitions to READY_TO_COMMIT
+end note
+
+SRH -> CR : save(contract)
+activate CR
+CR -> ContractDB : UPDATE\nOXSTATE = 'READY_TO_COMMIT',\nOXCONDITIONS = [...all fulfilled]
+activate ContractDB
+ContractDB --> CR : Updated
+deactivate ContractDB
+CR --> SRH : Saved
+deactivate CR
+
+SRH -> ED : **Emit** ContractConditionsFulfilledEvent(contract)
+activate ED
+note right of ED
+  **CRITICAL EVENT:**
+  All conditions met!
+  Contract ready for order creation.
+end note
+ED --> SRH : Event emitted
+deactivate ED
+
+SRH --> ED : Handler complete
+deactivate SRH
+deactivate ED
+
+== Order Creation - Only When Contract Ready ==
+
+note right of ED
+  **EventDispatcher Routes Event**
+  ContractConditionsFulfilledEvent
+  → OrderCreationHandler
+end note
+
+ED -> OCH : handle(ContractConditionsFulfilledEvent)
+activate ED
+activate OCH
+
+note right of OCH
+  **NOW Create oxorder**
+
+  All conditions verified:
+  ✓ Payment authorized
+  ✓ Fraud check passed
+  ✓ Stock reserved
+
+  Safe to create order!
+end note
+
+OCH -> CR : find(contractId)
+activate CR
+CR -> ContractDB : SELECT contract
+activate ContractDB
+ContractDB --> CR : Contract (READY_TO_COMMIT)
+deactivate ContractDB
+CR --> OCH : PaymentContract
+deactivate CR
+
+OCH -> OCH : Verify:\n- contract.isReadyToCommit() ✓\n- contract.areAllConditionsFulfilled() ✓
+
+OCH -> OF : createFromContract(contract)
+activate OF
+
+OF -> OF : Convert contract data:\n- Basket snapshot → Order items\n- User data → Order address\n- Discounts → Order discounts\n- Payment info → Order payment
+
+OF -> OrderDB : INSERT INTO oxorder\n(oxordernr, oxuserid, ...)\n(state: NOT_FINISHED)
+activate OrderDB
+note right of OrderDB
+  **Order Created:**
+  • Order number assigned HERE
+  • No gaps (only for real orders)
+  • State: NOT_FINISHED (awaiting capture)
+  • Already verified (payment auth ✓)
+end note
+OrderDB --> OF : Order ID: "order789"
+deactivate OrderDB
+
+OF --> OCH : Order
+deactivate OF
+
+OCH -> CR : find(contractId) // Reload
+activate CR
+CR -> ContractDB : SELECT
+activate ContractDB
+ContractDB --> CR : Contract
+deactivate ContractDB
+CR --> OCH : PaymentContract
+deactivate CR
+
+OCH -> OCH : contract.commitToOrder("order789")
+
+note right of OCH
+  **Contract → Order Link:**
+  Contract now knows its order ID
+  State: READY_TO_COMMIT → COMMITTED
+end note
+
+OCH -> CR : save(contract)
+activate CR
+CR -> ContractDB : UPDATE\nOXORDERID = "order789",\nOXSTATE = 'COMMITTED',\nOXCOMMITTEDAT = NOW()
+activate ContractDB
+note right of ContractDB
+  **Contract Record Updated:**
+  {
+    "OXID": "contract123",
+    "OXSTATE": "COMMITTED", ← Changed
+    "OXORDERID": "order789", ← Now set!
+    "OXCOMMITTEDAT": "2025-10-20..."
+  }
+end note
+ContractDB --> CR : Updated
+deactivate ContractDB
+CR --> OCH : Saved
+deactivate CR
+
+OCH -> OrderDB : INSERT INTO\nosc_payment_order_state\n(OXORDERID, OXCONTRACTID, ...)
+activate OrderDB
+note right of OrderDB
+  **Order ↔ Contract Link:**
+  osc_payment_order_state table
+  links both entities
+end note
+OrderDB --> OCH : Link created
+deactivate OrderDB
+
+OCH -> ED : **Emit** OrderCreatedFromContractEvent(\n  contract, order\n)
+activate ED
+ED --> OCH : Event emitted
+deactivate ED
+
+OCH -> OCH : Get provider approval URL\nfrom contract
+
+OCH --> ED : Handler complete,\nreturn redirect URL
+deactivate OCH
+
+ED --> OC : Event result with redirect
+deactivate ED
+
+OC --> Customer : Redirect to provider\n(approval_url)
+
+note right of Customer
+  **Timeline:**
+  t=0ms: Contract created
+  t=50ms: Payment authorized ✓
+  t=60ms: Fraud check passed ✓
+  t=70ms: Stock reserved ✓
+  t=80ms: Order created
+  t=100ms: Redirect to provider
+end note
+
+== Customer at Payment Provider ==
+
+Customer -> API : Approve payment\n(Complete 3DS, etc.)
+activate API
+API -> API : Validate customer\nProcess payment capture
+API --> Customer : Redirect to return URL
+deactivate API
+
+== Payment Capture - Webhook Path (EVENT-DRIVEN) ==
+
+API -> WC : Webhook:\nPAYMENT.CAPTURE.COMPLETED
+activate WC
+
+note right of WC
+  **Webhook uses same events!**
+  Identifies order via
+  contract → order mapping
+end note
+
+WC -> WC : Verify webhook signature
+
+WC -> ED : **Emit** PaymentCapturedEvent(payload)
+activate ED
+
+note right of ED
+  **EventDispatcher Routes**
+  PaymentCapturedEvent
+  → WebhookHandler
+end note
+
+ED -> WH : handle(PaymentCapturedEvent)
+activate WH
+
+WH -> WH : Extract:\n- Provider order ID\n- Transaction ID
+
+WH -> CR : findByProviderOrderId(providerOrderId)
+activate CR
+CR -> ContractDB : SELECT WHERE\nOXPROVIDERORDERID = ...
+activate ContractDB
+ContractDB --> CR : Contract with order ID
+deactivate ContractDB
+CR --> WH : PaymentContract\n{orderId: "order789"}
+deactivate CR
+
+note right of WH
+  **Contract provides order ID**
+  No need to query oxorder first
+end note
+
+WH -> OR : find(contract.getOrderId())
+activate OR
+OR -> OrderDB : SELECT order
+activate OrderDB
+OrderDB --> OR : Order
+deactivate OrderDB
+OR --> WH : Order
+deactivate OR
+
+WH -> WH : Process payment capture
+
+WH -> OrderDB : INSERT INTO\nosc_payment_transaction\n(type: 'capture', status: 'completed')
+activate OrderDB
+OrderDB --> WH : Transaction saved
+deactivate OrderDB
+
+WH -> ED : **Emit** ContractPaymentCapturedEvent(\n  contract, order\n)
+activate ED
+
+ED -> PCH : handle(ContractPaymentCapturedEvent)
+activate PCH
+
+PCH -> CR : find(contractId)
+activate CR
+CR -> ContractDB : SELECT contract
+activate ContractDB
+ContractDB --> CR : Contract
+deactivate ContractDB
+CR --> PCH : PaymentContract
+deactivate CR
+
+PCH -> PCH : contract.fulfill()
+
+note right of PCH
+  **Contract Fulfilled!**
+  State: COMMITTED → FULFILLED
+
+  Now finalize order
+end note
+
+PCH -> CR : save(contract)
+activate CR
+CR -> ContractDB : UPDATE\nOXSTATE = 'FULFILLED',\nOXFULFILLEDAT = NOW()
+activate ContractDB
+note right of ContractDB
+  **Final Contract State:**
+  {
+    "OXSTATE": "FULFILLED", ✓
+    "OXORDERID": "order789",
+    "OXFULFILLEDAT": "2025-10-20...",
+    "OXCONDITIONS": [...all fulfilled]
+  }
+end note
+ContractDB --> CR : Updated
+deactivate ContractDB
+CR --> PCH : Saved
+deactivate CR
+
+PCH -> OrderDB : UPDATE oxorder\nSET oxpaid = NOW(),\noxtransstatus = 'OK'
+activate OrderDB
+note right of OrderDB
+  **Order Completed:**
+  State: NOT_FINISHED → OK
+  Ready for fulfillment/shipping
+end note
+OrderDB --> PCH : Order updated
+deactivate OrderDB
+
+PCH -> ED : **Emit** ContractFulfilledEvent(\n  contract, order\n)
+activate ED
+note right of ED
+  **EventDispatcher Notifies Multiple Subscribers**
+  (Publish-Subscribe via internal event bus)
+
+  Subscribers react:
+  - EmailSubscriber → Send confirmation
+  - InventorySubscriber → Update stock
+  - AnalyticsSubscriber → Track conversion
+  - AuditLogSubscriber → Log completion
+end note
+
+ED -> ED : Notify all subscribers:\nEmailSubscriber\nInventorySubscriber\nAnalyticsSubscriber\nAuditLogSubscriber
+
+ED --> PCH : All subscribers notified
+deactivate ED
+
+PCH --> ED : Handler complete
+deactivate PCH
+
+ED --> WH : Event chain complete
+deactivate ED
+
+WH --> ED : Handler complete
+deactivate WH
+
+ED --> WC : All events processed
+deactivate ED
+
+WC --> API : 200 OK
+deactivate WC
+
+== Order Fulfillment ==
+
+Customer -> Customer : View order confirmation
+
+note right of Customer
+  **Smart-Contract Flow:**
+
+  1. Contract created (intent)
+  2. Conditions resolved in parallel
+  3. Order created when safe
+  4. Payment captured
+  5. Contract fulfilled
+
+  **Benefits:**
+  ✓ No order until conditions met
+  ✓ Clean rollback (cancel contract)
+  ✓ No order number gaps
+  ✓ Explicit audit trail
+  ✓ API-first ready
+  ✓ Parallel condition processing
+
+  **Key Insight:**
+  Contract = Intent
+  Order = Commitment
+
+  Separation enables better
+  error handling and rollback!
+end note
+
+@enduml

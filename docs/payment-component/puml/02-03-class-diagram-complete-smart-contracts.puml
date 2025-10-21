@@ -1,0 +1,694 @@
+@startuml Complete Payment Component Classes - Smart-Contract Pattern
+
+skinparam linetype ortho
+skinparam backgroundColor #FEFEFE
+skinparam roundcorner 8
+skinparam classAttributeIconSize 0
+skinparam nodesep 60
+skinparam ranksep 80
+
+title Complete Payment Component Classes - Smart-Contract Pattern\n(DDD + Event-Driven + Contract-First Architecture)
+
+' ================================================
+' LAYER 1: CONTRACT DOMAIN (Aggregate Root)
+' ================================================
+package "Contract Domain (Aggregate Root)" <<Rectangle>> #F3E5F5 {
+
+  class PaymentContract <<Aggregate Root>> {
+    - id: string
+    - shopId: string
+    - userId: string <<FK>>
+    - **orderId: ?string <<FK>> = NULL!**
+    - state: ContractState
+    - basketSnapshot: BasketSnapshot <<VO>>
+    - conditions: ContractCondition[] <<Entity>>
+    - provider: ?string
+    - providerOrderId: ?string
+    - createdAt, updatedAt, committedAt, fulfilledAt
+    --
+    + addCondition(condition): void
+    + fulfillCondition(type, data): void
+    + commitToOrder(orderId): void
+    + fulfill(): void
+    + cancel(reason): void
+    + getRecordedEvents(): DomainEvent[]
+    --
+    **State Machine:**
+    DRAFT → PENDING → READY_TO_COMMIT
+      → COMMITTED → FULFILLED
+  }
+
+  class ContractCondition <<Entity>> {
+    - type: string
+    - status: string
+    - data: array
+    --
+    + fulfill(data): void
+    + isFulfilled(): bool
+    --
+    **Types:**
+    payment_authorized,
+    fraud_check,
+    stock_reserved
+  }
+
+  class BasketSnapshot <<Value Object>> {
+    - items: array
+    - totals: Money <<VO>>
+    - capturedAt: DateTimeImmutable
+    --
+    + toArray(): array
+    {static} + fromOxidBasket(basket): self
+    --
+    **Immutable**
+  }
+
+  PaymentContract *-- "0..*" ContractCondition
+  PaymentContract *-- "1" BasketSnapshot
+}
+
+' ================================================
+' LAYER 2: COMPONENT MODELS (Enhanced)
+' ================================================
+package "Component Models (Contract-Aware)" <<Rectangle>> #E8F5E9 {
+
+  class PaymentTransaction {
+    - id: string
+    - orderId: string <<FK>>
+    **- contractId: ?string <<FK>> NEW**
+    - providerOrderId: string
+    - transactionId: ?string
+    - parentTransactionId: ?string
+    - type: TransactionType
+    - status: string
+    - amount: Money <<VO>>
+    --
+    + isCompleted(): bool
+    + getParentTransaction(): ?self
+    --
+    **Enhanced with contract link**
+  }
+
+  class PaymentOrderState {
+    - id: string
+    - orderId: string <<FK>> <<UNIQUE>>
+    **- contractId: ?string <<FK>> NEW**
+    - paymentState: string
+    - webhookWaitSince: ?DateTime
+    --
+    + markAsCompleted(): void
+    + isWaitingForWebhook(): bool
+    --
+    **Enhanced with contract link**
+  }
+
+  class PaymentCustomer {
+    - id: string
+    - userId: string <<FK>> <<UNIQUE>>
+    - paymentCustomerId: ?string
+    - savedPaymentMethods: array
+    --
+    + addSavedPaymentMethod(id): void
+    --
+    **Unchanged - 100% Reusable**
+  }
+
+  class PaymentIdempotency {
+    - key: string <<UNIQUE>>
+    - orderId: string
+    - operation: string
+    - result: ?string
+    --
+    + markAsCompleted(result): void
+    + isExpired(): bool
+    --
+    **Critical for duplicate prevention**
+  }
+
+  class PaymentSavedMethod {
+    - userId: string <<FK>>
+    - provider: string
+    - providerPaymentMethodId: string
+    - lastFour: ?string
+    - isDefault: bool
+    --
+    **Tokenization support**
+  }
+
+  PaymentTransaction ..> PaymentContract
+  PaymentOrderState ..> PaymentContract
+}
+
+' ================================================
+' LAYER 3: DOMAIN EVENTS
+' ================================================
+package "Domain Events (PSR-14)" <<Rectangle>> #C8E6C9 {
+
+  interface DomainEvent {
+    + getEventName(): string
+    + getOccurredOn(): DateTimeImmutable
+  }
+
+  class ContractCreatedEvent implements DomainEvent {
+    - contract: PaymentContract
+    --
+    + getContract(): PaymentContract
+  }
+
+  class ConditionsFulfilledEvent implements DomainEvent {
+    - contract: PaymentContract
+    --
+    + getContract(): PaymentContract
+  }
+
+  class ContractCommittedEvent implements DomainEvent {
+    - contract: PaymentContract
+    - orderId: string
+    --
+    + getOrderId(): string
+  }
+
+  class ContractFulfilledEvent implements DomainEvent {
+    - contract: PaymentContract
+    --
+    + getContract(): PaymentContract
+  }
+
+  class PaymentInitiatedEvent implements DomainEvent {
+    - orderId: string
+    - amount: Money
+  }
+
+  class PaymentCapturedEvent implements DomainEvent {
+    - orderId: string
+    - transactionId: string
+  }
+}
+
+' ================================================
+' LAYER 4: EVENT HANDLERS
+' ================================================
+package "Event Handlers (Business Logic)" <<Rectangle>> #FFF3E0 {
+
+  class ContractCreationHandler {
+    - contractService: ContractService
+    --
+    + handle(event): void
+  }
+
+  class ConditionResolverHandler {
+    - conditionValidator: ConditionValidator
+    - paymentService: PaymentService
+    --
+    + handle(event): void
+  }
+
+  class OrderCreationHandler {
+    - orderFactory: OrderFactory
+    - contractService: ContractService
+    --
+    + handle(event): void
+  }
+
+  class ContractFulfillmentHandler {
+    - contractService: ContractService
+    - orderRepository: OrderRepository
+    --
+    + handle(event): void
+  }
+
+  class PaymentAuthorizationHandler {
+    - paymentService: PaymentService
+    --
+    + handle(event): void
+  }
+
+  class PaymentCaptureHandler {
+    - captureService: CaptureService
+    --
+    + handle(event): void
+  }
+
+  ContractCreationHandler ..> ContractCreatedEvent
+  ConditionResolverHandler ..> PaymentInitiatedEvent
+  OrderCreationHandler ..> ConditionsFulfilledEvent
+  ContractFulfillmentHandler ..> ContractFulfilledEvent
+  PaymentAuthorizationHandler ..> PaymentInitiatedEvent
+  PaymentCaptureHandler ..> PaymentCapturedEvent
+}
+
+' ================================================
+' LAYER 5: REPOSITORIES
+' ================================================
+package "Repositories (Data Access)" <<Rectangle>> #E3F2FD {
+
+  interface ContractRepositoryInterface {
+    + save(contract): void
+    + find(id): ?PaymentContract
+    **+ findByProviderOrderId(id): ?PaymentContract ★**
+    + findByOrderId(id): ?PaymentContract
+  }
+
+  class ContractRepository {
+    - db: DatabaseInterface
+    --
+    + save(contract): void
+    + findByProviderOrderId(id): ?PaymentContract
+    - hydrate(data): PaymentContract
+    --
+    **Critical for webhooks**
+  }
+
+  interface PaymentTransactionRepositoryInterface {
+    + save(tx): void
+    + findById(id): ?PaymentTransaction
+    + findAllByOrderId(id): array
+    **+ findAllByContractId(id): array NEW**
+  }
+
+  class PaymentTransactionRepository {
+    - db: DatabaseInterface
+    --
+    + findAllByContractId(id): array
+    --
+    **Enhanced with contract queries**
+  }
+
+  interface PaymentOrderStateRepositoryInterface {
+    + save(state): void
+    + findByOrderId(id): ?PaymentOrderState
+    **+ findByContractId(id): ?PaymentOrderState NEW**
+  }
+
+  class PaymentOrderStateRepository {
+    - db: DatabaseInterface
+    --
+    + findByContractId(id): ?PaymentOrderState
+    --
+    **Enhanced with contract queries**
+  }
+
+  interface PaymentCustomerRepositoryInterface {
+    + save(customer): void
+    + findByUserId(id): ?PaymentCustomer
+  }
+
+  class PaymentCustomerRepository {
+    - db: DatabaseInterface
+    --
+    **Unchanged - 100% Reusable**
+  }
+
+  interface PaymentIdempotencyRepositoryInterface {
+    + save(idempotency): void
+    + findByKey(key): ?PaymentIdempotency
+    + deleteExpired(): int
+  }
+
+  class PaymentIdempotencyRepository {
+    - db: DatabaseInterface
+    --
+    **Unchanged - 100% Reusable**
+  }
+
+  ContractRepository ..|> ContractRepositoryInterface
+  PaymentTransactionRepository ..|> PaymentTransactionRepositoryInterface
+  PaymentOrderStateRepository ..|> PaymentOrderStateRepositoryInterface
+  PaymentCustomerRepository ..|> PaymentCustomerRepositoryInterface
+  PaymentIdempotencyRepository ..|> PaymentIdempotencyRepositoryInterface
+
+  ContractRepository ..> PaymentContract
+  PaymentTransactionRepository ..> PaymentTransaction
+  PaymentOrderStateRepository ..> PaymentOrderState
+  PaymentCustomerRepository ..> PaymentCustomer
+  PaymentIdempotencyRepository ..> PaymentIdempotency
+}
+
+' ================================================
+' LAYER 6: SERVICES (Application Logic)
+' ================================================
+package "Services (Application Logic)" <<Rectangle>> #FFF9C4 {
+
+  interface ContractServiceInterface {
+    + createContract(userId, basket): PaymentContract
+    + fulfillCondition(contract, type, data): void
+    + commitContract(contract, orderId): void
+    + fulfillContract(contract): void
+  }
+
+  class ContractService {
+    - contractRepo: ContractRepositoryInterface
+    - eventDispatcher: EventDispatcherInterface
+    - logger: LoggerInterface
+    --
+    + createContract(userId, basket): PaymentContract
+    + fulfillCondition(contract, type, data): void
+    + commitContract(contract, orderId): void
+    + fulfillContract(contract): void
+    - dispatchEvents(contract): void
+    --
+    **NEW - Contract orchestration**
+  }
+
+  class ConditionValidator {
+    --
+    + validate(contract): bool
+    + canCommit(contract): bool
+    --
+    **NEW - Validation logic**
+  }
+
+  interface PaymentServiceInterface {
+    + authorizePayment(orderId, amount): string
+    + capturePayment(orderId, txId): void
+    + refundPayment(orderId, amount): void
+  }
+
+  abstract class AbstractPaymentService {
+    # txRepo: PaymentTransactionRepositoryInterface
+    # contractRepo: ContractRepositoryInterface
+    # eventDispatcher: EventDispatcherInterface
+    --
+    + authorizePayment(orderId, amount): string
+    + capturePayment(orderId, txId): void
+    # createTransaction(orderId, contractId, type): PaymentTransaction
+    # findContractByProviderOrderId(id): ?PaymentContract
+    --
+    **Enhanced - Contract-aware**
+  }
+
+  class OrderFactory {
+    - contractRepo: ContractRepositoryInterface
+    --
+    + createFromContract(contract): Order
+    - createOrderNumber(): int
+    --
+    **NEW - Creates orders from contracts**
+  }
+
+  class OrderManager {
+    - orderStateRepo: PaymentOrderStateRepositoryInterface
+    - contractRepo: ContractRepositoryInterface
+    --
+    + createOrderFromContract(contract): Order
+    + initializePaymentState(orderId, contractId): void
+    --
+    **Enhanced - Contract integration**
+  }
+
+  class ModuleSettings {
+    - config: Config
+    --
+    + useSmartContracts(): bool
+    + getContractExpiryHours(): int
+    + isSandbox(): bool
+    --
+    **Enhanced - Contract settings**
+  }
+
+  ContractService ..|> ContractServiceInterface
+  ContractService --> ContractRepository
+  ContractService --> ConditionValidator
+  AbstractPaymentService ..|> PaymentServiceInterface
+  AbstractPaymentService --> PaymentTransactionRepository
+  AbstractPaymentService --> ContractRepository
+  OrderFactory --> ContractRepository
+  OrderManager --> PaymentOrderStateRepository
+  OrderManager --> ContractRepository
+}
+
+' ================================================
+' LAYER 7: OXID CORE (Read-Only)
+' ================================================
+package "OXID Core (Read-Only - Not Modified)" <<Rectangle>> #FFEBEE {
+
+  class Order <<OXID Core>> {
+    + OXID: string
+    + OXUSERID: string
+    + OXORDERNR: int
+    + OXTRANSSTATUS: string
+    + OXPAID: DateTime
+    --
+    <color:red>**NO NEW FIELDS**</color>
+    <color:red>**NO EXTENSION**</color>
+    --
+    Created when contract committed
+  }
+
+  class User <<OXID Core>> {
+    + OXID: string
+    + OXUSERNAME: string
+    + OXEMAIL: string
+    --
+    <color:red>**NO NEW FIELDS**</color>
+    <color:red>**NO EXTENSION**</color>
+  }
+
+  class Basket <<OXID Core>> {
+    + getTotal(): float
+    + getCurrency(): string
+    + getContents(): array
+    --
+    <color:red>**NO EXTENSION**</color>
+    --
+    Snapshot captured to contract
+  }
+}
+
+' ================================================
+' CROSS-LAYER RELATIONSHIPS
+' ================================================
+
+' Contract → Core
+PaymentContract ..> User : references\nvia OXUSERID
+PaymentContract ..> Order : references\nvia OXORDERID\n**NULL until committed!**
+
+' Component → Core
+PaymentTransaction ..> Order : references\nvia OXORDERID
+PaymentOrderState ..> Order : references\nvia OXORDERID (1:1)
+PaymentCustomer ..> User : references\nvia OXUSERID (1:1)
+
+' Handlers → Services
+ContractCreationHandler --> ContractService
+ConditionResolverHandler --> ContractService
+OrderCreationHandler --> OrderFactory
+ContractFulfillmentHandler --> ContractService
+PaymentAuthorizationHandler --> AbstractPaymentService
+PaymentCaptureHandler --> AbstractPaymentService
+
+' Snapshot → Core
+BasketSnapshot ..> Basket : created from
+
+' ================================================
+' KEY NOTES
+' ================================================
+
+note top of PaymentContract
+  **Contract = Aggregate Root**
+
+  Manages entire payment lifecycle:
+  1. Create contract (DRAFT)
+  2. Add conditions
+  3. Fulfill conditions (PENDING)
+  4. Create order (COMMITTED)
+  5. Capture payment (FULFILLED)
+
+  **OXORDERID = NULL until step 4!**
+  This prevents orphan orders.
+end note
+
+note top of ContractRepository
+  **Critical for Webhooks:**
+
+  findByProviderOrderId() allows
+  webhook to find contract BEFORE
+  finding order.
+
+  Flow:
+  1. Webhook arrives with provider ID
+  2. Find contract
+  3. Verify state = COMMITTED
+  4. Fulfill contract
+  5. Update order
+end note
+
+note top of ContractService
+  **Orchestrates Contract Lifecycle:**
+
+  • Creates contracts
+  • Manages state transitions
+  • Validates conditions
+  • Dispatches domain events
+
+  Events emitted:
+  - ContractCreatedEvent
+  - ConditionsFulfilledEvent
+  - ContractCommittedEvent
+  - ContractFulfilledEvent
+end note
+
+note top of OrderFactory
+  **Creates Orders from Contracts:**
+
+  When all conditions fulfilled:
+  1. Load basket snapshot from contract
+  2. Create oxorder
+  3. Assign sequential order number
+  4. Link contract.OXORDERID = order.OXID
+
+  **Guarantees:**
+  • No order number gaps
+  • No orphan orders
+  • Order only created when safe
+end note
+
+note bottom of AbstractPaymentService
+  **Provider Integration:**
+
+  Base class for all provider services:
+  • StripePaymentService
+  • PayPalPaymentService
+  • AdyenPaymentService
+  • UnzerPaymentService
+
+  Each implements provider-specific
+  API calls but uses same contract
+  and transaction patterns.
+end note
+
+note bottom of PaymentTransaction
+  **Transaction Chain:**
+
+  Parent-child relationships via
+  parentTransactionId:
+
+  auth_456 (authorization)
+    └→ cap_789 (capture)
+         └→ re_abc (refund)
+
+  All linked to same contract
+  via contractId.
+end note
+
+note bottom of Order
+  **OXID Core - Not Modified:**
+
+  • No ALTER TABLE
+  • No new columns
+  • No class extension
+  • Referenced via FK
+
+  **Contract Pattern:**
+  Order created LATE in lifecycle,
+  only when payment conditions met.
+end note
+
+' ================================================
+' ARCHITECTURE BENEFITS
+' ================================================
+
+note as N_ARCHITECTURE
+  **Smart-Contract Architecture:**
+
+  **✅ DDD Principles:**
+  • Aggregate Root (PaymentContract)
+  • Entities (ContractCondition)
+  • Value Objects (BasketSnapshot, Money)
+  • Domain Events
+  • Repositories
+
+  **✅ Event-Driven:**
+  • PSR-14 EventDispatcher
+  • Handlers contain business logic
+  • Subscribers for side effects
+  • Decoupled components
+
+  **✅ Contract-First:**
+  • Order created only when safe
+  • No orphan orders
+  • Sequential order numbers
+  • Complete audit trail
+
+  **✅ Provider-Agnostic:**
+  • Works with all providers
+  • Maps to provider patterns
+  • Extensible
+end note
+
+note as N_WORKFLOW
+  **Typical Workflow:**
+
+  **1. User clicks "Place Order"**
+     → Controller emits CheckoutInitiatedEvent
+     → ContractCreationHandler creates contract
+
+  **2. Contract in DRAFT state**
+     → Conditions added (payment, fraud, stock)
+     → Contract → PENDING
+
+  **3. Conditions fulfilled in parallel**
+     → PaymentAuthorizationHandler: payment_authorized ✓
+     → FraudCheckHandler: fraud_check ✓
+     → StockReservationHandler: stock_reserved ✓
+
+  **4. All conditions met**
+     → ConditionsFulfilledEvent emitted
+     → Contract → READY_TO_COMMIT
+
+  **5. Order created**
+     → OrderCreationHandler creates order
+     → Contract.OXORDERID = order.OXID
+     → Contract → COMMITTED
+
+  **6. Payment captured (webhook)**
+     → Find contract by provider order ID
+     → Contract → FULFILLED
+     → Order.oxtransstatus = 'OK'
+end note
+
+note as N_COMPARISON
+  **OLD vs NEW:**
+
+  **❌ OLD (No Contract):**
+  Order created immediately
+  → Payment fails → Orphan order
+  → Order number gaps
+  → Complex rollback needed
+
+  **✅ NEW (With Contract):**
+  Contract created first
+  → Payment fails → No order created
+  → Sequential order numbers
+  → Simple cancellation
+
+  **Cost:**
+  +10-15% storage
+  +50ms latency
+
+  **Worth It?**
+  YES for:
+  • Modern commerce platforms
+  • API-first architectures
+  • Multi-step checkouts
+  • B2B integrations
+end note
+
+legend bottom right
+  **Legend:**
+  ★ = Critical method
+  <<FK>> = Foreign key reference
+  <<VO>> = Value Object
+  **NEW** = New in smart-contract pattern
+  **= NULL!** = Key innovation (nullable until committed)
+
+  **Color Code:**
+  <color:#F3E5F5>Purple</color> = Contract Domain (NEW)
+  <color:#E8F5E9>Green</color> = Component Models (Enhanced)
+  <color:#C8E6C9>Light Green</color> = Domain Events
+  <color:#FFF3E0>Orange</color> = Event Handlers
+  <color:#E3F2FD>Blue</color> = Repositories
+  <color:#FFF9C4>Yellow</color> = Services
+  <color:#FFEBEE>Red</color> = OXID Core (Read-Only)
+endlegend
+
+@enduml

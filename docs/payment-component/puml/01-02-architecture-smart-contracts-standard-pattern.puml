@@ -1,0 +1,191 @@
+@startuml Smart-Contract Pattern - Standard Flow
+!define RECTANGLE class
+
+title Smart-Contract Pattern - Standard Flow\nEvent-Driven Architecture with Contract Lifecycle
+
+skinparam backgroundColor #FEFEFE
+skinparam handwritten false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+' Color scheme
+skinparam rectangle {
+    BackgroundColor<<user>> #E3F2FD
+    BackgroundColor<<controller>> #FFF9C4
+    BackgroundColor<<event>> #FFE0B2
+    BackgroundColor<<handler>> #C8E6C9
+    BackgroundColor<<service>> #B2DFDB
+    BackgroundColor<<model>> #F8BBD0
+    BackgroundColor<<database>> #E1BEE7
+    BackgroundColor<<external>> #FFCCBC
+}
+
+' Phase 1: Order Intent
+rectangle "PHASE 1: ORDER INTENT" #FFF3E0 {
+    rectangle "User\n(Frontend)" <<user>> as User1
+    rectangle "PaymentController\n(Validate & Emit)" <<controller>> as Controller1
+    rectangle "PaymentInitiatedEvent\n{basket, user, returnUrl}" <<event>> as Event1
+
+    User1 -down-> Controller1 : clicks "Place Order"
+    Controller1 -down-> Event1 : emits\n(validated data)
+}
+
+rectangle "PHASE 2: CONTRACT CREATION" #F1F8E9 {
+    rectangle "PaymentInitiationHandler\n(Event Handler)" <<handler>> as Handler1
+    rectangle "ContractFactory\n(Create Contract)" <<service>> as Factory1
+    rectangle "PaymentContract\n{state: DRAFT}" <<model>> as Contract1
+    rectangle "ContractRepository\n(Save)" <<service>> as Repo1
+    rectangle "osc_payment_contract\nTable" <<database>> as DB1
+
+    Event1 -down-> Handler1 : triggers
+    Handler1 -right-> Factory1 : createFromBasket()
+    Factory1 -down-> Contract1 : new PaymentContract()
+    Contract1 -down-> Contract1 : addCondition('payment_authorized')
+    Contract1 -down-> Contract1 : addCondition('fraud_check')
+    Contract1 -down-> Contract1 : addCondition('stock_reserved')
+    Contract1 -down-> Contract1 : transitionToPending()
+    Handler1 -down-> Repo1 : save(contract)
+    Repo1 -down-> DB1 : INSERT
+}
+
+rectangle "PHASE 3: CONDITION RESOLUTION (Parallel)" #E8F5E9 {
+    rectangle "ContractCreatedEvent\n{contract}" <<event>> as Event2
+
+    rectangle "Payment Authorization" #BBDEFB {
+        rectangle "PaymentAuthHandler" <<handler>> as Handler2
+        rectangle "PaymentService\n(via Adapter)" <<service>> as Service1
+        rectangle "Stripe/PayPal/Unzer\nAPI" <<external>> as Provider1
+
+        Event2 -down-> Handler2 : triggers
+        Handler2 -right-> Service1 : authorize(amount)
+        Service1 -right-> Provider1 : API call
+        Provider1 -down-> Service1 : AuthorizationResponse
+        Service1 -down-> Handler2 : success
+        Handler2 -down-> Contract1 : fulfillCondition(\n'payment_authorized')
+    }
+
+    rectangle "Fraud Check" #C5CAE9 {
+        rectangle "FraudCheckHandler" <<handler>> as Handler3
+        rectangle "FraudService" <<service>> as Service2
+
+        Event2 -down-> Handler3 : triggers
+        Handler3 -right-> Service2 : checkFraud(contract)
+        Service2 -down-> Handler3 : risk score
+        Handler3 -down-> Contract1 : fulfillCondition(\n'fraud_check')
+    }
+
+    rectangle "Stock Reservation" #B2DFDB {
+        rectangle "StockHandler" <<handler>> as Handler4
+        rectangle "InventoryService" <<service>> as Service3
+
+        Event2 -down-> Handler4 : triggers
+        Handler4 -right-> Service3 : reserveStock(items)
+        Service3 -down-> Handler4 : reserved
+        Handler4 -down-> Contract1 : fulfillCondition(\n'stock_reserved')
+    }
+}
+
+rectangle "PHASE 4: ORDER CREATION (When All Conditions Met)" #FFF9C4 {
+    rectangle "ContractConditions\nFulfilledEvent" <<event>> as Event3
+    rectangle "OrderCreationHandler" <<handler>> as Handler5
+    rectangle "OrderFactory\n(Convert Contract→Order)" <<service>> as Factory2
+    rectangle "oxorder\n{state: NOT_FINISHED}" <<database>> as DB2
+    rectangle "osc_payment_order_state\nTable" <<database>> as DB3
+
+    Contract1 -down-> Event3 : all conditions met →\nemits event
+    Event3 -down-> Handler5 : triggers
+    Handler5 -right-> Factory2 : createFromContract()
+    Factory2 -down-> DB2 : INSERT\nOrder created NOW!
+    Handler5 -down-> Contract1 : commitToOrder(orderId)
+    Handler5 -down-> DB3 : CREATE link\n(contract ↔ order)
+    Contract1 -down-> Contract1 : state: PENDING →\nCOMMITTED
+}
+
+rectangle "PHASE 5: PAYMENT CAPTURE (Webhook)" #FFECB3 {
+    rectangle "Provider Webhook\n(Async)" <<external>> as Webhook1
+    rectangle "WebhookController\n(Validate Signature)" <<controller>> as Controller2
+    rectangle "PaymentCapturedEvent\n{providerOrderId}" <<event>> as Event4
+    rectangle "PaymentCaptureHandler" <<handler>> as Handler6
+
+    Webhook1 -down-> Controller2 : POST /webhook
+    Controller2 -down-> Event4 : emits
+    Event4 -down-> Handler6 : triggers
+    Handler6 -down-> Contract1 : fulfill()
+    Handler6 -down-> DB2 : UPDATE\nstate: OK
+    Contract1 -down-> Contract1 : state: COMMITTED →\nFULFILLED
+}
+
+rectangle "PHASE 6: FULFILLMENT" #E8F5E9 {
+    rectangle "ContractFulfilledEvent\n{contract, order}" <<event>> as Event5
+    rectangle "Order Ready\nfor Shipping" <<model>> as Order1
+
+    Contract1 -down-> Event5 : emits
+    Event5 -down-> Order1 : notify fulfillment\nsystem
+}
+
+' State transitions (contract)
+note right of Contract1
+  **Contract State Machine:**
+  DRAFT → PENDING → COMMITTED → FULFILLED
+
+  **Conditions:**
+  • payment_authorized
+  • fraud_check
+  • stock_reserved
+
+  **Key Innovation:**
+  oxorder created ONLY when
+  all conditions met!
+end note
+
+' Timeline
+note left of User1
+  **Timeline:**
+  t=0ms: User clicks
+  t=50ms: Contract created
+  t=100ms: Conditions resolving
+  t=500ms: All conditions met
+  t=550ms: Order created
+  t=2000ms: Payment captured
+  t=2050ms: Contract fulfilled
+end note
+
+' Database state
+note right of DB1
+  **Contract Record:**
+  {
+    "OXID": "contract123",
+    "OXSTATE": "PENDING",
+    "OXORDERID": null,  ← No order yet!
+    "OXCONDITIONS": [
+      {type: "payment_authorized", status: "pending"},
+      {type: "fraud_check", status: "pending"},
+      {type: "stock_reserved", status: "pending"}
+    ]
+  }
+end note
+
+note right of DB2
+  **Order Created When:**
+  All conditions fulfilled ✓
+  No gaps in order numbers
+  Always in valid state
+end note
+
+' Legend
+legend bottom
+  **Key Principles:**
+  • Contract = Intent to purchase (created first)
+  • Order = Commitment to fulfill (created when safe)
+  • Conditions = Explicit requirements tracked in DB
+  • Events = Drive state transitions
+  • Parallel Processing = Conditions resolved concurrently
+
+  **Benefits:**
+  ✓ Clean rollback (cancel contract, no order exists)
+  ✓ No order number gaps (only assigned when fulfilled)
+  ✓ Explicit audit trail (all conditions tracked)
+  ✓ Better API semantics (contract ID ≠ order ID)
+end legend
+
+@enduml

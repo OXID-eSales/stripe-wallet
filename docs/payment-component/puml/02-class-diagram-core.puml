@@ -1,0 +1,554 @@
+@startuml Core Payment Component Classes
+
+skinparam linetype ortho
+skinparam backgroundColor #FEFEFE
+skinparam roundcorner 8
+skinparam classAttributeIconSize 0
+
+title Core Payment Component Classes\n(Component Models with FK References - NO Class Extensions)
+
+' Component Model Layer (NEW Architecture)
+package "Component Model Layer (NEW)" <<Rectangle>> #E8F5E9 {
+
+  class PaymentTransaction {
+    - id: string
+    - shopId: string
+    - orderId: string <<FK to oxorder.OXID>>
+    - providerOrderId: string
+    - transactionId: ?string
+    - status: string
+    - paymentMethodId: string
+    - transactionType: string
+    - providerData: array
+    - createdAt: DateTimeImmutable
+    - updatedAt: DateTimeImmutable
+    --
+    + __construct(shopId, orderId, providerOrderId, ...)
+    + getId(): ?string
+    + getOrderId(): string
+    + getProviderOrderId(): string
+    + getTransactionId(): ?string
+    + getStatus(): string
+    + setStatus(status): void
+    + setTransactionId(id): void
+    + isCompleted(): bool
+    + isRefunded(): bool
+    + isPending(): bool
+    --
+    **100% Reusable**
+    References oxorder via FK
+    NOT extends oxOrder
+  }
+
+  class PaymentOrderState implements PaymentOrderStates {
+    - id: string
+    - orderId: string <<FK to oxorder.OXID (1:1)>>
+    - paymentState: string
+    - providerOrderId: ?string
+    - webhookWaitSince: ?DateTime
+    - webhookTimeout: ?int
+    - lastPaymentAttempt: ?DateTime
+    - paymentAttemptCount: int
+    - createdAt: DateTimeImmutable
+    - updatedAt: DateTimeImmutable
+    --
+    + __construct(orderId, paymentState)
+    + markAsPaymentInProgress(): void
+    + markAsWaitingForWebhook(): void
+    + markAsCompleted(): void
+    + markAsFailed(reason): void
+    + getPaymentState(): string
+    + isWaitingForWebhook(): bool
+    - validateStateTransition(newState): void
+    - getValidTransitions(): array
+    --
+    **100% Reusable**
+    State machine in component table
+    References oxorder via FK (1:1)
+    NOT extends oxOrder
+  }
+
+  interface PaymentOrderStates {
+    + STATE_NOT_FINISHED = 'NOT_FINISHED'
+    + STATE_PAYMENT_IN_PROGRESS = '500'
+    + STATE_WAITING_FOR_WEBHOOK = '600'
+    + STATE_OK = 'OK'
+    + STATE_ERROR = 'ERROR'
+    + VALID_STATES: array
+  }
+
+  class PaymentCustomer {
+    - id: string
+    - userId: string <<FK to oxuser.OXID (1:1)>>
+    - paymentCustomerId: ?string
+    - defaultPaymentMethod: ?string
+    - savedPaymentMethods: array
+    - billingAgreement: bool
+    - lastPaymentDate: ?DateTime
+    - createdAt: DateTimeImmutable
+    - updatedAt: DateTimeImmutable
+    --
+    + __construct(userId)
+    + getUserId(): string
+    + getPaymentCustomerId(): ?string
+    + setPaymentCustomerId(customerId): void
+    + addSavedPaymentMethod(methodId): void
+    + getSavedPaymentMethods(): array
+    --
+    **100% Reusable**
+    References oxuser via FK (1:1)
+    NOT extends oxUser
+  }
+
+  class PaymentIdempotency {
+    - id: string
+    - key: string
+    - orderId: string
+    - operation: string
+    - result: ?string
+    - status: string
+    - createdAt: DateTimeImmutable
+    - expiresAt: DateTimeImmutable
+    --
+    + __construct(key, orderId, operation)
+    + getKey(): string
+    + getOrderId(): string
+    + getOperation(): string
+    + getResult(): ?string
+    + setResult(result): void
+    + getStatus(): string
+    + setStatus(status): void
+    + isExpired(): bool
+    + markAsProcessing(): void
+    + markAsCompleted(result): void
+    + markAsFailed(): void
+    --
+    **Critical for Safety**
+    Prevents duplicate charges
+    24-hour expiration
+  }
+
+  class PaymentSavedMethod {
+    - id: string
+    - userId: string <<FK to oxuser.OXID>>
+    - provider: string
+    - providerPaymentMethodId: string
+    - paymentMethodType: string
+    - lastFour: ?string
+    - expiryMonth: ?int
+    - expiryYear: ?int
+    - cardBrand: ?string
+    - isDefault: bool
+    - createdAt: DateTimeImmutable
+    --
+    + __construct(userId, provider, providerPaymentMethodId)
+    + getUserId(): string
+    + getProvider(): string
+    + getProviderPaymentMethodId(): string
+    + getLastFour(): ?string
+    + isExpired(): bool
+    + setAsDefault(): void
+    + isDefault(): bool
+    --
+    **100% Reusable**
+    Tokenization/vaulting support
+    References oxuser via FK
+  }
+
+  class PaymentSession {
+    - id: string
+    - provider: string
+    - sessionId: string
+    - userId: ?string
+    - basketId: ?string
+    - data: array
+    - createdAt: DateTimeImmutable
+    - expiresAt: DateTimeImmutable
+    --
+    + __construct(provider, sessionId, data, expiresAt)
+    + getProvider(): string
+    + getSessionId(): string
+    + getData(): array
+    + isExpired(): bool
+    + updateData(data): void
+    --
+    **100% Reusable**
+    Session state management
+    Amazon Pay, PayPal Express
+  }
+}
+
+' Repository Layer
+package "Repository Layer" <<Rectangle>> #E3F2FD {
+
+  interface PaymentTransactionRepositoryInterface {
+    + save(transaction): void
+    + findById(id): ?PaymentTransaction
+    + findByOrderAndProvider(orderId, providerOrderId): ?PaymentTransaction
+    + findAllByOrderId(orderId): array
+    + findByTransactionId(transactionId): ?PaymentTransaction
+    + delete(transaction): void
+  }
+
+  class PaymentTransactionRepository implements PaymentTransactionRepositoryInterface {
+    - db: DatabaseInterface
+    --
+    + save(transaction): void
+    + findById(id): ?PaymentTransaction
+    + findByOrderAndProvider(orderId, providerOrderId): ?PaymentTransaction
+    + findAllByOrderId(orderId): array
+    + findByTransactionId(transactionId): ?PaymentTransaction
+    + delete(transaction): void
+    - insert(transaction): void
+    - update(transaction): void
+    - hydrate(row): PaymentTransaction
+    - generateId(): string
+    --
+    **100% Reusable**
+    Generic data access
+  }
+
+  interface PaymentOrderStateRepositoryInterface {
+    + save(orderState): void
+    + findByOrderId(orderId): ?PaymentOrderState
+    + delete(orderState): void
+  }
+
+  class PaymentOrderStateRepository implements PaymentOrderStateRepositoryInterface {
+    - db: DatabaseInterface
+    --
+    + save(orderState): void
+    + findByOrderId(orderId): ?PaymentOrderState
+    + delete(orderState): void
+    --
+    **100% Reusable**
+  }
+
+  interface PaymentCustomerRepositoryInterface {
+    + save(customer): void
+    + findByUserId(userId): ?PaymentCustomer
+    + findByPaymentCustomerId(customerId): ?PaymentCustomer
+    + delete(customer): void
+  }
+
+  class PaymentCustomerRepository implements PaymentCustomerRepositoryInterface {
+    - db: DatabaseInterface
+    --
+    + save(customer): void
+    + findByUserId(userId): ?PaymentCustomer
+    + findByPaymentCustomerId(customerId): ?PaymentCustomer
+    + delete(customer): void
+    --
+    **100% Reusable**
+  }
+
+  interface PaymentIdempotencyRepositoryInterface {
+    + save(idempotency): void
+    + findByKey(key): ?PaymentIdempotency
+    + deleteExpired(): int
+  }
+
+  class PaymentIdempotencyRepository implements PaymentIdempotencyRepositoryInterface {
+    - db: DatabaseInterface
+    --
+    + save(idempotency): void
+    + findByKey(key): ?PaymentIdempotency
+    + deleteExpired(): int
+    --
+    **100% Reusable**
+    Critical for duplicate prevention
+  }
+
+  interface PaymentSavedMethodRepositoryInterface {
+    + save(method): void
+    + findById(id): ?PaymentSavedMethod
+    + findAllByUserId(userId): array
+    + findByProviderMethodId(userId, provider, methodId): ?PaymentSavedMethod
+    + delete(method): void
+  }
+
+  class PaymentSavedMethodRepository implements PaymentSavedMethodRepositoryInterface {
+    - db: DatabaseInterface
+    --
+    + save(method): void
+    + findById(id): ?PaymentSavedMethod
+    + findAllByUserId(userId): array
+    + findByProviderMethodId(userId, provider, methodId): ?PaymentSavedMethod
+    + delete(method): void
+    --
+    **100% Reusable**
+    Vaulted payment methods
+  }
+
+  interface PaymentSessionRepositoryInterface {
+    + save(session): void
+    + findBySessionId(sessionId): ?PaymentSession
+    + findByUserId(userId): array
+    + delete(session): void
+    + deleteExpired(): int
+  }
+
+  class PaymentSessionRepository implements PaymentSessionRepositoryInterface {
+    - db: DatabaseInterface
+    --
+    + save(session): void
+    + findBySessionId(sessionId): ?PaymentSession
+    + findByUserId(userId): array
+    + delete(session): void
+    + deleteExpired(): int
+    --
+    **100% Reusable**
+    Session state management
+  }
+}
+
+' Service Layer
+package "Service Layer" <<Rectangle>> #FFF3E0 {
+
+  interface PaymentServiceInterface {
+    + createPaymentIntent(amount, currency): mixed
+    + capturePaymentIntent(paymentIntentId): mixed
+    + refundPayment(paymentIntentId, amount): void
+  }
+
+  class AbstractPaymentService implements PaymentServiceInterface {
+    # transactionRepository: PaymentTransactionRepositoryInterface
+    # orderStateRepository: PaymentOrderStateRepositoryInterface
+    # basketSnapshotRepository: BasketSnapshotRepository
+    # eventDispatcher: EventDispatcherInterface
+    # logger: LoggerInterface
+    --
+    + initiatePayment(orderId, amount, currency): void
+    + capturePayment(orderId, providerOrderId): void
+    + refundPayment(orderId, amount): void
+    # createTransaction(orderId, providerOrderId, type): PaymentTransaction
+    # updateOrderState(orderId, state): void
+    # captureBasketSnapshot(orderId, basketData): void
+    --
+    **90% Reusable**
+    Base class for provider services
+  }
+
+  class OrderManager {
+    - session: Session
+    - basket: Basket
+    - orderStateRepository: PaymentOrderStateRepositoryInterface
+    --
+    + createShopOrder(user, basket): Order
+    + initializePaymentState(orderId): void
+    + getUser(): User
+    --
+    **100% Reusable**
+    Creates orders and initializes
+    payment state in component table
+  }
+
+  class ModuleSettings {
+    - config: Config
+    --
+    + isSandbox(): bool
+    + getClientId(): string
+    + getClientSecret(): string
+    + getMerchantId(): string
+    + getWebhookId(): string
+    + saveClientId(id): void
+    + saveClientSecret(secret): void
+    + getPaymentStandardCaptureStrategy(): string
+    + alwaysIgnoreSCAResult(): bool
+    --
+    **100% Pattern Reusable**
+    Structure generic,
+    values provider-specific
+  }
+
+  class OrderProcessTrackingService {
+    - session: Session
+    --
+    + startPaymentProcessTracking(): string
+    + getTrackingId(): string
+    --
+    **100% Reusable**
+    Process tracking
+  }
+
+  interface SCAValidatorInterface {
+    + isCardUsableForPayment(order): bool
+    + getCardAuthenticationResult(order): ?string
+  }
+
+  class SCAValidator implements SCAValidatorInterface {
+    + isCardUsableForPayment(order): bool
+    + getCardAuthenticationResult(order): ?string
+    --
+    **90% Reusable**
+    3D Secure validation pattern
+  }
+}
+
+' OXID Core Models (NOT EXTENDED)
+package "OXID Core Models (Read-Only)" <<Rectangle>> #FFEBEE {
+  class Order <<OXID Core>> {
+    + OXID: string
+    + OXSHOPID: int
+    + OXUSERID: string
+    + OXORDERDATE: DateTime
+    + OXTRANSSTATUS: string
+    + OXPAID: DateTime
+    --
+    <color:red>**NO NEW FIELDS**</color>
+    <color:red>**NO COMPONENT EXTENSION**</color>
+    --
+    Standard OXID Order
+    Used as-is, referenced via FK
+  }
+
+  class User <<OXID Core>> {
+    + OXID: string
+    + OXUSERNAME: string
+    + OXEMAIL: string
+    --
+    <color:red>**NO NEW FIELDS**</color>
+    <color:red>**NO COMPONENT EXTENSION**</color>
+    --
+    Standard OXID User
+    Used as-is, referenced via FK
+  }
+
+  class Basket <<OXID Core>> {
+    + getTotal(): float
+    + getCurrency(): string
+    + getContents(): array
+    --
+    <color:red>**NO EXTENSION**</color>
+    --
+    Standard OXID Basket
+    Snapshot captured to component table
+  }
+}
+
+' Relationships - Repository to Model
+PaymentTransactionRepository ..> PaymentTransaction : manages
+PaymentOrderStateRepository ..> PaymentOrderState : manages
+PaymentCustomerRepository ..> PaymentCustomer : manages
+PaymentIdempotencyRepository ..> PaymentIdempotency : manages
+PaymentSavedMethodRepository ..> PaymentSavedMethod : manages
+PaymentSessionRepository ..> PaymentSession : manages
+
+' Relationships - Service to Repository
+AbstractPaymentService --> PaymentTransactionRepository : uses
+AbstractPaymentService --> PaymentOrderStateRepository : uses
+AbstractPaymentService --> PaymentIdempotencyRepository : uses
+
+OrderManager --> PaymentOrderStateRepository : uses
+
+' Relationships - Model to Core (FK references)
+PaymentTransaction ..> Order : references via\nOXORDERID (FK)
+PaymentOrderState ..> Order : references via\nOXORDERID (FK, 1:1)
+PaymentIdempotency ..> Order : references via\nOXORDERID (FK)
+PaymentCustomer ..> User : references via\nOXUSERID (FK, 1:1)
+PaymentSavedMethod ..> User : references via\nOXUSERID (FK)
+
+note top of PaymentTransaction
+  **Component Model**
+  - Stores transaction data
+  - References oxorder via FK
+  - Does NOT extend oxOrder
+  - Table: osc_payment_transaction
+end note
+
+note top of PaymentOrderState
+  **Component Model**
+  - Stores payment lifecycle state
+  - 1:1 relationship with oxorder
+  - References via FK + UNIQUE
+  - Does NOT extend oxOrder
+  - Table: osc_payment_order_state
+end note
+
+note top of PaymentCustomer
+  **Component Model**
+  - Stores customer payment data
+  - 1:1 relationship with oxuser
+  - References via FK + UNIQUE
+  - Does NOT extend oxUser
+  - Table: osc_payment_customer
+end note
+
+note top of PaymentIdempotency
+  **Component Model - Critical Safety**
+  - Prevents duplicate charges (P0)
+  - Caches operation results
+  - 24-hour expiration
+  - Table: osc_payment_idempotency
+end note
+
+note top of PaymentSavedMethod
+  **Component Model**
+  - Tokenized payment methods
+  - 1:N relationship with oxuser
+  - References via FK
+  - Supports vaulting/tokenization
+  - Table: osc_payment_saved_methods
+end note
+
+note top of PaymentSession
+  **Component Model**
+  - Session state management
+  - Amazon Pay, PayPal Express
+  - Auto-cleanup on expire
+  - Table: osc_payment_sessions
+end note
+
+note top of Order
+  **OXID Core Table**
+  <color:red>**NOT MODIFIED**</color>
+  - No new columns added
+  - No class extension
+  - Component references via FK
+end note
+
+note as N1
+  **Architecture Principle:**
+
+  <color:green>**✅ Component Models:**</color>
+  - Independent domain models
+  - Reference core via FK
+  - 1:1 via UNIQUE constraint
+  - Clean isolation
+
+  <color:red>**❌ NO Class Extensions:**</color>
+  - No extends Order
+  - No extends User
+  - No extends Basket
+  - No metadata.php extensions
+
+  <color:blue>**Benefits:**</color>
+  1. Easy testing (no OXID deps)
+  2. Clean separation
+  3. Can extract to package
+  4. Core unaffected
+end note
+
+note as N2
+  **Data Access Pattern:**
+
+  // Load order (OXID core)
+  $order = oxNew(Order::class);
+  $order->load($orderId);
+
+  // Load payment state (component)
+  $orderState = $orderStateRepo
+    ->findByOrderId($orderId);
+
+  // Load transactions (component)
+  $transactions = $txRepo
+    ->findAllByOrderId($orderId);
+
+  // Load customer data (component)
+  $customer = $customerRepo
+    ->findByUserId($order->getFieldData('oxuserid'));
+
+  <color:green>**Separate queries, clean isolation**</color>
+end note
+
+@enduml

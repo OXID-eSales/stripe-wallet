@@ -1,0 +1,474 @@
+@startuml Capture & Refund Operations with Smart-Contract Integration
+
+skinparam backgroundColor #FFFFFF
+skinparam roundcorner 10
+skinparam sequenceMessageAlign center
+
+title Capture & Refund Operations - Smart-Contract Integration\n(Hybrid Pattern with Contract Lifecycle Tracking)
+
+actor "Admin/API" as Admin
+participant "CaptureController" as CC #FFE082
+participant "EventDispatcher" as ED #C5E1A5
+participant "CaptureRequestHandler" as CRH #FFF3E0
+participant "ContractRepository" as CR #F8BBD0
+participant "OrderRepository" as OR #E1F5FE
+participant "PaymentService" as PS #FFF9C4
+participant "Provider API" as API #E0F2F1
+participant "PaymentCaptureHandler" as PCH #FFF3E0
+database "osc_payment_contract" as ContractDB #FFE0B2
+database "osc_payment_transaction" as TxDB #B2EBF2
+database "oxorder" as OrderDB #B2DFDB
+
+== PART 1: CAPTURE OPERATION ==
+
+Admin -> CC : POST /admin/order/capture\n{orderId: "order789", amount: 99.99}
+activate CC
+
+note right of CC
+  **Capture Trigger:**
+
+  Can be initiated by:
+  • Admin (manual capture)
+  • GraphQL API (programmatic)
+  • MCP Agent (AI-driven)
+  • Auto-capture rule (on shipment)
+end note
+
+CC -> CC : Validate:\n• User permissions\n• Order exists\n• Amount valid
+
+CC -> ED : **Emit** CaptureRequestedEvent(\n  orderId, amount\n)
+activate ED
+
+ED -> CRH : handle(CaptureRequestedEvent)
+activate CRH
+
+== Phase 1: Load Contract & Order ==
+
+CRH -> OR : find(orderId)
+activate OR
+
+OR -> OrderDB : SELECT * FROM oxorder\nWHERE OXID = 'order789'
+activate OrderDB
+OrderDB --> OR : Order data
+deactivate OrderDB
+
+OR --> CRH : Order
+deactivate OR
+
+CRH -> CR : findByOrderId(orderId)
+activate CR
+
+CR -> ContractDB : SELECT * FROM osc_payment_contract\nWHERE OXORDERID = 'order789'
+activate ContractDB
+
+note right of ContractDB
+  **Contract Record:**
+  {
+    "OXID": "contract123",
+    "OXSTATE": "COMMITTED", ← Must be COMMITTED
+    "OXORDERID": "order789",
+    "OXPROVIDERORDERID": "pi_stripe_123"
+  }
+end note
+
+ContractDB --> CR : Contract data
+deactivate ContractDB
+
+CR --> CRH : PaymentContract
+deactivate CR
+
+== Phase 2: Validate Contract State ==
+
+CRH -> CRH : Verify contract state:\n• getState() == COMMITTED?\n• hasOrderId()?\n• getProviderOrderId() != null?
+
+alt Contract Not in COMMITTED State
+  note right of CRH
+    **State Validation:**
+
+    Contract must be COMMITTED
+    to allow capture.
+
+    States that BLOCK capture:
+    • DRAFT - No payment yet
+    • PENDING - Conditions not met
+    • FULFILLED - Already captured
+    • CANCELLED - Contract cancelled
+  end note
+
+  CRH -> CRH : Log error:\n"Cannot capture - contract not committed"
+
+  CRH --> ED : Handler complete (error)
+  deactivate CRH
+  ED --> CC : Error: Contract not ready
+  deactivate ED
+  CC --> Admin : 400 Bad Request\n{"error": "Contract not committed"}
+  deactivate CC
+
+else Contract Is COMMITTED
+
+  == Phase 3: Check Authorization Details ==
+
+  CRH -> TxDB : SELECT * FROM osc_payment_transaction t\nLEFT JOIN osc_payment_authorization_details a\n  ON t.OXID = a.OXTRANSACTIONID\nWHERE t.OXORDERID = 'order789'\n  AND t.OXTYPE = 'authorization'\n  AND t.OXSTATUS = 'completed'
+  activate TxDB
+
+  note right of TxDB
+    **Authorization Record:**
+    {
+      "OXAUTHORIZATIONID": "auth_456",
+      "OXAUTHORIZEDAMOUNT": 99.99,
+      "OXCAPTUREDAMOUNT": 0.00,
+      "OXREMAININGAMOUNT": 99.99,
+      "OXEXPIRESAT": "2025-10-27...",
+      "OXISEXPIRED": false
+    }
+  end note
+
+  TxDB --> CRH : Authorization details
+  deactivate TxDB
+
+  CRH -> CRH : Validate:\n• Amount <= remainingAmount\n• Authorization not expired\n• Authorization not fully captured
+
+  alt Validation Failed
+    CRH --> ED : Handler complete (error)
+    deactivate CRH
+    ED --> CC : Error: Validation failed
+    deactivate ED
+    CC --> Admin : 400 Bad Request
+    deactivate CC
+
+  else Validation Passed
+
+    == Phase 4: Call Provider API ==
+
+    CRH -> PS : capturePayment(\n  providerOrderId: "pi_stripe_123",\n  amount: 99.99\n)
+    activate PS
+
+    PS -> API : POST /captures\n{\n  "payment_intent": "pi_stripe_123",\n  "amount_to_capture": 9999\n}
+    activate API
+
+    note right of API
+      **Provider Capture:**
+
+      Different providers use
+      different capture endpoints:
+
+      • Stripe: PaymentIntent.capture()
+      • PayPal: Order.capture()
+      • Adyen: Payment.capture()
+      • Unzer: Charge.charge()
+    end note
+
+    API -> API : Process capture:\n• Deduct funds\n• Update payment status
+
+    API --> PS : CaptureResponse\n{\n  "id": "cap_789",\n  "status": "succeeded",\n  "amount": 9999\n}
+    deactivate API
+
+    PS --> CRH : CaptureResult
+    deactivate PS
+
+    == Phase 5: Record Capture Transaction ==
+
+    CRH -> TxDB : INSERT INTO osc_payment_transaction\n(OXORDERID, OXPROVIDERORDERID,\n OXTRANSACTIONID, OXTYPE, OXSTATUS,\n OXAMOUNT, OXCURRENCY,\n OXPARENTTRANSACTIONID)\nVALUES ('order789', 'pi_stripe_123',\n 'cap_789', 'capture', 'completed',\n 99.99, 'EUR', 'auth_456')
+    activate TxDB
+
+    note right of TxDB
+      **Capture Transaction:**
+
+      Links to authorization
+      via OXPARENTTRANSACTIONID
+
+      Transaction chain:
+      auth_456 (authorization)
+        └→ cap_789 (capture)
+    end note
+
+    TxDB --> CRH : Transaction saved
+    deactivate TxDB
+
+    CRH -> TxDB : UPDATE osc_payment_authorization_details\nSET OXCAPTUREDAMOUNT = OXCAPTUREDAMOUNT + 99.99,\n    OXREMAININGAMOUNT = OXREMAININGAMOUNT - 99.99,\n    OXUPDATED = NOW()\nWHERE OXTRANSACTIONID = 'auth_456'
+    activate TxDB
+    TxDB --> CRH : Authorization updated
+    deactivate TxDB
+
+    == Phase 6: Emit Payment Captured Event ==
+
+    CRH -> ED : **Emit** PaymentCapturedEvent(\n  contract, order, captureResult\n)
+    activate ED
+
+    note right of ED
+      **Event Emitted:**
+
+      Triggers contract fulfillment
+      and order finalization
+    end note
+
+    ED -> PCH : handle(PaymentCapturedEvent)
+    activate PCH
+
+    == Phase 7: Fulfill Contract ==
+
+    PCH -> CR : find(contractId)
+    activate CR
+    CR -> ContractDB : SELECT contract
+    activate ContractDB
+    ContractDB --> CR : Contract
+    deactivate ContractDB
+    CR --> PCH : PaymentContract
+    deactivate CR
+
+    PCH -> PCH : contract.fulfill()
+
+    note right of PCH
+      **Contract Fulfillment:**
+
+      State transition:
+      COMMITTED → FULFILLED
+
+      Marks contract lifecycle complete
+    end note
+
+    PCH -> CR : save(contract)
+    activate CR
+    CR -> ContractDB : UPDATE osc_payment_contract\nSET OXSTATE = 'FULFILLED',\n    OXFULFILLEDAT = NOW()
+    activate ContractDB
+
+    note right of ContractDB
+      **Contract Fulfilled:**
+      {
+        "OXSTATE": "FULFILLED", ✓
+        "OXFULFILLEDAT": "2025-10-20..."
+      }
+    end note
+
+    ContractDB --> CR : Updated
+    deactivate ContractDB
+    CR --> PCH : Saved
+    deactivate CR
+
+    == Phase 8: Finalize Order ==
+
+    PCH -> OrderDB : UPDATE oxorder\nSET oxpaid = NOW(),\n    oxtransstatus = 'OK'
+    activate OrderDB
+    OrderDB --> PCH : Order updated
+    deactivate OrderDB
+
+    PCH -> ED : **Emit** ContractFulfilledEvent(\n  contract, order\n)
+    activate ED
+
+    note right of ED
+      **Side Effects:**
+      • Email confirmation
+      • Invoice generation
+      • Analytics tracking
+      • Audit logging
+    end note
+
+    ED -> ED : Notify subscribers
+    ED --> PCH : Done
+    deactivate ED
+
+    PCH --> ED : Handler complete
+    deactivate PCH
+    ED --> CRH : Event chain complete
+    deactivate ED
+
+    CRH --> CC : Capture successful
+    deactivate CRH
+
+    CC --> Admin : 200 OK\n{\n  "status": "captured",\n  "captureId": "cap_789",\n  "amount": 99.99\n}
+    deactivate CC
+
+  end
+end
+
+== PART 2: REFUND OPERATION ==
+
+Admin -> CC : POST /admin/order/refund\n{orderId: "order789", amount: 50.00}
+activate CC
+
+CC -> CC : Validate:\n• Order paid\n• Amount <= captured amount
+
+CC -> ED : **Emit** RefundRequestedEvent(\n  orderId, amount, reason\n)
+activate ED
+
+ED -> CRH : handle(RefundRequestedEvent)
+activate CRH
+
+== Phase 1: Load Contract & Validate ==
+
+CRH -> CR : findByOrderId(orderId)
+activate CR
+CR -> ContractDB : SELECT contract
+activate ContractDB
+ContractDB --> CR : Contract
+deactivate ContractDB
+CR --> CRH : PaymentContract
+deactivate CR
+
+CRH -> CRH : Verify:\n• contract.getState() == FULFILLED\n• Order has captured payment
+
+alt Contract Not Fulfilled
+  CRH --> ED : Error: Cannot refund unfulfilled contract
+  deactivate CRH
+  ED --> CC : Error
+  deactivate ED
+  CC --> Admin : 400 Bad Request
+  deactivate CC
+
+else Contract Is Fulfilled
+
+  == Phase 2: Check Refund Limits ==
+
+  CRH -> TxDB : SELECT\n  SUM(CASE WHEN OXTYPE='capture' THEN OXAMOUNT ELSE 0 END) as total_captured,\n  SUM(CASE WHEN OXTYPE='refund' THEN OXAMOUNT ELSE 0 END) as total_refunded\nFROM osc_payment_transaction\nWHERE OXORDERID = 'order789'
+  activate TxDB
+
+  note right of TxDB
+    **Refund Calculation:**
+
+    Total captured: €99.99
+    Already refunded: €0.00
+    Remaining refundable: €99.99
+
+    Requested: €50.00 ✓
+  end note
+
+  TxDB --> CRH : Refund limits
+  deactivate TxDB
+
+  CRH -> CRH : Validate:\n• requestedAmount <= refundable\n• refundable = captured - refunded
+
+  == Phase 3: Call Provider API ==
+
+  CRH -> PS : refundPayment(\n  providerOrderId,\n  amount: 50.00,\n  reason: "Customer request"\n)
+  activate PS
+
+  PS -> API : POST /refunds\n{\n  "payment_intent": "pi_stripe_123",\n  "amount": 5000,\n  "reason": "requested_by_customer"\n}
+  activate API
+
+  API --> PS : RefundResponse\n{\n  "id": "re_abc",\n  "status": "succeeded",\n  "amount": 5000\n}
+  deactivate API
+
+  PS --> CRH : RefundResult
+  deactivate PS
+
+  == Phase 4: Record Refund Transaction ==
+
+  CRH -> TxDB : INSERT INTO osc_payment_transaction\n(OXORDERID, OXPROVIDERORDERID,\n OXTRANSACTIONID, OXTYPE, OXSTATUS,\n OXAMOUNT, OXCURRENCY,\n OXPARENTTRANSACTIONID)\nVALUES ('order789', 'pi_stripe_123',\n 're_abc', 'refund', 'completed',\n 50.00, 'EUR', 'cap_789')
+  activate TxDB
+  TxDB --> CRH : Transaction saved
+  deactivate TxDB
+
+  CRH -> TxDB : INSERT INTO osc_payment_refund_details\n(OXTRANSACTIONID, OXORIGINALAMOUNT,\n OXREFUNDAMOUNT, OXTOTALREFUNDED,\n OXREMAININGREFUNDABLE, OXREASON)\nVALUES ('re_abc', 99.99, 50.00,\n 50.00, 49.99, 'Customer request')
+  activate TxDB
+  TxDB --> CRH : Refund details saved
+  deactivate TxDB
+
+  == Phase 5: Update Order & Contract ==
+
+  CRH -> OrderDB : UPDATE oxorder\nSET oxtransstatus = 'PARTIAL_REFUND'\nWHERE OXID = 'order789'
+  activate OrderDB
+  OrderDB --> CRH : Updated
+  deactivate OrderDB
+
+  note right of CRH
+    **Contract State After Refund:**
+
+    Contract remains FULFILLED
+    (refund doesn't change fulfillment)
+
+    But we can track refund in contract
+    for audit purposes
+  end note
+
+  CRH -> CR : find(contractId)
+  activate CR
+  CR -> ContractDB : SELECT contract
+  activate ContractDB
+  ContractDB --> CR : Contract
+  deactivate ContractDB
+  CR --> CRH : Contract
+  deactivate CR
+
+  CRH -> CR : addRefundToContract(contract, refundData)
+  activate CR
+  CR -> ContractDB : UPDATE osc_payment_contract\nSET OXMETADATA = JSON_SET(OXMETADATA,\n  '$.refunds', JSON_ARRAY_APPEND(\n    JSON_EXTRACT(OXMETADATA, '$.refunds'),\n    '$', JSON_OBJECT(\n      'amount', 50.00,\n      'refundId', 're_abc',\n      'date', NOW()\n    )\n  )\n)
+  activate ContractDB
+  ContractDB --> CR : Updated
+  deactivate ContractDB
+  CR --> CRH : Done
+  deactivate CR
+
+  == Phase 6: Emit Refund Event ==
+
+  CRH -> ED : **Emit** RefundCompletedEvent(\n  contract, order, refundResult\n)
+  activate ED
+
+  note right of ED
+    **Side Effects:**
+    • Email refund confirmation
+    • Update accounting
+    • Analytics tracking
+  end note
+
+  ED -> ED : Notify subscribers
+  ED --> CRH : Done
+  deactivate ED
+
+  CRH --> CC : Refund successful
+  deactivate CRH
+
+  CC --> Admin : 200 OK\n{\n  "status": "refunded",\n  "refundId": "re_abc",\n  "amount": 50.00\n}
+  deactivate CC
+
+end
+
+note over Admin, OrderDB
+  **Smart-Contract Capture/Refund Benefits:**
+
+  ✅ **State Validation**: Contract state enforces
+     capture/refund eligibility
+
+  ✅ **Transaction Chain**: Parent-child relationships
+     track authorization → capture → refund
+
+  ✅ **Audit Trail**: Complete history in contract +
+     transaction tables
+
+  ✅ **Idempotency**: Contract state prevents duplicate
+     captures (COMMITTED → FULFILLED once only)
+
+  ✅ **Flexible Refunds**: Track multiple refunds in
+     contract metadata
+
+  ✅ **Provider Agnostic**: Works with Stripe, PayPal,
+     Adyen, Unzer, etc.
+end note
+
+note over Admin, OrderDB
+  **Capture/Refund Flow Comparison:**
+
+  **OLD PATTERN (No Contract):**
+  1. Load order
+  2. Call provider API
+  3. Update order status
+  4. Done
+
+  **SMART-CONTRACT PATTERN:**
+  1. Load order + contract
+  2. Validate contract state
+  3. Check transaction history
+  4. Call provider API
+  5. Record transaction (with parent link)
+  6. Update contract state
+  7. Update order status
+  8. Emit events → side effects
+
+  **Why More Steps Is Better:**
+  • Explicit state validation
+  • Complete audit trail
+  • Transaction relationships
+  • Event-driven side effects
+  • Idempotency guaranteed
+end note
+
+@enduml

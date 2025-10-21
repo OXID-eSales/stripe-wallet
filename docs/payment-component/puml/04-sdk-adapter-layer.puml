@@ -1,0 +1,565 @@
+@startuml SDK-Adapter Layer Architecture
+
+skinparam linetype ortho
+skinparam backgroundColor #FEFEFE
+skinparam roundcorner 8
+skinparam classAttributeIconSize 0
+
+title SDK-Adapter Layer Architecture\\n(Provider-Agnostic Payment Integration)
+
+' Adapter Interface
+package "Adapter Interface (100% Reusable)" <<Rectangle>> #E8F5E9 {
+
+  interface PaymentAdapterInterface {
+    + createPayment(CreatePaymentRequest): PaymentResponse
+    + capturePayment(CapturePaymentRequest): CaptureResponse
+    + refundPayment(RefundPaymentRequest): RefundResponse
+    + voidPayment(VoidPaymentRequest): VoidResponse
+    + getPaymentDetails(providerPaymentId): PaymentDetailsResponse
+    + getSupportedPaymentMethods(): array
+    + parseWebhook(payload, signature, secret): WebhookEvent
+    + getProviderName(): string
+    + supportsFeature(feature): bool
+    --
+    **100% Reusable**
+    Contract for all providers
+  }
+
+  interface WebhookEvent {
+    + getEventType(): string
+    + getProviderPaymentId(): string
+    + getData(): array
+    + getTimestamp(): DateTimeImmutable
+    + isPaymentSuccess(): bool
+    + isPaymentFailure(): bool
+    + isRefund(): bool
+  }
+}
+
+' Request Objects
+package "Request Objects (100% Reusable)" <<Rectangle>> #E3F2FD {
+
+  class CreatePaymentRequest {
+    - amount: float
+    - currency: string
+    - orderId: string
+    - shopId: string
+    - paymentMethod: string
+    - directCapture: bool
+    - paymentMethodId: ?string
+    - customerId: ?string
+    - returnUrl: ?string
+    - cancelUrl: ?string
+    - metadata: array
+    --
+    + __construct(...)
+    + getAmount(): float
+    + getCurrency(): string
+    + getOrderId(): string
+    + isDirectCapture(): bool
+    + getPaymentMethodId(): ?string
+    --
+    **100% Reusable**
+    Provider-agnostic request
+  }
+
+  class CapturePaymentRequest {
+    - providerPaymentId: string
+    - amount: float
+    - metadata: array
+    --
+    + getProviderPaymentId(): string
+    + getAmount(): float
+    + getMetadata(): array
+    --
+    **100% Reusable**
+  }
+
+  class RefundPaymentRequest {
+    - providerPaymentId: string
+    - amount: float
+    - reason: ?string
+    - metadata: array
+    --
+    + getProviderPaymentId(): string
+    + getAmount(): float
+    + getReason(): ?string
+    --
+    **100% Reusable**
+  }
+
+  class VoidPaymentRequest {
+    - providerPaymentId: string
+    - reason: ?string
+    --
+    + getProviderPaymentId(): string
+    + getReason(): ?string
+    --
+    **100% Reusable**
+  }
+}
+
+' Response Objects
+package "Response Objects (100% Reusable)" <<Rectangle>> #FFF3E0 {
+
+  class PaymentResponse {
+    - providerPaymentId: string
+    - status: string
+    - amount: float
+    - currency: string
+    - clientSecret: ?string
+    - requiresAction: bool
+    - nextActionUrl: ?string
+    - metadata: array
+    --
+    + getProviderPaymentId(): string
+    + getStatus(): string
+    + requiresAction(): bool
+    + getNextActionUrl(): ?string
+    + isPending(): bool
+    + isAuthorized(): bool
+    + isCaptured(): bool
+    --
+    **100% Reusable**
+    Provider-agnostic response
+  }
+
+  class CaptureResponse {
+    - providerPaymentId: string
+    - captureId: string
+    - status: string
+    - amount: float
+    - currency: string
+    --
+    + getCaptureId(): string
+    + getStatus(): string
+    + getAmount(): float
+    --
+    **100% Reusable**
+  }
+
+  class RefundResponse {
+    - refundId: string
+    - status: string
+    - amount: float
+    - currency: string
+    --
+    + getRefundId(): string
+    + getStatus(): string
+    + getAmount(): float
+    --
+    **100% Reusable**
+  }
+
+  class PaymentDetailsResponse {
+    - providerPaymentId: string
+    - status: string
+    - amount: float
+    - currency: string
+    - createdAt: DateTimeImmutable
+    - metadata: array
+    --
+    + getStatus(): string
+    + getAmount(): float
+    + getCreatedAt(): DateTimeImmutable
+    --
+    **100% Reusable**
+  }
+}
+
+' Provider Adapters
+package "Provider Adapters (Provider-Specific)" <<Rectangle>> #FFEBEE {
+
+  class StripeAdapter implements PaymentAdapterInterface {
+    - client: StripeClient
+    - apiKey: string
+    - sandbox: bool
+    --
+    + __construct(apiKey, sandbox)
+    + createPayment(request): PaymentResponse
+    + capturePayment(request): CaptureResponse
+    + refundPayment(request): RefundResponse
+    + voidPayment(request): VoidResponse
+    + getPaymentDetails(id): PaymentDetailsResponse
+    + parseWebhook(payload, sig, secret): WebhookEvent
+    + getSupportedPaymentMethods(): array
+    + getProviderName(): string
+    + supportsFeature(feature): bool
+    --
+    - convertAmountToCents(amount): int
+    - convertCentsToAmount(cents): float
+    - mapStripeStatus(status): string
+    - mapPaymentMethod(method): array
+    - mapRefundReason(reason): ?string
+    --
+    **Provider-Specific**
+    Stripe SDK integration
+  }
+
+  class UnzerAdapter implements PaymentAdapterInterface {
+    - client: Unzer
+    - privateKey: string
+    - sandbox: bool
+    --
+    + __construct(privateKey, sandbox)
+    + createPayment(request): PaymentResponse
+    + capturePayment(request): CaptureResponse
+    + refundPayment(request): RefundResponse
+    + getSupportedPaymentMethods(): array
+    + getProviderName(): string
+    + supportsFeature(feature): bool
+    --
+    - mapUnzerStatus(status): string
+    - createOrGetCustomer(request): Customer
+    - createBasket(request): Basket
+    --
+    **Provider-Specific**
+    Unzer SDK integration
+  }
+
+  class PayPalAdapter implements PaymentAdapterInterface {
+    - client: PayPalHttpClient
+    - clientId: string
+    - clientSecret: string
+    - sandbox: bool
+    --
+    + __construct(clientId, clientSecret, sandbox)
+    + createPayment(request): PaymentResponse
+    + capturePayment(request): CaptureResponse
+    + refundPayment(request): RefundResponse
+    + getSupportedPaymentMethods(): array
+    + getProviderName(): string
+    + supportsFeature(feature): bool
+    --
+    - mapPayPalStatus(status): string
+    - buildPurchaseUnits(request): array
+    --
+    **Provider-Specific**
+    PayPal SDK integration
+  }
+
+  class AdyenAdapter implements PaymentAdapterInterface {
+    - client: AdyenClient
+    - apiKey: string
+    - merchantAccount: string
+    - sandbox: bool
+    --
+    + __construct(apiKey, merchantAccount, sandbox)
+    + createPayment(request): PaymentResponse
+    + capturePayment(request): CaptureResponse
+    + getSupportedPaymentMethods(): array
+    + getProviderName(): string
+    --
+    **Provider-Specific**
+    Adyen SDK integration
+  }
+}
+
+' Exception Handling
+package "Exception Handling (100% Reusable)" <<Rectangle>> #FCE4EC {
+
+  class PaymentAdapterException extends RuntimeException {
+    - errorCode: string
+    - provider: ?string
+    --
+    + __construct(message, errorCode, provider, previous)
+    + {static} fromProviderError(provider, message, code, previous): self
+    + getErrorCode(): string
+    + getProvider(): ?string
+    + isCardDeclined(): bool
+    + isAuthenticationRequired(): bool
+    + isNetworkError(): bool
+    --
+    **100% Reusable**
+    Unified error handling
+  }
+
+  class CardDeclinedException extends PaymentAdapterException {
+    + __construct(message, provider, previous)
+    --
+    Specific: Card declined
+  }
+
+  class AuthenticationRequiredException extends PaymentAdapterException {
+    + __construct(message, provider, previous)
+    --
+    Specific: 3DS required
+  }
+
+  class NetworkException extends PaymentAdapterException {
+    + __construct(message, provider, previous)
+    --
+    Specific: Network error
+  }
+}
+
+' Factory
+package "Factory (100% Reusable)" <<Rectangle>> #F3E5F5 {
+
+  class AdapterFactory {
+    - settings: ModuleSettings
+    --
+    + __construct(settings)
+    + createAdapter(providerName): PaymentAdapterInterface
+    + createDefaultAdapter(): PaymentAdapterInterface
+    --
+    - createStripeAdapter(): StripeAdapter
+    - createUnzerAdapter(): UnzerAdapter
+    - createPayPalAdapter(): PayPalAdapter
+    - createAdyenAdapter(): AdyenAdapter
+    --
+    **100% Reusable**
+    Configuration-driven creation
+  }
+}
+
+' External SDKs
+package "External Provider SDKs" <<Rectangle>> #ECEFF1 {
+
+  class StripeClient <<External>> {
+    + paymentIntents
+    + refunds
+    + customers
+    --
+    Stripe PHP SDK
+  }
+
+  class Unzer <<External>> {
+    + charge()
+    + authorize()
+    + fetchPayment()
+    --
+    Unzer PHP SDK
+  }
+
+  class PayPalHttpClient <<External>> {
+    + execute()
+    --
+    PayPal PHP SDK
+  }
+
+  class AdyenClient <<External>> {
+    + payments()
+    + modifications()
+    --
+    Adyen PHP SDK
+  }
+}
+
+' Business Logic (Payment Component)
+package "Payment Component (Business Logic)" <<Rectangle>> #C8E6C9 {
+
+  class PaymentService {
+    - adapter: PaymentAdapterInterface
+    - transactionRepo: PaymentTransactionRepository
+    - orderStateRepo: PaymentOrderStateRepository
+    - eventDispatcher: EventDispatcherInterface
+    --
+    + initiatePayment(order, method): PaymentResponse
+    + capturePayment(order): CaptureResponse
+    + refundPayment(order, amount): RefundResponse
+    --
+    **Provider-Agnostic**
+    Uses adapter interface
+  }
+}
+
+' Relationships
+PaymentService --> PaymentAdapterInterface : uses
+PaymentAdapterInterface ..> CreatePaymentRequest : accepts
+PaymentAdapterInterface ..> PaymentResponse : returns
+
+StripeAdapter --> StripeClient : uses
+UnzerAdapter --> Unzer : uses
+PayPalAdapter --> PayPalHttpClient : uses
+AdyenAdapter --> AdyenClient : uses
+
+StripeAdapter ..> CreatePaymentRequest : translates
+StripeAdapter ..> PaymentResponse : creates
+UnzerAdapter ..> CreatePaymentRequest : translates
+UnzerAdapter ..> PaymentResponse : creates
+PayPalAdapter ..> CreatePaymentRequest : translates
+PayPalAdapter ..> PaymentResponse : creates
+
+StripeAdapter ..> PaymentAdapterException : throws
+UnzerAdapter ..> PaymentAdapterException : throws
+PayPalAdapter ..> PaymentAdapterException : throws
+
+AdapterFactory --> PaymentAdapterInterface : creates
+AdapterFactory ..> StripeAdapter : instantiates
+AdapterFactory ..> UnzerAdapter : instantiates
+AdapterFactory ..> PayPalAdapter : instantiates
+AdapterFactory ..> AdyenAdapter : instantiates
+
+note top of PaymentAdapterInterface
+  **Core Contract**
+
+  All providers implement this interface.
+  Business logic uses the interface,
+  never the concrete implementations.
+
+  **Benefits:**
+  - Easy to add new providers
+  - Easy to test (mock interface)
+  - Easy to switch providers
+end note
+
+note top of CreatePaymentRequest
+  **Provider-Agnostic Request**
+
+  Normalized data structure.
+  Adapters translate to provider format.
+
+  **Example:**
+  - Amount: 99.99 (float)
+  - Currency: "EUR" (uppercase)
+
+  **Stripe Translation:**
+  - amount: 9999 (cents, int)
+  - currency: "eur" (lowercase)
+end note
+
+note top of PaymentResponse
+  **Provider-Agnostic Response**
+
+  Normalized data structure.
+  Adapters translate from provider format.
+
+  **Example:**
+  - status: "authorized" (normalized)
+
+  **Stripe Status Mapping:**
+  - requires_capture → "authorized"
+  - succeeded → "captured"
+end note
+
+note top of StripeAdapter
+  **Stripe Integration**
+
+  Responsibilities:
+  1. Translate requests to Stripe format
+  2. Call Stripe SDK methods
+  3. Translate responses to component format
+  4. Map Stripe errors to component exceptions
+
+  **Example:**
+  Component: 99.99 EUR
+  Stripe: 9999 eur (cents, lowercase)
+end note
+
+note right of PaymentAdapterException
+  **Unified Error Handling**
+
+  All provider errors mapped to:
+  - PaymentAdapterException (base)
+  - CardDeclinedException
+  - AuthenticationRequiredException
+  - NetworkException
+
+  Business logic catches these
+  instead of provider-specific exceptions.
+end note
+
+note right of AdapterFactory
+  **Configuration-Driven**
+
+  Provider selection via config:
+
+  ```yaml
+  payment:
+    default_provider: stripe
+    providers:
+      stripe:
+        api_key: sk_test_...
+        sandbox: true
+      unzer:
+        private_key: s-priv-...
+        sandbox: true
+  ```
+
+  Factory reads config and creates
+  appropriate adapter instance.
+end note
+
+note as N1
+  **Architecture Benefits**
+
+  <color:green>**✅ Provider Agnostic:**</color>
+  Business logic doesn't know about Stripe/Unzer/PayPal
+
+  <color:green>**✅ Easy Testing:**</color>
+  Mock PaymentAdapterInterface, not provider SDKs
+
+  <color:green>**✅ Easy to Extend:**</color>
+  Add new provider = implement interface
+
+  <color:green>**✅ Easy to Switch:**</color>
+  Change provider via configuration
+
+  <color:green>**✅ Consistent Errors:**</color>
+  All providers throw PaymentAdapterException
+
+  <color:green>**✅ SDK Independence:**</color>
+  Update provider SDKs without changing component
+end note
+
+note as N2
+  **Example: Business Logic**
+
+  ```php
+  class PaymentService
+  {
+      public function __construct(
+          private PaymentAdapterInterface $adapter
+      ) {}
+
+      public function initiatePayment(Order $order): void
+      {
+          $request = new CreatePaymentRequest(
+              amount: $order->getTotal(),
+              currency: $order->getCurrency(),
+              orderId: $order->getId(),
+              shopId: $order->getShopId(),
+              paymentMethod: 'card'
+          );
+
+          // Provider-agnostic call
+          $response = $this->adapter->createPayment($request);
+
+          // Works with Stripe, Unzer, PayPal, etc.
+          $order->setProviderOrderId($response->getProviderPaymentId());
+      }
+  }
+  ```
+
+  **No provider-specific code in business logic!**
+end note
+
+note as N3
+  **Testing Strategy**
+
+  **Unit Tests:**
+  Mock PaymentAdapterInterface
+  ```php
+  $adapterMock = Mockery::mock(PaymentAdapterInterface::class);
+  $adapterMock->shouldReceive('createPayment')->andReturn(...);
+  $service = new PaymentService($adapterMock);
+  ```
+
+  **Adapter Tests:**
+  Mock provider SDK
+  ```php
+  $stripeMock = Mockery::mock(StripeClient::class);
+  $adapter = new StripeAdapter('key');
+  $adapter->setClient($stripeMock);
+  ```
+
+  **Integration Tests:**
+  Use real provider SDKs with test/sandbox keys
+  ```php
+  $adapter = new StripeAdapter($_ENV['STRIPE_TEST_KEY']);
+  $response = $adapter->createPayment($request);
+  ```
+end note
+
+@enduml

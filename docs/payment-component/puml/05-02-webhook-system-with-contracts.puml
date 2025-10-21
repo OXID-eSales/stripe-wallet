@@ -1,0 +1,371 @@
+@startuml Webhook Processing System with Smart-Contract Integration
+
+skinparam backgroundColor #FFFFFF
+skinparam roundcorner 10
+skinparam sequenceMessageAlign center
+
+title Webhook Processing System - Smart-Contract Integration\n(Hybrid Pattern with Contract Awareness)
+
+actor "Payment\nProvider" as Provider
+participant "WebhookController" as WC #FFE082
+participant "EventDispatcher" as ED #C5E1A5
+participant "WebhookHandler" as WH #FFF3E0
+participant "ContractRepository" as CR #F8BBD0
+participant "PaymentCaptureHandler" as PCH #FFF3E0
+participant "OrderRepository" as OR #E1F5FE
+participant "PaymentService" as PS #FFF9C4
+database "osc_payment_contract" as ContractDB #FFE0B2
+database "oxorder" as OrderDB #B2DFDB
+
+== Webhook Received from Provider ==
+
+Provider -> WC : POST /webhook\n+ signature header\n+ payload (providerOrderId, status)
+activate WC
+
+note right of WC
+  **Webhook Controller Responsibilities:**
+  1. Verify webhook signature (security)
+  2. Parse webhook payload
+  3. Emit domain event (event-driven)
+
+  **NO business logic here!**
+end note
+
+WC -> WC : Verify webhook signature\n(HMAC-SHA256 / RSA)
+
+alt Signature Invalid
+  WC --> Provider : 401 Unauthorized\n{"error": "Invalid signature"}
+  note right
+    Security: Reject invalid webhooks
+    Prevents spoofing attacks
+  end note
+else Signature Valid
+  WC -> WC : Parse JSON payload:\n{\n  "providerOrderId": "ord_123",\n  "transactionId": "txn_456",\n  "status": "COMPLETED"\n}
+
+  WC -> ED : **Emit** PaymentCapturedEvent(payload)
+  activate ED
+
+  note right of ED
+    **Event-Driven Pattern:**
+    Webhook emits event,
+    handlers react
+  end note
+
+  ED -> WH : handle(PaymentCapturedEvent)
+  activate WH
+
+  == Phase 1: Identify Contract via Provider Order ID ==
+
+  note right of WH
+    **Smart-Contract Integration:**
+
+    OLD: Find oxorder by provider ID
+    NEW: Find contract first,
+         contract knows order ID
+  end note
+
+  WH -> WH : Extract providerOrderId\nfrom webhook payload
+
+  WH -> CR : findByProviderOrderId(providerOrderId)
+  activate CR
+
+  CR -> ContractDB : SELECT * FROM osc_payment_contract\nWHERE OXPROVIDERORDERID = 'ord_123'
+  activate ContractDB
+
+  note right of ContractDB
+    **Contract Record:**
+    {
+      "OXID": "contract123",
+      "OXSTATE": "COMMITTED",
+      "OXORDERID": "order789", ← Has order!
+      "OXPROVIDERORDERID": "ord_123",
+      "OXPROVIDER": "stripe"
+    }
+  end note
+
+  ContractDB --> CR : Contract data
+  deactivate ContractDB
+
+  CR --> WH : PaymentContract\n{orderId: "order789"}
+  deactivate CR
+
+  note right of WH
+    **Benefit of Contract:**
+
+    • Single lookup finds both
+      contract and order ID
+    • Contract tracks provider ID
+    • Clean separation of concerns
+  end note
+
+  == Phase 2: Verify Contract State ==
+
+  WH -> WH : Verify contract state:\n• contract.getState() == COMMITTED?\n• contract.getOrderId() != null?
+
+  alt Contract Not Committed
+    note right of WH
+      **Error Handling:**
+      Contract must be in COMMITTED
+      state to process payment capture
+    end note
+
+    WH -> WH : Log error: "Contract not committed"
+    WH --> ED : Handler complete (error)
+    deactivate WH
+    ED --> WC : Event processed
+    deactivate ED
+    WC --> Provider : 200 OK\n(acknowledge, but no action)
+    deactivate WC
+
+  else Contract Is Committed
+
+    == Phase 3: Load Order via Contract ==
+
+    WH -> OR : find(contract.getOrderId())
+    activate OR
+
+    OR -> OrderDB : SELECT * FROM oxorder\nWHERE OXID = 'order789'
+    activate OrderDB
+
+    OrderDB --> OR : Order data
+    deactivate OrderDB
+
+    OR --> WH : Order\n{id: "order789",\n status: "NOT_FINISHED"}
+    deactivate OR
+
+    == Phase 4: Validate Payment Data ==
+
+    WH -> WH : Extract transactionId\nfrom webhook payload
+
+    WH -> PS : fetchPaymentDetails(providerOrderId)
+    activate PS
+
+    note right of PS
+      **Double-Check Payment:**
+      Query provider API to verify
+      webhook data integrity
+    end note
+
+    PS -> Provider : GET /payments/{providerOrderId}
+    activate Provider
+
+    Provider --> PS : Payment details:\n{\n  "status": "captured",\n  "amount": 99.99,\n  "currency": "EUR"\n}
+    deactivate Provider
+
+    PS --> WH : PaymentDetails
+    deactivate PS
+
+    WH -> WH : Validate:\n• Amount matches order\n• Currency matches\n• Status is successful
+
+    alt Validation Failed
+      WH -> WH : Log error: "Payment mismatch"
+      WH --> ED : Handler complete (error)
+      deactivate WH
+      ED --> WC : Event processed
+      deactivate ED
+      WC --> Provider : 200 OK\n(acknowledge, investigate)
+      deactivate WC
+
+    else Validation Passed
+
+      == Phase 5: Update Transaction ==
+
+      WH -> OrderDB : INSERT INTO osc_payment_transaction\n(OXORDERID, OXPROVIDERORDERID,\n OXTRANSACTIONID, OXTYPE, OXSTATUS,\n OXAMOUNT, OXCURRENCY)\nVALUES ('order789', 'ord_123',\n 'txn_456', 'capture', 'completed',\n 99.99, 'EUR')
+      activate OrderDB
+
+      note right of OrderDB
+        **Transaction Record Created:**
+
+        Links:
+        • Contract (via provider order ID)
+        • Order (via order ID)
+        • Provider (via transaction ID)
+      end note
+
+      OrderDB --> WH : Transaction saved
+      deactivate OrderDB
+
+      == Phase 6: Emit Contract Fulfillment Event ==
+
+      WH -> ED : **Emit** ContractPaymentCapturedEvent(\n  contract, order\n)
+      activate ED
+
+      note right of ED
+        **Event Chain:**
+        ContractPaymentCapturedEvent
+        triggers contract fulfillment
+      end note
+
+      ED -> PCH : handle(ContractPaymentCapturedEvent)
+      activate PCH
+
+      == Phase 7: Fulfill Contract ==
+
+      PCH -> CR : find(contractId)
+      activate CR
+
+      CR -> ContractDB : SELECT contract
+      activate ContractDB
+      ContractDB --> CR : Contract
+      deactivate ContractDB
+
+      CR --> PCH : PaymentContract
+      deactivate CR
+
+      PCH -> PCH : contract.fulfill()
+
+      note right of PCH
+        **Contract Fulfillment:**
+
+        State: COMMITTED → FULFILLED
+
+        Contract lifecycle complete:
+        ✓ Created (intent)
+        ✓ Conditions met
+        ✓ Order created
+        ✓ Payment captured
+        ✓ Fulfilled
+      end note
+
+      PCH -> CR : save(contract)
+      activate CR
+
+      CR -> ContractDB : UPDATE osc_payment_contract\nSET OXSTATE = 'FULFILLED',\n    OXFULFILLEDAT = NOW()
+      activate ContractDB
+
+      note right of ContractDB
+        **Final Contract State:**
+        {
+          "OXSTATE": "FULFILLED", ✓
+          "OXORDERID": "order789",
+          "OXFULFILLEDAT": "2025-10-20..."
+        }
+      end note
+
+      ContractDB --> CR : Updated
+      deactivate ContractDB
+
+      CR --> PCH : Saved
+      deactivate CR
+
+      == Phase 8: Finalize Order ==
+
+      PCH -> OrderDB : UPDATE oxorder\nSET oxpaid = NOW(),\n    oxtransstatus = 'OK',\n    oxfolder = 'ORDERFOLDER_NEW'
+      activate OrderDB
+
+      note right of OrderDB
+        **Order Finalized:**
+
+        State: NOT_FINISHED → OK
+
+        Now ready for:
+        • Fulfillment/shipping
+        • Invoice generation
+        • Customer notification
+      end note
+
+      OrderDB --> PCH : Order updated
+      deactivate OrderDB
+
+      == Phase 9: Trigger Side Effects ==
+
+      PCH -> ED : **Emit** ContractFulfilledEvent(\n  contract, order\n)
+      activate ED
+
+      note right of ED
+        **Multiple Subscribers React:**
+
+        1. EmailSubscriber
+           → Send order confirmation
+
+        2. InventorySubscriber
+           → Update stock levels
+
+        3. AnalyticsSubscriber
+           → Track conversion
+
+        4. AuditLogSubscriber
+           → Log completion
+
+        5. InvoiceSubscriber
+           → Generate invoice
+      end note
+
+      ED -> ED : Notify all subscribers:\n• EmailSubscriber.sendConfirmation()\n• InventorySubscriber.updateStock()\n• AnalyticsSubscriber.trackConversion()\n• AuditLogSubscriber.logCompletion()
+
+      ED --> PCH : All subscribers notified
+      deactivate ED
+
+      PCH --> ED : Handler complete
+      deactivate PCH
+
+      ED --> WH : Event chain complete
+      deactivate ED
+
+      WH --> WC : Handler complete (success)
+      deactivate WH
+
+      WC --> Provider : 200 OK\n{"status": "processed"}
+      deactivate WC
+
+    end
+  end
+end
+
+note over Provider, OrderDB
+  **Smart-Contract Webhook Benefits:**
+
+  ✅ **Single Lookup**: Contract found by provider order ID,
+     contains order ID - no separate query needed
+
+  ✅ **State Validation**: Verify contract is COMMITTED
+     before processing capture
+
+  ✅ **Complete Audit Trail**: Contract tracks full lifecycle
+     from intent to fulfillment
+
+  ✅ **Clean Separation**: Webhook updates contract first,
+     then order - clear ownership
+
+  ✅ **Event-Driven**: Multiple subscribers react to
+     ContractFulfilledEvent automatically
+
+  ✅ **Idempotency**: Webhook can be replayed - contract
+     state prevents duplicate processing
+end note
+
+note over Provider, OrderDB
+  **Idempotency Handling:**
+
+  If webhook is delivered multiple times (common):
+
+  1. Find contract by provider order ID ✓
+  2. Check contract.getState()
+     • If already FULFILLED → Return 200 (already processed)
+     • If COMMITTED → Process capture
+  3. State machine prevents duplicate fulfillment
+
+  **Result:** Safe webhook redelivery without side effects
+end note
+
+note over Provider, OrderDB
+  **Error Scenarios Handled:**
+
+  1. **Contract Not Found:**
+     → Log error, return 200, investigate
+     → May indicate provider sent webhook before contract created
+
+  2. **Contract Wrong State:**
+     → Return 200, log warning
+     → Contract may be CANCELLED or EXPIRED
+
+  3. **Payment Validation Failed:**
+     → Return 200, create alert
+     → Amount/currency mismatch requires investigation
+
+  4. **Order Not Found:**
+     → Critical error, log + alert
+     → Contract has orderID but order doesn't exist (data corruption)
+end note
+
+@enduml

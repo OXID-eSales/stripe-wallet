@@ -1,0 +1,560 @@
+@startuml Smart-Contract Pattern - Class Diagram
+!define ENTITY class
+!define AGGREGATE class
+!define VALUEOBJECT class
+!define SERVICE class
+
+title Smart-Contract Pattern - Classes, Services & Interactions\nDomain-Driven Design Architecture
+
+skinparam backgroundColor #FEFEFE
+skinparam handwritten false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+
+skinparam class {
+    BackgroundColor<<aggregate>> #FFE0B2
+    BorderColor<<aggregate>> #FF6F00
+    BackgroundColor<<entity>> #FFF9C4
+    BorderColor<<entity>> #F57F17
+    BackgroundColor<<valueobject>> #E1F5FE
+    BorderColor<<valueobject>> #0277BD
+    BackgroundColor<<service>> #C8E6C9
+    BorderColor<<service>> #2E7D32
+    BackgroundColor<<repository>> #F8BBD0
+    BorderColor<<repository>> #C2185B
+    BackgroundColor<<factory>> #D1C4E9
+    BorderColor<<factory>> #512DA8
+    BackgroundColor<<event>> #FFCCBC
+    BorderColor<<event>> #E64A19
+    BackgroundColor<<handler>> #B2DFDB
+    BorderColor<<handler>> #00695C
+}
+
+' ============================================================================
+' DOMAIN LAYER - Aggregate Roots & Entities
+' ============================================================================
+
+package "Domain Layer" #F5F5F5 {
+
+    AGGREGATE PaymentContract <<aggregate>> {
+        ' Identity
+        - id: ?string
+        - shopId: string
+        - userId: string
+        - orderId: ?string
+
+        ' State
+        - state: string
+        - stateReason: ?string
+
+        ' Value Objects
+        - basketSnapshot: BasketSnapshot
+        - conditions: ContractCondition[]
+
+        ' Provider
+        - provider: ?string
+        - providerOrderId: ?string
+
+        ' Timestamps
+        - createdAt: DateTime
+        - updatedAt: DateTime
+        - committedAt: ?DateTime
+        - fulfilledAt: ?DateTime
+        - expiresAt: ?DateTime
+
+        ' Domain Events
+        - events: object[]
+
+        ' ===== State Transitions =====
+        + transitionToPending(): void
+        + transitionToReadyToCommit(): void
+        + commitToOrder(orderId): void
+        + fulfill(): void
+        + cancel(reason): void
+        + expire(): void
+
+        ' ===== Condition Management =====
+        + addCondition(condition): void
+        + fulfillCondition(type, data): void
+        + failCondition(type, reason): void
+        + areAllConditionsFulfilled(): bool
+
+        ' ===== Queries =====
+        + isExpired(): bool
+        + getRecordedEvents(): object[]
+        + clearRecordedEvents(): void
+
+        ' ===== Setters =====
+        + setProvider(provider, providerOrderId): void
+    }
+
+    ENTITY ContractCondition <<entity>> {
+        ' Constants
+        + {static} TYPE_PAYMENT_AUTHORIZED
+        + {static} TYPE_FRAUD_CHECK
+        + {static} TYPE_STOCK_RESERVED
+        + {static} TYPE_COMPLIANCE_CHECK
+        + {static} TYPE_ADDRESS_VALIDATED
+
+        + {static} STATUS_PENDING
+        + {static} STATUS_FULFILLED
+        + {static} STATUS_FAILED
+
+        ' Properties
+        - type: string
+        - status: string
+        - data: array
+        - createdAt: DateTime
+        - fulfilledAt: ?DateTime
+        - failureReason: ?string
+
+        ' Methods
+        + fulfill(data): void
+        + fail(reason): void
+        + isFulfilled(): bool
+        + isPending(): bool
+        + isFailed(): bool
+        + toArray(): array
+        + {static} fromArray(data): self
+    }
+
+    VALUEOBJECT BasketSnapshot <<valueobject>> {
+        ' Immutable snapshot
+        - items: array
+        - discounts: array
+        - totalGross: float
+        - totalNet: float
+        - totalVat: float
+        - currency: string
+        - capturedAt: DateTime
+
+        ' Methods (no setters!)
+        + getItems(): array
+        + getTotalGross(): float
+        + toOrderData(): array
+        + {static} fromBasket(basket): self
+        + {static} fromArray(data): self
+    }
+
+    VALUEOBJECT ContractState <<valueobject>> {
+        ' Value object for state
+        - value: string
+
+        + isDraft(): bool
+        + isPending(): bool
+        + isCommitted(): bool
+        + isFulfilled(): bool
+        + isTerminal(): bool
+
+        + {static} draft(): self
+        + {static} pending(): self
+        + {static} committed(): self
+        + {static} fulfilled(): self
+    }
+
+    PaymentContract *-- "0..*" ContractCondition : contains >
+    PaymentContract *-- "1" BasketSnapshot : owns >
+    PaymentContract *-- "1" ContractState : has >
+}
+
+' ============================================================================
+' SERVICE LAYER - Domain Services & Factories
+' ============================================================================
+
+package "Service Layer" #E8F5E9 {
+
+    SERVICE ContractFactory <<factory>> {
+        - basketSnapshotFactory: BasketSnapshotFactory
+        - moduleSettings: ModuleSettings
+
+        + createFromBasket(basket, user): PaymentContract
+        + createDraftContract(userId, basketSnapshot): PaymentContract
+        + addStandardConditions(contract): void
+    }
+
+    SERVICE BasketSnapshotFactory <<factory>> {
+        + createFromBasket(basket): BasketSnapshot
+        + calculateTotals(basket): array
+    }
+
+    SERVICE OrderFactory <<factory>> {
+        - contractToOrderConverter: ContractToOrderConverter
+
+        + createFromContract(contract): Order
+        + mapContractDataToOrder(contract, order): void
+    }
+
+    SERVICE ContractToOrderConverter <<service>> {
+        + convert(contract): Order
+        - mapBasketItems(contract, order): void
+        - mapDiscounts(contract, order): void
+        - mapAddresses(contract, order): void
+        - mapPaymentInfo(contract, order): void
+    }
+
+    SERVICE PaymentService <<service>> {
+        - adapter: PaymentAdapterInterface
+        - authorizationService: AuthorizationService
+        - transactionRepo: PaymentTransactionRepository
+        - logger: LoggerInterface
+
+        + authorize(amount, currency): AuthorizationResponse
+        + capture(authorizationId, amount): CaptureResponse
+        + createPayment(contract): PaymentResponse
+    }
+
+    SERVICE FraudService <<service>> {
+        - riskEngine: RiskEngine
+        - moduleSettings: ModuleSettings
+
+        + checkFraud(contract): FraudResult
+        + calculateRiskScore(contract): int
+    }
+
+    SERVICE InventoryService <<service>> {
+        - stockRepository: StockRepository
+
+        + reserveStock(items): ReservationResult
+        + releaseStock(reservationId): void
+        + checkAvailability(items): bool
+    }
+
+    SERVICE ContractExpirationService <<service>> {
+        - contractRepository: ContractRepository
+
+        + expireOldContracts(): int
+        + isContractExpired(contract): bool
+    }
+
+    ContractFactory ..> PaymentContract : creates
+    ContractFactory ..> BasketSnapshotFactory : uses
+    OrderFactory ..> ContractToOrderConverter : uses
+    OrderFactory ..> PaymentContract : reads
+}
+
+' ============================================================================
+' REPOSITORY LAYER - Data Access
+' ============================================================================
+
+package "Repository Layer" #FCE4EC {
+
+    SERVICE ContractRepository <<repository>> {
+        - connection: Connection
+        - tableName: string
+
+        + save(contract): void
+        + find(id): ?PaymentContract
+        + findByProviderOrderId(providerOrderId): ?PaymentContract
+        + findByOrderId(orderId): ?PaymentContract
+        + findExpired(before): PaymentContract[]
+        - insert(contract): void
+        - update(contract): void
+        - hydrate(data): PaymentContract
+        - generateId(): string
+    }
+
+    SERVICE PaymentOrderStateRepository <<repository>> {
+        + findByOrderId(orderId): ?PaymentOrderState
+        + findByContractId(contractId): ?PaymentOrderState
+        + save(orderState): void
+        + createFromContract(contract, orderId): PaymentOrderState
+    }
+
+    SERVICE PaymentTransactionRepository <<repository>> {
+        + save(transaction): void
+        + findByOrderId(orderId): PaymentTransaction[]
+        + findByProviderOrderId(providerOrderId): ?PaymentTransaction
+    }
+
+    ContractRepository ..> PaymentContract : persists
+    PaymentOrderStateRepository ..> PaymentContract : links
+}
+
+' ============================================================================
+' EVENT LAYER - Domain Events
+' ============================================================================
+
+package "Event Layer" #FFF3E0 {
+
+    class PaymentInitiatedEvent <<event>> {
+        - context: EventContext
+        - basket: Basket
+        - user: User
+        - returnUrl: string
+
+        + getContext(): EventContext
+        + getBasket(): Basket
+        + getUser(): User
+    }
+
+    class ContractCreatedEvent <<event>> {
+        - contract: PaymentContract
+
+        + getContract(): PaymentContract
+    }
+
+    class ContractConditionFulfilledEvent <<event>> {
+        - contract: PaymentContract
+        - conditionType: string
+        - data: array
+
+        + getContract(): PaymentContract
+        + getConditionType(): string
+    }
+
+    class ContractConditionsFulfilledEvent <<event>> {
+        - contract: PaymentContract
+
+        + getContract(): PaymentContract
+    }
+
+    class ContractReadyToCommitEvent <<event>> {
+        - contract: PaymentContract
+
+        + getContract(): PaymentContract
+    }
+
+    class ContractCommittedEvent <<event>> {
+        - contract: PaymentContract
+        - orderId: string
+
+        + getContract(): PaymentContract
+        + getOrderId(): string
+    }
+
+    class ContractFulfilledEvent <<event>> {
+        - contract: PaymentContract
+        - order: Order
+
+        + getContract(): PaymentContract
+        + getOrder(): Order
+    }
+
+    class ContractFailedEvent <<event>> {
+        - contract: PaymentContract
+        - reason: string
+
+        + getContract(): PaymentContract
+        + getReason(): string
+    }
+
+    class ContractCancelledEvent <<event>> {
+        - contract: PaymentContract
+        - reason: string
+    }
+}
+
+' ============================================================================
+' HANDLER LAYER - Event Handlers
+' ============================================================================
+
+package "Handler Layer" #E0F2F1 {
+
+    class PaymentInitiationHandler <<handler>> {
+        - contractFactory: ContractFactory
+        - contractRepository: ContractRepository
+        - dispatcher: EventDispatcher
+
+        + handle(PaymentInitiatedEvent): void
+    }
+
+    class PaymentAuthorizationHandler <<handler>> {
+        - paymentService: PaymentService
+        - contractRepository: ContractRepository
+        - dispatcher: EventDispatcher
+
+        + handle(ContractCreatedEvent): void
+    }
+
+    class FraudCheckHandler <<handler>> {
+        - fraudService: FraudService
+        - contractRepository: ContractRepository
+        - dispatcher: EventDispatcher
+
+        + handle(ContractCreatedEvent): void
+    }
+
+    class StockReservationHandler <<handler>> {
+        - inventoryService: InventoryService
+        - contractRepository: ContractRepository
+        - dispatcher: EventDispatcher
+
+        + handle(ContractCreatedEvent): void
+    }
+
+    class OrderCreationHandler <<handler>> {
+        - orderFactory: OrderFactory
+        - contractRepository: ContractRepository
+        - orderStateRepository: PaymentOrderStateRepository
+        - dispatcher: EventDispatcher
+
+        + handle(ContractConditionsFulfilledEvent): void
+    }
+
+    class PaymentCaptureHandler <<handler>> {
+        - contractRepository: ContractRepository
+        - orderRepository: OrderRepository
+        - dispatcher: EventDispatcher
+
+        + handle(PaymentCapturedEvent): void
+    }
+
+    class ContractExpirationHandler <<handler>> {
+        - contractExpirationService: ContractExpirationService
+        - dispatcher: EventDispatcher
+
+        + handle(CronEvent): void
+    }
+}
+
+' ============================================================================
+' RELATIONSHIPS - Services & Handlers
+' ============================================================================
+
+' Handlers use Services
+PaymentInitiationHandler ..> ContractFactory : uses
+PaymentInitiationHandler ..> ContractRepository : uses
+
+PaymentAuthorizationHandler ..> PaymentService : uses
+PaymentAuthorizationHandler ..> ContractRepository : uses
+
+FraudCheckHandler ..> FraudService : uses
+FraudCheckHandler ..> ContractRepository : uses
+
+StockReservationHandler ..> InventoryService : uses
+StockReservationHandler ..> ContractRepository : uses
+
+OrderCreationHandler ..> OrderFactory : uses
+OrderCreationHandler ..> ContractRepository : uses
+OrderCreationHandler ..> PaymentOrderStateRepository : uses
+
+PaymentCaptureHandler ..> ContractRepository : uses
+
+ContractExpirationHandler ..> ContractExpirationService : uses
+ContractExpirationService ..> ContractRepository : uses
+
+' Handlers handle Events
+PaymentInitiationHandler ..> PaymentInitiatedEvent : handles
+PaymentAuthorizationHandler ..> ContractCreatedEvent : handles
+FraudCheckHandler ..> ContractCreatedEvent : handles
+StockReservationHandler ..> ContractCreatedEvent : handles
+OrderCreationHandler ..> ContractConditionsFulfilledEvent : handles
+PaymentCaptureHandler ..> ContractFulfilledEvent : handles
+
+' Handlers emit Events
+PaymentInitiationHandler ..> ContractCreatedEvent : emits
+PaymentAuthorizationHandler ..> ContractConditionFulfilledEvent : emits
+OrderCreationHandler ..> ContractCommittedEvent : emits
+PaymentCaptureHandler ..> ContractFulfilledEvent : emits
+
+' ============================================================================
+' NOTES & DOCUMENTATION
+' ============================================================================
+
+note top of PaymentContract
+  **Aggregate Root**
+  - Owns contract lifecycle
+  - Enforces invariants
+  - Emits domain events
+  - Encapsulates conditions
+
+  **State Machine:**
+  DRAFT → PENDING → READY_TO_COMMIT
+    → COMMITTED → FULFILLED
+
+  **Key Rule:**
+  Order created ONLY when
+  areAllConditionsFulfilled() == true
+end note
+
+note top of ContractCondition
+  **Entity (not Value Object)**
+  - Has lifecycle (pending → fulfilled)
+  - Mutable status
+  - Tracked in database
+
+  **Types:**
+  • payment_authorized
+  • fraud_check
+  • stock_reserved
+  • compliance_check
+  • address_validated
+end note
+
+note top of BasketSnapshot
+  **Value Object**
+  - Immutable
+  - Created once
+  - No setters
+
+  **Purpose:**
+  Freeze basket state at
+  contract creation time
+  (price changes don't affect contract)
+end note
+
+note bottom of ContractFactory
+  **Factory Pattern**
+  - Creates complex aggregates
+  - Encapsulates construction logic
+  - Adds standard conditions
+
+  **Usage:**
+  contract = factory.createFromBasket(basket, user)
+end note
+
+note bottom of ContractRepository
+  **Repository Pattern**
+  - Abstracts data access
+  - Provides collection-like interface
+  - Handles hydration/persistence
+
+  **JSON Storage:**
+  Basket snapshot & conditions
+  stored as JSON for flexibility
+end note
+
+note right of PaymentInitiationHandler
+  **Event Handler Pattern**
+  1. Listen to domain event
+  2. Execute business logic
+  3. Emit new events
+
+  **Sequence:**
+  PaymentInitiatedEvent
+    → Create contract
+    → Save contract
+    → Emit ContractCreatedEvent
+end note
+
+note right of OrderCreationHandler
+  **Critical Handler**
+  Creates oxorder from contract
+  ONLY when all conditions met.
+
+  **Guards:**
+  • Check contract.isReadyToCommit()
+  • Verify all conditions fulfilled
+  • Transaction: create order + link
+end note
+
+' Legend
+legend bottom left
+  **DDD Patterns Applied:**
+  • Aggregate Root: PaymentContract (owns lifecycle)
+  • Entity: ContractCondition (has identity & lifecycle)
+  • Value Object: BasketSnapshot, ContractState (immutable)
+  • Repository: Data access abstraction
+  • Factory: Complex object construction
+  • Domain Events: State change notifications
+  • Event Handlers: Orchestrate workflows
+
+  **Key Interactions:**
+  1. Controller → Event (thin layer)
+  2. Event → Handler (business logic)
+  3. Handler → Service (reusable operations)
+  4. Service → Repository (data access)
+  5. Handler → Event (trigger next step)
+end legend
+
+@enduml
