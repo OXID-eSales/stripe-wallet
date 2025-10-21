@@ -80,7 +80,7 @@ jobs:
           sleep 2
 
       - name: Checkout current module
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
         with:
           path: source/test-module
 
@@ -150,7 +150,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout current module
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: source/test-module
           fetch-depth: 0  # Fetch all commits for accurate diff
