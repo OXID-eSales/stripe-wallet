@@ -1,25 +1,26 @@
-# Event-Driven Architecture Layers
+# Event-Driven Architecture with Smart Contracts
 
-**Component Documentation - Part 1 (Refactored)**
-**Version:** 3.0.0
+**Component Documentation - Part 1**
+**Version:** 4.0.0
+**Date:** 2025-10-22
 **Target Platform:** OXID eShop 7.4+ (compatible with 7.5, 8.0+)
 **Visual Diagram:** [puml/01-architecture-overview.puml](puml/01-architecture-overview.puml)
-**Database & Models:** [02-database-and-models.md](02-database-and-models.md) - Normalized Master-Detail Pattern
+**Database & Models:** [02-database-and-models.md](02-database-and-models.md) - Contract-aware schema
 **Test Organization:** [10-test-organization.md](10-test-organization.md)
 
 ---
 
 ## Overview
 
-The payment component follows an **event-driven layered architecture** where business logic is decoupled from presentation concerns. Controllers act as thin validation and security layers that emit domain events. Event handlers orchestrate business operations.
+The payment component follows an **event-driven layered architecture with smart-contract pattern** where business logic is decoupled from presentation concerns. Controllers act as thin validation and security layers that emit domain events. Event handlers orchestrate business operations around payment contracts.
+
+**Key Innovation:** Payment contracts manage the lifecycle from intent to fulfillment, with orders created only when contracts are ready.
 
 **📊 See Visual Diagram:** [puml/01-architecture-overview.puml](puml/01-architecture-overview.puml) for complete architecture visualization.
 
-**🧪 Test Organization:** This architecture supports clear test separation between component tests (provider-agnostic) and provider tests (provider-specific SDK integration). Component tests mock the `PaymentAdapterInterface` to test business logic without external dependencies, while provider tests verify SDK integration with real provider APIs. See [09-test-organization.md](09-test-organization.md) for complete test organization strategy.
-
 ---
 
-## Event-Driven Layer Diagram
+## Contract-Aware Layer Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -29,39 +30,38 @@ The payment component follows an **event-driven layered architecture** where bus
 └────────────────────┬────────────────────────────────────────┘
                      │ emits events
 ┌────────────────────▼────────────────────────────────────────┐
-│                      EVENT LAYER (NEW)                       │
+│                      EVENT LAYER                             │
 │  Domain Events, Event Dispatcher, Event Context             │
-│  PaymentInitiated, OrderCreated, PaymentCaptured...         │
+│  ContractCreated, ConditionFulfilled, ContractCommitted...  │
 └───────┬────────────────────────────────────────────┬────────┘
         │ triggers                          triggers │
 ┌───────▼────────────────────────────────────────────▼────────┐
 │            EVENT HANDLERS & SUBSCRIBERS                      │
 │  Business Logic, Workflow Orchestration                      │
-│  Access cached request data, call services                   │
+│  Contract lifecycle, condition resolution, order creation    │
+└────────────────────┬────────────────────────────────────────┘
+                     │ uses
+┌────────────────────▼────────────────────────────────────────┐
+│                 CONTRACT DOMAIN LAYER (NEW)                  │
+│  PaymentContract (Aggregate Root), ContractCondition        │
+│  Contract state machine, condition tracking                  │
 └────────────────────┬────────────────────────────────────────┘
                      │ uses
 ┌────────────────────▼────────────────────────────────────────┐
 │                     SERVICE LAYER                            │
-│  PaymentService, OrderRepository, ModuleSettings            │
-│  OrderManager, Factories (Called by Event Handlers)         │
+│  ContractService, PaymentService, OrderManager              │
+│  Called by Event Handlers - Contract-aware                  │
 └────────────────────┬────────────────────────────────────────┘
                      │ uses
 ┌────────────────────▼────────────────────────────────────────┐
-│                  SDK-ADAPTER LAYER (NEW)                     │
+│                  SDK-ADAPTER LAYER                           │
 │  PaymentAdapterInterface - Unified Provider Interface        │
-│  StripeAdapter, UnzerAdapter, PayPalAdapter, AdyenAdapter   │
-│  Provider-Agnostic Request/Response Objects                  │
-└────────────────────┬────────────────────────────────────────┘
-                     │ translates to/from
-┌────────────────────▼────────────────────────────────────────┐
-│                      DOMAIN LAYER                            │
-│  Component Models (PaymentOrderState, PaymentTransaction)   │
-│  Domain Events, State Machine                                │
+│  Maps provider contracts to our contracts                    │
 └────────────────────┬────────────────────────────────────────┘
                      │ persists
 ┌────────────────────▼────────────────────────────────────────┐
 │                 DATA ACCESS LAYER                            │
-│  Repositories, QueryBuilder, Cache Layer                     │
+│  ContractRepository, OrderRepository, Repositories           │
 └────────────────────┬────────────────────────────────────────┘
                      │ uses
 ┌────────────────────▼────────────────────────────────────────┐
@@ -71,76 +71,190 @@ The payment component follows an **event-driven layered architecture** where bus
 
 ┌─────────────────────────────────────────────────────────────┐
 │                   EXTERNAL INTEGRATION                       │
-│  Provider SDKs (Stripe SDK, Unzer SDK, PayPal SDK, etc.)    │
+│  Provider SDKs (Stripe, PayPal, Unzer, Amazon Pay, etc.)    │
 │  ⬆️ Called via SDK-Adapter Layer (Provider-Agnostic)          │
-│  Webhook Notifications (Also emit events!)                  │
+│  Webhook Notifications → ContractLookup → Update Contract   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 **Key Architectural Principle**:
-- **Controllers**: Thin, only validate & emit events
-- **Event Handlers**: Fat, contain all business logic
-- **Services**: Reusable, called by event handlers
-- **SDK-Adapters**: Isolate provider-specific code
-- **Data flows through events, not direct method calls**
+- **Controllers**: Thin, validate & emit events
+- **Event Handlers**: Fat, contain business logic with contract awareness
+- **Contracts**: Aggregate roots managing payment lifecycle
+- **Services**: Reusable, contract-aware
+- **Data flows through events and contracts, not direct method calls**
 
 ---
 
-## 0. Event Layer (NEW - Primary Layer)
+## 0. Contract Domain Layer (NEW - Primary Business Logic)
 
 ### Responsibilities
-- Define domain events that represent business operations
+- Define payment contract aggregate root
+- Manage contract state machine (DRAFT → PENDING → COMMITTED → FULFILLED)
+- Track fulfillment conditions (payment_authorized, fraud_check, stock_reserved)
+- Encapsulate business rules for contract lifecycle
+- Emit domain events on state transitions
+
+### Components
+
+#### PaymentContract (Aggregate Root)
+**Location:** `src/Component/Model/PaymentContract.php`
+
+```php
+class PaymentContract
+{
+    // States
+    const STATE_DRAFT = 'draft';
+    const STATE_PENDING = 'pending';
+    const STATE_READY_TO_COMMIT = 'ready_to_commit';
+    const STATE_COMMITTED = 'committed';
+    const STATE_FULFILLED = 'fulfilled';
+    const STATE_CANCELLED = 'cancelled';
+    const STATE_EXPIRED = 'expired';
+    const STATE_FAILED = 'failed';
+
+    // Core properties
+    private ?string $id;
+    private string $userId;  // FK to oxuser
+    private ?string $orderId;  // FK to oxorder (NULL until committed!)
+    private string $state;
+    private BasketSnapshot $basketSnapshot;  // Value Object
+    private array $conditions = [];  // ContractCondition[]
+
+    // Contract lifecycle methods
+    public function addCondition(ContractCondition $condition): void;
+    public function transitionToPending(): void;
+    public function fulfillCondition(string $type, array $data = []): void;
+    public function areAllConditionsFulfilled(): bool;
+    public function commitToOrder(string $orderId): void;
+    public function fulfill(): void;
+    public function cancel(string $reason): void;
+}
+```
+
+**Key Features:**
+- **Aggregate Root**: Owns conditions, basket snapshot, state machine
+- **Immutable Basket**: Captured at contract creation, never changes
+- **Explicit Conditions**: Tracked in database, not hidden in code
+- **Domain Events**: Emits events on state transitions
+- **Order Creation Deferred**: OXORDERID is NULL until all conditions met
+
+#### ContractCondition (Entity)
+**Location:** `src/Component/Entity/ContractCondition.php`
+
+```php
+class ContractCondition
+{
+    // Types
+    const TYPE_PAYMENT_AUTHORIZED = 'payment_authorized';
+    const TYPE_FRAUD_CHECK = 'fraud_check';
+    const TYPE_STOCK_RESERVED = 'stock_reserved';
+    const TYPE_COMPLIANCE_CHECK = 'compliance_check';
+    const TYPE_ADDRESS_VALIDATED = 'address_validated';
+
+    // Statuses
+    const STATUS_PENDING = 'pending';
+    const STATUS_FULFILLED = 'fulfilled';
+    const STATUS_FAILED = 'failed';
+
+    private string $type;
+    private string $status;
+    private array $data;
+    private ?\DateTime $fulfilledAt;
+
+    public function fulfill(array $data = []): void;
+    public function fail(string $reason): void;
+    public function isFulfilled(): bool;
+}
+```
+
+#### BasketSnapshot (Value Object)
+**Location:** `src/Component/ValueObject/BasketSnapshot.php`
+
+```php
+final class BasketSnapshot
+{
+    // Immutable - no setters!
+    private array $items;
+    private array $discounts;
+    private float $totalGross;
+    private float $totalNet;
+    private float $totalVat;
+    private string $currency;
+    private \DateTime $capturedAt;
+
+    // Factory method
+    public static function fromOxidBasket(Basket $basket): self;
+
+    // Conversion
+    public function toArray(): array;  // For JSON storage
+    public static function fromArray(array $data): self;
+}
+```
+
+**Why Value Object?**
+- Immutable: Basket data cannot change after contract creation
+- Type-safe: Enforces structure
+- Reusable: Easy to serialize/deserialize
+
+---
+
+## 1. Event Layer (Enhanced with Contract Events)
+
+### Responsibilities
+- Define domain events representing contract lifecycle operations
 - Dispatch events to registered handlers
 - Carry event context (cached request data)
 - Enable loose coupling between components
 
-### Components
+### Contract-Specific Events
 
-#### Domain Events
-**Location:** `src/Event/Domain/`
+**Location:** `src/Event/Contract/`
 
-| Event | Emitted By | Purpose |
-|-------|-----------|---------|
-| `PaymentInitiatedEvent` | Controller | User starts payment process |
-| `OrderCreatedEvent` | Event Handler | Shop order created |
-| `OrderCreatedAtProviderEvent` | Event Handler | Provider order created |
-| `PaymentCapturedEvent` | Webhook Controller | Payment confirmed |
-| `PaymentFailedEvent` | Event Handler | Payment failed |
-| `OrderCompletedEvent` | Event Handler | Order finalized |
-| `RefundInitiatedEvent` | Admin Controller | Refund started |
+| Event | Emitted By | Purpose | Listeners |
+|-------|-----------|---------|-----------|
+| `ContractCreatedEvent` | PaymentInitiationHandler | Contract created (DRAFT) | ContractConditionResolverHandler |
+| `ContractTransitionedToPendingEvent` | PaymentContract | Conditions being resolved | PaymentAuthorizationHandler, FraudCheckHandler |
+| `ContractConditionFulfilledEvent` | PaymentContract | Single condition fulfilled | ContractStateMonitor |
+| `ContractReadyToCommitEvent` | PaymentContract | All conditions met | OrderCreationHandler |
+| `ContractCommittedEvent` | PaymentContract | Order created | PaymentOrderStateHandler |
+| `ContractFulfilledEvent` | PaymentContract | Payment captured | OrderCompletionHandler, EmailHandler |
+| `ContractCancelledEvent` | PaymentContract | User/system cancelled | CleanupHandler |
+| `ContractExpiredEvent` | CronJob | Timeout reached | CleanupHandler |
+| `ContractFailedEvent` | ConditionHandler | Condition failed | RollbackHandler, NotificationHandler |
 
-#### Event Context (NEW)
+### Event Context (Enhanced)
 **Location:** `src/Event/EventContext.php`
 
 ```php
-class EventContext {
+class EventContext
+{
     private Basket $basket;
     private User $user;
     private Session $session;
     private array $requestData;
+    private ?PaymentContract $contract = null;  // NEW!
 
     // Cached data accessible by all event handlers
     public function getBasket(): Basket;
     public function getUser(): User;
-    public function getRequestParam(string $key): mixed;
+    public function getContract(): ?PaymentContract;  // NEW!
+    public function setContract(PaymentContract $contract): void;  // NEW!
 }
 ```
 
-**Purpose**: Cache HTTP request data once, share across all event handlers
-
-#### Event Dispatcher
-**Standard PSR-14 EventDispatcher**
+**Enhancement:** Contract is cached in context for handlers to access without DB queries.
 
 ---
 
-## 1. Presentation Layer (Refactored)
+## 2. Presentation Layer (Contract-Aware Controllers)
 
-### NEW Responsibilities (Event-Driven)
+### NEW Responsibilities (Event-Driven + Contract-Aware)
 - **Validate & sanitize** user input
 - **Enforce security**: authentication, authorization, CSRF
 - **Cache request data** (basket, user, session)
-- **Emit domain events** with validated data
-- **Return responses** based on event outcomes
+- **Emit domain events** with validated data (ContractCreated, PaymentInitiated, etc.)
+- **Return responses** based on contract/event outcomes
 - **NO business logic** - just thin coordination
 
 ### Components
@@ -148,43 +262,21 @@ class EventContext {
 #### Controllers (Event Emitters)
 **Location:** `src/Controller/`
 
-| Controller | Purpose | Reusability |
-|------------|---------|-------------|
-| `PaymentController` | Validate payment selection, emit event | 90% |
-| `OrderController` | Validate order, emit PaymentInitiatedEvent | 95% |
-| `WebhookController` | Validate signature, emit WebhookReceivedEvent | 100% |
-| `AjaxPaymentController` | Validate AJAX requests, emit events | 90% |
-| `Admin/*` | Validate admin actions, emit events | 90% |
+| Controller | Purpose | Contract Interaction |
+|------------|---------|---------------------|
+| `PaymentController` | Validate payment selection, emit event | Retrieves contract by ID |
+| `OrderController` | Validate order, emit PaymentInitiatedEvent | Creates contract |
+| `WebhookController` | Validate signature, emit WebhookReceivedEvent | Finds contract by provider order ID |
+| `ContractStatusController` (NEW) | Check contract status (API) | Queries contract |
+| `Admin/ContractController` (NEW) | Manage pending contracts | CRUD operations |
 
-#### NEW Event-Driven Patterns
+#### Contract-Aware Payment Initiation Pattern
 
-**Payment Initiation (Event-Driven):**
 ```php
-OrderController::execute()
-  → Validate basket, user session
-  → Cache request data (basket, user, session)
-  → Emit PaymentInitiatedEvent($eventContext)
-  → Event Handler: Creates order, calls provider
-  → Event Handler: Emits OrderCreatedAtProviderEvent
-  → Controller receives provider redirect URL from event
-  → Return redirect response
-```
-
-**Webhook Processing (Event-Driven):**
-```php
-WebhookController::handleRequest()
-  → Validate webhook signature
-  → Emit WebhookReceivedEvent($payload)
-  → Event Handler: Processes payment, updates order
-  → Event Handler: Emits PaymentCapturedEvent
-  → Multiple Subscribers: Email, inventory, analytics
-  → Return HTTP 200
-```
-
-**Controller Pseudo-Code Pattern:**
-```php
-class OrderController {
-    public function execute(Request $request): Response {
+class OrderController
+{
+    public function execute(Request $request): Response
+    {
         // 1. Security & Validation
         $this->validateCsrfToken($request);
         $user = $this->requireAuthenticatedUser();
@@ -198,13 +290,18 @@ class OrderController {
             'returnUrl' => $request->get('returnUrl'),
         ]);
 
-        // 3. Emit event
+        // 3. Emit event (contract will be created by handler)
         $event = new PaymentInitiatedEvent($context);
         $this->dispatcher->dispatch($event);
 
-        // 4. Return response based on event outcome
-        if ($event->hasProviderRedirectUrl()) {
-            return $this->redirect($event->getProviderRedirectUrl());
+        // 4. Check if contract was created
+        if ($contract = $context->getContract()) {
+            // Return contract ID to frontend (for status polling)
+            return $this->json([
+                'contractId' => $contract->getId(),
+                'providerRedirectUrl' => $contract->getProviderRedirectUrl(),
+                'status' => $contract->getState()
+            ]);
         }
 
         return $this->error('Payment initiation failed');
@@ -212,1213 +309,702 @@ class OrderController {
 }
 ```
 
-### Templates
-**Location:** `views/`
+**Key Changes from Old Pattern:**
+- ❌ OLD: `$order = $this->orderManager->createOrder()`
+- ✅ NEW: Emit event, handler creates contract, order created later
 
-- `views/blocks/page/checkout/` - Checkout integration points
-- `views/blocks/page/details/` - Product page buttons
-- `views/admin/tpl/` - Admin interface
-- `views/blocks/email/` - Email templates
+#### Webhook Processing (Contract Lookup)
 
-**Pattern:** Template blocks extend shop templates at specific extension points
-
----
-
-## 1.5 Event Handlers & Subscribers (NEW - Core Business Logic)
-
-### Responsibilities
-- **Primary business logic layer** in event-driven architecture
-- Listen to domain events
-- Execute workflows (order creation, payment capture, etc.)
-- Call services to perform operations
-- Access cached request data via EventContext
-- Emit new events to trigger downstream processes
-
-### Components
-
-#### Event Handlers
-**Location:** `src/EventHandler/`
-
-| Handler | Listens To | Purpose |
-|---------|-----------|---------|
-| `PaymentInitiationHandler` | PaymentInitiatedEvent | Create order, call provider API |
-| `PaymentCaptureHandler` | PaymentCapturedEvent | Update order status, finalize |
-| `OrderCompletionHandler` | OrderCompletedEvent | Send email, clear cart |
-| `PaymentFailureHandler` | PaymentFailedEvent | Rollback, notify user |
-| `WebhookProcessingHandler` | WebhookReceivedEvent | Process provider webhooks |
-
-**Handler Pattern:**
 ```php
-class PaymentInitiationHandler {
-    public function handle(PaymentInitiatedEvent $event): void {
-        // 1. Get cached data from context
-        $basket = $event->getContext()->getBasket();
-        $user = $event->getContext()->getUser();
+class WebhookController
+{
+    public function handleRequest(Request $request): Response
+    {
+        // 1. Validate webhook signature
+        $signature = $request->headers->get('X-Provider-Signature');
+        if (!$this->webhookVerifier->verify($request->getContent(), $signature)) {
+            return $this->error('Invalid signature', 401);
+        }
 
-        // 2. Execute business logic
-        $order = $this->orderManager->createTemporaryOrder($basket, $user);
+        // 2. Parse webhook payload
+        $payload = json_decode($request->getContent(), true);
+        $providerOrderId = $payload['order_id'] ?? null;
 
-        // 3. Call provider API via service
-        $providerOrder = $this->paymentService->createProviderOrder($order);
+        // 3. Find contract by provider order ID
+        $contract = $this->contractRepository->findByProviderOrderId($providerOrderId);
+        if (!$contract) {
+            return $this->error('Contract not found', 404);
+        }
 
-        // 4. Emit new event
-        $this->dispatcher->dispatch(
-            new OrderCreatedAtProviderEvent($order, $providerOrder)
-        );
+        // 4. Emit webhook event with contract
+        $event = new WebhookReceivedEvent($payload, $contract);
+        $this->dispatcher->dispatch($event);
 
-        // 5. Store result in original event for controller
-        $event->setProviderRedirectUrl($providerOrder->getApprovalUrl());
+        return $this->json(['status' => 'received'], 200);
     }
 }
 ```
 
-#### Event Subscribers (Side Effects)
-**Location:** `src/EventSubscriber/`
-
-| Subscriber | Listens To | Purpose |
-|------------|-----------|---------|
-| `EmailNotificationSubscriber` | OrderCompletedEvent | Send order confirmation |
-| `InventorySubscriber` | OrderCompletedEvent | Reduce stock |
-| `AnalyticsSubscriber` | Multiple | Track conversion events |
-| `AuditLogSubscriber` | All payment events | Audit logging |
-
-**Benefits**:
-- Multiple subscribers can react to same event
-- Easy to add new features without modifying core
-- Decoupled from business logic
+**Pattern:** Webhooks always look up contract first, then emit event.
 
 ---
 
-## 2. Service Layer (Refactored)
+## 3. Event Handlers & Subscribers (Contract Lifecycle Management)
 
-### NEW Responsibilities (Called by Event Handlers)
-- Implement reusable business operations
-- NO direct controller access - called by event handlers
-- Integrate with external APIs (payment providers)
+### Responsibilities
+- **Primary business logic layer** for contract lifecycle
+- Listen to domain events
+- Execute workflows (contract creation, condition resolution, order creation)
+- Call services to perform operations
+- Access cached request data via EventContext
+- Update contract state and emit new events
+
+### Contract Lifecycle Handlers
+
+**Location:** `src/EventHandler/Contract/`
+
+| Handler | Listens To | Purpose | Contract Action |
+|---------|-----------|---------|-----------------|
+| `ContractCreationHandler` | PaymentInitiatedEvent | Create contract from basket | NEW Contract (DRAFT) |
+| `ContractConditionResolverHandler` | ContractCreatedEvent | Start condition resolution | Transition to PENDING |
+| `PaymentAuthorizationHandler` | ContractTransitionedToPendingEvent | Authorize payment | Fulfill payment_authorized |
+| `FraudCheckHandler` | ContractTransitionedToPendingEvent | Run fraud checks | Fulfill fraud_check |
+| `StockReservationHandler` | ContractTransitionedToPendingEvent | Reserve inventory | Fulfill stock_reserved |
+| `OrderCreationHandler` | ContractReadyToCommitEvent | Create OXID order | Commit contract (link order) |
+| `PaymentCaptureHandler` | WebhookReceivedEvent | Process payment capture | Fulfill contract |
+| `OrderCompletionHandler` | ContractFulfilledEvent | Finalize order | Mark order OK |
+| `ContractCleanupHandler` | ContractCancelledEvent, ContractExpiredEvent | Clean up resources | Archive contract |
+
+### Handler Implementation Pattern
+
+```php
+class ContractCreationHandler
+{
+    public function handle(PaymentInitiatedEvent $event): void
+    {
+        $context = $event->getContext();
+
+        // 1. Create basket snapshot (immutable)
+        $basketSnapshot = BasketSnapshot::fromOxidBasket($context->getBasket());
+
+        // 2. Create contract (DRAFT state)
+        $contract = new PaymentContract(
+            shopId: $this->config->getShopId(),
+            userId: $context->getUser()->getId(),
+            basketSnapshot: $basketSnapshot,
+            state: PaymentContract::STATE_DRAFT
+        );
+
+        // 3. Define conditions (what must be fulfilled)
+        $contract->addCondition(new ContractCondition(
+            type: ContractCondition::TYPE_PAYMENT_AUTHORIZED
+        ));
+        $contract->addCondition(new ContractCondition(
+            type: ContractCondition::TYPE_FRAUD_CHECK
+        ));
+        $contract->addCondition(new ContractCondition(
+            type: ContractCondition::TYPE_STOCK_RESERVED
+        ));
+
+        // 4. Save contract
+        $this->contractRepository->save($contract);
+
+        // 5. Store contract in context (for other handlers)
+        $context->setContract($contract);
+
+        // 6. Emit event (triggers condition resolution)
+        $this->dispatcher->dispatch(new ContractCreatedEvent($contract));
+    }
+}
+```
+
+### Parallel Condition Resolution Pattern
+
+```php
+class PaymentAuthorizationHandler
+{
+    public function handle(ContractTransitionedToPendingEvent $event): void
+    {
+        $contract = $event->getContract();
+
+        try {
+            // Call payment provider via adapter
+            $authResponse = $this->paymentService->authorizePayment(
+                amount: $contract->getBasketSnapshot()->getTotalGross(),
+                currency: $contract->getBasketSnapshot()->getCurrency(),
+                returnUrl: $this->buildReturnUrl($contract)
+            );
+
+            if ($authResponse->isSuccessful()) {
+                // Fulfill condition
+                $contract->fulfillCondition(
+                    type: ContractCondition::TYPE_PAYMENT_AUTHORIZED,
+                    data: [
+                        'authorizationId' => $authResponse->getAuthorizationId(),
+                        'providerOrderId' => $authResponse->getProviderOrderId()
+                    ]
+                );
+
+                // Set provider info on contract
+                $contract->setProvider(
+                    provider: $authResponse->getProvider(),
+                    providerOrderId: $authResponse->getProviderOrderId()
+                );
+
+                $this->contractRepository->save($contract);
+
+                // Check if all conditions fulfilled
+                if ($contract->areAllConditionsFulfilled()) {
+                    $this->dispatcher->dispatch(
+                        new ContractReadyToCommitEvent($contract)
+                    );
+                }
+            } else {
+                // Fail condition
+                $contract->failCondition(
+                    type: ContractCondition::TYPE_PAYMENT_AUTHORIZED,
+                    reason: $authResponse->getErrorMessage()
+                );
+
+                $this->dispatcher->dispatch(new ContractFailedEvent($contract));
+            }
+
+        } catch (\Exception $e) {
+            $this->logger->error('Payment authorization failed', [
+                'contractId' => $contract->getId(),
+                'error' => $e->getMessage()
+            ]);
+
+            $contract->fail('Payment authorization error: ' . $e->getMessage());
+            $this->dispatcher->dispatch(new ContractFailedEvent($contract));
+        }
+    }
+}
+```
+
+**Pattern Highlights:**
+- Handlers run in parallel (payment auth, fraud check, stock reservation)
+- Each fulfills one condition
+- Contract checks if ALL conditions fulfilled
+- If yes, emit ContractReadyToCommitEvent
+
+### Order Creation from Contract Pattern
+
+```php
+class OrderCreationHandler
+{
+    public function handle(ContractReadyToCommitEvent $event): void
+    {
+        $contract = $event->getContract();
+
+        // All conditions verified → Safe to create order
+        $order = $this->orderFactory->createFromContract($contract);
+        $order->setState(Order::ORDER_STATE_NOT_FINISHED);
+        $order->setOrderNumber($this->getNextOrderNumber());  // No gaps!
+        $order->save();
+
+        // Link contract to order
+        $contract->commitToOrder($order->getId());
+        $this->contractRepository->save($contract);
+
+        // Create PaymentOrderState (links both contract + order)
+        $orderState = new PaymentOrderState(
+            orderId: $order->getId(),
+            contractId: $contract->getId(),  // NEW!
+            paymentState: PaymentOrderState::STATE_PAYMENT_IN_PROGRESS
+        );
+        $this->orderStateRepository->save($orderState);
+
+        // Emit event
+        $this->dispatcher->dispatch(
+            new ContractCommittedEvent($contract, $order)
+        );
+    }
+}
+```
+
+**Critical:** Order number assigned HERE, not earlier. No gaps for failed payments!
+
+### Payment Capture from Webhook Pattern
+
+```php
+class PaymentCaptureHandler
+{
+    public function handle(WebhookReceivedEvent $event): void
+    {
+        $contract = $event->getContract();
+        $payload = $event->getPayload();
+
+        // Validate payment status from provider
+        if ($payload['status'] !== 'captured') {
+            $this->logger->warning('Webhook received but payment not captured', [
+                'contractId' => $contract->getId(),
+                'status' => $payload['status']
+            ]);
+            return;
+        }
+
+        // Fulfill contract
+        $contract->fulfill();
+        $this->contractRepository->save($contract);
+
+        // Update order
+        $order = $this->orderRepository->find($contract->getOrderId());
+        $order->markOrderPaid();
+        $order->setState(Order::ORDER_STATE_OK);
+        $order->save();
+
+        // Update order state
+        $orderState = $this->orderStateRepository->findByOrderId($order->getId());
+        $orderState->markAsCompleted();
+        $this->orderStateRepository->save($orderState);
+
+        // Create transaction record
+        $transaction = new PaymentTransaction(
+            shopId: $order->getShopId(),
+            orderId: $order->getId(),
+            contractId: $contract->getId(),  // NEW!
+            provider: $contract->getProvider(),
+            providerOrderId: $contract->getProviderOrderId(),
+            type: 'capture',
+            status: 'completed',
+            amount: $contract->getBasketSnapshot()->getTotalGross(),
+            currency: $contract->getBasketSnapshot()->getCurrency()
+        );
+        $this->transactionRepository->save($transaction);
+
+        // Emit completion event
+        $this->dispatcher->dispatch(
+            new ContractFulfilledEvent($contract, $order)
+        );
+    }
+}
+```
+
+---
+
+## 4. Service Layer (Contract-Aware Services)
+
+### NEW Responsibilities
+- Implement reusable business operations **with contract awareness**
+- Called by event handlers (not controllers!)
+- Integrate with external APIs via SDK-Adapter
 - Enforce business rules
 - Stateless operations
 
-### Components
+### Contract-Aware Services
 
-#### Core Services
 **Location:** `src/Service/`
 
-| Service | Purpose | Called By | Reusability |
-|---------|---------|-----------|-------------|
-| `PaymentService` | Provider API operations | Event Handlers | 90% |
-| `AuthorizationService` | Two-step auth/capture flow | PaymentService | 100% |
-| `IdempotencyService` | Duplicate request prevention | PaymentService | 100% |
-| `VaultingService` | Save payment methods | PaymentService | 100% |
-| `SCAValidatorService` | 3D Secure validation | PaymentService | 100% |
-| `RefundService` | Refund calculations | PaymentService | 100% |
-| `OrderManager` | Order lifecycle | Event Handlers | 100% |
-| `OrderRepository` | Order data access | Event Handlers | 100% |
-| `ModuleSettings` | Configuration | Event Handlers | 100% |
-| `OrderProcessTracking` | Process tracking | Event Handlers | 100% |
-| `BasketSummary` | Amount calculations | Event Handlers | 100% |
-| `UserRepository` | User data access | Event Handlers | 100% |
+| Service | Purpose | Contract Interaction |
+|---------|---------|---------------------|
+| `ContractService` | Contract CRUD, state management | Primary contract operations |
+| `PaymentService` | Provider API operations | Uses contract data for payment |
+| `AuthorizationService` | Two-step auth/capture | Links authorization to contract |
+| `IdempotencyService` | Duplicate prevention | Uses contract ID for key |
+| `VaultingService` | Save payment methods | Associates with contract user |
+| `OrderFactory` | Create orders | Builds order from contract snapshot |
+| `OrderManager` | Order lifecycle | Reads contract for context |
 
-#### Payment Service - Core Methods
+### ContractService Implementation
 
-**Payment Creation:**
 ```php
-initiatePayment(
-    order, paymentMethod, directCapture = false
-): PaymentResponse
+class ContractService
+{
+    public function createContract(
+        string $userId,
+        Basket $basket,
+        array $conditions = []
+    ): PaymentContract {
+        $basketSnapshot = BasketSnapshot::fromOxidBasket($basket);
 
-// Creates payment via adapter
-// Handles idempotency
-// Tracks transaction
-```
+        $contract = new PaymentContract(
+            shopId: $this->config->getShopId(),
+            userId: $userId,
+            basketSnapshot: $basketSnapshot
+        );
 
-**Authorization Flow (NEW):**
-```php
-authorizePayment(request): AuthorizationResponse
-captureAuthorization(authorizationId, amount): CaptureResponse
-voidAuthorization(authorizationId): VoidResponse
-reauthorizePayment(authorizationId): AuthorizationResponse
+        // Add default conditions if not provided
+        if (empty($conditions)) {
+            $conditions = [
+                ContractCondition::TYPE_PAYMENT_AUTHORIZED,
+                ContractCondition::TYPE_FRAUD_CHECK,
+            ];
+        }
 
-// Two-step authorization flow
-// Partial/full capture support
-// Reauthorization for expiring auths
-```
+        foreach ($conditions as $conditionType) {
+            $contract->addCondition(new ContractCondition($conditionType));
+        }
 
-**3D Secure Flow (NEW):**
-```php
-initiate3DSecure(request): ThreeDSecureResponse
-verify3DSecureResult(providerPaymentId): bool
+        $this->contractRepository->save($contract);
 
-// Start 3DS authentication
-// Verify authentication result
-```
+        return $contract;
+    }
 
-**Vaulting (NEW):**
-```php
-createPaymentWithSavedMethod(
-    order, savedPaymentMethodId
-): PaymentResponse
+    public function findActiveContractByUser(string $userId): ?PaymentContract
+    {
+        return $this->contractRepository->findOneBy([
+            'userId' => $userId,
+            'state' => [
+                PaymentContract::STATE_PENDING,
+                PaymentContract::STATE_READY_TO_COMMIT,
+                PaymentContract::STATE_COMMITTED
+            ]
+        ]);
+    }
 
-vaultPaymentMethod(
-    user, providerPaymentMethodId
-): SavedPaymentMethod
+    public function cleanupExpiredContracts(): int
+    {
+        $expired = $this->contractRepository->findExpired();
+        $count = 0;
 
-// Use saved payment methods
-// Vault new payment methods
-```
+        foreach ($expired as $contract) {
+            $contract->expire();
+            $this->contractRepository->save($contract);
+            $count++;
+        }
 
-**Refund Operations:**
-```php
-refundPayment(
-    orderId, amount = null, isPartial = false
-): RefundResponse
-
-// Full or partial refund
-// Validates max refundable amount
-// Tracks refunded amounts
-```
-
-**Transaction Tracking:**
-```php
-trackTransaction(
-    orderId, providerOrderId, status, transactionType
-): PaymentTransaction
-
-// Persists transaction to database
-```
-
-### Service Dependencies
-
-```
-PaymentService
-  ├─ uses: PaymentAdapterInterface (provider abstraction)
-  ├─ uses: AuthorizationService (two-step auth flow)
-  ├─ uses: IdempotencyService (duplicate prevention)
-  ├─ uses: VaultingService (saved payment methods)
-  ├─ uses: SCAValidatorService (3D Secure validation)
-  ├─ uses: RefundService (refund calculations)
-  ├─ uses: OrderRepository (data access)
-  ├─ uses: PaymentTransactionRepository (transaction tracking)
-  ├─ uses: ModuleSettings (configuration)
-  └─ uses: Logger (debugging/errors)
-
-AuthorizationService
-  ├─ uses: PaymentAdapterInterface (provider operations)
-  ├─ uses: PaymentTransactionRepository (authorization tracking)
-  └─ uses: Logger
-
-IdempotencyService
-  ├─ uses: IdempotencyRepository (key/result storage)
-  └─ uses: Cache
-
-VaultingService
-  ├─ uses: PaymentAdapterInterface (provider vaulting)
-  ├─ uses: SavedPaymentMethodRepository (stored methods)
-  └─ uses: Logger
-
-SCAValidatorService
-  ├─ uses: PaymentAdapterInterface (3DS operations)
-  ├─ uses: ModuleSettings (3DS configuration)
-  └─ uses: Logger
-
-RefundService
-  ├─ uses: PaymentAdapterInterface (provider refunds)
-  ├─ uses: PaymentTransactionRepository (refund tracking)
-  ├─ uses: ModuleSettings (provider-specific rules)
-  └─ uses: Logger
-```
-
-### Service Layer Patterns
-
-#### 1. Repository Pattern
-```php
-interface OrderRepository {
-    paymenterOrderByOrderIdAndPaymenterId(
-        shopOrderId, paymenterOrderId, transactionId
-    ): PaymenterOrder
-
-    getShopOrderByPaymenterOrderId(paymenterOrderId): Order
-
-    cleanUpNotFinishedOrders(): void
+        return $count;
+    }
 }
 ```
 
-**Benefits:**
-- Abstracts data access
-- Testable with mocks
-- Centralized query logic
+### OrderFactory (Create from Contract)
 
-#### 2. Configuration Service Pattern
 ```php
-class ModuleSettings {
-    isSandbox(): bool
-    getClientId(): string
-    getClientSecret(): string
-    getPaymenterStandardCaptureStrategy(): string  // 'directly', 'delivery', 'manually'
-    isAcdcEligibility(): bool
-    isPuiEligibility(): bool
-    // ... 50+ configuration methods
+class OrderFactory
+{
+    public function createFromContract(PaymentContract $contract): Order
+    {
+        $snapshot = $contract->getBasketSnapshot();
+
+        $order = new Order();
+
+        // Map basket snapshot to order
+        $order->setUserId($contract->getUserId());
+        $order->setTotalAmount($snapshot->getTotalGross());
+        $order->setNetAmount($snapshot->getTotalNet());
+        $order->setVatAmount($snapshot->getTotalVat());
+        $order->setCurrency($snapshot->getCurrency());
+
+        // Map items
+        foreach ($snapshot->getItems() as $item) {
+            $orderArticle = new OrderArticle();
+            $orderArticle->setArticleId($item['articleId']);
+            $orderArticle->setTitle($item['title']);
+            $orderArticle->setAmount($item['amount']);
+            $orderArticle->setPrice($item['price']);
+            $orderArticle->setVat($item['vat']);
+            $order->addArticle($orderArticle);
+        }
+
+        // Map discounts
+        foreach ($snapshot->getDiscounts() as $discount) {
+            $order->addDiscount($discount);
+        }
+
+        return $order;
+    }
 }
 ```
-
-**Benefits:**
-- Centralized configuration
-- Environment separation (sandbox/production)
-- Type-safe access
-
-#### 3. Factory Service Pattern
-```php
-class OrderRequestFactory {
-    setBasket(basket): self
-
-    getRequest(
-        basket, intent, userAction, customId,
-        processingInstruction, paymentSource,
-        payPalClientMetadataId, returnUrl, cancelUrl,
-        setProvidedAddress
-    ): OrderRequest
-}
-```
-
-**Benefits:**
-- Separates construction from business logic
-- Reusable request building
-- Testable independently
 
 ---
 
-## 2.5 SDK-Adapter Layer (NEW - Provider Abstraction)
+## 5. SDK-Adapter Layer (Provider Contract Mapping)
 
-### Responsibilities
-- **Unified interface** for all payment provider SDKs (Stripe, Unzer, PayPal, Adyen, etc.)
-- **Translate** component requests to provider-specific formats
-- **Map** provider responses to component format
-- **Isolate** business logic from provider SDK changes
-- **Enable** easy provider switching via configuration
+### NEW Responsibilities
+- Map **provider contract patterns** to **our contract pattern**
+- Translate provider states to contract states
+- Handle provider-specific contract IDs (PaymentIntent ID, Order ID, etc.)
 
-### Architecture Principle: Provider Agnostic Design
-
-**Problem Without SDK-Adapter:**
-```php
-// ❌ BAD: Business logic tightly coupled to Stripe SDK
-class PaymentService {
-    public function createPayment(Order $order): void {
-        $stripe = new \Stripe\StripeClient($apiKey);
-        $intent = $stripe->paymentIntents->create([
-            'amount' => $order->getTotal() * 100, // Stripe-specific cents conversion
-            'currency' => strtolower($order->getCurrency()),
-            // ... Stripe-specific code everywhere
-        ]);
-    }
-}
-```
-
-**Solution With SDK-Adapter:**
-```php
-// ✅ GOOD: Business logic uses provider-agnostic interface
-class PaymentService {
-    public function __construct(
-        private PaymentAdapterInterface $adapter  // Provider-agnostic!
-    ) {}
-
-    public function createPayment(Order $order): void {
-        $request = new CreatePaymentRequest(
-            amount: $order->getTotal(),
-            currency: $order->getCurrency(),
-            orderId: $order->getId()
-        );
-
-        // Works with Stripe, Unzer, PayPal, etc.
-        $response = $this->adapter->createPayment($request);
-    }
-}
-```
-
-### Components
-
-#### Core Interface
-**Location:** `src/Adapter/PaymentAdapterInterface.php`
+### Provider Contract State Mapping
 
 ```php
-interface PaymentAdapterInterface
+class StripeAdapter implements PaymentAdapterInterface
 {
-    // Payment operations
-    public function createPayment(CreatePaymentRequest $request): PaymentResponse;
-    public function capturePayment(CapturePaymentRequest $request): CaptureResponse;
-    public function refundPayment(RefundPaymentRequest $request): RefundResponse;
-    public function voidPayment(VoidPaymentRequest $request): VoidResponse;
-    public function getPaymentDetails(string $providerPaymentId): PaymentDetailsResponse;
-
-    // Provider metadata
-    public function getSupportedPaymentMethods(): array;
-    public function getProviderName(): string;
-    public function supportsFeature(string $feature): bool;
-
-    // Webhook handling
-    public function parseWebhook(string $payload, string $signature, string $secret): WebhookEvent;
-}
-```
-
-#### Provider Adapters
-**Location:** `src/Adapter/Provider/`
-
-| Adapter | Provider | SDK | Reusability |
-|---------|----------|-----|-------------|
-| `StripeAdapter` | Stripe | stripe/stripe-php | Provider-specific (30%) |
-| `UnzerAdapter` | Unzer | unzerdev/php-sdk | Provider-specific (30%) |
-| `PayPalAdapter` | PayPal | paypal/paypal-checkout-sdk | Provider-specific (30%) |
-| `AdyenAdapter` | Adyen | adyen/php-api-library | Provider-specific (30%) |
-
-**Note:** While adapters are provider-specific (30% reusable), the **adapter pattern itself is 100% reusable**.
-
-#### Request Objects (100% Reusable)
-**Location:** `src/Adapter/Request/`
-
-```php
-// Provider-agnostic request
-class CreatePaymentRequest
-{
-    public function __construct(
-        private readonly float $amount,
-        private readonly string $currency,
-        private readonly string $orderId,
-        private readonly string $shopId,
-        private readonly string $paymentMethod,
-        private readonly bool $directCapture = false,
-        private readonly ?string $returnUrl = null,
-        private readonly ?string $cancelUrl = null
-    ) {}
-
-    // Getters...
-}
-```
-
-**Other Requests:**
-- `CapturePaymentRequest` - Capture authorized payment
-- `RefundPaymentRequest` - Refund captured payment
-- `VoidPaymentRequest` - Cancel authorization
-- All are provider-agnostic and 100% reusable
-
-#### Response Objects (100% Reusable)
-**Location:** `src/Adapter/Response/`
-
-```php
-// Provider-agnostic response
-class PaymentResponse
-{
-    public function __construct(
-        private readonly string $providerPaymentId,
-        private readonly string $status,
-        private readonly float $amount,
-        private readonly string $currency,
-        private readonly ?string $clientSecret = null,
-        private readonly bool $requiresAction = false,
-        private readonly ?string $nextActionUrl = null
-    ) {}
-
-    // Status helpers
-    public function isPending(): bool { return $this->status === 'pending'; }
-    public function isAuthorized(): bool { return $this->status === 'authorized'; }
-    public function isCaptured(): bool { return $this->status === 'captured'; }
-}
-```
-
-**Other Responses:**
-- `CaptureResponse` - Capture result
-- `RefundResponse` - Refund result
-- `PaymentDetailsResponse` - Payment details
-- All are provider-agnostic and 100% reusable
-
-#### Adapter Factory (100% Reusable)
-**Location:** `src/Adapter/AdapterFactory.php`
-
-```php
-class AdapterFactory
-{
-    public function __construct(
-        private readonly ModuleSettings $settings
-    ) {}
-
-    // Create adapter based on configuration
-    public function createAdapter(string $providerName): PaymentAdapterInterface
-    {
-        return match ($providerName) {
-            'stripe' => $this->createStripeAdapter(),
-            'unzer' => $this->createUnzerAdapter(),
-            'paypal' => $this->createPayPalAdapter(),
-            'adyen' => $this->createAdyenAdapter(),
-            default => throw new \InvalidArgumentException("Unknown provider: {$providerName}"),
-        };
-    }
-
-    // Create default configured adapter
-    public function createDefaultAdapter(): PaymentAdapterInterface
-    {
-        $provider = $this->settings->getDefaultProvider();
-        return $this->createAdapter($provider);
-    }
-}
-```
-
-### Example: StripeAdapter Implementation
-
-```php
-final class StripeAdapter implements PaymentAdapterInterface
-{
-    private StripeClient $client;
-
-    public function __construct(
-        private readonly string $apiKey,
-        private readonly bool $sandbox = false
-    ) {
-        $this->client = new StripeClient($this->apiKey);
-    }
-
     public function createPayment(CreatePaymentRequest $request): PaymentResponse
     {
-        try {
-            // Translate component request to Stripe format
-            $intent = $this->client->paymentIntents->create([
-                'amount' => $this->convertAmountToCents($request->getAmount()),
-                'currency' => strtolower($request->getCurrency()),
-                'capture_method' => $request->isDirectCapture() ? 'automatic' : 'manual',
-                'metadata' => ['order_id' => $request->getOrderId()],
-            ]);
+        // Create Stripe PaymentIntent (their "contract")
+        $paymentIntent = $this->client->paymentIntents->create([
+            'amount' => $this->convertAmountToCents($request->getAmount()),
+            'currency' => strtolower($request->getCurrency()),
+            'capture_method' => 'manual',  // Two-step = contract pattern
+            'metadata' => [
+                'contract_id' => $request->getContractId()  // NEW!
+            ],
+        ]);
 
-            // Translate Stripe response to component format
-            return new PaymentResponse(
-                providerPaymentId: $intent->id,
-                status: $this->mapStripeStatus($intent->status),
-                amount: $this->convertCentsToAmount($intent->amount),
-                currency: strtoupper($intent->currency),
-                clientSecret: $intent->client_secret,
-                requiresAction: $intent->status === 'requires_action'
-            );
-
-        } catch (ApiErrorException $e) {
-            throw PaymentAdapterException::fromProviderError(
-                provider: 'stripe',
-                message: $e->getMessage(),
-                code: $e->getStripeCode() ?? 'unknown',
-                previous: $e
-            );
-        }
+        // Map Stripe state to our contract semantics
+        return new PaymentResponse(
+            providerPaymentId: $paymentIntent->id,  // Stripe's contract ID
+            status: $this->mapStripeStatusToContractStatus($paymentIntent->status),
+            amount: $this->convertCentsToAmount($paymentIntent->amount),
+            currency: strtoupper($paymentIntent->currency),
+            clientSecret: $paymentIntent->client_secret,
+            requiresAction: $paymentIntent->status === 'requires_action'
+        );
     }
 
-    private function convertAmountToCents(float $amount): int
+    private function mapStripeStatusToContractStatus(string $stripeStatus): string
     {
-        return (int) round($amount * 100);
-    }
-
-    private function mapStripeStatus(string $stripeStatus): string
-    {
-        return match ($stripeStatus) {
-            'requires_capture' => 'authorized',
-            'succeeded' => 'captured',
-            'requires_action' => 'requires_action',
-            'canceled' => 'cancelled',
+        return match($stripeStatus) {
+            'requires_confirmation' => 'pending',  // Contract PENDING
+            'requires_action' => 'pending',  // Contract PENDING (3DS)
+            'requires_capture' => 'ready_to_commit',  // Contract READY_TO_COMMIT
+            'succeeded' => 'fulfilled',  // Contract FULFILLED
+            'canceled' => 'cancelled',  // Contract CANCELLED
             default => 'unknown',
         };
     }
-
-    public function getProviderName(): string
-    {
-        return 'stripe';
-    }
-
-    public function getSupportedPaymentMethods(): array
-    {
-        return ['card', 'ideal', 'sepa_debit', 'sofort', 'giropay'];
-    }
 }
 ```
 
-### Error Handling
+**Pattern:** Provider states map to contract states, making the abstraction explicit.
 
-**Unified Exception:**
-```php
-class PaymentAdapterException extends \RuntimeException
-{
-    public function __construct(
-        string $message,
-        private readonly string $errorCode,
-        private readonly ?string $provider = null,
-        ?\Throwable $previous = null
-    ) {
-        parent::__construct($message, 0, $previous);
-    }
+---
 
-    public static function fromProviderError(
-        string $provider,
-        string $message,
-        string $code,
-        ?\Throwable $previous = null
-    ): self {
-        return new self(
-            message: "[{$provider}] {$message}",
-            errorCode: $code,
-            provider: $provider,
-            previous: $previous
-        );
-    }
+## 6. Data Layer (Contract-Enhanced Schema)
 
-    public function isCardDeclined(): bool
-    {
-        return in_array($this->errorCode, ['card_declined', 'insufficient_funds']);
-    }
-}
-```
+### Responsibilities
+- Persist contracts, conditions, basket snapshots
+- Maintain FK references to OXID core (NO ALTER TABLE)
+- Efficient queries for contract lookup
+- Cache contract state
 
-### Integration with PaymentService
+### Key Tables (Contract-Aware)
+
+**Primary:**
+- `osc_payment_contract` - Master contract table (NEW)
+  - Stores: state, basket snapshot (JSON), conditions (JSON), provider order ID
+  - FK to oxuser (OXUSERID)
+  - FK to oxorder (OXORDERID) - **NULL until committed!**
+
+**Enhanced:**
+- `osc_payment_order_state` - Enhanced with OXCONTRACTID FK
+- `osc_payment_transaction` - Enhanced with OXCONTRACTID FK
+
+**See:** [02-database-and-models.md](02-database-and-models.md) for complete schema.
+
+### Repository Patterns
 
 ```php
-class PaymentService
+class ContractRepository
 {
-    public function __construct(
-        private readonly PaymentAdapterInterface $adapter,  // Injected adapter
-        private readonly PaymentTransactionRepository $transactionRepo,
-        private readonly PaymentOrderStateRepository $orderStateRepo
-    ) {}
-
-    public function initiatePayment(Order $order, string $paymentMethod): PaymentResponse
+    public function findByProviderOrderId(string $providerOrderId): ?PaymentContract
     {
-        // Create adapter request (provider-agnostic)
-        $request = new CreatePaymentRequest(
-            amount: $order->getTotalAmount(),
-            currency: $order->getCurrency(),
-            orderId: $order->getId(),
-            shopId: $order->getShopId(),
-            paymentMethod: $paymentMethod,
-            directCapture: $this->shouldDirectCapture($paymentMethod),
-            returnUrl: $this->buildReturnUrl($order),
-            cancelUrl: $this->buildCancelUrl($order)
+        // Fast lookup for webhook processing
+        $data = $this->connection->fetchAssociative(
+            "SELECT * FROM osc_payment_contract WHERE OXPROVIDERORDERID = ?",
+            [$providerOrderId]
         );
 
-        try {
-            // Call adapter (works with any provider)
-            $response = $this->adapter->createPayment($request);
+        return $data ? $this->hydrate($data) : null;
+    }
 
-            // Track transaction
-            $transaction = new PaymentTransaction(
-                shopId: $order->getShopId(),
-                orderId: $order->getId(),
-                providerOrderId: $response->getProviderPaymentId(),
-                status: $response->getStatus(),
-                paymentMethodId: $paymentMethod,
-                transactionType: $response->isCaptured() ? 'capture' : 'authorization'
-            );
-            $this->transactionRepo->save($transaction);
+    public function findExpired(\DateTime $before = null): array
+    {
+        $before = $before ?? new \DateTime();
 
-            return $response;
+        $rows = $this->connection->fetchAllAssociative(
+            "SELECT * FROM osc_payment_contract
+             WHERE OXEXPIRESAT < ?
+             AND OXSTATE NOT IN (?, ?, ?)",
+            [
+                $before->format('Y-m-d H:i:s'),
+                PaymentContract::STATE_FULFILLED,
+                PaymentContract::STATE_CANCELLED,
+                PaymentContract::STATE_EXPIRED,
+            ]
+        );
 
-        } catch (PaymentAdapterException $e) {
-            // Unified error handling for all providers
-            $this->logger->error('Payment initiation failed', [
-                'provider' => $e->getProvider(),
-                'error' => $e->getErrorCode(),
-                'order_id' => $order->getId(),
-            ]);
-            throw new PaymentException("Payment failed: {$e->getMessage()}", previous: $e);
-        }
+        return array_map(fn($row) => $this->hydrate($row), $rows);
     }
 }
 ```
 
-### Benefits
+---
 
-✅ **Provider Agnostic** - Business logic doesn't know about Stripe/Unzer/PayPal
-✅ **Easy Testing** - Mock `PaymentAdapterInterface`, not provider SDKs
-✅ **Easy Provider Switching** - Change provider via configuration
-✅ **Consistent Errors** - All providers throw `PaymentAdapterException`
-✅ **SDK Independence** - Update provider SDKs without changing component
-✅ **100% Pattern Reusability** - The adapter pattern works for ANY provider
+## Contract Lifecycle: Complete Flow
 
-### Configuration
+### Phase 1: Contract Creation
 
-**Module Settings:**
-```yaml
-payment:
-  default_provider: stripe
-  providers:
-    stripe:
-      api_key: sk_test_...
-      sandbox: true
-    unzer:
-      private_key: s-priv-...
-      sandbox: true
-    paypal:
-      client_id: ...
-      client_secret: ...
-      sandbox: true
+```
+OrderController::execute()
+  → Validate input, cache data
+  → Emit PaymentInitiatedEvent
+
+PaymentInitiationHandler::handle()
+  → Create PaymentContract (DRAFT)
+  → Add conditions (payment_authorized, fraud_check, stock_reserved)
+  → Save contract
+  → Emit ContractCreatedEvent
+
+Contract state: DRAFT
 ```
 
-**DI Container Registration:**
-```php
-// Register factory
-$container->singleton(AdapterFactory::class, function ($c) {
-    return new AdapterFactory($c->get(ModuleSettings::class));
-});
+### Phase 2: Transition to Pending
 
-// Register default adapter
-$container->singleton(PaymentAdapterInterface::class, function ($c) {
-    return $c->get(AdapterFactory::class)->createDefaultAdapter();
-});
+```
+ContractConditionResolverHandler::handle()
+  → Validate conditions defined
+  → Transition contract to PENDING
+  → Emit ContractTransitionedToPendingEvent
+
+Contract state: DRAFT → PENDING
 ```
 
-**Documentation:** See [04-sdk-adapter-layer.md](04-sdk-adapter-layer.md) for complete SDK-Adapter architecture details.
+### Phase 3: Condition Resolution (Parallel)
+
+```
+PaymentAuthorizationHandler::handle()
+  → Authorize payment via adapter
+  → Contract.fulfillCondition('payment_authorized')
+
+FraudCheckHandler::handle()
+  → Run fraud check
+  → Contract.fulfillCondition('fraud_check')
+
+StockReservationHandler::handle()
+  → Reserve inventory
+  → Contract.fulfillCondition('stock_reserved')
+
+Contract monitors: All conditions fulfilled?
+  → YES: Emit ContractReadyToCommitEvent
+
+Contract state: PENDING → READY_TO_COMMIT
+```
+
+### Phase 4: Order Creation
+
+```
+OrderCreationHandler::handle()
+  → Create OXID order from contract snapshot
+  → Assign order number (NO GAPS!)
+  → Contract.commitToOrder(order.getId())
+  → Create PaymentOrderState (link contract + order)
+  → Emit ContractCommittedEvent
+
+Contract state: READY_TO_COMMIT → COMMITTED
+Order state: NOT_FINISHED
+```
+
+### Phase 5: Payment Capture (Webhook)
+
+```
+WebhookController::handleRequest()
+  → Validate signature
+  → Find contract by provider order ID
+  → Emit WebhookReceivedEvent
+
+PaymentCaptureHandler::handle()
+  → Validate payment captured
+  → Contract.fulfill()
+  → Order.markOrderPaid()
+  → Order.setState(OK)
+  → Create transaction record
+  → Emit ContractFulfilledEvent
+
+Contract state: COMMITTED → FULFILLED
+Order state: NOT_FINISHED → OK
+```
 
 ---
 
-## 3. Domain Layer (Refactored - OXID 7.4+)
+## Testing Strategy (Contract-Focused)
 
-### Responsibilities
-- Define business entities and value objects
-- Encapsulate business rules
-- **Reference core shop models via FK** (NO class extensions in metadata.php)
-- Define domain events
-- Maintain payment state machine
+### Unit Tests (Pure Domain Logic)
 
-### Architecture Principle: Foreign Key References (NEW)
-
-**OLD Approach (Deprecated)**:
-```
-❌ Class extensions: Order extends oxOrder
-❌ ALTER TABLE oxorder ADD COLUMN...
-❌ Tight coupling to OXID core
-```
-
-**NEW Approach (OXID 7.4+)**:
-```
-✅ Component models with FK references
-✅ CREATE TABLE osc_payment_* with OXORDERID FK
-✅ Clean isolation from OXID core
-✅ No metadata.php extensions
-```
-
-### Components
-
-#### Component Models (NEW - FK Reference Pattern)
-**Location:** `src/Component/Model/`
-
-**Philosophy**: Component uses separate tables that reference OXID core via FK
-
-| Component Model | References | Relationship | Reusability |
-|-----------------|------------|--------------|-------------|
-| `PaymentTransaction` | oxorder.OXID | 1:N (FK) | 100% |
-| `PaymentOrderState` | oxorder.OXID | 1:1 (FK + UNIQUE) | 100% |
-| `PaymentCustomer` | oxuser.OXID | 1:1 (FK + UNIQUE) | 100% |
-| `PaymentBasketSnapshot` | oxorder.OXID | 1:N (FK) | 100% |
-
-**Example - PaymentOrderState Model (NEW):**
 ```php
-namespace Osc\Payment\Component\Model;
-
-/**
- * Payment Order State
- *
- * Stores payment lifecycle state in separate component table.
- * References oxorder via FK (1:1), does NOT extend oxOrder.
- */
-final class PaymentOrderState implements PaymentOrderStates
+public function testContractLifecycle()
 {
-    private ?string $id = null;
-    private string $orderId;  // FK to oxorder.OXID (NOT inheritance!)
-    private string $paymentState;
-    private ?string $providerOrderId = null;
-    private ?\DateTime $webhookWaitSince = null;
-    private ?int $webhookTimeout = null;
+    // No database required!
+    $contract = new PaymentContract($shopId, $userId, $basketSnapshot);
+    $contract->addCondition(new ContractCondition('payment_authorized'));
 
-    public function __construct(string $orderId, string $paymentState = self::STATE_NOT_FINISHED)
-    {
-        $this->orderId = $orderId;  // Store FK reference
-        $this->paymentState = $paymentState;
-    }
+    $this->assertEquals(PaymentContract::STATE_DRAFT, $contract->getState());
 
-    // State machine methods
-    public function markAsPaymentInProgress(): void
-    {
-        $this->validateStateTransition(self::STATE_PAYMENT_IN_PROGRESS);
-        $this->paymentState = self::STATE_PAYMENT_IN_PROGRESS;
-    }
+    $contract->transitionToPending();
+    $this->assertEquals(PaymentContract::STATE_PENDING, $contract->getState());
 
-    public function markAsWaitingForWebhook(): void
-    {
-        $this->validateStateTransition(self::STATE_WAITING_FOR_WEBHOOK);
-        $this->paymentState = self::STATE_WAITING_FOR_WEBHOOK;
-        $this->webhookWaitSince = new \DateTime();
-    }
-
-    public function markAsCompleted(): void
-    {
-        $this->validateStateTransition(self::STATE_OK);
-        $this->paymentState = self::STATE_OK;
-    }
-
-    // Getters
-    public function getOrderId(): string { return $this->orderId; }
-    public function getPaymentState(): string { return $this->paymentState; }
+    $contract->fulfillCondition('payment_authorized', ['auth_id' => '123']);
+    $this->assertTrue($contract->areAllConditionsFulfilled());
 }
 ```
 
-**Example - PaymentTransaction Model:**
-```php
-namespace Osc\Payment\Component\Model;
+### Integration Tests
 
-/**
- * Payment Transaction
- *
- * Tracks provider transactions in separate component table.
- * References oxorder via FK (1:N), does NOT extend oxOrder.
- */
-final class PaymentTransaction
+```php
+public function testContractToOrderFlow()
 {
-    private ?string $id = null;
-    private string $shopId;
-    private string $orderId;  // FK to oxorder.OXID
-    private string $providerOrderId;
-    private ?string $transactionId = null;
-    private string $status;
-    private string $paymentMethodId;
-    private string $transactionType; // capture, authorization, refund
-    private array $providerData = [];
+    // Create contract
+    $contract = $this->contractService->createContract($userId, $basket);
 
-    public function __construct(
-        string $shopId,
-        string $orderId,
-        string $providerOrderId,
-        string $status,
-        string $paymentMethodId,
-        string $transactionType = 'capture'
-    ) {
-        $this->shopId = $shopId;
-        $this->orderId = $orderId;  // Store FK reference
-        $this->providerOrderId = $providerOrderId;
-        $this->status = $status;
-        $this->paymentMethodId = $paymentMethodId;
-        $this->transactionType = $transactionType;
-    }
+    // Fulfill conditions
+    $contract->fulfillCondition('payment_authorized');
+    $contract->fulfillCondition('fraud_check');
+    $this->contractRepository->save($contract);
 
-    // State management
-    public function markAsCompleted(): void { $this->status = 'COMPLETED'; }
-    public function markAsRefunded(): void { $this->status = 'REFUNDED'; }
-    public function setTransactionId(string $id): void { $this->transactionId = $id; }
+    // Create order from contract
+    $order = $this->orderFactory->createFromContract($contract);
+    $order->save();
 
-    // Getters
-    public function getOrderId(): string { return $this->orderId; }
-    public function getProviderOrderId(): string { return $this->providerOrderId; }
-    public function getTransactionId(): ?string { return $this->transactionId; }
-    public function getStatus(): string { return $this->status; }
-}
-```
+    $contract->commitToOrder($order->getId());
+    $this->contractRepository->save($contract);
 
-**Example - PaymentCustomer Model:**
-```php
-namespace Osc\Payment\Component\Model;
-
-/**
- * Payment Customer
- *
- * Stores customer payment data in separate component table.
- * References oxuser via FK (1:1), does NOT extend oxUser.
- */
-final class PaymentCustomer
-{
-    private ?string $id = null;
-    private string $userId;  // FK to oxuser.OXID (1:1)
-    private ?string $paymentCustomerId = null;
-    private ?string $defaultPaymentMethod = null;
-    private array $savedPaymentMethods = [];
-
-    public function __construct(string $userId)
-    {
-        $this->userId = $userId;  // Store FK reference
-    }
-
-    public function getUserId(): string { return $this->userId; }
-    public function getPaymentCustomerId(): ?string { return $this->paymentCustomerId; }
-
-    public function setPaymentCustomerId(string $customerId): void
-    {
-        $this->paymentCustomerId = $customerId;
-    }
-
-    public function addSavedPaymentMethod(string $methodId): void
-    {
-        $this->savedPaymentMethods[] = $methodId;
-    }
-}
-```
-
-#### Key Model Patterns
-
-**Order State Management:**
-```php
-class Order extends EshopModelOrder {
-    // Payment states
-    const ORDER_STATE_SESSIONPAYMENT_INPROGRESS = 500;
-    const ORDER_STATE_WAIT_FOR_WEBHOOK_EVENTS = 600;
-    const ORDER_STATE_ACDCINPROGRESS = 700;
-    const ORDER_STATE_ACDCCOMPLETED = 750;
-    const ORDER_STATE_NEED_CALL_ACDC_FINALIZE = 800;
-    const ORDER_STATE_TIMEOUT_FOR_WEBHOOK_EVENTS = 900;
-
-    finalizeOrder(): int
-    finalizeOrderAfterExternalPayment(basket): int
-    markOrderPaid(): void
-    setTransId(transactionId): void
-    isOrderFinished(): bool
-    isWaitForWebhookTimeoutReached(): bool
-}
-```
-
-**Transaction Tracking Model:**
-```php
-class PaymenterOrder extends EshopCoreModel {
-    getPaymenterOrderId(): string
-    getTransactionId(): string
-    getShopOrderId(): string
-    getStatus(): string
-    getPaymentMethodId(): string
-
-    setStatus(status): void
-    setTransactionId(id): void
-    setPaymentMethodId(id): void
-    setTransactionType(type): void  // 'capture' or 'authorization'
-}
-```
-
-**Basket Amount Methods:**
-```php
-class Basket extends EshopModelBasket {
-    getPaymenterCheckoutWrapping(): float
-    getPaymenterCheckoutGiftCard(): float
-    getPaymenterCheckoutPayment(): float
-    getPaymenterCheckoutDeliveryCosts(): float
-    getPaymenterCheckoutDiscount(): float
-    getPaymenterCheckoutItems(): float
-    isVirtualPaymenterBasket(): bool
-    isFractionQuantityItemsPresent(): bool
-}
-```
-
-#### Events
-**Location:** `src/Event/`
-
-```php
-class PaymenterOrderCompletedEvent extends Event {
-    private Order $order;
-    private Basket $basket;
-    private User $user;
-    private string $shopOrderId;
-    private string $payPalOrderId;
-    private string $paymentsId;
-    private string $transactionId;
-    private string $payPalCustomerId;
-
-    // Getters...
-}
-
-class PaymenterVaultingSucceededEvent extends Event {
-    private User $user;
-    private string $payPalCustomerId;
-
-    // Getters...
-}
-```
-
-**Pattern:** Domain events represent important business occurrences
-
----
-
-## 4. Data Access Layer (Enhanced with Caching)
-
-### Responsibilities
-- Execute database queries
-- Map database rows to domain objects
-- **Cache frequently accessed data** (NEW)
-- Manage transactions
-- Optimize queries
-
-### Components
-
-#### Repositories (Enhanced)
-**Location:** `src/Repository/`
-
-**OrderRepository Methods:**
-```php
-getTransactionByOrderAndProvider(
-    shopOrderId, providerOrderId, transactionId
-): PaymentTransaction
-
-getOrderByProviderOrderId(providerOrderId): Order
-
-getOrderByTransactionId(transactionId): Order
-
-getProviderOrderIdByShopOrderId(shopOrderId): string
-
-getCurrentOrderId(): string
-getCurrentOrder(): Order
-
-cleanUpAbandonedOrders(): void
-```
-
-**UserRepository Methods:**
-```php
-getUserById(userId): User
-getUserCountryIso(user): string
-getUserStateIso(user): string
-```
-
-#### Request Data Cache (NEW)
-**Location:** `src/Cache/RequestDataCache.php`
-
-**Purpose**: Cache expensive data fetches within a single HTTP request
-
-```php
-class RequestDataCache {
-    private array $cache = [];
-
-    // Cache basket for request lifetime
-    public function cacheBasket(Basket $basket): void;
-    public function getBasket(): ?Basket;
-
-    // Cache user for request lifetime
-    public function cacheUser(User $user): void;
-    public function getUser(): ?User;
-
-    // Cache session data
-    public function cacheSessionData(array $data): void;
-    public function getSessionData(): array;
-
-    // Clear cache after request
-    public function clear(): void;
-}
-```
-
-**Usage Pattern (in Controllers):**
-```php
-class OrderController {
-    public function execute() {
-        // Fetch once, cache for all event handlers
-        $basket = $this->basketRepository->getCurrentBasket();
-        $user = $this->userRepository->getCurrentUser();
-
-        $this->requestCache->cacheBasket($basket);
-        $this->requestCache->cacheUser($user);
-
-        // Event handlers access cached data
-        $event = new PaymentInitiatedEvent($this->requestCache);
-        $this->dispatcher->dispatch($event);
-    }
-}
-```
-
-**Benefits**:
-- Reduces database queries by 50-70%
-- Ensures data consistency across event handlers
-- No need to pass objects through multiple layers
-
-### Database Schema (OXID 7.4+)
-
-**Component Tables with FK References (NO ALTER TABLE on core):**
-
-**⚠️ IMPORTANT:** The database schema has been **normalized** to use a **Master-Detail Pattern** for optimal performance and maintainability.
-
-**📖 Complete Database Documentation:** See [02-database-and-models.md](02-database-and-models.md) for:
-- Normalized master-detail pattern architecture
-- Performance comparison (3-6x faster queries)
-- Complete SQL schemas for all 11 tables
-- Data models with FK reference pattern
-- Query examples and repository patterns
-- Migration scripts
-- Provider-specific handling
-
-**Quick Summary:**
-- **Master Table** (15 columns): `osc_payment_transaction` - Core fields only (~250 bytes/row)
-- **Detail Tables** (5 tables): Authorization, 3DS, Refund, Tracking, Provider Data
-- **Support Tables** (5 tables): Order State, Customer, Idempotency, Saved Methods, Sessions
-- **Benefits**: 6x smaller rows, 3-6x faster queries, 60-70% storage reduction, NULL-free schema
-
-**Database Tables (11 Total):**
-
-1. **osc_payment_transaction** - Master table (15 columns, ~250 bytes/row)
-2. **osc_payment_authorization_details** - Authorization-specific (computed columns for expiry)
-3. **osc_payment_3ds_details** - 3D Secure/SCA fields
-4. **osc_payment_refund_details** - Refund calculations
-5. **osc_payment_delivery_tracking** - Shipment tracking (Amazon Pay, PayPal)
-6. **osc_payment_provider_data** - Flexible key-value storage
-7. **osc_payment_order_state** - Payment lifecycle state (1:1 with oxorder)
-8. **osc_payment_customer** - Customer payment data (1:1 with oxuser)
-9. **osc_payment_idempotency** - Duplicate charge prevention (CRITICAL P0)
-10. **osc_payment_saved_methods** - Vaulting/tokenization
-11. **osc_payment_sessions** - Session state (Amazon Pay, PayPal)
-
-**Pattern**:
-- Component tables are **completely independent** from OXID core
-- Can be dropped with `DROP TABLE` without affecting oxorder/oxuser
-- FK constraints ensure data integrity
-- OXID core tables remain **unmodified** (no ALTER TABLE)
-
-**📖 See:** [02-database-and-models.md](02-database-and-models.md) for complete schemas, models, migrations, and query examples.
-
----
-
-## 5. Infrastructure Layer
-
-### Responsibilities
-- Provide low-level services
-- Manage external resources
-- Handle cross-cutting concerns
-
-### Components
-
-- **Database Connection:** Doctrine DBAL QueryBuilder
-- **HTTP Client:** Guzzle / cURL
-- **Logger:** PSR-3 Logger (Monolog)
-- **Session:** Shop session management
-- **Config:** Shop configuration access
-- **Event Dispatcher:** PSR-14 or Symfony EventDispatcher
-
-### Service Factory Pattern
-
-```php
-class ServiceFactory {
-    getOrderService(): ApiOrderService
-    getPaymentService(): ApiPaymentService
-    getVaultingService(): VaultingService
-    // Creates provider API clients
+    // Verify linkage
+    $this->assertEquals($order->getId(), $contract->getOrderId());
+    $this->assertEquals(PaymentContract::STATE_COMMITTED, $contract->getState());
 }
 ```
 
 ---
 
-## 6. External Integration Layer
+## Performance Characteristics
 
-### Responsibilities
-- Communicate with payment provider API
-- Handle webhook notifications
-- Verify signatures
-- Map provider responses to domain objects
+### Contract Operations Overhead
 
-### Components
+| Operation | Time | Notes |
+|-----------|------|-------|
+| Contract creation | ~50ms | JSON storage, condition setup |
+| Condition fulfillment | ~10ms | JSON update, state check |
+| All conditions check | <1ms | In-memory array iteration |
+| Order creation from contract | ~100ms | Standard OXID order creation |
+| **Total overhead vs. old** | **+50ms** | Acceptable for better architecture |
 
-#### API Client Integration
-**Location:** `src/Core/`, external SDK
+### Optimization Strategies
 
-- **Order API:** Create, update, capture, authorize orders
-- **Payment API:** Capture, refund, reauthorize payments
-- **Vaulting API:** Save/retrieve payment methods
-- **Identity API:** User information
-- **Webhook API:** Register/manage webhooks
-
-#### Webhook Processing
-**Location:** `src/Core/Webhook/`
-
-**Components:**
-- `Event` - Webhook event representation
-- `EventVerifier` - Signature verification
-- `EventDispatcher` - Route to handlers
-- `EventHandlerMapping` - Event type → handler class
-- `RequestHandler` - Process webhook request
-- `Handler/WebhookHandlerBase` - Base handler class
-- `Handler/*Handler` - Concrete event handlers
+- Redis caching for active contracts (PENDING, COMMITTED)
+- Indexed queries on OXSTATE, OXPROVIDERORDERID
+- Lazy-loading of basket snapshot (only when needed)
+- Async condition processing where possible
 
 ---
 
-## Layer Communication Rules
+## Summary: Layer Reusability (Contract-Enhanced)
 
-### Allowed Dependencies
-```
-Presentation → Service → Domain → Data Access → Infrastructure
-                      ↓
-                   External
-```
-
-### Forbidden Dependencies
-- Domain layer MUST NOT depend on Service layer
-- Service layer MUST NOT depend on Presentation layer
-- External systems accessed only through Service layer
-
-### Dependency Injection
-
-All layers use constructor injection:
-
-```php
-class PaymentService {
-    public function __construct(
-        Session $session,
-        OrderRepository $orderRepository,
-        SCAValidatorInterface $scaValidator,
-        ModuleSettings $moduleSettings,
-        LoggerInterface $logger,
-        OrderProcessTrackingService $trackingService,
-        ServiceFactory $serviceFactory,
-        PatchRequestFactory $patchFactory,
-        OrderRequestFactory $requestFactory
-    ) {
-        // Store dependencies
-    }
-}
-```
-
-**Benefits:**
-- Testability (inject mocks)
-- Flexibility (swap implementations)
-- Explicit dependencies (no hidden coupling)
+| Layer | Reusability | Contract Enhancements |
+|-------|-------------|----------------------|
+| Presentation | 70-90% | Contract status endpoints, webhook lookup |
+| Event Layer | 100% | Contract-specific events |
+| Event Handlers | 90-100% | Contract lifecycle management |
+| Contract Domain | 100% | NEW - fully reusable |
+| Service Layer | 95-100% | Contract-aware operations |
+| SDK-Adapter | 100% (pattern) | Provider contract state mapping |
+| Data Access | 100% | Contract repository, FK references |
+| Infrastructure | 100% | Standard PSR interfaces |
 
 ---
 
-## Cross-Cutting Concerns
+## Key Takeaways
 
-### Logging
-```php
-$this->logger->log('debug', 'Payment order created', [
-    'orderId' => $orderId,
-    'amount' => $amount
-]);
-```
-
-**Pattern:** PSR-3 Logger injected into services
-
-### Error Handling
-```php
-try {
-    $response = $orderService->createOrder($request);
-} catch (ApiException $e) {
-    $this->handlePaymenterApiError($e);
-    $this->setPaymentExecutionError(self::PAYMENT_ERROR_GENERIC);
-}
-```
-
-**Pattern:** Catch provider-specific exceptions, convert to domain errors
-
-### Configuration
-```php
-$captureStrategy = $this->moduleSettings->getPaymenterStandardCaptureStrategy();
-$isSandbox = $this->moduleSettings->isSandbox();
-```
-
-**Pattern:** Centralized configuration service
-
-### Session Management
-```php
-$sessionOrderId = $this->session->getVariable('sess_challenge');
-PaymenterSession::storePaymenterOrderId($payPalOrderId);
-```
-
-**Pattern:** Wrapper around shop session
-
----
-
-## Summary: Layer Reusability
-
-| Layer | Reusability | Notes |
-|-------|-------------|-------|
-| Presentation | 70-90% | Controller patterns reusable, templates vary |
-| Service | 90-100% | Core business logic is generic |
-| Domain | 90-100% | State machine and patterns reusable |
-| Data Access | 100% | Fully generic repositories |
-| Infrastructure | 100% | Standard interfaces (PSR) |
-| External | 30-50% | Provider-specific, but patterns apply |
+✅ **Contract-First Architecture**: Payment contracts manage lifecycle before order creation
+✅ **Event-Driven**: All operations triggered by domain events
+✅ **Explicit Conditions**: Tracked in database, not hidden in code
+✅ **Provider Alignment**: Maps to how Stripe, PayPal, etc. work internally
+✅ **Clean Separation**: Payment domain vs. order domain
+✅ **DDD-Compliant**: Aggregate roots, entities, value objects
+✅ **Testable**: Pure domain logic, no framework dependencies
+✅ **OXID-Compatible**: NO ALTER TABLE on core, FK references only
 
 ---
 

@@ -1,12 +1,13 @@
 # Database Implementation Guide - Sprint 1
-## TDD Approach for Migrations, Models, and Repositories
+## TDD Approach for Migrations, Models, and Repositories (Contract-Aware)
 
-**Version:** 1.0.0
-**Date:** 2025-10-17
+**Version:** 4.0.0
+**Date:** 2025-10-22
 **Target:** OXID eShop 7.4+
-**Philosophy:** Test-First Development with Clean Architecture
+**Philosophy:** Test-First Development with Clean Architecture + Smart Contracts
 **Related Docs:**
-- [02-database-and-models.md](02-database-and-models.md) - Database schema and architecture
+- [02-database-and-models.md](02-database-and-models.md) - Contract-aware database schema
+- [01-architecture-layers.md](01-architecture-layers.md) - Contract-aware architecture
 - [09-tdd-strategy.md](09-tdd-strategy.md) - Complete TDD strategy
 - [10-test-organization.md](10-test-organization.md) - Component vs Provider tests
 - [IMPLEMENTATION-TICKETS-SPRINT-1.md](IMPLEMENTATION-TICKETS-SPRINT-1.md) - Sprint tickets
@@ -31,15 +32,18 @@
 ### Goals for Sprint 1 Database Work
 
 **Primary Objectives:**
-1. ✅ Create component tables using **FK references** (NOT ALTER TABLE on OXID core)
-2. ✅ Implement domain models with proper state management
-3. ✅ Build repository layer with full test coverage
-4. ✅ Ensure 100% data integrity through constraints
-5. ✅ Achieve 95%+ test coverage on database layer
+1. ✅ Create **contract table** as primary entity (`osc_payment_contract`)
+2. ✅ Enhance existing tables with contract FK (`OXCONTRACTID`)
+3. ✅ Implement contract domain models (PaymentContract, ContractCondition, BasketSnapshot)
+4. ✅ Build contract-aware repository layer with full test coverage
+5. ✅ Ensure 100% data integrity through constraints
+6. ✅ Achieve 95%+ test coverage on database layer
 
-**Architecture Principles:**
+**Architecture Principles (Contract-Aware):**
+- **Contract-first pattern** - Contract created BEFORE order
 - **NO class extensions** in metadata.php
-- **Component tables reference OXID core** via FK (OXORDERID → oxorder.OXID)
+- **Component tables reference OXID core** via FK (OXUSERID → oxuser.OXID, OXORDERID → oxorder.OXID)
+- **Order creation deferred** - OXORDERID is NULL in contract until committed
 - **Clean isolation** - can drop component tables without affecting core
 - **Test-first approach** - write tests before implementation
 
@@ -97,28 +101,301 @@
 
 ## Migration Strategy
 
-### Migration Files Structure
+### Migration Files Structure (Contract-Aware)
 
 **Location:** `migration/` directory in component
 
 ```
 migration/
-├── 001_create_payment_transaction_table.sql
-├── 002_create_payment_authorization_details_table.sql
-├── 003_create_payment_3ds_details_table.sql
-├── 004_create_payment_refund_details_table.sql
-├── 005_create_payment_delivery_tracking_table.sql
-├── 006_create_payment_provider_data_table.sql
-├── 007_create_payment_order_state_table.sql
-├── 008_create_payment_customer_table.sql
-├── 009_create_payment_idempotency_table.sql
-├── 010_create_payment_saved_methods_table.sql
-└── 011_create_payment_sessions_table.sql
+├── 001_create_payment_contract_table.sql                 (NEW - PRIMARY TABLE!)
+├── 002_create_payment_transaction_table.sql
+├── 003_enhance_tables_with_contract_fk.sql              (NEW - Add OXCONTRACTID to existing tables)
+├── 004_create_payment_authorization_details_table.sql
+├── 005_create_payment_3ds_details_table.sql
+├── 006_create_payment_refund_details_table.sql
+├── 007_create_payment_delivery_tracking_table.sql
+├── 008_create_payment_provider_data_table.sql
+├── 009_create_payment_order_state_table.sql
+├── 010_create_payment_customer_table.sql
+├── 011_create_payment_idempotency_table.sql
+├── 012_create_payment_saved_methods_table.sql
+└── 013_create_payment_sessions_table.sql
 ```
+
+**Migration Order (CRITICAL):**
+1. **001** - Create contract table FIRST (no dependencies)
+2. **002** - Create transaction table (will reference contract via FK)
+3. **003** - Enhance existing tables with contract FK
+4. **004-013** - Create remaining tables
 
 ### TDD Approach for Migrations
 
-#### Step 1: Write Migration Test FIRST
+#### Migration 001: Contract Table (PRIMARY - NEW!)
+
+**Step 1: Write Contract Table Migration Test**
+
+```php
+<?php
+// tests/Component/Integration/Migration/PaymentContractMigrationTest.php
+
+namespace Tests\Component\Integration\Migration;
+
+use Tests\Component\Support\IntegrationTestCase;
+
+/**
+ * Test contract table migration
+ *
+ * @group migration
+ * @group database
+ * @group contract
+ */
+class PaymentContractMigrationTest extends IntegrationTestCase
+{
+    /** @test */
+    public function migration_001_creates_payment_contract_table(): void
+    {
+        // Arrange
+        $this->dropAllTables();
+
+        // Act
+        $this->runMigration('001_create_payment_contract_table.sql');
+
+        // Assert - Table exists
+        $this->assertTableExists('osc_payment_contract');
+
+        // Assert - Core columns
+        $this->assertColumnExists('osc_payment_contract', 'OXID');
+        $this->assertColumnExists('osc_payment_contract', 'OXUSERID');
+        $this->assertColumnExists('osc_payment_contract', 'OXORDERID');
+        $this->assertColumnExists('osc_payment_contract', 'OXSTATE');
+        $this->assertColumnExists('osc_payment_contract', 'OXBASKETDATA');
+        $this->assertColumnExists('osc_payment_contract', 'OXCONDITIONS');
+        $this->assertColumnExists('osc_payment_contract', 'OXPROVIDERORDERID');
+
+        // Assert - Column types
+        $this->assertColumnType('osc_payment_contract', 'OXID', 'CHAR', 32);
+        $this->assertColumnType('osc_payment_contract', 'OXBASKETDATA', 'JSON');
+        $this->assertColumnType('osc_payment_contract', 'OXCONDITIONS', 'JSON');
+
+        // Assert - Primary key
+        $this->assertPrimaryKeyExists('osc_payment_contract', 'OXID');
+
+        // Assert - Indexes
+        $this->assertIndexExists('osc_payment_contract', 'IDX_STATE');
+        $this->assertIndexExists('osc_payment_contract', 'IDX_USER');
+        $this->assertIndexExists('osc_payment_contract', 'IDX_ORDER');
+        $this->assertIndexExists('osc_payment_contract', 'IDX_PROVIDER_ORDER');
+    }
+
+    /** @test */
+    public function migration_001_creates_foreign_keys(): void
+    {
+        $this->runMigration('001_create_payment_contract_table.sql');
+
+        // FK to oxuser
+        $this->assertForeignKeyExists(
+            'osc_payment_contract',
+            'FK_CONTRACT_USER',
+            'OXUSERID',
+            'oxuser',
+            'OXID'
+        );
+
+        // FK to oxorder (NULL until committed!)
+        $this->assertForeignKeyExists(
+            'osc_payment_contract',
+            'FK_CONTRACT_ORDER',
+            'OXORDERID',
+            'oxorder',
+            'OXID'
+        );
+
+        // FK behavior
+        $this->assertForeignKeyOnDelete('osc_payment_contract', 'FK_CONTRACT_USER', 'CASCADE');
+        $this->assertForeignKeyOnDelete('osc_payment_contract', 'FK_CONTRACT_ORDER', 'SET NULL');
+    }
+
+    /** @test */
+    public function contract_created_with_null_order_id(): void
+    {
+        $this->runMigration('001_create_payment_contract_table.sql');
+
+        $userId = $this->createTestUser(['OXID' => 'user-123']);
+
+        // Create contract WITHOUT order (order created later!)
+        $contractId = $this->insertContract([
+            'OXID' => 'contract-123',
+            'OXUSERID' => 'user-123',
+            'OXORDERID' => null,  // NULL until committed!
+            'OXSTATE' => 'pending',
+            'OXBASKETDATA' => '{"items":[], "totals": {"gross": 99.99}}',
+            'OXCONDITIONS' => '[{"type":"payment_authorized","status":"pending"}]',
+            'OXPROVIDERORDERID' => 'pi_stripe_123'
+        ]);
+
+        // Assert contract created
+        $this->assertDatabaseHas('osc_payment_contract', [
+            'OXID' => 'contract-123',
+            'OXUSERID' => 'user-123',
+            'OXORDERID' => null  // NULL!
+        ]);
+    }
+
+    /** @test */
+    public function contract_linked_to_order_when_committed(): void
+    {
+        $this->runMigration('001_create_payment_contract_table.sql');
+
+        $userId = $this->createTestUser(['OXID' => 'user-123']);
+        $orderId = $this->createTestOrder(['OXID' => 'order-123', 'OXUSERID' => 'user-123']);
+
+        $contractId = $this->insertContract([
+            'OXID' => 'contract-123',
+            'OXUSERID' => 'user-123',
+            'OXORDERID' => null,
+            'OXSTATE' => 'pending',
+            'OXBASKETDATA' => '{}',
+            'OXCONDITIONS' => '[]'
+        ]);
+
+        // Update contract to link order (commit)
+        $this->updateContract('contract-123', [
+            'OXORDERID' => 'order-123',
+            'OXSTATE' => 'committed'
+        ]);
+
+        // Assert order linked
+        $this->assertDatabaseHas('osc_payment_contract', [
+            'OXID' => 'contract-123',
+            'OXORDERID' => 'order-123',
+            'OXSTATE' => 'committed'
+        ]);
+    }
+
+    /** @test */
+    public function contract_deleted_when_user_deleted_cascade(): void
+    {
+        $this->runMigration('001_create_payment_contract_table.sql');
+
+        $userId = $this->createTestUser(['OXID' => 'user-123']);
+        $contractId = $this->insertContract([
+            'OXID' => 'contract-123',
+            'OXUSERID' => 'user-123',
+            'OXORDERID' => null,
+            'OXSTATE' => 'draft',
+            'OXBASKETDATA' => '{}',
+            'OXCONDITIONS' => '[]'
+        ]);
+
+        // Delete user
+        $this->deleteUser('user-123');
+
+        // Contract should be cascade deleted
+        $this->assertDatabaseNotHas('osc_payment_contract', ['OXID' => 'contract-123']);
+    }
+
+    /** @test */
+    public function contract_order_id_set_to_null_when_order_deleted(): void
+    {
+        $this->runMigration('001_create_payment_contract.sql');
+
+        $userId = $this->createTestUser(['OXID' => 'user-123']);
+        $orderId = $this->createTestOrder(['OXID' => 'order-123', 'OXUSERID' => 'user-123']);
+
+        $contractId = $this->insertContract([
+            'OXID' => 'contract-123',
+            'OXUSERID' => 'user-123',
+            'OXORDERID' => 'order-123',
+            'OXSTATE' => 'committed',
+            'OXBASKETDATA' => '{}',
+            'OXCONDITIONS' => '[]'
+        ]);
+
+        // Delete order
+        $this->deleteOrder('order-123');
+
+        // Contract still exists but OXORDERID set to NULL
+        $this->assertDatabaseHas('osc_payment_contract', [
+            'OXID' => 'contract-123',
+            'OXORDERID' => null  // SET NULL!
+        ]);
+    }
+}
+```
+
+**Step 2: Create Contract Table Migration SQL**
+
+```sql
+-- migration/001_create_payment_contract_table.sql
+
+CREATE TABLE IF NOT EXISTS osc_payment_contract (
+    -- Primary key
+    OXID CHAR(32) NOT NULL PRIMARY KEY COMMENT 'Contract ID (UUID)',
+
+    -- Shop & user references
+    OXSHOPID INT NOT NULL COMMENT 'Shop ID (multi-shop support)',
+    OXUSERID CHAR(32) NOT NULL COMMENT 'FK to oxuser.OXID',
+    OXORDERID CHAR(32) NULL COMMENT 'FK to oxorder.OXID (NULL until committed!)',
+
+    -- Contract state machine
+    OXSTATE VARCHAR(32) NOT NULL COMMENT 'draft, pending, ready_to_commit, committed, fulfilled, cancelled, expired, failed',
+    OXSTATEREASON VARCHAR(255) NULL COMMENT 'Reason for state (if failed/cancelled)',
+
+    -- Snapshot data (immutable)
+    OXBASKETDATA JSON NOT NULL COMMENT 'Complete basket snapshot (items, discounts, totals)',
+    OXTERMS JSON NULL COMMENT 'Terms & conditions agreed by customer',
+    OXMETADATA JSON NULL COMMENT 'Additional metadata (IP, user agent, session ID)',
+
+    -- Fulfillment conditions
+    OXCONDITIONS JSON NOT NULL COMMENT 'Array of conditions with status (payment_authorized, fraud_check, etc.)',
+
+    -- Provider data
+    OXPROVIDER VARCHAR(32) NULL COMMENT 'Payment provider: stripe, paypal, unzer, adyen, klarna, amazonpay',
+    OXPROVIDERORDERID VARCHAR(128) NULL COMMENT 'Provider contract ID (PaymentIntent ID, Order ID, etc.)',
+    OXPROVIDERDATA JSON NULL COMMENT 'Provider-specific data',
+
+    -- Timestamps
+    OXCREATED DATETIME NOT NULL COMMENT 'Contract creation timestamp',
+    OXUPDATED DATETIME NOT NULL COMMENT 'Last update timestamp',
+    OXCOMMITTEDAT DATETIME NULL COMMENT 'When order was created (contract committed)',
+    OXFULFILLEDAT DATETIME NULL COMMENT 'When payment was captured (contract fulfilled)',
+    OXEXPIRESAT DATETIME NULL COMMENT 'Contract expiration (default: +24 hours)',
+
+    -- Indexes for performance
+    INDEX IDX_STATE (OXSTATE),
+    INDEX IDX_USER (OXUSERID),
+    INDEX IDX_ORDER (OXORDERID),
+    INDEX IDX_PROVIDER_ORDER (OXPROVIDERORDERID),
+    INDEX IDX_CREATED (OXCREATED),
+    INDEX IDX_EXPIRES (OXEXPIRESAT),
+    INDEX IDX_STATE_EXPIRES (OXSTATE, OXEXPIRESAT),
+
+    -- Foreign keys
+    FOREIGN KEY FK_CONTRACT_USER (OXUSERID)
+        REFERENCES oxuser(OXID)
+        ON DELETE CASCADE
+        COMMENT 'User who created contract',
+
+    FOREIGN KEY FK_CONTRACT_ORDER (OXORDERID)
+        REFERENCES oxorder(OXID)
+        ON DELETE SET NULL
+        COMMENT 'Order created from contract (NULL until committed)'
+
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='Payment contract lifecycle - NEW in v4.0 - Contract created BEFORE order!';
+```
+
+**Step 3: Run Test → See it PASS**
+
+```bash
+vendor/bin/phpunit --filter PaymentContractMigrationTest
+```
+
+---
+
+#### Migration 002: Transaction Table (Enhanced with Contract FK)
+
+**Step 1: Write Transaction Table Migration Test**
 
 ```php
 <?php
