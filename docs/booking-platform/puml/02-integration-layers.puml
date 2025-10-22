@@ -1,0 +1,311 @@
+@startuml Booking Platform - Integration Architecture with Service Providers
+
+skinparam backgroundColor #1A1A2E
+skinparam roundcorner 10
+skinparam shadowing true
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+' Make all lines and arrows white/visible
+skinparam ArrowColor #FFFFFF
+skinparam linecolor #FFFFFF
+
+' Make package text dark for bright package backgrounds
+skinparam packageFontColor #000000
+skinparam packageBorderColor #FFFFFF
+skinparam packageBackgroundColor transparent
+
+' Make component text dark for bright backgrounds
+skinparam componentFontColor #000000
+skinparam componentFontSize 12
+skinparam componentFontStyle bold
+
+' Make database/queue/cloud text darker for bright backgrounds
+skinparam databaseFontColor #000000
+skinparam queueFontColor #000000
+skinparam cloudFontColor #000000
+
+' Make note text white with dark background
+skinparam noteFontColor #FFFFFF
+skinparam noteBorderColor #FFFFFF
+skinparam noteBackgroundColor #2C3E50
+
+' Futurama Color Palette
+!define FUTURAMA_ORANGE #FF6B35
+!define FUTURAMA_BLUE #4ECDC4
+!define FUTURAMA_PURPLE #9B59B6
+!define FUTURAMA_GREEN #2ECC71
+!define FUTURAMA_YELLOW #F4D03F
+!define FUTURAMA_RED #E74C3C
+!define FUTURAMA_DARK #2C3E50
+!define FUTURAMA_CYAN #16A085
+!define FUTURAMA_PINK #E91E63
+!define FUTURAMA_TEAL #1ABC9C
+
+title <color:#FF6B35><b>Booking Platform - Integration Architecture</b></color><color:#FFFFFF> | Service Provider Aggregation</color>
+
+' =====================================
+' BOOKING PLATFORM CORE
+' =====================================
+package "Booking Platform Core" as CORE <<Rectangle>> FUTURAMA_PURPLE {
+  [Booking Orchestrator] as ORCHESTRATOR #9B59B6
+  [Availability Aggregator] as AGGREGATOR #9B59B6
+  [Price Comparator] as COMPARATOR #9B59B6
+  [Booking Manager] as MANAGER #9B59B6
+}
+
+' =====================================
+' INVENTORY SOURCE LAYER (NEW!)
+' =====================================
+package "Inventory Source Layer" as INVENTORY_SOURCE <<Rectangle>> FUTURAMA_TEAL {
+
+  [InventorySourceAdapter Interface] as INV_ADAPTER #22C1A8
+
+  package "Internal Inventory" as INTERNAL #2AD4B5 {
+    [Direct Inventory] as DIRECT #45DEC3
+    [Blockchain Inventory] as BLOCKCHAIN_INV #45DEC3
+  }
+
+  package "External Service Providers" as EXTERNAL_PROVIDERS #2AD4B5 {
+    [Booking.com Adapter] as BOOKING_COM #45DEC3
+    [Amadeus Adapter] as AMADEUS #45DEC3
+    [Expedia Adapter] as EXPEDIA #45DEC3
+    [Airbnb Adapter] as AIRBNB #45DEC3
+    [Sabre Adapter] as SABRE #45DEC3
+    [Travelport Adapter] as TRAVELPORT #45DEC3
+  }
+}
+
+note right of INVENTORY_SOURCE
+  <color:#FFFFFF><b>Dual-Source Architecture</b></color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF><b>Internal:</b></color>
+  <color:#FFFFFF>• Own inventory (hotels, events)</color>
+  <color:#FFFFFF>• Blockchain-managed resources</color>
+  <color:#FFFFFF>• Direct integrations</color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF><b>External:</b></color>
+  <color:#FFFFFF>• Booking.com API</color>
+  <color:#FFFFFF>• Amadeus GDS</color>
+  <color:#FFFFFF>• Expedia Affiliate</color>
+  <color:#FFFFFF>• Airbnb API</color>
+  <color:#FFFFFF>• Sabre GDS</color>
+  <color:#FFFFFF>• Travelport uAPI</color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF><b>Benefits:</b></color>
+  <color:#FFFFFF>• Massive inventory access</color>
+  <color:#FFFFFF>• Price comparison</color>
+  <color:#FFFFFF>• Best rate guarantee</color>
+  <color:#FFFFFF>• Failover redundancy</color>
+end note
+
+' =====================================
+' EXTERNAL SERVICE PROVIDER APIs
+' =====================================
+package "Service Provider APIs" as PROVIDER_APIS <<Rectangle>> FUTURAMA_YELLOW {
+
+  cloud "Booking.com API" as BOOKING_API #F4D03F {
+    [Hotel Availability] as HOTEL_AVAIL
+    [Hotel Booking] as HOTEL_BOOK
+    [Hotel Cancel] as HOTEL_CANCEL
+  }
+
+  cloud "Amadeus API" as AMADEUS_API #F4D03F {
+    [Flight Search] as FLIGHT_SEARCH
+    [Hotel Search] as HOTEL_SEARCH
+    [Car Rental] as CAR_RENTAL
+  }
+
+  cloud "Expedia API" as EXPEDIA_API #F4D03F {
+    [Property Search] as PROP_SEARCH
+    [Booking API] as EXP_BOOK
+    [Cancellation] as EXP_CANCEL
+  }
+
+  cloud "Airbnb API" as AIRBNB_API #F4D03F {
+    [Listing Search] as LIST_SEARCH
+    [Reservation] as AIRBNB_RES
+  }
+
+  cloud "Sabre GDS" as SABRE_API #F4D03F {
+    [Availability] as SABRE_AVAIL
+    [Booking] as SABRE_BOOK
+  }
+
+  cloud "Travelport uAPI" as TRAVELPORT_API #F4D03F {
+    [Search] as TP_SEARCH
+    [Book] as TP_BOOK
+  }
+}
+
+' =====================================
+' PAYMENT INTEGRATION
+' =====================================
+package "Payment Layer" as PAYMENT <<Rectangle>> FUTURAMA_RED {
+  [Payment Component v4.0] as PAY_COMPONENT #E74C3C
+  [Payment Contract] as CONTRACT #EC6B6B
+  [Multi-Provider Gateway] as PAY_GATEWAY #EC6B6B
+}
+
+' =====================================
+' E-COMMERCE ADAPTER
+' =====================================
+package "E-Commerce Adapter" as ECOMMERCE <<Rectangle>> FUTURAMA_GREEN {
+  [Adapter Interface] as ECOM_ADAPTER #2ECC71
+  [OXID EE Shop] as OXID #43E095
+  [Standalone Mode] as STANDALONE #43E095
+}
+
+' =====================================
+' DATA LAYER
+' =====================================
+package "Data & Cache Layer" as DATA <<Rectangle>> FUTURAMA_BLUE {
+  database "Booking DB" as DB #4ECDC4 {
+    [bookings] as TBL_BOOKING
+    [resources] as TBL_RESOURCE
+    [provider_mappings] as TBL_MAPPING
+    [rate_cache] as TBL_RATE
+  }
+
+  database "Redis Cache" as CACHE #4ECDC4 {
+    [Provider Rates] as CACHE_RATES
+    [Availability Cache] as CACHE_AVAIL
+    [Search Results] as CACHE_SEARCH
+  }
+}
+
+' =====================================
+' CONNECTIONS: Core → Inventory Sources
+' =====================================
+ORCHESTRATOR -down-> INV_ADAPTER : <color:#FFFFFF>query inventory</color>
+AGGREGATOR -down-> INV_ADAPTER : <color:#FFFFFF>aggregate results</color>
+COMPARATOR -down-> INV_ADAPTER : <color:#FFFFFF>compare prices</color>
+
+' =====================================
+' CONNECTIONS: Adapter → Sources
+' =====================================
+INV_ADAPTER -down-> DIRECT : <color:#FFFFFF>internal</color>
+INV_ADAPTER -down-> BLOCKCHAIN_INV : <color:#FFFFFF>blockchain</color>
+INV_ADAPTER -down-> BOOKING_COM : <color:#FFFFFF>external</color>
+INV_ADAPTER -down-> AMADEUS : <color:#FFFFFF>GDS</color>
+INV_ADAPTER -down-> EXPEDIA : <color:#FFFFFF>OTA</color>
+INV_ADAPTER -down-> AIRBNB : <color:#FFFFFF>vacation</color>
+INV_ADAPTER -down-> SABRE : <color:#FFFFFF>GDS</color>
+INV_ADAPTER -down-> TRAVELPORT : <color:#FFFFFF>uAPI</color>
+
+' =====================================
+' CONNECTIONS: Adapters → Provider APIs
+' =====================================
+BOOKING_COM -down-> HOTEL_AVAIL : <color:#FFFFFF>REST/XML</color>
+BOOKING_COM -down-> HOTEL_BOOK
+BOOKING_COM -down-> HOTEL_CANCEL
+
+AMADEUS -down-> FLIGHT_SEARCH : <color:#FFFFFF>REST</color>
+AMADEUS -down-> HOTEL_SEARCH
+AMADEUS -down-> CAR_RENTAL
+
+EXPEDIA -down-> PROP_SEARCH : <color:#FFFFFF>SOAP/REST</color>
+EXPEDIA -down-> EXP_BOOK
+EXPEDIA -down-> EXP_CANCEL
+
+AIRBNB -down-> LIST_SEARCH : <color:#FFFFFF>REST</color>
+AIRBNB -down-> AIRBNB_RES
+
+SABRE -down-> SABRE_AVAIL : <color:#FFFFFF>SOAP</color>
+SABRE -down-> SABRE_BOOK
+
+TRAVELPORT -down-> TP_SEARCH : <color:#FFFFFF>XML/SOAP</color>
+TRAVELPORT -down-> TP_BOOK
+
+' =====================================
+' CONNECTIONS: Payment Integration
+' =====================================
+MANAGER -down-> PAY_COMPONENT : <color:#FFFFFF>create contract</color>
+PAY_COMPONENT -down-> CONTRACT
+CONTRACT -down-> PAY_GATEWAY
+
+' =====================================
+' CONNECTIONS: E-Commerce Integration
+' =====================================
+MANAGER -down-> ECOM_ADAPTER : <color:#FFFFFF>create order</color>
+ECOM_ADAPTER -down-> OXID
+
+' =====================================
+' CONNECTIONS: Data Layer
+' =====================================
+ORCHESTRATOR -down-> TBL_BOOKING : <color:#FFFFFF>persist</color>
+MANAGER -down-> TBL_RESOURCE
+INV_ADAPTER -down-> TBL_MAPPING : <color:#FFFFFF>provider map</color>
+
+AGGREGATOR -right-> CACHE_RATES : <color:#FFFFFF>cache 5min</color>
+COMPARATOR -right-> CACHE_SEARCH : <color:#FFFFFF>cache 30s</color>
+INV_ADAPTER -right-> CACHE_AVAIL : <color:#FFFFFF>cache 1min</color>
+
+' =====================================
+' FLOW ANNOTATIONS
+' =====================================
+note as FLOW1
+  <color:#FFFFFF><b>Booking Flow - Internal Inventory</b></color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF>1. User searches "Hotels in Amsterdam"</color>
+  <color:#FFFFFF>2. Aggregator queries Direct Inventory</color>
+  <color:#FFFFFF>3. Returns available rooms</color>
+  <color:#FFFFFF>4. User selects room</color>
+  <color:#FFFFFF>5. Payment Contract created</color>
+  <color:#FFFFFF>6. Blockchain lock acquired</color>
+  <color:#FFFFFF>7. Booking confirmed</color>
+  <color:#FFFFFF>8. Order created in e-commerce</color>
+end note
+
+note as FLOW2
+  <color:#FFFFFF><b>Booking Flow - External Provider</b></color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF>1. User searches "Hotels in Amsterdam"</color>
+  <color:#FFFFFF>2. Aggregator queries:</color>
+  <color:#FFFFFF>   • Direct Inventory</color>
+  <color:#FFFFFF>   • Booking.com API</color>
+  <color:#FFFFFF>   • Expedia API</color>
+  <color:#FFFFFF>   • Airbnb API</color>
+  <color:#FFFFFF>3. Price Comparator merges results</color>
+  <color:#FFFFFF>4. User sees best rates from all sources</color>
+  <color:#FFFFFF>5. User selects Booking.com hotel</color>
+  <color:#FFFFFF>6. Payment Contract created</color>
+  <color:#FFFFFF>7. Booking.com Adapter books room</color>
+  <color:#FFFFFF>8. Confirmation stored locally</color>
+  <color:#FFFFFF>9. Order created in e-commerce</color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF><b>Commission earned on external bookings!</b></color>
+end note
+
+FLOW1 -[hidden]-> CORE
+FLOW2 -[hidden]-> PROVIDER_APIS
+
+' =====================================
+' LEGEND
+' =====================================
+legend left
+  <color:#FFFFFF>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF><b>Integration Types</b></color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF><b>Internal Inventory:</b></color>
+  <color:#FFFFFF>• Direct ownership (0% commission)</color>
+  <color:#FFFFFF>• Full control over pricing</color>
+  <color:#FFFFFF>• Blockchain-guaranteed availability</color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF><b>External Providers:</b></color>
+  <color:#FFFFFF>• Booking.com (3-15% commission)</color>
+  <color:#FFFFFF>• Amadeus GDS (standard GDS fees)</color>
+  <color:#FFFFFF>• Expedia (10-30% commission)</color>
+  <color:#FFFFFF>• Airbnb (3% host + 14% guest fee)</color>
+  <color:#FFFFFF>• Sabre (transaction fees)</color>
+  <color:#FFFFFF>• Travelport (per-segment fees)</color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF><b>Business Model:</b></color>
+  <color:#FFFFFF>✓ Aggregate best rates from all sources</color>
+  <color:#FFFFFF>✓ Show internal inventory first</color>
+  <color:#FFFFFF>✓ Earn commission on external bookings</color>
+  <color:#FFFFFF>✓ Unified payment & order management</color>
+  <color:#FFFFFF>✓ Single customer experience</color>
+endlegend
+
+@enduml

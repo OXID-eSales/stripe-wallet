@@ -1,0 +1,295 @@
+@startuml Booking Platform - Federation Architecture (Hub and Spoke)
+
+skinparam backgroundColor #1A1A2E
+skinparam roundcorner 10
+skinparam shadowing true
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+' Make all lines and arrows white/visible
+skinparam ArrowColor #FFFFFF
+skinparam linecolor #FFFFFF
+
+' Make component text dark for bright backgrounds
+skinparam componentFontColor #000000
+skinparam componentFontSize 12
+skinparam componentFontStyle bold
+
+' Make package text dark for bright package backgrounds
+skinparam packageFontColor #000000
+skinparam packageBorderColor #FFFFFF
+skinparam packageBackgroundColor transparent
+
+' Make database/queue/cloud text dark for bright backgrounds
+skinparam databaseFontColor #000000
+skinparam queueFontColor #000000
+skinparam cloudFontColor #000000
+
+' Make note text white with dark background
+skinparam noteFontColor #FFFFFF
+skinparam noteBorderColor #FFFFFF
+skinparam noteBackgroundColor #2C3E50
+
+' Futurama Color Palette
+!define FUTURAMA_ORANGE #FF6B35
+!define FUTURAMA_BLUE #4ECDC4
+!define FUTURAMA_PURPLE #9B59B6
+!define FUTURAMA_GREEN #2ECC71
+!define FUTURAMA_YELLOW #F4D03F
+!define FUTURAMA_RED #E74C3C
+!define FUTURAMA_CYAN #16A085
+!define FUTURAMA_PINK #E91E63
+!define FUTURAMA_TEAL #1ABC9C
+
+title <color:#FF6B35><b>Booking Platform - Federation Architecture</b></color><color:#FFFFFF> | Central Hub Managing 20 Legacy Shops</color>
+
+' =====================================
+' CENTRAL HUB (MASTER BOOKING SYSTEM)
+' =====================================
+package "Central Hub (OXID EE 8.x) - Master Booking System" as CENTRAL_HUB <<Rectangle>> FUTURAMA_PURPLE {
+
+  package "Booking Platform Module (Master)" as BOOKING_MODULE #9B59B6 {
+    [Booking Orchestrator] as ORCHESTRATOR #B983D6
+    [Inventory Manager] as INVENTORY_MGR #B983D6
+    [Availability Calendar] as CALENDAR #B983D6
+    [Federation Service] as FEDERATION #B983D6
+    [WebSocket Server] as WEBSOCKET #B983D6
+    [Shop Registry] as SHOP_REGISTRY #B983D6
+  }
+
+  package "Payment Component v4.0 (Master)" as PAYMENT_HUB #E74C3C {
+    [Smart Contracts] as CONTRACTS #F06292
+    [Multi-Currency Gateway] as GATEWAY #F06292
+    [Fraud Detection] as FRAUD_HUB #F06292
+  }
+
+  package "Blockchain Inventory Manager" as BLOCKCHAIN #1ABC9C {
+    [Atomic Locking] as LOCKING #45DEC3
+    [Distributed Consensus] as CONSENSUS #45DEC3
+    [Inventory Ledger] as LEDGER #45DEC3
+  }
+
+  database "Central Hub Database (Master)" as HUB_DB #4ECDC4 {
+    [osc_booking_bookings] as BOOKINGS_TBL
+    [osc_booking_resources] as RESOURCES_TBL
+    [osc_booking_timeslots] as TIMESLOTS_TBL
+    [osc_federation_shops] as SHOPS_TBL
+    [osc_federation_sync_log] as SYNC_LOG
+  }
+
+  package "Federation API" as FEDERATION_API #F4D03F {
+    [REST API] as REST_HUB #F7DC6F
+    [GraphQL API] as GRAPHQL_HUB #F7DC6F
+    [WebHooks] as WEBHOOKS_HUB #F7DC6F
+  }
+
+  [Central Admin Panel] as ADMIN_PANEL #FF6B35
+}
+
+note right of CENTRAL_HUB
+  <color:#FFFFFF><b>Central Hub Responsibilities</b></color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF>• Single source of truth for bookings</color>
+  <color:#FFFFFF>• Unified inventory management</color>
+  <color:#FFFFFF>• Centralized payment processing</color>
+  <color:#FFFFFF>• Real-time sync to 20 shops</color>
+  <color:#FFFFFF>• Master admin panel</color>
+  <color:#FFFFFF>• No double-booking guarantee</color>
+end note
+
+' =====================================
+' FEDERATED LEGACY SHOPS
+' =====================================
+package "Federated Shop #1 - Amsterdam" as SHOP1 <<Rectangle>> FUTURAMA_GREEN {
+  [Magento 1.9.4 Storefront] as SHOP1_FRONTEND #2ECC71
+  [Booking Widget] as SHOP1_WIDGET #43E095
+  [MagentoAdapter] as SHOP1_ADAPTER #43E095
+  [REST Client] as SHOP1_REST #43E095
+  [WebSocket Client] as SHOP1_WS #43E095
+  database "Local Cache DB" as SHOP1_DB #2ECC71 {
+    [osc_booking_cache] as SHOP1_CACHE
+    [osc_availability_cache] as SHOP1_AVAIL
+  }
+}
+
+note right of SHOP1
+  <color:#FFFFFF><b>Amsterdam Agency</b></color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF>Platform: Magento 1.9.4</color>
+  <color:#FFFFFF>Locale: nl_NL (Dutch)</color>
+  <color:#FFFFFF>Currency: EUR</color>
+  <color:#FFFFFF>Customers: 5,000 (local)</color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF>Role: Frontend only</color>
+  <color:#FFFFFF>Bookings: Proxy to hub</color>
+end note
+
+package "Federated Shop #2 - Paris" as SHOP2 <<Rectangle>> FUTURAMA_GREEN {
+  [OXID 6.2 Storefront] as SHOP2_FRONTEND #2ECC71
+  [Booking Widget] as SHOP2_WIDGET #43E095
+  [OxidAdapter] as SHOP2_ADAPTER #43E095
+  [REST Client] as SHOP2_REST #43E095
+  [WebSocket Client] as SHOP2_WS #43E095
+  database "Local Cache DB" as SHOP2_DB #2ECC71 {
+    [osc_booking_cache] as SHOP2_CACHE
+    [osc_availability_cache] as SHOP2_AVAIL
+  }
+}
+
+note right of SHOP2
+  <color:#FFFFFF><b>Paris Agency</b></color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF>Platform: OXID 6.2</color>
+  <color:#FFFFFF>Locale: fr_FR (French)</color>
+  <color:#FFFFFF>Currency: EUR</color>
+  <color:#FFFFFF>Customers: 8,000 (local)</color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF>Role: Frontend only</color>
+  <color:#FFFFFF>Bookings: Proxy to hub</color>
+end note
+
+package "Federated Shop #20 - Berlin" as SHOP20 <<Rectangle>> FUTURAMA_GREEN {
+  [Shopware 5.7 Storefront] as SHOP20_FRONTEND #2ECC71
+  [Booking Widget] as SHOP20_WIDGET #43E095
+  [ShopwareAdapter] as SHOP20_ADAPTER #43E095
+  [REST Client] as SHOP20_REST #43E095
+  [WebSocket Client] as SHOP20_WS #43E095
+  database "Local Cache DB" as SHOP20_DB #2ECC71 {
+    [osc_booking_cache] as SHOP20_CACHE
+    [osc_availability_cache] as SHOP20_AVAIL
+  }
+}
+
+note right of SHOP20
+  <color:#FFFFFF><b>Berlin Agency</b></color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF>Platform: Shopware 5.7</color>
+  <color:#FFFFFF>Locale: de_DE (German)</color>
+  <color:#FFFFFF>Currency: EUR</color>
+  <color:#FFFFFF>Customers: 12,000 (local)</color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF>Role: Frontend only</color>
+  <color:#FFFFFF>Bookings: Proxy to hub</color>
+end note
+
+cloud "... 17 more shops ..." as MORE_SHOPS #95A5A6
+
+' =====================================
+' CONNECTIONS: HUB INTERNAL
+' =====================================
+ORCHESTRATOR --> INVENTORY_MGR : <color:#FFFFFF>check availability</color>
+ORCHESTRATOR --> CONTRACTS : <color:#FFFFFF>create payment</color>
+ORCHESTRATOR --> LOCKING : <color:#FFFFFF>lock inventory</color>
+ORCHESTRATOR --> BOOKINGS_TBL : <color:#FFFFFF>store booking</color>
+ORCHESTRATOR --> FEDERATION : <color:#FFFFFF>sync to shops</color>
+
+INVENTORY_MGR --> RESOURCES_TBL
+INVENTORY_MGR --> TIMESLOTS_TBL
+INVENTORY_MGR --> LEDGER : <color:#FFFFFF>blockchain</color>
+
+FEDERATION --> SHOP_REGISTRY : <color:#FFFFFF>get active shops</color>
+FEDERATION --> WEBSOCKET : <color:#FFFFFF>broadcast</color>
+FEDERATION --> SYNC_LOG : <color:#FFFFFF>log sync</color>
+
+SHOP_REGISTRY --> SHOPS_TBL
+
+ADMIN_PANEL --> ORCHESTRATOR : <color:#FFFFFF>manage bookings</color>
+ADMIN_PANEL --> SHOP_REGISTRY : <color:#FFFFFF>manage shops</color>
+
+' =====================================
+' CONNECTIONS: HUB → FEDERATION API
+' =====================================
+FEDERATION --> REST_HUB : <color:#FFFFFF>expose API</color>
+FEDERATION --> GRAPHQL_HUB : <color:#FFFFFF>expose API</color>
+FEDERATION --> WEBHOOKS_HUB : <color:#FFFFFF>send events</color>
+
+' =====================================
+' CONNECTIONS: SHOPS → HUB (BOOKING REQUEST)
+' =====================================
+SHOP1_FRONTEND --> SHOP1_WIDGET : <color:#FFFFFF>embed</color>
+SHOP1_WIDGET --> SHOP1_ADAPTER : <color:#FFFFFF>booking request</color>
+SHOP1_ADAPTER --> SHOP1_REST : <color:#FFFFFF>HTTP</color>
+SHOP1_REST --> REST_HUB : <color:#FFFFFF>POST /bookings/create</color>
+
+SHOP2_FRONTEND --> SHOP2_WIDGET : <color:#FFFFFF>embed</color>
+SHOP2_WIDGET --> SHOP2_ADAPTER : <color:#FFFFFF>booking request</color>
+SHOP2_ADAPTER --> SHOP2_REST : <color:#FFFFFF>HTTP</color>
+SHOP2_REST --> REST_HUB : <color:#FFFFFF>POST /bookings/create</color>
+
+SHOP20_FRONTEND --> SHOP20_WIDGET : <color:#FFFFFF>embed</color>
+SHOP20_WIDGET --> SHOP20_ADAPTER : <color:#FFFFFF>booking request</color>
+SHOP20_ADAPTER --> SHOP20_REST : <color:#FFFFFF>HTTP</color>
+SHOP20_REST --> REST_HUB : <color:#FFFFFF>POST /bookings/create</color>
+
+' =====================================
+' CONNECTIONS: HUB → SHOPS (REAL-TIME SYNC)
+' =====================================
+WEBSOCKET --> SHOP1_WS : <color:#FFFFFF>booking.created</color>
+SHOP1_WS --> SHOP1_ADAPTER : <color:#FFFFFF>event</color>
+SHOP1_ADAPTER --> SHOP1_CACHE : <color:#FFFFFF>update local</color>
+
+WEBSOCKET --> SHOP2_WS : <color:#FFFFFF>booking.created</color>
+SHOP2_WS --> SHOP2_ADAPTER : <color:#FFFFFF>event</color>
+SHOP2_ADAPTER --> SHOP2_CACHE : <color:#FFFFFF>update local</color>
+
+WEBSOCKET --> SHOP20_WS : <color:#FFFFFF>booking.created</color>
+SHOP20_WS --> SHOP20_ADAPTER : <color:#FFFFFF>event</color>
+SHOP20_ADAPTER --> SHOP20_CACHE : <color:#FFFFFF>update local</color>
+
+WEBSOCKET --> MORE_SHOPS : <color:#FFFFFF>broadcast to all</color>
+
+' =====================================
+' FLOW ANNOTATION
+' =====================================
+note as FLOW
+  <color:#FFFFFF><b>Booking Flow Example</b></color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF>1. Customer Jan (Amsterdam shop) books Room 101</color>
+  <color:#FFFFFF>2. MagentoAdapter sends POST /bookings/create to hub</color>
+  <color:#FFFFFF>3. Hub Orchestrator:</color>
+  <color:#FFFFFF>   a. Checks availability (Inventory Manager)</color>
+  <color:#FFFFFF>   b. Locks inventory (Blockchain)</color>
+  <color:#FFFFFF>   c. Creates payment contract (Payment Component)</color>
+  <color:#FFFFFF>   d. Authorizes payment (240 EUR)</color>
+  <color:#FFFFFF>   e. Stores booking (CONFIRMED)</color>
+  <color:#FFFFFF>4. Federation Service broadcasts via WebSocket:</color>
+  <color:#FFFFFF>   Event: "booking.created" → All 20 shops</color>
+  <color:#FFFFFF>5. All shops update local cache:</color>
+  <color:#FFFFFF>   Room 101: UNAVAILABLE for 2025-11-01 to 11-03</color>
+  <color:#FFFFFF>6. Customer Marie (Paris shop) sees Room 101 booked</color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF><b>Result: No double-booking across 20 shops!</b></color>
+end note
+
+FLOW -[hidden]-> CENTRAL_HUB
+
+' =====================================
+' LEGEND
+' =====================================
+legend right
+  <color:#FFFFFF>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF><b>Federation Architecture</b></color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF><b>Central Hub (OXID EE 8.x):</b></color>
+  <color:#FFFFFF>• Master booking system</color>
+  <color:#FFFFFF>• Single source of truth</color>
+  <color:#FFFFFF>• Payment Component v4.0</color>
+  <color:#FFFFFF>• Blockchain Inventory Manager</color>
+  <color:#FFFFFF>• Real-time sync via WebSocket</color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF><b>Federated Shops (20 legacy shops):</b></color>
+  <color:#FFFFFF>• Mixed platforms (Magento, OXID, Shopware)</color>
+  <color:#FFFFFF>• Different versions (legacy systems)</color>
+  <color:#FFFFFF>• Local customers (not shared)</color>
+  <color:#FFFFFF>• Frontend only (proxy bookings to hub)</color>
+  <color:#FFFFFF>• Adapter plugin connects to hub</color>
+  <color:#FFFFFF>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</color>
+  <color:#FFFFFF><b>Key Benefits:</b></color>
+  <color:#FFFFFF>✓ No double-booking guarantee</color>
+  <color:#FFFFFF>✓ Centralized payment processing</color>
+  <color:#FFFFFF>✓ Non-invasive (no shop migration)</color>
+  <color:#FFFFFF>✓ Real-time inventory sync</color>
+  <color:#FFFFFF>✓ Single admin panel for all shops</color>
+endlegend
+
+@enduml
