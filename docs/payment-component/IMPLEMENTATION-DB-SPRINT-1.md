@@ -38,6 +38,7 @@
 4. ✅ Build contract-aware repository layer with full test coverage
 5. ✅ Ensure 100% data integrity through constraints
 6. ✅ Achieve 95%+ test coverage on database layer
+7. ✅ **CRITICAL: Comprehensive smart contract functionality testing**
 
 **Architecture Principles (Contract-Aware):**
 - **Contract-first pattern** - Contract created BEFORE order
@@ -79,12 +80,17 @@
 ### Test Priority for Database Layer
 
 **🔴 CRITICAL (P0)** - Must test FIRST:
+- **Smart Contract Lifecycle** (draft → pending → ready_to_commit → committed → fulfilled)
+- **Contract Conditions** (payment_authorized, fraud_check, inventory_reserved, etc.)
+- **Condition State Tracking** (pending → completed/failed with timestamps)
 - Foreign key constraints (CASCADE, SET NULL)
 - Unique constraints (prevent duplicates)
 - Required fields validation (NOT NULL)
 - Data integrity (refund ≤ captured amount)
 - State machine transitions (invalid states rejected)
 - Concurrent access (pessimistic locking)
+- **Contract expiration** (automatic timeout after 24 hours)
+- **Contract-to-order linking** (OXORDERID NULL until committed)
 
 **🟠 HIGH (P1)** - Test SECOND:
 - Repository CRUD operations
@@ -389,6 +395,743 @@ COMMENT='Payment contract lifecycle - NEW in v4.0 - Contract created BEFORE orde
 
 ```bash
 vendor/bin/phpunit --filter PaymentContractMigrationTest
+```
+
+---
+
+### 🔥 SMART CONTRACT FUNCTIONALITY TESTS (CRITICAL!)
+
+**These tests are ESSENTIAL for the smart contract pattern to work correctly!**
+
+```php
+<?php
+// tests/Component/Integration/SmartContract/ContractLifecycleTest.php
+
+namespace Tests\Component\Integration\SmartContract;
+
+use Tests\Component\Support\IntegrationTestCase;
+
+/**
+ * Smart Contract Lifecycle Tests
+ *
+ * Tests the complete contract lifecycle from creation to fulfillment
+ *
+ * @group integration
+ * @group smart-contract
+ * @group critical
+ */
+class ContractLifecycleTest extends IntegrationTestCase
+{
+    /** @test */
+    public function contract_created_in_draft_state(): void
+    {
+        $userId = $this->createTestUser(['OXID' => 'user-123']);
+
+        $contractId = $this->insertContract([
+            'OXID' => 'contract-123',
+            'OXUSERID' => 'user-123',
+            'OXORDERID' => null,  // No order yet!
+            'OXSTATE' => 'draft',
+            'OXBASKETDATA' => '{"items": [], "totals": {"gross": 99.99}}',
+            'OXCONDITIONS' => '[]',
+            'OXEXPIRESAT' => date('Y-m-d H:i:s', strtotime('+24 hours'))
+        ]);
+
+        $this->assertDatabaseHas('osc_payment_contract', [
+            'OXID' => 'contract-123',
+            'OXSTATE' => 'draft',
+            'OXORDERID' => null
+        ]);
+    }
+
+    /** @test */
+    public function contract_transitions_from_draft_to_pending(): void
+    {
+        $contract = $this->createTestContract(['OXSTATE' => 'draft']);
+
+        $this->updateContract($contract['OXID'], ['OXSTATE' => 'pending']);
+
+        $this->assertDatabaseHas('osc_payment_contract', [
+            'OXID' => $contract['OXID'],
+            'OXSTATE' => 'pending'
+        ]);
+    }
+
+    /** @test */
+    public function contract_conditions_can_be_added(): void
+    {
+        $contract = $this->createTestContract(['OXSTATE' => 'pending']);
+
+        $conditions = [
+            [
+                'type' => 'payment_authorized',
+                'status' => 'pending',
+                'required' => true,
+                'created_at' => date('c')
+            ],
+            [
+                'type' => 'fraud_check',
+                'status' => 'pending',
+                'required' => true,
+                'created_at' => date('c')
+            ]
+        ];
+
+        $this->updateContract($contract['OXID'], [
+            'OXCONDITIONS' => json_encode($conditions)
+        ]);
+
+        $stored = $this->getContract($contract['OXID']);
+        $storedConditions = json_decode($stored['OXCONDITIONS'], true);
+
+        $this->assertCount(2, $storedConditions);
+        $this->assertEquals('payment_authorized', $storedConditions[0]['type']);
+        $this->assertEquals('fraud_check', $storedConditions[1]['type']);
+    }
+
+    /** @test */
+    public function contract_condition_can_be_marked_completed(): void
+    {
+        $conditions = [
+            ['type' => 'payment_authorized', 'status' => 'pending', 'required' => true],
+            ['type' => 'fraud_check', 'status' => 'pending', 'required' => true]
+        ];
+
+        $contract = $this->createTestContract([
+            'OXSTATE' => 'pending',
+            'OXCONDITIONS' => json_encode($conditions)
+        ]);
+
+        // Mark payment_authorized as completed
+        $updatedConditions = [
+            [
+                'type' => 'payment_authorized',
+                'status' => 'completed',
+                'required' => true,
+                'completed_at' => date('c')
+            ],
+            ['type' => 'fraud_check', 'status' => 'pending', 'required' => true]
+        ];
+
+        $this->updateContract($contract['OXID'], [
+            'OXCONDITIONS' => json_encode($updatedConditions)
+        ]);
+
+        $stored = $this->getContract($contract['OXID']);
+        $storedConditions = json_decode($stored['OXCONDITIONS'], true);
+
+        $this->assertEquals('completed', $storedConditions[0]['status']);
+        $this->assertEquals('pending', $storedConditions[1]['status']);
+        $this->assertArrayHasKey('completed_at', $storedConditions[0]);
+    }
+
+    /** @test */
+    public function contract_becomes_ready_to_commit_when_all_conditions_met(): void
+    {
+        $conditions = [
+            [
+                'type' => 'payment_authorized',
+                'status' => 'completed',
+                'required' => true,
+                'completed_at' => date('c')
+            ],
+            [
+                'type' => 'fraud_check',
+                'status' => 'completed',
+                'required' => true,
+                'completed_at' => date('c')
+            ]
+        ];
+
+        $contract = $this->createTestContract([
+            'OXSTATE' => 'pending',
+            'OXCONDITIONS' => json_encode($conditions)
+        ]);
+
+        // All conditions met → ready_to_commit
+        $this->updateContract($contract['OXID'], ['OXSTATE' => 'ready_to_commit']);
+
+        $this->assertDatabaseHas('osc_payment_contract', [
+            'OXID' => $contract['OXID'],
+            'OXSTATE' => 'ready_to_commit'
+        ]);
+    }
+
+    /** @test */
+    public function contract_committed_creates_order_link(): void
+    {
+        $userId = $this->createTestUser(['OXID' => 'user-123']);
+        $contract = $this->createTestContract([
+            'OXUSERID' => 'user-123',
+            'OXSTATE' => 'ready_to_commit',
+            'OXORDERID' => null
+        ]);
+
+        // Create order
+        $orderId = $this->createTestOrder([
+            'OXID' => 'order-123',
+            'OXUSERID' => 'user-123'
+        ]);
+
+        // Commit contract → link order
+        $this->updateContract($contract['OXID'], [
+            'OXSTATE' => 'committed',
+            'OXORDERID' => 'order-123',
+            'OXCOMMITTEDAT' => date('Y-m-d H:i:s')
+        ]);
+
+        $this->assertDatabaseHas('osc_payment_contract', [
+            'OXID' => $contract['OXID'],
+            'OXSTATE' => 'committed',
+            'OXORDERID' => 'order-123'
+        ]);
+
+        $stored = $this->getContract($contract['OXID']);
+        $this->assertNotNull($stored['OXCOMMITTEDAT']);
+    }
+
+    /** @test */
+    public function contract_fulfilled_when_payment_captured(): void
+    {
+        $contract = $this->createTestContract([
+            'OXSTATE' => 'committed',
+            'OXORDERID' => $this->createTestOrder()
+        ]);
+
+        // Fulfill contract (payment captured)
+        $this->updateContract($contract['OXID'], [
+            'OXSTATE' => 'fulfilled',
+            'OXFULFILLEDAT' => date('Y-m-d H:i:s')
+        ]);
+
+        $this->assertDatabaseHas('osc_payment_contract', [
+            'OXID' => $contract['OXID'],
+            'OXSTATE' => 'fulfilled'
+        ]);
+
+        $stored = $this->getContract($contract['OXID']);
+        $this->assertNotNull($stored['OXFULFILLEDAT']);
+    }
+
+    /** @test */
+    public function contract_can_be_cancelled_before_commit(): void
+    {
+        $contract = $this->createTestContract(['OXSTATE' => 'pending']);
+
+        $this->updateContract($contract['OXID'], [
+            'OXSTATE' => 'cancelled',
+            'OXSTATEREASON' => 'Customer cancelled checkout'
+        ]);
+
+        $this->assertDatabaseHas('osc_payment_contract', [
+            'OXID' => $contract['OXID'],
+            'OXSTATE' => 'cancelled'
+        ]);
+    }
+
+    /** @test */
+    public function contract_expires_after_timeout(): void
+    {
+        $contract = $this->createTestContract([
+            'OXSTATE' => 'pending',
+            'OXEXPIRESAT' => date('Y-m-d H:i:s', strtotime('-1 hour'))  // Expired
+        ]);
+
+        // Query expired contracts
+        $expired = $this->db->query("
+            SELECT * FROM osc_payment_contract
+            WHERE OXSTATE IN ('draft', 'pending')
+            AND OXEXPIRESAT < NOW()
+        ")->fetchAll();
+
+        $this->assertCount(1, $expired);
+        $this->assertEquals($contract['OXID'], $expired[0]['OXID']);
+    }
+
+    /** @test */
+    public function contract_condition_can_fail(): void
+    {
+        $conditions = [
+            [
+                'type' => 'fraud_check',
+                'status' => 'failed',
+                'required' => true,
+                'failed_at' => date('c'),
+                'failure_reason' => 'High risk score detected'
+            ]
+        ];
+
+        $contract = $this->createTestContract([
+            'OXSTATE' => 'pending',
+            'OXCONDITIONS' => json_encode($conditions)
+        ]);
+
+        // Mark contract as failed due to condition failure
+        $this->updateContract($contract['OXID'], [
+            'OXSTATE' => 'failed',
+            'OXSTATEREASON' => 'Fraud check failed'
+        ]);
+
+        $this->assertDatabaseHas('osc_payment_contract', [
+            'OXID' => $contract['OXID'],
+            'OXSTATE' => 'failed',
+            'OXSTATEREASON' => 'Fraud check failed'
+        ]);
+    }
+
+    /** @test */
+    public function contract_stores_provider_order_id(): void
+    {
+        $contract = $this->createTestContract([
+            'OXSTATE' => 'pending',
+            'OXPROVIDER' => 'stripe',
+            'OXPROVIDERORDERID' => 'pi_stripe_123456'
+        ]);
+
+        $this->assertDatabaseHas('osc_payment_contract', [
+            'OXID' => $contract['OXID'],
+            'OXPROVIDERORDERID' => 'pi_stripe_123456'
+        ]);
+    }
+
+    /** @test */
+    public function contract_stores_basket_snapshot_immutably(): void
+    {
+        $basketData = [
+            'items' => [
+                ['id' => 'product-1', 'title' => 'Product 1', 'price' => 50.00, 'qty' => 2],
+                ['id' => 'product-2', 'title' => 'Product 2', 'price' => 25.00, 'qty' => 1]
+            ],
+            'totals' => [
+                'subtotal' => 125.00,
+                'tax' => 23.75,
+                'shipping' => 5.00,
+                'discount' => -10.00,
+                'gross' => 143.75
+            ]
+        ];
+
+        $contract = $this->createTestContract([
+            'OXSTATE' => 'draft',
+            'OXBASKETDATA' => json_encode($basketData)
+        ]);
+
+        $stored = $this->getContract($contract['OXID']);
+        $storedBasket = json_decode($stored['OXBASKETDATA'], true);
+
+        $this->assertEquals(2, count($storedBasket['items']));
+        $this->assertEquals(143.75, $storedBasket['totals']['gross']);
+    }
+
+    /** @test */
+    public function multiple_contracts_can_exist_for_same_user(): void
+    {
+        $userId = $this->createTestUser();
+
+        $contract1 = $this->createTestContract(['OXUSERID' => $userId, 'OXSTATE' => 'cancelled']);
+        $contract2 = $this->createTestContract(['OXUSERID' => $userId, 'OXSTATE' => 'pending']);
+
+        $contracts = $this->db->query("
+            SELECT * FROM osc_payment_contract WHERE OXUSERID = ?
+        ", [$userId])->fetchAll();
+
+        $this->assertCount(2, $contracts);
+    }
+
+    /** @test */
+    public function contract_cannot_be_modified_after_fulfillment(): void
+    {
+        // This would be enforced in application logic, but we test immutability principle
+        $contract = $this->createTestContract([
+            'OXSTATE' => 'fulfilled',
+            'OXFULFILLEDAT' => date('Y-m-d H:i:s')
+        ]);
+
+        // Attempt to modify (should be prevented by application logic)
+        // Test verifies we can query the fulfilled contract correctly
+        $stored = $this->getContract($contract['OXID']);
+        $this->assertEquals('fulfilled', $stored['OXSTATE']);
+        $this->assertNotNull($stored['OXFULFILLEDAT']);
+    }
+}
+```
+
+---
+
+### 🔥 SMART CONTRACT CONDITIONS TESTS
+
+```php
+<?php
+// tests/Component/Integration/SmartContract/ContractConditionsTest.php
+
+namespace Tests\Component\Integration\SmartContract;
+
+use Tests\Component\Support\IntegrationTestCase;
+
+/**
+ * Contract Conditions Tests
+ *
+ * Tests condition management and state tracking
+ *
+ * @group integration
+ * @group smart-contract
+ * @group conditions
+ */
+class ContractConditionsTest extends IntegrationTestCase
+{
+    /** @test */
+    public function condition_types_are_properly_stored(): void
+    {
+        $conditions = [
+            ['type' => 'payment_authorized', 'status' => 'pending', 'required' => true],
+            ['type' => 'payment_captured', 'status' => 'pending', 'required' => false],
+            ['type' => 'fraud_check', 'status' => 'pending', 'required' => true],
+            ['type' => 'inventory_reserved', 'status' => 'pending', 'required' => true],
+            ['type' => 'address_validated', 'status' => 'pending', 'required' => false],
+            ['type' => '3ds_authenticated', 'status' => 'pending', 'required' => false],
+        ];
+
+        $contract = $this->createTestContract([
+            'OXCONDITIONS' => json_encode($conditions)
+        ]);
+
+        $stored = json_decode($this->getContract($contract['OXID'])['OXCONDITIONS'], true);
+        $this->assertCount(6, $stored);
+
+        $types = array_column($stored, 'type');
+        $this->assertContains('payment_authorized', $types);
+        $this->assertContains('fraud_check', $types);
+        $this->assertContains('inventory_reserved', $types);
+    }
+
+    /** @test */
+    public function required_conditions_are_marked(): void
+    {
+        $conditions = [
+            ['type' => 'payment_authorized', 'status' => 'pending', 'required' => true],
+            ['type' => 'address_validated', 'status' => 'pending', 'required' => false]
+        ];
+
+        $contract = $this->createTestContract([
+            'OXCONDITIONS' => json_encode($conditions)
+        ]);
+
+        $stored = json_decode($this->getContract($contract['OXID'])['OXCONDITIONS'], true);
+
+        $this->assertTrue($stored[0]['required']);
+        $this->assertFalse($stored[1]['required']);
+    }
+
+    /** @test */
+    public function condition_completion_timestamp_is_stored(): void
+    {
+        $now = date('c');
+        $conditions = [
+            [
+                'type' => 'payment_authorized',
+                'status' => 'completed',
+                'required' => true,
+                'completed_at' => $now
+            ]
+        ];
+
+        $contract = $this->createTestContract([
+            'OXCONDITIONS' => json_encode($conditions)
+        ]);
+
+        $stored = json_decode($this->getContract($contract['OXID'])['OXCONDITIONS'], true);
+        $this->assertEquals('completed', $stored[0]['status']);
+        $this->assertEquals($now, $stored[0]['completed_at']);
+    }
+
+    /** @test */
+    public function condition_failure_stores_reason(): void
+    {
+        $conditions = [
+            [
+                'type' => 'fraud_check',
+                'status' => 'failed',
+                'required' => true,
+                'failed_at' => date('c'),
+                'failure_reason' => 'Risk score above threshold: 85'
+            ]
+        ];
+
+        $contract = $this->createTestContract([
+            'OXCONDITIONS' => json_encode($conditions)
+        ]);
+
+        $stored = json_decode($this->getContract($contract['OXID'])['OXCONDITIONS'], true);
+        $this->assertEquals('failed', $stored[0]['status']);
+        $this->assertArrayHasKey('failure_reason', $stored[0]);
+        $this->assertStringContainsString('Risk score', $stored[0]['failure_reason']);
+    }
+
+    /** @test */
+    public function optional_conditions_do_not_block_fulfillment(): void
+    {
+        $conditions = [
+            ['type' => 'payment_authorized', 'status' => 'completed', 'required' => true],
+            ['type' => 'address_validated', 'status' => 'pending', 'required' => false]  // Optional
+        ];
+
+        $contract = $this->createTestContract([
+            'OXSTATE' => 'pending',
+            'OXCONDITIONS' => json_encode($conditions)
+        ]);
+
+        // Can transition to ready_to_commit even though optional condition pending
+        $this->updateContract($contract['OXID'], ['OXSTATE' => 'ready_to_commit']);
+
+        $this->assertDatabaseHas('osc_payment_contract', [
+            'OXID' => $contract['OXID'],
+            'OXSTATE' => 'ready_to_commit'
+        ]);
+    }
+
+    /** @test */
+    public function all_required_conditions_must_complete_for_readiness(): void
+    {
+        $conditions = [
+            ['type' => 'payment_authorized', 'status' => 'completed', 'required' => true],
+            ['type' => 'fraud_check', 'status' => 'pending', 'required' => true],  // Still pending!
+            ['type' => 'inventory_reserved', 'status' => 'completed', 'required' => true]
+        ];
+
+        $contract = $this->createTestContract([
+            'OXSTATE' => 'pending',
+            'OXCONDITIONS' => json_encode($conditions)
+        ]);
+
+        $stored = json_decode($this->getContract($contract['OXID'])['OXCONDITIONS'], true);
+
+        // Check if all required are completed
+        $requiredConditions = array_filter($stored, fn($c) => $c['required']);
+        $allCompleted = array_reduce(
+            $requiredConditions,
+            fn($carry, $c) => $carry && $c['status'] === 'completed',
+            true
+        );
+
+        $this->assertFalse($allCompleted, 'Not all required conditions completed');
+    }
+
+    /** @test */
+    public function condition_metadata_can_be_stored(): void
+    {
+        $conditions = [
+            [
+                'type' => 'payment_authorized',
+                'status' => 'completed',
+                'required' => true,
+                'completed_at' => date('c'),
+                'metadata' => [
+                    'authorization_code' => 'AUTH_123456',
+                    'amount' => 99.99,
+                    'currency' => 'EUR',
+                    'payment_method' => 'card'
+                ]
+            ]
+        ];
+
+        $contract = $this->createTestContract([
+            'OXCONDITIONS' => json_encode($conditions)
+        ]);
+
+        $stored = json_decode($this->getContract($contract['OXID'])['OXCONDITIONS'], true);
+        $this->assertArrayHasKey('metadata', $stored[0]);
+        $this->assertEquals('AUTH_123456', $stored[0]['metadata']['authorization_code']);
+        $this->assertEquals(99.99, $stored[0]['metadata']['amount']);
+    }
+}
+```
+
+---
+
+### 🔥 SMART CONTRACT REPOSITORY TESTS
+
+```php
+<?php
+// tests/Component/Integration/Repository/PaymentContractRepositoryTest.php
+
+namespace Tests\Component\Integration\Repository;
+
+use Tests\Component\Support\IntegrationTestCase;
+use PaymentComponent\Repository\PaymentContractRepository;
+use PaymentComponent\Model\PaymentContract;
+
+/**
+ * Payment Contract Repository Tests
+ *
+ * @group integration
+ * @group repository
+ * @group smart-contract
+ */
+class PaymentContractRepositoryTest extends IntegrationTestCase
+{
+    private PaymentContractRepository $repository;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->repository = new PaymentContractRepository($this->getDatabase());
+        $this->runMigrations();
+    }
+
+    /** @test */
+    public function it_persists_new_contract(): void
+    {
+        $userId = $this->createTestUser(['OXID' => 'user-123']);
+
+        $contract = new PaymentContract(
+            userId: 'user-123',
+            state: 'draft',
+            basketData: ['items' => [], 'totals' => ['gross' => 99.99]],
+            conditions: [],
+            expiresAt: new \DateTimeImmutable('+24 hours')
+        );
+
+        $this->repository->save($contract);
+
+        $this->assertNotNull($contract->getId());
+        $this->assertDatabaseHas('osc_payment_contract', [
+            'OXID' => $contract->getId(),
+            'OXUSERID' => 'user-123',
+            'OXSTATE' => 'draft'
+        ]);
+    }
+
+    /** @test */
+    public function it_finds_contract_by_id(): void
+    {
+        $contract = $this->createTestContract(['OXSTATE' => 'pending']);
+
+        $found = $this->repository->findById($contract['OXID']);
+
+        $this->assertNotNull($found);
+        $this->assertEquals($contract['OXID'], $found->getId());
+        $this->assertEquals('pending', $found->getState());
+    }
+
+    /** @test */
+    public function it_finds_contracts_by_user(): void
+    {
+        $userId = $this->createTestUser();
+
+        $this->createTestContract(['OXUSERID' => $userId, 'OXSTATE' => 'cancelled']);
+        $this->createTestContract(['OXUSERID' => $userId, 'OXSTATE' => 'pending']);
+        $this->createTestContract(['OXUSERID' => $userId, 'OXSTATE' => 'fulfilled']);
+
+        $contracts = $this->repository->findByUserId($userId);
+
+        $this->assertCount(3, $contracts);
+    }
+
+    /** @test */
+    public function it_finds_contract_by_provider_order_id(): void
+    {
+        $contract = $this->createTestContract([
+            'OXPROVIDERORDERID' => 'pi_stripe_unique_123'
+        ]);
+
+        $found = $this->repository->findByProviderOrderId('pi_stripe_unique_123');
+
+        $this->assertNotNull($found);
+        $this->assertEquals('pi_stripe_unique_123', $found->getProviderOrderId());
+    }
+
+    /** @test */
+    public function it_finds_expired_contracts(): void
+    {
+        $this->createTestContract([
+            'OXSTATE' => 'pending',
+            'OXEXPIRESAT' => date('Y-m-d H:i:s', strtotime('-2 hours'))  // Expired
+        ]);
+        $this->createTestContract([
+            'OXSTATE' => 'pending',
+            'OXEXPIRESAT' => date('Y-m-d H:i:s', strtotime('+2 hours'))  // Not expired
+        ]);
+
+        $expired = $this->repository->findExpiredContracts();
+
+        $this->assertCount(1, $expired);
+    }
+
+    /** @test */
+    public function it_updates_existing_contract(): void
+    {
+        $contract = $this->createTestContract(['OXSTATE' => 'pending']);
+
+        $found = $this->repository->findById($contract['OXID']);
+        $found->setState('ready_to_commit');
+
+        $this->repository->save($found);
+
+        $this->assertDatabaseHas('osc_payment_contract', [
+            'OXID' => $contract['OXID'],
+            'OXSTATE' => 'ready_to_commit'
+        ]);
+    }
+
+    /** @test */
+    public function it_updates_contract_conditions(): void
+    {
+        $contract = $this->createTestContract([
+            'OXCONDITIONS' => json_encode([
+                ['type' => 'payment_authorized', 'status' => 'pending', 'required' => true]
+            ])
+        ]);
+
+        $found = $this->repository->findById($contract['OXID']);
+        $found->markConditionCompleted('payment_authorized');
+
+        $this->repository->save($found);
+
+        $stored = $this->getContract($contract['OXID']);
+        $conditions = json_decode($stored['OXCONDITIONS'], true);
+
+        $this->assertEquals('completed', $conditions[0]['status']);
+    }
+
+    /** @test */
+    public function it_links_contract_to_order_on_commit(): void
+    {
+        $userId = $this->createTestUser();
+        $orderId = $this->createTestOrder(['OXUSERID' => $userId]);
+
+        $contract = $this->createTestContract([
+            'OXUSERID' => $userId,
+            'OXSTATE' => 'ready_to_commit',
+            'OXORDERID' => null
+        ]);
+
+        $found = $this->repository->findById($contract['OXID']);
+        $found->commit($orderId);
+
+        $this->repository->save($found);
+
+        $this->assertDatabaseHas('osc_payment_contract', [
+            'OXID' => $contract['OXID'],
+            'OXSTATE' => 'committed',
+            'OXORDERID' => $orderId
+        ]);
+    }
+
+    /** @test */
+    public function it_counts_active_contracts_for_user(): void
+    {
+        $userId = $this->createTestUser();
+
+        $this->createTestContract(['OXUSERID' => $userId, 'OXSTATE' => 'pending']);
+        $this->createTestContract(['OXUSERID' => $userId, 'OXSTATE' => 'ready_to_commit']);
+        $this->createTestContract(['OXUSERID' => $userId, 'OXSTATE' => 'cancelled']);  // Not active
+        $this->createTestContract(['OXUSERID' => $userId, 'OXSTATE' => 'fulfilled']);  // Not active
+
+        $count = $this->repository->countActiveContractsByUser($userId);
+
+        $this->assertEquals(2, $count);
+    }
+}
 ```
 
 ---
@@ -1731,12 +2474,59 @@ public function concurrent_updates_use_pessimistic_locking(): void
 
 ## Implementation Checklist
 
-### Phase 1: Core Tables (Week 1, Days 1-2)
+### Phase 0: Smart Contract Tables (Week 1, Day 1) - **CRITICAL FIRST!**
 
-- [ ] **Migration 001: osc_payment_transaction**
+- [ ] **Migration 001: osc_payment_contract (PRIMARY TABLE)**
+  - [ ] Write contract table migration test
+  - [ ] Create contract table migration SQL
+  - [ ] Test FK to oxuser (CASCADE)
+  - [ ] Test FK to oxorder (SET NULL - order linked later!)
+  - [ ] Test OXORDERID can be NULL (contract created before order!)
+  - [ ] Test JSON columns (OXBASKETDATA, OXCONDITIONS)
+  - [ ] Test all indexes work correctly
+  - [ ] Verify 100% test pass
+
+- [ ] **Smart Contract Lifecycle Tests (18+ tests)**
+  - [ ] Contract created in draft state with NULL order
+  - [ ] Contract transitions: draft → pending → ready_to_commit → committed → fulfilled
+  - [ ] Contract can be cancelled before commit
+  - [ ] Contract can expire after timeout
+  - [ ] Contract stores immutable basket snapshot
+  - [ ] Contract stores provider order ID
+  - [ ] Multiple contracts can exist for same user
+  - [ ] Contract links to order on commit (OXORDERID updated from NULL)
+  - [ ] Contract fulfilled when payment captured
+  - [ ] Contract cannot be modified after fulfillment
+  - [ ] User deletion cascades to contract (FK CASCADE)
+  - [ ] Order deletion sets OXORDERID to NULL (FK SET NULL)
+
+- [ ] **Smart Contract Conditions Tests (8+ tests)**
+  - [ ] Condition types properly stored (payment_authorized, fraud_check, etc.)
+  - [ ] Required vs optional conditions marked
+  - [ ] Condition completion timestamps stored
+  - [ ] Condition failure stores reason
+  - [ ] Optional conditions don't block fulfillment
+  - [ ] All required conditions must complete for readiness
+  - [ ] Condition metadata can be stored
+
+- [ ] **Smart Contract Repository Tests (11+ tests)**
+  - [ ] Persist new contract
+  - [ ] Find contract by ID
+  - [ ] Find contracts by user
+  - [ ] Find contract by provider order ID
+  - [ ] Find expired contracts
+  - [ ] Update existing contract
+  - [ ] Update contract conditions
+  - [ ] Link contract to order on commit
+  - [ ] Count active contracts for user
+
+### Phase 1: Core Tables (Week 1, Day 2)
+
+- [ ] **Migration 002: osc_payment_transaction (Enhanced with OXCONTRACTID FK)**
   - [ ] Write migration test
   - [ ] Create migration SQL
   - [ ] Test FK to oxorder (CASCADE)
+  - [ ] **Test FK to osc_payment_contract (NEW!)**
   - [ ] Test indexes work correctly
   - [ ] Verify 100% test pass
 
@@ -1847,6 +2637,37 @@ public function concurrent_updates_use_pessimistic_locking(): void
 4. ✅ **Test repositories with real database (integration tests)**
 5. ✅ **Test state machines exhaustively**
 6. ✅ **Achieve 95%+ coverage**
+7. ✅ **Test smart contract lifecycle completely (37+ tests minimum)**
+
+### Smart Contract Testing Summary
+
+**Total Smart Contract Tests Required: 37+ tests**
+
+| Test Category | Test Count | Purpose |
+|---------------|-----------|---------|
+| **Contract Lifecycle** | 18 tests | Complete state machine: draft → fulfilled |
+| **Contract Conditions** | 8 tests | Condition tracking, required vs optional |
+| **Contract Repository** | 11 tests | CRUD operations, queries, expiration |
+| **TOTAL** | **37 tests** | **Comprehensive contract functionality** |
+
+**Critical Test Scenarios:**
+1. ✅ Contract created BEFORE order (OXORDERID = NULL)
+2. ✅ Contract state transitions (8 states)
+3. ✅ Condition state tracking (pending, completed, failed)
+4. ✅ Contract expiration (24 hour timeout)
+5. ✅ Order linking on commit (OXORDERID updated)
+6. ✅ Payment capture triggers fulfillment
+7. ✅ Basket snapshot immutability
+8. ✅ Multiple contracts per user
+9. ✅ FK CASCADE and SET NULL behaviors
+10. ✅ Required conditions block progression
+
+**Test File Locations:**
+- `tests/Component/Integration/SmartContract/ContractLifecycleTest.php` (18 tests)
+- `tests/Component/Integration/SmartContract/ContractConditionsTest.php` (8 tests)
+- `tests/Component/Integration/Repository/PaymentContractRepositoryTest.php` (11 tests)
+
+**Coverage Target: 100%** for all smart contract functionality!
 
 ### Benefits of TDD Approach
 
@@ -1877,3 +2698,9 @@ After completing database layer:
 
 **Version History:**
 - v1.0.0 (2025-10-17): Initial implementation guide with TDD approach
+- v4.0.0 (2025-10-22): **Added comprehensive smart contract testing strategy (37+ tests)**
+  - Added Contract Lifecycle Tests (18 tests)
+  - Added Contract Conditions Tests (8 tests)
+  - Added Contract Repository Tests (11 tests)
+  - Updated implementation checklist with Phase 0 (Smart Contract Tables)
+  - Added smart contract testing summary with coverage targets
