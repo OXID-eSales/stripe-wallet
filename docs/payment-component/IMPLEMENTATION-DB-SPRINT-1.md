@@ -5,6 +5,10 @@
 **Date:** 2025-10-22
 **Target:** OXID eShop 7.4+
 **Philosophy:** Test-First Development with Clean Architecture + Smart Contracts
+⚠️ **NOTE:** This file is comprehensive (2700+ lines). For focused reading, see:
+- **[PART-1-MIGRATIONS.md](IMPLEMENTATION-DB-SPRINT-1-PART-1-MIGRATIONS.md)** - Migrations only (~1800 tokens)
+- **[PART-2-MODELS.md](IMPLEMENTATION-DB-SPRINT-1-PART-2-MODELS.md)** - Domain models only (~5000 tokens)
+
 **Related Docs:**
 - [02-database-and-models.md](02-database-and-models.md) - Contract-aware database schema
 - [01-architecture-layers.md](01-architecture-layers.md) - Contract-aware architecture

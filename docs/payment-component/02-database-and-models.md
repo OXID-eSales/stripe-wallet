@@ -4,7 +4,7 @@
 **Date:** 2025-10-22
 **Target:** OXID eShop 7.4+ (compatible with 7.5, 8.0+)
 **Philosophy:** Normalized master-detail pattern WITH smart-contract support
-**Visual Diagram:** [puml/06-database-schema.puml](puml/06-database-schema.puml)
+**Visual Diagram:** [puml/01-01-database-schema.puml](puml/01-01-database-schema.puml)
 **Related:** [01-architecture-layers.md](01-architecture-layers.md) - Contract-aware architecture
 
 ---
@@ -1142,7 +1142,7 @@ The contract-aware database schema provides:
 **See also:**
 - [01-architecture-layers.md](01-architecture-layers.md) - Contract-aware architecture
 - [03-building-payment-modules.md](03-building-payment-modules.md) - How to build provider modules
-- [puml/06-database-schema.puml](puml/06-database-schema.puml) - Visual diagram
+- [puml/01-01-database-schema.puml](puml/01-01-database-schema.puml) - Visual diagram
 
 ---
 
