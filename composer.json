@@ -67,7 +67,7 @@
       "@phpstan",
       "@phpmd"
     ],
-    "phpunit": "XDEBUG_MODE=coverage vendor/bin/phpunit -c tests/phpunit.xml --bootstrap=/var/www/source/bootstrap.php",
+    "phpunit": "XDEBUG_MODE=coverage vendor/bin/phpunit -c tests/Component/phpunit.xml --bootstrap=/var/www/source/bootstrap.php",
 
     "generate-reports": [
       "@phpstan-report",
