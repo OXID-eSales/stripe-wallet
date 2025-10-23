@@ -1,11 +1,11 @@
-@startuml Payment Component Database Schema (Normalized)
+@startuml Payment Component Database Schema (Smart-Contract Pattern)
 !theme vibrant
 
 skinparam backgroundColor #FEFEFE
 skinparam linetype ortho
 skinparam roundcorner 8
 
-title Payment Component Database Schema - Normalized Master-Detail Pattern\n(Component Tables with FK References - NO Core Table Extensions)
+title Payment Component Database Schema - Smart-Contract Pattern\n(Contract-First Architecture with Normalized Master-Detail Pattern)\n(Component Tables with FK References - NO Core Table Extensions)
 
 ' OXID Core Tables (READ-ONLY - NOT EXTENDED)
 package "OXID Core Tables (Not Modified)" #LightGray {
@@ -69,6 +69,47 @@ package "OXID Core Tables (Not Modified)" #LightGray {
   }
 }
 
+' Component Tables - CONTRACT (NEW - AGGREGATE ROOT)
+package "Payment Component Tables (CONTRACT - AGGREGATE ROOT)" #F3E5F5 {
+  entity "osc_payment_contract\n(Contract Lifecycle)" as CONTRACT {
+    * **OXID** : CHAR(32) <<PK>>
+    --
+    <color:blue>**References**</color>
+    OXSHOPID : INT
+    **OXUSERID** : CHAR(32) <<FK>>
+    **OXORDERID** : CHAR(32) <<FK>> = NULL!
+    --
+    <color:orange>**State Machine**</color>
+    **OXSTATE** : VARCHAR(32)
+    OXSTATEREASON : VARCHAR(255)
+    --
+    <color:purple>**Immutable Snapshot**</color>
+    **OXBASKETDATA** : JSON
+    OXTERMS : JSON
+    OXMETADATA : JSON
+    --
+    <color:green>**Conditions**</color>
+    **OXCONDITIONS** : JSON
+    --
+    <color:brown>**Provider**</color>
+    OXPROVIDER : VARCHAR(32)
+    **OXPROVIDERORDERID** : VARCHAR(128)
+    OXPROVIDERDATA : JSON
+    --
+    <color:gray>**Lifecycle Timestamps**</color>
+    OXCREATED : DATETIME
+    OXUPDATED : DATETIME
+    OXCOMMITTEDAT : DATETIME
+    OXFULFILLEDAT : DATETIME
+    OXEXPIRESAT : DATETIME
+    --
+    <color:teal>**Indexes**</color>
+    IDX(OXSTATE)
+    IDX(OXPROVIDERORDERID) ★
+    IDX(OXSTATE, OXEXPIRESAT)
+  }
+}
+
 ' Component Tables (NEW - Normalized Master-Detail Pattern)
 package "Payment Component Tables (MASTER TABLE)" #LightGreen {
   entity "osc_payment_transaction\n(Master - Core Fields Only)" as PAYMENT_TX {
@@ -76,6 +117,7 @@ package "Payment Component Tables (MASTER TABLE)" #LightGreen {
     --
     OXSHOPID : INT
     **OXORDERID** : CHAR(32) <<FK>>
+    **OXCONTRACTID** : CHAR(32) <<FK>> <<NEW>>
     --
     <color:blue>**Provider Identification:**</color>
     **OXPROVIDER** : VARCHAR(32)
@@ -255,6 +297,7 @@ package "Payment Component Tables (SUPPORT TABLES)" #LightYellow {
     * **OXID** : CHAR(32) <<PK>>
     --
     **OXORDERID** : CHAR(32) <<FK>> <<UNIQUE>>
+    **OXCONTRACTID** : CHAR(32) <<FK>> <<NEW>>
     --
     <color:blue>**Payment Lifecycle:**</color>
     **OXPAYMENTSTATE** : VARCHAR(32)
@@ -364,6 +407,12 @@ package "Payment Component Tables (SUPPORT TABLES)" #LightYellow {
     INDEX (OXEXPIRES)
   }
 }
+
+' Relationships - Contract Layer (NEW!)
+USER ||--o{ CONTRACT : "1:N\ncreates contracts"
+CONTRACT }o--|| ORDER : "0..1:1\ncommits to order\n(NULL until ready)"
+CONTRACT ||--o{ PAYMENT_TX : "1:N\ntracks transactions"
+CONTRACT ||--o| ORDER_STATE : "1:1\nlinks to state"
 
 ' Relationships - Core
 ORDER ||--o{ PAYMENT_TX : "1:N\ntransactions"
@@ -658,8 +707,38 @@ note bottom of PAYMENT_TX
   // Automatically loads related details
 end note
 
+note right of CONTRACT
+  **CONTRACT = AGGREGATE ROOT (NEW!)**
+
+  <color:blue>**State Machine:**</color>
+  DRAFT → PENDING → READY_TO_COMMIT
+    → COMMITTED → FULFILLED
+
+  <color:red>**Terminal States:**</color>
+  CANCELLED | EXPIRED | FAILED
+
+  <color:green>**KEY INNOVATION:**</color>
+  OXORDERID = **NULL** until committed!
+
+  <color:purple>**When Order Created:**</color>
+  1. All conditions fulfilled
+  2. Payment authorized
+  3. Fraud check passed
+  4. Stock reserved
+  → THEN order created
+  → OXORDERID set
+  → OXSTATE = 'committed'
+
+  <color:orange>**Benefits:**</color>
+  ✅ No orphan orders
+  ✅ Sequential order numbers
+  ✅ Complete audit trail
+  ✅ Explicit conditions
+  ✅ Provider-agnostic
+end note
+
 note as N1
-  **Architecture Principle: Normalized Master-Detail**
+  **Architecture Principle: Normalized Master-Detail + Smart Contracts**
 
   <color:green>**✅ Master Table:**</color>
   - Core fields only (15 columns)
