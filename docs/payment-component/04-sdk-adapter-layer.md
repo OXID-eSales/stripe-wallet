@@ -1320,7 +1320,7 @@ final class AdapterFactory
 **Mock the Provider SDKs:**
 
 ```php
-// tests/Unit/Adapter/StripeAdapterTest.php
+// tests/Provider/Stripe/Unit/StripeAdapterTest.php
 
 use Mockery;
 use Stripe\StripeClient;
@@ -1376,7 +1376,7 @@ class StripeAdapterTest extends TestCase
 ### Integration Testing with Real SDKs (Sandbox)
 
 ```php
-// tests/Integration/Adapter/StripeAdapterIntegrationTest.php
+// tests/Provider/Stripe/Integration/StripeAdapterIntegrationTest.php
 
 class StripeAdapterIntegrationTest extends TestCase
 {
@@ -1426,7 +1426,7 @@ class StripeAdapterIntegrationTest extends TestCase
 ### Testing Business Logic with Mocked Adapter
 
 ```php
-// tests/Unit/Service/PaymentServiceTest.php
+// tests/Component/Unit/Service/PaymentServiceTest.php
 
 class PaymentServiceTest extends TestCase
 {

@@ -97,15 +97,15 @@
 #### 3. Service Layer (90% coverage)
 
 **Test Files:**
-- `tests/Unit/Service/PaymentServiceTest.php`
-- `tests/Unit/Service/OrderManagerTest.php`
-- `tests/Unit/Service/ModuleSettingsTest.php`
+- `tests/Component/Unit/Service/PaymentServiceTest.php`
+- `tests/Component/Unit/Service/OrderManagerTest.php`
+- `tests/Component/Unit/Service/ModuleSettingsTest.php`
 
 **Example: PaymentService Create Order Test**
 
 ```php
 <?php
-// tests/Unit/Service/PaymentServiceTest.php
+// tests/Component/Unit/Service/PaymentServiceTest.php
 
 namespace PaymentComponent\Tests\Unit\Service;
 
@@ -263,15 +263,15 @@ class PaymentServiceTest extends TestCase
 #### 4. Event Handlers (95% coverage)
 
 **Test Files:**
-- `tests/Unit/EventHandler/PaymentInitiationHandlerTest.php`
-- `tests/Unit/EventHandler/PaymentCaptureHandlerTest.php`
-- `tests/Unit/EventHandler/PaymentRefundHandlerTest.php`
+- `tests/Component/Unit/EventHandler/PaymentInitiationHandlerTest.php`
+- `tests/Component/Unit/EventHandler/PaymentCaptureHandlerTest.php`
+- `tests/Component/Unit/EventHandler/PaymentRefundHandlerTest.php`
 
 **Example: Payment Capture Handler Test**
 
 ```php
 <?php
-// tests/Unit/EventHandler/PaymentCaptureHandlerTest.php
+// tests/Component/Unit/EventHandler/PaymentCaptureHandlerTest.php
 
 namespace PaymentComponent\Tests\Unit\EventHandler;
 
@@ -422,14 +422,14 @@ class PaymentCaptureHandlerTest extends TestCase
 #### 5. Factory Layer (85% coverage)
 
 **Test Files:**
-- `tests/Unit/Factory/OrderRequestFactoryTest.php`
-- `tests/Unit/Factory/PurchaseUnitsFactoryTest.php`
+- `tests/Component/Unit/Factory/OrderRequestFactoryTest.php`
+- `tests/Component/Unit/Factory/PurchaseUnitsFactoryTest.php`
 
 **Example: OrderRequestFactory Test**
 
 ```php
 <?php
-// tests/Unit/Factory/OrderRequestFactoryTest.php
+// tests/Component/Unit/Factory/OrderRequestFactoryTest.php
 
 namespace PaymentComponent\Tests\Unit\Factory;
 
@@ -517,13 +517,13 @@ class OrderRequestFactoryTest extends TestCase
 #### 6. Repository Layer (Unit Tests Only - No DB)
 
 **Test Files:**
-- `tests/Unit/Repository/OrderRepositoryTest.php`
+- `tests/Component/Unit/Repository/OrderRepositoryTest.php`
 
 **Example: OrderRepository Query Building Test**
 
 ```php
 <?php
-// tests/Unit/Repository/OrderRepositoryTest.php
+// tests/Component/Unit/Repository/OrderRepositoryTest.php
 
 namespace PaymentComponent\Tests\Unit\Repository;
 
@@ -628,7 +628,7 @@ docker pull wiremock/wiremock
 
 ```php
 <?php
-// tests/Integration/DatabaseTestCase.php
+// tests/Component/Integration/DatabaseTestCase.php
 
 namespace PaymentComponent\Tests\Integration;
 
@@ -693,7 +693,7 @@ abstract class DatabaseTestCase extends TestCase
 
 #### 1. Repository Integration Tests
 
-**Test File:** `tests/Integration/Repository/OrderRepositoryIntegrationTest.php`
+**Test File:** `tests/Component/Integration/Repository/OrderRepositoryIntegrationTest.php`
 
 ```php
 <?php

@@ -80,7 +80,7 @@ This TDD strategy document covers testing approaches for both **component tests*
 
 **Critical Test Scenarios:**
 ```php
-// tests/Unit/Service/PaymentService_Transaction_CRITICAL_Test.php
+// tests/Component/Unit/Service/PaymentService_Transaction_CRITICAL_Test.php
 
 ✅ testTransactionAtomicity_NoPartialCaptures()
 ✅ testAmountPrecision_NoCentsLost()

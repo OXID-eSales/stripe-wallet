@@ -84,11 +84,11 @@ mkdir -p "$MODULE_DIR/src/Stripe/Controller/Admin"
 mkdir -p "$MODULE_DIR/src/Stripe/Model"
 
 # Create test directories
-mkdir -p "$MODULE_DIR/tests/Unit/Component/Event/Domain"
-mkdir -p "$MODULE_DIR/tests/Unit/Component/Model"
-mkdir -p "$MODULE_DIR/tests/Unit/Stripe/Handler"
-mkdir -p "$MODULE_DIR/tests/Integration/Component/Repository"
-mkdir -p "$MODULE_DIR/tests/Integration/Stripe"
+mkdir -p "$MODULE_DIR/tests/Component/Unit/Component/Event/Domain"
+mkdir -p "$MODULE_DIR/tests/Component/Unit/Component/Model"
+mkdir -p "$MODULE_DIR/tests/Component/Unit/Stripe/Handler"
+mkdir -p "$MODULE_DIR/tests/Component/Integration/Component/Repository"
+mkdir -p "$MODULE_DIR/tests/Component/Integration/Stripe"
 mkdir -p "$MODULE_DIR/tests/Acceptance/Stripe"
 mkdir -p "$MODULE_DIR/tests/Support/Builders"
 mkdir -p "$MODULE_DIR/tests/Support/Fixtures"
@@ -159,7 +159,7 @@ class MigrationRunner
 
 ```php
 <?php
-// tests/Unit/Infrastructure/ModuleStructureTest.php
+// tests/Component/Unit/Infrastructure/ModuleStructureTest.php
 
 namespace Osc\Payment\Tests\Unit\Infrastructure;
 
@@ -246,10 +246,10 @@ class ModuleStructureTest extends TestCase
     public function test_directories_exist(): void
     {
         $requiredDirs = [
-            'tests/Unit/Component',
-            'tests/Unit/Stripe',
-            'tests/Integration/Component',
-            'tests/Integration/Stripe',
+            'tests/Component/Unit/Component',
+            'tests/Component/Unit/Stripe',
+            'tests/Component/Integration/Component',
+            'tests/Component/Integration/Stripe',
             'tests/Support',
         ];
 

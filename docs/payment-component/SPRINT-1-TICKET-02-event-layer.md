@@ -292,10 +292,10 @@ final class EventDispatcher implements EventDispatcherInterface
 
 ```php
 <?php
-// tests/Unit/Component/Event/EventContextTest.php
-// tests/Unit/Component/Event/EventDispatcherTest.php
-// tests/Unit/Component/Event/Domain/PaymentInitiatedEventTest.php
-// tests/Unit/Component/Event/Domain/PaymentCapturedEventTest.php
+// tests/Component/Unit/Component/Event/EventContextTest.php
+// tests/Component/Unit/Component/Event/EventDispatcherTest.php
+// tests/Component/Unit/Component/Event/Domain/PaymentInitiatedEventTest.php
+// tests/Component/Unit/Component/Event/Domain/PaymentCapturedEventTest.php
 // ... (tests for all 8 events)
 ```
 

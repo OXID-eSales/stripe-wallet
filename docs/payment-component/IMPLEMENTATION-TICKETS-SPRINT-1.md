@@ -612,11 +612,11 @@ mkdir -p "$MODULE_DIR/src/Stripe/Controller/Admin"
 mkdir -p "$MODULE_DIR/src/Stripe/Model"
 
 # Create test directories
-mkdir -p "$MODULE_DIR/tests/Unit/Component/Event/Domain"
-mkdir -p "$MODULE_DIR/tests/Unit/Component/Model"
-mkdir -p "$MODULE_DIR/tests/Unit/Stripe/Handler"
-mkdir -p "$MODULE_DIR/tests/Integration/Component/Repository"
-mkdir -p "$MODULE_DIR/tests/Integration/Stripe"
+mkdir -p "$MODULE_DIR/tests/Component/Unit/Component/Event/Domain"
+mkdir -p "$MODULE_DIR/tests/Component/Unit/Component/Model"
+mkdir -p "$MODULE_DIR/tests/Component/Unit/Stripe/Handler"
+mkdir -p "$MODULE_DIR/tests/Component/Integration/Component/Repository"
+mkdir -p "$MODULE_DIR/tests/Component/Integration/Stripe"
 mkdir -p "$MODULE_DIR/tests/Acceptance/Stripe"
 mkdir -p "$MODULE_DIR/tests/Support/Builders"
 mkdir -p "$MODULE_DIR/tests/Support/Fixtures"
@@ -687,7 +687,7 @@ class MigrationRunner
 
 ```php
 <?php
-// tests/Unit/Infrastructure/ModuleStructureTest.php
+// tests/Component/Unit/Infrastructure/ModuleStructureTest.php
 
 namespace Osc\Payment\Tests\Unit\Infrastructure;
 
@@ -774,10 +774,10 @@ class ModuleStructureTest extends TestCase
     public function test_directories_exist(): void
     {
         $requiredDirs = [
-            'tests/Unit/Component',
-            'tests/Unit/Stripe',
-            'tests/Integration/Component',
-            'tests/Integration/Stripe',
+            'tests/Component/Unit/Component',
+            'tests/Component/Unit/Stripe',
+            'tests/Component/Integration/Component',
+            'tests/Component/Integration/Stripe',
             'tests/Support',
         ];
 
@@ -1188,10 +1188,10 @@ final class EventDispatcher implements EventDispatcherInterface
 
 ```php
 <?php
-// tests/Unit/Component/Event/EventContextTest.php
-// tests/Unit/Component/Event/EventDispatcherTest.php
-// tests/Unit/Component/Event/Domain/PaymentInitiatedEventTest.php
-// tests/Unit/Component/Event/Domain/PaymentCapturedEventTest.php
+// tests/Component/Unit/Component/Event/EventContextTest.php
+// tests/Component/Unit/Component/Event/EventDispatcherTest.php
+// tests/Component/Unit/Component/Event/Domain/PaymentInitiatedEventTest.php
+// tests/Component/Unit/Component/Event/Domain/PaymentCapturedEventTest.php
 // ... (tests for all 8 events)
 ```
 
@@ -1615,7 +1615,7 @@ interface PaymentOrderStates
 
 ## TDD Workflow
 
-Write tests in `tests/Unit/Component/Model/` for:
+Write tests in `tests/Component/Unit/Component/Model/` for:
 - PaymentTransaction creation, validation, state changes
 - PaymentOrderState state machine transitions
 - PaymentCustomer payment method management
@@ -1844,7 +1844,7 @@ class PaymentTransactionRepository implements PaymentTransactionRepositoryInterf
 
 ## TDD Workflow
 
-Write integration tests in `tests/Integration/Component/Repository/`:
+Write integration tests in `tests/Component/Integration/Component/Repository/`:
 - PaymentTransactionRepositoryTest (CRUD operations)
 - OrderRepositoryTest (order queries)
 
@@ -2254,7 +2254,7 @@ final class StripeAdapter implements PaymentAdapterInterface
 
 ```php
 <?php
-// tests/Unit/Component/Adapter/Request/CreatePaymentRequestTest.php
+// tests/Component/Unit/Component/Adapter/Request/CreatePaymentRequestTest.php
 
 namespace Osc\Payment\Tests\Unit\Component\Adapter\Request;
 
@@ -2334,7 +2334,7 @@ Implement all request/response objects with validation.
 
 ```php
 <?php
-// tests/Unit/Stripe/Adapter/StripeAdapterTest.php
+// tests/Component/Unit/Stripe/Adapter/StripeAdapterTest.php
 
 namespace Osc\Payment\Tests\Unit\Stripe\Adapter;
 
@@ -2400,7 +2400,7 @@ class StripeAdapterTest extends TestCase
 
 ```php
 <?php
-// tests/Integration/Stripe/Adapter/StripeAdapterIntegrationTest.php
+// tests/Component/Integration/Stripe/Adapter/StripeAdapterIntegrationTest.php
 
 namespace Osc\Payment\Tests\Integration\Stripe\Adapter;
 
@@ -2743,7 +2743,7 @@ class PaymentInitiationHandler
 
 ```php
 <?php
-// tests/Unit/Component/Service/PaymentServiceTest.php
+// tests/Component/Unit/Component/Service/PaymentServiceTest.php
 
 namespace Osc\Payment\Tests\Unit\Component\Service;
 
@@ -2831,7 +2831,7 @@ class PaymentServiceTest extends TestCase
 
 ```php
 <?php
-// tests/Integration/Stripe/FullPaymentFlowWithAdapterTest.php
+// tests/Component/Integration/Stripe/FullPaymentFlowWithAdapterTest.php
 
 namespace Osc\Payment\Tests\Integration\Stripe;
 

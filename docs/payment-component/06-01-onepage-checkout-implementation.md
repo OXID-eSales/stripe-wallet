@@ -173,7 +173,7 @@ Create the foundation: controller, routing, basic template rendering
 
 ```php
 <?php
-// tests/Unit/Controller/OnePageCheckoutControllerTest.php
+// tests/Component/Unit/Controller/OnePageCheckoutControllerTest.php
 
 declare(strict_types=1);
 
@@ -253,7 +253,7 @@ class OnePageCheckoutControllerTest extends TestCase
 
 **Run Test (Should Fail):**
 ```bash
-vendor/bin/phpunit tests/Unit/Controller/OnePageCheckoutControllerTest.php
+vendor/bin/phpunit tests/Component/Unit/Controller/OnePageCheckoutControllerTest.php
 ```
 
 Expected: ❌ **FAIL** - Class `OnePageCheckoutController` not found
@@ -330,7 +330,7 @@ class OnePageCheckoutController extends FrontendController
 
 **Run Test (Should Pass):**
 ```bash
-vendor/bin/phpunit tests/Unit/Controller/OnePageCheckoutControllerTest.php
+vendor/bin/phpunit tests/Component/Unit/Controller/OnePageCheckoutControllerTest.php
 ```
 
 Expected: ✅ **PASS** - All tests green
@@ -343,7 +343,7 @@ Expected: ✅ **PASS** - All tests green
 
 ```php
 <?php
-// tests/Unit/Service/ModuleSettingsTest.php
+// tests/Component/Unit/Service/ModuleSettingsTest.php
 
 declare(strict_types=1);
 
@@ -407,7 +407,7 @@ class ModuleSettingsTest extends TestCase
 
 **Run Test:**
 ```bash
-vendor/bin/phpunit tests/Unit/Service/ModuleSettingsTest.php
+vendor/bin/phpunit tests/Component/Unit/Service/ModuleSettingsTest.php
 ```
 
 Expected: ❌ **FAIL** - Methods not implemented
@@ -479,7 +479,7 @@ class ModuleSettings
 
 **Run Test:**
 ```bash
-vendor/bin/phpunit tests/Unit/Service/ModuleSettingsTest.php
+vendor/bin/phpunit tests/Component/Unit/Service/ModuleSettingsTest.php
 ```
 
 Expected: ✅ **PASS**
@@ -957,7 +957,7 @@ Implement basket display with quantity updates and dynamic total calculation
 
 ```php
 <?php
-// tests/Integration/OnePageCheckout/BasketOperationsTest.php
+// tests/Component/Integration/OnePageCheckout/BasketOperationsTest.php
 
 declare(strict_types=1);
 
@@ -1060,7 +1060,7 @@ class BasketOperationsTest extends IntegrationTestCase
 
 **Run Test:**
 ```bash
-vendor/bin/phpunit tests/Integration/OnePageCheckout/BasketOperationsTest.php
+vendor/bin/phpunit tests/Component/Integration/OnePageCheckout/BasketOperationsTest.php
 ```
 
 Expected: ❌ **FAIL** - Endpoints not implemented
@@ -1191,7 +1191,7 @@ public function validateBasket(): JsonResponse
 
 **Run Test:**
 ```bash
-vendor/bin/phpunit tests/Integration/OnePageCheckout/BasketOperationsTest.php
+vendor/bin/phpunit tests/Component/Integration/OnePageCheckout/BasketOperationsTest.php
 ```
 
 Expected: ✅ **PASS**

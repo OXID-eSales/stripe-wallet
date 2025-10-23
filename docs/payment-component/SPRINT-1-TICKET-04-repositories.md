@@ -187,7 +187,7 @@ class PaymentTransactionRepository implements PaymentTransactionRepositoryInterf
 
 ## TDD Workflow
 
-Write integration tests in `tests/Integration/Component/Repository/`:
+Write integration tests in `tests/Component/Integration/Component/Repository/`:
 - PaymentTransactionRepositoryTest (CRUD operations)
 - OrderRepositoryTest (order queries)
 

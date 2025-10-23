@@ -58,16 +58,15 @@ This document defines the **clear separation between component tests and provide
 - ✅ No provider SDK dependencies
 
 **What Component Tests Cover**:
-- Event system (EventDispatcher, EventContext, Domain Events)
-- Domain models (PaymentTransaction, PaymentOrderState, PaymentCustomer)
-- Repositories (PaymentTransactionRepository, OrderRepository)
-- Business services (PaymentService, OrderManager)
-- State machine logic
-- Abstract base classes (AbstractCustomerMapper, AbstractBasketMapper)
-- Utility classes (AmountConverter, CurrencyNormalizer)
+- EventSystem (EventDispatcher, Events, Handlers, Subscribers)
+- Domain models (PaymentContract, PaymentTransaction, ContractCondition)
+- Repositories (ContractRepository, TransactionRepository)
+- Business services (PaymentService, ContractService)
+- Controllers (HTTP, GraphQL, Webhook)
+- State machine logic (Contract state transitions)
+- Service factories
 - Exception handling
-- Request/Response DTOs
-- Adapter interface contracts
+- Validation logic
 
 **What Component Tests DON'T Cover**:
 - ❌ Provider SDK integration
@@ -114,68 +113,83 @@ This document defines the **clear separation between component tests and provide
 payment-component/
 ├── src/
 │   └── Component/              # 100% Reusable code
-│       ├── Adapter/
-│       │   ├── PaymentAdapterInterface.php
-│       │   ├── Request/
-│       │   ├── Response/
-│       │   ├── Exception/
-│       │   └── Util/
-│       ├── Contract/
-│       ├── Event/
-│       ├── Model/
-│       ├── Repository/
-│       └── Service/
+│       ├── Contract/           # Domain contracts/interfaces
+│       ├── Controller/         # Controllers (thin layer)
+│       │   ├── Http/           # HTTP REST controllers
+│       │   ├── GraphQL/        # GraphQL resolvers
+│       │   ├── Mcp/            # MCP integration
+│       │   └── Webhook/        # Webhook handlers
+│       ├── EventSystem/        # Event-driven architecture
+│       │   ├── Event/          # Domain events
+│       │   │   ├── Contract/   # Contract events
+│       │   │   └── Payment/    # Payment events
+│       │   ├── Handler/        # Event handlers
+│       │   │   ├── Contract/   # Contract handlers
+│       │   │   └── Payment/    # Payment handlers
+│       │   └── Subscriber/     # Event subscribers
+│       ├── Model/              # Domain models
+│       ├── Repository/         # Data access layer
+│       └── Service/            # Business services
+│           ├── Factory/        # Service factories
+│           ├── Payment/        # Payment services
+│           └── Support/        # Support services
 │
 └── tests/
     └── Component/              # Component tests (provider-agnostic)
         ├── Unit/
-        │   ├── Adapter/
-        │   │   ├── Request/
-        │   │   │   ├── CreatePaymentRequestTest.php
-        │   │   │   ├── CapturePaymentRequestTest.php
-        │   │   │   └── RefundPaymentRequestTest.php
-        │   │   ├── Response/
-        │   │   │   ├── PaymentResponseTest.php
-        │   │   │   ├── CaptureResponseTest.php
-        │   │   │   └── RefundResponseTest.php
-        │   │   ├── Exception/
-        │   │   │   └── PaymentAdapterExceptionTest.php
-        │   │   └── Util/
-        │   │       ├── AmountConverterTest.php
-        │   │       └── CurrencyNormalizerTest.php
-        │   ├── Event/
-        │   │   ├── EventContextTest.php
+        │   ├── Controller/
+        │   │   ├── Http/
+        │   │   │   ├── PaymentControllerTest.php
+        │   │   │   └── OrderControllerTest.php
+        │   │   └── Webhook/
+        │   │       └── WebhookControllerTest.php
+        │   ├── EventSystem/
         │   │   ├── EventDispatcherTest.php
-        │   │   └── Domain/
-        │   │       ├── PaymentInitiatedEventTest.php
-        │   │       ├── PaymentAuthorizedEventTest.php
-        │   │       └── PaymentCapturedEventTest.php
+        │   │   ├── Event/
+        │   │   │   ├── Contract/
+        │   │   │   │   ├── ContractCreatedEventTest.php
+        │   │   │   │   ├── ContractCommittedEventTest.php
+        │   │   │   │   └── ContractFulfilledEventTest.php
+        │   │   │   └── Payment/
+        │   │   │       ├── PaymentInitiatedEventTest.php
+        │   │   │       ├── PaymentAuthorizedEventTest.php
+        │   │   │       └── PaymentCapturedEventTest.php
+        │   │   └── Handler/
+        │   │       ├── Contract/
+        │   │       │   └── ContractCreationHandlerTest.php
+        │   │       └── Payment/
+        │   │           └── PaymentInitiationHandlerTest.php
         │   ├── Model/
+        │   │   ├── PaymentContractTest.php
         │   │   ├── PaymentTransactionTest.php
         │   │   ├── PaymentOrderStateTest.php
-        │   │   ├── PaymentCustomerTest.php
-        │   │   └── PaymentBasketSnapshotTest.php
+        │   │   └── ContractConditionTest.php
         │   └── Service/
-        │       ├── PaymentServiceTest.php          # Mocks adapter interface
-        │       ├── OrderManagerTest.php
-        │       └── BasketSummaryServiceTest.php
+        │       ├── Payment/
+        │       │   ├── PaymentServiceTest.php
+        │       │   └── ContractServiceTest.php
+        │       └── Support/
+        │           └── ValidationServiceTest.php
         │
         ├── Integration/
         │   ├── Repository/
+        │   │   ├── PaymentContractRepositoryTest.php
         │   │   ├── PaymentTransactionRepositoryTest.php
-        │   │   └── OrderRepositoryTest.php
-        │   └── Service/
-        │       └── PaymentServiceIntegrationTest.php
+        │   │   └── OrderStateRepositoryTest.php
+        │   ├── Service/
+        │   │   └── PaymentServiceIntegrationTest.php
+        │   └── EventSystem/
+        │       └── EventFlowIntegrationTest.php
         │
         └── Support/
             ├── TestCase.php
             ├── IntegrationTestCase.php
             ├── Builders/
-            │   ├── OrderBuilder.php
+            │   ├── ContractBuilder.php
             │   ├── PaymentTransactionBuilder.php
-            │   └── PaymentRequestBuilder.php
-            └── Mocks/
-                └── MockPaymentAdapter.php          # Mock adapter for tests
+            │   └── OrderBuilder.php
+            └── Fixtures/
+                └── DatabaseFixtures.php
 ```
 
 ### Example: Component Unit Test (Mocking Adapter)

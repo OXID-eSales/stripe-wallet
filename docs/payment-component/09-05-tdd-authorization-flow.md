@@ -403,15 +403,15 @@ Unit tests verify **individual component logic in isolation**. All dependencies 
 #### 1. Event Layer (100% coverage)
 
 **Test Files:**
-- `tests/Unit/Event/PaymentInitiatedEventTest.php`
-- `tests/Unit/Event/PaymentCapturedEventTest.php`
-- `tests/Unit/Event/EventContextTest.php`
+- `tests/Component/Unit/Event/PaymentInitiatedEventTest.php`
+- `tests/Component/Unit/Event/PaymentCapturedEventTest.php`
+- `tests/Component/Unit/Event/EventContextTest.php`
 
 **Example: EventContext Caching Test**
 
 ```php
 <?php
-// tests/Unit/Event/EventContextTest.php
+// tests/Component/Unit/Event/EventContextTest.php
 
 namespace PaymentComponent\Tests\Unit\Event;
 
@@ -483,15 +483,15 @@ class EventContextTest extends TestCase
 #### 2. Domain Layer (95% coverage)
 
 **Test Files:**
-- `tests/Unit/Model/OrderTest.php`
-- `tests/Unit/Model/PaymentTransactionTest.php`
-- `tests/Unit/Model/BasketTest.php`
+- `tests/Component/Unit/Model/OrderTest.php`
+- `tests/Component/Unit/Model/PaymentTransactionTest.php`
+- `tests/Component/Unit/Model/BasketTest.php`
 
 **Example: Order State Transitions Test**
 
 ```php
 <?php
-// tests/Unit/Model/OrderTest.php
+// tests/Component/Unit/Model/OrderTest.php
 
 namespace PaymentComponent\Tests\Unit\Model;
 
