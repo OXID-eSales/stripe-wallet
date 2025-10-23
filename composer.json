@@ -49,27 +49,33 @@
     }
   },
   "scripts": {
-    "post-install-cmd": "@install-pre-commit-hook",
-    "post-update-cmd": "@install-pre-commit-hook",
-    "install-pre-commit-hook": "git config --local core.hooksPath .github/commit-hooks",
-    "phpcs": "phpcs --standard=tests/phpcs.xml  --report=full",
-    "phpcs-report": "phpcs --standard=tests/phpcs.xml --report=json --report-file=tests/Reports/phpcs.report.json",
+    "phpmd": "./.github/scripts/codestyle_check.sh phpmd",
+    "phpmd-commit": "./.github/scripts/codestyle_check.sh phpmd commit",
+    "phpmd-generate-baseline": "phpmd src ansi tests/PhpMd/standard.xml --generate-baseline",
+    "phpmd-report": "phpmd src json tests/PhpMd/standard.xml --reportfile tests/reports/phpmd.report.json --baseline tests/PhpMd/phpmd.baseline.xml",
+    "phpstan": "./.github/scripts/codestyle_check.sh phpstan",
+    "phpstan-commit": "./.github/scripts/codestyle_check.sh phpstan commit",
+    "phpstan-generate-baseline": "phpstan -ctests/PhpStan/phpstan.neon --level=max analyse src/ --generate-baseline tests/PhpStan/phpstan-baseline.neon",
+    "phpstan-report": "phpstan -ctests/PhpStan/phpstan.neon --level=max analyse src/ --error-format=json > tests/reports/phpstan.report.json",
+    "phpcs": "./.github/scripts/codestyle_check.sh phpcs",
+    "phpcs-commit": "./.github/scripts/codestyle_check.sh phpcs commit",
+    "style": "./.github/scripts/codestyle_check.sh all",
+    "style-commit":  "./.github/scripts/codestyle_check.sh all commit || exit 1",
     "phpcbf": "phpcbf --standard=tests/phpcs.xml",
-    "phpstan": "phpstan -ctests/PhpStan/phpstan.neon analyse src/",
-    "phpstan-report": "phpstan -ctests/PhpStan/phpstan.neon analyse src/ --error-format=json > tests/Reports/phpstan.report.json",
-    "phpmd": "phpmd src ansi tests/PhpMd/standard.xml",
-    "phpmd-report": "phpmd src json tests/PhpMd/standard.xml --reportfile tests/Reports/phpmd.report.json",
     "static": [
       "@phpcs",
       "@phpstan",
       "@phpmd"
     ],
-    "tests-unit": "XDEBUG_MODE=coverage vendor/bin/phpunit --config=tests/ --testsuite=Unit --coverage-clover=tests/Reports/coverage_unit_module-template.xml",
-    "tests-integration": "XDEBUG_MODE=coverage vendor/bin/phpunit --bootstrap=/var/www/source/bootstrap.php --config=tests/ --testsuite=Integration --coverage-clover=tests/Reports/coverage_integration_module-template.xml",
-    "tests-coverage": "XDEBUG_MODE=coverage vendor/bin/phpunit --coverage-text --bootstrap=/var/www/source/bootstrap.php --config=tests/ --coverage-html=tests/Reports/CoverageHtml",
-    "tests-all": [
-      "@tests-unit",
-      "@tests-integration"
+    "phpunit": "XDEBUG_MODE=coverage vendor/bin/phpunit -c tests/phpunit.xml --bootstrap=/var/www/source/bootstrap.php",
+
+    "generate-reports": [
+      "@phpstan-report",
+      "@phpmd-report"
+    ],
+    "generate-baselines": [
+      "@phpstan-generate-baseline",
+      "@phpmd-generate-baseline"
     ]
   },
   "config": {
