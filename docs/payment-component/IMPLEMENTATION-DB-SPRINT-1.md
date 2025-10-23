@@ -148,9 +148,9 @@ migration/
 <?php
 // tests/Component/Integration/Migration/PaymentContractMigrationTest.php
 
-namespace Tests\Component\Integration\Migration;
+namespace OxidSolutionCatalysts\Component\Tests\Integration\Migration;
 
-use Tests\Component\Support\IntegrationTestCase;
+use OxidSolutionCatalysts\Component\Tests\Support\IntegrationTestCase;
 
 /**
  * Test contract table migration
@@ -411,9 +411,9 @@ vendor/bin/phpunit --filter PaymentContractMigrationTest
 <?php
 // tests/Component/Integration/SmartContract/ContractLifecycleTest.php
 
-namespace Tests\Component\Integration\SmartContract;
+namespace OxidSolutionCatalysts\Component\Tests\Integration\SmartContract;
 
-use Tests\Component\Support\IntegrationTestCase;
+use OxidSolutionCatalysts\Component\Tests\Support\IntegrationTestCase;
 
 /**
  * Smart Contract Lifecycle Tests
@@ -768,9 +768,9 @@ class ContractLifecycleTest extends IntegrationTestCase
 <?php
 // tests/Component/Integration/SmartContract/ContractConditionsTest.php
 
-namespace Tests\Component\Integration\SmartContract;
+namespace OxidSolutionCatalysts\Component\Tests\Integration\SmartContract;
 
-use Tests\Component\Support\IntegrationTestCase;
+use OxidSolutionCatalysts\Component\Tests\Support\IntegrationTestCase;
 
 /**
  * Contract Conditions Tests
@@ -958,11 +958,11 @@ class ContractConditionsTest extends IntegrationTestCase
 <?php
 // tests/Component/Integration/Repository/PaymentContractRepositoryTest.php
 
-namespace Tests\Component\Integration\Repository;
+namespace OxidSolutionCatalysts\Component\Tests\Integration\Repository;
 
-use Tests\Component\Support\IntegrationTestCase;
-use PaymentComponent\Repository\PaymentContractRepository;
-use PaymentComponent\Model\PaymentContract;
+use OxidSolutionCatalysts\Component\Tests\Support\IntegrationTestCase;
+use OxidSolutionCatalysts\Component\Repository\PaymentContractRepository;
+use OxidSolutionCatalysts\Component\Model\PaymentContract;
 
 /**
  * Payment Contract Repository Tests
@@ -1148,9 +1148,9 @@ class PaymentContractRepositoryTest extends IntegrationTestCase
 <?php
 // tests/Component/Integration/Migration/PaymentTransactionMigrationTest.php
 
-namespace Tests\Component\Integration\Migration;
+namespace OxidSolutionCatalysts\Component\Tests\Integration\Migration;
 
-use Tests\Component\Support\IntegrationTestCase;
+use OxidSolutionCatalysts\Component\Tests\Support\IntegrationTestCase;
 
 /**
  * Test migration creates correct schema
@@ -1361,10 +1361,10 @@ public function cascade_deletes_all_related_transactions_when_order_deleted(): v
 <?php
 // tests/Component/Unit/Model/PaymentTransactionTest.php
 
-namespace Tests\Component\Unit\Model;
+namespace OxidSolutionCatalysts\Component\Tests\Unit\Model;
 
 use PHPUnit\Framework\TestCase;
-use PaymentComponent\Model\PaymentTransaction;
+use OxidSolutionCatalysts\Component\Model\PaymentTransaction;
 
 /**
  * Unit tests for PaymentTransaction model
@@ -1517,7 +1517,7 @@ class PaymentTransactionTest extends TestCase
 <?php
 // src/Component/Model/PaymentTransaction.php
 
-namespace PaymentComponent\Model;
+namespace OxidSolutionCatalysts\Component\Model;
 
 final class PaymentTransaction
 {
@@ -1689,11 +1689,11 @@ vendor/bin/phpunit tests/Component/Unit/Model/PaymentTransactionTest.php
 <?php
 // tests/Component/Unit/Model/PaymentOrderStateTest.php
 
-namespace Tests\Component\Unit\Model;
+namespace OxidSolutionCatalysts\Component\Tests\Unit\Model;
 
 use PHPUnit\Framework\TestCase;
-use PaymentComponent\Model\PaymentOrderState;
-use PaymentComponent\Model\PaymentOrderStates;
+use OxidSolutionCatalysts\Component\Model\PaymentOrderState;
+use OxidSolutionCatalysts\Component\Model\PaymentOrderStates;
 
 class PaymentOrderStateTest extends TestCase
 {
@@ -1791,7 +1791,7 @@ class PaymentOrderStateTest extends TestCase
 <?php
 // src/Component/Model/PaymentOrderState.php
 
-namespace PaymentComponent\Model;
+namespace OxidSolutionCatalysts\Component\Model;
 
 final class PaymentOrderState implements PaymentOrderStates
 {
@@ -1929,7 +1929,7 @@ final class PaymentOrderState implements PaymentOrderStates
 <?php
 // src/Component/Model/PaymentOrderStates.php
 
-namespace PaymentComponent\Model;
+namespace OxidSolutionCatalysts\Component\Model;
 
 interface PaymentOrderStates
 {
@@ -1953,11 +1953,11 @@ interface PaymentOrderStates
 <?php
 // tests/Component/Integration/Repository/PaymentTransactionRepositoryTest.php
 
-namespace Tests\Component\Integration\Repository;
+namespace OxidSolutionCatalysts\Component\Tests\Integration\Repository;
 
-use Tests\Component\Support\IntegrationTestCase;
-use PaymentComponent\Repository\PaymentTransactionRepository;
-use PaymentComponent\Model\PaymentTransaction;
+use OxidSolutionCatalysts\Component\Tests\Support\IntegrationTestCase;
+use OxidSolutionCatalysts\Component\Repository\PaymentTransactionRepository;
+use OxidSolutionCatalysts\Component\Model\PaymentTransaction;
 
 /**
  * Integration tests for PaymentTransactionRepository
@@ -2132,10 +2132,10 @@ class PaymentTransactionRepositoryTest extends IntegrationTestCase
 <?php
 // src/Component/Repository/PaymentTransactionRepository.php
 
-namespace PaymentComponent\Repository;
+namespace OxidSolutionCatalysts\Component\Repository;
 
-use PaymentComponent\Model\PaymentTransaction;
-use PaymentComponent\Contract\PaymentTransactionRepositoryInterface;
+use OxidSolutionCatalysts\Component\Model\PaymentTransaction;
+use OxidSolutionCatalysts\Component\Contract\PaymentTransactionRepositoryInterface;
 
 final class PaymentTransactionRepository implements PaymentTransactionRepositoryInterface
 {

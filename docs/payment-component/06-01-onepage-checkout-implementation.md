@@ -177,10 +177,10 @@ Create the foundation: controller, routing, basic template rendering
 
 declare(strict_types=1);
 
-namespace PaymentComponent\Tests\Unit\Controller;
+namespace OxidSolutionCatalysts\Component\Tests\Unit\Controller;
 
-use PaymentComponent\Controller\OnePageCheckoutController;
-use PaymentComponent\Service\ModuleSettings;
+use OxidSolutionCatalysts\Component\Controller\OnePageCheckoutController;
+use OxidSolutionCatalysts\Component\Service\ModuleSettings;
 use PHPUnit\Framework\TestCase;
 
 class OnePageCheckoutControllerTest extends TestCase
@@ -268,14 +268,14 @@ Expected: ❌ **FAIL** - Class `OnePageCheckoutController` not found
 
 declare(strict_types=1);
 
-namespace PaymentComponent\Controller;
+namespace OxidSolutionCatalysts\Component\Controller;
 
 use OxidEsales\Eshop\Application\Controller\FrontendController;
 use OxidEsales\Eshop\Core\Registry;
-use PaymentComponent\Service\ModuleSettings;
-use PaymentComponent\Repository\BasketRepository;
-use PaymentComponent\Repository\UserRepository;
-use PaymentComponent\Service\PaymentMethodService;
+use OxidSolutionCatalysts\Component\Service\ModuleSettings;
+use OxidSolutionCatalysts\Component\Repository\BasketRepository;
+use OxidSolutionCatalysts\Component\Repository\UserRepository;
+use OxidSolutionCatalysts\Component\Service\PaymentMethodService;
 
 class OnePageCheckoutController extends FrontendController
 {
@@ -347,9 +347,9 @@ Expected: ✅ **PASS** - All tests green
 
 declare(strict_types=1);
 
-namespace PaymentComponent\Tests\Unit\Service;
+namespace OxidSolutionCatalysts\Component\Tests\Unit\Service;
 
-use PaymentComponent\Service\ModuleSettings;
+use OxidSolutionCatalysts\Component\Service\ModuleSettings;
 use PHPUnit\Framework\TestCase;
 
 class ModuleSettingsTest extends TestCase
@@ -422,7 +422,7 @@ Expected: ❌ **FAIL** - Methods not implemented
 
 declare(strict_types=1);
 
-namespace PaymentComponent\Service;
+namespace OxidSolutionCatalysts\Component\Service;
 
 use OxidEsales\Eshop\Core\Config;
 
@@ -961,9 +961,9 @@ Implement basket display with quantity updates and dynamic total calculation
 
 declare(strict_types=1);
 
-namespace PaymentComponent\Tests\Integration\OnePageCheckout;
+namespace OxidSolutionCatalysts\Component\Tests\Integration\OnePageCheckout;
 
-use PaymentComponent\Tests\Integration\IntegrationTestCase;
+use OxidSolutionCatalysts\Component\Tests\Integration\IntegrationTestCase;
 use OxidEsales\Eshop\Application\Model\Article;
 use OxidEsales\Eshop\Application\Model\Basket;
 

@@ -43,6 +43,7 @@
   },
   "autoload-dev": {
     "psr-4": {
+      "OxidSolutionCatalysts\\Infrastructure\\Tests\\": "tests/Infrastructure",
       "OxidSolutionCatalysts\\Component\\Tests\\": "tests/Component",
       "OxidSolutionCatalysts\\Stripe\\Tests\\": "tests/Stripe",
       "OxidEsales\\EshopCommunity\\Tests\\": "./vendor/oxid-esales/oxideshop-ce/tests"

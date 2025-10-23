@@ -162,10 +162,10 @@ payment_component:
 The component provides a unified controller that serves all three modes:
 
 ```php
-namespace PaymentComponent\Controller;
+namespace OxidSolutionCatalysts\Component\Controller;
 
-use PaymentComponent\Event\CheckoutStepCompletedEvent;
-use PaymentComponent\Event\PaymentInitiatedEvent;
+use OxidSolutionCatalysts\Component\Event\CheckoutStepCompletedEvent;
+use OxidSolutionCatalysts\Component\Event\PaymentInitiatedEvent;
 
 class OnePageCheckoutController extends AbstractCheckoutController
 {
@@ -634,7 +634,7 @@ enum OrderStatus {
 ### GraphQL Resolvers
 
 ```php
-namespace PaymentComponent\GraphQL\Resolver;
+namespace OxidSolutionCatalysts\Component\GraphQL\Resolver;
 
 class CheckoutResolver
 {
@@ -758,7 +758,7 @@ mcp:
 ### MCP Handler
 
 ```php
-namespace PaymentComponent\MCP;
+namespace OxidSolutionCatalysts\Component\MCP;
 
 class MCPHandler
 {

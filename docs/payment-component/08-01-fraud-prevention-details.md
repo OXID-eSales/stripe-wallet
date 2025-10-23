@@ -110,7 +110,7 @@ Customer → Component Fraud Check → High Risk? Block → Safe? → Provider �
 **Purpose:** Detect suspicious IP addresses and geographic anomalies
 
 ```php
-namespace PaymentComponent\FraudPrevention;
+namespace OxidSolutionCatalysts\Component\FraudPrevention;
 
 class IPGeolocationAnalyzer
 {
@@ -388,7 +388,7 @@ class VelocityChecker
 **Purpose:** Calculate overall fraud risk score using ML model
 
 ```php
-namespace PaymentComponent\FraudPrevention\AI;
+namespace OxidSolutionCatalysts\Component\FraudPrevention\AI;
 
 class FraudRiskModel
 {
@@ -519,12 +519,12 @@ class FeatureExtractor
 ### Event-Driven Fraud Check
 
 ```php
-namespace PaymentComponent\EventHandler;
+namespace OxidSolutionCatalysts\Component\EventHandler;
 
-use PaymentComponent\Event\PaymentInitiatedEvent;
-use PaymentComponent\Event\FraudCheckRequestedEvent;
-use PaymentComponent\Event\FraudDetectedEvent;
-use PaymentComponent\Event\PaymentBlockedEvent;
+use OxidSolutionCatalysts\Component\Event\PaymentInitiatedEvent;
+use OxidSolutionCatalysts\Component\Event\FraudCheckRequestedEvent;
+use OxidSolutionCatalysts\Component\Event\FraudDetectedEvent;
+use OxidSolutionCatalysts\Component\Event\PaymentBlockedEvent;
 
 class FraudCheckHandler
 {
@@ -665,7 +665,7 @@ class FraudCheckHandler
 ### Domain Events
 
 ```php
-namespace PaymentComponent\Event;
+namespace OxidSolutionCatalysts\Component\Event;
 
 class FraudCheckRequestedEvent extends Event
 {
@@ -719,7 +719,7 @@ class ManualReviewRequiredEvent extends Event
 ### Event Subscribers
 
 ```php
-namespace PaymentComponent\EventSubscriber;
+namespace OxidSolutionCatalysts\Component\EventSubscriber;
 
 class FraudMonitoringSubscriber implements EventSubscriberInterface
 {

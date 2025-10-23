@@ -261,18 +261,18 @@ Update provider SDKs without changing component code.
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\PaymentComponent\Adapter;
+namespace OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter;
 
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Request\CreatePaymentRequest;
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Request\CapturePaymentRequest;
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Request\RefundPaymentRequest;
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Request\VoidPaymentRequest;
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Response\PaymentResponse;
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Response\CaptureResponse;
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Response\RefundResponse;
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Response\VoidResponse;
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Response\PaymentDetailsResponse;
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Exception\PaymentAdapterException;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Request\CreatePaymentRequest;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Request\CapturePaymentRequest;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Request\RefundPaymentRequest;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Request\VoidPaymentRequest;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Response\PaymentResponse;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Response\CaptureResponse;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Response\RefundResponse;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Response\VoidResponse;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Response\PaymentDetailsResponse;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Exception\PaymentAdapterException;
 
 /**
  * Unified interface for all payment provider adapters.
@@ -376,7 +376,7 @@ interface PaymentAdapterInterface
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\PaymentComponent\Adapter;
+namespace OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter;
 
 /**
  * Normalized webhook event from any provider.
@@ -433,12 +433,12 @@ interface WebhookEvent
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\PaymentComponent\Adapter\Provider;
+namespace OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Provider;
 
-use OxidSolutionCatalysts\PaymentComponent\Adapter\PaymentAdapterInterface;
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Request\CreatePaymentRequest;
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Response\PaymentResponse;
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Exception\PaymentAdapterException;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\PaymentAdapterInterface;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Request\CreatePaymentRequest;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Response\PaymentResponse;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Exception\PaymentAdapterException;
 use Stripe\StripeClient;
 use Stripe\Exception\ApiErrorException;
 
@@ -698,11 +698,11 @@ final class StripeAdapter implements PaymentAdapterInterface
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\PaymentComponent\Adapter\Provider;
+namespace OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Provider;
 
-use OxidSolutionCatalysts\PaymentComponent\Adapter\PaymentAdapterInterface;
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Request\CreatePaymentRequest;
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Response\PaymentResponse;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\PaymentAdapterInterface;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Request\CreatePaymentRequest;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Response\PaymentResponse;
 use UnzerSDK\Unzer;
 use UnzerSDK\Exceptions\UnzerApiException;
 
@@ -851,9 +851,9 @@ final class UnzerAdapter implements PaymentAdapterInterface
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\PaymentComponent\Adapter\Provider;
+namespace OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Provider;
 
-use OxidSolutionCatalysts\PaymentComponent\Adapter\PaymentAdapterInterface;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\PaymentAdapterInterface;
 use PayPalCheckoutSdk\Core\PayPalHttpClient;
 use PayPalCheckoutSdk\Orders\OrdersCreateRequest;
 
@@ -981,7 +981,7 @@ final class PayPalAdapter implements PaymentAdapterInterface
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\PaymentComponent\Adapter\Request;
+namespace OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Request;
 
 /**
  * Normalized request for creating a payment.
@@ -1072,7 +1072,7 @@ final class CreatePaymentRequest
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\PaymentComponent\Adapter\Response;
+namespace OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Response;
 
 /**
  * Normalized response from payment creation.
@@ -1161,7 +1161,7 @@ final class PaymentResponse
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\PaymentComponent\Adapter\Exception;
+namespace OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Exception;
 
 /**
  * Base exception for all adapter errors.
@@ -1245,12 +1245,12 @@ class PaymentAdapterException extends \RuntimeException
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\PaymentComponent\Adapter;
+namespace OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter;
 
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Provider\StripeAdapter;
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Provider\UnzerAdapter;
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Provider\PayPalAdapter;
-use OxidSolutionCatalysts\PaymentComponent\Service\ModuleSettings;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Provider\StripeAdapter;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Provider\UnzerAdapter;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Provider\PayPalAdapter;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Service\ModuleSettings;
 
 /**
  * Factory for creating payment adapters based on configuration.
@@ -1465,11 +1465,11 @@ class PaymentServiceTest extends TestCase
 ```php
 <?php
 
-namespace OxidSolutionCatalysts\PaymentComponent\Service;
+namespace OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Service;
 
-use OxidSolutionCatalysts\PaymentComponent\Adapter\PaymentAdapterInterface;
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Request\CreatePaymentRequest;
-use OxidSolutionCatalysts\PaymentComponent\Adapter\Exception\PaymentAdapterException;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\PaymentAdapterInterface;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Request\CreatePaymentRequest;
+use OxidSolutionCatalysts\OxidSolutionCatalysts\Component\Adapter\Exception\PaymentAdapterException;
 
 class PaymentService
 {

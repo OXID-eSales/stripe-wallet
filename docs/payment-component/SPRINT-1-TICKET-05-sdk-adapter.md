@@ -238,7 +238,7 @@ final readonly class PaymentResponse
 <?php
 // src/Stripe/Adapter/StripeAdapter.php
 
-namespace Osc\Payment\Stripe\Adapter;
+namespace OxidSolutionCatalysts\Stripe\Adapter;
 
 use Osc\Payment\Component\Contract\PaymentAdapterInterface;
 use Osc\Payment\Component\Adapter\Request\CreatePaymentRequest;
@@ -373,7 +373,7 @@ final class StripeAdapter implements PaymentAdapterInterface
 <?php
 // tests/Component/Unit/Component/Adapter/Request/CreatePaymentRequestTest.php
 
-namespace Osc\Payment\Tests\Unit\Component\Adapter\Request;
+namespace OxidSolutionCatalysts\Stripe\Tests\Unit\Component\Adapter\Request;
 
 use Osc\Payment\Component\Adapter\Request\CreatePaymentRequest;
 use PHPUnit\Framework\TestCase;
@@ -453,10 +453,10 @@ Implement all request/response objects with validation.
 <?php
 // tests/Component/Unit/Stripe/Adapter/StripeAdapterTest.php
 
-namespace Osc\Payment\Tests\Unit\Stripe\Adapter;
+namespace OxidSolutionCatalysts\Stripe\Tests\Unit\Stripe\Adapter;
 
 use Mockery;
-use Osc\Payment\Stripe\Adapter\StripeAdapter;
+use OxidSolutionCatalysts\Stripe\Adapter\StripeAdapter;
 use Osc\Payment\Component\Adapter\Request\CreatePaymentRequest;
 use PHPUnit\Framework\TestCase;
 use Stripe\StripeClient;
@@ -519,9 +519,9 @@ class StripeAdapterTest extends TestCase
 <?php
 // tests/Component/Integration/Stripe/Adapter/StripeAdapterIntegrationTest.php
 
-namespace Osc\Payment\Tests\Integration\Stripe\Adapter;
+namespace OxidSolutionCatalysts\Stripe\Tests\Integration\Stripe\Adapter;
 
-use Osc\Payment\Stripe\Adapter\StripeAdapter;
+use OxidSolutionCatalysts\Stripe\Adapter\StripeAdapter;
 use Osc\Payment\Component\Adapter\Request\CreatePaymentRequest;
 use PHPUnit\Framework\TestCase;
 

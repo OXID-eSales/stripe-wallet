@@ -66,7 +66,7 @@ This part focuses on implementing the **Smart Contract Pattern** domain models u
 
 declare(strict_types=1);
 
-namespace Tests\Component\Unit\Model;
+namespace OxidSolutionCatalysts\Component\Tests\Unit\Model;
 
 use PHPUnit\Framework\TestCase;
 use Osc\Payment\Component\Model\PaymentContract;
@@ -754,7 +754,7 @@ vendor/bin/phpunit tests/Component/Unit/Model/PaymentContractTest.php
 
 declare(strict_types=1);
 
-namespace Tests\Component\Unit\Entity;
+namespace OxidSolutionCatalysts\Component\Tests\Unit\Entity;
 
 use PHPUnit\Framework\TestCase;
 use Osc\Payment\Component\Entity\ContractCondition;

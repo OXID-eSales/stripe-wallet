@@ -85,7 +85,7 @@ tests/Component/Unit/Model/PaymentTransactionTest.php
 
 declare(strict_types=1);
 
-namespace Tests\Component\Unit\Model;
+namespace OxidSolutionCatalysts\Component\Tests\Unit\Model;
 
 use PHPUnit\Framework\TestCase;
 use Osc\Payment\Component\Model\PaymentTransaction;
@@ -424,7 +424,7 @@ tests/Component/Unit/Model/PaymentOrderStateTest.php
 
 declare(strict_types=1);
 
-namespace Tests\Component\Unit\Model;
+namespace OxidSolutionCatalysts\Component\Tests\Unit\Model;
 
 use PHPUnit\Framework\TestCase;
 use Osc\Payment\Component\Model\PaymentOrderState;
@@ -837,7 +837,7 @@ tests/Component/Unit/Model/PaymentCustomerTest.php
 
 declare(strict_types=1);
 
-namespace Tests\Component\Unit\Model;
+namespace OxidSolutionCatalysts\Component\Tests\Unit\Model;
 
 use PHPUnit\Framework\TestCase;
 use Osc\Payment\Component\Model\PaymentCustomer;
@@ -934,7 +934,7 @@ tests/Component/Unit/Model/PaymentBasketSnapshotTest.php
 
 declare(strict_types=1);
 
-namespace Tests\Component\Unit\Model;
+namespace OxidSolutionCatalysts\Component\Tests\Unit\Model;
 
 use PHPUnit\Framework\TestCase;
 use Osc\Payment\Component\Model\PaymentBasketSnapshot;
@@ -1031,7 +1031,7 @@ These tests verify that models persist correctly to the database and that all co
 <?php
 // tests/Component/Support/DatabaseTestCase.php
 
-namespace Tests\Component\Support;
+namespace OxidSolutionCatalysts\Component\Tests\Support;
 
 use PHPUnit\Framework\TestCase;
 use PDO;
@@ -1250,9 +1250,9 @@ tests/Component/Integration/Model/PaymentTransactionIntegrationTest.php
 
 declare(strict_types=1);
 
-namespace Tests\Component\Integration\Model;
+namespace OxidSolutionCatalysts\Component\Tests\Integration\Model;
 
-use Tests\Component\Support\DatabaseTestCase;
+use OxidSolutionCatalysts\Component\Tests\Support\DatabaseTestCase;
 use Osc\Payment\Component\Model\PaymentTransaction;
 use Osc\Payment\Component\Repository\PaymentTransactionRepository;
 
@@ -1622,9 +1622,9 @@ tests/Component/Integration/Model/PaymentOrderStateIntegrationTest.php
 
 declare(strict_types=1);
 
-namespace Tests\Component\Integration\Model;
+namespace OxidSolutionCatalysts\Component\Tests\Integration\Model;
 
-use Tests\Component\Support\DatabaseTestCase;
+use OxidSolutionCatalysts\Component\Tests\Support\DatabaseTestCase;
 use Osc\Payment\Component\Model\PaymentOrderState;
 use Osc\Payment\Component\Model\PaymentOrderStates;
 use Osc\Payment\Component\Repository\PaymentOrderStateRepository;

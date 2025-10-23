@@ -620,12 +620,12 @@ All mapped through contract's `OXPROVIDERORDERID`.
 ```php
 <?php
 
-namespace Osc\Payment\EventHandler;
+namespace OxidSolutionCatalysts\Component\EventSystem\Handler;
 
-use Osc\Payment\Event\PaymentCapturedEvent;
-use Osc\Payment\Repository\ContractRepository;
-use Osc\Payment\Repository\OrderRepository;
-use Osc\Payment\Model\PaymentContract;
+use OxidSolutionCatalysts\Component\EventSystem\Event\PaymentCapturedEvent;
+use OxidSolutionCatalysts\Component\Repository\ContractRepository;
+use OxidSolutionCatalysts\Component\Repository\OrderRepository;
+use OxidSolutionCatalysts\Component\Model\PaymentContract;
 
 class WebhookPaymentCaptureHandler
 {
@@ -678,9 +678,9 @@ class WebhookPaymentCaptureHandler
 ```php
 <?php
 
-namespace Osc\Payment\EventHandler;
+namespace OxidSolutionCatalysts\Component\EventSystem\Handler;
 
-use Osc\Payment\Event\CaptureRequestedEvent;
+use OxidSolutionCatalysts\Component\EventSystem\Event\CaptureRequestedEvent;
 
 class CaptureRequestHandler
 {
@@ -735,9 +735,9 @@ class CaptureRequestHandler
 ```php
 <?php
 
-namespace Osc\Payment\EventHandler;
+namespace OxidSolutionCatalysts\Component\EventSystem\Handler;
 
-use Osc\Payment\Event\RefundRequestedEvent;
+use OxidSolutionCatalysts\Component\EventSystem\Event\RefundRequestedEvent;
 
 class RefundRequestHandler
 {

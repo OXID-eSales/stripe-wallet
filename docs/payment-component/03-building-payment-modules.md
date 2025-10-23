@@ -281,10 +281,10 @@ Extend the component's base event handlers:
 
 ```php
 // src/EventHandler/StripePaymentInitiationHandler.php
-namespace Stripe\EventHandler;
+namespace OxidSolutionCatalysts\Stripe\EventHandler;
 
-use PaymentComponent\EventHandler\AbstractPaymentHandler;
-use PaymentComponent\Event\PaymentInitiatedEvent;
+use OxidSolutionCatalysts\Component\EventHandler\AbstractPaymentHandler;
+use OxidSolutionCatalysts\Component\Event\PaymentInitiatedEvent;
 
 class StripePaymentInitiationHandler extends AbstractPaymentHandler
 {
@@ -335,10 +335,10 @@ class StripePaymentInitiationHandler extends AbstractPaymentHandler
 
 ```php
 // src/EventHandler/StripeWebhookHandler.php
-namespace Stripe\EventHandler;
+namespace OxidSolutionCatalysts\Stripe\EventHandler;
 
-use PaymentComponent\EventHandler\AbstractWebhookHandler;
-use PaymentComponent\Event\WebhookReceivedEvent;
+use OxidSolutionCatalysts\Component\EventHandler\AbstractWebhookHandler;
+use OxidSolutionCatalysts\Component\Event\WebhookReceivedEvent;
 
 class StripeWebhookHandler extends AbstractWebhookHandler
 {

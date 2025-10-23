@@ -134,11 +134,11 @@ tests/
 <?php
 // tests/Providers/Stripe/Unit/StripeRequestFactoryTest.php
 
-namespace PaymentComponent\Tests\Providers\Stripe\Unit;
+namespace OxidSolutionCatalysts\Component\Tests\Providers\Stripe\Unit;
 
-use PaymentComponent\Providers\Stripe\Factory\StripeRequestFactory;
-use PaymentComponent\Model\Basket;
-use PaymentComponent\Tests\Fixtures\Builders\BasketBuilder;
+use OxidSolutionCatalysts\Component\Providers\Stripe\Factory\StripeRequestFactory;
+use OxidSolutionCatalysts\Component\Model\Basket;
+use OxidSolutionCatalysts\Component\Tests\Fixtures\Builders\BasketBuilder;
 use PHPUnit\Framework\TestCase;
 
 class StripeRequestFactoryTest extends TestCase
@@ -244,11 +244,11 @@ class StripeRequestFactoryTest extends TestCase
 <?php
 // tests/Providers/Stripe/Integration/StripeApiClientTest.php
 
-namespace PaymentComponent\Tests\Providers\Stripe\Integration;
+namespace OxidSolutionCatalysts\Component\Tests\Providers\Stripe\Integration;
 
-use PaymentComponent\Providers\Stripe\Client\StripeApiClient;
-use PaymentComponent\Tests\Integration\DatabaseTestCase;
-use PaymentComponent\Tests\Fixtures\WireMock\WireMockServer;
+use OxidSolutionCatalysts\Component\Providers\Stripe\Client\StripeApiClient;
+use OxidSolutionCatalysts\Component\Tests\Integration\DatabaseTestCase;
+use OxidSolutionCatalysts\Component\Tests\Fixtures\WireMock\WireMockServer;
 
 class StripeApiClientTest extends DatabaseTestCase
 {
@@ -434,10 +434,10 @@ class StripeApiClientTest extends DatabaseTestCase
 <?php
 // tests/Providers/Stripe/Sandbox/StripeCheckoutFlowTest.php
 
-namespace PaymentComponent\Tests\Providers\Stripe\Sandbox;
+namespace OxidSolutionCatalysts\Component\Tests\Providers\Stripe\Sandbox;
 
-use PaymentComponent\Tests\E2E\SandboxTestCase;
-use PaymentComponent\Providers\Stripe\StripePaymentService;
+use OxidSolutionCatalysts\Component\Tests\E2E\SandboxTestCase;
+use OxidSolutionCatalysts\Component\Providers\Stripe\StripePaymentService;
 
 /**
  * @group sandbox
@@ -727,12 +727,12 @@ Tests that ensure consistent behavior across all providers.
 <?php
 // tests/Providers/CrossProvider/ConsistencyTest.php
 
-namespace PaymentComponent\Tests\Providers\CrossProvider;
+namespace OxidSolutionCatalysts\Component\Tests\Providers\CrossProvider;
 
-use PaymentComponent\Tests\Integration\DatabaseTestCase;
-use PaymentComponent\Providers\Stripe\StripePaymentService;
-use PaymentComponent\Providers\Paymenter\PaymenterPaymentService;
-use PaymentComponent\Providers\Adyen\AdyenPaymentService;
+use OxidSolutionCatalysts\Component\Tests\Integration\DatabaseTestCase;
+use OxidSolutionCatalysts\Component\Providers\Stripe\StripePaymentService;
+use OxidSolutionCatalysts\Component\Providers\Paymenter\PaymenterPaymentService;
+use OxidSolutionCatalysts\Component\Providers\Adyen\AdyenPaymentService;
 
 /**
  * Tests that ensure all providers behave consistently
@@ -838,7 +838,7 @@ class ConsistencyTest extends DatabaseTestCase
 <?php
 // tests/Fixtures/Providers/StripeTestCards.php
 
-namespace PaymentComponent\Tests\Fixtures\Providers;
+namespace OxidSolutionCatalysts\Component\Tests\Fixtures\Providers;
 
 class StripeTestCards
 {
@@ -897,7 +897,7 @@ class StripeTestCards
 <?php
 // tests/Fixtures/Providers/PaymenterTestAccounts.php
 
-namespace PaymentComponent\Tests\Fixtures\Providers;
+namespace OxidSolutionCatalysts\Component\Tests\Fixtures\Providers;
 
 class PaymenterTestAccounts
 {
@@ -925,7 +925,7 @@ class PaymenterTestAccounts
 <?php
 // tests/Fixtures/Providers/StripeApiResponseFactory.php
 
-namespace PaymentComponent\Tests\Fixtures\Providers;
+namespace OxidSolutionCatalysts\Component\Tests\Fixtures\Providers;
 
 class StripeApiResponseFactory
 {
@@ -1153,7 +1153,7 @@ jobs:
 ```php
 <?php
 // Use provider-specific fixture classes
-use PaymentComponent\Tests\Fixtures\Providers\StripeFixtures;
+use OxidSolutionCatalysts\Component\Tests\Fixtures\Providers\StripeFixtures;
 
 // Good
 $paymentIntent = StripeFixtures::createPaymentIntentResponse([

@@ -323,7 +323,7 @@ The component provides encryption at the edge:
 ### Component Architecture
 
 ```php
-namespace PaymentComponent\Security;
+namespace OxidSolutionCatalysts\Component\Security;
 
 /**
  * Client-side encryption service
@@ -498,7 +498,7 @@ async function submitPayment(formData) {
 ### Implementation: Backend (PHP)
 
 ```php
-namespace PaymentComponent\Security;
+namespace OxidSolutionCatalysts\Component\Security;
 
 use phpseclib3\Crypt\RSA;
 

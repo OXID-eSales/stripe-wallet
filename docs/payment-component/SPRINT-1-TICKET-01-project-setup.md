@@ -109,7 +109,7 @@ echo "✅ Directory structure created"
 <?php
 // src/Stripe/Setup/MigrationRunner.php
 
-namespace Osc\Payment\Stripe\Setup;
+namespace OxidSolutionCatalysts\Stripe\Setup;
 
 use OxidEsales\Eshop\Core\Database\Adapter\DatabaseInterface;
 
@@ -161,7 +161,7 @@ class MigrationRunner
 <?php
 // tests/Component/Unit/Infrastructure/ModuleStructureTest.php
 
-namespace Osc\Payment\Tests\Unit\Infrastructure;
+namespace OxidSolutionCatalysts\Stripe\Tests\Unit\Infrastructure;
 
 use PHPUnit\Framework\TestCase;
 

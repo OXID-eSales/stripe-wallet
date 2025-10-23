@@ -42,11 +42,11 @@
 <?php
 // tests/Component/Unit/Service/PaymentServiceWithAdapterTest.php
 
-use PaymentComponent\Service\PaymentService;
-use PaymentComponent\Adapter\PaymentAdapterInterface;
-use PaymentComponent\Adapter\Request\CreatePaymentRequest;
-use PaymentComponent\Adapter\Response\PaymentResponse;
-use PaymentComponent\Adapter\Exception\PaymentAdapterException;
+use OxidSolutionCatalysts\Component\Service\PaymentService;
+use OxidSolutionCatalysts\Component\Adapter\PaymentAdapterInterface;
+use OxidSolutionCatalysts\Component\Adapter\Request\CreatePaymentRequest;
+use OxidSolutionCatalysts\Component\Adapter\Response\PaymentResponse;
+use OxidSolutionCatalysts\Component\Adapter\Exception\PaymentAdapterException;
 use Mockery;
 
 class PaymentServiceWithAdapterTest extends TestCase

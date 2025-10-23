@@ -38,14 +38,14 @@
 
 ```php
 <?php
-namespace PaymentComponent\Tests\Integration\EventFlow;
+namespace OxidSolutionCatalysts\Component\Tests\Integration\EventFlow;
 
-use PaymentComponent\Tests\Integration\DatabaseTestCase;
-use PaymentComponent\Event\CaptureRequestedEvent;
-use PaymentComponent\Event\PaymentCapturedEvent;
-use PaymentComponent\EventHandler\PaymentCaptureHandler;
-use PaymentComponent\Service\PaymentService;
-use PaymentComponent\Repository\OrderRepository;
+use OxidSolutionCatalysts\Component\Tests\Integration\DatabaseTestCase;
+use OxidSolutionCatalysts\Component\Event\CaptureRequestedEvent;
+use OxidSolutionCatalysts\Component\Event\PaymentCapturedEvent;
+use OxidSolutionCatalysts\Component\EventHandler\PaymentCaptureHandler;
+use OxidSolutionCatalysts\Component\Service\PaymentService;
+use OxidSolutionCatalysts\Component\Repository\OrderRepository;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 
 class CaptureEventFlowTest extends DatabaseTestCase
@@ -173,12 +173,12 @@ class CaptureEventFlowTest extends DatabaseTestCase
 
 ```php
 <?php
-namespace PaymentComponent\Tests\Integration\Webhook;
+namespace OxidSolutionCatalysts\Component\Tests\Integration\Webhook;
 
-use PaymentComponent\Tests\Integration\DatabaseTestCase;
-use PaymentComponent\Webhook\RequestHandler;
-use PaymentComponent\Webhook\EventVerifier;
-use PaymentComponent\Repository\OrderRepository;
+use OxidSolutionCatalysts\Component\Tests\Integration\DatabaseTestCase;
+use OxidSolutionCatalysts\Component\Webhook\RequestHandler;
+use OxidSolutionCatalysts\Component\Webhook\EventVerifier;
+use OxidSolutionCatalysts\Component\Repository\OrderRepository;
 
 class WebhookProcessingTest extends DatabaseTestCase
 {
@@ -307,7 +307,7 @@ composer require --dev symfony/panther
 
 ```php
 <?php
-namespace PaymentComponent\Tests\E2E;
+namespace OxidSolutionCatalysts\Component\Tests\E2E;
 
 use Codeception\Test\Unit;
 
@@ -405,7 +405,7 @@ class CheckoutFlowTest extends Unit
 
 ```php
 <?php
-namespace PaymentComponent\Tests\E2E;
+namespace OxidSolutionCatalysts\Component\Tests\E2E;
 
 use Codeception\Test\Unit;
 use GuzzleHttp\Client;
@@ -601,9 +601,9 @@ class GraphQLApiTest extends Unit
 <?php
 // tests/Fixtures/Builders/OrderBuilder.php
 
-namespace PaymentComponent\Tests\Fixtures\Builders;
+namespace OxidSolutionCatalysts\Component\Tests\Fixtures\Builders;
 
-use PaymentComponent\Model\Order;
+use OxidSolutionCatalysts\Component\Model\Order;
 
 class OrderBuilder
 {

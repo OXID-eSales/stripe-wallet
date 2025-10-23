@@ -198,14 +198,14 @@ payment-component/
 <?php
 // tests/Component/Unit/Service/PaymentServiceTest.php
 
-namespace Tests\Component\Unit\Service;
+namespace OxidSolutionCatalysts\Component\Tests\Unit\Service;
 
 use Mockery;
 use PHPUnit\Framework\TestCase;
-use PaymentComponent\Service\PaymentService;
-use PaymentComponent\Contract\PaymentAdapterInterface;
-use PaymentComponent\Adapter\Request\CreatePaymentRequest;
-use PaymentComponent\Adapter\Response\PaymentResponse;
+use OxidSolutionCatalysts\Component\Service\PaymentService;
+use OxidSolutionCatalysts\Component\Contract\PaymentAdapterInterface;
+use OxidSolutionCatalysts\Component\Adapter\Request\CreatePaymentRequest;
+use OxidSolutionCatalysts\Component\Adapter\Response\PaymentResponse;
 
 /**
  * Component Test: Tests business logic without provider dependencies
@@ -287,11 +287,11 @@ class PaymentServiceTest extends TestCase
 <?php
 // tests/Component/Integration/Repository/PaymentTransactionRepositoryTest.php
 
-namespace Tests\Component\Integration\Repository;
+namespace OxidSolutionCatalysts\Component\Tests\Integration\Repository;
 
-use Tests\Component\Support\IntegrationTestCase;
-use PaymentComponent\Repository\PaymentTransactionRepository;
-use PaymentComponent\Model\PaymentTransaction;
+use OxidSolutionCatalysts\Component\Tests\Support\IntegrationTestCase;
+use OxidSolutionCatalysts\Component\Repository\PaymentTransactionRepository;
+use OxidSolutionCatalysts\Component\Model\PaymentTransaction;
 
 /**
  * Component Integration Test: Tests repository with real database
@@ -408,13 +408,13 @@ stripe-module/
 <?php
 // tests/Stripe/Unit/Adapter/StripeAdapterTest.php
 
-namespace Tests\Stripe\Unit\Adapter;
+namespace OxidSolutionCatalysts\Stripe\Tests\Unit\Adapter;
 
 use Mockery;
 use PHPUnit\Framework\TestCase;
-use Stripe\Adapter\StripeAdapter;
+use OxidSolutionCatalysts\Stripe\Adapter\StripeAdapter;
 use Stripe\StripeClient;
-use PaymentComponent\Adapter\Request\CreatePaymentRequest;
+use OxidSolutionCatalysts\Component\Adapter\Request\CreatePaymentRequest;
 
 /**
  * Provider Unit Test: Tests Stripe adapter with mocked Stripe SDK
@@ -524,12 +524,12 @@ class StripeAdapterTest extends TestCase
 <?php
 // tests/Stripe/Integration/Adapter/StripeAdapterIntegrationTest.php
 
-namespace Tests\Stripe\Integration\Adapter;
+namespace OxidSolutionCatalysts\Stripe\Tests\Integration\Adapter;
 
 use PHPUnit\Framework\TestCase;
-use Stripe\Adapter\StripeAdapter;
-use PaymentComponent\Adapter\Request\CreatePaymentRequest;
-use PaymentComponent\Adapter\Request\CapturePaymentRequest;
+use OxidSolutionCatalysts\Stripe\Adapter\StripeAdapter;
+use OxidSolutionCatalysts\Component\Adapter\Request\CreatePaymentRequest;
+use OxidSolutionCatalysts\Component\Adapter\Request\CapturePaymentRequest;
 
 /**
  * Provider Integration Test: Tests with real Stripe API (sandbox)

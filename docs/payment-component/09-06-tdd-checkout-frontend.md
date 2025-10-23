@@ -107,14 +107,14 @@
 <?php
 // tests/Component/Unit/Service/PaymentServiceTest.php
 
-namespace PaymentComponent\Tests\Unit\Service;
+namespace OxidSolutionCatalysts\Component\Tests\Unit\Service;
 
-use PaymentComponent\Service\PaymentService;
-use PaymentComponent\Repository\OrderRepository;
-use PaymentComponent\Service\ModuleSettings;
-use PaymentComponent\Factory\OrderRequestFactory;
-use PaymentComponent\Model\Basket;
-use PaymentComponent\Model\ProviderOrder;
+use OxidSolutionCatalysts\Component\Service\PaymentService;
+use OxidSolutionCatalysts\Component\Repository\OrderRepository;
+use OxidSolutionCatalysts\Component\Service\ModuleSettings;
+use OxidSolutionCatalysts\Component\Factory\OrderRequestFactory;
+use OxidSolutionCatalysts\Component\Model\Basket;
+use OxidSolutionCatalysts\Component\Model\ProviderOrder;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -273,14 +273,14 @@ class PaymentServiceTest extends TestCase
 <?php
 // tests/Component/Unit/EventHandler/PaymentCaptureHandlerTest.php
 
-namespace PaymentComponent\Tests\Unit\EventHandler;
+namespace OxidSolutionCatalysts\Component\Tests\Unit\EventHandler;
 
-use PaymentComponent\EventHandler\PaymentCaptureHandler;
-use PaymentComponent\Event\CaptureRequestedEvent;
-use PaymentComponent\Event\PaymentCapturedEvent;
-use PaymentComponent\Service\PaymentService;
-use PaymentComponent\Repository\OrderRepository;
-use PaymentComponent\Model\Order;
+use OxidSolutionCatalysts\Component\EventHandler\PaymentCaptureHandler;
+use OxidSolutionCatalysts\Component\Event\CaptureRequestedEvent;
+use OxidSolutionCatalysts\Component\Event\PaymentCapturedEvent;
+use OxidSolutionCatalysts\Component\Service\PaymentService;
+use OxidSolutionCatalysts\Component\Repository\OrderRepository;
+use OxidSolutionCatalysts\Component\Model\Order;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
@@ -431,10 +431,10 @@ class PaymentCaptureHandlerTest extends TestCase
 <?php
 // tests/Component/Unit/Factory/OrderRequestFactoryTest.php
 
-namespace PaymentComponent\Tests\Unit\Factory;
+namespace OxidSolutionCatalysts\Component\Tests\Unit\Factory;
 
-use PaymentComponent\Factory\OrderRequestFactory;
-use PaymentComponent\Model\Basket;
+use OxidSolutionCatalysts\Component\Factory\OrderRequestFactory;
+use OxidSolutionCatalysts\Component\Model\Basket;
 use PHPUnit\Framework\TestCase;
 
 class OrderRequestFactoryTest extends TestCase
@@ -525,9 +525,9 @@ class OrderRequestFactoryTest extends TestCase
 <?php
 // tests/Component/Unit/Repository/OrderRepositoryTest.php
 
-namespace PaymentComponent\Tests\Unit\Repository;
+namespace OxidSolutionCatalysts\Component\Tests\Unit\Repository;
 
-use PaymentComponent\Repository\OrderRepository;
+use OxidSolutionCatalysts\Component\Repository\OrderRepository;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Mockery;
 use PHPUnit\Framework\TestCase;
@@ -630,7 +630,7 @@ docker pull wiremock/wiremock
 <?php
 // tests/Component/Integration/DatabaseTestCase.php
 
-namespace PaymentComponent\Tests\Integration;
+namespace OxidSolutionCatalysts\Component\Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
 use Testcontainers\Container\MySQLContainer;
@@ -697,12 +697,12 @@ abstract class DatabaseTestCase extends TestCase
 
 ```php
 <?php
-namespace PaymentComponent\Tests\Integration\Repository;
+namespace OxidSolutionCatalysts\Component\Tests\Integration\Repository;
 
-use PaymentComponent\Tests\Integration\DatabaseTestCase;
-use PaymentComponent\Repository\OrderRepository;
-use PaymentComponent\Model\Order;
-use PaymentComponent\Model\PaymentTransaction;
+use OxidSolutionCatalysts\Component\Tests\Integration\DatabaseTestCase;
+use OxidSolutionCatalysts\Component\Repository\OrderRepository;
+use OxidSolutionCatalysts\Component\Model\Order;
+use OxidSolutionCatalysts\Component\Model\PaymentTransaction;
 
 class OrderRepositoryIntegrationTest extends DatabaseTestCase
 {

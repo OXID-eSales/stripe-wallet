@@ -70,11 +70,11 @@ CREATE TABLE osc_payment_customer (
 ```php
 <?php
 
-namespace PaymentComponent\Tests\Component\Integration\Repository;
+namespace OxidSolutionCatalysts\Component\Tests\Component\Integration\Repository;
 
-use PaymentComponent\Repository\PaymentTransactionRepository;
-use PaymentComponent\Model\PaymentTransaction;
-use PaymentComponent\Tests\Integration\DatabaseTestCase;
+use OxidSolutionCatalysts\Component\Repository\PaymentTransactionRepository;
+use OxidSolutionCatalysts\Component\Model\PaymentTransaction;
+use OxidSolutionCatalysts\Component\Tests\Integration\DatabaseTestCase;
 
 class PaymentTransactionRepositoryTest extends DatabaseTestCase
 {
@@ -224,10 +224,10 @@ class PaymentTransactionRepositoryTest extends DatabaseTestCase
 ```php
 <?php
 
-namespace PaymentComponent\Tests\Component\Integration\Repository;
+namespace OxidSolutionCatalysts\Component\Tests\Component\Integration\Repository;
 
-use PaymentComponent\Repository\PaymentTransactionRepository;
-use PaymentComponent\Tests\Integration\DatabaseTestCase;
+use OxidSolutionCatalysts\Component\Repository\PaymentTransactionRepository;
+use OxidSolutionCatalysts\Component\Tests\Integration\DatabaseTestCase;
 
 class TransactionAuditTrailTest extends DatabaseTestCase
 {

@@ -413,11 +413,11 @@ Unit tests verify **individual component logic in isolation**. All dependencies 
 <?php
 // tests/Component/Unit/Event/EventContextTest.php
 
-namespace PaymentComponent\Tests\Unit\Event;
+namespace OxidSolutionCatalysts\Component\Tests\Unit\Event;
 
-use PaymentComponent\Event\EventContext;
-use PaymentComponent\Model\Basket;
-use PaymentComponent\Model\User;
+use OxidSolutionCatalysts\Component\Event\EventContext;
+use OxidSolutionCatalysts\Component\Model\Basket;
+use OxidSolutionCatalysts\Component\Model\User;
 use PHPUnit\Framework\TestCase;
 
 class EventContextTest extends TestCase
@@ -493,9 +493,9 @@ class EventContextTest extends TestCase
 <?php
 // tests/Component/Unit/Model/OrderTest.php
 
-namespace PaymentComponent\Tests\Unit\Model;
+namespace OxidSolutionCatalysts\Component\Tests\Unit\Model;
 
-use PaymentComponent\Model\Order;
+use OxidSolutionCatalysts\Component\Model\Order;
 use PHPUnit\Framework\TestCase;
 
 class OrderTest extends TestCase

@@ -27,9 +27,9 @@
 <?php
 // tests/Fixtures/Factories/OrderFactory.php
 
-namespace PaymentComponent\Tests\Fixtures\Factories;
+namespace OxidSolutionCatalysts\Component\Tests\Fixtures\Factories;
 
-use PaymentComponent\Model\Order;
+use OxidSolutionCatalysts\Component\Model\Order;
 
 class OrderFactory
 {
@@ -136,7 +136,7 @@ class BasketFactory
 <?php
 // tests/Fixtures/Seeders/DatabaseSeeder.php
 
-namespace PaymentComponent\Tests\Fixtures\Seeders;
+namespace OxidSolutionCatalysts\Component\Tests\Fixtures\Seeders;
 
 class DatabaseSeeder
 {
@@ -328,7 +328,7 @@ docker run -d -p 8080:8080 \
 ```php
 use Mockery;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
-use PaymentComponent\Event\PaymentCapturedEvent;
+use OxidSolutionCatalysts\Component\Event\PaymentCapturedEvent;
 
 $dispatcherMock = Mockery::mock(EventDispatcherInterface::class);
 
@@ -379,8 +379,8 @@ $paymentService = new PaymentService($loggerMock, ...);
 
 ```php
 use Mockery;
-use PaymentComponent\Repository\OrderRepository;
-use PaymentComponent\Model\Order;
+use OxidSolutionCatalysts\Component\Repository\OrderRepository;
+use OxidSolutionCatalysts\Component\Model\Order;
 
 $orderRepoMock = Mockery::mock(OrderRepository::class);
 
