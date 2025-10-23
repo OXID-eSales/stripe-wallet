@@ -101,16 +101,13 @@ jobs:
           docker compose exec -T php composer require oxid-esales/apex-theme:dev-b-7.4.x --no-update
 
 
-      - name: Install dependencies and reset shop
+      - name: Install dependencies, reset shop, activate theme, install demodata
         run: |
           docker compose exec -T php composer update --no-interaction
           docker compose exec -T php bin/oe-console oe:database:reset \
             --db-host=mysql --db-port=3306 --db-name=example --db-user=root --db-password=root --force
           docker compose exec -T php bin/oe-console oe:setup:demodata
           docker compose exec -T php bin/oe-console oe:theme:activate apex
-          docker compose exec -T php bin/oe-console oe:module:activate stripe
-          ls -la
-          ls -la source
 
       - name: Put module settings
         continue-on-error: true
