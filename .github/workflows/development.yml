@@ -205,8 +205,7 @@ jobs:
 
       - name: Install testing dependencies
         run: |
-          docker compose exec -T php composer require symfony/dotenv --no-update --dev
-          docker compose exec -T php composer update
+          docker compose exec -T php composer update --no-interaction
 
       - name: Run tests
         run: |
