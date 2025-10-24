@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Component\Tests\Integration\Migrations;
+namespace OxidSolutionCatalysts\Payments\Component\Tests\Integration\Component\Migrations;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Schema\Schema;
