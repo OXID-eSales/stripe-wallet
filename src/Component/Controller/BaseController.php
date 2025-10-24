@@ -1,8 +1,13 @@
 <?php
 
+/**
+ * Copyright © OXID eSales AG. All rights reserved.
+ * See LICENSE file for license details.
+ */
+
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Component\Controller;
+namespace OxidSolutionCatalysts\Payments\Component\Controller;
 
 class BaseController extends AbstractController
 {

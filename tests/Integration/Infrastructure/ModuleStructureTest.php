@@ -1,9 +1,13 @@
 <?php
-// tests/Component/Unit/Infrastructure/ModuleStructureTest.php
+
+/**
+ * Copyright © OXID eSales AG. All rights reserved.
+ * See LICENSE file for license details.
+ */
 
 declare(strict_types=1);
 
-namespace Osc\Payment\Tests\Unit\Infrastructure;
+namespace OxidSolutionCatalysts\Payments\Infrastructure\Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
 
@@ -13,7 +17,7 @@ class ModuleStructureTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->moduleRoot = __DIR__ . '/../..';
+        $this->moduleRoot = __DIR__ . '/../../..';
     }
 
     /** @test */
@@ -24,11 +28,11 @@ class ModuleStructureTest extends TestCase
 
         $data = json_decode(file_get_contents($composerJson), true);
 
-        $this->assertEquals('osc/oxid-payment-stripe', $data['name']);
-        $this->assertArrayHasKey('Osc\\Payment\\Component\\', $data['autoload']['psr-4']);
-        $this->assertArrayHasKey('Osc\\Payment\\Stripe\\', $data['autoload']['psr-4']);
-        $this->assertEquals('src/Component/', $data['autoload']['psr-4']['Osc\\Payment\\Component\\']);
-        $this->assertEquals('src/Stripe/', $data['autoload']['psr-4']['Osc\\Payment\\Stripe\\']);
+        $this->assertEquals('oxid-esales/stripe-wallet', $data['name']);
+        $this->assertArrayHasKey('OxidSolutionCatalysts\\Payments\\Component\\', $data['autoload']['psr-4']);
+        $this->assertArrayHasKey('OxidSolutionCatalysts\\Payments\\Stripe\\', $data['autoload']['psr-4']);
+        $this->assertEquals('./src/Component', $data['autoload']['psr-4']['OxidSolutionCatalysts\\Payments\\Component\\']);
+        $this->assertEquals('./src/Stripe', $data['autoload']['psr-4']['OxidSolutionCatalysts\\Payments\\Stripe\\']);
     }
 
     /** @test */
@@ -88,10 +92,11 @@ class ModuleStructureTest extends TestCase
     public function test_directories_exist(): void
     {
         $requiredDirs = [
-            'tests/Component/Unit/Component',
-            'tests/Component/Unit/Stripe',
-            'tests/Component/Integration/Component',
-            'tests/Component/Integration/Stripe',
+            'tests/Unit/Component',
+            'tests/Unit/Stripe',
+            'tests/Integration/Component',
+            'tests/Integration/Stripe',
+            'tests/Integration/Infrastructure',
             'tests/Support',
         ];
 
@@ -106,7 +111,7 @@ class ModuleStructureTest extends TestCase
     /** @test */
     public function migration_files_exist(): void
     {
-        $migrationDir = $this->moduleRoot . '/migration';
+        $migrationDir = $this->moduleRoot . '/migrations';
         $this->assertDirectoryExists($migrationDir);
 
         $expectedMigrations = [
@@ -127,7 +132,7 @@ class ModuleStructureTest extends TestCase
     /** @test */
     public function phpunit_xml_is_configured_correctly(): void
     {
-        $phpunitXml = $this->moduleRoot . '/phpunit.xml.dist';
+        $phpunitXml = $this->moduleRoot . '/tests/phpunit.xml';
         $this->assertFileExists($phpunitXml);
 
         $xml = simplexml_load_file($phpunitXml);

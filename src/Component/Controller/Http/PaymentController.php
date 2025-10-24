@@ -1,6 +1,13 @@
 <?php
 
-namespace OxidSolutionCatalysts\Component\Controller\Http;
+/**
+ * Copyright © OXID eSales AG. All rights reserved.
+ * See LICENSE file for license details.
+ */
+
+declare(strict_types=1);
+
+namespace OxidSolutionCatalysts\Payments\Component\Controller\Http;
 
 class PaymentController
 {

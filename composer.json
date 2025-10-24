@@ -37,15 +37,18 @@
   },
   "autoload": {
     "psr-4": {
-      "OxidSolutionCatalysts\\Component\\": "./src/Component",
-      "OxidSolutionCatalysts\\Stripe\\": "./src/Stripe"
+      "OxidSolutionCatalysts\\Payments\\Component\\": "./src/Component",
+      "OxidSolutionCatalysts\\Payments\\Stripe\\": "./src/Stripe"
     }
   },
   "autoload-dev": {
     "psr-4": {
-      "OxidSolutionCatalysts\\Infrastructure\\Tests\\": "tests/Infrastructure",
-      "OxidSolutionCatalysts\\Component\\Tests\\": "tests/Component",
-      "OxidSolutionCatalysts\\Stripe\\Tests\\": "tests/Stripe",
+      "OxidSolutionCatalysts\\Payments\\Component\\Tests\\Integration\\": "tests/Integration/Component",
+      "OxidSolutionCatalysts\\Payments\\Component\\Tests\\Unit\\": "tests/Unit/Component",
+      "OxidSolutionCatalysts\\Payments\\Stripe\\Tests\\Integration\\": "tests/Integration/Stripe",
+      "OxidSolutionCatalysts\\Payments\\Stripe\\Tests\\Unit\\": "tests/Unit/Stripe",
+      "OxidSolutionCatalysts\\Payments\\Infrastructure\\Tests\\Integration\\": "tests/Integration/Infrastructure",
+      "OxidSolutionCatalysts\\Payments\\Infrastructure\\Tests\\Unit\\": "tests/Unit/Infrastructure",
       "OxidEsales\\EshopCommunity\\Tests\\": "./vendor/oxid-esales/oxideshop-ce/tests"
     }
   },
