@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         backupGlobals="true"
+         bootstrap="bootstrap.php"
+         backupStaticAttributes="false"
+         processIsolation="false"
+         stopOnError="false"
+         stopOnFailure="false"
+         stopOnIncomplete="false"
+         stopOnSkipped="false"
+         beStrictAboutTestsThatDoNotTestAnything="true"
+         verbose="false"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/11.4/phpunit.xsd">
+    <testsuites>
+
+        <testsuite name="UnitTests">
+            <directory>Unit/</directory>
+            <directory>Integration/</directory>
+        </testsuite>
+    </testsuites>
+    <coverage includeUncoveredFiles="true">
+        <include>
+            <directory suffix=".php">../src</directory>
+        </include>
+    </coverage>
+    <php>
+        <const name="OXID_PHP_UNIT" value="true"/>
+    </php>
+</phpunit>

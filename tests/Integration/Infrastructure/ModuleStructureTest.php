@@ -13,7 +13,7 @@ class ModuleStructureTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->moduleRoot = __DIR__ . '/../../..';
+        $this->moduleRoot = __DIR__ . '/../..';
     }
 
     /** @test */
