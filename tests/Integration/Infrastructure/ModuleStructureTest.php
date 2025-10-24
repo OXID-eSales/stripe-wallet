@@ -6,8 +6,7 @@
  */
 
 declare(strict_types=1);
-
-namespace OxidSolutionCatalysts\Payments\Infrastructure\Tests\Integration;
+namespace OxidSolutionCatalysts\Payments\Tests\Integration\Infrastructure;
 
 use PHPUnit\Framework\TestCase;
 
