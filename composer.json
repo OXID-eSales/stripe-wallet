@@ -47,7 +47,7 @@
       "OxidSolutionCatalysts\\Payments\\Component\\Tests\\Unit\\": "tests/Unit/Component",
       "OxidSolutionCatalysts\\Payments\\Stripe\\Tests\\Integration\\": "tests/Integration/Stripe",
       "OxidSolutionCatalysts\\Payments\\Stripe\\Tests\\Unit\\": "tests/Unit/Stripe",
-      "OxidSolutionCatalysts\\Payments\\Infrastructure\\Tests\\Integration\\": "tests/Integration/Infrastructure",
+      "OxidSolutionCatalysts\\Payments\\Infrastructure\\Tests\\Integration\\": "tests/Integration",
       "OxidSolutionCatalysts\\Payments\\Infrastructure\\Tests\\Unit\\": "tests/Unit/Infrastructure",
       "OxidEsales\\EshopCommunity\\Tests\\": "./vendor/oxid-esales/oxideshop-ce/tests"
     }

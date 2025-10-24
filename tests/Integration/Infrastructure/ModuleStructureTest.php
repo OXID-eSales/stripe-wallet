@@ -38,13 +38,14 @@ class ModuleStructureTest extends TestCase
     /** @test */
     public function metadata_php_exists_and_is_valid(): void
     {
+        global $sMetadataVersion;
         $metadataFile = $this->moduleRoot . '/metadata.php';
         $this->assertFileExists($metadataFile);
 
         $aModule = [];
         include $metadataFile;
 
-        $this->assertEquals('osc/payment-stripe', $aModule['id']);
+        $this->assertEquals('stripe', $aModule['id']);
         $this->assertEquals('2.1', $GLOBALS['sMetadataVersion'] ?? $sMetadataVersion);
     }
 
@@ -53,12 +54,13 @@ class ModuleStructureTest extends TestCase
     {
         $requiredDirs = [
             'src/Component/Contract',
-            'src/Component/Event',
-            'src/Component/Event/Domain',
+            'src/Component/EventSystem/Event',
+            'src/Component/EventSystem/Event/Contract',
+            'src/Component/EventSystem/Event/Payment',
             'src/Component/Model',
             'src/Component/Repository',
             'src/Component/Service',
-            'src/Component/Webhook',
+            'src/Component/Controller/Webhook',
         ];
 
         foreach ($requiredDirs as $dir) {
@@ -75,7 +77,7 @@ class ModuleStructureTest extends TestCase
         $requiredDirs = [
             'src/Stripe/Handler',
             'src/Stripe/Service',
-            'src/Stripe/Webhook',
+            'src/Stripe/Controller/Webhook',
             'src/Stripe/Controller',
             'src/Stripe/Model',
         ];
@@ -111,20 +113,35 @@ class ModuleStructureTest extends TestCase
     /** @test */
     public function migration_files_exist(): void
     {
-        $migrationDir = $this->moduleRoot . '/migrations';
-        $this->assertDirectoryExists($migrationDir);
+        // Check migration directory structure
+        $migrationDir = $this->moduleRoot . '/migration';
+        $this->assertDirectoryExists($migrationDir, 'Migration directory should exist');
 
+        // Check migrations.yml configuration file
+        $migrationsYml = $migrationDir . '/migrations.yml';
+        $this->assertFileExists($migrationsYml, 'migrations.yml configuration file should exist');
+
+        // Verify migrations.yml content
+        $yamlContent = file_get_contents($migrationsYml);
+        $this->assertStringContainsString('oxmigrations_osc_stripe', $yamlContent, 'migrations.yml should contain correct table name');
+        $this->assertStringContainsString('OxidSolutionCatalysts\Payments\Migrations', $yamlContent, 'migrations.yml should contain correct namespace');
+
+        // Check migration/data directory
+        $migrationDataDir = $migrationDir . '/data';
+        $this->assertDirectoryExists($migrationDataDir, 'Migration data directory should exist');
+
+        // Check Doctrine migration files
         $expectedMigrations = [
-            '001_create_payment_transaction_table.sql',
-            '002_create_payment_order_state_table.sql',
-            '003_create_payment_customer_table.sql',
-            '004_create_payment_basket_snapshot_table.sql',
+            'Version20251024140000.php', // Payment transaction table
+            'Version20251024140100.php', // Payment order state table
+            'Version20251024140200.php', // Payment customer table
+            'Version20251024140300.php', // Payment basket snapshot table
         ];
 
         foreach ($expectedMigrations as $migration) {
             $this->assertFileExists(
-                $migrationDir . '/' . $migration,
-                "Missing migration: $migration"
+                $migrationDataDir . '/' . $migration,
+                "Missing Doctrine migration: $migration"
             );
         }
     }

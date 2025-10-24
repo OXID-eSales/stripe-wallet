@@ -1,0 +1,14 @@
+# Doctrine Migrations Configuration for Stripe Payment Module
+#
+# Tables created by migrations in this module:
+# - osc_stripe_payment_transaction      (Version20251024140000)
+# - osc_stripe_payment_order_state      (Version20251024140100)
+# - osc_stripe_payment_customer         (Version20251024140200)
+# - osc_stripe_payment_basket_snapshot  (Version20251024140300)
+
+table_storage:
+  # Doctrine Migrations tracking table (stores migration version history)
+  table_name: oxmigrations_osc_stripe
+
+migrations_paths:
+  'OxidSolutionCatalysts\Payments\Migrations': data
