@@ -1,0 +1,117 @@
+@startuml
+title P1: OXID Cloud (PaaS) - Recurring Revenue Business Model
+
+participant "Investment\n€150,000" as Invest
+participant "Platform\nDevelopment" as Dev
+participant "Month 1-12\nEarly Growth" as Phase1
+participant "Year 2-3\nScale" as Phase2
+participant "€52M\n3-Year Revenue" as Revenue
+
+Invest -> Dev: 3 Developers\n+ Infrastructure\n+ Security
+note right of Invest
+  **Investment:**
+  • 3 Developers x €40K (6mo): €120K
+  • Infrastructure setup: €15K
+  • Security audit: €10K
+  • Marketing: €5K
+
+  **Total: €150,000**
+end note
+
+note right of Dev
+  **Platform as a Service (PaaS):**
+
+  Architecture:
+  • Multi-Tenant
+  • Auto-Scaling
+  • Load Balanced
+
+  Stack:
+  • PHP 8.2 + Nginx
+  • PostgreSQL (Managed)
+  • Redis (Cache)
+  • Elasticsearch (Search)
+
+  Management:
+  • Control Panel
+  • Deployment Pipeline
+  • Backup & Restore
+  • Monitoring & Alerts
+
+  Security:
+  • SSL/TLS Auto-provision
+  • WAF (Firewall)
+  • DDoS Protection
+  • **PCI DSS Compliance**
+end note
+
+Dev -> Phase1: Launch\nPaaS Platform
+note right of Phase1
+  **Pricing Tiers:**
+  • Starter: €49/mo
+  • Business: €149/mo
+  • Professional: €349/mo
+  • Enterprise: €999/mo
+  + Overage fees
+
+  **Growth:**
+  Month 1-6: 25 shops (€1.7K MRR)
+
+  Month 7-12: 152 shops (€73.4K MRR)
+  • 100 Starter
+  • 40 Business
+  • 10 Professional
+  • 2 Enterprise
+end note
+
+Phase1 -> Phase2: OXID Partnership\nMarket Dominance
+note right of Phase2
+  **Year 2:**
+  800 shops
+  **€146.8K MRR**
+
+  **Year 3:**
+  1,600 shops
+  **€213.3K MRR**
+
+  **Value Proposition:**
+  ✅ Zero DevOps for merchants
+  ✅ Auto-scaling
+  ✅ 99.9% uptime SLA
+  ✅ Automatic backups
+  ✅ 1-click deployments
+  ✅ PCI compliant
+  ✅ 24/7 monitoring
+end note
+
+Phase2 -> Revenue: SaaS Economics\n(65-70% Gross Margin)
+note right of Revenue
+  **3-Year Revenue: €52.0M**
+  **ROI: 34,567%**
+
+  **MRR Growth:**
+  Y1 avg: €733K/mo
+  Y2 avg: €1.47M/mo
+  Y3 avg: €2.13M/mo
+
+  **Recurring Revenue = Predictable Cash Flow**
+end note
+
+note left of Revenue
+  **Developer Wealth (3 founders)**
+
+  Net profit margin: ~40%
+  (after infra + ops costs)
+
+  Year 1: €300K each
+  (€40K salary + €260K royalty)
+
+  Year 2: €1.87M each
+
+  Year 3: **€2.73M each**
+
+  **3-Year Total: €4.9M/founder**
+  **10-Year Value: €25M+/founder**
+end note
+
+@enduml

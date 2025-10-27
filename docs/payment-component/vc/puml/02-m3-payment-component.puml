@@ -1,0 +1,86 @@
+@startuml
+title M3: Payment Component Library - Quick Win Strategy (70% Built!)
+
+participant "Investment\n€80,000" as Invest
+participant "Development\n(6 Months)" as Dev
+participant "Launch &\nGrowth" as Launch
+participant "Revenue\nGeneration" as Revenue
+participant "Developer\nWealth" as Wealth
+
+Invest -> Dev: Fund 2 Developers\n(€40K each x 6mo)
+note right of Invest
+  **Investment Breakdown:**
+  • 2 Developers x €40K (6mo)
+  • Total: €80,000
+
+  **70% already built!**
+  Quick win opportunity
+end note
+
+note right of Dev
+  **Timeline:**
+  Month 1-2: Core Refactoring
+  • Extract Stripe code
+  • Create abstraction layer
+  • Add PayPal support
+
+  Month 3-4: Feature Expansion
+  • Add Klarna, Adyen
+  • Build admin interface
+  • Implement webhooks
+
+  Month 5-6: Polish & Launch
+  • Documentation
+  • Testing & QA
+  • Package & publish
+end note
+
+Dev -> Launch: Product Launch\nv1.0
+note right of Launch
+  **Customer Growth:**
+  Month 1-3: 50 shops
+  Month 4-6: 200 shops
+  Month 7-12: 800 shops
+  Year 2: 2,500 shops
+  Year 3: **5,000 shops**
+
+  **Pricing:**
+  • €29/mo (Starter)
+  • €79/mo (Professional)
+  • €199/mo (Enterprise)
+  + Transaction fees (0.2%)
+
+  **Break-even: Month 7**
+end note
+
+Launch -> Revenue: Scale to\n5,000 Shops
+note right of Revenue
+  **3-Year Revenue:**
+  Year 1: €2.8M
+  Year 2: €4.1M
+  Year 3: **€6.1M**
+
+  **Total: €13.0M**
+  **ROI: 16,150%**
+
+  Average: €79/month per shop
+  Churn: 5% per year
+end note
+
+Revenue -> Wealth: 60% Royalties to\nFounding Developers
+note right of Wealth
+  **Developer Royalties (2 founders)**
+
+  Year 1: €160K each
+  (€80K salary + €80K royalty)
+
+  Year 2: €820K each
+
+  Year 3: **€1.42M each**
+
+  **3-Year Total: €2.4M per developer**
+
+  From €40K investment!
+end note
+
+@enduml

@@ -1,0 +1,86 @@
+@startuml
+title M1: OXID Component Marketplace - 2-Sided Platform (Network Effects)
+
+participant "Investment\n€72,000" as Invest
+participant "Platform\nDevelopment" as Dev
+participant "Month 1-6\nBootstrapping" as Phase1
+participant "Month 7-12\nGrowth" as Phase2
+participant "Year 2-3\nDominance" as Phase3
+participant "€7.8M\n3-Year Revenue" as Revenue
+
+Invest -> Dev: 2 Developers\n+ Infrastructure\n+ Marketing
+note right of Invest
+  **Investment:**
+  • 2 Devs x €36K (6mo): €72K
+  • Infrastructure: €12K
+  • Marketing (agencies): €24K
+
+  **Total: €72,000**
+
+  2-sided platform model
+end note
+
+Dev -> Phase1: Launch\nMarketplace
+note right of Phase1
+  **Bootstrapping Phase:**
+  10 component sellers
+  50 OXID shops buying
+
+  **€13K MRR**
+
+  Network just starting...
+end note
+
+Phase1 -> Phase2: Network Effects\nKick In
+note right of Phase2
+  **Growth Phase:**
+  50 sellers
+  300 shops
+
+  **€130K MRR**
+  **(10x growth!)**
+
+  More sellers → More buyers
+  More buyers → More sellers
+end note
+
+Phase2 -> Phase3: Exponential\nGrowth
+note right of Phase3
+  **Dominance Phase:**
+
+  Year 2:
+  200 sellers, 1,500 shops
+  **€216K MRR**
+
+  Year 3:
+  500 sellers, 3,000 shops
+  **€303K MRR**
+end note
+
+Phase3 -> Revenue: Platform\nMaturity
+note right of Revenue
+  **3-Year Total: €7.8M**
+  **ROI: 10,833%**
+
+  **Revenue Streams:**
+  • Commission: 20% per sale
+  • Featured Listings: €99/mo
+  • Premium Support: €199/mo
+  • Analytics Pro: €49/mo
+end note
+
+note left of Revenue
+  **Developer Wealth (2 founders)**
+
+  Year 1: €280K each
+  (€36K salary + €244K royalty)
+
+  Year 2: €624K each
+
+  Year 3: **€873K each**
+
+  **3-Year Total: €1.78M/founder**
+  **10-Year Value: €8M+/founder**
+end note
+
+@enduml

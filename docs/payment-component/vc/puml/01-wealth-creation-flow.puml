@@ -1,0 +1,70 @@
+@startuml
+title OSC Wealth Creation Model: From €80K Investment to €8.6M/Year Royalties
+
+participant "Founding Team\n(2-3 Developers)" as Team
+participant "Product Development\n(6 Months)" as Dev
+participant "Market Launch\n(Month 6-12)" as Launch
+participant "Revenue Distribution\n(€100M Example)" as Revenue
+participant "Developer Wealth\n(Per Founder)" as Wealth
+
+Team -> Dev: Start Building\n(€40K/dev salary)\n\nInvestment: €80K total
+note right of Dev
+  Month 1-2: MVP
+  Month 3-4: Features
+  Month 5-6: Launch
+
+  Cost: €80K (2 devs x €40K)
+end note
+
+Dev -> Launch: Product Ready\nv1.0 Launch
+note right of Launch
+  5-10 agencies onboard
+  First paying merchants
+  Word-of-mouth growth
+
+  Revenue: €5K → €150K/month
+end note
+
+Launch -> Revenue: Scale to €100M\nGross Revenue
+note right of Revenue
+  Agency Commission: €17M (17%)
+  Net Revenue: €83M
+
+  Splits:
+  • OXID AG: €4.15M (5%)
+  • OSC Infra: €8.3M (10%)
+  • **Mini-Team: €58.1M (70%)**
+    → Founding Devs: €34.86M (60%)
+    → Operations: €14.53M (25%)
+    → Growth Fund: €8.72M (15%)
+end note
+
+Revenue -> Wealth: 60% of Net to\nFounding Devs\n(LIFETIME ROYALTIES)
+note right of Wealth
+  Year 1: €488K each
+  Year 2: €1.82M each
+  Year 3: **€8.6M each**
+
+  **3-Year Total: €10.9M/dev**
+  **10-Year Value: €50M+/dev**
+
+  **ROI: 13,625% per developer**
+end note
+
+note left of Team
+  **Initial Investment**
+  • €40K/developer
+  • 2-3 developers
+  • 6 months build time
+
+  **Total: €80K-€120K**
+end note
+
+note left of Wealth
+  **Life-Changing Wealth**
+  • Passive income for life
+  • Multi-millionaire in 3 years
+  • Generational wealth
+end note
+
+@enduml
