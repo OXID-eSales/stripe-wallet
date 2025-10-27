@@ -53,13 +53,14 @@ $MODULE_ROOT/recipe/parts/shared/require_demodata_package.sh -e"${edition}" -b"$
 
 mkdir -p "$PROJECT_ROOT"/source/extensions || exit 1
 cp -r "$MODULE_ROOT" "$PROJECT_ROOT"/source/extensions/stripe || exit 1
+
+docker compose exec -T \
+  php composer config repositories.osc/stripe-wallet \
+  --json '{"type":"path", "url":"./extensions/stripe", "options": {"symlink": true}}' || exit 1
+
 # Configure module in composer
 docker compose exec -T \
   php composer require osc/stripe-wallet || exit 1
-
-docker compose exec -T \
-  php composer config repositories.oxid-esales/stripe \
-  --json '{"type":"path", "url":"./extensions/stripe", "options": {"symlink": true}}' || exit 1
 
 
 mkdir -p ./source/var/configuration/environment/shops/1/modules
