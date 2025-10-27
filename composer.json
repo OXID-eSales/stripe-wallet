@@ -1,5 +1,5 @@
 {
-  "name": "oxid-esales/stripe-wallet",
+  "name": "osc/stripe-wallet",
   "description": "Stripe Payment Module for Oxid 7",
   "type": "oxideshop-module",
   "keywords": [

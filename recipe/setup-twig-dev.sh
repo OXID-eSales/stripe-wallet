@@ -3,8 +3,8 @@
 # -e for shop edition. Possible values: CE/EE
 ##
 ##  Use: cd oxideshop_root
-##  git clone <git> extensions/paypal
-##  bash:: ./extensions/paypal/recipe/setup-dev.sh -eEE
+##  git clone <git> extensions/stripe
+##  bash:: ./extensions/stripe/recipe/setup-twig-dev.sh -eEE
 ##
 
 # set -x  # Enables debugging
@@ -55,8 +55,12 @@ mkdir -p "$PROJECT_ROOT"/source/extensions || exit 1
 cp -r "$MODULE_ROOT" "$PROJECT_ROOT"/source/extensions/stripe || exit 1
 # Configure module in composer
 docker compose exec -T \
+  php composer require osc/stripe-wallet || exit 1
+
+docker compose exec -T \
   php composer config repositories.oxid-esales/stripe \
   --json '{"type":"path", "url":"./extensions/stripe", "options": {"symlink": true}}' || exit 1
+
 
 mkdir -p ./source/var/configuration/environment/shops/1/modules
 docker compose exec -T php composer update --no-interaction
