@@ -1,0 +1,744 @@
+# SPRINT-2 TICKET-10: Database Layer Implementation
+
+**Priority:** 🔴 HIGH
+**Estimated Effort:** 8-10 hours
+**Sprint:** Sprint 2 (Core Integration)
+**Depends On:** TICKET-06 (Contract Domain Layer)
+**Blocks:** Production deployment, Data persistence
+
+---
+
+## 📋 Overview
+
+Replace in-memory repositories with real database-backed implementations using Doctrine ORM. This enables persistent storage of payment contracts, orders, and webhook logs required for production.
+
+**Why This Matters:**
+- In-memory repositories lose data on restart (not production-ready)
+- Database persistence enables audit trails and compliance
+- Proper indexes ensure performance at scale
+- Transactions ensure data consistency
+
+---
+
+## 🎯 Goals
+
+### Primary Objectives
+1. Create database migrations for all tables
+2. Implement Doctrine ORM entity mappings
+3. Replace in-memory repositories with DB-backed versions
+4. Add database indexes for performance
+5. Implement transaction management
+6. Ensure backward compatibility with tests
+
+### Success Criteria
+- ✅ All database tables created via migrations
+- ✅ Doctrine entities correctly mapped
+- ✅ All existing tests pass with DB repositories
+- ✅ Performance acceptable (< 50ms for contract operations)
+- ✅ Database schema documented
+
+---
+
+## 🏗️ Architecture
+
+### Database Schema
+
+```sql
+-- Payment Contracts Table
+CREATE TABLE oxpaymentcontracts (
+    oxid VARCHAR(32) PRIMARY KEY,
+    oxuserid VARCHAR(32) NOT NULL,
+    oxstate VARCHAR(20) NOT NULL,
+    oxbasket TEXT NOT NULL,
+    oxproviderorderid VARCHAR(255),
+    oxorderid VARCHAR(32),
+    oxcreatedat DATETIME NOT NULL,
+    oxupdatedat DATETIME NOT NULL,
+    oxfulfilledat DATETIME,
+    INDEX idx_userid (oxuserid),
+    INDEX idx_state (oxstate),
+    INDEX idx_providerorderid (oxproviderorderid),
+    INDEX idx_orderid (oxorderid)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Contract Conditions Table
+CREATE TABLE oxpaymentcontractconditions (
+    oxid VARCHAR(32) PRIMARY KEY,
+    oxcontractid VARCHAR(32) NOT NULL,
+    oxtype VARCHAR(50) NOT NULL,
+    oxisfulfilled TINYINT(1) DEFAULT 0,
+    oxfulfilledat DATETIME,
+    INDEX idx_contractid (oxcontractid),
+    INDEX idx_type (oxtype),
+    INDEX idx_fulfilled (oxisfulfilled),
+    FOREIGN KEY (oxcontractid) REFERENCES oxpaymentcontracts(oxid) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Webhook Logs Table
+CREATE TABLE oxpaymentwebhooklogs (
+    oxid VARCHAR(32) PRIMARY KEY,
+    oxeventid VARCHAR(255) UNIQUE NOT NULL,
+    oxeventtype VARCHAR(100),
+    oxcontractid VARCHAR(32),
+    oxstatus VARCHAR(20) NOT NULL,
+    oxreceivedat DATETIME NOT NULL,
+    INDEX idx_eventid (oxeventid),
+    INDEX idx_contractid (oxcontractid),
+    INDEX idx_receivedat (oxreceivedat)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+---
+
+## 📝 Implementation Phases
+
+### Phase 1: Database Migrations (TDD Approach)
+
+**Goal:** Create migration files for schema setup
+
+**Test File:** `tests/Integration/Database/MigrationTest.php`
+
+**Test Specifications:**
+```php
+class MigrationTest extends TestCase
+{
+    // 1. Migration creates contracts table
+    public function testCreatesPaymentContractsTable(): void
+    {
+        // Given: Clean database
+        // When: Run migrations
+        // Then: oxpaymentcontracts table exists with correct schema
+    }
+
+    // 2. Migration creates conditions table
+    public function testCreatesContractConditionsTable(): void
+    {
+        // Given: Clean database
+        // When: Run migrations
+        // Then: oxpaymentcontractconditions table exists
+    }
+
+    // 3. Migration creates webhook logs table
+    public function testCreatesWebhookLogsTable(): void
+    {
+        // Given: Clean database
+        // When: Run migrations
+        // Then: oxpaymentwebhooklogs table exists
+    }
+
+    // 4. Foreign key constraints exist
+    public function testForeignKeyConstraintsExist(): void
+    {
+        // Given: Tables created
+        // When: Query foreign key metadata
+        // Then: CASCADE constraint on conditions->contracts
+    }
+
+    // 5. Indexes created
+    public function testIndexesCreated(): void
+    {
+        // Given: Tables created
+        // When: Query index metadata
+        // Then: All performance indexes exist
+    }
+}
+```
+
+**Implementation:** `migration/data/20251030_payment_contracts_schema.php`
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use Doctrine\DBAL\Schema\Schema;
+use Doctrine\Migrations\AbstractMigration;
+
+final class Version20251030PaymentContractsSchema extends AbstractMigration
+{
+    public function up(Schema $schema): void
+    {
+        // Create payment contracts table
+        $contractsTable = $schema->createTable('oxpaymentcontracts');
+        $contractsTable->addColumn('oxid', 'string', ['length' => 32]);
+        $contractsTable->addColumn('oxuserid', 'string', ['length' => 32]);
+        $contractsTable->addColumn('oxstate', 'string', ['length' => 20]);
+        $contractsTable->addColumn('oxbasket', 'text');
+        $contractsTable->addColumn('oxproviderorderid', 'string', ['length' => 255, 'notnull' => false]);
+        $contractsTable->addColumn('oxorderid', 'string', ['length' => 32, 'notnull' => false]);
+        $contractsTable->addColumn('oxcreatedat', 'datetime');
+        $contractsTable->addColumn('oxupdatedat', 'datetime');
+        $contractsTable->addColumn('oxfulfilledat', 'datetime', ['notnull' => false]);
+        $contractsTable->setPrimaryKey(['oxid']);
+        $contractsTable->addIndex(['oxuserid'], 'idx_userid');
+        $contractsTable->addIndex(['oxstate'], 'idx_state');
+        $contractsTable->addIndex(['oxproviderorderid'], 'idx_providerorderid');
+        $contractsTable->addIndex(['oxorderid'], 'idx_orderid');
+
+        // Create contract conditions table
+        $conditionsTable = $schema->createTable('oxpaymentcontractconditions');
+        $conditionsTable->addColumn('oxid', 'string', ['length' => 32]);
+        $conditionsTable->addColumn('oxcontractid', 'string', ['length' => 32]);
+        $conditionsTable->addColumn('oxtype', 'string', ['length' => 50]);
+        $conditionsTable->addColumn('oxisfulfilled', 'boolean', ['default' => false]);
+        $conditionsTable->addColumn('oxfulfilledat', 'datetime', ['notnull' => false]);
+        $conditionsTable->setPrimaryKey(['oxid']);
+        $conditionsTable->addIndex(['oxcontractid'], 'idx_contractid');
+        $conditionsTable->addIndex(['oxtype'], 'idx_type');
+        $conditionsTable->addIndex(['oxisfulfilled'], 'idx_fulfilled');
+        $conditionsTable->addForeignKeyConstraint(
+            'oxpaymentcontracts',
+            ['oxcontractid'],
+            ['oxid'],
+            ['onDelete' => 'CASCADE']
+        );
+
+        // Create webhook logs table
+        $webhookLogsTable = $schema->createTable('oxpaymentwebhooklogs');
+        $webhookLogsTable->addColumn('oxid', 'string', ['length' => 32]);
+        $webhookLogsTable->addColumn('oxeventid', 'string', ['length' => 255]);
+        $webhookLogsTable->addColumn('oxeventtype', 'string', ['length' => 100, 'notnull' => false]);
+        $webhookLogsTable->addColumn('oxcontractid', 'string', ['length' => 32, 'notnull' => false]);
+        $webhookLogsTable->addColumn('oxstatus', 'string', ['length' => 20]);
+        $webhookLogsTable->addColumn('oxreceivedat', 'datetime');
+        $webhookLogsTable->setPrimaryKey(['oxid']);
+        $webhookLogsTable->addUniqueIndex(['oxeventid'], 'idx_eventid');
+        $webhookLogsTable->addIndex(['oxcontractid'], 'idx_contractid');
+        $webhookLogsTable->addIndex(['oxreceivedat'], 'idx_receivedat');
+    }
+
+    public function down(Schema $schema): void
+    {
+        $schema->dropTable('oxpaymentcontractconditions');
+        $schema->dropTable('oxpaymentwebhooklogs');
+        $schema->dropTable('oxpaymentcontracts');
+    }
+}
+```
+
+---
+
+### Phase 2: Doctrine Entity Mappings (TDD)
+
+**Goal:** Map domain objects to database tables
+
+**Test File:** `tests/Integration/Database/EntityMappingTest.php`
+
+**Test Specifications:**
+```php
+class EntityMappingTest extends TestCase
+{
+    // 1. PaymentContract entity persists
+    public function testPersistsPaymentContract(): void
+    {
+        // Given: PaymentContract entity
+        // When: EntityManager->persist() and flush()
+        // Then: Contract saved to database
+    }
+
+    // 2. ContractCondition entity persists
+    public function testPersistsContractCondition(): void
+    {
+        // Given: ContractCondition entity
+        // When: Persist and flush
+        // Then: Condition saved with foreign key to contract
+    }
+
+    // 3. Cascade delete works
+    public function testCascadeDeletesConditions(): void
+    {
+        // Given: Contract with 2 conditions
+        // When: Delete contract
+        // Then: Both conditions automatically deleted
+    }
+
+    // 4. Basket snapshot serialization
+    public function testSerializesBasketSnapshot(): void
+    {
+        // Given: Contract with BasketSnapshot
+        // When: Persist and reload
+        // Then: Basket data correctly serialized/deserialized
+    }
+
+    // 5. State value object mapping
+    public function testMapsContractState(): void
+    {
+        // Given: Contract with ContractState value object
+        // When: Persist and reload
+        // Then: State correctly stored as string, rehydrated as object
+    }
+}
+```
+
+**Implementation:** `src/Component/Contract/PaymentContract.orm.xml`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping
+                  https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+
+    <entity name="OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract"
+            table="oxpaymentcontracts">
+        <id name="id" type="string" column="oxid" length="32"/>
+        <field name="userId" type="string" column="oxuserid" length="32"/>
+        <field name="state" type="string" column="oxstate" length="20"/>
+        <field name="basketSnapshot" type="json" column="oxbasket"/>
+        <field name="providerOrderId" type="string" column="oxproviderorderid" length="255" nullable="true"/>
+        <field name="orderId" type="string" column="oxorderid" length="32" nullable="true"/>
+        <field name="createdAt" type="datetime" column="oxcreatedat"/>
+        <field name="updatedAt" type="datetime" column="oxupdatedat"/>
+        <field name="fulfilledAt" type="datetime" column="oxfulfilledat" nullable="true"/>
+
+        <one-to-many field="conditions" target-entity="OxidSolutionCatalysts\Payments\Component\Contract\ContractCondition"
+                     mapped-by="contract" orphan-removal="true">
+            <cascade>
+                <cascade-all/>
+            </cascade>
+        </one-to-many>
+    </entity>
+
+</doctrine-mapping>
+```
+
+**Implementation:** `src/Component/Contract/ContractCondition.orm.xml`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping
+                  https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+
+    <entity name="OxidSolutionCatalysts\Payments\Component\Contract\ContractCondition"
+            table="oxpaymentcontractconditions">
+        <id name="id" type="string" column="oxid" length="32"/>
+        <field name="type" type="string" column="oxtype" length="50"/>
+        <field name="isFulfilled" type="boolean" column="oxisfulfilled"/>
+        <field name="fulfilledAt" type="datetime" column="oxfulfilledat" nullable="true"/>
+
+        <many-to-one field="contract" target-entity="OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract"
+                     inversed-by="conditions">
+            <join-column name="oxcontractid" referenced-column-name="oxid" on-delete="CASCADE"/>
+        </many-to-one>
+    </entity>
+
+</doctrine-mapping>
+```
+
+---
+
+### Phase 3: Database-Backed Repositories (TDD)
+
+**Goal:** Implement real repositories using Doctrine
+
+**Test File:** `tests/Integration/Repository/DoctrineContractRepositoryTest.php`
+
+**Test Specifications:**
+```php
+class DoctrineContractRepositoryTest extends TestCase
+{
+    // 1. Save and find contract
+    public function testSavesAndFindsContract(): void
+    {
+        // Given: New PaymentContract
+        // When: repository->save($contract)
+        // Then: findById() returns same contract
+    }
+
+    // 2. Find by provider order ID
+    public function testFindsByProviderOrderId(): void
+    {
+        // Given: Contract with providerOrderId
+        // When: findByProviderOrderId() called
+        // Then: Returns correct contract
+    }
+
+    // 3. Find by user ID
+    public function testFindsByUserId(): void
+    {
+        // Given: 3 contracts for user123, 2 for user456
+        // When: findByUserId('user123')
+        // Then: Returns 3 contracts
+    }
+
+    // 4. Update contract state
+    public function testUpdatesContractState(): void
+    {
+        // Given: Contract in PENDING state
+        // When: Update state to COMMITTED, save()
+        // Then: Reloaded contract has COMMITTED state
+    }
+
+    // 5. Cascade saves conditions
+    public function testCascadeSavesConditions(): void
+    {
+        // Given: Contract with 2 conditions
+        // When: save($contract)
+        // Then: Both conditions saved to database
+    }
+
+    // 6. Transaction rollback
+    public function testRollsBackTransaction(): void
+    {
+        // Given: Begin transaction
+        // When: Save contract, then rollback
+        // Then: Contract not in database
+    }
+}
+```
+
+**Implementation:** `src/Component/Repository/DoctrineContractRepository.php`
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace OxidSolutionCatalysts\Payments\Component\Repository;
+
+use Doctrine\ORM\EntityManagerInterface;
+use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
+
+class DoctrineContractRepository implements ContractRepositoryInterface
+{
+    public function __construct(
+        private EntityManagerInterface $entityManager
+    ) {
+    }
+
+    public function save(PaymentContract $contract): void
+    {
+        $this->entityManager->persist($contract);
+        $this->entityManager->flush();
+    }
+
+    public function findById(string $id): ?PaymentContract
+    {
+        return $this->entityManager->find(PaymentContract::class, $id);
+    }
+
+    public function findByProviderOrderId(string $providerOrderId): ?PaymentContract
+    {
+        return $this->entityManager->createQueryBuilder()
+            ->select('c')
+            ->from(PaymentContract::class, 'c')
+            ->where('c.providerOrderId = :providerOrderId')
+            ->setParameter('providerOrderId', $providerOrderId)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    public function findByUserId(string $userId): array
+    {
+        return $this->entityManager->createQueryBuilder()
+            ->select('c')
+            ->from(PaymentContract::class, 'c')
+            ->where('c.userId = :userId')
+            ->setParameter('userId', $userId)
+            ->orderBy('c.createdAt', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function beginTransaction(): void
+    {
+        $this->entityManager->beginTransaction();
+    }
+
+    public function commit(): void
+    {
+        $this->entityManager->commit();
+    }
+
+    public function rollback(): void
+    {
+        $this->entityManager->rollback();
+    }
+}
+```
+
+---
+
+### Phase 4: Repository Interface Enhancement
+
+**Goal:** Ensure interface supports all needed operations
+
+**File:** `src/Component/Repository/ContractRepositoryInterface.php`
+
+**Add Methods:**
+```php
+public function findByUserId(string $userId): array;
+public function findByState(string $state): array;
+public function beginTransaction(): void;
+public function commit(): void;
+public function rollback(): void;
+```
+
+---
+
+## 🔌 Integration with Existing Code
+
+### Service Container Configuration
+
+**File:** `src/di.php` (Symfony DI configuration)
+
+```php
+<?php
+
+use OxidSolutionCatalysts\Payments\Component\Repository\DoctrineContractRepository;
+use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
+
+return static function (ContainerConfigurator $container): void {
+    $services = $container->services()
+        ->defaults()
+        ->autowire()
+        ->autoconfigure();
+
+    // Register Doctrine repositories
+    $services->set(ContractRepositoryInterface::class, DoctrineContractRepository::class)
+        ->args([service('doctrine.orm.entity_manager')]);
+
+    $services->set(WebhookLogRepositoryInterface::class, DoctrineWebhookLogRepository::class)
+        ->args([service('doctrine.orm.entity_manager')]);
+};
+```
+
+### Test Suite Configuration
+
+**File:** `tests/phpunit.xml`
+
+```xml
+<phpunit>
+    <testsuites>
+        <testsuite name="unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="integration">
+            <directory>tests/Integration</directory>
+        </testsuite>
+    </testsuites>
+
+    <php>
+        <env name="DATABASE_URL" value="mysql://root:root@localhost:3306/oxid_test"/>
+    </php>
+</phpunit>
+```
+
+### In-Memory Repository Fallback (for fast unit tests)
+
+Keep existing `ContractRepository.php` for unit tests:
+
+**File:** `src/Component/Repository/ContractRepository.php` (rename to InMemoryContractRepository)
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace OxidSolutionCatalysts\Payments\Component\Repository;
+
+class InMemoryContractRepository implements ContractRepositoryInterface
+{
+    private array $contracts = [];
+
+    // ... existing in-memory implementation
+    // Used by unit tests for speed
+}
+```
+
+---
+
+## 📊 Test Summary
+
+### Migration Tests (5 tests)
+1. Creates contracts table
+2. Creates conditions table
+3. Creates webhook logs table
+4. Foreign key constraints
+5. Indexes created
+
+### Entity Mapping Tests (5 tests)
+1. Persists PaymentContract
+2. Persists ContractCondition
+3. Cascade delete
+4. Basket snapshot serialization
+5. State value object mapping
+
+### Repository Tests (8 tests)
+1. Save and find contract
+2. Find by provider order ID
+3. Find by user ID
+4. Update contract state
+5. Cascade save conditions
+6. Transaction rollback
+7. WebhookLog repository tests (2 tests)
+
+**Total: 18+ tests**
+
+---
+
+## ✅ Acceptance Criteria
+
+### Functional Requirements
+- [ ] All database tables created
+- [ ] Doctrine entities mapped correctly
+- [ ] All repository methods work with DB
+- [ ] Transactions support implemented
+- [ ] Cascade operations work (delete, save)
+
+### Non-Functional Requirements
+- [ ] Performance: < 50ms for single contract operations
+- [ ] All existing tests still pass
+- [ ] Database schema documented
+- [ ] Indexes improve query performance
+
+### Data Integrity
+- [ ] Foreign key constraints enforced
+- [ ] No orphaned conditions in database
+- [ ] Basket data correctly serialized/deserialized
+- [ ] DateTime fields use UTC timezone
+
+---
+
+## 📁 Files to Create
+
+### Source Files (3)
+```
+src/Component/Repository/
+├── DoctrineContractRepository.php         (80 lines)
+├── DoctrineWebhookLogRepository.php       (60 lines)
+└── InMemoryContractRepository.php         (existing, renamed)
+
+migration/data/
+└── 20251030_payment_contracts_schema.php  (100 lines)
+```
+
+### Configuration Files (2)
+```
+src/Component/Contract/
+├── PaymentContract.orm.xml                (40 lines)
+└── ContractCondition.orm.xml              (30 lines)
+
+src/
+└── di.php                                 (20 lines)
+```
+
+### Test Files (3)
+```
+tests/Integration/Database/
+├── MigrationTest.php                      (120 lines)
+├── EntityMappingTest.php                  (150 lines)
+└── DoctrineContractRepositoryTest.php     (200 lines)
+```
+
+**Total Lines:** ~800 (source: ~260, config: ~90, tests: ~470)
+
+---
+
+## 📚 References
+
+**OXID Documentation:**
+- [Database Structure](https://docs.oxid-esales.com/developer/en/latest/development/modules_components_themes/module/skeleton/database.html)
+- [Doctrine Integration](https://docs.oxid-esales.com/developer/en/latest/development/modules_components_themes/module/using_database.html)
+
+**Doctrine Documentation:**
+- [Migrations](https://www.doctrine-project.org/projects/doctrine-migrations/en/3.7/index.html)
+- [ORM Mapping](https://www.doctrine-project.org/projects/doctrine-orm/en/2.17/reference/xml-mapping.html)
+
+**Existing Code:**
+- `src/Component/Repository/ContractRepository.php` (in-memory version)
+- `src/Component/Contract/PaymentContract.php` (domain entity)
+
+---
+
+## 🚀 Implementation Order
+
+### Day 1 (4 hours)
+1. Phase 1: Create migration file (1.5 hours)
+2. Run migration, verify tables created (30 min)
+3. Write migration tests (1 hour)
+4. Phase 2: Create Doctrine entity mappings (1 hour)
+
+### Day 2 (4-6 hours)
+1. Phase 3: Implement DoctrineContractRepository (2 hours)
+2. Implement DoctrineWebhookLogRepository (1 hour)
+3. Write repository tests (2 hours)
+4. Service container configuration (30 min)
+5. Run all existing tests with DB repositories (30 min)
+
+---
+
+## 🔍 Testing Strategy
+
+### Migration Testing
+```bash
+# Run migrations
+vendor/bin/oe-console oe:module:apply-configuration
+
+# Verify schema
+vendor/bin/oe-console dbal:run-sql "SHOW TABLES LIKE 'oxpaymentcontracts'"
+vendor/bin/oe-console dbal:run-sql "DESCRIBE oxpaymentcontracts"
+```
+
+### Repository Testing
+```bash
+# Run integration tests (with real database)
+vendor/bin/phpunit --testsuite integration
+
+# Performance check
+vendor/bin/phpunit --testsuite integration --log-junit results.xml
+# Verify test times < 50ms per test
+```
+
+### Unit Tests (keep fast with in-memory)
+```bash
+# Unit tests should still use in-memory repositories
+vendor/bin/phpunit --testsuite unit
+# Should complete in < 0.1s
+```
+
+---
+
+## 📋 Definition of Done
+
+- [x] Migration file created and tested
+- [x] All 3 tables created with correct schema
+- [x] Doctrine entity mappings configured
+- [x] DoctrineContractRepository implemented
+- [x] DoctrineWebhookLogRepository implemented
+- [x] All 18+ tests passing
+- [x] Existing unit tests still pass (in-memory)
+- [x] Performance benchmarks met (< 50ms)
+- [x] Service container configured
+- [x] Documentation updated
+
+---
+
+## 🎯 Success Metrics
+
+**Database:**
+- 3 tables created successfully
+- 9 indexes for query performance
+- Foreign key constraints enforced
+
+**Testing:**
+- 18+ tests passing
+- All 297 existing tests still pass
+- < 50ms per repository operation
+
+**Code Quality:**
+- 100% test coverage for repositories
+- No N+1 query problems
+- Transaction support implemented
+
+---
+
+**Estimated Completion:** 8-10 hours (1-1.5 days)
+**Priority:** 🔴 HIGH (Critical Path)
+**Next Ticket:** TICKET-11 (Module Configuration)
+
+*Created: 2025-10-30*
+*Version: 1.0*

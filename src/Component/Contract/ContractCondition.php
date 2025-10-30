@@ -1,0 +1,132 @@
+<?php
+
+declare(strict_types=1);
+
+namespace OxidSolutionCatalysts\Payments\Component\Contract;
+
+class ContractCondition
+{
+    public const TYPE_PAYMENT_AUTHORIZED = 'payment_authorized';
+    public const TYPE_FRAUD_CHECK = 'fraud_check';
+    public const TYPE_STOCK_RESERVED = 'stock_reserved';
+    public const TYPE_COMPLIANCE_CHECK = 'compliance_check';
+    public const TYPE_ADDRESS_VALIDATED = 'address_validated';
+
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_FULFILLED = 'fulfilled';
+    public const STATUS_FAILED = 'failed';
+
+    private string $type;
+    private string $status;
+    private array $data = [];
+    private ?\DateTimeInterface $fulfilledAt = null;
+    private ?string $failureReason = null;
+
+    public function __construct(string $type)
+    {
+        $this->validateType($type);
+        $this->type = $type;
+        $this->status = self::STATUS_PENDING;
+    }
+
+    public function fulfill(array $data = []): void
+    {
+        if ($this->status === self::STATUS_FULFILLED) {
+            throw new \DomainException("Condition '{$this->type}' is already fulfilled");
+        }
+
+        $this->status = self::STATUS_FULFILLED;
+        $this->data = $data;
+        $this->fulfilledAt = new \DateTime();
+    }
+
+    public function fail(string $reason): void
+    {
+        if ($this->status === self::STATUS_FULFILLED) {
+            throw new \DomainException("Cannot fail a fulfilled condition");
+        }
+
+        $this->status = self::STATUS_FAILED;
+        $this->failureReason = $reason;
+    }
+
+    public function isFulfilled(): bool
+    {
+        return $this->status === self::STATUS_FULFILLED;
+    }
+
+    public function isPending(): bool
+    {
+        return $this->status === self::STATUS_PENDING;
+    }
+
+    public function isFailed(): bool
+    {
+        return $this->status === self::STATUS_FAILED;
+    }
+
+    public function getType(): string
+    {
+        return $this->type;
+    }
+
+    public function getStatus(): string
+    {
+        return $this->status;
+    }
+
+    public function getData(): array
+    {
+        return $this->data;
+    }
+
+    public function getFulfilledAt(): ?\DateTimeInterface
+    {
+        return $this->fulfilledAt;
+    }
+
+    public function getFailureReason(): ?string
+    {
+        return $this->failureReason;
+    }
+
+    private function validateType(string $type): void
+    {
+        $validTypes = [
+            self::TYPE_PAYMENT_AUTHORIZED,
+            self::TYPE_FRAUD_CHECK,
+            self::TYPE_STOCK_RESERVED,
+            self::TYPE_COMPLIANCE_CHECK,
+            self::TYPE_ADDRESS_VALIDATED,
+        ];
+
+        if (!in_array($type, $validTypes, true)) {
+            throw new \InvalidArgumentException("Invalid condition type: {$type}");
+        }
+    }
+
+    public function toArray(): array
+    {
+        return [
+            'type' => $this->type,
+            'status' => $this->status,
+            'data' => $this->data,
+            'fulfilledAt' => $this->fulfilledAt?->format('Y-m-d H:i:s'),
+            'failureReason' => $this->failureReason,
+        ];
+    }
+
+    public static function fromArray(array $data): self
+    {
+        $condition = new self($data['type']);
+        $condition->status = $data['status'];
+        $condition->data = $data['data'] ?? [];
+        $condition->failureReason = $data['failureReason'] ?? null;
+
+        if (isset($data['fulfilledAt'])) {
+            $condition->fulfilledAt = new \DateTime($data['fulfilledAt']);
+        }
+
+        return $condition;
+    }
+}

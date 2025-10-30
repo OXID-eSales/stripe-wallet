@@ -1,0 +1,50 @@
+<?php
+
+declare(strict_types=1);
+
+namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment;
+
+use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
+
+readonly class PaymentRefundedEvent implements PaymentRefundedEventInterface
+{
+    public function __construct(
+        private EventContext $context,
+        private string $refundId,
+        private string $providerOrderId,
+        private float $amount,
+        private string $currency,
+        private string $orderId
+    ) {
+    }
+
+    public function getContext(): EventContext
+    {
+        return $this->context;
+    }
+
+    public function getRefundId(): string
+    {
+        return $this->refundId;
+    }
+
+    public function getProviderOrderId(): string
+    {
+        return $this->providerOrderId;
+    }
+
+    public function getAmount(): float
+    {
+        return $this->amount;
+    }
+
+    public function getCurrency(): string
+    {
+        return $this->currency;
+    }
+
+    public function getOrderId(): string
+    {
+        return $this->orderId;
+    }
+}
