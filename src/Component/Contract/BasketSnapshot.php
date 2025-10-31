@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\Contract;
 
+use DateTime;
+use InvalidArgumentException;
+
 class BasketSnapshot
 {
     /**
@@ -48,29 +51,89 @@ class BasketSnapshot
      */
     public static function fromArray(array $data): self
     {
-        if (!isset($data['totalGross'], $data['totalNet'], $data['totalVat'], $data['currency'])) {
-            throw new \InvalidArgumentException('Required basket data is missing');
-        }
-
-        $capturedAt = isset($data['capturedAt']) && is_string($data['capturedAt'])
-            ? new \DateTime($data['capturedAt'])
-            : new \DateTime();
-
-        /** @var array<int, array<string, mixed>> $items */
-        $items = isset($data['items']) && is_array($data['items']) ? $data['items'] : [];
-
-        /** @var array<int, array<string, mixed>> $discounts */
-        $discounts = isset($data['discounts']) && is_array($data['discounts']) ? $data['discounts'] : [];
-
         return new self(
-            items: $items,
-            discounts: $discounts,
-            totalGross: is_float($data['totalGross']) || is_int($data['totalGross']) ? (float) $data['totalGross'] : (float) $data['totalGross'],
-            totalNet: is_float($data['totalNet']) || is_int($data['totalNet']) ? (float) $data['totalNet'] : (float) $data['totalNet'],
-            totalVat: is_float($data['totalVat']) || is_int($data['totalVat']) ? (float) $data['totalVat'] : (float) $data['totalVat'],
-            currency: is_string($data['currency']) ? $data['currency'] : (string) $data['currency'],
-            capturedAt: $capturedAt
+            items: self::extractItems($data),
+            discounts: self::extractDiscounts($data),
+            totalGross: self::extractFloat($data, 'totalGross'),
+            totalNet: self::extractFloat($data, 'totalNet'),
+            totalVat: self::extractFloat($data, 'totalVat'),
+            currency: self::extractCurrency($data),
+            capturedAt: self::extractCapturedAt($data)
         );
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array<int, array<string, mixed>>
+     */
+    private static function extractItems(array $data): array
+    {
+        if (!isset($data['items'])) {
+            return [];
+        }
+        if (!is_array($data['items'])) {
+            return [];
+        }
+        /** @var array<int, array<string, mixed>> $items */
+        $items = $data['items'];
+        return $items;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array<int, array<string, mixed>>
+     */
+    private static function extractDiscounts(array $data): array
+    {
+        if (!isset($data['discounts'])) {
+            return [];
+        }
+        if (!is_array($data['discounts'])) {
+            return [];
+        }
+        /** @var array<int, array<string, mixed>> $discounts */
+        $discounts = $data['discounts'];
+        return $discounts;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private static function extractFloat(array $data, string $key): float
+    {
+        if (!isset($data[$key])) {
+            throw new InvalidArgumentException("Required field '{$key}' is missing");
+        }
+        $value = $data[$key];
+        if (is_float($value) || is_int($value)) {
+            return (float) $value;
+        }
+        throw new InvalidArgumentException("Field '{$key}' must be a number");
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private static function extractCurrency(array $data): string
+    {
+        if (!isset($data['currency'])) {
+            throw new InvalidArgumentException('Required field \'currency\' is missing');
+        }
+        if (!is_string($data['currency'])) {
+            throw new InvalidArgumentException('Field \'currency\' must be a string');
+        }
+        return $data['currency'];
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private static function extractCapturedAt(array $data): \DateTimeInterface
+    {
+        if (isset($data['capturedAt']) && is_string($data['capturedAt'])) {
+            return new DateTime($data['capturedAt']);
+        }
+        return new DateTime();
     }
 
     /**
