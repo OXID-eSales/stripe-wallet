@@ -5,15 +5,16 @@ declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Component\Service;
 
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
+use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
 use OxidSolutionCatalysts\Payments\Component\Contract\ContractCondition;
 use OxidSolutionCatalysts\Payments\Component\Contract\BasketSnapshot;
-use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepository;
+use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
 
-class ContractService
+class ContractService implements ContractServiceInterface
 {
-    private ContractRepository $contractRepository;
+    private ContractRepositoryInterface $contractRepository;
 
-    public function __construct(ContractRepository $contractRepository)
+    public function __construct(ContractRepositoryInterface $contractRepository)
     {
         $this->contractRepository = $contractRepository;
     }
@@ -22,7 +23,7 @@ class ContractService
         string $userId,
         object $basket,
         array $conditionTypes = []
-    ): PaymentContract {
+    ): PaymentContractInterface {
         $basketSnapshot = $this->createBasketSnapshot($basket);
 
         $contract = new PaymentContract(
@@ -47,7 +48,7 @@ class ContractService
         return $contract;
     }
 
-    public function findActiveContractByUser(string $userId): ?PaymentContract
+    public function findActiveContractByUser(string $userId): ?PaymentContractInterface
     {
         return $this->contractRepository->findActiveByUserId($userId);
     }

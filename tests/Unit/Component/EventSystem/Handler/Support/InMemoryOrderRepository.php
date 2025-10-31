@@ -4,18 +4,22 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Unit\Component\EventSystem\Handler\Support;
 
-class InMemoryOrderRepository
+use OxidSolutionCatalysts\Payments\Component\Repository\OrderRepositoryInterface;
+
+class InMemoryOrderRepository implements OrderRepositoryInterface
 {
     private array $orders = [];
     private int $nextId = 1;
     private int $nextOrderNumber = 1000;
 
-    public function save(Order $order): void
+    public function save(object $order): void
     {
-        $this->orders[$order->getId()] = $order;
+        if ($order instanceof Order) {
+            $this->orders[$order->getId()] = $order;
+        }
     }
 
-    public function findById(int $id): ?Order
+    public function findById(int $id): ?object
     {
         return $this->orders[$id] ?? null;
     }

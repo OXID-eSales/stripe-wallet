@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment;
 
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContextInterface;
 
 readonly class WebhookReceivedEvent implements WebhookReceivedEventInterface
 {
     public function __construct(
-        private EventContext $context,
+        private EventContextInterface $context,
         private string $provider,
         private string $eventType,
         private array $payload,
@@ -17,7 +17,7 @@ readonly class WebhookReceivedEvent implements WebhookReceivedEventInterface
     ) {
     }
 
-    public function getContext(): EventContext
+    public function getContext(): EventContextInterface
     {
         return $this->context;
     }

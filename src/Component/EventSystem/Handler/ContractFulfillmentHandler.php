@@ -6,17 +6,14 @@ namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Handler;
 
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\WebhookReceivedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractFulfilledEvent;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher;
-use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepository;
-use OxidSolutionCatalysts\Payments\Tests\Unit\Component\EventSystem\Handler\Support\InMemoryOrderRepository;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
+use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Repository\OrderRepositoryInterface;
 
 /**
  * Handles contract fulfillment when payment confirmation webhook is received.
  *
  * Transitions contract to FULFILLED state and marks associated order as completed.
- *
- * @todo Refactor to use proper OrderRepository interface from production namespace
- *       instead of test support classes (TICKET-10)
  *
  * @since 1.0.0
  */
@@ -28,9 +25,9 @@ class ContractFulfillmentHandler extends AbstractHandler
     ];
 
     public function __construct(
-        ContractRepository $contractRepository,
-        private InMemoryOrderRepository $orderRepository,
-        ?EventDispatcher $eventDispatcher = null
+        ContractRepositoryInterface $contractRepository,
+        private OrderRepositoryInterface $orderRepository,
+        ?EventDispatcherInterface $eventDispatcher = null
     ) {
         parent::__construct($contractRepository, $eventDispatcher);
     }

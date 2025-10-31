@@ -6,14 +6,14 @@ namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Handler;
 
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentInitiatedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractCreatedEvent;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher;
-use OxidSolutionCatalysts\Payments\Component\Service\ContractService;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\ContractServiceInterface;
 
 class ContractCreationHandler implements HandlerInterface
 {
     public function __construct(
-        private ContractService $contractService,
-        private EventDispatcher $eventDispatcher
+        private ContractServiceInterface $contractService,
+        private EventDispatcherInterface $eventDispatcher
     ) {
     }
 

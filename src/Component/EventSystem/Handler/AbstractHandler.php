@@ -9,8 +9,8 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Handler;
 
-use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepository;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher;
+use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
 
 /**
  * Abstract base class for all event handlers.
@@ -43,12 +43,12 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher;
 abstract class AbstractHandler implements HandlerInterface
 {
     /**
-     * @param ContractRepository $contractRepository Repository for accessing payment contracts
-     * @param EventDispatcher|null $eventDispatcher Optional dispatcher for emitting subsequent events
+     * @param ContractRepositoryInterface $contractRepository Repository for accessing payment contracts
+     * @param EventDispatcherInterface|null $eventDispatcher Optional dispatcher for emitting subsequent events
      */
     public function __construct(
-        protected ContractRepository $contractRepository,
-        protected ?EventDispatcher $eventDispatcher = null
+        protected ContractRepositoryInterface $contractRepository,
+        protected ?EventDispatcherInterface $eventDispatcher = null
     ) {
     }
 

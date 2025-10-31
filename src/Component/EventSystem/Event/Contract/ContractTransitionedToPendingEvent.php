@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract;
 
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContextInterface;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
 
 readonly class ContractTransitionedToPendingEvent implements ContractTransitionedToPendingEventInterface
 {
     public function __construct(
         private PaymentContractInterface $contract,
-        private EventContext $context,
+        private EventContextInterface $context,
         private array $conditions
     ) {
     }
@@ -21,7 +21,7 @@ readonly class ContractTransitionedToPendingEvent implements ContractTransitione
         return $this->contract;
     }
 
-    public function getContext(): EventContext
+    public function getContext(): EventContextInterface
     {
         return $this->context;
     }

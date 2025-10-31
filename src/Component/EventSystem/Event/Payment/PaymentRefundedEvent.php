@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment;
 
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContextInterface;
 
 readonly class PaymentRefundedEvent implements PaymentRefundedEventInterface
 {
     public function __construct(
-        private EventContext $context,
+        private EventContextInterface $context,
         private string $refundId,
         private string $providerOrderId,
         private float $amount,
@@ -18,7 +18,7 @@ readonly class PaymentRefundedEvent implements PaymentRefundedEventInterface
     ) {
     }
 
-    public function getContext(): EventContext
+    public function getContext(): EventContextInterface
     {
         return $this->context;
     }

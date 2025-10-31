@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract;
 
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContextInterface;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
 
 readonly class ContractFailedEvent implements ContractFailedEventInterface
 {
     public function __construct(
         private PaymentContractInterface $contract,
-        private EventContext $context,
+        private EventContextInterface $context,
         private string $errorCode,
         private string $errorMessage
     ) {
@@ -22,7 +22,7 @@ readonly class ContractFailedEvent implements ContractFailedEventInterface
         return $this->contract;
     }
 
-    public function getContext(): EventContext
+    public function getContext(): EventContextInterface
     {
         return $this->context;
     }

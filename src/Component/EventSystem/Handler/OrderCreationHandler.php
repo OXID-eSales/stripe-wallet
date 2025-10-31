@@ -6,9 +6,9 @@ namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Handler;
 
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractReadyToCommitEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractCommittedEvent;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher;
-use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepository;
-use OxidSolutionCatalysts\Payments\Tests\Unit\Component\EventSystem\Handler\Support\InMemoryOrderRepository;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
+use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Repository\OrderRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Tests\Unit\Component\EventSystem\Handler\Support\Order;
 
 /**
@@ -17,17 +17,14 @@ use OxidSolutionCatalysts\Payments\Tests\Unit\Component\EventSystem\Handler\Supp
  * Creates an order from the contract's basket snapshot and transitions
  * the contract to COMMITTED state.
  *
- * @todo Refactor to use proper OrderRepository interface from production namespace
- *       instead of test support classes (TICKET-10)
- *
  * @since 1.0.0
  */
 class OrderCreationHandler extends AbstractHandler
 {
     public function __construct(
-        ContractRepository $contractRepository,
-        private InMemoryOrderRepository $orderRepository,
-        ?EventDispatcher $eventDispatcher = null
+        ContractRepositoryInterface $contractRepository,
+        private OrderRepositoryInterface $orderRepository,
+        ?EventDispatcherInterface $eventDispatcher = null
     ) {
         parent::__construct($contractRepository, $eventDispatcher);
     }

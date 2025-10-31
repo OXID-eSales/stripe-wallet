@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment;
 
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContextInterface;
 
 class PaymentInitiatedEvent implements PaymentInitiatedEventInterface
 {
@@ -12,7 +12,7 @@ class PaymentInitiatedEvent implements PaymentInitiatedEventInterface
     private ?string $providerOrderId = null;
 
     public function __construct(
-        private readonly EventContext $context,
+        private readonly EventContextInterface $context,
         private readonly string $paymentMethodId,
         private readonly float $amount,
         private readonly string $currency,
@@ -21,7 +21,7 @@ class PaymentInitiatedEvent implements PaymentInitiatedEventInterface
     ) {
     }
 
-    public function getContext(): EventContext
+    public function getContext(): EventContextInterface
     {
         return $this->context;
     }
