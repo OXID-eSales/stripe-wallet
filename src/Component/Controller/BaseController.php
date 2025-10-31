@@ -11,5 +11,4 @@ namespace OxidSolutionCatalysts\Payments\Component\Controller;
 
 class BaseController extends AbstractController
 {
-
 }

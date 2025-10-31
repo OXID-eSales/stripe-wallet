@@ -11,5 +11,4 @@ namespace OxidSolutionCatalysts\Payments\Component\Service;
 
 interface ServiceInterface
 {
-
 }

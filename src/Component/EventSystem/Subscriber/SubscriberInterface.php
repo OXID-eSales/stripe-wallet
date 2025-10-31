@@ -11,5 +11,4 @@ namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Subscriber;
 
 interface SubscriberInterface
 {
-
 }

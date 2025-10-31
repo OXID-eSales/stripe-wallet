@@ -11,5 +11,4 @@ namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Event;
 
 interface EventInterface
 {
-
 }
