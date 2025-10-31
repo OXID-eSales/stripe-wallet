@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\Contract;
 
+use DateTimeInterface;
 use OxidSolutionCatalysts\Payments\Component\Model\ModelInterface;
 
 /**
@@ -14,6 +15,7 @@ use OxidSolutionCatalysts\Payments\Component\Model\ModelInterface;
  */
 interface PaymentContractInterface extends ModelInterface
 {
+    public function getState(): ContractState;
 
     public function getStateValue(): string;
 
@@ -27,7 +29,17 @@ interface PaymentContractInterface extends ModelInterface
 
     public function getProviderOrderId(): ?string;
 
-    public function getCreatedAt(): \DateTimeInterface;
+    public function getCreatedAt(): DateTimeInterface;
 
-    public function getUpdatedAt(): \DateTimeInterface;
+    public function getUpdatedAt(): DateTimeInterface;
+
+    public function getUserId(): string;
+
+    public function getBasketSnapshot(): BasketSnapshot;
+
+    public function areAllConditionsFulfilled(): bool;
+
+    public function commitToOrder(string $orderId): void;
+
+    public function fulfill(): void;
 }

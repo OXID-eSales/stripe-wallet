@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Handler;
 
+use DomainException;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractReadyToCommitEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractCommittedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
@@ -37,11 +38,11 @@ class OrderCreationHandler extends AbstractHandler
         $contract = $event->getContract();
 
         if (!$contract->getState()->isReadyToCommit()) {
-            throw new \DomainException('Cannot create order: contract is not ready to commit');
+            throw new DomainException('Cannot create order: contract is not ready to commit');
         }
 
         if (!$contract->areAllConditionsFulfilled()) {
-            throw new \DomainException('Cannot create order: not all conditions fulfilled');
+            throw new DomainException('Cannot create order: not all conditions fulfilled');
         }
 
         $basket = $contract->getBasketSnapshot();
@@ -57,7 +58,7 @@ class OrderCreationHandler extends AbstractHandler
             $basket->getTotalVat(),
             $basket->getCurrency(),
             $basket->getItems(),
-            $contract->getId()
+            $contract->getId() ?? ''
         );
 
         $this->orderRepository->save($order);
@@ -71,6 +72,8 @@ class OrderCreationHandler extends AbstractHandler
             (string) $orderId
         );
 
-        $this->eventDispatcher->dispatch($committedEvent);
+        if ($this->eventDispatcher) {
+            $this->eventDispatcher->dispatch($committedEvent);
+        }
     }
 }

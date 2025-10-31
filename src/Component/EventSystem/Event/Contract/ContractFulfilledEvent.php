@@ -28,7 +28,7 @@ readonly class ContractFulfilledEvent implements ContractFulfilledEventInterface
 
     public function getContractId(): string
     {
-        return $this->contract->getId();
+        return $this->contract->getId() ?? '';
     }
 
     public function getContractState(): string

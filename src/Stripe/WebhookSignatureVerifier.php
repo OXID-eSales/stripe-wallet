@@ -38,7 +38,10 @@ class WebhookSignatureVerifier implements WebhookSignatureVerifierInterface
     }
 
     /**
+     * @param string $payload
+     * @param string $signature
      * @return array<string, mixed>
+     * @throws \Stripe\Exception\SignatureVerificationException
      */
     public function parseEvent(string $payload, string $signature): array
     {

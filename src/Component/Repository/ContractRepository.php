@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Component\Repository;
 
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
+use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
 
 class ContractRepository implements ContractRepositoryInterface
 {
     private array $storage = [];
 
-    public function save(PaymentContract $contract): void
+    public function save(PaymentContractInterface $contract): void
     {
         $this->storage[$contract->getId()] = $contract->toArray();
     }

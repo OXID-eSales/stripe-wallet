@@ -8,6 +8,9 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContextInter
 
 readonly class WebhookReceivedEvent implements WebhookReceivedEventInterface
 {
+    /**
+     * @param array<string, mixed> $payload
+     */
     public function __construct(
         private EventContextInterface $context,
         private string $provider,
@@ -32,6 +35,9 @@ readonly class WebhookReceivedEvent implements WebhookReceivedEventInterface
         return $this->eventType;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getPayload(): array
     {
         return $this->payload;

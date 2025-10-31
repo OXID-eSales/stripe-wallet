@@ -28,7 +28,7 @@ readonly class ContractCommittedEvent implements ContractCommittedEventInterface
 
     public function getContractId(): string
     {
-        return $this->contract->getId();
+        return $this->contract->getId() ?? '';
     }
 
     public function getContractState(): string

@@ -9,6 +9,9 @@ use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
 
 readonly class ContractReadyToCommitEvent implements ContractReadyToCommitEventInterface
 {
+    /**
+     * @param array<string, mixed> $paymentProviderData
+     */
     public function __construct(
         private PaymentContractInterface $contract,
         private EventContextInterface $context,
@@ -28,7 +31,7 @@ readonly class ContractReadyToCommitEvent implements ContractReadyToCommitEventI
 
     public function getContractId(): string
     {
-        return $this->contract->getId();
+        return $this->contract->getId() ?? '';
     }
 
     public function getContractState(): string
@@ -36,6 +39,9 @@ readonly class ContractReadyToCommitEvent implements ContractReadyToCommitEventI
         return $this->contract->getStateValue();
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getPaymentProviderData(): array
     {
         return $this->paymentProviderData;

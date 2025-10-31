@@ -6,9 +6,13 @@ namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract;
 
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContextInterface;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
+use OxidSolutionCatalysts\Payments\Component\Contract\ContractCondition;
 
 readonly class ContractTransitionedToPendingEvent implements ContractTransitionedToPendingEventInterface
 {
+    /**
+     * @param array<int, ContractCondition> $conditions
+     */
     public function __construct(
         private PaymentContractInterface $contract,
         private EventContextInterface $context,
@@ -28,7 +32,7 @@ readonly class ContractTransitionedToPendingEvent implements ContractTransitione
 
     public function getContractId(): string
     {
-        return $this->contract->getId();
+        return $this->contract->getId() ?? '';
     }
 
     public function getContractState(): string
@@ -36,6 +40,9 @@ readonly class ContractTransitionedToPendingEvent implements ContractTransitione
         return $this->contract->getStateValue();
     }
 
+    /**
+     * @return array<int, ContractCondition>
+     */
     public function getConditions(): array
     {
         return $this->conditions;

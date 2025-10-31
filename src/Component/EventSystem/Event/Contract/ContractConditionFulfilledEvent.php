@@ -9,6 +9,9 @@ use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
 
 readonly class ContractConditionFulfilledEvent implements ContractConditionFulfilledEventInterface
 {
+    /**
+     * @param array<string, mixed> $conditionData
+     */
     public function __construct(
         private PaymentContractInterface $contract,
         private EventContextInterface $context,
@@ -29,7 +32,7 @@ readonly class ContractConditionFulfilledEvent implements ContractConditionFulfi
 
     public function getContractId(): string
     {
-        return $this->contract->getId();
+        return $this->contract->getId() ?? '';
     }
 
     public function getContractState(): string
@@ -42,6 +45,9 @@ readonly class ContractConditionFulfilledEvent implements ContractConditionFulfi
         return $this->conditionType;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getConditionData(): array
     {
         return $this->conditionData;

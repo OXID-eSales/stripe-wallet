@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\Contract;
 
+use DateTime;
+use DateInterval;
+use DateTimeInterface;
+use DomainException;
+use LogicException;
 use OxidSolutionCatalysts\Payments\Component\Model\AbstractModel;
 
 class PaymentContract extends AbstractModel implements PaymentContractInterface
@@ -18,10 +23,10 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
      * @var array<int, ContractCondition>
      */
     private array $conditions = [];
-    private ?\DateTimeInterface $expiresAt = null;
-    private \DateTimeInterface $createdAt;
-    private \DateTimeInterface $updatedAt;
-    private ?\DateTimeInterface $fulfilledAt = null;
+    private ?DateTimeInterface $expiresAt = null;
+    private DateTimeInterface $createdAt;
+    private DateTimeInterface $updatedAt;
+    private ?DateTimeInterface $fulfilledAt = null;
 
     private ?string $provider = null;
     private ?string $providerOrderId = null;
@@ -38,15 +43,15 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
         $this->userId = $userId;
         $this->basketSnapshot = $basketSnapshot;
         $this->state = ContractState::draft();
-        $this->createdAt = new \DateTime();
-        $this->updatedAt = new \DateTime();
-        $this->expiresAt = (new \DateTime())->add(new \DateInterval('PT24H'));
+        $this->createdAt = new DateTime();
+        $this->updatedAt = new DateTime();
+        $this->expiresAt = (new DateTime())->add(new DateInterval('PT24H'));
     }
 
     public function addCondition(ContractCondition $condition): void
     {
         if (!$this->state->isDraft()) {
-            throw new \DomainException('Cannot add conditions after DRAFT state');
+            throw new DomainException('Cannot add conditions after DRAFT state');
         }
 
         $this->conditions[] = $condition;
@@ -56,11 +61,11 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
     public function transitionToPending(): void
     {
         if (!$this->state->isDraft()) {
-            throw new \DomainException('Can only transition to PENDING from DRAFT state');
+            throw new DomainException('Can only transition to PENDING from DRAFT state');
         }
 
         if (empty($this->conditions)) {
-            throw new \DomainException('Cannot transition to PENDING without conditions');
+            throw new DomainException('Cannot transition to PENDING without conditions');
         }
 
         $this->state = ContractState::pending();
@@ -75,7 +80,7 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
         $condition = $this->findCondition($type);
 
         if ($condition === null) {
-            throw new \DomainException("Condition type '{$type}' not found");
+            throw new DomainException("Condition type '{$type}' not found");
         }
 
         $condition->fulfill($data);
@@ -91,7 +96,7 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
         $condition = $this->findCondition($type);
 
         if ($condition === null) {
-            throw new \DomainException("Condition type '{$type}' not found");
+            throw new DomainException("Condition type '{$type}' not found");
         }
 
         $condition->fail($reason);
@@ -117,11 +122,11 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
     public function commitToOrder(string $orderId): void
     {
         if (!$this->state->isReadyToCommit()) {
-            throw new \DomainException('Contract must be in READY_TO_COMMIT state to commit');
+            throw new DomainException('Contract must be in READY_TO_COMMIT state to commit');
         }
 
         if (!$this->areAllConditionsFulfilled()) {
-            throw new \DomainException('Cannot commit contract with unfulfilled conditions');
+            throw new DomainException('Cannot commit contract with unfulfilled conditions');
         }
 
         $this->orderId = $orderId;
@@ -132,18 +137,18 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
     public function fulfill(): void
     {
         if (!$this->state->isCommitted()) {
-            throw new \DomainException('Contract must be COMMITTED before fulfillment');
+            throw new DomainException('Contract must be COMMITTED before fulfillment');
         }
 
         $this->state = ContractState::fulfilled();
-        $this->fulfilledAt = new \DateTime();
+        $this->fulfilledAt = new DateTime();
         $this->touch();
     }
 
     public function cancel(string $reason = ''): void
     {
         if ($this->state->isTerminal()) {
-            throw new \DomainException('Cannot cancel a terminal state contract');
+            throw new DomainException('Cannot cancel a terminal state contract');
         }
 
         $this->state = ContractState::cancelled();
@@ -153,7 +158,7 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
     public function fail(string $reason): void
     {
         if ($this->state->isTerminal()) {
-            throw new \DomainException('Cannot fail a terminal state contract');
+            throw new DomainException('Cannot fail a terminal state contract');
         }
 
         $this->state = ContractState::failed();
@@ -163,7 +168,7 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
     public function expire(): void
     {
         if ($this->state->isTerminal()) {
-            throw new \DomainException('Cannot expire a terminal state contract');
+            throw new DomainException('Cannot expire a terminal state contract');
         }
 
         $this->state = ContractState::expired();
@@ -180,6 +185,9 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
 
     public function getId(): string
     {
+        if ($this->id === null) {
+            throw new LogicException('Contract ID should never be null');
+        }
         return $this->id;
     }
 
@@ -236,22 +244,22 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
         return $this->providerRedirectUrl;
     }
 
-    public function getExpiresAt(): ?\DateTimeInterface
+    public function getExpiresAt(): ?DateTimeInterface
     {
         return $this->expiresAt;
     }
 
-    public function getCreatedAt(): \DateTimeInterface
+    public function getCreatedAt(): DateTimeInterface
     {
         return $this->createdAt;
     }
 
-    public function getUpdatedAt(): \DateTimeInterface
+    public function getUpdatedAt(): DateTimeInterface
     {
         return $this->updatedAt;
     }
 
-    public function getFulfilledAt(): ?\DateTimeInterface
+    public function getFulfilledAt(): ?DateTimeInterface
     {
         return $this->fulfilledAt;
     }
@@ -262,7 +270,7 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
             return false;
         }
 
-        return $this->expiresAt !== null && $this->expiresAt < new \DateTime();
+        return $this->expiresAt !== null && $this->expiresAt < new DateTime();
     }
 
     public function isInState(string $state): bool
@@ -293,7 +301,7 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
 
     private function touch(): void
     {
-        $this->updatedAt = new \DateTime();
+        $this->updatedAt = new DateTime();
     }
 
     /**
@@ -324,40 +332,60 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
      */
     public static function fromArray(array $data): self
     {
+        if (!is_int($data['shopId']) && !is_string($data['shopId'])) {
+            throw new \InvalidArgumentException('shopId must be an integer');
+        }
+        if (!is_string($data['userId'])) {
+            throw new \InvalidArgumentException('userId must be a string');
+        }
+        if (!is_array($data['basketSnapshot'])) {
+            throw new \InvalidArgumentException('basketSnapshot must be an array');
+        }
+
+        /** @var array<string, mixed> $basketData */
+        $basketData = $data['basketSnapshot'];
+
         $contract = new self(
-            shopId: $data['shopId'],
+            shopId: is_int($data['shopId']) ? $data['shopId'] : (int) $data['shopId'],
             userId: $data['userId'],
-            basketSnapshot: BasketSnapshot::fromArray($data['basketSnapshot']),
-            id: $data['id']
+            basketSnapshot: BasketSnapshot::fromArray($basketData),
+            id: isset($data['id']) && is_string($data['id']) ? $data['id'] : null
         );
 
-        $contract->orderId = $data['orderId'] ?? null;
+        $contract->orderId = isset($data['orderId']) && is_string($data['orderId']) ? $data['orderId'] : null;
+
+        if (!is_string($data['state'])) {
+            throw new \InvalidArgumentException('state must be a string');
+        }
         $contract->state = ContractState::fromValue($data['state']);
-        $contract->provider = $data['provider'] ?? null;
-        $contract->providerOrderId = $data['providerOrderId'] ?? null;
-        $contract->providerRedirectUrl = $data['providerRedirectUrl'] ?? null;
 
-        if (isset($data['conditions'])) {
-            $contract->conditions = array_map(
-                fn($c) => ContractCondition::fromArray($c),
-                $data['conditions']
-            );
+        $contract->provider = isset($data['provider']) && is_string($data['provider']) ? $data['provider'] : null;
+        $contract->providerOrderId = isset($data['providerOrderId']) && is_string($data['providerOrderId']) ? $data['providerOrderId'] : null;
+        $contract->providerRedirectUrl = isset($data['providerRedirectUrl']) && is_string($data['providerRedirectUrl']) ? $data['providerRedirectUrl'] : null;
+
+        if (isset($data['conditions']) && is_array($data['conditions'])) {
+            /** @var array<int, array<string, mixed>> $conditionsData */
+            $conditionsData = array_filter($data['conditions'], 'is_array');
+            $contract->conditions = array_values(array_map(
+                fn(array $c): ContractCondition => ContractCondition::fromArray($c),
+                $conditionsData
+            ));
         }
 
-        if (isset($data['expiresAt'])) {
-            $contract->expiresAt = new \DateTime($data['expiresAt']);
+        if (isset($data['expiresAt']) && is_string($data['expiresAt'])) {
+            $contract->expiresAt = new DateTime($data['expiresAt']);
         }
 
-        $contract->createdAt = isset($data['createdAt'])
-            ? new \DateTime($data['createdAt'])
-            : new \DateTime();
+        $contract->createdAt = isset($data['createdAt']) && is_string($data['createdAt'])
+            ? new DateTime($data['createdAt'])
+            : new DateTime();
 
-        $contract->updatedAt = isset($data['updatedAt'])
-            ? new \DateTime($data['updatedAt'])
-            : new \DateTime();
+        $contract->updatedAt = isset($data['updatedAt']) && is_string($data['updatedAt'])
+            ? new DateTime($data['updatedAt'])
+            : new DateTime();
 
-        if (isset($data['fulfilledAt'])) {
-            $contract->fulfilledAt = new \DateTime($data['fulfilledAt']);
+        if (isset($data['fulfilledAt']) && is_string($data['fulfilledAt'])) {
+            $contract->fulfilledAt = new DateTime($data['fulfilledAt']);
         }
 
         return $contract;

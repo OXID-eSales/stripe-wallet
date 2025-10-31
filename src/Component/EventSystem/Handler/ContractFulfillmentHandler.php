@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Handler;
 
+use DomainException;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\WebhookReceivedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractFulfilledEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
@@ -42,7 +43,7 @@ class ContractFulfillmentHandler extends AbstractHandler
         }
 
         $contractId = $event->getContext()->get('contractId');
-        if (!$contractId) {
+        if (!is_string($contractId) || $contractId === '') {
             return;
         }
 
@@ -52,7 +53,7 @@ class ContractFulfillmentHandler extends AbstractHandler
         }
 
         if (!$contract->getState()->isCommitted()) {
-            throw new \DomainException('Contract must be COMMITTED before fulfillment');
+            throw new DomainException('Contract must be COMMITTED before fulfillment');
         }
 
         $contract->fulfill();
@@ -61,7 +62,7 @@ class ContractFulfillmentHandler extends AbstractHandler
         $orderId = $contract->getOrderId();
         if ($orderId) {
             $order = $this->orderRepository->findById((int) $orderId);
-            if ($order) {
+            if ($order && method_exists($order, 'setStatus')) {
                 $order->setStatus('completed');
                 $this->orderRepository->save($order);
             }
@@ -73,7 +74,9 @@ class ContractFulfillmentHandler extends AbstractHandler
             $orderId ?? ''
         );
 
-        $this->eventDispatcher->dispatch($fulfilledEvent);
+        if ($this->eventDispatcher) {
+            $this->eventDispatcher->dispatch($fulfilledEvent);
+        }
     }
 
     private function isFulfillmentEvent(WebhookReceivedEvent $event): bool

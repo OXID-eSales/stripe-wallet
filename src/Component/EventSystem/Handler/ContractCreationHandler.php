@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Handler;
 
+use InvalidArgumentException;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentInitiatedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractCreatedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
@@ -26,21 +27,27 @@ class ContractCreationHandler implements HandlerInterface
         $context = $event->getContext();
 
         $userId = $context->get('userId');
-        if (!$userId) {
-            throw new \InvalidArgumentException('User ID is required');
+        if (!is_string($userId) || $userId === '') {
+            throw new InvalidArgumentException('User ID is required');
         }
 
         $basket = $context->get('basket');
-        if (!$basket) {
-            throw new \InvalidArgumentException('Basket is required');
+        if (!is_object($basket)) {
+            throw new InvalidArgumentException('Basket is required');
         }
 
-        $conditionTypes = $context->get('conditionTypes') ?? [];
+        $conditionTypes = $context->get('conditionTypes', []);
+        if (!is_array($conditionTypes)) {
+            $conditionTypes = [];
+        }
+
+        /** @var array<int, string> $validatedConditionTypes */
+        $validatedConditionTypes = array_values(array_filter($conditionTypes, 'is_string'));
 
         $contract = $this->contractService->createContract(
             $userId,
             $basket,
-            $conditionTypes
+            $validatedConditionTypes
         );
 
         $context->set('contract', $contract);

@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\Contract;
 
+use DateTime;
+use DateTimeInterface;
+use DomainException;
+use InvalidArgumentException;
+
 class ContractCondition
 {
     public const TYPE_PAYMENT_AUTHORIZED = 'payment_authorized';
@@ -23,7 +28,7 @@ class ContractCondition
      * @var array<string, mixed>
      */
     private array $data = [];
-    private ?\DateTimeInterface $fulfilledAt = null;
+    private ?DateTimeInterface $fulfilledAt = null;
     private ?string $failureReason = null;
 
     public function __construct(string $type)
@@ -39,18 +44,18 @@ class ContractCondition
     public function fulfill(array $data = []): void
     {
         if ($this->status === self::STATUS_FULFILLED) {
-            throw new \DomainException("Condition '{$this->type}' is already fulfilled");
+            throw new DomainException("Condition '{$this->type}' is already fulfilled");
         }
 
         $this->status = self::STATUS_FULFILLED;
         $this->data = $data;
-        $this->fulfilledAt = new \DateTime();
+        $this->fulfilledAt = new DateTime();
     }
 
     public function fail(string $reason): void
     {
         if ($this->status === self::STATUS_FULFILLED) {
-            throw new \DomainException("Cannot fail a fulfilled condition");
+            throw new DomainException("Cannot fail a fulfilled condition");
         }
 
         $this->status = self::STATUS_FAILED;
@@ -90,7 +95,7 @@ class ContractCondition
         return $this->data;
     }
 
-    public function getFulfilledAt(): ?\DateTimeInterface
+    public function getFulfilledAt(): ?DateTimeInterface
     {
         return $this->fulfilledAt;
     }
@@ -111,7 +116,7 @@ class ContractCondition
         ];
 
         if (!in_array($type, $validTypes, true)) {
-            throw new \InvalidArgumentException("Invalid condition type: {$type}");
+            throw new InvalidArgumentException("Invalid condition type: {$type}");
         }
     }
 
@@ -134,13 +139,24 @@ class ContractCondition
      */
     public static function fromArray(array $data): self
     {
+        if (!is_string($data['type'])) {
+            throw new InvalidArgumentException('type must be a string');
+        }
+        if (!is_string($data['status'])) {
+            throw new InvalidArgumentException('status must be a string');
+        }
+
         $condition = new self($data['type']);
         $condition->status = $data['status'];
-        $condition->data = $data['data'] ?? [];
-        $condition->failureReason = $data['failureReason'] ?? null;
 
-        if (isset($data['fulfilledAt'])) {
-            $condition->fulfilledAt = new \DateTime($data['fulfilledAt']);
+        /** @var array<string, mixed> $conditionData */
+        $conditionData = isset($data['data']) && is_array($data['data']) ? $data['data'] : [];
+        $condition->data = $conditionData;
+
+        $condition->failureReason = isset($data['failureReason']) && is_string($data['failureReason']) ? $data['failureReason'] : null;
+
+        if (isset($data['fulfilledAt']) && is_string($data['fulfilledAt'])) {
+            $condition->fulfilledAt = new DateTime($data['fulfilledAt']);
         }
 
         return $condition;

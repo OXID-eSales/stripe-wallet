@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\Contract;
 
+use InvalidArgumentException;
+
 class ContractState
 {
     private const VALID_STATES = [
@@ -29,7 +31,7 @@ class ContractState
     private function __construct(string $value)
     {
         if (!in_array($value, self::VALID_STATES, true)) {
-            throw new \InvalidArgumentException("Invalid contract state: {$value}");
+            throw new InvalidArgumentException("Invalid contract state: {$value}");
         }
 
         $this->value = $value;
