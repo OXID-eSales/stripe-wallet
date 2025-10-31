@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\Webhook;
 
+use DateTimeImmutable;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\WebhookReceivedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
@@ -22,10 +23,14 @@ class WebhookProcessor implements WebhookProcessorInterface
     ) {
     }
 
+    /**
+     * @param array<string, mixed> $webhookData
+     */
     public function process(array $webhookData): void
     {
-        $eventId = $webhookData['id'];
-        $eventType = $webhookData['type'];
+        $eventId = (string) $webhookData['id'];
+        $eventType = (string) $webhookData['type'];
+        /** @var array<string, mixed> $eventData */
         $eventData = $webhookData['data'];
 
         if ($this->idempotencyChecker->isProcessed($eventId)) {
@@ -65,14 +70,18 @@ class WebhookProcessor implements WebhookProcessorInterface
         $this->logWebhookEvent($eventId, $eventType, $contract->getId());
     }
 
+    /**
+     * @param array<string, mixed> $eventData
+     */
     private function extractPaymentIntentId(array $eventData): ?string
     {
-        return $eventData['object']['id'] ?? null;
+        $id = $eventData['object']['id'] ?? null;
+        return is_string($id) ? $id : null;
     }
 
     private function logWebhookEvent(string $eventId, string $eventType, string $contractId): void
     {
-        $log = new WebhookLog($eventId, new \DateTimeImmutable(), 'processed');
+        $log = new WebhookLog($eventId, new DateTimeImmutable(), 'processed');
         $log->setEventType($eventType);
         $log->setContractId($contractId);
         $this->logRepository->save($log);

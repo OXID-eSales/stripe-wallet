@@ -6,5 +6,8 @@ namespace OxidSolutionCatalysts\Payments\Component\Controller\Http;
 
 interface WebhookControllerInterface
 {
+    /**
+     * @return array<string, mixed>
+     */
     public function handleWebhook(string $payload, string $signature): array;
 }

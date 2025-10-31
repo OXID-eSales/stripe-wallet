@@ -211,16 +211,6 @@ jobs:
         run: |
           docker compose exec -T php bash -c "cd /var/www/test-module && vendor/bin/phpunit -c tests/phpunit.xml --testsuite Unit"
 
-      - name: Upload log artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: TestsLog-${{ matrix.php }}-${{ matrix.mysql }}
-          path: |
-            source/coverage.xml
-            source/phpunit.xml
-            source/source/log/oxideshop.log
-            source/data/php/logs/error_log.txt
 
   unit_tests:
     strategy:

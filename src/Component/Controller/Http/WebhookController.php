@@ -17,6 +17,9 @@ class WebhookController implements WebhookControllerInterface
     ) {
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function handleWebhook(string $payload, string $signature): array
     {
         try {

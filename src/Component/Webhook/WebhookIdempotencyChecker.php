@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\Webhook;
 
+use DateTimeImmutable;
 use OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface;
 
 class WebhookIdempotencyChecker implements WebhookIdempotencyCheckerInterface
@@ -33,7 +34,7 @@ class WebhookIdempotencyChecker implements WebhookIdempotencyCheckerInterface
 
         $log = new WebhookLog(
             $eventId,
-            new \DateTimeImmutable(),
+            new DateTimeImmutable(),
             'processed'
         );
 
