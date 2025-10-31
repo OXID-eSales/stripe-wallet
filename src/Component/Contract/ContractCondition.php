@@ -18,6 +18,10 @@ class ContractCondition
 
     private string $type;
     private string $status;
+
+    /**
+     * @var array<string, mixed>
+     */
     private array $data = [];
     private ?\DateTimeInterface $fulfilledAt = null;
     private ?string $failureReason = null;
@@ -29,6 +33,9 @@ class ContractCondition
         $this->status = self::STATUS_PENDING;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function fulfill(array $data = []): void
     {
         if ($this->status === self::STATUS_FULFILLED) {
@@ -75,6 +82,9 @@ class ContractCondition
         return $this->status;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getData(): array
     {
         return $this->data;
@@ -105,6 +115,9 @@ class ContractCondition
         }
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [
@@ -116,6 +129,9 @@ class ContractCondition
         ];
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public static function fromArray(array $data): self
     {
         $condition = new self($data['type']);

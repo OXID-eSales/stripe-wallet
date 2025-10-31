@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\Contract;
 
-class PaymentContract implements PaymentContractInterface
+use OxidSolutionCatalysts\Payments\Component\Model\AbstractModel;
+
+class PaymentContract extends AbstractModel implements PaymentContractInterface
 {
-    private ?string $id = null;
     private int $shopId;
     private string $userId;
     private ?string $orderId = null;
     private ContractState $state;
     private BasketSnapshot $basketSnapshot;
+
+    /**
+     * @var array<int, ContractCondition>
+     */
     private array $conditions = [];
     private ?\DateTimeInterface $expiresAt = null;
     private \DateTimeInterface $createdAt;
@@ -28,7 +33,7 @@ class PaymentContract implements PaymentContractInterface
         BasketSnapshot $basketSnapshot,
         ?string $id = null
     ) {
-        $this->id = $id ?? $this->generateId();
+        $this->id = $id ?? $this->generateId('contract');
         $this->shopId = $shopId;
         $this->userId = $userId;
         $this->basketSnapshot = $basketSnapshot;
@@ -62,6 +67,9 @@ class PaymentContract implements PaymentContractInterface
         $this->touch();
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function fulfillCondition(string $type, array $data = []): void
     {
         $condition = $this->findCondition($type);
@@ -205,6 +213,9 @@ class PaymentContract implements PaymentContractInterface
         return $this->basketSnapshot;
     }
 
+    /**
+     * @return array<int, ContractCondition>
+     */
     public function getConditions(): array
     {
         return $this->conditions;
@@ -285,11 +296,9 @@ class PaymentContract implements PaymentContractInterface
         $this->updatedAt = new \DateTime();
     }
 
-    private function generateId(): string
-    {
-        return uniqid('contract_', true);
-    }
-
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [
@@ -304,12 +313,15 @@ class PaymentContract implements PaymentContractInterface
             'providerOrderId' => $this->providerOrderId,
             'providerRedirectUrl' => $this->providerRedirectUrl,
             'expiresAt' => $this->expiresAt?->format('Y-m-d H:i:s'),
-            'createdAt' => $this->createdAt?->format('Y-m-d H:i:s'),
-            'updatedAt' => $this->updatedAt?->format('Y-m-d H:i:s'),
+            'createdAt' => $this->createdAt->format('Y-m-d H:i:s'),
+            'updatedAt' => $this->updatedAt->format('Y-m-d H:i:s'),
             'fulfilledAt' => $this->fulfilledAt?->format('Y-m-d H:i:s'),
         ];
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public static function fromArray(array $data): self
     {
         $contract = new self(

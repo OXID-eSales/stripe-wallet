@@ -6,7 +6,14 @@ namespace OxidSolutionCatalysts\Payments\Component\Contract;
 
 class BasketSnapshot
 {
+    /**
+     * @var array<int, array<string, mixed>>
+     */
     private array $items;
+
+    /**
+     * @var array<int, array<string, mixed>>
+     */
     private array $discounts;
     private float $totalGross;
     private float $totalNet;
@@ -14,6 +21,10 @@ class BasketSnapshot
     private string $currency;
     private \DateTimeInterface $capturedAt;
 
+    /**
+     * @param array<int, array<string, mixed>> $items
+     * @param array<int, array<string, mixed>> $discounts
+     */
     private function __construct(
         array $items,
         array $discounts,
@@ -32,6 +43,9 @@ class BasketSnapshot
         $this->capturedAt = $capturedAt;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public static function fromArray(array $data): self
     {
         $capturedAt = isset($data['capturedAt'])
@@ -49,11 +63,17 @@ class BasketSnapshot
         );
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
     public function getItems(): array
     {
         return $this->items;
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
     public function getDiscounts(): array
     {
         return $this->discounts;
@@ -84,6 +104,9 @@ class BasketSnapshot
         return $this->capturedAt;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [

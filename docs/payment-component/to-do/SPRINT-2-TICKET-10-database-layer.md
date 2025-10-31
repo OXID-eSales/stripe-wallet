@@ -45,7 +45,7 @@ Replace in-memory repositories with real database-backed implementations using D
 
 ```sql
 -- Payment Contracts Table
-CREATE TABLE oxpaymentcontracts (
+CREATE TABLE osc_payments_contracts (
     oxid VARCHAR(32) PRIMARY KEY,
     oxuserid VARCHAR(32) NOT NULL,
     oxstate VARCHAR(20) NOT NULL,
@@ -62,7 +62,7 @@ CREATE TABLE oxpaymentcontracts (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Contract Conditions Table
-CREATE TABLE oxpaymentcontractconditions (
+CREATE TABLE osc_payments_contract_conditions (
     oxid VARCHAR(32) PRIMARY KEY,
     oxcontractid VARCHAR(32) NOT NULL,
     oxtype VARCHAR(50) NOT NULL,
@@ -71,11 +71,11 @@ CREATE TABLE oxpaymentcontractconditions (
     INDEX idx_contractid (oxcontractid),
     INDEX idx_type (oxtype),
     INDEX idx_fulfilled (oxisfulfilled),
-    FOREIGN KEY (oxcontractid) REFERENCES oxpaymentcontracts(oxid) ON DELETE CASCADE
+    FOREIGN KEY (oxcontractid) REFERENCES osc_payments_contracts(oxid) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Webhook Logs Table
-CREATE TABLE oxpaymentwebhooklogs (
+CREATE TABLE osc_payments_webhooklogs (
     oxid VARCHAR(32) PRIMARY KEY,
     oxeventid VARCHAR(255) UNIQUE NOT NULL,
     oxeventtype VARCHAR(100),
@@ -107,7 +107,7 @@ class MigrationTest extends TestCase
     {
         // Given: Clean database
         // When: Run migrations
-        // Then: oxpaymentcontracts table exists with correct schema
+        // Then: osc_payments_contracts table exists with correct schema
     }
 
     // 2. Migration creates conditions table
@@ -115,7 +115,7 @@ class MigrationTest extends TestCase
     {
         // Given: Clean database
         // When: Run migrations
-        // Then: oxpaymentcontractconditions table exists
+        // Then: osc_payments_contract_conditions table exists
     }
 
     // 3. Migration creates webhook logs table
@@ -123,7 +123,7 @@ class MigrationTest extends TestCase
     {
         // Given: Clean database
         // When: Run migrations
-        // Then: oxpaymentwebhooklogs table exists
+        // Then: osc_payments_webhooklogs table exists
     }
 
     // 4. Foreign key constraints exist
@@ -159,7 +159,7 @@ final class Version20251030PaymentContractsSchema extends AbstractMigration
     public function up(Schema $schema): void
     {
         // Create payment contracts table
-        $contractsTable = $schema->createTable('oxpaymentcontracts');
+        $contractsTable = $schema->createTable('osc_payments_contracts');
         $contractsTable->addColumn('oxid', 'string', ['length' => 32]);
         $contractsTable->addColumn('oxuserid', 'string', ['length' => 32]);
         $contractsTable->addColumn('oxstate', 'string', ['length' => 20]);
@@ -176,7 +176,7 @@ final class Version20251030PaymentContractsSchema extends AbstractMigration
         $contractsTable->addIndex(['oxorderid'], 'idx_orderid');
 
         // Create contract conditions table
-        $conditionsTable = $schema->createTable('oxpaymentcontractconditions');
+        $conditionsTable = $schema->createTable('osc_payments_contract_conditions');
         $conditionsTable->addColumn('oxid', 'string', ['length' => 32]);
         $conditionsTable->addColumn('oxcontractid', 'string', ['length' => 32]);
         $conditionsTable->addColumn('oxtype', 'string', ['length' => 50]);
@@ -187,14 +187,14 @@ final class Version20251030PaymentContractsSchema extends AbstractMigration
         $conditionsTable->addIndex(['oxtype'], 'idx_type');
         $conditionsTable->addIndex(['oxisfulfilled'], 'idx_fulfilled');
         $conditionsTable->addForeignKeyConstraint(
-            'oxpaymentcontracts',
+            'osc_payments_contracts',
             ['oxcontractid'],
             ['oxid'],
             ['onDelete' => 'CASCADE']
         );
 
         // Create webhook logs table
-        $webhookLogsTable = $schema->createTable('oxpaymentwebhooklogs');
+        $webhookLogsTable = $schema->createTable('osc_payments_webhooklogs');
         $webhookLogsTable->addColumn('oxid', 'string', ['length' => 32]);
         $webhookLogsTable->addColumn('oxeventid', 'string', ['length' => 255]);
         $webhookLogsTable->addColumn('oxeventtype', 'string', ['length' => 100, 'notnull' => false]);
@@ -209,9 +209,9 @@ final class Version20251030PaymentContractsSchema extends AbstractMigration
 
     public function down(Schema $schema): void
     {
-        $schema->dropTable('oxpaymentcontractconditions');
-        $schema->dropTable('oxpaymentwebhooklogs');
-        $schema->dropTable('oxpaymentcontracts');
+        $schema->dropTable('osc_payments_contract_conditions');
+        $schema->dropTable('osc_payments_webhooklogs');
+        $schema->dropTable('osc_payments_contracts');
     }
 }
 ```
@@ -280,7 +280,7 @@ class EntityMappingTest extends TestCase
                   https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
 
     <entity name="OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract"
-            table="oxpaymentcontracts">
+            table="osc_payments_contracts">
         <id name="id" type="string" column="oxid" length="32"/>
         <field name="userId" type="string" column="oxuserid" length="32"/>
         <field name="state" type="string" column="oxstate" length="20"/>
@@ -312,7 +312,7 @@ class EntityMappingTest extends TestCase
                   https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
 
     <entity name="OxidSolutionCatalysts\Payments\Component\Contract\ContractCondition"
-            table="oxpaymentcontractconditions">
+            table="osc_payments_contract_conditions">
         <id name="id" type="string" column="oxid" length="32"/>
         <field name="type" type="string" column="oxtype" length="50"/>
         <field name="isFulfilled" type="boolean" column="oxisfulfilled"/>
@@ -679,8 +679,8 @@ tests/Integration/Database/
 vendor/bin/oe-console oe:module:apply-configuration
 
 # Verify schema
-vendor/bin/oe-console dbal:run-sql "SHOW TABLES LIKE 'oxpaymentcontracts'"
-vendor/bin/oe-console dbal:run-sql "DESCRIBE oxpaymentcontracts"
+vendor/bin/oe-console dbal:run-sql "SHOW TABLES LIKE 'osc_payments_contracts'"
+vendor/bin/oe-console dbal:run-sql "DESCRIBE osc_payments_contracts"
 ```
 
 ### Repository Testing

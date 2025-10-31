@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\Contract;
 
+use OxidSolutionCatalysts\Payments\Component\Model\ModelInterface;
+
 /**
  * Payment contract capturing purchase intent before order creation.
  *
  * States: DRAFT → PENDING → READY_TO_COMMIT → COMMITTED → FULFILLED
  * Or: CANCELLED | EXPIRED | FAILED
  */
-interface PaymentContractInterface
+interface PaymentContractInterface extends ModelInterface
 {
-    public function getId(): string;
 
     public function getStateValue(): string;
 
