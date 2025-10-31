@@ -6,7 +6,7 @@ namespace OxidSolutionCatalysts\Payments\Component\Repository;
 
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
 
-class ContractRepository
+class ContractRepository implements ContractRepositoryInterface
 {
     private array $storage = [];
 

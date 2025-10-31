@@ -6,7 +6,7 @@ namespace OxidSolutionCatalysts\Payments\Component\EventSystem;
 
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventInterface;
 
-class EventDispatcher
+class EventDispatcher implements EventDispatcherInterface
 {
     private array $listeners = [];
 
