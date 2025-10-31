@@ -6,7 +6,7 @@
     <rule ref="PSR12"/>
 
     <!-- Paths to check -->
-    <file>src</file>
+    <file>../src</file>
 
     <!-- Exclude vendor and other directories -->
     <exclude-pattern>*/vendor/*</exclude-pattern>

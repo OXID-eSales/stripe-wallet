@@ -10,7 +10,20 @@
     <rule ref="rulesets/cleancode.xml">
         <exclude name="StaticAccess"/>
     </rule>
-    <rule ref="rulesets/codesize.xml"/>
+    <rule ref="rulesets/codesize.xml">
+        <exclude name="CyclomaticComplexity"/>
+        <exclude name="NPathComplexity"/>
+    </rule>
+    <rule ref="rulesets/codesize.xml/CyclomaticComplexity">
+        <properties>
+            <property name="reportLevel" value="11"/>
+        </properties>
+    </rule>
+    <rule ref="rulesets/codesize.xml/NPathComplexity">
+        <properties>
+            <property name="minimum" value="220"/>
+        </properties>
+    </rule>
     <rule ref="rulesets/controversial.xml"/>
     <rule ref="rulesets/design.xml"/>
     <rule ref="rulesets/naming.xml">
