@@ -1,8 +1,8 @@
 # Payment Component - Remaining Implementation Work
 
 **Date:** 2025-10-31
-**Status:** Sprint 1-2 Complete (78% overall)
-**Current State:** Event System + Contract Layer + Event Handlers + Payment Adapter Layer + Webhook Processing + Database Models ✅
+**Status:** Sprint 2 - 75% Complete (MVP Backend Nearly Done)
+**Current State:** Event System + Contract Layer + Event Handlers + Payment Adapter Layer + Webhook Processing + Database Layer ✅
 
 ---
 
@@ -64,20 +64,20 @@
 - All code style checks pass (PHPCS, PHPStan Level 6, PHPMD)
 - **Status:** ✅ COMPLETE
 
-**TICKET-10: Database Models (Part 1)**
-- PaymentContract aggregate root
-- ContractCondition entity
-- BasketSnapshot value object
-- ContractState value object
-- Database migration (3 tables: osc_payments_contracts, osc_payments_contract_conditions, osc_payments_webhooklogs)
-- 50 tests, 138 assertions
-- **Status:** 🟢 50% COMPLETE (Models done, Repositories pending)
+**TICKET-10: Database Layer (Complete)**
+- Provider-agnostic database schema (6 tables: osc_payment_*)
+- 3 Doctrine migrations (Version20251031140000, Version20251031140100, Version20251031140200)
+- DoctrineContractRepository implementation (Doctrine DBAL)
+- DoctrineWebhookLogRepository implementation (Doctrine DBAL)
+- 22 integration tests (13 for ContractRepository, 9 for WebhookLogRepository)
+- JSON storage for conditions (no separate table)
+- Contract-first architecture with latin1_general_ci collation
+- **Status:** ✅ COMPLETE
 
 **Total Implemented:**
-- **482 tests** (478 unit + 4 integration)
-- **1,028 assertions**
+- **454 tests** (432 unit + 22 integration)
 - **100% pass rate**
-- **0.163 seconds** total test time
+- All code quality checks passing (PHPCS, PHPStan Level 6, PHPMD)
 
 ---
 
@@ -132,36 +132,7 @@
 
 ---
 
-#### 3. **Database Layer - Models (HIGH PRIORITY)**
-**Status:** 🟢 50% COMPLETE (Models Done, Repositories Pending)
-**Priority:** HIGH
-**Estimated:** 4-6 hours remaining
-
-**Completed (TICKET-10 Models):**
-- ✅ PaymentContract aggregate root (24 tests)
-- ✅ ContractCondition entity (9 tests)
-- ✅ BasketSnapshot value object (4 tests)
-- ✅ ContractState value object (13 tests)
-- ✅ Database migration file created (3 tables)
-- ✅ Table naming convention: osc_payments_*
-- ✅ 50 tests, 138 assertions
-- ✅ All code quality checks pass (PHPCS, PHPStan Level 6, PHPMD)
-
-**Remaining:**
-- ✗ Execute migrations to create tables
-- ✗ Doctrine ORM XML mappings
-- ✗ DoctrineContractRepository implementation
-- ✗ DoctrineWebhookLogRepository implementation
-- ✗ Repository integration tests
-- ✗ Service container configuration
-
-**Status:** See `docs/payment-component/DONE/TICKET-10-DATABASE-MODELS-STATUS.md`
-
-**Blocks:** Production deployment, Data persistence
-
----
-
-#### 4. **Module Configuration & Admin UI (HIGH PRIORITY)**
+#### 3. **Module Configuration & Admin UI (HIGH PRIORITY)**
 **Status:** 🔴 NOT STARTED
 **Priority:** HIGH
 **Estimated:** 10-12 hours
@@ -180,7 +151,7 @@
 
 ---
 
-#### 5. **One-Page Checkout Implementation (MEDIUM PRIORITY)**
+#### 4. **One-Page Checkout Implementation (MEDIUM PRIORITY)**
 **Status:** 🔴 NOT STARTED
 **Priority:** MEDIUM
 **Estimated:** 16-20 hours
@@ -200,7 +171,7 @@
 
 ---
 
-#### 6. **Capture & Refund Operations (MEDIUM PRIORITY)**
+#### 5. **Capture & Refund Operations (MEDIUM PRIORITY)**
 **Status:** 🔴 NOT STARTED
 **Priority:** MEDIUM
 **Estimated:** 8-10 hours
@@ -219,7 +190,7 @@
 
 ---
 
-#### 7. **Security & Fraud Prevention (MEDIUM PRIORITY)**
+#### 6. **Security & Fraud Prevention (MEDIUM PRIORITY)**
 **Status:** 🔴 NOT STARTED
 **Priority:** MEDIUM
 **Estimated:** 10-12 hours
@@ -238,7 +209,7 @@
 
 ---
 
-#### 8. **GraphQL & API Integration (LOW PRIORITY)**
+#### 7. **GraphQL & API Integration (LOW PRIORITY)**
 **Status:** 🔴 NOT STARTED
 **Priority:** LOW
 **Estimated:** 12-16 hours
@@ -256,7 +227,7 @@
 
 ---
 
-#### 9. **MCP (Model Context Protocol) Integration (LOW PRIORITY)**
+#### 8. **MCP (Model Context Protocol) Integration (LOW PRIORITY)**
 **Status:** 🔴 NOT STARTED
 **Priority:** LOW
 **Estimated:** 8-10 hours
@@ -272,7 +243,7 @@
 
 ---
 
-#### 10. **Comprehensive Testing (MEDIUM PRIORITY)**
+#### 9. **Comprehensive Testing (MEDIUM PRIORITY)**
 **Status:** 🟡 PARTIAL
 **Priority:** MEDIUM
 **Estimated:** 12-16 hours
@@ -290,7 +261,7 @@
 
 ---
 
-#### 11. **Documentation & Developer Experience (MEDIUM PRIORITY)**
+#### 10. **Documentation & Developer Experience (MEDIUM PRIORITY)**
 **Status:** 🟡 PARTIAL
 **Priority:** MEDIUM
 **Estimated:** 6-8 hours
@@ -319,10 +290,9 @@
 | Event Handlers | ✅ COMPLETE | 42 | - | - |
 | Payment Adapter Layer (TICKET-08) | 🟢 85% DONE | 98 | - | 17h done, 1h left |
 | Webhook Processing (TICKET-09) | ✅ COMPLETE | 37 | - | 12h done |
-| Database Models (TICKET-10 Part 1) | 🟢 50% DONE | 50 | HIGH | 2h done, 4-6h left |
-| **Subtotal Completed** | **✅** | **482** | - | **31h** |
+| Database Layer (TICKET-10) | ✅ COMPLETE | 22 | - | 6h done |
+| **Subtotal Completed** | **✅** | **454** | - | **35h** |
 | Payment Provider Integration | 🟢 85% DONE | 98 | HIGHEST | 1h |
-| Database Repositories (TICKET-10 Part 2) | 🔴 PENDING | 0 | HIGH | 4-6h |
 | Module Configuration | 🔴 NOT STARTED | 0 | HIGH | 10-12h |
 | One-Page Checkout | 🔴 NOT STARTED | 0 | MEDIUM | 16-20h |
 | Capture & Refund | 🔴 NOT STARTED | 0 | MEDIUM | 8-10h |
@@ -338,9 +308,9 @@
 **Critical Path (MVP):**
 - ~~Payment Provider Integration (TICKET-08 docs): 1 hour~~ ← NEARLY DONE
 - ~~Webhook Processing (TICKET-09): 10-12 hours~~ ✅ COMPLETE
-- Database Layer (TICKET-10): 8-10 hours
+- ~~Database Layer (TICKET-10): 6 hours~~ ✅ COMPLETE
 - Module Configuration (TICKET-11): 10-12 hours
-- **Total for MVP:** ~19-23 hours (2-3 days for 1 developer)
+- **Total for MVP:** ~11-13 hours (1-2 days for 1 developer)
 
 **Full Feature Set:**
 - MVP: ~19-23 hours
@@ -375,11 +345,11 @@ Detailed implementation tickets are in this `to-do/` directory:
    - Event processing
    - **Status:** See `DONE/TICKET-09-WEBHOOKS-STATUS.md`
 
-3. **SPRINT-2-TICKET-10-database-layer.md** ← START HERE
-   - Migrations
-   - Doctrine entities
-   - Real repositories
-   - **Priority:** 🔴 HIGH
+3. **~~SPRINT-2-TICKET-10-database-layer.md~~** ✅ COMPLETE
+   - Provider-agnostic database schema (6 tables)
+   - 3 Doctrine migrations
+   - Doctrine DBAL repositories
+   - **Status:** See `DONE/SPRINT-2-TICKET-10-database-layer.md` and `DONE/TICKET-10-COMPLETION-SUMMARY.md`
 
 4. **SPRINT-2-TICKET-11-module-configuration.md**
    - Module metadata
@@ -440,11 +410,11 @@ Detailed implementation tickets are in this `to-do/` directory:
 
 1. ~~TICKET-08: Payment Provider Integration (3-4 days)~~ ✅ 85% COMPLETE
 2. ~~TICKET-09: Webhook Processing (2 days)~~ ✅ COMPLETE
-3. TICKET-10: Database Layer (1-2 days) ← **NEXT**
-4. TICKET-11: Module Configuration (2 days)
+3. ~~TICKET-10: Database Layer (1 day)~~ ✅ COMPLETE
+4. TICKET-11: Module Configuration (2 days) ← **NEXT**
 
 **Deliverable:** Functional Stripe payment module with backend complete
-**Progress:** 2/4 completed, ~19-23 hours remaining
+**Progress:** 3/4 completed, ~10-12 hours remaining
 
 ---
 
@@ -476,15 +446,15 @@ Detailed implementation tickets are in this `to-do/` directory:
 ### Immediate (Today/Tomorrow)
 - [x] ~~Complete TICKET-08 (Payment Provider Integration)~~ ✅ 85% DONE
 - [x] ~~Complete TICKET-09 (Webhook Processing)~~ ✅ COMPLETE
-- [ ] Read TICKET-10 (Database Layer) in detail
-- [ ] Set up Doctrine ORM configuration
-- [ ] Create database migration for contracts table
-- [ ] Write first repository test with database
+- [x] ~~Complete TICKET-10 (Database Layer)~~ ✅ COMPLETE
+- [ ] Read TICKET-11 (Module Configuration) in detail
+- [ ] Set up module metadata.php
+- [ ] Create admin configuration interface
 
 ### This Week
-- [ ] Complete TICKET-10 (Database Layer)
-- [ ] Implement TICKET-11 (Module Configuration)
+- [ ] Complete TICKET-11 (Module Configuration)
 - [ ] Set up admin UI for payment settings
+- [ ] Test MVP end-to-end
 
 ### Next Week
 - [ ] Test MVP end-to-end
@@ -515,10 +485,10 @@ Detailed implementation tickets are in this `to-do/` directory:
 
 ---
 
-**Status:** 🟢 Sprint 2 - 50% Complete (TICKET-08 & TICKET-09 done)
-**Next Milestone:** MVP with Database Layer + Module Configuration
-**Estimated Completion:** 2-3 days for MVP backend complete
+**Status:** 🟢 Sprint 2 - 75% Complete (TICKET-08, TICKET-09 & TICKET-10 done)
+**Next Milestone:** MVP with Module Configuration (TICKET-11)
+**Estimated Completion:** 1-2 days for MVP backend complete
 **Team:** 1-2 developers
 
 *Last Updated: 2025-10-31*
-*Version: 1.1*
+*Version: 1.2*

@@ -1,0 +1,336 @@
+<?php
+
+/**
+ * Copyright © OXID eSales AG. All rights reserved.
+ * See LICENSE file for license details.
+ */
+
+declare(strict_types=1);
+
+namespace OxidSolutionCatalysts\Payments\Migrations;
+
+use Doctrine\DBAL\Schema\Schema;
+use Doctrine\DBAL\Schema\SchemaException;
+use Doctrine\DBAL\Types\Types;
+use Doctrine\Migrations\AbstractMigration;
+
+/**
+ * Migration: Create support tables (order_state, customer, idempotency, sessions)
+ *
+ * Essential support tables for payment lifecycle management.
+ */
+final class Version20251031140200 extends AbstractMigration
+{
+    public function getDescription(): string
+    {
+        return 'Create payment support tables - order_state, customer, idempotency, sessions (provider-agnostic)';
+    }
+
+    public function up(Schema $schema): void
+    {
+        $this->platform->registerDoctrineTypeMapping('enum', 'string');
+
+        $this->createPaymentOrderStateTable($schema);
+        $this->createPaymentCustomerTable($schema);
+        $this->createPaymentIdempotencyTable($schema);
+        $this->createPaymentSessionsTable($schema);
+    }
+
+    public function down(Schema $schema): void
+    {
+        if ($schema->hasTable('osc_payment_sessions')) {
+            $schema->dropTable('osc_payment_sessions');
+        }
+        if ($schema->hasTable('osc_payment_idempotency')) {
+            $schema->dropTable('osc_payment_idempotency');
+        }
+        if ($schema->hasTable('osc_payment_customer')) {
+            $schema->dropTable('osc_payment_customer');
+        }
+        if ($schema->hasTable('osc_payment_order_state')) {
+            $schema->dropTable('osc_payment_order_state');
+        }
+    }
+
+    /**
+     * @throws SchemaException
+     */
+    private function createPaymentOrderStateTable(Schema $schema): void
+    {
+        $tableName = 'osc_payment_order_state';
+
+        if ($schema->hasTable($tableName)) {
+            return;
+        }
+
+        $table = $schema->createTable($tableName);
+
+        $table->addColumn('OXID', Types::STRING, [
+            'columnDefinition' => 'CHAR(32) COLLATE latin1_general_ci NOT NULL',
+            'comment' => 'State record ID'
+        ]);
+
+        $table->addColumn('OXORDERID', Types::STRING, [
+            'columnDefinition' => 'CHAR(32) COLLATE latin1_general_ci NOT NULL',
+            'comment' => 'FK to oxorder.OXID (1:1)'
+        ]);
+
+        $table->addColumn('OXCONTRACTID', Types::STRING, [
+            'columnDefinition' => 'CHAR(32) COLLATE latin1_general_ci NULL',
+            'notnull' => false,
+            'comment' => 'FK to osc_payment_contract.OXID (contract-aware)'
+        ]);
+
+        $table->addColumn('OXPAYMENTSTATE', Types::STRING, [
+            'columnDefinition' => 'VARCHAR(32) NOT NULL',
+            'comment' => 'NOT_FINISHED, 500, 600, OK, ERROR'
+        ]);
+
+        $table->addColumn('OXPROVIDERORDERID', Types::STRING, [
+            'columnDefinition' => 'VARCHAR(128) NULL',
+            'notnull' => false,
+            'comment' => 'Provider order ID'
+        ]);
+
+        $table->addColumn('OXWEBHOOKWAITSINCE', Types::DATETIME_MUTABLE, [
+            'notnull' => false,
+            'comment' => 'Waiting for webhook since timestamp'
+        ]);
+
+        $table->addColumn('OXWEBHOOKTIMEOUT', Types::INTEGER, [
+            'notnull' => false,
+            'comment' => 'Webhook timeout in seconds'
+        ]);
+
+        $table->addColumn('OXLASTPAYMENTATTEMPT', Types::DATETIME_MUTABLE, [
+            'notnull' => false,
+            'comment' => 'Last payment attempt timestamp'
+        ]);
+
+        $table->addColumn('OXPAYMENTATTEMPTCOUNT', Types::INTEGER, [
+            'notnull' => true,
+            'default' => 0,
+            'comment' => 'Number of payment attempts'
+        ]);
+
+        $table->addColumn('OXCREATED', Types::DATETIME_MUTABLE, [
+            'columnDefinition' => 'DATETIME NOT NULL'
+        ]);
+
+        $table->addColumn('OXUPDATED', Types::DATETIME_MUTABLE, [
+            'columnDefinition' => 'DATETIME NOT NULL'
+        ]);
+
+        $table->setPrimaryKey(['OXID']);
+        $table->addUniqueIndex(['OXORDERID'], 'UK_ORDER');
+        $table->addIndex(['OXPAYMENTSTATE'], 'IDX_PAYMENT_STATE');
+        $table->addIndex(['OXPROVIDERORDERID'], 'IDX_PROVIDER_ORDER');
+        $table->addIndex(['OXCONTRACTID'], 'IDX_CONTRACT');
+
+        $table->addForeignKeyConstraint(
+            'oxorder',
+            ['OXORDERID'],
+            ['OXID'],
+            ['onDelete' => 'CASCADE'],
+            'FK_ORDER_STATE'
+        );
+
+        $table->addForeignKeyConstraint(
+            'osc_payment_contract',
+            ['OXCONTRACTID'],
+            ['OXID'],
+            ['onDelete' => 'SET NULL'],
+            'FK_ORDER_STATE_CONTRACT'
+        );
+
+        $table->addOption('engine', 'InnoDB');
+        $table->addOption('charset', 'utf8mb4');
+    }
+
+    /**
+     * @throws SchemaException
+     */
+    private function createPaymentCustomerTable(Schema $schema): void
+    {
+        $tableName = 'osc_payment_customer';
+
+        if ($schema->hasTable($tableName)) {
+            return;
+        }
+
+        $table = $schema->createTable($tableName);
+
+        $table->addColumn('OXID', Types::STRING, [
+            'columnDefinition' => 'CHAR(32) COLLATE latin1_general_ci NOT NULL'
+        ]);
+
+        $table->addColumn('OXUSERID', Types::STRING, [
+            'columnDefinition' => 'CHAR(32) COLLATE latin1_general_ci NOT NULL',
+            'comment' => 'FK to oxuser.OXID (1:1)'
+        ]);
+
+        $table->addColumn('OXPAYMENTCUSTOMERID', Types::STRING, [
+            'columnDefinition' => 'VARCHAR(128) NULL',
+            'notnull' => false,
+            'comment' => 'Provider customer ID'
+        ]);
+
+        $table->addColumn('OXDEFAULTPAYMENTMETHOD', Types::STRING, [
+            'columnDefinition' => 'VARCHAR(64) NULL',
+            'notnull' => false
+        ]);
+
+        $table->addColumn('OXSAVEDPAYMENTMETHODS', Types::TEXT, [
+            'notnull' => false,
+            'comment' => 'JSON array of saved payment methods'
+        ]);
+
+        $table->addColumn('OXBILLINGAGREEMENT', Types::BOOLEAN, [
+            'default' => false
+        ]);
+
+        $table->addColumn('OXLASTPAYMENTDATE', Types::DATETIME_MUTABLE, [
+            'notnull' => false
+        ]);
+
+        $table->addColumn('OXCREATED', Types::DATETIME_MUTABLE, [
+            'columnDefinition' => 'DATETIME NOT NULL'
+        ]);
+
+        $table->addColumn('OXUPDATED', Types::DATETIME_MUTABLE, [
+            'columnDefinition' => 'DATETIME NOT NULL'
+        ]);
+
+        $table->setPrimaryKey(['OXID']);
+        $table->addUniqueIndex(['OXUSERID'], 'UK_USER');
+
+        $table->addForeignKeyConstraint(
+            'oxuser',
+            ['OXUSERID'],
+            ['OXID'],
+            ['onDelete' => 'CASCADE'],
+            'FK_USER_CUSTOMER'
+        );
+
+        $table->addOption('engine', 'InnoDB');
+        $table->addOption('charset', 'utf8mb4');
+    }
+
+    /**
+     * @throws SchemaException
+     */
+    private function createPaymentIdempotencyTable(Schema $schema): void
+    {
+        $tableName = 'osc_payment_idempotency';
+
+        if ($schema->hasTable($tableName)) {
+            return;
+        }
+
+        $table = $schema->createTable($tableName);
+
+        $table->addColumn('OXID', Types::STRING, [
+            'columnDefinition' => 'CHAR(32) COLLATE latin1_general_ci NOT NULL'
+        ]);
+
+        $table->addColumn('OXKEY', Types::STRING, [
+            'columnDefinition' => 'VARCHAR(128) COLLATE latin1_general_ci NOT NULL',
+            'comment' => 'Idempotency key'
+        ]);
+
+        $table->addColumn('OXORDERID', Types::STRING, [
+            'columnDefinition' => 'CHAR(32) COLLATE latin1_general_ci NOT NULL'
+        ]);
+
+        $table->addColumn('OXOPERATION', Types::STRING, [
+            'columnDefinition' => 'VARCHAR(32) NOT NULL',
+            'comment' => 'createPayment, capturePayment, refundPayment'
+        ]);
+
+        $table->addColumn('OXRESULT', Types::TEXT, [
+            'notnull' => false,
+            'comment' => 'Cached result (JSON)'
+        ]);
+
+        $table->addColumn('OXSTATUS', Types::STRING, [
+            'columnDefinition' => 'VARCHAR(32) NULL',
+            'notnull' => false,
+            'comment' => 'processing, completed, failed'
+        ]);
+
+        $table->addColumn('OXCREATED', Types::DATETIME_MUTABLE, [
+            'columnDefinition' => 'DATETIME NOT NULL'
+        ]);
+
+        $table->addColumn('OXEXPIRES', Types::DATETIME_MUTABLE, [
+            'columnDefinition' => 'DATETIME NOT NULL'
+        ]);
+
+        $table->setPrimaryKey(['OXID']);
+        $table->addUniqueIndex(['OXKEY'], 'UK_KEY');
+        $table->addIndex(['OXEXPIRES'], 'IDX_EXPIRES');
+        $table->addIndex(['OXORDERID', 'OXOPERATION'], 'IDX_ORDER_OPERATION');
+
+        $table->addOption('engine', 'InnoDB');
+        $table->addOption('charset', 'utf8mb4');
+    }
+
+    /**
+     * @throws SchemaException
+     */
+    private function createPaymentSessionsTable(Schema $schema): void
+    {
+        $tableName = 'osc_payment_sessions';
+
+        if ($schema->hasTable($tableName)) {
+            return;
+        }
+
+        $table = $schema->createTable($tableName);
+
+        $table->addColumn('OXID', Types::STRING, [
+            'columnDefinition' => 'CHAR(32) COLLATE latin1_general_ci NOT NULL'
+        ]);
+
+        $table->addColumn('OXPROVIDER', Types::STRING, [
+            'columnDefinition' => 'VARCHAR(32) COLLATE latin1_general_ci NOT NULL',
+            'comment' => 'Payment provider'
+        ]);
+
+        $table->addColumn('OXSESSIONID', Types::STRING, [
+            'columnDefinition' => 'VARCHAR(128) COLLATE latin1_general_ci NOT NULL',
+            'comment' => 'Provider session ID'
+        ]);
+
+        $table->addColumn('OXUSERID', Types::STRING, [
+            'columnDefinition' => 'CHAR(32) COLLATE latin1_general_ci NULL',
+            'notnull' => false
+        ]);
+
+        $table->addColumn('OXBASKETID', Types::STRING, [
+            'columnDefinition' => 'CHAR(32) COLLATE latin1_general_ci NULL',
+            'notnull' => false
+        ]);
+
+        $table->addColumn('OXDATA', Types::TEXT, [
+            'notnull' => false,
+            'comment' => 'JSON session data'
+        ]);
+
+        $table->addColumn('OXCREATED', Types::DATETIME_MUTABLE, [
+            'columnDefinition' => 'DATETIME NOT NULL'
+        ]);
+
+        $table->addColumn('OXEXPIRES', Types::DATETIME_MUTABLE, [
+            'columnDefinition' => 'DATETIME NOT NULL'
+        ]);
+
+        $table->setPrimaryKey(['OXID']);
+        $table->addIndex(['OXSESSIONID'], 'IDX_SESSION');
+        $table->addIndex(['OXUSERID'], 'IDX_USER');
+        $table->addIndex(['OXEXPIRES'], 'IDX_EXPIRES');
+
+        $table->addOption('engine', 'InnoDB');
+        $table->addOption('charset', 'utf8mb4');
+    }
+}
