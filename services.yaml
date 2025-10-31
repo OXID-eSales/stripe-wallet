@@ -60,3 +60,48 @@ services:
       $webhookService: '@OxidSolutionCatalysts\Stripe\Application\Service\StripeWebhookService'
       $paymentMethodService: '@OxidSolutionCatalysts\Stripe\Application\Service\StripePaymentMethodService'
     public: true
+
+  # ==========================================
+  # Payment Adapter Layer (Provider-Agnostic)
+  # ==========================================
+  #
+  # This layer provides a provider-agnostic payment integration architecture
+  # that supports multiple payment providers (Stripe, Unzer, PayPal, etc.)
+  # through a unified interface.
+  #
+  # Key Features:
+  # - Provider-agnostic PaymentAdapterInterface
+  # - Request/Response objects (no domain leakage)
+  # - Two-step authorization (authorize → capture)
+  # - Vaulting/tokenization (saved cards)
+  # - 3D Secure/SCA support
+  # - Webhook signature verification
+  #
+  # TODO: Integrate with StripeConfigService for API key management
+
+  # Stripe Client Factory - Creates configured Stripe SDK clients
+  OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeClientFactory:
+    arguments:
+      $secretKey: 'sk_test_placeholder' # TODO: Get from module configuration
+      $testMode: true
+    public: false
+
+  # Stripe Client - Actual Stripe SDK client instance
+  # Created via factory method from StripeClientFactory
+  stripe.payment.adapter.client:
+    factory: ['@OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeClientFactory', 'create']
+    public: false
+
+  # Stripe Adapter - Implements PaymentAdapterInterface for Stripe
+  OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapter:
+    arguments:
+      $stripeClient: '@stripe.payment.adapter.client'
+    public: true
+
+  # Payment Adapter Factory - Creates adapters for different providers
+  # This is the main entry point for getting payment adapters
+  OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory:
+    arguments:
+      $secretKey: 'sk_test_placeholder' # TODO: Get from module configuration
+      $testMode: true
+    public: true
