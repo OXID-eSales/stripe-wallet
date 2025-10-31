@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\Repository;
 
+use DateTime;
+use DateTimeInterface;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
 
 class ContractRepository implements ContractRepositoryInterface
 {
+    /**
+     * @var array<string, array<string, mixed>>
+     */
     private array $storage = [];
 
     public function save(PaymentContractInterface $contract): void
@@ -16,7 +21,7 @@ class ContractRepository implements ContractRepositoryInterface
         $this->storage[$contract->getId()] = $contract->toArray();
     }
 
-    public function findById(string $id): ?PaymentContract
+    public function findById(string $id): ?PaymentContractInterface
     {
         if (!isset($this->storage[$id])) {
             return null;
@@ -25,7 +30,7 @@ class ContractRepository implements ContractRepositoryInterface
         return PaymentContract::fromArray($this->storage[$id]);
     }
 
-    public function findByProviderOrderId(string $providerOrderId): ?PaymentContract
+    public function findByProviderOrderId(string $providerOrderId): ?PaymentContractInterface
     {
         foreach ($this->storage as $data) {
             if (($data['providerOrderId'] ?? null) === $providerOrderId) {
@@ -41,7 +46,7 @@ class ContractRepository implements ContractRepositoryInterface
         $contracts = [];
 
         foreach ($this->storage as $data) {
-            if ($data['userId'] === $userId) {
+            if (isset($data['userId']) && $data['userId'] === $userId) {
                 $contracts[] = PaymentContract::fromArray($data);
             }
         }
@@ -49,10 +54,11 @@ class ContractRepository implements ContractRepositoryInterface
         return $contracts;
     }
 
-    public function findActiveByUserId(string $userId): ?PaymentContract
+    public function findActiveByUserId(string $userId): ?PaymentContractInterface
     {
         foreach ($this->storage as $data) {
             if (
+                isset($data['userId'], $data['state']) &&
                 $data['userId'] === $userId &&
                 in_array($data['state'], ['draft', 'pending', 'ready_to_commit', 'committed'], true)
             ) {
@@ -63,17 +69,20 @@ class ContractRepository implements ContractRepositoryInterface
         return null;
     }
 
-    public function findExpired(?\DateTimeInterface $before = null): array
+    public function findExpired(?DateTimeInterface $before = null): array
     {
-        $before = $before ?? new \DateTime();
+        $before = $before ?? new DateTime();
         $expired = [];
 
         foreach ($this->storage as $data) {
-            $expiresAt = isset($data['expiresAt']) ? new \DateTime($data['expiresAt']) : null;
+            $expiresAt = isset($data['expiresAt']) && is_string($data['expiresAt'])
+                ? new DateTime($data['expiresAt'])
+                : null;
 
             if (
                 $expiresAt &&
                 $expiresAt < $before &&
+                isset($data['state']) &&
                 !in_array($data['state'], ['fulfilled', 'cancelled', 'expired', 'failed'], true)
             ) {
                 $expired[] = PaymentContract::fromArray($data);

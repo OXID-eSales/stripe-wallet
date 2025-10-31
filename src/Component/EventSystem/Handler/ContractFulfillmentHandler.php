@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Handler;
 
 use DomainException;
+use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContextInterface;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\WebhookReceivedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractFulfilledEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
@@ -35,48 +37,71 @@ class ContractFulfillmentHandler extends AbstractHandler
 
     public function handle(object $event): void
     {
-        if (!$event instanceof WebhookReceivedEvent) {
-            return;
-        }
-        if (!$this->isFulfillmentEvent($event)) {
+        if (!$event instanceof WebhookReceivedEvent || !$this->isFulfillmentEvent($event)) {
             return;
         }
 
-        $contractId = $event->getContext()->get('contractId');
-        if (!is_string($contractId) || $contractId === '') {
+        $contract = $this->retrieveValidContract($event->getContext());
+        if (!$contract) {
             return;
+        }
+
+        $this->fulfillContract($contract);
+        $this->completeOrder($contract->getOrderId());
+        $this->dispatchFulfilledEvent($contract, $event->getContext());
+    }
+
+    private function retrieveValidContract(EventContextInterface $context): ?PaymentContractInterface
+    {
+        $contractId = $context->get('contractId');
+        if (!is_string($contractId) || $contractId === '') {
+            return null;
         }
 
         $contract = $this->contractRepository->findById($contractId);
         if (!$contract) {
-            return;
+            return null;
         }
 
         if (!$contract->getState()->isCommitted()) {
             throw new DomainException('Contract must be COMMITTED before fulfillment');
         }
 
+        return $contract;
+    }
+
+    private function fulfillContract(PaymentContractInterface $contract): void
+    {
         $contract->fulfill();
         $this->contractRepository->save($contract);
+    }
 
-        $orderId = $contract->getOrderId();
-        if ($orderId) {
-            $order = $this->orderRepository->findById((int) $orderId);
-            if ($order && method_exists($order, 'setStatus')) {
-                $order->setStatus('completed');
-                $this->orderRepository->save($order);
-            }
+    private function completeOrder(?string $orderId): void
+    {
+        if (!$orderId) {
+            return;
+        }
+
+        $order = $this->orderRepository->findById((int) $orderId);
+        if ($order && method_exists($order, 'setStatus')) {
+            $order->setStatus('completed');
+            $this->orderRepository->save($order);
+        }
+    }
+
+    private function dispatchFulfilledEvent(PaymentContractInterface $contract, EventContextInterface $context): void
+    {
+        if (!$this->eventDispatcher) {
+            return;
         }
 
         $fulfilledEvent = new ContractFulfilledEvent(
             $contract,
-            $event->getContext(),
-            $orderId ?? ''
+            $context,
+            $contract->getOrderId() ?? ''
         );
 
-        if ($this->eventDispatcher) {
-            $this->eventDispatcher->dispatch($fulfilledEvent);
-        }
+        $this->eventDispatcher->dispatch($fulfilledEvent);
     }
 
     private function isFulfillmentEvent(WebhookReceivedEvent $event): bool

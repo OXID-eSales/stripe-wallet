@@ -48,17 +48,27 @@ class BasketSnapshot
      */
     public static function fromArray(array $data): self
     {
-        $capturedAt = isset($data['capturedAt'])
+        if (!isset($data['totalGross'], $data['totalNet'], $data['totalVat'], $data['currency'])) {
+            throw new \InvalidArgumentException('Required basket data is missing');
+        }
+
+        $capturedAt = isset($data['capturedAt']) && is_string($data['capturedAt'])
             ? new \DateTime($data['capturedAt'])
             : new \DateTime();
 
+        /** @var array<int, array<string, mixed>> $items */
+        $items = isset($data['items']) && is_array($data['items']) ? $data['items'] : [];
+
+        /** @var array<int, array<string, mixed>> $discounts */
+        $discounts = isset($data['discounts']) && is_array($data['discounts']) ? $data['discounts'] : [];
+
         return new self(
-            items: $data['items'] ?? [],
-            discounts: $data['discounts'] ?? [],
-            totalGross: (float) $data['totalGross'],
-            totalNet: (float) $data['totalNet'],
-            totalVat: (float) $data['totalVat'],
-            currency: $data['currency'],
+            items: $items,
+            discounts: $discounts,
+            totalGross: is_float($data['totalGross']) || is_int($data['totalGross']) ? (float) $data['totalGross'] : (float) $data['totalGross'],
+            totalNet: is_float($data['totalNet']) || is_int($data['totalNet']) ? (float) $data['totalNet'] : (float) $data['totalNet'],
+            totalVat: is_float($data['totalVat']) || is_int($data['totalVat']) ? (float) $data['totalVat'] : (float) $data['totalVat'],
+            currency: is_string($data['currency']) ? $data['currency'] : (string) $data['currency'],
             capturedAt: $capturedAt
         );
     }

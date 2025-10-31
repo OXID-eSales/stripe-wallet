@@ -8,6 +8,7 @@ use DateTime;
 use DateInterval;
 use DateTimeInterface;
 use DomainException;
+use InvalidArgumentException;
 use LogicException;
 use OxidSolutionCatalysts\Payments\Component\Model\AbstractModel;
 
@@ -332,62 +333,123 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
      */
     public static function fromArray(array $data): self
     {
-        if (!is_int($data['shopId']) && !is_string($data['shopId'])) {
-            throw new \InvalidArgumentException('shopId must be an integer');
-        }
-        if (!is_string($data['userId'])) {
-            throw new \InvalidArgumentException('userId must be a string');
-        }
-        if (!is_array($data['basketSnapshot'])) {
-            throw new \InvalidArgumentException('basketSnapshot must be an array');
-        }
-
-        /** @var array<string, mixed> $basketData */
-        $basketData = $data['basketSnapshot'];
-
         $contract = new self(
-            shopId: is_int($data['shopId']) ? $data['shopId'] : (int) $data['shopId'],
-            userId: $data['userId'],
-            basketSnapshot: BasketSnapshot::fromArray($basketData),
-            id: isset($data['id']) && is_string($data['id']) ? $data['id'] : null
+            shopId: self::extractShopId($data),
+            userId: self::extractUserId($data),
+            basketSnapshot: self::extractBasketSnapshot($data),
+            id: self::extractOptionalString($data, 'id')
         );
 
-        $contract->orderId = isset($data['orderId']) && is_string($data['orderId']) ? $data['orderId'] : null;
-
-        if (!is_string($data['state'])) {
-            throw new \InvalidArgumentException('state must be a string');
-        }
-        $contract->state = ContractState::fromValue($data['state']);
-
-        $contract->provider = isset($data['provider']) && is_string($data['provider']) ? $data['provider'] : null;
-        $contract->providerOrderId = isset($data['providerOrderId']) && is_string($data['providerOrderId']) ? $data['providerOrderId'] : null;
-        $contract->providerRedirectUrl = isset($data['providerRedirectUrl']) && is_string($data['providerRedirectUrl']) ? $data['providerRedirectUrl'] : null;
-
-        if (isset($data['conditions']) && is_array($data['conditions'])) {
-            /** @var array<int, array<string, mixed>> $conditionsData */
-            $conditionsData = array_filter($data['conditions'], 'is_array');
-            $contract->conditions = array_values(array_map(
-                fn(array $c): ContractCondition => ContractCondition::fromArray($c),
-                $conditionsData
-            ));
-        }
-
-        if (isset($data['expiresAt']) && is_string($data['expiresAt'])) {
-            $contract->expiresAt = new DateTime($data['expiresAt']);
-        }
-
-        $contract->createdAt = isset($data['createdAt']) && is_string($data['createdAt'])
-            ? new DateTime($data['createdAt'])
-            : new DateTime();
-
-        $contract->updatedAt = isset($data['updatedAt']) && is_string($data['updatedAt'])
-            ? new DateTime($data['updatedAt'])
-            : new DateTime();
-
-        if (isset($data['fulfilledAt']) && is_string($data['fulfilledAt'])) {
-            $contract->fulfilledAt = new DateTime($data['fulfilledAt']);
-        }
+        $contract->orderId = self::extractOptionalString($data, 'orderId');
+        $contract->state = self::extractState($data);
+        $contract->provider = self::extractOptionalString($data, 'provider');
+        $contract->providerOrderId = self::extractOptionalString($data, 'providerOrderId');
+        $contract->providerRedirectUrl = self::extractOptionalString($data, 'providerRedirectUrl');
+        $contract->conditions = self::extractConditions($data);
+        $contract->expiresAt = self::extractOptionalDateTime($data, 'expiresAt');
+        $contract->createdAt = self::extractDateTime($data, 'createdAt');
+        $contract->updatedAt = self::extractDateTime($data, 'updatedAt');
+        $contract->fulfilledAt = self::extractOptionalDateTime($data, 'fulfilledAt');
 
         return $contract;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private static function extractShopId(array $data): int
+    {
+        if (!isset($data['shopId'])) {
+            throw new InvalidArgumentException('shopId is required');
+        }
+        if (is_int($data['shopId'])) {
+            return $data['shopId'];
+        }
+        if (is_string($data['shopId'])) {
+            return (int) $data['shopId'];
+        }
+        throw new InvalidArgumentException('shopId must be an integer');
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private static function extractUserId(array $data): string
+    {
+        if (!isset($data['userId']) || !is_string($data['userId'])) {
+            throw new InvalidArgumentException('userId must be a string');
+        }
+        return $data['userId'];
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private static function extractBasketSnapshot(array $data): BasketSnapshot
+    {
+        if (!isset($data['basketSnapshot']) || !is_array($data['basketSnapshot'])) {
+            throw new InvalidArgumentException('basketSnapshot must be an array');
+        }
+        /** @var array<string, mixed> $basketData */
+        $basketData = $data['basketSnapshot'];
+        return BasketSnapshot::fromArray($basketData);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private static function extractState(array $data): ContractState
+    {
+        if (!isset($data['state']) || !is_string($data['state'])) {
+            throw new InvalidArgumentException('state must be a string');
+        }
+        return ContractState::fromValue($data['state']);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array<int, ContractCondition>
+     */
+    private static function extractConditions(array $data): array
+    {
+        if (!isset($data['conditions']) || !is_array($data['conditions'])) {
+            return [];
+        }
+        /** @var array<int, array<string, mixed>> $conditionsData */
+        $conditionsData = array_filter($data['conditions'], 'is_array');
+        return array_values(array_map(
+            fn(array $c): ContractCondition => ContractCondition::fromArray($c),
+            $conditionsData
+        ));
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private static function extractOptionalString(array $data, string $key): ?string
+    {
+        return isset($data[$key]) && is_string($data[$key]) ? $data[$key] : null;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private static function extractDateTime(array $data, string $key): DateTimeInterface
+    {
+        if (isset($data[$key]) && is_string($data[$key])) {
+            return new DateTime($data[$key]);
+        }
+        return new DateTime();
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private static function extractOptionalDateTime(array $data, string $key): ?DateTimeInterface
+    {
+        if (isset($data[$key]) && is_string($data[$key])) {
+            return new DateTime($data[$key]);
+        }
+        return null;
     }
 }
