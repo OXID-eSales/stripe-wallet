@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Integration\Migrations;
+namespace OxidSolutionCatalysts\Payments\Tests\Integration\Component\Migrations;
 
 use Doctrine\DBAL\Schema\Schema;
 use OxidSolutionCatalysts\Payments\Migrations\Version20251031140000;
@@ -15,9 +15,9 @@ use Psr\Log\NullLogger;
 
 class PaymentContractsMigrationTest extends MigrationTestBase
 {
-    private const TABLE_CONTRACTS = 'oxpayment_contracts';
-    private const TABLE_CONDITIONS = 'oxpayment_contract_conditions';
-    private const TABLE_WEBHOOK_LOGS = 'oxpayment_webhooklogs';
+    private const TABLE_CONTRACTS = 'osc_payment_contracts';
+    private const TABLE_CONDITIONS = 'osc_payment_contract_conditions';
+    private const TABLE_WEBHOOK_LOGS = 'osc_payment_webhook_logs';
 
     /** @test */
     public function migration_creates_payment_contracts_table(): void
