@@ -108,7 +108,7 @@ jobs:
       - name: Drop FK constraints
         run: |
           docker compose exec -T php bash -c "ls -la /var/www/extensions"
-          docker compose exec -T php bash -c "cd /var/www/extensions/osc/stripe/migration/scripts && ./setup-helper.sh drop-fk"
+          docker compose exec -T php bash -c "cd ./test-module/migration/scripts && ./setup-helper.sh drop-fk"
 
       - name: Install demodata
         run: |
@@ -118,7 +118,7 @@ jobs:
 
       - name: Re-add FK constraints
         run: |
-          docker compose exec -T php bash -c "cd /var/www/extensions/osc/stripe/migration/scripts && ./setup-helper.sh add-fk"
+          docker compose exec -T php bash -c "cd ./test-module/migration/scripts && ./setup-helper.sh add-fk"
 
       - name: Activate theme
         run: |
