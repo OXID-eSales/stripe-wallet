@@ -200,13 +200,9 @@ final class Version20251031140200 extends AbstractMigration
         $table->setPrimaryKey(['OXID']);
         $table->addUniqueIndex(['OXUSERID'], 'UK_USER');
 
-        $table->addForeignKeyConstraint(
-            'oxuser',
-            ['OXUSERID'],
-            ['OXID'],
-            ['onDelete' => 'CASCADE'],
-            'FK_USER_CUSTOMER'
-        );
+        // Note: FK to oxuser removed to allow TRUNCATE during demodata installation
+        // Referential integrity maintained at application level
+        // Unique index UK_USER ensures 1:1 relationship and query performance
 
         $table->addOption('engine', 'InnoDB');
         $table->addOption('charset', 'utf8mb4');
