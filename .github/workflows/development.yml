@@ -253,6 +253,10 @@ jobs:
         run: |
           docker compose exec -T php composer update --no-interaction
 
+      - name: Install module
+        run: |
+          docker compose exec -T php bin/oe-console oe:module:install ./test-module
+
       - name: Run integration tests with shop bootstrap
         run: |
           docker compose exec -T -e XDEBUG_MODE=coverage php vendor/bin/phpunit \
