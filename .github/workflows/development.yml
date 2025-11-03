@@ -107,7 +107,6 @@ jobs:
 
       - name: Drop FK constraints
         run: |
-          docker compose exec -T php bash -c "ls -la /var/www/extensions"
           docker compose exec -T php bash -c "cd ./test-module/migration/scripts && ./setup-helper.sh drop-fk"
 
       - name: Install demodata
