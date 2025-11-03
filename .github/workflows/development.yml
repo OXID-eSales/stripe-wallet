@@ -211,7 +211,6 @@ jobs:
         run: |
           docker compose exec -T php bash -c "cd /var/www/test-module && vendor/bin/phpunit -c tests/phpunit.xml --testsuite Unit"
 
-
   unit_tests:
     strategy:
       fail-fast: false

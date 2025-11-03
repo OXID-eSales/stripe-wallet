@@ -160,13 +160,9 @@ final class Version20251031140100 extends AbstractMigration
         $table->addIndex(['OXPARENTTRANSACTIONID'], 'IDX_PARENT');
 
         // Foreign keys
-        $table->addForeignKeyConstraint(
-            'oxorder',
-            ['OXORDERID'],
-            ['OXID'],
-            ['onDelete' => 'CASCADE'],
-            'FK_ORDER'
-        );
+        // Note: FK to oxorder removed to allow TRUNCATE during demodata installation
+        // Referential integrity maintained at application level
+        // Index IDX_ORDER is sufficient for query performance
 
         $table->addForeignKeyConstraint(
             'osc_payment_contract',

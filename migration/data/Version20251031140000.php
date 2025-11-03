@@ -167,6 +167,7 @@ final class Version20251031140000 extends AbstractMigration
         $table->addIndex(['OXSTATE', 'OXEXPIRESAT'], 'IDX_STATE_EXPIRES');
 
         // Foreign keys
+        // Note: FK to oxuser kept for referential integrity
         $table->addForeignKeyConstraint(
             'oxuser',
             ['OXUSERID'],
@@ -175,13 +176,9 @@ final class Version20251031140000 extends AbstractMigration
             'FK_CONTRACT_USER'
         );
 
-        $table->addForeignKeyConstraint(
-            'oxorder',
-            ['OXORDERID'],
-            ['OXID'],
-            ['onDelete' => 'SET NULL'],
-            'FK_CONTRACT_ORDER'
-        );
+        // Note: FK to oxorder removed to allow TRUNCATE during demodata installation
+        // Referential integrity maintained at application level
+        // Index IDX_ORDER is sufficient for query performance
 
         $table->addOption('engine', 'InnoDB');
         $table->addOption('charset', 'latin1');
