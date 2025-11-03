@@ -101,12 +101,24 @@ jobs:
           docker compose exec -T php composer require oxid-esales/apex-theme:dev-b-7.4.x --no-update
 
 
-      - name: Install dependencies, reset shop, activate theme, install demodata
+      - name: Install dependencies, reset shop, activate theme
         run: |
           docker compose exec -T php composer update --no-interaction
+
+      - name: Drop FK constraints
+        run: docker compose exec -T php bash -c "cd /var/www/source/extensions/stripe/migration/scripts && ./setup-helper.sh drop-fk"
+      - name: Install demodata
+        run: |
           docker compose exec -T php bin/oe-console oe:database:reset \
             --db-host=mysql --db-port=3306 --db-name=example --db-user=root --db-password=root --force
-          docker compose exec -T php bin/oe-console oe:setup:demodata
+          docker compose exec -T php bash -c "cd /var/www/source && vendor/bin/oe-console oe:setup:demodata"
+
+      - name: Re-add FK constraints
+        run: |
+          docker compose exec -T php bash -c "cd /var/www/source/extensions/stripe/migration/scripts && ./setup-helper.sh add-fk"
+
+      - name: Activate theme
+        run: |
           docker compose exec -T php bin/oe-console oe:theme:activate apex
 
       - name: Put module settings
