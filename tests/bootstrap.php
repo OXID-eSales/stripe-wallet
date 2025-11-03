@@ -18,6 +18,8 @@ if (file_exists($moduleAutoloader)) {
 } else {
     // Fallback: Manually register test namespace if module vendor doesn't exist
     // This happens in CI when only shop-level composer install runs
+
+    // Register PSR-4 autoloader for test classes
     spl_autoload_register(function ($class) use ($moduleRoot) {
         // Handle test classes: OxidSolutionCatalysts\Payments\Tests\
         if (strpos($class, 'OxidSolutionCatalysts\\Payments\\Tests\\') === 0) {
@@ -29,7 +31,19 @@ if (file_exists($moduleAutoloader)) {
             }
         }
         return false;
-    });
+    }, true, true); // Prepend to autoloader stack
+
+    // WORKAROUND: Explicitly require base test classes that are extended
+    // PHPUnit loads these before autoloader can kick in
+    $baseTestClasses = [
+        $moduleRoot . '/tests/Integration/Component/Migrations/MigrationTestBase.php',
+    ];
+
+    foreach ($baseTestClasses as $baseClass) {
+        if (file_exists($baseClass)) {
+            require_once $baseClass;
+        }
+    }
 }
 
 // Try to find and load OXID shop bootstrap (which loads shop's vendor)

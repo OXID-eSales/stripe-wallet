@@ -272,7 +272,7 @@ jobs:
         with:
           name: TestsLog-${{ matrix.php }}-${{ matrix.mysql }}
           path: |
-            source/coverage.xml
-            source/phpunit.xml
             source/source/log/oxideshop.log
             source/data/php/logs/error_log.txt
+            source/composer.lock
+            source/composer.json
