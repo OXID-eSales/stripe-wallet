@@ -4,7 +4,6 @@ on: [ push, pull_request ]
 
 env:
   PACKAGE_NAME: 'osc/stripe-wallet'
-  MODULE_PATH: 'osc/stripe'
   SONARCLOUD_ORGANIZATION: 'oxid-esales'
   SONARCLOUD_PROJECT_KEY: 'OXID-eSales_module-stripe'
   PHP_VERSION: '8.2'
@@ -262,9 +261,9 @@ jobs:
           docker compose exec -T php cat /var/www/test-module/tests/bootstrap.php
           docker compose exec -T -e XDEBUG_MODE=coverage php ls -la
           docker compose exec -T -e XDEBUG_MODE=coverage php vendor/bin/phpunit \
-            -c /var/www/test-module/tests/phpunit.xml \
+            -c /var/www/vendor/osc/stripe-wallet/tests/phpunit.xml \
             --testsuite Integration
-            --bootstrap=/var/www/test-module/tests/bootstrap.php
+            --bootstrap=/var/www/source/bootstrap.php
 
       - name: Upload log artifact
         if: always()
