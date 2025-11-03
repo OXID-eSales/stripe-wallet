@@ -27,7 +27,7 @@ class ModuleStructureTest extends TestCase
 
         $data = json_decode(file_get_contents($composerJson), true);
 
-        $this->assertEquals('oxid-esales/stripe-wallet', $data['name']);
+        $this->assertEquals('osc/stripe-wallet', $data['name']);
         $this->assertArrayHasKey('OxidSolutionCatalysts\\Payments\\Component\\', $data['autoload']['psr-4']);
         $this->assertArrayHasKey('OxidSolutionCatalysts\\Payments\\Stripe\\', $data['autoload']['psr-4']);
         $this->assertEquals('./src/Component', $data['autoload']['psr-4']['OxidSolutionCatalysts\\Payments\\Component\\']);
@@ -122,7 +122,7 @@ class ModuleStructureTest extends TestCase
 
         // Verify migrations.yml content
         $yamlContent = file_get_contents($migrationsYml);
-        $this->assertStringContainsString('oxmigrations_osc_stripe', $yamlContent, 'migrations.yml should contain correct table name');
+        $this->assertStringContainsString('oxmigrations_payment_component', $yamlContent, 'migrations.yml should contain correct table name');
         $this->assertStringContainsString('OxidSolutionCatalysts\Payments\Migrations', $yamlContent, 'migrations.yml should contain correct namespace');
 
         // Check migration/data directory

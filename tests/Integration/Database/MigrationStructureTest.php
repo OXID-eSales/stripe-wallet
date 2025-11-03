@@ -143,19 +143,22 @@ class MigrationStructureTest extends TestCase
         $this->assertTrue($hasStateIndex, 'Contract table should have index on OXSTATE');
     }
 
-    public function testContractTableHasForeignKeyToUser(): void
+    public function testContractTableHasNoForeignKeysToOxidCoreTables(): void
     {
         $foreignKeys = $this->getTableForeignKeys('osc_payment_contract');
 
-        $hasUserFK = false;
+        // Verify NO foreign keys to OXID core tables (oxuser, oxorder)
+        // This allows TRUNCATE during demodata installation
         foreach ($foreignKeys as $fk) {
-            if ($fk['column'] === 'OXUSERID' && $fk['referenced_table'] === 'oxuser') {
-                $hasUserFK = true;
-                break;
-            }
+            $this->assertNotEquals('oxuser', $fk['referenced_table'],
+                'Contract table should NOT have FK to oxuser (blocks TRUNCATE)');
+            $this->assertNotEquals('oxorder', $fk['referenced_table'],
+                'Contract table should NOT have FK to oxorder (blocks TRUNCATE)');
         }
 
-        $this->assertTrue($hasUserFK, 'Contract table should have FK to oxuser');
+        // Referential integrity is maintained at application level
+        // Indexes on OXUSERID and OXORDERID provide query performance
+        $this->assertTrue(true, 'No foreign keys to core tables - correct!');
     }
 
     // ==================== TRANSACTION TABLE STRUCTURE ====================

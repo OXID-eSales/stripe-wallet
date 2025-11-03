@@ -29,7 +29,8 @@ class DoctrineWebhookLogRepositoryTest extends IntegrationTestCase
         parent::setUp();
 
         $container = ContainerFactory::getInstance()->getContainer();
-        $this->connection = $container->get(Connection::class);
+        $connectionProvider = $container->get(\OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionProviderInterface::class);
+        $this->connection = $connectionProvider->get();
         $this->repository = new DoctrineWebhookLogRepository($this->connection);
 
         // Clean up test data

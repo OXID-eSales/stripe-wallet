@@ -12,6 +12,7 @@ namespace OxidSolutionCatalysts\Payments\Tests\Integration\Component\Migrations;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Schema\Schema;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
+use OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionProviderInterface;
 use OxidEsales\EshopCommunity\Tests\Integration\IntegrationTestCase;
 
 /**
@@ -27,7 +28,8 @@ abstract class MigrationTestBase extends IntegrationTestCase
         parent::setUp();
 
         $container = ContainerFactory::getInstance()->getContainer();
-        $this->connection = $container->get(Connection::class);
+        $connectionProvider = $container->get(ConnectionProviderInterface::class);
+        $this->connection = $connectionProvider->get();
         $this->schema = $this->connection->createSchemaManager()->introspectSchema();
     }
 
