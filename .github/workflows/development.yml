@@ -90,7 +90,7 @@ jobs:
             php composer config repositories.${{ env.PACKAGE_NAME }} \
             --json '{"type":"path", "url":"./test-module", "options": {"symlink": true}}'
           docker compose exec -T \
-            php composer require ${{ env.PACKAGE_NAME }}:* --no-interaction --no-update
+            php composer require ${{ env.PACKAGE_NAME }}:dev-b-7.4.x-provider-sdk-STRP-60 --no-interaction --no-update
 
       - name: Install demodata
         run: |
@@ -258,7 +258,7 @@ jobs:
           docker compose exec -T -e XDEBUG_MODE=coverage php vendor/bin/phpunit \
             -c /var/www/test-module/tests/phpunit.xml \
             --testsuite Integration
-            --bootstrap /var/www/test-module/tests/bootstrap.php
+            --bootstrap=/var/www/test-module/tests/bootstrap.php
 
       - name: Upload log artifact
         if: always()
