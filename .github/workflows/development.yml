@@ -104,10 +104,6 @@ jobs:
         run: |
           docker compose exec -T php composer update --no-interaction
 
-      - name: Configure test namespace autoloading
-        run: |
-          docker compose exec -T php bash test-module/.github/scripts/setup-autoload.sh
-
       - name: Drop FK constraints
         run: |
           docker compose exec -T php bash -c "cd ./test-module/migration/scripts && ./setup-helper.sh drop-fk"
