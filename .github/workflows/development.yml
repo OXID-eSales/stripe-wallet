@@ -106,7 +106,7 @@ jobs:
 
       - name: Configure test namespace autoloading
         run: |
-          docker compose exec -T php composer config autoload-dev.psr-4.OxidSolutionCatalysts\\\\Payments\\\\Tests\\\\ ./extensions/stripe/tests
+          docker compose exec -T php bash test-module/.github/scripts/setup-autoload.sh
 
       - name: Drop FK constraints
         run: |
