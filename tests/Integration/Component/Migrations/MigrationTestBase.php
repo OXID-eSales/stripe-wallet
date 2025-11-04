@@ -7,12 +7,12 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Component\Migrations;
+namespace OxidSolutionCatalysts\Payments\Tests\Integration\Component\Migrations;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Schema\Schema;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
-use OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionFactoryInterface;
+use OxidEsales\EshopCommunity\Internal\Framework\Database\QueryBuilderFactoryInterface;
 use OxidEsales\EshopCommunity\Tests\Integration\IntegrationTestCase;
 
 /**
@@ -28,9 +28,14 @@ class MigrationTestBase extends IntegrationTestCase
         parent::setUp();
 
         $container = ContainerFactory::getInstance()->getContainer();
-        $connectionProvider = $container->get(ConnectionFactoryInterface::class);
-        $this->connection = $connectionProvider->get();
-        $this->schema = $this->connection->createSchemaManager()->introspectSchema();
+        $queryBuilderFactory = $container->get(QueryBuilderFactoryInterface::class);
+        $this->connection = $queryBuilderFactory->create()->getConnection();
+
+        // Register enum type mapping to handle ENUM columns in existing database
+        $platform = $this->connection->getDatabasePlatform();
+        $platform->registerDoctrineTypeMapping('enum', 'string');
+
+        $this->schema = $this->connection->getSchemaManager()->createSchema();
     }
 
     /**
@@ -118,6 +123,6 @@ class MigrationTestBase extends IntegrationTestCase
      */
     protected function refreshSchema(): void
     {
-        $this->schema = $this->connection->createSchemaManager()->introspectSchema();
+        $this->schema = $this->connection->getSchemaManager()->createSchema();
     }
 }

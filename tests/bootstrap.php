@@ -32,18 +32,6 @@ if (file_exists($moduleAutoloader)) {
         }
         return false;
     }, true, true); // Prepend to autoloader stack
-
-    // WORKAROUND: Explicitly require base test classes that are extended
-    // PHPUnit loads these before autoloader can kick in
-    $baseTestClasses = [
-        $moduleRoot . '/tests/Integration/Component/Migrations/MigrationTestBase.php',
-    ];
-
-    foreach ($baseTestClasses as $baseClass) {
-        if (file_exists($baseClass)) {
-            require_once $baseClass;
-        }
-    }
 }
 
 // Try to find and load OXID shop bootstrap (which loads shop's vendor)
