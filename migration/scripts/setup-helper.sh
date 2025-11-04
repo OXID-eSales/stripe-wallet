@@ -40,11 +40,12 @@ drop_fk_constraints() {
 add_fk_constraints() {
     echo "Adding foreign key constraints back..."
 
-    execute_sql "
-        ALTER TABLE osc_payment_contract
-            ADD CONSTRAINT FK_CONTRACT_ORDER
-            FOREIGN KEY (OXORDERID) REFERENCES oxorder(OXID) ON DELETE SET NULL;
+    # NOTE: FK_CONTRACT_ORDER is intentionally NOT added back
+    # Reason: It blocks TRUNCATE operations during testing
+    # Referential integrity is maintained at application level
+    # See: docs/payment-component/architecture/04-database-design.md
 
+    execute_sql "
         ALTER TABLE osc_payment_order_state
             ADD CONSTRAINT FK_ORDER_STATE
             FOREIGN KEY (OXORDERID) REFERENCES oxorder(OXID) ON DELETE CASCADE;
@@ -62,7 +63,7 @@ add_fk_constraints() {
             FOREIGN KEY (OXCONTRACTID) REFERENCES osc_payment_contract(OXID) ON DELETE SET NULL;
     " 2>/dev/null || echo "Some constraints already exist"
 
-    echo "✓ FK constraints added"
+    echo "✓ FK constraints added (FK_CONTRACT_ORDER intentionally omitted)"
 }
 
 # Main script

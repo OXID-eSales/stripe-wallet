@@ -56,6 +56,11 @@ class Transaction
         $this->status = $status;
         $this->amount = $amount;
         $this->currency = $currency;
+        $this->providerOrderId = null;
+        $this->transactionId = null;
+        $this->paymentMethodId = null;
+        $this->paymentMethodType = null;
+        $this->parentTransactionId = null;
         $this->createdAt = new DateTimeImmutable();
         $this->updatedAt = new DateTimeImmutable();
     }

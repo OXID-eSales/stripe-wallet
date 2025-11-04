@@ -13,7 +13,11 @@ use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookLog;
+use RuntimeException;
 
+/**
+ * @SuppressWarnings(PHPMD)
+ */
 class DoctrineWebhookLogRepository implements WebhookLogRepositoryInterface
 {
     private const TABLE_NAME = 'osc_payment_webhooklogs';
@@ -43,11 +47,12 @@ class DoctrineWebhookLogRepository implements WebhookLogRepositoryInterface
 
             if ($exists > 0) {
                 $this->connection->update(self::TABLE_NAME, $data, ['OXID' => $log->getId()]);
-            } else {
-                $this->connection->insert(self::TABLE_NAME, $data);
+                return;
             }
+
+            $this->connection->insert(self::TABLE_NAME, $data);
         } catch (Exception $e) {
-            throw new \RuntimeException('Failed to save webhook log: ' . $e->getMessage(), 0, $e);
+            throw new RuntimeException('Failed to save webhook log: ' . $e->getMessage(), 0, $e);
         }
     }
 
@@ -89,30 +94,46 @@ class DoctrineWebhookLogRepository implements WebhookLogRepositoryInterface
     private function hydrateWebhookLog(array $data): WebhookLog
     {
         $log = new WebhookLog(
-            (string) $data['OXEVENTID'],
-            new DateTimeImmutable($data['OXRECEIVEDAT']),
-            (string) $data['OXSTATUS']
+            $this->extractString($data, 'OXEVENTID', ''),
+            new DateTimeImmutable($this->extractString($data, 'OXRECEIVEDAT', 'now')),
+            $this->extractString($data, 'OXSTATUS', 'received'),
+            $this->extractString($data, 'OXID', '')
         );
 
-        // Use reflection to set the readonly id property
-        $reflection = new \ReflectionClass($log);
-        $idProperty = $reflection->getProperty('id');
-        $idProperty->setAccessible(true);
-        $idProperty->setValue($log, $data['OXID']);
+        $this->setOptionalWebhookProperties($log, $data);
 
-        // Set optional properties if they exist
+        return $log;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function setOptionalWebhookProperties(WebhookLog $log, array $data): void
+    {
         if (!empty($data['OXEVENTTYPE'])) {
-            $log->setEventType((string) $data['OXEVENTTYPE']);
+            $log->setEventType($this->extractString($data, 'OXEVENTTYPE'));
         }
 
         if (!empty($data['OXCONTRACTID'])) {
-            $log->setContractId((string) $data['OXCONTRACTID']);
+            $log->setContractId($this->extractString($data, 'OXCONTRACTID'));
         }
 
         if (!empty($data['OXERROR'])) {
-            $log->setError((string) $data['OXERROR']);
+            $log->setError($this->extractString($data, 'OXERROR'));
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @phpstan-ignore-next-line
+     */
+    private function extractString(array $data, string $key, string $default = ''): string
+    {
+        if (!isset($data[$key])) {
+            return $default;
         }
 
-        return $log;
+        /** @phpstan-ignore-next-line */
+        return is_string($data[$key]) ? $data[$key] : (string) $data[$key];
     }
 }

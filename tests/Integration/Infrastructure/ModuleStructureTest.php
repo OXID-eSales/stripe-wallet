@@ -122,7 +122,7 @@ class ModuleStructureTest extends TestCase
 
         // Verify migrations.yml content
         $yamlContent = file_get_contents($migrationsYml);
-        $this->assertStringContainsString('oxmigrations_payment_component', $yamlContent, 'migrations.yml should contain correct table name');
+        $this->assertStringContainsString('oxmigrations_osc_payment_component', $yamlContent, 'migrations.yml should contain correct table name');
         $this->assertStringContainsString('OxidSolutionCatalysts\Payments\Migrations', $yamlContent, 'migrations.yml should contain correct namespace');
 
         // Check migration/data directory
@@ -131,10 +131,9 @@ class ModuleStructureTest extends TestCase
 
         // Check Doctrine migration files
         $expectedMigrations = [
-            'Version20251024140000.php', // Payment transaction table
-            'Version20251024140100.php', // Payment order state table
-            'Version20251024140200.php', // Payment customer table
-            'Version20251024140300.php', // Payment basket snapshot table
+            'Version20251031140000.php', // Payment contract table
+            'Version20251031140100.php', // Payment transaction table
+            'Version20251031140200.php', // Payment support tables
         ];
 
         foreach ($expectedMigrations as $migration) {

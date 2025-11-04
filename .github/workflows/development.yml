@@ -256,6 +256,10 @@ jobs:
         run: |
           docker compose exec -T php bin/oe-console oe:module:install ./test-module
 
+      - name: Run database migrations
+        run: |
+          docker compose exec -T php vendor/bin/oe-eshop-db_migrate migrations:migrate STRIPE --no-interaction
+
       - name: Run integration tests with shop bootstrap
         run: |
           docker compose exec -T -e XDEBUG_MODE=coverage php vendor/bin/phpunit \

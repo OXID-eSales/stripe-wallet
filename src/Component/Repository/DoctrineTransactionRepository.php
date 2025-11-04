@@ -116,6 +116,53 @@ class DoctrineTransactionRepository implements TransactionRepositoryInterface
         return $count > 0;
     }
 
+    public function getTotalRefundedForContract(string $contractId): float
+    {
+        $sql = 'SELECT COALESCE(SUM(OXAMOUNT), 0) FROM ' . self::TABLE_NAME .
+               ' WHERE OXCONTRACTID = :contractId AND OXTYPE = :type';
+        $total = $this->connection->fetchOne($sql, [
+            'contractId' => $contractId,
+            'type' => 'refund'
+        ]);
+
+        return (float) $total;
+    }
+
+    public function logRefund(string $contractId, float $amount, string $refundId, string $reason): void
+    {
+        // Find the contract's order to get necessary details
+        $sql = 'SELECT OXSHOPID, OXORDERID, OXPROVIDER, OXCURRENCY
+                FROM ' . self::TABLE_NAME . '
+                WHERE OXCONTRACTID = :contractId
+                LIMIT 1';
+        $data = $this->connection->fetchAssociative($sql, ['contractId' => $contractId]);
+
+        if ($data === false) {
+            throw new \RuntimeException(
+                sprintf('Cannot log refund: No transactions found for contract ID "%s"', $contractId)
+            );
+        }
+
+        // Generate unique ID for refund transaction
+        $refundTransactionId = 'refund_' . uniqid() . '_' . time();
+
+        $transaction = new Transaction(
+            $refundTransactionId,
+            (int) $data['OXSHOPID'],
+            (string) $data['OXORDERID'],
+            $contractId,
+            (string) $data['OXPROVIDER'],
+            'refund',
+            'completed',
+            $amount,
+            (string) $data['OXCURRENCY']
+        );
+
+        $transaction->setTransactionId($refundId);
+
+        $this->save($transaction);
+    }
+
     /**
      * @return array<string, mixed>
      */

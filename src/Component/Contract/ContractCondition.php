@@ -121,6 +121,56 @@ class ContractCondition
     }
 
     /**
+     * Factory method for payment authorized condition
+     */
+    public static function paymentAuthorized(): self
+    {
+        return new self(self::TYPE_PAYMENT_AUTHORIZED);
+    }
+
+    /**
+     * Factory method for fraud check condition
+     */
+    public static function fraudCheck(): self
+    {
+        return new self(self::TYPE_FRAUD_CHECK);
+    }
+
+    /**
+     * Factory method for stock reserved condition
+     */
+    public static function stockReserved(): self
+    {
+        return new self(self::TYPE_STOCK_RESERVED);
+    }
+
+    /**
+     * Factory method for compliance check condition
+     */
+    public static function complianceCheck(): self
+    {
+        return new self(self::TYPE_COMPLIANCE_CHECK);
+    }
+
+    /**
+     * Factory method for address validated condition
+     */
+    public static function addressValidated(): self
+    {
+        return new self(self::TYPE_ADDRESS_VALIDATED);
+    }
+
+    /**
+     * Factory method for fulfilled fraud check condition (convenience for testing)
+     */
+    public static function fraudCheckPassed(): self
+    {
+        $condition = new self(self::TYPE_FRAUD_CHECK);
+        $condition->fulfill(['passed' => true]);
+        return $condition;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toArray(): array

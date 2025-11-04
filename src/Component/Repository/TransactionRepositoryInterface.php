@@ -65,4 +65,22 @@ interface TransactionRepositoryInterface
      * Check if a transaction exists by ID
      */
     public function exists(string $id): bool;
+
+    /**
+     * Get total refunded amount for a contract
+     *
+     * @param string $contractId The contract ID
+     * @return float Total amount refunded
+     */
+    public function getTotalRefundedForContract(string $contractId): float;
+
+    /**
+     * Log a refund transaction
+     *
+     * @param string $contractId The contract ID
+     * @param float $amount Refund amount
+     * @param string $refundId Provider refund ID
+     * @param string $reason Refund reason
+     */
+    public function logRefund(string $contractId, float $amount, string $refundId, string $reason): void;
 }

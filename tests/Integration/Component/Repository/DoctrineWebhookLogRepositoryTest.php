@@ -13,6 +13,9 @@ use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Tests\Integration\IntegrationTestCase;
+use OxidSolutionCatalysts\Payments\Component\Contract\BasketSnapshot;
+use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
+use OxidSolutionCatalysts\Payments\Component\Repository\DoctrineContractRepository;
 use OxidSolutionCatalysts\Payments\Component\Repository\DoctrineWebhookLogRepository;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookLog;
 
@@ -22,6 +25,7 @@ use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookLog;
 class DoctrineWebhookLogRepositoryTest extends IntegrationTestCase
 {
     private DoctrineWebhookLogRepository $repository;
+    private DoctrineContractRepository $contractRepository;
     private Connection $connection;
 
     public function setUp(): void
@@ -32,6 +36,7 @@ class DoctrineWebhookLogRepositoryTest extends IntegrationTestCase
         $connectionProvider = $container->get(\OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionProviderInterface::class);
         $this->connection = $connectionProvider->get();
         $this->repository = new DoctrineWebhookLogRepository($this->connection);
+        $this->contractRepository = new DoctrineContractRepository($this->connection);
 
         // Clean up test data
         $this->cleanupTestData();
@@ -45,21 +50,60 @@ class DoctrineWebhookLogRepositoryTest extends IntegrationTestCase
 
     private function cleanupTestData(): void
     {
+        // Clean webhook logs first (has FK to contracts)
         $this->connection->executeStatement('DELETE FROM osc_payment_webhooklogs WHERE OXEVENTID LIKE "test_%"');
+        // Clean test contracts
+        $this->connection->executeStatement('DELETE FROM osc_payment_contract WHERE OXID LIKE "contract_%"');
     }
 
-    private function createTestWebhookLog(string $eventId = 'test_event_123'): WebhookLog
+    private function createTestContract(string $contractId): PaymentContract
     {
+        $basketSnapshot = BasketSnapshot::fromArray([
+            'items' => [
+                [
+                    'articleId' => 'test_article_1',
+                    'title' => 'Test Product',
+                    'amount' => 1,
+                    'price' => 10.00,
+                    'vat' => 19,
+                ],
+            ],
+            'totalGross' => 10.00,
+            'totalNet' => 8.40,
+            'totalVat' => 1.60,
+            'currency' => 'EUR',
+        ]);
+
+        $contract = new PaymentContract(
+            1, // shopId
+            'test_user_123',
+            $basketSnapshot,
+            $contractId
+        );
+
+        $this->contractRepository->save($contract);
+        return $contract;
+    }
+
+    private function createTestWebhookLog(string $eventId = 'test_event_123', ?string $id = null): WebhookLog
+    {
+        // Use predictable IDs for tests to avoid uniqid() collisions
+        // Use only md5 hash (32 chars) to fit CHAR(32) column
+        $logId = $id ?? md5('webhook_log_' . $eventId);
+
         return new WebhookLog(
             $eventId,
             new DateTimeImmutable(),
-            'received'
+            'received',
+            $logId
         );
     }
 
     public function testSaveAndFindByEventId(): void
     {
-        // Given
+        // Given - Create contract first to satisfy FK constraint
+        $this->createTestContract('contract_123');
+
         $log = $this->createTestWebhookLog('test_event_123');
         $log->setEventType('payment_intent.succeeded');
         $log->setContractId('contract_123');
@@ -133,7 +177,9 @@ class DoctrineWebhookLogRepositoryTest extends IntegrationTestCase
 
     public function testUpdateWebhookLog(): void
     {
-        // Given
+        // Given - Create contract first to satisfy FK constraint
+        $this->createTestContract('contract_456');
+
         $log = $this->createTestWebhookLog('test_event_update');
         $log->setEventType('payment_intent.created');
         $this->repository->save($log);
@@ -186,7 +232,9 @@ class DoctrineWebhookLogRepositoryTest extends IntegrationTestCase
 
     public function testSaveWithAllFields(): void
     {
-        // Given
+        // Given - Create contract first to satisfy FK constraint
+        $this->createTestContract('contract_789');
+
         $log = $this->createTestWebhookLog('test_event_complete');
         $log->setEventType('charge.succeeded');
         $log->setContractId('contract_789');

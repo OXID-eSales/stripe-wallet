@@ -11,7 +11,7 @@
 
 table_storage:
   # Doctrine Migrations tracking table (stores migration version history)
-  table_name: oxmigrations_payment_component
+  table_name: oxmigrations_osc_payment_component
 
 migrations_paths:
   'OxidSolutionCatalysts\Payments\Migrations': data

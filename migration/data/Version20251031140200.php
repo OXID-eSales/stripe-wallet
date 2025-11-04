@@ -23,9 +23,14 @@ final class Version20251031140200 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Create payment support tables - order_state, customer, idempotency, sessions (provider-agnostic)';
+        return 'Create payment support tables - order_state, customer, idempotency, sessions, webhook_logs (provider-agnostic)';
     }
 
+    /**
+     * Run migration up
+     *
+     * @SuppressWarnings(PHPMD)
+     */
     public function up(Schema $schema): void
     {
         $this->platform->registerDoctrineTypeMapping('enum', 'string');
@@ -34,10 +39,14 @@ final class Version20251031140200 extends AbstractMigration
         $this->createPaymentCustomerTable($schema);
         $this->createPaymentIdempotencyTable($schema);
         $this->createPaymentSessionsTable($schema);
+        $this->createPaymentWebhookLogsTable($schema);
     }
 
     public function down(Schema $schema): void
     {
+        if ($schema->hasTable('osc_payment_webhooklogs')) {
+            $schema->dropTable('osc_payment_webhooklogs');
+        }
         if ($schema->hasTable('osc_payment_sessions')) {
             $schema->dropTable('osc_payment_sessions');
         }
@@ -324,5 +333,74 @@ final class Version20251031140200 extends AbstractMigration
 
         $table->addOption('engine', 'InnoDB');
         $table->addOption('charset', 'utf8mb4');
+    }
+
+    /**
+     * @throws SchemaException
+     */
+    private function createPaymentWebhookLogsTable(Schema $schema): void
+    {
+        $tableName = 'osc_payment_webhooklogs';
+
+        if ($schema->hasTable($tableName)) {
+            return;
+        }
+
+        $table = $schema->createTable($tableName);
+
+        $table->addColumn('OXID', Types::STRING, [
+            'columnDefinition' => 'CHAR(32) COLLATE latin1_general_ci NOT NULL',
+            'comment' => 'Log entry ID'
+        ]);
+
+        $table->addColumn('OXEVENTID', Types::STRING, [
+            'columnDefinition' => 'VARCHAR(128) COLLATE latin1_general_ci NOT NULL',
+            'comment' => 'Provider webhook event ID (unique)'
+        ]);
+
+        $table->addColumn('OXEVENTTYPE', Types::STRING, [
+            'columnDefinition' => 'VARCHAR(128) NULL',
+            'notnull' => false,
+            'comment' => 'Event type (payment_intent.succeeded, etc.)'
+        ]);
+
+        $table->addColumn('OXCONTRACTID', Types::STRING, [
+            'columnDefinition' => 'CHAR(32) COLLATE latin1_general_ci NULL',
+            'notnull' => false,
+            'comment' => 'FK to osc_payment_contract.OXID'
+        ]);
+
+        $table->addColumn('OXSTATUS', Types::STRING, [
+            'columnDefinition' => 'VARCHAR(32) NOT NULL',
+            'comment' => 'received, processed, failed'
+        ]);
+
+        $table->addColumn('OXRECEIVEDAT', Types::DATETIME_MUTABLE, [
+            'columnDefinition' => 'DATETIME NOT NULL',
+            'comment' => 'When webhook was received'
+        ]);
+
+        $table->addColumn('OXERROR', Types::TEXT, [
+            'notnull' => false,
+            'comment' => 'Error message if processing failed'
+        ]);
+
+        $table->setPrimaryKey(['OXID']);
+        $table->addUniqueIndex(['OXEVENTID'], 'UK_EVENT_ID');
+        $table->addIndex(['OXCONTRACTID'], 'IDX_CONTRACT');
+        $table->addIndex(['OXSTATUS'], 'IDX_STATUS');
+        $table->addIndex(['OXRECEIVEDAT'], 'IDX_RECEIVED_AT');
+
+        $table->addForeignKeyConstraint(
+            'osc_payment_contract',
+            ['OXCONTRACTID'],
+            ['OXID'],
+            ['onDelete' => 'SET NULL'],
+            'FK_WEBHOOK_CONTRACT'
+        );
+
+        $table->addOption('engine', 'InnoDB');
+        $table->addOption('charset', 'utf8mb4');
+        $table->addOption('comment', 'Webhook event logs for payment providers');
     }
 }

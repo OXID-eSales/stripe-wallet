@@ -14,9 +14,11 @@ class WebhookLog
     public function __construct(
         private readonly string $eventId,
         private readonly \DateTimeImmutable $receivedAt,
-        private readonly string $status
+        private readonly string $status,
+        ?string $id = null
     ) {
-        $this->id = uniqid('webhook_log_', true);
+        // Allow ID to be provided (for hydration from DB) or auto-generate (for new instances)
+        $this->id = $id ?? uniqid('webhook_log_', true);
     }
 
     public function getId(): string
@@ -64,7 +66,7 @@ class WebhookLog
         return $this->error;
     }
 
-    public function setError(string $error): void
+    public function setError(?string $error): void
     {
         $this->error = $error;
     }

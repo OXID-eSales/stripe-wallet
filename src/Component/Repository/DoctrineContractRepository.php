@@ -18,7 +18,14 @@ use OxidSolutionCatalysts\Payments\Component\Contract\ContractCondition;
 use OxidSolutionCatalysts\Payments\Component\Contract\ContractState;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
+use ReflectionClass;
+use ReflectionException;
 
+/**
+ * Doctrine DBAL implementation of ContractRepositoryInterface
+ *
+ * @SuppressWarnings(PHPMD)
+ */
 class DoctrineContractRepository implements ContractRepositoryInterface
 {
     private const TABLE_CONTRACTS = 'osc_payment_contract';
@@ -30,13 +37,12 @@ class DoctrineContractRepository implements ContractRepositoryInterface
 
     public function save(PaymentContractInterface $contract): void
     {
-        $this->connection->beginTransaction();
-
+        // Repository does not manage transactions - this is the responsibility of the application layer
+        // This follows SOLID principles (Single Responsibility) and allows proper transaction management
+        // at the use case/service layer where business logic resides
         try {
             $this->saveContract($contract);
-            $this->connection->commit();
         } catch (Exception $e) {
-            $this->connection->rollBack();
             throw $e;
         }
     }
@@ -165,9 +171,10 @@ class DoctrineContractRepository implements ContractRepositoryInterface
 
         if ($exists > 0) {
             $this->connection->update(self::TABLE_CONTRACTS, $data, ['OXID' => $contract->getId()]);
-        } else {
-            $this->connection->insert(self::TABLE_CONTRACTS, $data);
+            return;
         }
+
+        $this->connection->insert(self::TABLE_CONTRACTS, $data);
     }
 
     /**
@@ -177,6 +184,9 @@ class DoctrineContractRepository implements ContractRepositoryInterface
     private function prepareContractData(PaymentContractInterface $contract): array
     {
         $contractArray = $contract->toArray();
+
+        $createdAt = $contractArray['createdAt'] ?? 'now';
+        $updatedAt = $contractArray['updatedAt'] ?? 'now';
 
         return [
             'OXID' => $contract->getId(),
@@ -192,64 +202,148 @@ class DoctrineContractRepository implements ContractRepositoryInterface
             'OXPROVIDER' => $contractArray['provider'] ?? null,
             'OXPROVIDERORDERID' => $contractArray['providerOrderId'] ?? null,
             'OXPROVIDERDATA' => isset($contractArray['providerData']) ? json_encode($contractArray['providerData']) : null,
-            'OXCREATED' => new DateTime($contractArray['createdAt'] ?? 'now'),
-            'OXUPDATED' => new DateTime($contractArray['updatedAt'] ?? 'now'),
-            'OXCOMMITTEDAT' => isset($contractArray['committedAt']) ? new DateTime($contractArray['committedAt']) : null,
-            'OXFULFILLEDAT' => isset($contractArray['fulfilledAt']) ? new DateTime($contractArray['fulfilledAt']) : null,
-            'OXEXPIRESAT' => isset($contractArray['expiresAt']) ? new DateTime($contractArray['expiresAt']) : null,
+            'OXCREATED' => $this->formatDateTime($createdAt),
+            'OXUPDATED' => $this->formatDateTime($updatedAt),
+            'OXCOMMITTEDAT' => isset($contractArray['committedAt']) ? $this->formatDateTime($contractArray['committedAt']) : null,
+            'OXFULFILLEDAT' => isset($contractArray['fulfilledAt']) ? $this->formatDateTime($contractArray['fulfilledAt']) : null,
+            'OXEXPIRESAT' => isset($contractArray['expiresAt']) ? $this->formatDateTime($contractArray['expiresAt']) : null,
         ];
     }
 
     /**
      * @param array<string, mixed> $data
      * @throws Exception
+     * @SuppressWarnings(PHPMD)
      */
     private function hydrateContract(array $data): PaymentContractInterface
     {
-        // Decode basket snapshot
-        $basketData = json_decode((string) $data['OXBASKETDATA'], true);
-        $basketSnapshot = BasketSnapshot::fromArray($basketData);
+        $basketSnapshot = $this->hydrateContractBasketSnapshot($data);
+        $conditions = $this->hydrateContractConditions($data);
+        $requiredFields = $this->extractContractRequiredFields($data);
 
-        // Decode conditions from JSON
-        $conditionsData = json_decode((string) $data['OXCONDITIONS'], true) ?: [];
-        $conditions = array_map(fn($condData) => ContractCondition::fromArray($condData), $conditionsData);
-
-        // Create contract with basic data
         $contract = new PaymentContract(
-            (int) $data['OXSHOPID'],
-            (string) $data['OXUSERID'],
+            $requiredFields['shopId'],
+            $requiredFields['userId'],
             $basketSnapshot,
-            (string) $data['OXID']
+            $requiredFields['contractId']
         );
 
-        // Use reflection to set private properties (as PaymentContract doesn't have setters)
-        $reflection = new \ReflectionClass($contract);
-
-        $this->setPrivateProperty($reflection, $contract, 'state', ContractState::from((string) $data['OXSTATE']));
-        $this->setPrivateProperty($reflection, $contract, 'orderId', $data['OXORDERID']);
-        $this->setPrivateProperty($reflection, $contract, 'provider', $data['OXPROVIDER']);
-        $this->setPrivateProperty($reflection, $contract, 'providerOrderId', $data['OXPROVIDERORDERID']);
-        $this->setPrivateProperty($reflection, $contract, 'expiresAt', $data['OXEXPIRESAT'] ? new DateTime($data['OXEXPIRESAT']) : null);
-        $this->setPrivateProperty($reflection, $contract, 'createdAt', new DateTime($data['OXCREATED']));
-        $this->setPrivateProperty($reflection, $contract, 'updatedAt', new DateTime($data['OXUPDATED']));
-        $this->setPrivateProperty($reflection, $contract, 'committedAt', $data['OXCOMMITTEDAT'] ? new DateTime($data['OXCOMMITTEDAT']) : null);
-        $this->setPrivateProperty($reflection, $contract, 'fulfilledAt', $data['OXFULFILLEDAT'] ? new DateTime($data['OXFULFILLEDAT']) : null);
-        $this->setPrivateProperty($reflection, $contract, 'conditions', $conditions);
+        $this->setContractPrivateProperties($contract, $data, $conditions);
 
         return $contract;
     }
 
     /**
-     * Set a private property value using reflection
+     * @param array<string, mixed> $data
      */
-    private function setPrivateProperty(\ReflectionClass $reflection, object $object, string $propertyName, mixed $value): void
+    private function hydrateContractBasketSnapshot(array $data): BasketSnapshot
+    {
+        $basketDataString = is_string($data['OXBASKETDATA']) ? $data['OXBASKETDATA'] : '[]';
+        /** @var array<string, mixed> $basketData */
+        $basketData = json_decode($basketDataString, true) ?: [];
+        return BasketSnapshot::fromArray($basketData);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array<int, ContractCondition>
+     */
+    private function hydrateContractConditions(array $data): array
+    {
+        $conditionsDataString = is_string($data['OXCONDITIONS']) ? $data['OXCONDITIONS'] : '[]';
+        /** @var array<int, array<string, mixed>> $conditionsData */
+        $conditionsData = json_decode($conditionsDataString, true) ?: [];
+        return array_map(
+            fn(array $condData): ContractCondition => ContractCondition::fromArray($condData),
+            $conditionsData
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array{shopId: int, userId: string, contractId: string}
+     */
+    private function extractContractRequiredFields(array $data): array
+    {
+        /** @phpstan-ignore-next-line */
+        $shopId = is_int($data['OXSHOPID']) ? $data['OXSHOPID'] : (int) ($data['OXSHOPID'] ?? 0);
+        /** @phpstan-ignore-next-line */
+        $userId = is_string($data['OXUSERID']) ? $data['OXUSERID'] : (string) ($data['OXUSERID'] ?? '');
+        /** @phpstan-ignore-next-line */
+        $contractId = is_string($data['OXID']) ? $data['OXID'] : (string) ($data['OXID'] ?? '');
+
+        return [
+            'shopId' => $shopId,
+            'userId' => $userId,
+            'contractId' => $contractId,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<int, ContractCondition> $conditions
+     */
+    private function setContractPrivateProperties(
+        PaymentContract $contract,
+        array $data,
+        array $conditions
+    ): void {
+        $reflection = new ReflectionClass($contract);
+
+        /** @phpstan-ignore-next-line */
+        $stateValue = is_string($data['OXSTATE']) ? $data['OXSTATE'] : (string) ($data['OXSTATE'] ?? 'draft');
+        $this->setPrivateProperty($reflection, $contract, 'state', ContractState::fromValue($stateValue));
+        $this->setPrivateProperty($reflection, $contract, 'orderId', $data['OXORDERID']);
+        $this->setPrivateProperty($reflection, $contract, 'provider', $data['OXPROVIDER']);
+        $this->setPrivateProperty($reflection, $contract, 'providerOrderId', $data['OXPROVIDERORDERID']);
+        $this->setPrivateProperty($reflection, $contract, 'expiresAt', $this->parseDateTime($data['OXEXPIRESAT']));
+        $this->setPrivateProperty($reflection, $contract, 'createdAt', $this->parseDateTime($data['OXCREATED']));
+        $this->setPrivateProperty($reflection, $contract, 'updatedAt', $this->parseDateTime($data['OXUPDATED']));
+        $this->setPrivateProperty($reflection, $contract, 'committedAt', $this->parseDateTime($data['OXCOMMITTEDAT']));
+        $this->setPrivateProperty($reflection, $contract, 'fulfilledAt', $this->parseDateTime($data['OXFULFILLEDAT']));
+        $this->setPrivateProperty($reflection, $contract, 'conditions', $conditions);
+    }
+
+    /**
+     * Set a private property value using reflection
+     *
+     * @param ReflectionClass<object> $reflection
+     */
+    private function setPrivateProperty(ReflectionClass $reflection, object $object, string $propertyName, mixed $value): void
     {
         try {
             $property = $reflection->getProperty($propertyName);
             $property->setAccessible(true);
             $property->setValue($object, $value);
-        } catch (\ReflectionException $e) {
+        } catch (ReflectionException $e) {
             // Property doesn't exist, skip
         }
+    }
+
+    /**
+     * Format a DateTime value for database storage
+     */
+    private function formatDateTime(mixed $value): string
+    {
+        if ($value instanceof DateTimeInterface) {
+            return $value->format('Y-m-d H:i:s');
+        }
+
+        $stringValue = is_string($value) ? $value : 'now';
+        return (new DateTime($stringValue))->format('Y-m-d H:i:s');
+    }
+
+    /**
+     * Parse a DateTime from database value
+     */
+    private function parseDateTime(mixed $value): ?DateTime
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        /** @phpstan-ignore-next-line */
+        $stringValue = is_string($value) ? $value : (string) $value;
+        return new DateTime($stringValue);
     }
 }

@@ -33,6 +33,7 @@ class DoctrineTransactionRepositoryTest extends IntegrationTestCase
         $this->repository = new DoctrineTransactionRepository($this->connection);
 
         $this->cleanupTestData();
+        $this->createTestContracts();
     }
 
     public function tearDown(): void
@@ -44,6 +45,31 @@ class DoctrineTransactionRepositoryTest extends IntegrationTestCase
     private function cleanupTestData(): void
     {
         $this->connection->executeStatement('DELETE FROM osc_payment_transaction WHERE OXID LIKE "test_%"');
+        $this->connection->executeStatement('DELETE FROM osc_payment_contract WHERE OXID LIKE "test_%"');
+    }
+
+    private function createTestContracts(): void
+    {
+        // Create test contracts that transactions can reference
+        $contracts = [
+            'test_contract_123' => ['order' => 'test_order_123', 'user' => 'test_user_123'],
+            'test_contract_456' => ['order' => 'test_order_456', 'user' => 'test_user_456'],
+        ];
+
+        foreach ($contracts as $contractId => $data) {
+            $this->connection->insert('osc_payment_contract', [
+                'OXID' => $contractId,
+                'OXSHOPID' => 1,
+                'OXUSERID' => $data['user'],
+                'OXORDERID' => $data['order'],
+                'OXSTATE' => 'committed',
+                'OXBASKETDATA' => json_encode(['items' => []]),
+                'OXCONDITIONS' => json_encode([]),
+                'OXPROVIDER' => 'stripe',
+                'OXCREATED' => date('Y-m-d H:i:s'),
+                'OXUPDATED' => date('Y-m-d H:i:s'),
+            ]);
+        }
     }
 
     private function createTestTransaction(string $id = 'test_tx_123'): Transaction
@@ -276,13 +302,17 @@ class DoctrineTransactionRepositoryTest extends IntegrationTestCase
 
     public function testSaveWithAllOptionalFields(): void
     {
-        // Given
+        // Given - create parent transaction first to satisfy FK constraint
+        $parentTransaction = $this->createTestTransaction('test_parent_tx_123');
+        $this->repository->save($parentTransaction);
+
+        // Given - create child transaction with all optional fields
         $transaction = $this->createTestTransaction();
         $transaction->setProviderOrderId('pi_complete_123');
         $transaction->setTransactionId('txn_complete_123');
         $transaction->setPaymentMethodId('pm_card_visa');
         $transaction->setPaymentMethodType('card');
-        $transaction->setParentTransactionId('parent_tx_123');
+        $transaction->setParentTransactionId('test_parent_tx_123');
 
         // When
         $this->repository->save($transaction);
@@ -295,7 +325,7 @@ class DoctrineTransactionRepositoryTest extends IntegrationTestCase
         $this->assertEquals('txn_complete_123', $found->getTransactionId());
         $this->assertEquals('pm_card_visa', $found->getPaymentMethodId());
         $this->assertEquals('card', $found->getPaymentMethodType());
-        $this->assertEquals('parent_tx_123', $found->getParentTransactionId());
+        $this->assertEquals('test_parent_tx_123', $found->getParentTransactionId());
     }
 
     public function testMultipleSavesUpdate(): void

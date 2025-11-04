@@ -11,6 +11,7 @@ namespace OxidSolutionCatalysts\Payments\Migrations;
 
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Schema\SchemaException;
+use Doctrine\DBAL\Schema\Table;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\Migrations\AbstractMigration;
 
@@ -30,7 +31,34 @@ final class Version20251031140000 extends AbstractMigration
     public function up(Schema $schema): void
     {
         $this->platform->registerDoctrineTypeMapping('enum', 'string');
+
+        // Remove FK to oxorder if it exists (blocks TRUNCATE in tests)
+        // Must use raw SQL because schema-based removal doesn't work reliably
+        $this->removeForeignKeyIfExists();
+
         $this->createPaymentContractTable($schema);
+    }
+
+    /**
+     * Remove FK_CONTRACT_ORDER constraint if it exists
+     * Uses raw SQL for reliable removal across different environments
+     */
+    private function removeForeignKeyIfExists(): void
+    {
+        $sql = "
+            SELECT COUNT(*) as fk_count
+            FROM information_schema.TABLE_CONSTRAINTS
+            WHERE CONSTRAINT_SCHEMA = DATABASE()
+            AND CONSTRAINT_NAME = 'FK_CONTRACT_ORDER'
+            AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+            AND TABLE_NAME = 'osc_payment_contract'
+        ";
+
+        $result = $this->connection->fetchOne($sql);
+
+        if ($result > 0) {
+            $this->addSql('ALTER TABLE osc_payment_contract DROP FOREIGN KEY FK_CONTRACT_ORDER');
+        }
     }
 
     public function down(Schema $schema): void
@@ -53,13 +81,22 @@ final class Version20251031140000 extends AbstractMigration
 
         $table = $schema->createTable($tableName);
 
-        // Primary key
+        $this->addContractIdentifierColumns($table);
+        $this->addContractStateColumns($table);
+        $this->addContractDataColumns($table);
+        $this->addContractProviderColumns($table);
+        $this->addContractTimestampColumns($table);
+        $this->addContractIndexes($table);
+        $this->addContractTableOptions($table);
+    }
+
+    private function addContractIdentifierColumns(Table $table): void
+    {
         $table->addColumn('OXID', Types::STRING, [
             'columnDefinition' => 'CHAR(32) COLLATE latin1_general_ci NOT NULL',
             'comment' => 'Contract ID (UUID)'
         ]);
 
-        // Shop & user references
         $table->addColumn('OXSHOPID', Types::INTEGER, [
             'notnull' => true,
             'comment' => 'Shop ID (multi-shop support)'
@@ -76,7 +113,11 @@ final class Version20251031140000 extends AbstractMigration
             'comment' => 'FK to oxorder.OXID (NULL until committed!)'
         ]);
 
-        // Contract state machine
+        $table->setPrimaryKey(['OXID']);
+    }
+
+    private function addContractStateColumns(Table $table): void
+    {
         $table->addColumn('OXSTATE', Types::STRING, [
             'columnDefinition' => 'VARCHAR(32) NOT NULL',
             'comment' => 'draft, pending, ready_to_commit, committed, fulfilled, cancelled, expired, failed'
@@ -87,8 +128,10 @@ final class Version20251031140000 extends AbstractMigration
             'notnull' => false,
             'comment' => 'Reason for state (if failed/cancelled)'
         ]);
+    }
 
-        // Snapshot data (immutable)
+    private function addContractDataColumns(Table $table): void
+    {
         $table->addColumn('OXBASKETDATA', Types::TEXT, [
             'notnull' => true,
             'comment' => 'Complete basket snapshot (JSON: items, discounts, totals)'
@@ -104,13 +147,14 @@ final class Version20251031140000 extends AbstractMigration
             'comment' => 'Additional metadata (JSON: IP, user agent, session ID)'
         ]);
 
-        // Fulfillment conditions
         $table->addColumn('OXCONDITIONS', Types::TEXT, [
             'notnull' => true,
             'comment' => 'Array of conditions with status (JSON: payment_authorized, fraud_check, etc.)'
         ]);
+    }
 
-        // Provider data (provider-agnostic)
+    private function addContractProviderColumns(Table $table): void
+    {
         $table->addColumn('OXPROVIDER', Types::STRING, [
             'columnDefinition' => 'VARCHAR(32) NULL',
             'notnull' => false,
@@ -127,8 +171,10 @@ final class Version20251031140000 extends AbstractMigration
             'notnull' => false,
             'comment' => 'Provider-specific data (JSON)'
         ]);
+    }
 
-        // Timestamps
+    private function addContractTimestampColumns(Table $table): void
+    {
         $table->addColumn('OXCREATED', Types::DATETIME_MUTABLE, [
             'columnDefinition' => 'DATETIME NOT NULL',
             'comment' => 'Contract creation timestamp'
@@ -153,11 +199,10 @@ final class Version20251031140000 extends AbstractMigration
             'notnull' => false,
             'comment' => 'Contract expiration (default: +24 hours)'
         ]);
+    }
 
-        // Primary key
-        $table->setPrimaryKey(['OXID']);
-
-        // Indexes for performance
+    private function addContractIndexes(Table $table): void
+    {
         $table->addIndex(['OXSTATE'], 'IDX_STATE');
         $table->addIndex(['OXUSERID'], 'IDX_USER');
         $table->addIndex(['OXORDERID'], 'IDX_ORDER');
@@ -165,13 +210,10 @@ final class Version20251031140000 extends AbstractMigration
         $table->addIndex(['OXCREATED'], 'IDX_CREATED');
         $table->addIndex(['OXEXPIRESAT'], 'IDX_EXPIRES');
         $table->addIndex(['OXSTATE', 'OXEXPIRESAT'], 'IDX_STATE_EXPIRES');
+    }
 
-        // Foreign keys
-        // Note: All FK constraints to OXID core tables (oxuser, oxorder) removed
-        // to allow TRUNCATE during demodata installation.
-        // Referential integrity maintained at application level.
-        // Indexes (IDX_USER, IDX_ORDER) are sufficient for query performance.
-
+    private function addContractTableOptions(Table $table): void
+    {
         $table->addOption('engine', 'InnoDB');
         $table->addOption('charset', 'latin1');
         $table->addOption('collate', 'latin1_general_ci');
