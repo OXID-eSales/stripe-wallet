@@ -40,7 +40,8 @@
   "autoload": {
     "psr-4": {
       "OxidSolutionCatalysts\\Payments\\Component\\": "./src/Component",
-      "OxidSolutionCatalysts\\Payments\\Stripe\\": "./src/Stripe"
+      "OxidSolutionCatalysts\\Payments\\Stripe\\": "./src/Stripe",
+      "OxidSolutionCatalysts\\Payments\\Migrations\\": "./migration/data"
     }
   },
   "autoload-dev": {

@@ -104,6 +104,10 @@ jobs:
         run: |
           docker compose exec -T php composer update --no-interaction
 
+      - name: Configure test namespace autoloading
+        run: |
+          docker compose exec -T php composer config autoload-dev.psr-4.OxidSolutionCatalysts\\\\Payments\\\\Tests\\\\ ./extensions/stripe/tests
+
       - name: Drop FK constraints
         run: |
           docker compose exec -T php bash -c "cd ./test-module/migration/scripts && ./setup-helper.sh drop-fk"
