@@ -263,7 +263,7 @@ jobs:
       - name: Run integration tests with shop bootstrap
         run: |
           docker compose exec -T -e XDEBUG_MODE=coverage php vendor/bin/phpunit \
-            -c /var/www/extensions/stripe/tests/phpunit.xml \
+            -c /var/www/test-module/tests/phpunit.xml \
             --testsuite Integration
             --bootstrap=/var/www/source/bootstrap.php
 
