@@ -102,7 +102,7 @@ $aModule = [
             'name' => 'osc_stripe_capture_method',
             'type' => 'select',
             'value' => 'automatic',
-            'constraints' => ['automatic', 'manual'],
+            'constraints' => 'automatic|manual',
         ],
     ],
     'events' => [

@@ -364,15 +364,23 @@ class MetadataTest extends TestCase
             'Capture method setting must have constraints'
         );
 
+        // OXID expects constraints as pipe-delimited string, not array
+        $this->assertIsString(
+            $captureMethodSetting['constraints'],
+            'Constraints must be a pipe-delimited string'
+        );
+
+        $constraints = explode('|', $captureMethodSetting['constraints']);
+
         $this->assertContains(
             'automatic',
-            $captureMethodSetting['constraints'],
+            $constraints,
             'Constraints must include "automatic"'
         );
 
         $this->assertContains(
             'manual',
-            $captureMethodSetting['constraints'],
+            $constraints,
             'Constraints must include "manual"'
         );
     }
