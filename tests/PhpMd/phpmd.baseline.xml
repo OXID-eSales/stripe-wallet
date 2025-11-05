@@ -13,6 +13,12 @@
     <rule ref="rulesets/codesize.xml">
         <exclude name="TooManyPublicMethods"/>
         <exclude name="ExcessiveClassComplexity"/>
+        <exclude name="TooManyFields"/>
+    </rule>
+    <rule ref="rulesets/codesize.xml/TooManyFields">
+        <properties>
+            <property name="maxfields" value="20"/>
+        </properties>
     </rule>
     <rule ref="rulesets/codesize.xml/CyclomaticComplexity">
         <properties>

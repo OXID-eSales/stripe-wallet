@@ -73,10 +73,15 @@ class PaymentRefundService
             throw new DomainException('Refund amount must be positive');
         }
 
+        $providerOrderId = $contract->getProviderOrderId();
+        if ($providerOrderId === null) {
+            throw new DomainException('Cannot refund: Contract has no provider order ID');
+        }
+
         try {
             // Call provider API
             $request = new RefundPaymentRequest(
-                providerPaymentId: $contract->getProviderOrderId(),
+                providerPaymentId: $providerOrderId,
                 amount: $refundAmount,
                 reason: $reason
             );
