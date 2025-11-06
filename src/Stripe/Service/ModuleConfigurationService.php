@@ -28,8 +28,8 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function isTestMode(): bool
     {
-        $mode = (string) $this->config->getConfigParam('sStripeMode');
-        return $mode === 'test';
+        $mode = $this->config->getConfigParam('sStripeMode');
+        return is_string($mode) && $mode === 'test';
     }
 
     /**
@@ -38,10 +38,12 @@ class ModuleConfigurationService implements ServiceInterface
     public function getPublishableKey(): string
     {
         if ($this->isTestMode()) {
-            return (string) $this->config->getConfigParam('sStripeTestPk');
+            $key = $this->config->getConfigParam('sStripeTestPk');
+            return is_string($key) ? $key : '';
         }
 
-        return (string) $this->config->getConfigParam('sStripeLivePk');
+        $key = $this->config->getConfigParam('sStripeLivePk');
+        return is_string($key) ? $key : '';
     }
 
     /**
@@ -50,10 +52,12 @@ class ModuleConfigurationService implements ServiceInterface
     public function getSecretKey(): string
     {
         if ($this->isTestMode()) {
-            return (string) $this->config->getConfigParam('sStripeTestKey');
+            $key = $this->config->getConfigParam('sStripeTestKey');
+            return is_string($key) ? $key : '';
         }
 
-        return (string) $this->config->getConfigParam('sStripeLiveKey');
+        $key = $this->config->getConfigParam('sStripeLiveKey');
+        return is_string($key) ? $key : '';
     }
 
     /**
@@ -62,10 +66,12 @@ class ModuleConfigurationService implements ServiceInterface
     public function getToken(): string
     {
         if ($this->isTestMode()) {
-            return (string) $this->config->getConfigParam('sStripeTestToken');
+            $token = $this->config->getConfigParam('sStripeTestToken');
+            return is_string($token) ? $token : '';
         }
 
-        return (string) $this->config->getConfigParam('sStripeLiveToken');
+        $token = $this->config->getConfigParam('sStripeLiveToken');
+        return is_string($token) ? $token : '';
     }
 
     /**
@@ -73,7 +79,8 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function getWebhookSecret(): string
     {
-        return (string) $this->config->getConfigParam('sStripeWebhookEndpointSecret');
+        $secret = $this->config->getConfigParam('sStripeWebhookEndpointSecret');
+        return is_string($secret) ? $secret : '';
     }
 
     /**
@@ -81,7 +88,8 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function getWebhookEndpoint(): string
     {
-        return (string) $this->config->getConfigParam('sStripeWebhookEndpoint');
+        $endpoint = $this->config->getConfigParam('sStripeWebhookEndpoint');
+        return is_string($endpoint) ? $endpoint : '';
     }
 
     /**
@@ -97,7 +105,8 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function getStatusPending(): string
     {
-        return (string) $this->config->getConfigParam('sStripeStatusPending');
+        $status = $this->config->getConfigParam('sStripeStatusPending');
+        return is_string($status) ? $status : '';
     }
 
     /**
@@ -105,7 +114,8 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function getStatusProcessing(): string
     {
-        return (string) $this->config->getConfigParam('sStripeStatusProcessing');
+        $status = $this->config->getConfigParam('sStripeStatusProcessing');
+        return is_string($status) ? $status : '';
     }
 
     /**
@@ -113,7 +123,8 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function getStatusCancelled(): string
     {
-        return (string) $this->config->getConfigParam('sStripeStatusCancelled');
+        $status = $this->config->getConfigParam('sStripeStatusCancelled');
+        return is_string($status) ? $status : '';
     }
 
     /**
