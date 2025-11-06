@@ -363,14 +363,14 @@ class MetadataTest extends TestCase
             'Capture method setting must have constraints'
         );
 
-        // Constraints can be either array or pipe-delimited string
+        // Constraints must be a pipe-delimited string
         $constraints = $captureMethodSetting['constraints'];
 
-        if (is_string($constraints)) {
-            $constraints = explode('|', $constraints);
-        }
+        $this->assertIsString($constraints, 'Capture method constraints must be a string');
 
-        $this->assertIsArray($constraints, 'Constraints must be an array or pipe-delimited string');
+        $constraints = explode('|', $constraints);
+
+        $this->assertIsArray($constraints, 'Constraints must be convertible to an array');
 
         $this->assertContains(
             'automatic',
