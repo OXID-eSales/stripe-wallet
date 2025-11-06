@@ -415,4 +415,177 @@ class ModuleConfigurationServiceTest extends TestCase
         // Then: Returns test token
         $this->assertEquals($testToken, $result);
     }
+
+    /**
+     * Test 18: Check if payment method should be removed by billing country
+     */
+    public function testIsRemoveByBillingCountry(): void
+    {
+        // Given: Setting enabled
+        $this->configMock
+            ->expects($this->once())
+            ->method('getConfigParam')
+            ->with('blStripeRemoveByBillingCountry')
+            ->willReturn(true);
+
+        // When: isRemoveByBillingCountry() called
+        $result = $this->service->isRemoveByBillingCountry();
+
+        // Then: Returns true
+        $this->assertTrue($result);
+    }
+
+    /**
+     * Test 19: Check if payment method should be removed by basket currency
+     */
+    public function testIsRemoveByBasketCurrency(): void
+    {
+        // Given: Setting disabled
+        $this->configMock
+            ->expects($this->once())
+            ->method('getConfigParam')
+            ->with('blStripeRemoveByBasketCurrency')
+            ->willReturn(false);
+
+        // When: isRemoveByBasketCurrency() called
+        $result = $this->service->isRemoveByBasketCurrency();
+
+        // Then: Returns false
+        $this->assertFalse($result);
+    }
+
+    /**
+     * Test 20: Check if customer email should be provided to Stripe
+     */
+    public function testShouldProvideCustomerEmail(): void
+    {
+        // Given: Setting enabled
+        $this->configMock
+            ->expects($this->once())
+            ->method('getConfigParam')
+            ->with('blStripeProvideCustomerEmailAddress')
+            ->willReturn(true);
+
+        // When: shouldProvideCustomerEmail() called
+        $result = $this->service->shouldProvideCustomerEmail();
+
+        // Then: Returns true
+        $this->assertTrue($result);
+    }
+
+    /**
+     * Test 21: Check if cron finish orders is active
+     */
+    public function testIsCronFinishOrdersActive(): void
+    {
+        // Given: Cron job active
+        $this->configMock
+            ->expects($this->once())
+            ->method('getConfigParam')
+            ->with('sStripeCronFinishOrdersActive')
+            ->willReturn(true);
+
+        // When: isCronFinishOrdersActive() called
+        $result = $this->service->isCronFinishOrdersActive();
+
+        // Then: Returns true
+        $this->assertTrue($result);
+    }
+
+    /**
+     * Test 22: Check if cron second chance is active
+     */
+    public function testIsCronSecondChanceActive(): void
+    {
+        // Given: Cron job active
+        $this->configMock
+            ->expects($this->once())
+            ->method('getConfigParam')
+            ->with('sStripeCronSecondChanceActive')
+            ->willReturn(true);
+
+        // When: isCronSecondChanceActive() called
+        $result = $this->service->isCronSecondChanceActive();
+
+        // Then: Returns true
+        $this->assertTrue($result);
+    }
+
+    /**
+     * Test 23: Get cron second chance time diff
+     */
+    public function testGetsCronSecondChanceTimeDiff(): void
+    {
+        // Given: Time diff = 3 days
+        $this->configMock
+            ->expects($this->once())
+            ->method('getConfigParam')
+            ->with('iStripeCronSecondChanceTimeDiff')
+            ->willReturn('3');
+
+        // When: getCronSecondChanceTimeDiff() called
+        $result = $this->service->getCronSecondChanceTimeDiff();
+
+        // Then: Returns 3
+        $this->assertEquals(3, $result);
+    }
+
+    /**
+     * Test 24: Get cron second chance time diff with default
+     */
+    public function testGetsCronSecondChanceTimeDiffDefault(): void
+    {
+        // Given: No value configured
+        $this->configMock
+            ->expects($this->once())
+            ->method('getConfigParam')
+            ->with('iStripeCronSecondChanceTimeDiff')
+            ->willReturn(null);
+
+        // When: getCronSecondChanceTimeDiff() called
+        $result = $this->service->getCronSecondChanceTimeDiff();
+
+        // Then: Returns default value of 1
+        $this->assertEquals(1, $result);
+    }
+
+    /**
+     * Test 25: Check if cron order shipment is active
+     */
+    public function testIsCronOrderShipmentActive(): void
+    {
+        // Given: Cron job active
+        $this->configMock
+            ->expects($this->once())
+            ->method('getConfigParam')
+            ->with('sStripeCronOrderShipmentActive')
+            ->willReturn(true);
+
+        // When: isCronOrderShipmentActive() called
+        $result = $this->service->isCronOrderShipmentActive();
+
+        // Then: Returns true
+        $this->assertTrue($result);
+    }
+
+    /**
+     * Test 26: Get cron secure key
+     */
+    public function testGetsCronSecureKey(): void
+    {
+        // Given: Secure key configured
+        $secureKey = 'my_secure_key_123';
+
+        $this->configMock
+            ->expects($this->once())
+            ->method('getConfigParam')
+            ->with('sStripeCronSecureKey')
+            ->willReturn($secureKey);
+
+        // When: getCronSecureKey() called
+        $result = $this->service->getCronSecureKey();
+
+        // Then: Returns secure key
+        $this->assertEquals($secureKey, $result);
+    }
 }

@@ -128,6 +128,72 @@ class ModuleConfigurationService implements ServiceInterface
     }
 
     /**
+     * Check if payment method should be removed by billing country
+     */
+    public function isRemoveByBillingCountry(): bool
+    {
+        return (bool) $this->config->getConfigParam('blStripeRemoveByBillingCountry');
+    }
+
+    /**
+     * Check if payment method should be removed by basket currency
+     */
+    public function isRemoveByBasketCurrency(): bool
+    {
+        return (bool) $this->config->getConfigParam('blStripeRemoveByBasketCurrency');
+    }
+
+    /**
+     * Check if customer email address should be provided to Stripe
+     */
+    public function shouldProvideCustomerEmail(): bool
+    {
+        return (bool) $this->config->getConfigParam('blStripeProvideCustomerEmailAddress');
+    }
+
+    /**
+     * Check if cron job for finishing orders is active
+     */
+    public function isCronFinishOrdersActive(): bool
+    {
+        return (bool) $this->config->getConfigParam('sStripeCronFinishOrdersActive');
+    }
+
+    /**
+     * Check if cron job for second chance emails is active
+     */
+    public function isCronSecondChanceActive(): bool
+    {
+        return (bool) $this->config->getConfigParam('sStripeCronSecondChanceActive');
+    }
+
+    /**
+     * Get time difference for second chance cron job (in days)
+     */
+    public function getCronSecondChanceTimeDiff(): int
+    {
+        $value = $this->config->getConfigParam('iStripeCronSecondChanceTimeDiff');
+        return is_numeric($value) ? (int)$value : 1;
+    }
+
+    /**
+     * Check if cron job for order shipment is active
+     */
+    public function isCronOrderShipmentActive(): bool
+    {
+        return (bool) $this->config->getConfigParam('sStripeCronOrderShipmentActive');
+    }
+
+    /**
+     * Get secure key for cron job execution
+     */
+    public function getCronSecureKey(): string
+    {
+        $key = $this->config->getConfigParam('sStripeCronSecureKey');
+        return is_string($key) ? $key : '';
+    }
+
+    /**
      * Get the webhook URL for Stripe configuration
      */
     public function getWebhookUrl(): string
