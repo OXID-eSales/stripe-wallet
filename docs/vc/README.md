@@ -1,12 +1,12 @@
 # Wealth Opportunity Presentations for Colleagues
 
-This directory contains **5 presentations** about wealth opportunities available through implementing the pet-projects introduced in the payment-component/vc documentation.
+This directory contains **7 presentations** about wealth opportunities available through implementing the pet-projects introduced in the payment-component/vc documentation.
 
 All presentations use the **Futurama color scheme** (neon green, cyan, orange, magenta on dark background) for a tech-forward, futuristic aesthetic.
 
 ---
 
-## 🎯 The 5 Presentations
+## 🎯 The 7 Presentations
 
 ### 1. Developer Royalties: Lifetime Wealth
 **File:** `01-developer-royalties-lifetime-wealth.md`
@@ -84,6 +84,45 @@ All presentations use the **Futurama color scheme** (neon green, cyan, orange, m
 
 ---
 
+### 6. Industrial Platform Revolution
+**File:** `06-industrial-platforms.md`
+
+**Focus:** **Deep dive into 6 specific industrial platform opportunities** with detailed business cases for automotive, pharma, and generic SaaS markets.
+
+**Key Messages:**
+- 2 Automotive projects: P16 Auto Parts B2B (€23.6M/dev) & M15 Auto Aftermarket (€2.0M/dev)
+- 1 Pharma project: P11 Medical/Pharma B2B (€8.2M/dev) - the "fortress business"
+- 3 Generic SaaS: OXID Cloud, Integration Hub, B2B Marketplace SaaS (€1-3M/dev each)
+- Personal development benefits (technical mastery, business skills, leadership)
+- Career trajectory comparison: Employee vs Founder
+- Work-life reality check (Year 1 build vs Years 2-3 harvest)
+- Risk analysis: worst case, middle case, best case scenarios
+- Why NOW is the perfect time (market timing + personal timing)
+- Addressing common objections ("I'm not a business person", "I don't know the industry", etc.)
+- Clear next steps to get started
+
+**Best for:** Convincing colleagues that industrial platforms are THE opportunity - includes both inspiring vision AND practical reality check. **Use this when you need to overcome skepticism and show concrete paths forward!**
+
+---
+
+### 7. Automotive Parts SaaS: Startup Pitch
+**File:** `07-automotive-parts-saas.md`
+
+**Focus:** **Complete investor pitch deck and business plan** for a white-label B2B automotive parts marketplace SaaS platform built on OXID 7.
+
+**Key Messages:**
+- Market opportunity: €22B Germany, €136B Europe automotive aftermarket (9.1% B2B CAGR)
+- Team structure: 3 developers + 3 managers with equity split (CTO 15%, CEO 20%, etc.)
+- Technology: Multi-tenant SaaS on OXID 7 with TecDoc integration, VIN decoder, white-label customization
+- Financial projections: €27.4M Y1 → €343.2M Y3 revenue, 75% gross margin
+- Funding ask: €650K seed round, €2.5M pre-money valuation (38x exit potential)
+- OSC's unfair advantage: 150 agency partners (€5M+ S&M savings), OXID 7 foundation (€640K tech savings), 75-85% success probability vs 15-20% for generic startups
+- Proof: Mercedes-Benz (2,200 dealerships, €50M+ GMV) and GROB-WERKE (3,000 B2B customers) already using OXID for automotive
+
+**Best for:** Investor pitches, recruiting senior developers/managers for automotive B2B opportunity, demonstrating why ONLY OSC/OXID can execute this specific market. **The most complete business case with real proof of concept!**
+
+---
+
 ## 🎨 Presentation Style (Futurama Theme)
 
 All presentations use the Futurama color scheme:
@@ -122,8 +161,8 @@ marp 01-developer-royalties-lifetime-wealth.md --pdf -o 01-developer-royalties-l
 # Build PowerPoint (for traditional presentations)
 marp 01-developer-royalties-lifetime-wealth.md --pptx -o 01-developer-royalties-lifetime-wealth.pptx
 
-# Build all 5 presentations at once
-for i in 01 02 03 04 05; do
+# Build all 7 presentations at once
+for i in 01 02 03 04 05 06 07; do
   marp ${i}-*.md --html -o ${i}-*.html
   marp ${i}-*.md --pdf -o ${i}-*.pdf
   marp ${i}-*.md --pptx -o ${i}-*.pptx
@@ -132,9 +171,9 @@ done
 
 ### Presentation Flow Recommendations
 
-**For a team meeting (30-45 minutes):**
+**For a team meeting (45-60 minutes):**
 1. Start with **05-choose-your-wealth-path.md** (overview of all options) - 10 min
-2. Deep dive into **03-mini-team-millions.md** (most relevant for most) - 15 min
+2. Deep dive into **06-industrial-platforms.md** (concrete opportunities + reality check) - 25 min
 3. Optional: **01-developer-royalties-lifetime-wealth.md** (explain OSC model) - 10 min
 4. Q&A and discussion - 10-15 min
 
@@ -143,12 +182,13 @@ done
 - Show them the specific presentation that matches:
   - Independent? → **02-solo-entrepreneur-path.md**
   - Want team? → **03-mini-team-millions.md**
-  - Senior/ambitious? → **04-platform-empire-builders.md**
+  - Senior/ambitious? → **04-platform-empire-builders.md** or **06-industrial-platforms.md**
   - Undecided? → **05-choose-your-wealth-path.md**
+  - Skeptical? → **06-industrial-platforms.md** (includes objections & reality checks)
 
 **For convincing skeptics:**
-- Start with **01-developer-royalties-lifetime-wealth.md** to show the math
-- Follow with specific product presentation based on their interests
+- Use **06-industrial-platforms.md** - it addresses objections directly and provides concrete examples
+- Follow with **01-developer-royalties-lifetime-wealth.md** to show the financial model
 
 ---
 
@@ -184,11 +224,15 @@ done
 | **First team meeting** | 05: Choose Your Wealth Path (overview) |
 | **One-on-one with junior dev** | 02: Solo Entrepreneur Path |
 | **One-on-one with mid-level dev** | 03: Mini-Team Millions |
-| **One-on-one with senior/lead** | 04: Platform Empire Builders |
+| **One-on-one with senior/lead** | 04: Platform Empire Builders or 06: Industrial Platforms |
 | **Explaining OSC model** | 01: Developer Royalties |
 | **Decision-making session** | 05: Choose Your Wealth Path |
 | **Recruiting developers** | 01 + 03 or 04 (depending on seniority) |
-| **Investor pitch** | 01 + 04 (show royalty model + biggest opportunities) |
+| **Investor pitch** | 07: Automotive Parts SaaS (complete business plan with financials) |
+| **Recruiting for automotive project** | 07: Automotive Parts SaaS (team structure + equity splits) |
+| **Overcoming skepticism** | 06: Industrial Platforms (includes objections & reality checks) |
+| **Technical deep-dive** | 06: Industrial Platforms (specific tech requirements per project) |
+| **Proving OSC competitive advantage** | 07: Automotive Parts SaaS (unfair advantages with real numbers) |
 
 ---
 
@@ -227,12 +271,17 @@ After presenting:
 
 ---
 
-**Created:** 2025-11-04
+**Created:** 2025-11-04 (Updated: 2025-11-06)
 **Theme:** Futurama (neon green, cyan, orange, magenta)
 **Format:** Marp (Markdown Presentation)
-**Total Presentations:** 5
+**Total Presentations:** 7
 **Target Audience:** OXID Solution Catalyst team developers
 
 ---
 
-**Ready to change lives?** Start with presentation 05 (Choose Your Wealth Path) and let your colleagues discover their path to millions! 🚀
+**Ready to change lives?**
+
+- Start with presentation **05** (Choose Your Wealth Path) for overview
+- Use presentation **06** (Industrial Platforms) to dive deep into specific opportunities and overcome objections
+- Show presentation **07** (Automotive Parts SaaS) to investors or when recruiting for the automotive B2B opportunity
+- Let your colleagues discover their path to millions! 🚀

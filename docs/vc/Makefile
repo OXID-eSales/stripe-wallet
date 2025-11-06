@@ -13,6 +13,8 @@ PRES_02 := 02-solo-entrepreneur-path
 PRES_03 := 03-mini-team-millions
 PRES_04 := 04-platform-empire-builders
 PRES_05 := 05-choose-your-wealth-path
+PRES_06 := 06-industrial-platforms
+PRES_07 := 07-automotive-parts-saas
 
 # Output files
 HTML_01 := $(PRES_01).html
@@ -20,8 +22,10 @@ HTML_02 := $(PRES_02).html
 HTML_03 := $(PRES_03).html
 HTML_04 := $(PRES_04).html
 HTML_05 := $(PRES_05).html
+HTML_06 := $(PRES_06).html
+HTML_07 := $(PRES_07).html
 
-ALL_HTML := $(HTML_01) $(HTML_02) $(HTML_03) $(HTML_04) $(HTML_05)
+ALL_HTML := $(HTML_01) $(HTML_02) $(HTML_03) $(HTML_04) $(HTML_05) $(HTML_06) $(HTML_07)
 
 # Default: Build all presentations
 all: build
@@ -34,6 +38,8 @@ all: build
 	@echo "   ./$(HTML_03)"
 	@echo "   ./$(HTML_04)"
 	@echo "   ./$(HTML_05)"
+	@echo "   ./$(HTML_06)"
+	@echo "   ./$(HTML_07)"
 	@echo ""
 	@echo "💡 Open any HTML file in your browser (works offline!)"
 	@echo "💡 Press F11 for fullscreen, arrow keys to navigate"
@@ -62,6 +68,14 @@ $(HTML_05): $(PRES_05).md
 	@echo "🎯 Building Choose Your Wealth Path presentation..."
 	@marp $< --html --allow-local-files -o $@
 
+$(HTML_06): $(PRES_06).md
+	@echo "🏭 Building Industrial Platforms presentation..."
+	@marp $< --html --allow-local-files -o $@
+
+$(HTML_07): $(PRES_07).md
+	@echo "🚗 Building Automotive Parts SaaS presentation..."
+	@marp $< --html --allow-local-files -o $@
+
 # Quick build commands for each presentation
 p1: $(HTML_01)
 	@echo "✅ Presentation 1 ready: $(HTML_01)"
@@ -77,6 +91,12 @@ p4: $(HTML_04)
 
 p5: $(HTML_05)
 	@echo "✅ Presentation 5 ready: $(HTML_05)"
+
+p6: $(HTML_06)
+	@echo "✅ Presentation 6 ready: $(HTML_06)"
+
+p7: $(HTML_07)
+	@echo "✅ Presentation 7 ready: $(HTML_07)"
 
 # Clean all generated files
 clean:
@@ -117,6 +137,14 @@ preview-5:
 	@echo "🌐 Opening Presentation 5 preview..."
 	@marp $(PRES_05).md --preview
 
+preview-6:
+	@echo "🌐 Opening Presentation 6 preview..."
+	@marp $(PRES_06).md --preview
+
+preview-7:
+	@echo "🌐 Opening Presentation 7 preview..."
+	@marp $(PRES_07).md --preview
+
 # Open presentations in browser (cross-platform)
 open-1:
 	@xdg-open $(HTML_01) 2>/dev/null || open $(HTML_01) 2>/dev/null || start $(HTML_01) 2>/dev/null || echo "Please open $(HTML_01) manually"
@@ -133,6 +161,12 @@ open-4:
 open-5:
 	@xdg-open $(HTML_05) 2>/dev/null || open $(HTML_05) 2>/dev/null || start $(HTML_05) 2>/dev/null || echo "Please open $(HTML_05) manually"
 
+open-6:
+	@xdg-open $(HTML_06) 2>/dev/null || open $(HTML_06) 2>/dev/null || start $(HTML_06) 2>/dev/null || echo "Please open $(HTML_06) manually"
+
+open-7:
+	@xdg-open $(HTML_07) 2>/dev/null || open $(HTML_07) 2>/dev/null || start $(HTML_07) 2>/dev/null || echo "Please open $(HTML_07) manually"
+
 # Open all presentations at once (useful for reviewing)
 open-all: $(ALL_HTML)
 	@echo "🌐 Opening all presentations..."
@@ -145,6 +179,10 @@ open-all: $(ALL_HTML)
 	@$(MAKE) -s open-4
 	@sleep 1
 	@$(MAKE) -s open-5
+	@sleep 1
+	@$(MAKE) -s open-6
+	@sleep 1
+	@$(MAKE) -s open-7
 
 # Build and open specific presentation
 present-1: p1 open-1
@@ -152,6 +190,8 @@ present-2: p2 open-2
 present-3: p3 open-3
 present-4: p4 open-4
 present-5: p5 open-5
+present-6: p6 open-6
+present-7: p7 open-7
 
 # Export to PowerPoint (requires marp-cli)
 pptx: $(ALL_HTML)
@@ -161,6 +201,8 @@ pptx: $(ALL_HTML)
 	@marp $(PRES_03).md --pptx -o $(PRES_03).pptx
 	@marp $(PRES_04).md --pptx -o $(PRES_04).pptx
 	@marp $(PRES_05).md --pptx -o $(PRES_05).pptx
+	@marp $(PRES_06).md --pptx -o $(PRES_06).pptx
+	@marp $(PRES_07).md --pptx -o $(PRES_07).pptx
 	@echo "✅ PowerPoint files created!"
 
 # Export to PDF (requires Chrome/Chromium)
@@ -171,6 +213,8 @@ pdf: $(ALL_HTML)
 	@marp $(PRES_03).md --pdf -o $(PRES_03).pdf
 	@marp $(PRES_04).md --pdf -o $(PRES_04).pdf
 	@marp $(PRES_05).md --pdf -o $(PRES_05).pdf
+	@marp $(PRES_06).md --pdf -o $(PRES_06).pdf
+	@marp $(PRES_07).md --pdf -o $(PRES_07).pdf
 	@echo "✅ PDF files created!"
 
 # Clean all exports (PDF, PPTX, HTML)
@@ -196,6 +240,8 @@ help:
 	@echo "  make p3  - Build: Mini-Team Millions"
 	@echo "  make p4  - Build: Platform Empire Builders"
 	@echo "  make p5  - Build: Choose Your Wealth Path"
+	@echo "  make p6  - Build: Industrial Platforms"
+	@echo "  make p7  - Build: Automotive Parts SaaS"
 	@echo ""
 	@echo "🌐 Open in Browser:"
 	@echo "  make open-1       - Open Presentation 1"
@@ -203,6 +249,8 @@ help:
 	@echo "  make open-3       - Open Presentation 3"
 	@echo "  make open-4       - Open Presentation 4"
 	@echo "  make open-5       - Open Presentation 5"
+	@echo "  make open-6       - Open Presentation 6"
+	@echo "  make open-7       - Open Presentation 7"
 	@echo "  make open-all     - Open all presentations"
 	@echo ""
 	@echo "🚀 Build & Present:"
@@ -211,6 +259,8 @@ help:
 	@echo "  make present-3    - Build p3 and open in browser"
 	@echo "  make present-4    - Build p4 and open in browser"
 	@echo "  make present-5    - Build p5 and open in browser"
+	@echo "  make present-6    - Build p6 and open in browser"
+	@echo "  make present-7    - Build p7 and open in browser"
 	@echo ""
 	@echo "📤 Export Formats:"
 	@echo "  make pptx         - Export all to PowerPoint (.pptx)"
@@ -223,6 +273,8 @@ help:
 	@echo "  make preview-3    - Preview p3 with live reload"
 	@echo "  make preview-4    - Preview p4 with live reload"
 	@echo "  make preview-5    - Preview p5 with live reload"
+	@echo "  make preview-6    - Preview p6 with live reload"
+	@echo "  make preview-7    - Preview p7 with live reload"
 	@echo "  make dev          - Same as 'make watch'"
 	@echo ""
 	@echo "💡 Quick Start:"
@@ -240,6 +292,8 @@ help:
 	@echo "  3. Mini-Team Millions - €1-3M/dev, best risk/reward"
 	@echo "  4. Platform Builders  - €5-25M/dev, generational wealth"
 	@echo "  5. Choose Your Path   - Complete comparison & decision guide ⭐"
+	@echo "  6. Industrial Platforms - 6 opportunities in automotive, pharma & SaaS"
+	@echo "  7. Automotive Parts SaaS - Startup pitch & business plan (3 devs + 3 mgrs)"
 
 # Validate that marp is installed
 check-marp:
