@@ -49,8 +49,10 @@ class ConfigurationValidator implements ServiceInterface
         // Validate webhook secret
         if (empty($webhookSecret)) {
             $errors['webhookSecret'] = 'Webhook secret is required';
-        } elseif (!str_starts_with($webhookSecret, self::WEBHOOK_SECRET_PREFIX) ||
-                  strlen($webhookSecret) <= strlen(self::WEBHOOK_SECRET_PREFIX)) {
+        } elseif (
+            !str_starts_with($webhookSecret, self::WEBHOOK_SECRET_PREFIX) ||
+                  strlen($webhookSecret) <= strlen(self::WEBHOOK_SECRET_PREFIX)
+        ) {
             $errors['webhookSecret'] = 'Invalid webhook secret format (must start with whsec_)';
         }
 

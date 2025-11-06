@@ -1,12 +1,13 @@
 <?php
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Core;
-
 /**
  * Copyright © OXID eSales AG. All rights reserved.
  * See LICENSE file for license details.
  */
 
+declare(strict_types=1);
+
+namespace OxidSolutionCatalysts\Payments\Stripe\Core;
 
 use OxidEsales\Eshop\Core\DatabaseProvider;
 use OxidEsales\Eshop\Core\Registry;
@@ -65,7 +66,7 @@ class Events
      */
     public static function onDeactivate()
     {
-        if(Registry::getConfig()->isAdmin()) { // onDeactivate is triggered in the apply-configuration console command which should not deactivate the payment methods
+        if (Registry::getConfig()->isAdmin()) { // onDeactivate is triggered in the apply-configuration console command which should not deactivate the payment methods
             self::deactivatePaymentMethods();
             self::clearTmp();
         }
@@ -160,7 +161,7 @@ class Events
     protected static function deletePaymentMethod($sPaymentId)
     {
         DatabaseProvider::getDb()->Execute("DELETE FROM oxpayments WHERE oxid = ?", array($sPaymentId));
-        DatabaseProvider::getDb()->Execute("DELETE FROM ".PaymentConfig::$sTableName." WHERE oxid = ?", array($sPaymentId));
+        DatabaseProvider::getDb()->Execute("DELETE FROM " . PaymentConfig::$sTableName . " WHERE oxid = ?", array($sPaymentId));
     }
 
     /**
