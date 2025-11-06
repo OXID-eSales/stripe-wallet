@@ -153,7 +153,8 @@ style: |
     width: 100%;
     border-collapse: collapse;
     margin: 20px 0;
-    color: #cccccc;
+    color: #ffffff;
+    background: #0a0a0a;
   }
   th {
     background: #16213e;
@@ -161,13 +162,20 @@ style: |
     padding: 12px;
     text-align: left;
     border: 1px solid #00d4ff;
+    font-weight: 700;
   }
   td {
     padding: 10px 12px;
     border: 1px solid #16213e;
-  }
-  tr:nth-child(even) {
     background: #0f1419;
+    color: #ffffff;
+  }
+  tr:nth-child(even) td {
+    background: #1a1a2e;
+  }
+  td strong {
+    color: #00d4ff;
+    font-weight: 700;
   }
   code {
     background: #0a0a0a;
