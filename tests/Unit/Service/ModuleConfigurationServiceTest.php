@@ -39,8 +39,8 @@ class ModuleConfigurationServiceTest extends TestCase
             ->method('getConfigParam')
             ->willReturnCallback(function ($param) use ($testSecretKey) {
                 return match ($param) {
-                    'osc_stripe_test_mode' => true,
-                    'osc_stripe_test_secret_key' => $testSecretKey,
+                    'sStripeMode' => 'test',
+                    'sStripeTestKey' => $testSecretKey,
                     default => null
                 };
             });
@@ -57,7 +57,7 @@ class ModuleConfigurationServiceTest extends TestCase
      */
     public function testGetsLiveSecretKey(): void
     {
-        // Given: Test mode disabled, live key configured
+        // Given: Live mode enabled, live key configured
         $liveSecretKey = 'sk_live_51XYZ789';
 
         $this->configMock
@@ -65,8 +65,8 @@ class ModuleConfigurationServiceTest extends TestCase
             ->method('getConfigParam')
             ->willReturnCallback(function ($param) use ($liveSecretKey) {
                 return match ($param) {
-                    'osc_stripe_test_mode' => false,
-                    'osc_stripe_live_secret_key' => $liveSecretKey,
+                    'sStripeMode' => 'live',
+                    'sStripeLiveKey' => $liveSecretKey,
                     default => null
                 };
             });
@@ -79,55 +79,45 @@ class ModuleConfigurationServiceTest extends TestCase
     }
 
     /**
-     * Test 3: Get webhook secret in test mode
+     * Test 3: Get webhook secret
      */
-    public function testGetsTestWebhookSecret(): void
+    public function testGetsWebhookSecret(): void
     {
-        // Given: Test mode enabled, webhook secret configured
-        $testWebhookSecret = 'whsec_test_ABC123';
+        // Given: Webhook secret configured
+        $webhookSecret = 'whsec_ABC123';
 
         $this->configMock
-            ->expects($this->exactly(2))
+            ->expects($this->once())
             ->method('getConfigParam')
-            ->willReturnCallback(function ($param) use ($testWebhookSecret) {
-                return match ($param) {
-                    'osc_stripe_test_mode' => true,
-                    'osc_stripe_test_webhook_secret' => $testWebhookSecret,
-                    default => null
-                };
-            });
+            ->with('sStripeWebhookEndpointSecret')
+            ->willReturn($webhookSecret);
 
         // When: getWebhookSecret() called
         $result = $this->service->getWebhookSecret();
 
-        // Then: Returns test webhook secret
-        $this->assertEquals($testWebhookSecret, $result);
+        // Then: Returns webhook secret
+        $this->assertEquals($webhookSecret, $result);
     }
 
     /**
-     * Test 4: Get webhook secret in live mode
+     * Test 4: Get webhook endpoint
      */
-    public function testGetsLiveWebhookSecret(): void
+    public function testGetsWebhookEndpoint(): void
     {
-        // Given: Test mode disabled, live webhook secret configured
-        $liveWebhookSecret = 'whsec_live_XYZ789';
+        // Given: Webhook endpoint configured
+        $webhookEndpoint = 'https://example.com/webhook';
 
         $this->configMock
-            ->expects($this->exactly(2))
+            ->expects($this->once())
             ->method('getConfigParam')
-            ->willReturnCallback(function ($param) use ($liveWebhookSecret) {
-                return match ($param) {
-                    'osc_stripe_test_mode' => false,
-                    'osc_stripe_live_webhook_secret' => $liveWebhookSecret,
-                    default => null
-                };
-            });
+            ->with('sStripeWebhookEndpoint')
+            ->willReturn($webhookEndpoint);
 
-        // When: getWebhookSecret() called
-        $result = $this->service->getWebhookSecret();
+        // When: getWebhookEndpoint() called
+        $result = $this->service->getWebhookEndpoint();
 
-        // Then: Returns live webhook secret
-        $this->assertEquals($liveWebhookSecret, $result);
+        // Then: Returns webhook endpoint
+        $this->assertEquals($webhookEndpoint, $result);
     }
 
     /**
@@ -135,12 +125,12 @@ class ModuleConfigurationServiceTest extends TestCase
      */
     public function testIsTestModeEnabled(): void
     {
-        // Given: Test mode setting = true
+        // Given: Mode setting = 'test'
         $this->configMock
             ->expects($this->once())
             ->method('getConfigParam')
-            ->with('osc_stripe_test_mode')
-            ->willReturn(true);
+            ->with('sStripeMode')
+            ->willReturn('test');
 
         // When: isTestMode() called
         $result = $this->service->isTestMode();
@@ -154,12 +144,12 @@ class ModuleConfigurationServiceTest extends TestCase
      */
     public function testIsTestModeDisabled(): void
     {
-        // Given: Test mode setting = false
+        // Given: Mode setting = 'live'
         $this->configMock
             ->expects($this->once())
             ->method('getConfigParam')
-            ->with('osc_stripe_test_mode')
-            ->willReturn(false);
+            ->with('sStripeMode')
+            ->willReturn('live');
 
         // When: isTestMode() called
         $result = $this->service->isTestMode();
@@ -169,65 +159,60 @@ class ModuleConfigurationServiceTest extends TestCase
     }
 
     /**
-     * Test 7: Get payment methods
+     * Test 7: Check if transaction logging is enabled
      */
-    public function testGetsPaymentMethods(): void
+    public function testIsTransactionLoggingEnabled(): void
     {
-        // Given: Payment methods ['card', 'sepa_debit']
-        $paymentMethods = ['card', 'sepa_debit'];
-
+        // Given: Transaction logging enabled
         $this->configMock
             ->expects($this->once())
             ->method('getConfigParam')
-            ->with('osc_stripe_payment_methods')
-            ->willReturn($paymentMethods);
+            ->with('blStripeLogTransactionInfo')
+            ->willReturn(true);
 
-        // When: getPaymentMethods() called
-        $result = $this->service->getPaymentMethods();
+        // When: isTransactionLoggingEnabled() called
+        $result = $this->service->isTransactionLoggingEnabled();
 
-        // Then: Returns array of enabled methods
-        $this->assertEquals($paymentMethods, $result);
-        $this->assertIsArray($result);
-        $this->assertContains('card', $result);
-        $this->assertContains('sepa_debit', $result);
+        // Then: Returns true
+        $this->assertTrue($result);
     }
 
     /**
-     * Test 8: Get capture method - automatic
+     * Test 8: Get status mapping for pending orders
      */
-    public function testGetsCaptureMethodAutomatic(): void
+    public function testGetsStatusPending(): void
     {
-        // Given: Capture method = 'automatic'
+        // Given: Status pending = 'NOT_FINISHED'
         $this->configMock
             ->expects($this->once())
             ->method('getConfigParam')
-            ->with('osc_stripe_capture_method')
-            ->willReturn('automatic');
+            ->with('sStripeStatusPending')
+            ->willReturn('NOT_FINISHED');
 
-        // When: getCaptureMethod() called
-        $result = $this->service->getCaptureMethod();
+        // When: getStatusPending() called
+        $result = $this->service->getStatusPending();
 
-        // Then: Returns 'automatic'
-        $this->assertEquals('automatic', $result);
+        // Then: Returns 'NOT_FINISHED'
+        $this->assertEquals('NOT_FINISHED', $result);
     }
 
     /**
-     * Test 9: Get capture method - manual
+     * Test 9: Get status mapping for processing orders
      */
-    public function testGetsCaptureMethodManual(): void
+    public function testGetsStatusProcessing(): void
     {
-        // Given: Capture method = 'manual'
+        // Given: Status processing = 'OK'
         $this->configMock
             ->expects($this->once())
             ->method('getConfigParam')
-            ->with('osc_stripe_capture_method')
-            ->willReturn('manual');
+            ->with('sStripeStatusProcessing')
+            ->willReturn('OK');
 
-        // When: getCaptureMethod() called
-        $result = $this->service->getCaptureMethod();
+        // When: getStatusProcessing() called
+        $result = $this->service->getStatusProcessing();
 
-        // Then: Returns 'manual'
-        $this->assertEquals('manual', $result);
+        // Then: Returns 'OK'
+        $this->assertEquals('OK', $result);
     }
 
     /**
@@ -292,8 +277,8 @@ class ModuleConfigurationServiceTest extends TestCase
             ->method('getConfigParam')
             ->willReturnCallback(function ($param) use ($testPublishableKey) {
                 return match ($param) {
-                    'osc_stripe_test_mode' => true,
-                    'osc_stripe_test_publishable_key' => $testPublishableKey,
+                    'sStripeMode' => 'test',
+                    'sStripeTestPk' => $testPublishableKey,
                     default => null
                 };
             });
@@ -310,7 +295,7 @@ class ModuleConfigurationServiceTest extends TestCase
      */
     public function testGetsLivePublishableKey(): void
     {
-        // Given: Test mode disabled, live publishable key configured
+        // Given: Live mode enabled, live publishable key configured
         $livePublishableKey = 'pk_live_XYZ789';
 
         $this->configMock
@@ -318,8 +303,8 @@ class ModuleConfigurationServiceTest extends TestCase
             ->method('getConfigParam')
             ->willReturnCallback(function ($param) use ($livePublishableKey) {
                 return match ($param) {
-                    'osc_stripe_test_mode' => false,
-                    'osc_stripe_live_publishable_key' => $livePublishableKey,
+                    'sStripeMode' => 'live',
+                    'sStripeLivePk' => $livePublishableKey,
                     default => null
                 };
             });
@@ -338,13 +323,13 @@ class ModuleConfigurationServiceTest extends TestCase
     {
         // Given: Secret key and webhook secret configured
         $this->configMock
-            ->expects($this->exactly(4))
+            ->expects($this->exactly(3))
             ->method('getConfigParam')
             ->willReturnCallback(function ($param) {
                 return match ($param) {
-                    'osc_stripe_test_mode' => true,
-                    'osc_stripe_test_secret_key' => 'sk_test_ABC123',
-                    'osc_stripe_test_webhook_secret' => 'whsec_test_ABC123',
+                    'sStripeMode' => 'test',
+                    'sStripeTestKey' => 'sk_test_ABC123',
+                    'sStripeWebhookEndpointSecret' => 'whsec_ABC123',
                     default => null
                 };
             });
@@ -367,8 +352,8 @@ class ModuleConfigurationServiceTest extends TestCase
             ->method('getConfigParam')
             ->willReturnCallback(function ($param) {
                 return match ($param) {
-                    'osc_stripe_test_mode' => true,
-                    'osc_stripe_test_secret_key' => '',
+                    'sStripeMode' => 'test',
+                    'sStripeTestKey' => '',
                     default => null
                 };
             });
@@ -387,13 +372,13 @@ class ModuleConfigurationServiceTest extends TestCase
     {
         // Given: Secret key configured, webhook secret not set
         $this->configMock
-            ->expects($this->exactly(4))
+            ->expects($this->exactly(3))
             ->method('getConfigParam')
             ->willReturnCallback(function ($param) {
                 return match ($param) {
-                    'osc_stripe_test_mode' => true,
-                    'osc_stripe_test_secret_key' => 'sk_test_ABC123',
-                    'osc_stripe_test_webhook_secret' => '',
+                    'sStripeMode' => 'test',
+                    'sStripeTestKey' => 'sk_test_ABC123',
+                    'sStripeWebhookEndpointSecret' => '',
                     default => null
                 };
             });
@@ -406,22 +391,28 @@ class ModuleConfigurationServiceTest extends TestCase
     }
 
     /**
-     * Test 17: Empty payment methods returns empty array
+     * Test 17: Get token in test mode
      */
-    public function testEmptyPaymentMethodsReturnsEmptyArray(): void
+    public function testGetsTestToken(): void
     {
-        // Given: Payment methods not configured
+        // Given: Test mode enabled, test token configured
+        $testToken = 'token_test_ABC123';
+
         $this->configMock
-            ->expects($this->once())
+            ->expects($this->exactly(2))
             ->method('getConfigParam')
-            ->with('osc_stripe_payment_methods')
-            ->willReturn(null);
+            ->willReturnCallback(function ($param) use ($testToken) {
+                return match ($param) {
+                    'sStripeMode' => 'test',
+                    'sStripeTestToken' => $testToken,
+                    default => null
+                };
+            });
 
-        // When: getPaymentMethods() called
-        $result = $this->service->getPaymentMethods();
+        // When: getToken() called
+        $result = $this->service->getToken();
 
-        // Then: Returns empty array
-        $this->assertIsArray($result);
-        $this->assertEmpty($result);
+        // Then: Returns test token
+        $this->assertEquals($testToken, $result);
     }
 }

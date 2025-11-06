@@ -38,6 +38,7 @@ $aLang = array(
     'SHOP_MODULE_sStripeCronSecureKey'                  => 'Cronjob secure key',
     'SHOP_MODULE_GROUP_STRIPE_WEBHOOKS'                 => 'Webhooks',
     'SHOP_MODULE_sStripeWebhookEndpoint'                => 'Webhook Endpoint',
+    'SHOP_MODULE_sStripeWebhookEndpointSecret'          => 'Webhook Endpoint secret',
     'SHOP_MODULE_blStripeProvideCustomerEmailAddress'   => 'Send customer email address to Stripe',
 
     'HELP_SHOP_MODULE_sStripeTestKey'                   => 'Fill in your personal TEST private API key that will be used to set up the webhook endpoint.',

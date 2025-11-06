@@ -191,62 +191,88 @@ class MetadataTest extends TestCase
         // Extract setting names for easier testing
         $settingNames = array_column($settings, 'name');
 
-        // Test mode setting
+        // Mode setting
         $this->assertContains(
-            'osc_stripe_test_mode',
+            'sStripeMode',
             $settingNames,
-            'Test mode setting must be defined'
+            'Stripe mode setting must be defined'
         );
 
-        // API keys
+        // Test mode API keys
         $this->assertContains(
-            'osc_stripe_test_publishable_key',
+            'sStripeTestToken',
+            $settingNames,
+            'Test token setting must be defined'
+        );
+
+        $this->assertContains(
+            'sStripeTestPk',
             $settingNames,
             'Test publishable key setting must be defined'
         );
 
         $this->assertContains(
-            'osc_stripe_test_secret_key',
+            'sStripeTestKey',
             $settingNames,
             'Test secret key setting must be defined'
         );
 
+        // Live mode API keys
         $this->assertContains(
-            'osc_stripe_live_publishable_key',
+            'sStripeLiveToken',
+            $settingNames,
+            'Live token setting must be defined'
+        );
+
+        $this->assertContains(
+            'sStripeLivePk',
             $settingNames,
             'Live publishable key setting must be defined'
         );
 
         $this->assertContains(
-            'osc_stripe_live_secret_key',
+            'sStripeLiveKey',
             $settingNames,
             'Live secret key setting must be defined'
         );
 
-        // Webhook secrets
+        // Webhook configuration
         $this->assertContains(
-            'osc_stripe_test_webhook_secret',
+            'sStripeWebhookEndpoint',
             $settingNames,
-            'Test webhook secret setting must be defined'
+            'Webhook endpoint setting must be defined'
         );
 
         $this->assertContains(
-            'osc_stripe_live_webhook_secret',
+            'sStripeWebhookEndpointSecret',
             $settingNames,
-            'Live webhook secret setting must be defined'
+            'Webhook endpoint secret setting must be defined'
         );
 
-        // Payment configuration
+        // Logging and behavior settings
         $this->assertContains(
-            'osc_stripe_payment_methods',
+            'blStripeLogTransactionInfo',
             $settingNames,
-            'Payment methods setting must be defined'
+            'Transaction logging setting must be defined'
+        );
+
+        // Status mapping settings
+        $this->assertContains(
+            'sStripeStatusPending',
+            $settingNames,
+            'Status pending mapping must be defined'
         );
 
         $this->assertContains(
-            'osc_stripe_capture_method',
+            'sStripeStatusProcessing',
             $settingNames,
-            'Capture method setting must be defined'
+            'Status processing mapping must be defined'
+        );
+
+        $this->assertContains(
+            'sStripeStatusCancelled',
+            $settingNames,
+            'Status cancelled mapping must be defined'
         );
     }
 
@@ -258,11 +284,19 @@ class MetadataTest extends TestCase
         $this->assertArrayHasKey('settings', $this->moduleData);
         $settings = $this->moduleData['settings'];
 
-        foreach ($settings as $setting) {
-            // Check if setting name contains 'secret' or 'secret_key'
-            if (str_contains($setting['name'], 'secret_key') ||
-                str_contains($setting['name'], 'webhook_secret')) {
+        $sensitivePatterns = ['Token', 'Key', 'Secret'];
 
+        foreach ($settings as $setting) {
+            // Check if setting name contains sensitive patterns
+            $isSensitive = false;
+            foreach ($sensitivePatterns as $pattern) {
+                if (str_contains($setting['name'], $pattern)) {
+                    $isSensitive = true;
+                    break;
+                }
+            }
+
+            if ($isSensitive) {
                 $this->assertEquals(
                     'password',
                     $setting['type'],
@@ -353,102 +387,107 @@ class MetadataTest extends TestCase
     }
 
     /**
-     * Test 11: Capture method setting has valid constraints
+     * Test 11: Stripe mode setting has valid constraints
      */
-    public function testCaptureMethodConstraints(): void
+    public function testStripeModeConstraints(): void
     {
         $this->assertArrayHasKey('settings', $this->moduleData);
         $settings = $this->moduleData['settings'];
 
-        $captureMethodSetting = null;
+        $stripeModeSettting = null;
         foreach ($settings as $setting) {
-            if ($setting['name'] === 'osc_stripe_capture_method') {
-                $captureMethodSetting = $setting;
+            if ($setting['name'] === 'sStripeMode') {
+                $stripeModeSettting = $setting;
                 break;
             }
         }
 
         $this->assertNotNull(
-            $captureMethodSetting,
-            'Capture method setting must exist'
+            $stripeModeSettting,
+            'Stripe mode setting must exist'
         );
 
         $this->assertEquals(
             'select',
-            $captureMethodSetting['type'],
-            'Capture method setting must be of type "select"'
+            $stripeModeSettting['type'],
+            'Stripe mode setting must be of type "select"'
         );
 
         $this->assertArrayHasKey(
             'constraints',
-            $captureMethodSetting,
-            'Capture method setting must have constraints'
+            $stripeModeSettting,
+            'Stripe mode setting must have constraints'
         );
 
         // Constraints must be a pipe-delimited string
-        $constraints = $captureMethodSetting['constraints'];
+        $constraints = $stripeModeSettting['constraints'];
 
-        $this->assertIsString($constraints, 'Capture method constraints must be a string');
+        $this->assertIsString($constraints, 'Stripe mode constraints must be a string');
 
         $constraints = explode('|', $constraints);
 
         $this->assertIsArray($constraints, 'Constraints must be convertible to an array');
 
         $this->assertContains(
-            'automatic',
+            'live',
             $constraints,
-            'Constraints must include "automatic"'
+            'Constraints must include "live"'
         );
 
         $this->assertContains(
-            'manual',
+            'test',
             $constraints,
-            'Constraints must include "manual"'
+            'Constraints must include "test"'
         );
     }
 
     /**
-     * Test 12: Payment methods setting has default value
+     * Test 12: Settings have required structure
      */
-    public function testPaymentMethodsDefaultValue(): void
+    public function testSettingsStructure(): void
     {
         $this->assertArrayHasKey('settings', $this->moduleData);
         $settings = $this->moduleData['settings'];
 
-        $paymentMethodsSetting = null;
         foreach ($settings as $setting) {
-            if ($setting['name'] === 'osc_stripe_payment_methods') {
-                $paymentMethodsSetting = $setting;
-                break;
-            }
+            // Each setting must have required fields
+            $this->assertArrayHasKey(
+                'group',
+                $setting,
+                sprintf('Setting "%s" must have a group', $setting['name'] ?? 'unknown')
+            );
+
+            $this->assertArrayHasKey(
+                'name',
+                $setting,
+                'Setting must have a name'
+            );
+
+            $this->assertArrayHasKey(
+                'type',
+                $setting,
+                sprintf('Setting "%s" must have a type', $setting['name'])
+            );
+
+            $this->assertArrayHasKey(
+                'value',
+                $setting,
+                sprintf('Setting "%s" must have a value', $setting['name'])
+            );
+
+            $this->assertArrayHasKey(
+                'position',
+                $setting,
+                sprintf('Setting "%s" must have a position', $setting['name'])
+            );
+
+            // Validate type is valid
+            $validTypes = ['str', 'bool', 'select', 'password', 'arr', 'num'];
+            $this->assertContains(
+                $setting['type'],
+                $validTypes,
+                sprintf('Setting "%s" has invalid type "%s"', $setting['name'], $setting['type'])
+            );
         }
-
-        $this->assertNotNull(
-            $paymentMethodsSetting,
-            'Payment methods setting must exist'
-        );
-
-        $this->assertEquals(
-            'arr',
-            $paymentMethodsSetting['type'],
-            'Payment methods setting must be of type "arr"'
-        );
-
-        $this->assertArrayHasKey(
-            'value',
-            $paymentMethodsSetting,
-            'Payment methods setting must have default value'
-        );
-
-        $this->assertIsArray(
-            $paymentMethodsSetting['value'],
-            'Payment methods default value must be an array'
-        );
-
-        $this->assertContains(
-            'card',
-            $paymentMethodsSetting['value'],
-            'Default payment methods must include "card"'
-        );
     }
 }

@@ -28,7 +28,8 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function isTestMode(): bool
     {
-        return (bool) $this->config->getConfigParam('osc_stripe_test_mode');
+        $mode = (string) $this->config->getConfigParam('sStripeMode');
+        return $mode === 'test';
     }
 
     /**
@@ -37,10 +38,10 @@ class ModuleConfigurationService implements ServiceInterface
     public function getPublishableKey(): string
     {
         if ($this->isTestMode()) {
-            return (string) $this->config->getConfigParam('osc_stripe_test_publishable_key');
+            return (string) $this->config->getConfigParam('sStripeTestPk');
         }
 
-        return (string) $this->config->getConfigParam('osc_stripe_live_publishable_key');
+        return (string) $this->config->getConfigParam('sStripeLivePk');
     }
 
     /**
@@ -49,10 +50,22 @@ class ModuleConfigurationService implements ServiceInterface
     public function getSecretKey(): string
     {
         if ($this->isTestMode()) {
-            return (string) $this->config->getConfigParam('osc_stripe_test_secret_key');
+            return (string) $this->config->getConfigParam('sStripeTestKey');
         }
 
-        return (string) $this->config->getConfigParam('osc_stripe_live_secret_key');
+        return (string) $this->config->getConfigParam('sStripeLiveKey');
+    }
+
+    /**
+     * Get the token (API token) based on current mode (test/live)
+     */
+    public function getToken(): string
+    {
+        if ($this->isTestMode()) {
+            return (string) $this->config->getConfigParam('sStripeTestToken');
+        }
+
+        return (string) $this->config->getConfigParam('sStripeLiveToken');
     }
 
     /**
@@ -60,29 +73,47 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function getWebhookSecret(): string
     {
-        if ($this->isTestMode()) {
-            return (string) $this->config->getConfigParam('osc_stripe_test_webhook_secret');
-        }
-
-        return (string) $this->config->getConfigParam('osc_stripe_live_webhook_secret');
+        return (string) $this->config->getConfigParam('sStripeWebhookEndpointSecret');
     }
 
     /**
-     * Get the list of enabled payment methods
-     *
-     * @return array<string>
+     * Get the webhook endpoint URL
      */
-    public function getPaymentMethods(): array
+    public function getWebhookEndpoint(): string
     {
-        return (array) $this->config->getConfigParam('osc_stripe_payment_methods');
+        return (string) $this->config->getConfigParam('sStripeWebhookEndpoint');
     }
 
     /**
-     * Get the capture method (automatic or manual)
+     * Check if transaction logging is enabled
      */
-    public function getCaptureMethod(): string
+    public function isTransactionLoggingEnabled(): bool
     {
-        return (string) $this->config->getConfigParam('osc_stripe_capture_method');
+        return (bool) $this->config->getConfigParam('blStripeLogTransactionInfo');
+    }
+
+    /**
+     * Get status mapping for pending orders
+     */
+    public function getStatusPending(): string
+    {
+        return (string) $this->config->getConfigParam('sStripeStatusPending');
+    }
+
+    /**
+     * Get status mapping for processing orders
+     */
+    public function getStatusProcessing(): string
+    {
+        return (string) $this->config->getConfigParam('sStripeStatusProcessing');
+    }
+
+    /**
+     * Get status mapping for cancelled orders
+     */
+    public function getStatusCancelled(): string
+    {
+        return (string) $this->config->getConfigParam('sStripeStatusCancelled');
     }
 
     /**
