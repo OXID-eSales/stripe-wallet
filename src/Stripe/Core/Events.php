@@ -20,7 +20,7 @@ class Events
     /**
      * Lists of all custom-groups to add the payment-methods to
      *
-     * @var array
+     * @var array<string>
      */
     public static $aGroupsToAdd = array(
         'oxidadmin',
@@ -42,7 +42,7 @@ class Events
     /**
      * List of all removed payment methods
      *
-     * @var array
+     * @var array<string>
      */
     public static $aRemovedPaymentMethods = array(
         'stripepaypal'
@@ -79,6 +79,7 @@ class Events
      */
     protected static function regenerateViews()
     {
+        /** @var \OxidEsales\Eshop\Application\Model\Shop $oShop */
         $oShop = oxNew('oxShop');
         $oShop->generateViews();
     }
@@ -90,16 +91,17 @@ class Events
      */
     protected static function clearTmp()
     {
-        $output = shell_exec(VENDOR_PATH . '/bin/oe-console oe:cache:clear');
+        shell_exec(VENDOR_PATH . '/bin/oe-console oe:cache:clear');
     }
 
     /**
      * Get all available stripe payment methods from payment helper
      *
-     * @return array
+     * @return array<string, string>
      */
     protected static function getStripePaymentMethods()
     {
+        /** @var array<string, string> */
         return Payment::getInstance()->getStripePaymentMethods();
     }
 
@@ -206,7 +208,7 @@ class Events
     protected static function addTableIfNotExists($sTableName, $sQuery)
     {
         $aTables = DatabaseProvider::getDb()->getAll("SHOW TABLES LIKE ?", array($sTableName));
-        if (!$aTables || count($aTables) == 0) {
+        if (empty($aTables)) {
             DatabaseProvider::getDb()->Execute($sQuery);
             return true;
         }
@@ -219,7 +221,7 @@ class Events
      * @param string $sTableName            table name
      * @param string $sColumnName           column name
      * @param string $sQuery                sql-query to add column to table
-     * @param array  $aNewColumnDataQueries  array of queries to execute when column was added
+     * @param array<string>  $aNewColumnDataQueries  array of queries to execute when column was added
      *
      * @return boolean true or false
      */
@@ -244,9 +246,9 @@ class Events
      * Insert a database row to an existing table.
      *
      * @param string $sTableName database table name
-     * @param array  $aKeyValue  keys of rows to add for existance check
+     * @param array<string, string>  $aKeyValue  keys of rows to add for existance check
      * @param string $sQuery     sql-query to insert data
-     * @param array  $aParams    sql-query insert parameters
+     * @param array<string, mixed>  $aParams    sql-query insert parameters
      *
      * @return boolean true or false
      */
@@ -254,7 +256,7 @@ class Events
     {
         $sCheckQuery = "SELECT * FROM {$sTableName} WHERE 1";
         foreach ($aKeyValue as $key => $value) {
-            $sCheckQuery .= " AND $key = '$value'";
+            $sCheckQuery .= " AND $key = '" . (string)$value . "'";
         }
 
         if (!DatabaseProvider::getDb()->getOne($sCheckQuery)) { // row not existing yet?
