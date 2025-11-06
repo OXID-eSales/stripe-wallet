@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 use OxidSolutionCatalysts\Payments\Component\Controller\Http\WebhookController;
 use OxidSolutionCatalysts\Payments\Component\Controller\Http\PaymentController;
+use OxidSolutionCatalysts\Payments\Stripe\Core\Events;
 
 /**
  * Metadata version
@@ -106,7 +107,7 @@ $aModule = [
         ],
     ],
     'events' => [
-        'onActivate' => 'OxidSolutionCatalysts\\Payments\\Component\\Core\\Events::onActivate',
-        'onDeactivate' => 'OxidSolutionCatalysts\\Payments\\Component\\Core\\Events::onDeactivate',
+        'onActivate' => Events::class . '::onActivate',
+        'onDeactivate' => Events::class . '::onDeactivate',
     ],
 ];

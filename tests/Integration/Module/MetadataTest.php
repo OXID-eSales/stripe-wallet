@@ -313,6 +313,28 @@ class MetadataTest extends TestCase
             $events['onDeactivate'],
             'onDeactivate event handler must be in format "Class::method"'
         );
+
+        // Verify event handler classes exist and methods are callable
+        foreach ($events as $eventName => $eventHandler) {
+            $parts = explode('::', $eventHandler);
+            $this->assertCount(
+                2,
+                $parts,
+                sprintf('Event handler "%s" must be in format "Class::method"', $eventHandler)
+            );
+
+            [$className, $methodName] = $parts;
+
+            $this->assertTrue(
+                class_exists($className),
+                sprintf('Event handler class "%s" for event "%s" must exist', $className, $eventName)
+            );
+
+            $this->assertTrue(
+                is_callable([$className, $methodName]),
+                sprintf('Event handler method "%s::%s" for event "%s" must be callable', $className, $methodName, $eventName)
+            );
+        }
     }
 
     /**
