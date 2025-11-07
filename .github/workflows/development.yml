@@ -179,7 +179,7 @@ jobs:
 
       - name: Run style check
         run: |
-          ./test-module/bin/pre-commit-check.sh
+          ./source/test-module/bin/pre-commit-check.sh
 
       - name: Upload log artifact
         if: always()
