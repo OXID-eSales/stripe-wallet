@@ -44,7 +44,7 @@ class ModuleStructureTest extends TestCase
         $aModule = [];
         include $metadataFile;
 
-        $this->assertEquals('stripe', $aModule['id']);
+        $this->assertEquals('osc_stripe_wallet', $aModule['id']);
         $this->assertEquals('2.1', $GLOBALS['sMetadataVersion'] ?? $sMetadataVersion);
     }
 

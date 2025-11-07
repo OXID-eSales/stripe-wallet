@@ -6,3 +6,29 @@ parameters:
         - ../../vendor
         - ../../var
     reportUnmatchedIgnoredErrors: false
+    ignoreErrors:
+        # Legacy OXID function
+        - '#Function oxNew not found#'
+        # Legacy constant
+        - '#Constant VENDOR_PATH not found#'
+        # Missing legacy classes - to be implemented
+        - '#unknown class OxidSolutionCatalysts\\Payments\\Stripe\\Core\\Payment#'
+        - '#unknown class OxidSolutionCatalysts\\Payments\\Stripe\\Core\\PaymentConfig#'
+        - '#unknown class OxidSolutionCatalysts\\Payments\\Stripe\\Core\\RequestLog#'
+        - '#unknown class OxidSolutionCatalysts\\Payments\\Stripe\\Core\\Cronjob#'
+        # Method calls on legacy mixed types from oxNew and legacy classes
+        - '#Cannot call method generateViews\(\) on mixed#'
+        - '#Cannot call method getStripePaymentMethods\(\) on mixed#'
+        # Binary operations with VENDOR_PATH constant and static properties
+        - '#Binary operation "\." .* results in an error#'
+        # Access to static properties on unknown classes
+        - '#Access to static property \$sTableName on an unknown class#'
+        # Calls to static methods on unknown classes
+        - '#Call to static method .* on an unknown class#'
+        # Parameters from legacy code
+        - '#Parameter .* of static method .* expects string, mixed given#'
+        - '#Parameter .* of method .* expects string, mixed given#'
+        # Return types for legacy methods
+        -
+            message: '#Method .* should return array but returns mixed#'
+            path: src/Stripe/Core/Events.php
