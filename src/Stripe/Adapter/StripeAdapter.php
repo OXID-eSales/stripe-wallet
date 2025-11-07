@@ -68,7 +68,6 @@ final class StripeAdapter implements PaymentAdapterInterface
                 'amount' => $amountInCents,
                 'currency' => strtolower($request->currency),
                 'capture_method' => $captureMethod,
-                'confirmation_method' => 'automatic', // Automatic 3D Secure handling
                 'metadata' => array_merge($request->metadata, [
                     'order_id' => $request->orderId,
                     'shop_id' => $request->shopId,
@@ -265,7 +264,6 @@ final class StripeAdapter implements PaymentAdapterInterface
                 'amount' => $amountInCents,
                 'currency' => strtolower($request->currency),
                 'capture_method' => 'manual', // Two-step: manual capture
-                'confirmation_method' => 'automatic', // Automatic 3D Secure handling
                 'metadata' => array_merge($request->metadata, [
                     'order_id' => $request->orderId,
                     'shop_id' => $request->shopId,
