@@ -51,7 +51,7 @@ run_phpmd() {
     local files="$1"
     if [ -n "$files" ]; then
         echo "Running PHPMD on changed files: $files"
-        vendor/bin/phpmd $files text tests/PhpMd/phpmd.baseline.xml --exclude tests/ --suffixes php --strict || EXIT_CODE=$?
+        vendor/bin/phpmd $files text tests/PhpMd/phpmd.baseline.xml --exclude tests/,migration/data/ --suffixes php --strict || EXIT_CODE=$?
     else
         echo "No PHP files to check with PHPMD"
     fi

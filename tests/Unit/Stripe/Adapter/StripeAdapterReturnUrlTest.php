@@ -45,7 +45,7 @@ class TestStripeClient extends StripeClient
  */
 final class StripeAdapterReturnUrlTest extends TestCase
 {
-    private TestStripeClient $stripeClient;
+    private StripeClient $stripeClient;
     private StripeAdapter $adapter;
 
     protected function setUp(): void

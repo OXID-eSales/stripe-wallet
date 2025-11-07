@@ -340,6 +340,230 @@ class MigrationStructureTest extends TestCase
         }
     }
 
+    // ==================== PAYMENTWATCH INDEXES (Version20250112) ====================
+
+    /**
+     * @test
+     * @group watch
+     */
+    public function testContractTableHasPaymentWatchStateIndex(): void
+    {
+        $indexes = $this->getTableIndexes('osc_payment_contract');
+
+        $this->assertArrayHasKey(
+            'idx_pw_contract_state',
+            $indexes,
+            'Contract table should have PaymentWatch state index (idx_pw_contract_state)'
+        );
+
+        $this->assertContains(
+            'OXSTATE',
+            $indexes['idx_pw_contract_state']['columns'],
+            'idx_pw_contract_state should index OXSTATE column'
+        );
+    }
+
+    /**
+     * @test
+     * @group watch
+     */
+    public function testContractTableHasPaymentWatchProviderOrderIndex(): void
+    {
+        $indexes = $this->getTableIndexes('osc_payment_contract');
+
+        $this->assertArrayHasKey(
+            'idx_pw_contract_provider_order',
+            $indexes,
+            'Contract table should have PaymentWatch provider order index (idx_pw_contract_provider_order)'
+        );
+
+        $this->assertContains(
+            'OXPROVIDERORDERID',
+            $indexes['idx_pw_contract_provider_order']['columns'],
+            'idx_pw_contract_provider_order should index OXPROVIDERORDERID column'
+        );
+    }
+
+    /**
+     * @test
+     * @group watch
+     */
+    public function testContractTableHasPaymentWatchOrderIndex(): void
+    {
+        $indexes = $this->getTableIndexes('osc_payment_contract');
+
+        $this->assertArrayHasKey(
+            'idx_pw_contract_order',
+            $indexes,
+            'Contract table should have PaymentWatch order index (idx_pw_contract_order)'
+        );
+
+        $this->assertContains(
+            'OXORDERID',
+            $indexes['idx_pw_contract_order']['columns'],
+            'idx_pw_contract_order should index OXORDERID column'
+        );
+    }
+
+    /**
+     * @test
+     * @group watch
+     */
+    public function testContractTableHasPaymentWatchUserIndex(): void
+    {
+        $indexes = $this->getTableIndexes('osc_payment_contract');
+
+        $this->assertArrayHasKey(
+            'idx_pw_contract_user',
+            $indexes,
+            'Contract table should have PaymentWatch user index (idx_pw_contract_user)'
+        );
+
+        $this->assertContains(
+            'OXUSERID',
+            $indexes['idx_pw_contract_user']['columns'],
+            'idx_pw_contract_user should index OXUSERID column'
+        );
+    }
+
+    /**
+     * @test
+     * @group watch
+     */
+    public function testContractTableHasPaymentWatchCompositeIndex(): void
+    {
+        $indexes = $this->getTableIndexes('osc_payment_contract');
+
+        $this->assertArrayHasKey(
+            'idx_pw_contract_id_state',
+            $indexes,
+            'Contract table should have PaymentWatch composite index (idx_pw_contract_id_state)'
+        );
+
+        $this->assertContains(
+            'OXID',
+            $indexes['idx_pw_contract_id_state']['columns'],
+            'idx_pw_contract_id_state should include OXID column'
+        );
+
+        $this->assertContains(
+            'OXSTATE',
+            $indexes['idx_pw_contract_id_state']['columns'],
+            'idx_pw_contract_id_state should include OXSTATE column'
+        );
+    }
+
+    /**
+     * @test
+     * @group watch
+     */
+    public function testTransactionTableHasPaymentWatchStatusIndex(): void
+    {
+        $indexes = $this->getTableIndexes('osc_payment_transaction');
+
+        $this->assertArrayHasKey(
+            'idx_pw_transaction_status',
+            $indexes,
+            'Transaction table should have PaymentWatch status index (idx_pw_transaction_status)'
+        );
+
+        $this->assertContains(
+            'OXSTATUS',
+            $indexes['idx_pw_transaction_status']['columns'],
+            'idx_pw_transaction_status should index OXSTATUS column'
+        );
+    }
+
+    /**
+     * @test
+     * @group watch
+     */
+    public function testTransactionTableHasPaymentWatchContractIndex(): void
+    {
+        $indexes = $this->getTableIndexes('osc_payment_transaction');
+
+        $this->assertArrayHasKey(
+            'idx_pw_transaction_contract',
+            $indexes,
+            'Transaction table should have PaymentWatch contract index (idx_pw_transaction_contract)'
+        );
+
+        $this->assertContains(
+            'OXCONTRACTID',
+            $indexes['idx_pw_transaction_contract']['columns'],
+            'idx_pw_transaction_contract should index OXCONTRACTID column'
+        );
+    }
+
+    /**
+     * @test
+     * @group watch
+     */
+    public function testTransactionTableHasPaymentWatchProviderOrderIndex(): void
+    {
+        $indexes = $this->getTableIndexes('osc_payment_transaction');
+
+        $this->assertArrayHasKey(
+            'idx_pw_transaction_provider_order',
+            $indexes,
+            'Transaction table should have PaymentWatch provider order index (idx_pw_transaction_provider_order)'
+        );
+
+        $this->assertContains(
+            'OXPROVIDERORDERID',
+            $indexes['idx_pw_transaction_provider_order']['columns'],
+            'idx_pw_transaction_provider_order should index OXPROVIDERORDERID column'
+        );
+    }
+
+    /**
+     * @test
+     * @group watch
+     */
+    public function testTransactionTableHasPaymentWatchTypeIndex(): void
+    {
+        $indexes = $this->getTableIndexes('osc_payment_transaction');
+
+        $this->assertArrayHasKey(
+            'idx_pw_transaction_type',
+            $indexes,
+            'Transaction table should have PaymentWatch type index (idx_pw_transaction_type)'
+        );
+
+        $this->assertContains(
+            'OXTYPE',
+            $indexes['idx_pw_transaction_type']['columns'],
+            'idx_pw_transaction_type should index OXTYPE column'
+        );
+    }
+
+    /**
+     * @test
+     * @group watch
+     */
+    public function testTransactionTableHasPaymentWatchCompositeIndex(): void
+    {
+        $indexes = $this->getTableIndexes('osc_payment_transaction');
+
+        $this->assertArrayHasKey(
+            'idx_pw_transaction_contract_status',
+            $indexes,
+            'Transaction table should have PaymentWatch composite index (idx_pw_transaction_contract_status)'
+        );
+
+        $this->assertContains(
+            'OXCONTRACTID',
+            $indexes['idx_pw_transaction_contract_status']['columns'],
+            'idx_pw_transaction_contract_status should include OXCONTRACTID column'
+        );
+
+        $this->assertContains(
+            'OXSTATUS',
+            $indexes['idx_pw_transaction_contract_status']['columns'],
+            'idx_pw_transaction_contract_status should include OXSTATUS column'
+        );
+    }
+
     // ==================== HELPER METHODS ====================
 
     private function tableExists(string $tableName): bool

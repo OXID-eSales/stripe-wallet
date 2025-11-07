@@ -1,0 +1,79 @@
+services:
+  _defaults:
+    autowire: false
+    autoconfigure: false
+    public: false
+
+  # Value Objects (created via factories, not as services)
+
+  # Auth Configuration
+  paymentwatch.auth_config:
+    class: OxidSolutionCatalysts\Payments\Watch\ValueObject\AuthConfig
+    arguments:
+      - '%paymentwatch.allowed_hosts%'
+
+  # Strategy Factory
+  paymentwatch.operator_strategy_factory:
+    class: OxidSolutionCatalysts\Payments\Watch\Strategy\OperatorStrategyFactory
+    public: true
+
+  # Services
+  paymentwatch.request_validator:
+    class: OxidSolutionCatalysts\Payments\Watch\Service\RequestValidator
+    public: true
+
+  paymentwatch.api_key_validator:
+    class: OxidSolutionCatalysts\Payments\Watch\Service\ApiKeyValidator
+    public: true
+
+  paymentwatch.ip_validator:
+    class: OxidSolutionCatalysts\Payments\Watch\Service\IpValidator
+    public: true
+
+  paymentwatch.authentication_service:
+    class: OxidSolutionCatalysts\Payments\Watch\Service\AuthenticationService
+    arguments:
+      - '@paymentwatch.auth_config'
+      - '@paymentwatch.ip_validator'
+      - '@paymentwatch.api_key_validator'
+    public: true
+
+  paymentwatch.assumption_parser:
+    class: OxidSolutionCatalysts\Payments\Watch\Service\AssumptionParser
+    arguments:
+      - '@paymentwatch.request_validator'
+    public: true
+
+  paymentwatch.query_builder:
+    class: OxidSolutionCatalysts\Payments\Watch\Service\QueryBuilder
+    arguments:
+      - '@oxid_esales.doctrine.connection.default'
+      - '@paymentwatch.operator_strategy_factory'
+    public: true
+
+  paymentwatch.audit_logger:
+    class: OxidSolutionCatalysts\Payments\Watch\Service\AuditLogger
+    arguments:
+      - '@logger'
+    public: true
+
+  # Controller
+  paymentwatch.controller.assumption:
+    class: OxidSolutionCatalysts\Payments\Watch\Controller\AssumptionController
+    arguments:
+      - '@paymentwatch.authentication_service'
+      - '@paymentwatch.assumption_parser'
+      - '@paymentwatch.query_builder'
+      - '@paymentwatch.audit_logger'
+      - '@logger'
+    public: true
+    calls:
+      - [setContainer, ['@service_container']]
+
+parameters:
+  # PaymentWatch configuration
+  # This should be loaded from module settings
+  paymentwatch.enabled: false
+  paymentwatch.allowed_hosts: []
+  paymentwatch.rate_limit_enabled: false
+  paymentwatch.rate_limit_per_minute: 100

@@ -1,0 +1,8 @@
+paymentwatch_assume:
+    path: /paymentwatch/assume
+    controller: paymentwatch_assumption::assume
+    methods: [POST]
+    requirements:
+        _moduleId: osc_stripe_wallet
+    defaults:
+        _format: json

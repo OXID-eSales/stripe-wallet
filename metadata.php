@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 use OxidSolutionCatalysts\Payments\Component\Controller\Http\WebhookController;
 use OxidSolutionCatalysts\Payments\Component\Controller\Http\PaymentController;
+use OxidSolutionCatalysts\Payments\Watch\Controller\AssumptionController;
 use OxidSolutionCatalysts\Payments\Stripe\Core\Events;
 use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\StripeConnect;
 use OxidSolutionCatalysts\Payments\Stripe\Application\Controller\Admin\ModuleConfiguration;
@@ -41,6 +42,7 @@ $aModule = [
     'controllers' => [
         'osc_stripe_webhook' => WebhookController::class,
         'osc_stripe_payment' => PaymentController::class,
+        'paymentwatch_assumption' => AssumptionController::class,
         'StripeConnect' => StripeConnect::class,
     ],
     'templates' => [
@@ -77,6 +79,11 @@ $aModule = [
         ['group' => 'STRIPE_CRONJOBS',          'name' => 'sStripeCronSecureKey',               'type' => 'str',        'value' => '',          'position' => 120],
         ['group' => 'STRIPE_WEBHOOKS',          'name' => 'sStripeWebhookEndpoint',             'type' => 'str',        'value' => '',          'position' => 130],
         ['group' => 'STRIPE_WEBHOOKS',          'name' => 'sStripeWebhookEndpointSecret',       'type' => 'str',        'value' => '',          'position' => 140],
+        ['group' => 'STRIPE_WEBHOOKS',          'name' => 'sStripeWebhookEndpointSecret',       'type' => 'password',   'value' => '',          'position' => 140],
+        ['group' => 'PAYMENTWATCH',             'name' => 'paywatchEnabled',                    'type' => 'bool',       'value' => '0',         'position' => 200],
+        ['group' => 'PAYMENTWATCH',             'name' => 'paywatchAllowedHosts',               'type' => 'arr',        'value' => '[]',        'position' => 210],
+        ['group' => 'PAYMENTWATCH',             'name' => 'paywatchRateLimitEnabled',           'type' => 'bool',       'value' => '0',         'position' => 220],
+        ['group' => 'PAYMENTWATCH',             'name' => 'paywatchRateLimitPerMinute',         'type' => 'str',        'value' => '100',       'position' => 230],
     ],
     'events' => [
         'onActivate' => Events::class . '::onActivate',

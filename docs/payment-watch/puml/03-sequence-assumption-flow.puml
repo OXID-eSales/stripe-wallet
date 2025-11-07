@@ -1,0 +1,170 @@
+@startuml Assumption Request Flow (Happy Path)
+
+skinparam backgroundColor #FEFEFE
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor "Test Suite" as Test
+participant "AssumptionController" as Controller
+participant "AuthenticationService" as Auth
+participant "AssumptionParser" as Parser
+participant "RequestValidator" as Validator
+participant "AssumptionRequest" as Request <<ValueObject>>
+participant "QueryBuilder" as QueryBuilder
+participant "OperatorStrategy" as Strategy
+participant "SqlSanitizer" as Sanitizer
+participant "Database" as DB
+participant "AssumptionResponse" as Response <<ValueObject>>
+participant "AuditLogger" as Audit
+
+== Request Reception ==
+Test -> Controller : POST /paymentwatch/assume\n+ JSON payload\n+ X-API-Key header
+activate Controller
+
+Controller -> Controller : getClientIp(request)
+note right
+    Extract IP from:
+    • X-Forwarded-For
+    • X-Real-IP
+    • REMOTE_ADDR
+end note
+
+== Authentication Phase ==
+Controller -> Auth : authenticate(clientIp, apiKey)
+activate Auth
+
+Auth -> Auth : validateIpWhitelist(clientIp)
+note right
+    Check against:
+    • Exact match
+    • CIDR ranges
+end note
+
+Auth -> Auth : validateApiKey(apiKey)
+note right
+    • Format validation (64-char hex)
+    • hash_equals() for constant-time
+end note
+
+Auth --> Controller : void (success)
+deactivate Auth
+
+== Parsing Phase ==
+Controller -> Controller : json_decode(body)
+
+Controller -> Parser : parse(payload)
+activate Parser
+
+Parser -> Validator : validatePayload(payload)
+activate Validator
+Validator -> Validator : checkRequiredKeys()
+Validator -> Validator : checkFieldPathFormat()
+Validator --> Parser : void (valid)
+deactivate Validator
+
+Parser -> Parser : extractFieldPath()
+note right
+    Parse: "table.field"
+    → [table, field]
+end note
+
+Parser -> Validator : validateIdentifier(tableName)
+activate Validator
+Validator -> Validator : checkSqlKeywords()
+Validator -> Validator : checkRegex(/^[a-zA-Z_][a-zA-Z0-9_]*$/)
+Validator --> Parser : void (valid)
+deactivate Validator
+
+Parser -> Validator : validateOperator(operator)
+activate Validator
+Validator -> Validator : checkAllowedOperators()
+Validator --> Parser : void (valid)
+deactivate Validator
+
+Parser -> Request ** : new(tableName, fieldName, \nexpectedValue, operator, whereClause)
+activate Request
+Request -> Request : self-validate()
+Request --> Parser : AssumptionRequest
+deactivate Request
+
+Parser --> Controller : AssumptionRequest
+deactivate Parser
+
+== Query Execution Phase ==
+Controller -> QueryBuilder : execute(request)
+activate QueryBuilder
+
+QueryBuilder -> Strategy : getOperator(request.getOperator())
+activate Strategy
+Strategy --> QueryBuilder : OperatorStrategyInterface
+deactivate Strategy
+
+QueryBuilder -> Sanitizer : quoteIdentifier(tableName)
+activate Sanitizer
+Sanitizer --> QueryBuilder : quoted identifier
+deactivate Sanitizer
+
+QueryBuilder -> Sanitizer : quoteIdentifier(fieldName)
+activate Sanitizer
+Sanitizer --> QueryBuilder : quoted identifier
+deactivate Sanitizer
+
+QueryBuilder -> QueryBuilder : buildQuery(request)
+note right
+    SELECT `field`
+    FROM `table`
+    WHERE `filter` = ?
+    LIMIT 1
+end note
+
+QueryBuilder -> QueryBuilder : buildParams(request)
+note right
+    Extract WHERE values
+    for parameter binding
+end note
+
+QueryBuilder -> DB : executeQuery(sql, params)
+activate DB
+DB --> QueryBuilder : result row or false
+deactivate DB
+
+alt Result Found
+    QueryBuilder -> Strategy : compare(actualValue, expectedValue)
+    activate Strategy
+    Strategy --> QueryBuilder : bool (match result)
+    deactivate Strategy
+
+    QueryBuilder -> Response ** : new(isMatch, matchedRows, actualValue)
+    activate Response
+    Response --> QueryBuilder : AssumptionResponse
+    deactivate Response
+else No Result
+    QueryBuilder -> Response ** : new(false, 0, null)
+    activate Response
+    Response --> QueryBuilder : AssumptionResponse
+    deactivate Response
+end
+
+QueryBuilder --> Controller : AssumptionResponse
+deactivate QueryBuilder
+
+== Audit & Response ==
+Controller -> Audit : logRequest(requestId, clientIp, query, result, time)
+activate Audit
+Audit --> Controller : void
+deactivate Audit
+
+Controller -> Controller : buildJsonResponse(response)
+note right
+    {
+        "assumption": true/false,
+        "query_time_ms": 12.5,
+        "matched_rows": 1,
+        "actual_value": "..."
+    }
+end note
+
+Controller --> Test : 200 OK + JSON response
+deactivate Controller
+
+@enduml
