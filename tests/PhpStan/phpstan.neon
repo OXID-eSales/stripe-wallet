@@ -4,7 +4,7 @@ parameters:
         - ../../src
     excludePaths:
         - ../../vendor
-        - ../../var
+        - ../../var (?)
     reportUnmatchedIgnoredErrors: false
     ignoreErrors:
         # Legacy OXID function

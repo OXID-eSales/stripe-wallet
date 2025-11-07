@@ -46,7 +46,7 @@ echo ""
 # 2. PHPUnit - All Tests
 echo ">>> Running PHPUnit Tests (All)..."
 docker compose exec -w /var/www/extensions/stripe -T php \
-    vendor/bin/phpunit -c tests/phpunit.xml
+    vendor/bin/phpunit -c tests/phpunit.xml --bootstrap=/var/www/source/bootstrap.php
 PHPUNIT_STATUS=$?
 if [ $PHPUNIT_STATUS -ne 0 ]; then
     OVERALL_STATUS=1
