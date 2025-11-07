@@ -1,0 +1,278 @@
+@startuml Contract State Machine
+!theme plain
+
+title PaymentContract State Machine
+
+[*] --> DRAFT : Contract created
+
+DRAFT --> PENDING : transitionToPending()\n[conditions added]
+
+PENDING --> READY_TO_COMMIT : All conditions fulfilled\n[areAllConditionsFulfilled() = true]
+
+READY_TO_COMMIT --> COMMITTED : commitToOrder(orderId)\n[order created]
+
+COMMITTED --> FULFILLED : fulfill()\n[payment captured]
+
+FULFILLED --> [*]
+
+DRAFT --> CANCELLED : cancel(reason)
+PENDING --> CANCELLED : cancel(reason)
+READY_TO_COMMIT --> CANCELLED : cancel(reason)
+COMMITTED --> CANCELLED : cancel(reason)
+
+DRAFT --> EXPIRED : expire()\n[24h TTL exceeded]
+PENDING --> EXPIRED : expire()\n[24h TTL exceeded]
+READY_TO_COMMIT --> EXPIRED : expire()\n[24h TTL exceeded]
+
+DRAFT --> FAILED : fail(reason)\n[condition failure]
+PENDING --> FAILED : fail(reason)\n[condition failure]
+READY_TO_COMMIT --> FAILED : fail(reason)\n[condition failure]
+COMMITTED --> FAILED : fail(reason)\n[condition failure]
+
+CANCELLED --> [*]
+EXPIRED --> [*]
+FAILED --> [*]
+
+note right of DRAFT
+    **DRAFT State**
+    - Initial state
+    - Conditions can be added
+    - No payment initiated yet
+    - Default TTL: 24 hours
+
+    Actions:
+    - addCondition()
+    - transitionToPending()
+    - cancel()
+    - expire()
+end note
+
+note right of PENDING
+    **PENDING State**
+    - Payment initiated
+    - Awaiting condition fulfillment
+    - No more conditions can be added
+
+    Conditions to fulfill:
+    - PAYMENT_AUTHORIZED
+    - FRAUD_CHECK
+    - (optional) STOCK_RESERVED
+    - (optional) COMPLIANCE_CHECK
+    - (optional) ADDRESS_VALIDATED
+
+    Actions:
+    - fulfillCondition()
+    - failCondition()
+    - cancel()
+    - expire()
+end note
+
+note right of READY_TO_COMMIT
+    **READY_TO_COMMIT State**
+    - All conditions fulfilled
+    - Ready for order creation
+    - Payment authorized but not captured
+
+    Actions:
+    - commitToOrder()
+    - cancel()
+    - expire()
+end note
+
+note right of COMMITTED
+    **COMMITTED State**
+    - Linked to order
+    - Order created in system
+    - Awaiting payment capture
+
+    Actions:
+    - fulfill() (after capture)
+    - cancel() (rare, refund required)
+    - fail() (if capture fails)
+end note
+
+note right of FULFILLED
+    **FULFILLED State**
+    - Terminal state
+    - Payment captured successfully
+    - Order completed
+
+    No further state transitions
+end note
+
+note bottom of CANCELLED
+    **Terminal States**
+
+    **CANCELLED:**
+    - User/admin cancelled
+    - Payment voided if authorized
+    - No order created
+
+    **EXPIRED:**
+    - TTL exceeded (24h)
+    - Automatic cleanup
+    - Payment voided if authorized
+
+    **FAILED:**
+    - Condition failure
+    - Payment declined
+    - Fraud detected
+    - Technical error
+end note
+
+@enduml
+
+@startuml Condition State Machine
+!theme plain
+
+title ContractCondition State Machine
+
+[*] --> PENDING : Condition created
+
+PENDING --> FULFILLED : fulfill(data)\n[verification successful]
+
+PENDING --> FAILED : fail(reason)\n[verification failed]
+
+FULFILLED --> [*]
+FAILED --> [*]
+
+note right of PENDING
+    **PENDING State**
+    - Condition not yet verified
+    - Awaiting external validation
+    - Contract cannot proceed
+
+    Condition Types:
+    - PAYMENT_AUTHORIZED
+    - FRAUD_CHECK
+    - STOCK_RESERVED
+    - COMPLIANCE_CHECK
+    - ADDRESS_VALIDATED
+end note
+
+note right of FULFILLED
+    **FULFILLED State**
+    - Terminal state
+    - Condition verified successfully
+    - Data stored for audit
+
+    Properties:
+    - type: string
+    - status: 'fulfilled'
+    - data: array (verification data)
+    - fulfilledAt: DateTime
+end note
+
+note right of FAILED
+    **FAILED State**
+    - Terminal state
+    - Condition verification failed
+    - Failure reason recorded
+
+    Properties:
+    - type: string
+    - status: 'failed'
+    - failureReason: string
+    - data: array (error details)
+
+    Effects:
+    - Contract transitions to FAILED
+    - Payment cancelled/voided
+end note
+
+@enduml
+
+@startuml State Validation Rules
+!theme plain
+
+title State Transition Validation Rules
+
+package "Validation Rules" {
+    component "addCondition()" as ADD {
+        condition "state.isDraft()" as C1
+        note right of C1
+            Can only add conditions
+            in DRAFT state
+        end note
+    }
+
+    component "transitionToPending()" as TRANS {
+        condition "state.isDraft()" as C2
+        condition "!empty(conditions)" as C3
+        note right of C2
+            Must be in DRAFT state
+        end note
+        note right of C3
+            Must have at least
+            one condition
+        end note
+    }
+
+    component "commitToOrder()" as COMMIT {
+        condition "state.isReadyToCommit()" as C4
+        condition "areAllConditionsFulfilled()" as C5
+        note right of C4
+            Must be in
+            READY_TO_COMMIT state
+        end note
+        note right of C5
+            All conditions must
+            be fulfilled
+        end note
+    }
+
+    component "fulfill()" as FULFILL {
+        condition "state.isCommitted()" as C6
+        note right of C6
+            Must be in
+            COMMITTED state
+        end note
+    }
+
+    component "cancel()" as CANCEL {
+        condition "!state.isTerminal()" as C7
+        note right of C7
+            Cannot cancel
+            terminal states:
+            - FULFILLED
+            - CANCELLED
+            - EXPIRED
+            - FAILED
+        end note
+    }
+
+    component "expire()" as EXPIRE {
+        condition "!state.isTerminal()" as C8
+        condition "expiresAt < now()" as C9
+        note right of C8
+            Cannot expire
+            terminal states
+        end note
+        note right of C9
+            Must be past
+            expiration time
+        end note
+    }
+
+    component "fail()" as FAIL {
+        condition "!state.isTerminal()" as C10
+        note right of C10
+            Cannot fail
+            terminal states
+        end note
+    }
+}
+
+note bottom
+    **DomainException Thrown When:**
+    - Invalid state for operation
+    - Missing required conditions
+    - Unfulfilled conditions
+    - Terminal state modification
+
+    **LogicException Thrown When:**
+    - Contract ID is null (should never happen)
+    - Internal consistency violation
+end note
+
+@enduml

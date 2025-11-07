@@ -1,0 +1,297 @@
+@startuml Service Layer Architecture
+!theme plain
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+
+title Service Layer - Business Logic
+
+package "Component\Service" {
+    interface ContractServiceInterface {
+        +createContract(userId: string, basket: object, conditionTypes: array): PaymentContractInterface
+        +findActiveContractByUser(userId: string): ?PaymentContractInterface
+        +cleanupExpiredContracts(): int
+    }
+
+    class ContractService {
+        -contractRepository: ContractRepositoryInterface
+        ..
+        +__construct(repository: ContractRepositoryInterface)
+        +createContract(userId, basket, conditionTypes): PaymentContractInterface
+        +findActiveContractByUser(userId): ?PaymentContractInterface
+        +cleanupExpiredContracts(): int
+        ..
+        -createBasketSnapshot(basket: object): BasketSnapshot
+    }
+
+    ContractService ..|> ContractServiceInterface
+    ContractService --> ContractRepositoryInterface : uses
+}
+
+package "Component\Service <<Payment Operations>>" {
+    class PaymentCaptureService {
+        -contractRepository: ContractRepositoryInterface
+        -paymentAdapter: PaymentAdapterInterface
+        -logger: LoggerInterface
+        ..
+        +__construct(repo, adapter, logger)
+        +capturePayment(contractId: string, ?amount: float): array
+        ..
+        // Returns:
+        // ['success' => bool,
+        //  'captureId' => string,
+        //  'amount' => float]
+    }
+
+    class PaymentRefundService {
+        -contractRepository: ContractRepositoryInterface
+        -transactionRepository: TransactionRepositoryInterface
+        -paymentAdapter: PaymentAdapterInterface
+        -logger: LoggerInterface
+        ..
+        +__construct(contractRepo, txRepo, adapter, logger)
+        +refundPayment(contractId: string, ?amount: float, reason: string): array
+        ..
+        // Returns:
+        // ['success' => bool,
+        //  'refundId' => string,
+        //  'amount' => float,
+        //  'totalRefunded' => float,
+        //  'availableForRefund' => float]
+    }
+
+    PaymentCaptureService --> ContractRepositoryInterface : uses
+    PaymentCaptureService --> PaymentAdapterInterface : uses
+    PaymentCaptureService --> "PSR-3\LoggerInterface" : uses
+
+    PaymentRefundService --> ContractRepositoryInterface : uses
+    PaymentRefundService --> TransactionRepositoryInterface : uses
+    PaymentRefundService --> PaymentAdapterInterface : uses
+    PaymentRefundService --> "PSR-3\LoggerInterface" : uses
+}
+
+package "Component\Webhook" {
+    interface WebhookProcessorInterface {
+        +process(webhookData: array): void
+    }
+
+    class WebhookProcessor {
+        -contractRepository: ContractRepositoryInterface
+        -eventDispatcher: EventDispatcherInterface
+        -idempotencyChecker: WebhookIdempotencyCheckerInterface
+        -logRepository: WebhookLogRepositoryInterface
+        -logger: LoggerInterface
+        ..
+        +__construct(repo, dispatcher, checker, logRepo, logger)
+        +process(webhookData: array): void
+        ..
+        -validateWebhookData(data: array): ?array
+        -prepareWebhookProcessing(data: array): ?array
+        -findContractForWebhook(data, providerId): ?PaymentContractInterface
+        -dispatchWebhookEvent(eventType, contractId, data, eventId): void
+        -extractPaymentIntentId(data: array): ?string
+        -logWebhookEvent(eventId, eventType, contractId): void
+    }
+
+    interface WebhookIdempotencyCheckerInterface {
+        +isProcessed(eventId: string): bool
+        +markAsProcessed(eventId: string): void
+    }
+
+    class WebhookIdempotencyChecker {
+        -processedEvents: array<string, true>
+        -logRepository: WebhookLogRepositoryInterface
+        ..
+        +__construct(logRepo: WebhookLogRepositoryInterface)
+        +isProcessed(eventId: string): bool
+        +markAsProcessed(eventId: string): void
+    }
+
+    WebhookProcessor ..|> WebhookProcessorInterface
+    WebhookProcessor --> ContractRepositoryInterface : uses
+    WebhookProcessor --> EventDispatcherInterface : uses
+    WebhookProcessor --> WebhookIdempotencyCheckerInterface : uses
+    WebhookProcessor --> WebhookLogRepositoryInterface : uses
+    WebhookProcessor --> "PSR-3\LoggerInterface" : uses
+
+    WebhookIdempotencyChecker ..|> WebhookIdempotencyCheckerInterface
+    WebhookIdempotencyChecker --> WebhookLogRepositoryInterface : uses
+}
+
+package "Component\Service\Factory" {
+    interface FactoryInterface {
+        +create(string): object
+    }
+
+    class PaymentAdapterFactory {
+        -adapters: array<string, callable>
+        ..
+        +__construct()
+        +create(providerName: string): PaymentAdapterInterface
+        +register(name: string, factory: callable): void
+    }
+
+    PaymentAdapterFactory ..|> FactoryInterface
+    PaymentAdapterFactory ..> PaymentAdapterInterface : creates
+}
+
+note right of ContractService
+    **Contract Lifecycle Management**
+
+    Responsibilities:
+    - Create contract with basket snapshot
+    - Add default conditions:
+      * PAYMENT_AUTHORIZED
+      * FRAUD_CHECK
+    - Find active contracts (non-terminal)
+    - Cleanup expired contracts
+
+    Workflow (createContract):
+    1. Create BasketSnapshot from basket
+    2. Create PaymentContract
+    3. Add default conditions
+    4. Save to repository
+    5. Return contract
+end note
+
+note right of PaymentCaptureService
+    **Payment Capture Orchestration**
+
+    Workflow:
+    1. Load contract from repository
+    2. Validate:
+       - Contract exists
+       - State is COMMITTED
+       - Has providerOrderId
+       - Not already FULFILLED
+    3. Determine amount (partial or full)
+    4. Call adapter.capturePayment()
+    5. Update contract: fulfill()
+    6. Save contract
+    7. Log success/failure
+    8. Return capture details
+
+    Validation Errors:
+    - Contract not found
+    - Invalid state
+    - No provider order ID
+    - Already fulfilled
+end note
+
+note right of PaymentRefundService
+    **Refund Orchestration**
+
+    Workflow:
+    1. Load contract
+    2. Validate:
+       - Contract exists
+       - State is FULFILLED
+       - Has providerOrderId
+    3. Calculate refund limits:
+       - totalCaptured = contract amount
+       - alreadyRefunded = sum from TX repo
+       - availableForRefund = total - refunded
+    4. Validate refund amount <= available
+    5. Call adapter.refundPayment()
+    6. Log refund transaction
+    7. Return refund details
+
+    Features:
+    - Partial refunds
+    - Refund limit tracking
+    - Reason tracking
+    - Audit trail
+end note
+
+note right of WebhookProcessor
+    **Webhook Processing Pipeline**
+
+    Workflow:
+    1. Validate webhook data structure
+    2. Extract: eventId, eventType, providerOrderId
+    3. Check idempotency (skip if processed)
+    4. Find associated contract
+    5. Dispatch WebhookReceivedEvent
+    6. Mark as processed
+    7. Log webhook event
+
+    Idempotency:
+    - Uses eventId from provider
+    - Checks in-memory cache first
+    - Then checks database
+    - Prevents duplicate processing
+
+    Error Handling:
+    - Invalid webhook data → log + skip
+    - Contract not found → log + continue
+    - Duplicate event → skip silently
+end note
+
+note right of PaymentAdapterFactory
+    **Factory Pattern**
+
+    Supported Providers:
+    - 'stripe' → StripeAdapter
+    - 'unzer' → UnzerAdapter (future)
+    - 'paypal' → PayPalAdapter (future)
+    - 'amazon' → AmazonPayAdapter (future)
+
+    Usage:
+    factory.create('stripe')
+      → returns StripeAdapter instance
+
+    Extensibility:
+    - Register new providers via register()
+    - Factory callable pattern
+    - Lazy instantiation
+end note
+
+package "Design Patterns" {
+    note as N1
+        **Command Pattern**
+        Services expose command methods:
+        - capturePayment()
+        - refundPayment()
+        - createContract()
+
+        Commands are atomic operations
+        with clear success/failure
+    end note
+
+    note as N2
+        **Repository Pattern**
+        Services depend on
+        repository interfaces,
+        not implementations.
+
+        Enables:
+        - Testing (in-memory repos)
+        - Swapping implementations
+        - Database abstraction
+    end note
+
+    note as N3
+        **Adapter Pattern**
+        Services use
+        PaymentAdapterInterface,
+        not specific providers.
+
+        Enables:
+        - Provider switching
+        - Multi-provider support
+        - Testing (mock adapters)
+    end note
+
+    note as N4
+        **Dependency Injection**
+        All dependencies injected
+        via constructor.
+
+        Benefits:
+        - Testability
+        - Modularity
+        - Clear dependencies
+        - SOLID principles
+    end note
+}
+
+@enduml

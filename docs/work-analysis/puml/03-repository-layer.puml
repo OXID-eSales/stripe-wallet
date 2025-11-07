@@ -1,0 +1,277 @@
+@startuml Repository Layer
+!theme plain
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+
+title Repository Pattern - Data Persistence
+
+package "Component\Repository" {
+    interface ContractRepositoryInterface {
+        +save(contract: PaymentContractInterface): void
+        +findById(id: string): ?PaymentContractInterface
+        +findByProviderOrderId(id: string): ?PaymentContractInterface
+        +findByUserId(userId: string): array
+        +findActiveByUserId(userId: string): ?PaymentContractInterface
+        +findExpired(before: ?DateTimeInterface): array
+        +delete(id: string): void
+    }
+
+    interface TransactionRepositoryInterface {
+        +save(transaction: Transaction): void
+        +findById(id: string): ?Transaction
+        +findByOrderId(orderId: string): array
+        +findByContractId(contractId: string): array
+        +findByProviderTransactionId(id: string): ?Transaction
+        +findByTypeAndStatus(type: string, status: string): array
+        +findChildTransactions(parentId: string): array
+        +exists(id: string): bool
+        +getTotalRefundedForContract(contractId: string): float
+        +logRefund(contractId: string, amount: float, refundId: string, reason: string): void
+    }
+
+    interface WebhookLogRepositoryInterface {
+        +save(log: WebhookLog): void
+        +existsByEventId(eventId: string): bool
+        +findByEventId(eventId: string): ?WebhookLog
+    }
+}
+
+package "Component\Repository <<In-Memory>>" {
+    class ContractRepository {
+        -storage: array<string, array>
+        ..
+        +save(contract): void
+        +findById(id): ?PaymentContractInterface
+        +findByProviderOrderId(id): ?PaymentContractInterface
+        +findByUserId(userId): array
+        +findActiveByUserId(userId): ?PaymentContractInterface
+        +findExpired(before): array
+        +delete(id): void
+    }
+
+    ContractRepository ..|> ContractRepositoryInterface
+
+    note right of ContractRepository
+        **In-Memory Implementation**
+
+        Use Cases:
+        - Unit testing
+        - Development
+        - Prototyping
+
+        Storage: array<string, array>
+        No persistence between requests
+    end note
+}
+
+package "Component\Repository <<Doctrine DBAL>>" {
+    class DoctrineContractRepository {
+        -connection: Connection
+        -tableName: string = "osc_payment_contract"
+        ..
+        +__construct(connection: Connection)
+        +save(contract): void
+        +findById(id): ?PaymentContractInterface
+        +findByProviderOrderId(id): ?PaymentContractInterface
+        +findByUserId(userId): array
+        +findActiveByUserId(userId): ?PaymentContractInterface
+        +findExpired(before): array
+        ..
+        -prepareContractData(contract): array
+        -hydrateContract(data: array): PaymentContractInterface
+        -setContractPrivateProperties(contract, data): void
+        -formatDateTime(dt): string
+        -parseDateTime(value): ?DateTime
+    }
+
+    class DoctrineTransactionRepository {
+        -connection: Connection
+        -tableName: string = "osc_payment_transaction"
+        ..
+        +__construct(connection: Connection)
+        +save(transaction): void
+        +findById(id): ?Transaction
+        +findByOrderId(orderId): array
+        +findByContractId(contractId): array
+        +findByProviderTransactionId(id): ?Transaction
+        +findByTypeAndStatus(type, status): array
+        +findChildTransactions(parentId): array
+        +exists(id): bool
+        +getTotalRefundedForContract(contractId): float
+        +logRefund(contractId, amount, refundId, reason): void
+        ..
+        -prepareTransactionData(transaction): array
+        -hydrateTransaction(data: array): Transaction
+    }
+
+    class DoctrineWebhookLogRepository {
+        -connection: Connection
+        -tableName: string = "osc_payment_webhook_log"
+        ..
+        +__construct(connection: Connection)
+        +save(log): void
+        +existsByEventId(eventId): bool
+        +findByEventId(eventId): ?WebhookLog
+        ..
+        -prepareLogData(log): array
+        -hydrateLog(data: array): WebhookLog
+    }
+
+    DoctrineContractRepository ..|> ContractRepositoryInterface
+    DoctrineTransactionRepository ..|> TransactionRepositoryInterface
+    DoctrineWebhookLogRepository ..|> WebhookLogRepositoryInterface
+
+    DoctrineContractRepository --> "Doctrine\DBAL\Connection" : uses
+    DoctrineTransactionRepository --> "Doctrine\DBAL\Connection" : uses
+    DoctrineWebhookLogRepository --> "Doctrine\DBAL\Connection" : uses
+}
+
+package "Database Tables" {
+    entity "osc_payment_contract" as CONTRACT {
+        * OXID : string <<PK>>
+        --
+        OXSHOPID : int
+        OXUSERID : string
+        OXORDERID : string (nullable)
+        OXSTATE : string
+        OXSTATEREASON : string (nullable)
+        OXBASKETDATA : json
+        OXTERMS : json (nullable)
+        OXMETADATA : json (nullable)
+        OXCONDITIONS : json
+        OXPROVIDER : string (nullable)
+        OXPROVIDERORDERID : string (nullable)
+        OXPROVIDERDATA : json (nullable)
+        OXCREATED : datetime
+        OXUPDATED : datetime
+        OXCOMMITTEDAT : datetime (nullable)
+        OXFULFILLEDAT : datetime (nullable)
+        OXEXPIRESAT : datetime (nullable)
+    }
+
+    entity "osc_payment_transaction" as TRANSACTION {
+        * OXID : string <<PK>>
+        --
+        OXSHOPID : int
+        OXORDERID : string
+        OXCONTRACTID : string (nullable) <<FK>>
+        OXPROVIDER : string
+        OXPROVIDERORDERID : string (nullable)
+        OXTRANSACTIONID : string (nullable)
+        OXTYPE : string
+        OXSTATUS : string
+        OXAMOUNT : decimal(10,2)
+        OXCURRENCY : string(3)
+        OXPAYMENTMETHODID : string (nullable)
+        OXPAYMENTMETHODTYPE : string (nullable)
+        OXPARENTTRANSACTIONID : string (nullable) <<FK>>
+        OXCREATED : datetime
+        OXUPDATED : datetime
+    }
+
+    entity "osc_payment_webhook_log" as WEBHOOK {
+        * OXID : string <<PK>>
+        --
+        OXEVENTID : string <<UNIQUE>>
+        OXRECEIVEDAT : datetime
+        OXSTATUS : string
+        OXEVENTTYPE : string (nullable)
+        OXCONTRACTID : string (nullable) <<FK>>
+        OXERROR : text (nullable)
+    }
+
+    CONTRACT ||--o{ TRANSACTION : "tracked by"
+    CONTRACT ||--o{ WEBHOOK : "receives"
+    TRANSACTION ||--o{ TRANSACTION : "refunds/voids"
+}
+
+DoctrineContractRepository ..> CONTRACT : "CRUD"
+DoctrineTransactionRepository ..> TRANSACTION : "CRUD"
+DoctrineWebhookLogRepository ..> WEBHOOK : "CRUD"
+
+note right of DoctrineContractRepository
+    **Implementation Details**
+
+    - Uses Doctrine DBAL v2.13
+    - Reflection for private property hydration
+    - JSON encode/decode for complex types
+    - UPSERT logic (insert or update)
+    - No explicit transaction management
+      (follows Single Responsibility)
+
+    Queries:
+    - findById: WHERE OXID = ?
+    - findByProviderOrderId:
+      WHERE OXPROVIDERORDERID = ?
+    - findByUserId:
+      WHERE OXUSERID = ?
+    - findActiveByUserId:
+      WHERE OXUSERID = ?
+        AND OXSTATE NOT IN (terminal states)
+    - findExpired:
+      WHERE OXEXPIRESAT < ?
+        AND OXSTATE NOT IN (terminal states)
+end note
+
+note right of CONTRACT
+    **Table: osc_payment_contract**
+
+    Indexes:
+    - PRIMARY KEY (OXID)
+    - INDEX idx_provider_order (OXPROVIDERORDERID)
+    - INDEX idx_user (OXUSERID)
+    - INDEX idx_state (OXSTATE)
+    - INDEX idx_expires (OXEXPIRESAT)
+
+    JSON Columns:
+    - OXBASKETDATA: BasketSnapshot
+    - OXCONDITIONS: ContractCondition[]
+    - OXMETADATA: arbitrary key-value
+    - OXTERMS: payment terms
+    - OXPROVIDERDATA: provider-specific data
+end note
+
+note right of TRANSACTION
+    **Table: osc_payment_transaction**
+
+    Indexes:
+    - PRIMARY KEY (OXID)
+    - INDEX idx_contract (OXCONTRACTID)
+    - INDEX idx_order (OXORDERID)
+    - INDEX idx_provider_tx (OXTRANSACTIONID)
+    - INDEX idx_parent (OXPARENTTRANSACTIONID)
+    - INDEX idx_type_status (OXTYPE, OXSTATUS)
+
+    Transaction Types:
+    - authorization
+    - capture
+    - refund
+    - void
+    - reauthorization
+
+    Status Values:
+    - pending
+    - succeeded
+    - failed
+end note
+
+note right of WEBHOOK
+    **Table: osc_payment_webhook_log**
+
+    Indexes:
+    - PRIMARY KEY (OXID)
+    - UNIQUE KEY (OXEVENTID)
+    - INDEX idx_contract (OXCONTRACTID)
+
+    Purpose:
+    - Idempotency tracking
+    - Audit log
+    - Debugging webhook issues
+
+    Status Values:
+    - processed
+    - failed
+    - skipped
+end note
+
+@enduml

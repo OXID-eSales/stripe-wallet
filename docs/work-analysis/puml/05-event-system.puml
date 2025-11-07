@@ -1,0 +1,472 @@
+@startuml Event-Driven Architecture
+!theme plain
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+
+title Event-Driven Architecture - Event System
+
+package "Component\EventSystem" {
+    interface EventDispatcherInterface {
+        +addListener(eventClass: string, listener: callable, priority: int): void
+        +removeListener(eventClass: string, listener: callable): void
+        +dispatch(event: EventInterface): EventInterface
+    }
+
+    class EventDispatcher {
+        -listeners: array<string, array<array>>
+        ..
+        +addListener(eventClass, listener, priority = 0): void
+        +removeListener(eventClass, listener): void
+        +dispatch(event): EventInterface
+        ..
+        -getSortedListeners(eventClass): array
+        -isStoppableEvent(event): bool
+    }
+
+    EventDispatcher ..|> EventDispatcherInterface
+
+    note right of EventDispatcher
+        **Observer Pattern with Priorities**
+
+        Listener Storage:
+        [
+          EventClass => [
+            ['listener' => callable, 'priority' => int],
+            ...
+          ]
+        ]
+
+        Execution:
+        - Listeners sorted by priority (DESC)
+        - Supports stoppable events (PSR-14)
+        - Returns modified event object
+    end note
+}
+
+package "Component\EventSystem\Event" {
+    interface EventInterface {
+        +getContext(): EventContextInterface
+    }
+
+    interface EventContextInterface {
+        +getEventId(): string
+        +getTimestamp(): DateTimeInterface
+        +getMetadata(): array
+        +addMetadata(key: string, value: mixed): self
+    }
+
+    class EventContext {
+        -eventId: string
+        -timestamp: DateTimeImmutable
+        -metadata: array
+        ..
+        +__construct(?eventId, ?timestamp, metadata)
+        +getEventId(): string
+        +getTimestamp(): DateTimeInterface
+        +getMetadata(): array
+        +addMetadata(key, value): self
+    }
+
+    EventContext ..|> EventContextInterface
+}
+
+package "Component\EventSystem\Event\Contract" {
+    interface ContractEventInterface {
+        +getContractId(): string
+    }
+
+    class ContractCreatedEvent <<readonly>> {
+        -context: EventContextInterface
+        -contractId: string
+        -userId: string
+        -shopId: int
+        -basketSnapshot: array
+        ..
+        +__construct(context, contractId, userId, shopId, basket)
+        +getContractId(): string
+        +getUserId(): string
+        +getShopId(): int
+        +getBasketSnapshot(): array
+    }
+
+    class ContractTransitionedToPendingEvent <<readonly>> {
+        -context: EventContextInterface
+        -contractId: string
+        -providerOrderId: string
+        ..
+        +__construct(context, contractId, providerOrderId)
+        +getContractId(): string
+        +getProviderOrderId(): string
+    }
+
+    class ContractConditionFulfilledEvent <<readonly>> {
+        -context: EventContextInterface
+        -contractId: string
+        -conditionType: string
+        -conditionData: array
+        ..
+        +__construct(context, contractId, type, data)
+        +getContractId(): string
+        +getConditionType(): string
+        +getConditionData(): array
+    }
+
+    class ContractReadyToCommitEvent <<readonly>> {
+        -context: EventContextInterface
+        -contractId: string
+        ..
+        +__construct(context, contractId)
+        +getContractId(): string
+    }
+
+    class ContractCommittedEvent <<readonly>> {
+        -context: EventContextInterface
+        -contractId: string
+        -orderId: string
+        ..
+        +__construct(context, contractId, orderId)
+        +getContractId(): string
+        +getOrderId(): string
+    }
+
+    class ContractFulfilledEvent <<readonly>> {
+        -context: EventContextInterface
+        -contractId: string
+        ..
+        +__construct(context, contractId)
+        +getContractId(): string
+    }
+
+    class ContractCancelledEvent <<readonly>> {
+        -context: EventContextInterface
+        -contractId: string
+        -reason: string
+        ..
+        +__construct(context, contractId, reason)
+        +getContractId(): string
+        +getReason(): string
+    }
+
+    class ContractExpiredEvent <<readonly>> {
+        -context: EventContextInterface
+        -contractId: string
+        ..
+        +__construct(context, contractId)
+        +getContractId(): string
+    }
+
+    class ContractFailedEvent <<readonly>> {
+        -context: EventContextInterface
+        -contractId: string
+        -reason: string
+        ..
+        +__construct(context, contractId, reason)
+        +getContractId(): string
+        +getReason(): string
+    }
+
+    ContractCreatedEvent ..|> EventInterface
+    ContractCreatedEvent ..|> ContractEventInterface
+    ContractTransitionedToPendingEvent ..|> EventInterface
+    ContractTransitionedToPendingEvent ..|> ContractEventInterface
+    ContractConditionFulfilledEvent ..|> EventInterface
+    ContractConditionFulfilledEvent ..|> ContractEventInterface
+    ContractReadyToCommitEvent ..|> EventInterface
+    ContractReadyToCommitEvent ..|> ContractEventInterface
+    ContractCommittedEvent ..|> EventInterface
+    ContractCommittedEvent ..|> ContractEventInterface
+    ContractFulfilledEvent ..|> EventInterface
+    ContractFulfilledEvent ..|> ContractEventInterface
+    ContractCancelledEvent ..|> EventInterface
+    ContractCancelledEvent ..|> ContractEventInterface
+    ContractExpiredEvent ..|> EventInterface
+    ContractExpiredEvent ..|> ContractEventInterface
+    ContractFailedEvent ..|> EventInterface
+    ContractFailedEvent ..|> ContractEventInterface
+}
+
+package "Component\EventSystem\Event\Payment" {
+    interface PaymentEventInterface {
+        +getAmount(): float
+        +getCurrency(): string
+    }
+
+    class PaymentInitiatedEvent <<readonly>> {
+        -context: EventContextInterface
+        -userId: string
+        -shopId: int
+        -amount: float
+        -currency: string
+        -paymentMethod: string
+        ..
+        +__construct(context, userId, shopId, amount, currency, method)
+        +getUserId(): string
+        +getShopId(): int
+        +getAmount(): float
+        +getCurrency(): string
+        +getPaymentMethod(): string
+    }
+
+    class PaymentAuthorizedEvent <<readonly>> {
+        -context: EventContextInterface
+        -authorizationId: string
+        -providerOrderId: string
+        -amount: float
+        -currency: string
+        ..
+        +__construct(context, authId, providerOrderId, amount, currency)
+        +getAuthorizationId(): string
+        +getProviderOrderId(): string
+        +getAmount(): float
+        +getCurrency(): string
+    }
+
+    class PaymentCapturedEvent <<readonly>> {
+        -context: EventContextInterface
+        -contractId: string
+        -captureId: string
+        -amount: float
+        -currency: string
+        ..
+        +__construct(context, contractId, captureId, amount, currency)
+        +getContractId(): string
+        +getCaptureId(): string
+        +getAmount(): float
+        +getCurrency(): string
+    }
+
+    class PaymentRefundedEvent <<readonly>> {
+        -context: EventContextInterface
+        -contractId: string
+        -refundId: string
+        -amount: float
+        -currency: string
+        -reason: ?string
+        ..
+        +__construct(context, contractId, refundId, amount, currency, reason)
+        +getContractId(): string
+        +getRefundId(): string
+        +getAmount(): float
+        +getCurrency(): string
+        +getReason(): ?string
+    }
+
+    class PaymentFailedEvent <<readonly>> {
+        -context: EventContextInterface
+        -contractId: string
+        -reason: string
+        -providerCode: ?string
+        ..
+        +__construct(context, contractId, reason, providerCode)
+        +getContractId(): string
+        +getReason(): string
+        +getProviderCode(): ?string
+    }
+
+    class OrderCreatedEvent <<readonly>> {
+        -context: EventContextInterface
+        -orderId: string
+        -contractId: string
+        ..
+        +__construct(context, orderId, contractId)
+        +getOrderId(): string
+        +getContractId(): string
+    }
+
+    class OrderCompletedEvent <<readonly>> {
+        -context: EventContextInterface
+        -orderId: string
+        ..
+        +__construct(context, orderId)
+        +getOrderId(): string
+    }
+
+    class WebhookReceivedEvent <<readonly>> {
+        -context: EventContextInterface
+        -webhookEventId: string
+        -eventType: string
+        -contractId: ?string
+        -eventData: array
+        ..
+        +__construct(context, eventId, eventType, contractId, data)
+        +getWebhookEventId(): string
+        +getEventType(): string
+        +getContractId(): ?string
+        +getEventData(): array
+    }
+
+    PaymentInitiatedEvent ..|> EventInterface
+    PaymentInitiatedEvent ..|> PaymentEventInterface
+    PaymentAuthorizedEvent ..|> EventInterface
+    PaymentAuthorizedEvent ..|> PaymentEventInterface
+    PaymentCapturedEvent ..|> EventInterface
+    PaymentCapturedEvent ..|> PaymentEventInterface
+    PaymentRefundedEvent ..|> EventInterface
+    PaymentRefundedEvent ..|> PaymentEventInterface
+    PaymentFailedEvent ..|> EventInterface
+    OrderCreatedEvent ..|> EventInterface
+    OrderCompletedEvent ..|> EventInterface
+    WebhookReceivedEvent ..|> EventInterface
+}
+
+package "Component\EventSystem\Handler" {
+    abstract class AbstractHandler {
+        #contractRepository: ContractRepositoryInterface
+        #eventDispatcher: EventDispatcherInterface
+        ..
+        +__construct(repo, dispatcher)
+    }
+
+    class ContractCreationHandler {
+        -contractService: ContractServiceInterface
+        ..
+        +__construct(service, dispatcher)
+        +handle(event: PaymentInitiatedEvent): void
+        ..
+        // Workflow:
+        // 1. Create contract with basket
+        // 2. Add default conditions
+        // 3. Dispatch ContractCreatedEvent
+    }
+
+    class PaymentAuthorizationHandler {
+        +handle(event: ContractTransitionedToPendingEvent): void
+        ..
+        // Workflow:
+        // 1. Load contract
+        // 2. Fulfill PAYMENT_AUTHORIZED condition
+        // 3. Set provider order ID
+        // 4. Check if all conditions fulfilled
+        // 5. Dispatch ContractReadyToCommitEvent if ready
+    }
+
+    class ContractFulfillmentHandler {
+        +handle(event: PaymentCapturedEvent): void
+        ..
+        // Workflow:
+        // 1. Load contract
+        // 2. Fulfill contract (COMMITTED → FULFILLED)
+        // 3. Save contract
+        // 4. Dispatch ContractFulfilledEvent
+    }
+
+    class ContractConditionResolverHandler {
+        +handle(event: ContractConditionFulfilledEvent): void
+        ..
+        // Workflow:
+        // 1. Load contract
+        // 2. Check if all conditions fulfilled
+        // 3. Transition to READY_TO_COMMIT if applicable
+        // 4. Dispatch ContractReadyToCommitEvent
+    }
+
+    class OrderCreationHandler {
+        -orderRepository: OrderRepositoryInterface
+        ..
+        +__construct(contractRepo, orderRepo, dispatcher)
+        +handle(event: ContractReadyToCommitEvent): void
+        ..
+        // Workflow:
+        // 1. Load contract
+        // 2. Create order from contract
+        // 3. Commit contract to order
+        // 4. Dispatch OrderCreatedEvent
+    }
+
+    class ContractCleanupHandler {
+        +handle(event: ContractExpiredEvent | ContractCancelledEvent): void
+        ..
+        // Workflow:
+        // 1. Log cleanup action
+        // 2. Perform cleanup tasks
+    }
+
+    PaymentAuthorizationHandler --|> AbstractHandler
+    ContractFulfillmentHandler --|> AbstractHandler
+    ContractConditionResolverHandler --|> AbstractHandler
+    ContractCleanupHandler --|> AbstractHandler
+
+    ContractCreationHandler ..> PaymentInitiatedEvent : listens
+    PaymentAuthorizationHandler ..> ContractTransitionedToPendingEvent : listens
+    ContractFulfillmentHandler ..> PaymentCapturedEvent : listens
+    ContractConditionResolverHandler ..> ContractConditionFulfilledEvent : listens
+    OrderCreationHandler ..> ContractReadyToCommitEvent : listens
+    ContractCleanupHandler ..> ContractExpiredEvent : listens
+    ContractCleanupHandler ..> ContractCancelledEvent : listens
+}
+
+EventDispatcher --> EventInterface : dispatches
+EventDispatcher --> AbstractHandler : invokes
+
+note right of EventDispatcher
+    **Event Flow Example**
+
+    1. Service triggers event:
+       dispatcher.dispatch(new PaymentInitiatedEvent(...))
+
+    2. Dispatcher finds listeners:
+       listeners[PaymentInitiatedEvent::class]
+
+    3. Sorts by priority (high to low)
+
+    4. Invokes each listener:
+       listener(event)
+
+    5. Returns event (possibly modified)
+end note
+
+note bottom of AbstractHandler
+    **Handler Registration**
+
+    Handlers registered in DI container:
+
+    dispatcher.addListener(
+      PaymentInitiatedEvent::class,
+      [handler, 'handle'],
+      priority: 100
+    )
+
+    Priority Levels:
+    - 100: High (contract creation)
+    - 50: Normal (condition fulfillment)
+    - 0: Low (cleanup, logging)
+end note
+
+note bottom of ContractCreatedEvent
+    **Event Lifecycle**
+
+    Contract Events (9):
+    1. ContractCreatedEvent
+    2. ContractTransitionedToPendingEvent
+    3. ContractConditionFulfilledEvent
+    4. ContractReadyToCommitEvent
+    5. ContractCommittedEvent
+    6. ContractFulfilledEvent
+    7. ContractCancelledEvent
+    8. ContractExpiredEvent
+    9. ContractFailedEvent
+
+    All events are readonly (immutable)
+    All carry EventContext metadata
+end note
+
+note bottom of PaymentInitiatedEvent
+    **Payment Events (8)**
+
+    1. PaymentInitiatedEvent
+    2. PaymentAuthorizedEvent
+    3. PaymentCapturedEvent
+    4. PaymentRefundedEvent
+    5. PaymentFailedEvent
+    6. OrderCreatedEvent
+    7. OrderCompletedEvent
+    8. WebhookReceivedEvent
+
+    Events enable:
+    - Loose coupling
+    - Async processing (future)
+    - Audit trails
+    - Integration hooks
+end note
+
+@enduml

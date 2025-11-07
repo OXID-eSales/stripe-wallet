@@ -1,0 +1,328 @@
+@startuml Adapter Pattern - Payment Adapters
+!theme plain
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+
+title Adapter Pattern - Payment Provider Integration
+
+package "Component\Adapter" {
+    interface PaymentAdapterInterface <<Port>> {
+        ' Basic Operations
+        +createPayment(request): PaymentResponse
+        +capturePayment(request): CaptureResponse
+        +refundPayment(request): RefundResponse
+        +voidPayment(request): VoidResponse
+        +getPaymentDetails(id): PaymentDetailsResponse
+
+        ' Two-Step Authorization
+        +authorizePayment(request): AuthorizationResponse
+        +captureAuthorization(request): CaptureResponse
+        +voidAuthorization(request): VoidResponse
+        +reauthorizePayment(request): AuthorizationResponse
+
+        ' Vaulting/Tokenization
+        +createPaymentMethod(request): PaymentMethodResponse
+        +listPaymentMethods(customerId): array
+        +deletePaymentMethod(id): bool
+
+        ' 3D Secure/SCA
+        +initiate3DSecure(request): ThreeDSecureResponse
+        +verify3DSecureResult(id): bool
+
+        ' Provider Metadata
+        +getSupportedPaymentMethods(): array
+        +getProviderName(): string
+        +supportsFeature(feature): bool
+
+        ' Webhooks
+        +parseWebhook(payload, signature, secret): WebhookEvent
+    }
+
+    package "Request" {
+        class CreatePaymentRequest <<readonly>> {
+            +amount: float
+            +currency: string
+            +orderId: string
+            +shopId: int
+            +paymentMethod: ?string
+            +directCapture: bool
+            +paymentMethodId: ?string
+            +customerId: ?string
+            +returnUrl: ?string
+            +cancelUrl: ?string
+            +metadata: array
+            +billingAddress: ?array
+            +shippingAddress: ?array
+        }
+
+        class AuthorizePaymentRequest <<readonly>> {
+            +amount: float
+            +currency: string
+            +orderId: string
+            +paymentMethod: ?string
+            +paymentMethodId: ?string
+            +customerId: ?string
+            +returnUrl: ?string
+            +metadata: array
+        }
+
+        class CapturePaymentRequest <<readonly>> {
+            +providerPaymentId: string
+            +amount: ?float
+            +metadata: array
+        }
+
+        class RefundPaymentRequest <<readonly>> {
+            +providerPaymentId: string
+            +amount: ?float
+            +reason: ?string
+            +metadata: array
+        }
+
+        class VoidPaymentRequest <<readonly>> {
+            +providerPaymentId: string
+            +reason: ?string
+            +metadata: array
+        }
+
+        class CreatePaymentMethodRequest <<readonly>> {
+            +paymentMethod: string
+            +customerId: ?string
+            +paymentMethodData: array
+            +billingAddress: ?array
+            +metadata: array
+        }
+
+        class ThreeDSecureRequest <<readonly>> {
+            +paymentId: string
+            +returnUrl: string
+        }
+    }
+
+    package "Response" {
+        class PaymentResponse <<readonly>> {
+            +providerPaymentId: string
+            +status: string
+            +amount: float
+            +currency: string
+            +requiresAction: bool
+            +clientSecret: ?string
+            +redirectUrl: ?string
+            +providerData: array
+            +metadata: array
+        }
+
+        class AuthorizationResponse <<readonly>> {
+            +authorizationId: string
+            +providerPaymentId: string
+            +status: string
+            +amount: float
+            +currency: string
+            +authorizedAt: DateTimeInterface
+            +expiresAt: ?DateTimeInterface
+            +requiresAction: bool
+            +clientSecret: ?string
+            +redirectUrl: ?string
+            +providerData: array
+            +metadata: array
+        }
+
+        class CaptureResponse <<readonly>> {
+            +providerPaymentId: string
+            +captureId: string
+            +amountCaptured: float
+            +currency: string
+            +status: string
+            +capturedAt: DateTimeInterface
+            +providerData: array
+            +metadata: array
+        }
+
+        class RefundResponse <<readonly>> {
+            +providerPaymentId: string
+            +refundId: string
+            +amountRefunded: float
+            +currency: string
+            +status: string
+            +refundedAt: DateTimeInterface
+            +reason: ?string
+            +providerData: array
+            +metadata: array
+        }
+
+        class PaymentDetailsResponse <<readonly>> {
+            +providerPaymentId: string
+            +status: string
+            +amount: float
+            +currency: string
+            +amountCaptured: float
+            +amountRefunded: float
+            +isCaptured: bool
+            +isRefunded: bool
+            +isCancelled: bool
+            +createdAt: DateTimeInterface
+            +capturedAt: ?DateTimeInterface
+            +providerData: array
+        }
+
+        class PaymentMethodResponse <<readonly>> {
+            +paymentMethodId: string
+            +customerId: string
+            +type: string
+            +details: array
+            +isDefault: bool
+            +createdAt: DateTimeInterface
+            +providerData: array
+            +metadata: array
+        }
+
+        class ThreeDSecureResponse <<readonly>> {
+            +paymentId: string
+            +authenticated: bool
+            +status: string
+            +redirectUrl: ?string
+            +authenticationId: ?string
+            +providerData: array
+        }
+    }
+
+    package "Exception" {
+        class PaymentAdapterException {
+            +getProviderCode(): ?string
+            +getProviderMessage(): ?string
+        }
+    }
+
+    PaymentAdapterInterface ..> CreatePaymentRequest : uses
+    PaymentAdapterInterface ..> AuthorizePaymentRequest : uses
+    PaymentAdapterInterface ..> CapturePaymentRequest : uses
+    PaymentAdapterInterface ..> RefundPaymentRequest : uses
+    PaymentAdapterInterface ..> VoidPaymentRequest : uses
+    PaymentAdapterInterface ..> CreatePaymentMethodRequest : uses
+    PaymentAdapterInterface ..> ThreeDSecureRequest : uses
+
+    PaymentAdapterInterface ..> PaymentResponse : returns
+    PaymentAdapterInterface ..> AuthorizationResponse : returns
+    PaymentAdapterInterface ..> CaptureResponse : returns
+    PaymentAdapterInterface ..> RefundResponse : returns
+    PaymentAdapterInterface ..> PaymentDetailsResponse : returns
+    PaymentAdapterInterface ..> PaymentMethodResponse : returns
+    PaymentAdapterInterface ..> ThreeDSecureResponse : returns
+
+    PaymentAdapterInterface ..> PaymentAdapterException : throws
+}
+
+package "Stripe" {
+    class StripeAdapter <<Adapter>> {
+        -stripeClient: StripeClient
+        ..
+        +__construct(apiKey: string)
+        +createPayment(request): PaymentResponse
+        +capturePayment(request): CaptureResponse
+        +refundPayment(request): RefundResponse
+        +voidPayment(request): VoidResponse
+        +getPaymentDetails(id): PaymentDetailsResponse
+        +authorizePayment(request): AuthorizationResponse
+        +captureAuthorization(request): CaptureResponse
+        +createPaymentMethod(request): PaymentMethodResponse
+        +listPaymentMethods(customerId): array
+        +deletePaymentMethod(id): bool
+        +initiate3DSecure(request): ThreeDSecureResponse
+        +verify3DSecureResult(id): bool
+        +getSupportedPaymentMethods(): array
+        +getProviderName(): string
+        +supportsFeature(feature): bool
+        +parseWebhook(payload, sig, secret): WebhookEvent
+        ..
+        -convertStripeException(e): PaymentAdapterException
+        -mapRefundReason(reason): string
+        -mapPaymentMethodType(type): string
+        -extractPaymentMethodDetails(pm): array
+        -map3DSecureStatus(status): string
+    }
+
+    class StripeClientFactory {
+        +create(apiKey: string, options: array): StripeClient
+    }
+
+    class StripeStatusMapper {
+        +toNormalized(stripeStatus: string): string
+        +requiresAction(stripeStatus: string): bool
+        +isCaptured(stripeStatus: string): bool
+        +isCancelled(stripeStatus: string): bool
+    }
+
+    class StripeWebhookEvent {
+        -event: Stripe\Event
+        -rawPayload: string
+        -verified: bool
+        ..
+        +getEventId(): string
+        +getEventType(): string
+        +getData(): array
+        +getRawPayload(): string
+        +isVerified(): bool
+    }
+
+    StripeAdapter ..|> PaymentAdapterInterface
+    StripeAdapter ..> StripeClientFactory : creates client
+    StripeAdapter ..> StripeStatusMapper : uses
+    StripeAdapter ..> StripeWebhookEvent : creates
+}
+
+package "Service\Factory" {
+    interface FactoryInterface {
+        +create(string): object
+    }
+
+    class PaymentAdapterFactory {
+        -adapters: array
+        ..
+        +__construct()
+        +create(providerName: string): PaymentAdapterInterface
+        +register(name: string, factory: callable): void
+    }
+
+    PaymentAdapterFactory ..|> FactoryInterface
+    PaymentAdapterFactory ..> PaymentAdapterInterface : creates
+    PaymentAdapterFactory ..> StripeAdapter : creates
+}
+
+note right of PaymentAdapterInterface
+    **Hexagonal Architecture Port**
+
+    Provider-agnostic interface allowing:
+    - Stripe
+    - Unzer
+    - PayPal
+    - Amazon Pay
+    - etc.
+
+    Features:
+    - Direct & 2-step payments
+    - Partial capture/refund
+    - Payment vaulting
+    - 3D Secure
+    - Webhook parsing
+end note
+
+note bottom of StripeAdapter
+    **Stripe Implementation**
+
+    Supported Payment Methods:
+    - card, sepa_debit, ideal
+    - giropay, sofort, bancontact
+    - eps, p24
+
+    Supported Features:
+    - partial_refund: true
+    - partial_capture: true
+    - recurring: true
+    - saved_cards: true
+    - webhooks: true
+    - 3ds: true
+
+    API Version: Stripe SDK v18+
+end note
+
+@enduml

@@ -1,0 +1,180 @@
+@startuml Component Architecture
+!theme plain
+
+title Component Architecture - Layered System
+
+skinparam component {
+    BackgroundColor<<domain>> LightYellow
+    BackgroundColor<<port>> LightGreen
+    BackgroundColor<<adapter>> LightBlue
+    BackgroundColor<<service>> LightCoral
+    BackgroundColor<<infrastructure>> LightGray
+}
+
+package "Presentation Layer" {
+    [WebhookController] as WHC
+    [PaymentController] as PC
+    [GraphQL Endpoints] as GQL
+    [Admin Controllers] as ADM
+}
+
+package "Application Layer" <<service>> {
+    [ContractService] as CS
+    [PaymentCaptureService] as PCS
+    [PaymentRefundService] as PRS
+    [WebhookProcessor] as WHP
+    [PaymentAdapterFactory] as PAF
+}
+
+package "Domain Layer" <<domain>> {
+    [PaymentContract\n<<Aggregate Root>>] as CONTRACT
+    [ContractState\n<<Value Object>>] as STATE
+    [ContractCondition\n<<Value Object>>] as CONDITION
+    [BasketSnapshot\n<<Value Object>>] as BASKET
+    [Transaction\n<<Entity>>] as TX
+    [WebhookLog\n<<Entity>>] as WHLOG
+}
+
+package "Port Interfaces" <<port>> {
+    [PaymentAdapterInterface] as PAI
+    [ContractRepositoryInterface] as CRI
+    [TransactionRepositoryInterface] as TRI
+    [WebhookLogRepositoryInterface] as WLRI
+    [EventDispatcherInterface] as EDI
+}
+
+package "Adapter Layer" <<adapter>> {
+    [StripeAdapter] as SA
+    [UnzerAdapter\n(future)] as UA
+    [PayPalAdapter\n(future)] as PPA
+}
+
+package "Infrastructure Layer" <<infrastructure>> {
+    [DoctrineContractRepository] as DCR
+    [DoctrineTransactionRepository] as DTR
+    [DoctrineWebhookLogRepository] as DWR
+    [EventDispatcher] as ED
+}
+
+package "Event System" {
+    [Event Handlers] as EH
+    [Contract Events] as CE
+    [Payment Events] as PE
+}
+
+database "MySQL Database" {
+    [osc_payment_contract] as DB_CONTRACT
+    [osc_payment_transaction] as DB_TX
+    [osc_payment_webhook_log] as DB_WH
+}
+
+cloud "External Services" {
+    [Stripe API] as STRIPE_API
+    [Unzer API\n(future)] as UNZER_API
+}
+
+' Presentation → Application
+WHC --> WHP
+PC --> CS
+PC --> PCS
+PC --> PRS
+ADM --> CS
+
+' Application → Ports
+CS --> CRI
+PCS --> CRI
+PCS --> PAI
+PRS --> CRI
+PRS --> TRI
+PRS --> PAI
+WHP --> CRI
+WHP --> EDI
+WHP --> WLRI
+PAF ..> PAI : creates
+
+' Application → Domain
+CS ..> CONTRACT : creates
+PCS ..> CONTRACT : uses
+PRS ..> CONTRACT : uses
+CONTRACT *-- STATE
+CONTRACT *-- CONDITION
+CONTRACT *-- BASKET
+
+' Ports → Adapters
+PAI <|.. SA
+PAI <|.. UA
+PAI <|.. PPA
+
+' Ports → Infrastructure
+CRI <|.. DCR
+TRI <|.. DTR
+WLRI <|.. DWR
+EDI <|.. ED
+
+' Infrastructure → Database
+DCR --> DB_CONTRACT
+DTR --> DB_TX
+DWR --> DB_WH
+
+' Adapters → External
+SA --> STRIPE_API
+UA --> UNZER_API
+
+' Event System
+ED --> EH
+EH ..> CE : handles
+EH ..> PE : handles
+EH --> CRI : uses
+EH --> EDI : dispatches
+
+note right of CONTRACT
+    **Domain Model**
+    - Aggregate Root
+    - Enforces invariants
+    - State machine
+    - Business logic
+    - No dependencies
+end note
+
+note right of PAI
+    **Hexagonal Architecture**
+    - Port interface
+    - Provider-agnostic
+    - Multiple adapters
+    - Testable
+end note
+
+note right of SA
+    **Adapter Implementation**
+    - Stripe-specific
+    - Translates requests
+    - Maps responses
+    - Handles errors
+end note
+
+note right of DCR
+    **Repository Pattern**
+    - Persistence abstraction
+    - Multiple implementations:
+      * In-memory (testing)
+      * Doctrine DBAL (prod)
+    - No domain coupling
+end note
+
+note right of ED
+    **Event-Driven**
+    - Loose coupling
+    - Observer pattern
+    - Priority support
+    - Extensible
+end note
+
+note bottom of DB_CONTRACT
+    **Data Layer**
+    - MySQL (Doctrine DBAL v2.13)
+    - 3 tables
+    - JSON columns
+    - Indexes for queries
+end note
+
+@enduml

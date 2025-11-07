@@ -1,0 +1,180 @@
+@startuml Payment Flow Sequence
+!theme plain
+
+title Payment Authorization & Capture Flow
+
+actor "Customer" as USER
+participant "PaymentController" as PC
+participant "EventDispatcher" as ED
+participant "ContractCreationHandler" as CCH
+participant "ContractService" as CS
+participant "ContractRepository" as CR
+participant "PaymentAdapter\n(Stripe)" as PA
+participant "Stripe API" as STRIPE
+database "Database" as DB
+participant "PaymentAuthorizationHandler" as PAH
+participant "OrderCreationHandler" as OCH
+participant "PaymentCaptureService" as PCS
+
+== Payment Initiation ==
+
+USER -> PC: Initiate payment\n(amount, currency, basket)
+activate PC
+
+PC -> ED: dispatch(PaymentInitiatedEvent)
+activate ED
+
+ED -> CCH: handle(PaymentInitiatedEvent)
+activate CCH
+
+CCH -> CS: createContract(userId, basket,\n[PAYMENT_AUTHORIZED, FRAUD_CHECK])
+activate CS
+
+CS -> CS: createBasketSnapshot(basket)
+CS -> CR: save(contract)
+activate CR
+CR -> DB: INSERT INTO\nosc_payment_contract
+CR --> CS: void
+deactivate CR
+
+CS --> CCH: PaymentContract(DRAFT)
+deactivate CS
+
+CCH -> ED: dispatch(ContractCreatedEvent)
+CCH --> ED: void
+deactivate CCH
+
+ED --> PC: event handled
+deactivate ED
+
+== Payment Authorization ==
+
+PC -> PA: authorizePayment(request:\n  amount, currency, orderId,\n  paymentMethod, customerId)
+activate PA
+
+PA -> PA: Convert amount to cents\nCreate Stripe PaymentIntent\n(capture_method: manual)
+PA -> STRIPE: POST /v1/payment_intents
+activate STRIPE
+
+STRIPE --> PA: PaymentIntent\n(id: pi_xxx,\n status: requires_capture)
+deactivate STRIPE
+
+PA --> PC: AuthorizationResponse(\n  authorizationId: pi_xxx,\n  status: authorized,\n  requiresAction: false)
+deactivate PA
+
+PC -> CR: findById(contractId)
+activate CR
+CR -> DB: SELECT * FROM\nosc_payment_contract\nWHERE OXID = ?
+CR --> PC: PaymentContract
+deactivate CR
+
+PC -> PC: contract.transitionToPending()
+PC -> PC: contract.setProvider(\n  'stripe', 'pi_xxx', null)
+PC -> CR: save(contract)
+activate CR
+CR -> DB: UPDATE\nosc_payment_contract
+CR --> PC: void
+deactivate CR
+
+PC -> ED: dispatch(\n  ContractTransitionedToPendingEvent)
+activate ED
+
+ED -> PAH: handle(\n  ContractTransitionedToPendingEvent)
+activate PAH
+
+PAH -> CR: findById(contractId)
+activate CR
+CR -> DB: SELECT
+CR --> PAH: PaymentContract
+deactivate CR
+
+PAH -> PAH: contract.fulfillCondition(\n  PAYMENT_AUTHORIZED)
+PAH -> CR: save(contract)
+activate CR
+CR -> DB: UPDATE\nosc_payment_contract\nSET OXCONDITIONS = ?
+CR --> PAH: void
+deactivate CR
+
+PAH -> PAH: Check if all\nconditions fulfilled
+PAH -> ED: dispatch(\n  ContractReadyToCommitEvent)
+deactivate PAH
+
+ED --> PC: events handled
+deactivate ED
+
+PC --> USER: Payment authorized\n(clientSecret, status)
+deactivate PC
+
+== Order Creation ==
+
+ED -> OCH: handle(ContractReadyToCommitEvent)
+activate OCH
+
+OCH -> CR: findById(contractId)
+activate CR
+CR -> DB: SELECT
+CR --> OCH: PaymentContract
+deactivate CR
+
+OCH -> OCH: Create Order from\nBasketSnapshot
+OCH -> OCH: contract.commitToOrder(orderId)
+OCH -> CR: save(contract)
+activate CR
+CR -> DB: UPDATE\nosc_payment_contract\nSET OXORDERID = ?,\n    OXSTATE = 'committed'
+CR --> OCH: void
+deactivate CR
+
+OCH -> ED: dispatch(OrderCreatedEvent)
+OCH --> ED: void
+deactivate OCH
+
+== Payment Capture ==
+
+note over PCS: Triggered by admin action\nor webhook confirmation
+
+PCS -> CR: findById(contractId)
+activate PCS
+activate CR
+CR -> DB: SELECT
+CR --> PCS: PaymentContract(COMMITTED)
+deactivate CR
+
+PCS -> PCS: Validate:\n- State is COMMITTED\n- Has providerOrderId\n- Not already FULFILLED
+
+PCS -> PA: capturePayment(request:\n  providerPaymentId: pi_xxx,\n  amount: null (full capture))
+activate PA
+
+PA -> STRIPE: POST /v1/payment_intents/\npi_xxx/capture
+activate STRIPE
+STRIPE --> PA: PaymentIntent\n(status: succeeded,\n charges: [{captured: true}])
+deactivate STRIPE
+
+PA --> PCS: CaptureResponse(\n  captureId: ch_xxx,\n  amountCaptured: 5000,\n  status: captured)
+deactivate PA
+
+PCS -> PCS: contract.fulfill()
+PCS -> CR: save(contract)
+activate CR
+CR -> DB: UPDATE\nosc_payment_contract\nSET OXSTATE = 'fulfilled',\n    OXFULFILLEDAT = NOW()
+CR --> PCS: void
+deactivate CR
+
+PCS -> ED: dispatch(PaymentCapturedEvent)
+activate ED
+ED --> PCS: event dispatched
+deactivate ED
+
+PCS --> USER: Capture successful\n['success' => true,\n 'captureId' => 'ch_xxx',\n 'amount' => 50.00]
+deactivate PCS
+
+note over DB
+    **Final Contract State:**
+    OXID: contract_xxx
+    OXSTATE: fulfilled
+    OXORDERID: order_123
+    OXPROVIDER: stripe
+    OXPROVIDERORDERID: pi_xxx
+    OXFULFILLEDAT: 2025-11-07 10:30:00
+end note
+
+@enduml

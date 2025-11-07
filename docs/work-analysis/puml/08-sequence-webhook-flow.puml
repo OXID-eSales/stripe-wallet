@@ -1,0 +1,203 @@
+@startuml Webhook Processing Flow
+!theme plain
+
+title Webhook Processing with Idempotency
+
+participant "Stripe API" as STRIPE
+participant "WebhookController" as WHC
+participant "SignatureVerifier" as SV
+participant "WebhookProcessor" as WHP
+participant "IdempotencyChecker" as IC
+participant "WebhookLogRepository" as WLR
+participant "ContractRepository" as CR
+participant "EventDispatcher" as ED
+participant "Event Handlers" as EH
+database "Database" as DB
+
+== Webhook Received ==
+
+STRIPE -> WHC: POST /webhook\n(payload, signature header)
+activate WHC
+
+WHC -> SV: verify(payload, signature)
+activate SV
+
+SV -> SV: Extract signature\nfrom header
+SV -> SV: Stripe\\Webhook::\nconstructEvent(\n  payload, signature, secret)
+
+alt Signature Valid
+    SV --> WHC: true
+    deactivate SV
+else Signature Invalid
+    SV --> WHC: throws PaymentAdapterException
+    WHC --> STRIPE: 401 Unauthorized\n{'error': 'Invalid signature'}
+    deactivate WHC
+end
+
+== Parse Webhook Event ==
+
+WHC -> WHP: process(webhookData:\n  ['event_id' => 'evt_xxx',\n   'event_type' => 'payment_intent.succeeded',\n   'data' => [...]])
+activate WHP
+
+WHP -> WHP: validateWebhookData(data)
+
+WHP -> IC: isProcessed('evt_xxx')
+activate IC
+
+IC -> IC: Check in-memory cache
+IC -> WLR: existsByEventId('evt_xxx')
+activate WLR
+
+WLR -> DB: SELECT COUNT(*)\nFROM osc_payment_webhook_log\nWHERE OXEVENTID = 'evt_xxx'
+DB --> WLR: 0 (not found)
+WLR --> IC: false
+deactivate WLR
+
+IC --> WHP: false (not processed)
+deactivate IC
+
+== Find Associated Contract ==
+
+WHP -> WHP: extractPaymentIntentId(data)
+note right: Extracts 'pi_xxx'\nfrom event data
+
+WHP -> CR: findByProviderOrderId('pi_xxx')
+activate CR
+
+CR -> DB: SELECT *\nFROM osc_payment_contract\nWHERE OXPROVIDERORDERID = 'pi_xxx'
+DB --> CR: Contract record
+CR --> WHP: PaymentContract
+deactivate CR
+
+== Dispatch Webhook Event ==
+
+WHP -> ED: dispatch(\n  WebhookReceivedEvent(\n    eventId: 'evt_xxx',\n    eventType: 'payment_intent.succeeded',\n    contractId: 'contract_123',\n    eventData: [...]))
+activate ED
+
+ED -> EH: handle(WebhookReceivedEvent)
+activate EH
+
+note over EH
+    Handlers process event
+    based on event type:
+    - payment_intent.succeeded
+    - payment_intent.payment_failed
+    - charge.refunded
+    - etc.
+end note
+
+EH -> EH: Process webhook logic\n(update contract state,\n dispatch follow-up events)
+
+EH --> ED: event handled
+deactivate EH
+
+ED --> WHP: event dispatched
+deactivate ED
+
+== Mark as Processed ==
+
+WHP -> IC: markAsProcessed('evt_xxx')
+activate IC
+
+IC -> IC: Add to in-memory cache\nprocessedEvents['evt_xxx'] = true
+
+IC -> WLR: save(WebhookLog(\n  eventId: 'evt_xxx',\n  status: 'processed',\n  eventType: 'payment_intent.succeeded',\n  contractId: 'contract_123'))
+activate WLR
+
+WLR -> DB: INSERT INTO\nosc_payment_webhook_log\n(OXID, OXEVENTID, OXSTATUS,\n OXEVENTTYPE, OXCONTRACTID,\n OXRECEIVEDAT)\nVALUES (?, ?, ?, ?, ?, NOW())
+DB --> WLR: success
+WLR --> IC: void
+deactivate WLR
+
+IC --> WHP: void
+deactivate IC
+
+WHP --> WHC: void
+deactivate WHP
+
+WHC --> STRIPE: 200 OK\n{'status': 'processed'}
+deactivate WHC
+
+== Duplicate Webhook (Idempotency Check) ==
+
+note over STRIPE
+    Stripe retries webhook
+    with same event ID
+end note
+
+STRIPE -> WHC: POST /webhook\n(same payload, evt_xxx)
+activate WHC
+
+WHC -> SV: verify(payload, signature)
+activate SV
+SV --> WHC: true (valid)
+deactivate SV
+
+WHC -> WHP: process(webhookData:\n  ['event_id' => 'evt_xxx', ...])
+activate WHP
+
+WHP -> IC: isProcessed('evt_xxx')
+activate IC
+
+IC -> IC: Check in-memory cache
+note right of IC: Found in cache:\nprocessedEvents['evt_xxx'] = true
+
+IC --> WHP: true (already processed)
+deactivate IC
+
+WHP --> WHC: void (skipped silently)
+deactivate WHP
+
+WHC --> STRIPE: 200 OK\n{'status': 'already_processed'}
+deactivate WHC
+
+note over DB
+    **Webhook Log Table:**
+    OXID: log_abc123
+    OXEVENTID: evt_xxx (UNIQUE)
+    OXSTATUS: processed
+    OXEVENTTYPE: payment_intent.succeeded
+    OXCONTRACTID: contract_123
+    OXRECEIVEDAT: 2025-11-07 10:35:00
+    OXERROR: null
+end note
+
+== Error Handling ==
+
+STRIPE -> WHC: POST /webhook\n(malformed payload)
+activate WHC
+
+WHC -> SV: verify(payload, signature)
+activate SV
+SV --> WHC: true (signature valid)
+deactivate SV
+
+WHC -> WHP: process(webhookData)
+activate WHP
+
+WHP -> WHP: validateWebhookData(data)
+note right: Validation fails:\nmissing event_id
+
+WHP -> WLR: save(WebhookLog(\n  eventId: 'unknown',\n  status: 'failed',\n  error: 'Missing event_id'))
+activate WLR
+WLR -> DB: INSERT with status='failed'
+WLR --> WHP: void
+deactivate WLR
+
+WHP --> WHC: throws exception
+deactivate WHP
+
+WHC -> WHC: Log error
+WHC --> STRIPE: 400 Bad Request\n{'error': 'Invalid webhook data'}
+deactivate WHC
+
+note over WHP
+    **Idempotency Benefits:**
+    1. Prevents duplicate processing
+    2. Handles Stripe retries gracefully
+    3. In-memory cache for performance
+    4. Database for persistence
+    5. Audit trail for debugging
+end note
+
+@enduml

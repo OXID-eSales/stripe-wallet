@@ -1,0 +1,249 @@
+@startuml Database Schema
+!theme plain
+
+title Database Schema - Payment Extension
+
+!define table(x) class x << (T,#FFAAAA) >>
+!define primary_key(x) <b><u>x</u></b>
+!define foreign_key(x) <i>x</i>
+!define index(x) {field} x
+
+hide methods
+hide stereotypes
+
+table(osc_payment_contract) {
+    primary_key(OXID) : VARCHAR(255)
+    --
+    OXSHOPID : INT NOT NULL
+    OXUSERID : VARCHAR(255) NOT NULL
+    index(OXORDERID) : VARCHAR(255) NULL
+    index(OXSTATE) : VARCHAR(50) NOT NULL
+    OXSTATEREASON : TEXT NULL
+    OXBASKETDATA : JSON NOT NULL
+    OXTERMS : JSON NULL
+    OXMETADATA : JSON NULL
+    OXCONDITIONS : JSON NOT NULL
+    OXPROVIDER : VARCHAR(50) NULL
+    index(OXPROVIDERORDERID) : VARCHAR(255) NULL
+    OXPROVIDERDATA : JSON NULL
+    OXPROVIDERREDIRECTURL : TEXT NULL
+    OXCREATED : DATETIME NOT NULL
+    OXUPDATED : DATETIME NOT NULL
+    OXCOMMITTEDAT : DATETIME NULL
+    OXFULFILLEDAT : DATETIME NULL
+    index(OXEXPIRESAT) : DATETIME NULL
+}
+
+table(osc_payment_transaction) {
+    primary_key(OXID) : VARCHAR(255)
+    --
+    OXSHOPID : INT NOT NULL
+    index(OXORDERID) : VARCHAR(255) NOT NULL
+    index(foreign_key(OXCONTRACTID)) : VARCHAR(255) NULL
+    OXPROVIDER : VARCHAR(50) NOT NULL
+    OXPROVIDERORDERID : VARCHAR(255) NULL
+    index(OXTRANSACTIONID) : VARCHAR(255) NULL
+    index(OXTYPE) : VARCHAR(50) NOT NULL
+    index(OXSTATUS) : VARCHAR(50) NOT NULL
+    OXAMOUNT : DECIMAL(10,2) NOT NULL
+    OXCURRENCY : VARCHAR(3) NOT NULL
+    OXPAYMENTMETHODID : VARCHAR(255) NULL
+    OXPAYMENTMETHODTYPE : VARCHAR(50) NULL
+    index(foreign_key(OXPARENTTRANSACTIONID)) : VARCHAR(255) NULL
+    OXCREATED : DATETIME NOT NULL
+    OXUPDATED : DATETIME NOT NULL
+}
+
+table(osc_payment_webhook_log) {
+    primary_key(OXID) : VARCHAR(255)
+    --
+    index(OXEVENTID) : VARCHAR(255) NOT NULL UNIQUE
+    OXRECEIVEDAT : DATETIME NOT NULL
+    OXSTATUS : VARCHAR(50) NOT NULL
+    OXEVENTTYPE : VARCHAR(100) NULL
+    index(foreign_key(OXCONTRACTID)) : VARCHAR(255) NULL
+    OXERROR : TEXT NULL
+}
+
+osc_payment_contract "1" -- "0..*" osc_payment_transaction : "tracks"
+osc_payment_contract "1" -- "0..*" osc_payment_webhook_log : "receives"
+osc_payment_transaction "1" -- "0..*" osc_payment_transaction : "refunds/voids"
+
+note right of osc_payment_contract
+    **Primary Entity: Payment Contract**
+
+    **Indexes:**
+    - PRIMARY KEY (OXID)
+    - INDEX idx_provider_order (OXPROVIDERORDERID)
+    - INDEX idx_user (OXUSERID)
+    - INDEX idx_order (OXORDERID)
+    - INDEX idx_state (OXSTATE)
+    - INDEX idx_expires (OXEXPIRESAT)
+
+    **JSON Columns:**
+    - OXBASKETDATA: BasketSnapshot
+      * items: array
+      * discounts: array
+      * totalGross, totalNet, totalVat: float
+      * currency: string
+      * capturedAt: datetime
+
+    - OXCONDITIONS: ContractCondition[]
+      * type: string (payment_authorized, fraud_check, etc.)
+      * status: string (pending, fulfilled, failed)
+      * data: array
+      * fulfilledAt: datetime
+      * failureReason: string
+
+    - OXMETADATA: arbitrary key-value pairs
+    - OXTERMS: payment terms (future use)
+    - OXPROVIDERDATA: provider-specific data
+
+    **State Values:**
+    - draft, pending, ready_to_commit
+    - committed, fulfilled
+    - cancelled, expired, failed
+
+    **TTL:** 24 hours (via OXEXPIRESAT)
+end note
+
+note right of osc_payment_transaction
+    **Transaction Audit Log**
+
+    **Indexes:**
+    - PRIMARY KEY (OXID)
+    - INDEX idx_contract (OXCONTRACTID)
+    - INDEX idx_order (OXORDERID)
+    - INDEX idx_provider_tx (OXTRANSACTIONID)
+    - INDEX idx_parent (OXPARENTTRANSACTIONID)
+    - INDEX idx_type_status (OXTYPE, OXSTATUS)
+
+    **Transaction Types:**
+    - authorization: Payment authorized
+    - capture: Payment captured
+    - refund: Payment refunded
+    - void: Payment/authorization voided
+    - reauthorization: Authorization renewed
+
+    **Status Values:**
+    - pending: Processing
+    - succeeded: Completed successfully
+    - failed: Failed to complete
+
+    **Parent-Child Relationships:**
+    - Refunds link to original capture
+    - Voids link to original authorization
+    - Enables tracking of partial refunds
+
+    **Usage:**
+    - Audit trail for all payment operations
+    - Calculate total refunded amount
+    - Track partial captures/refunds
+    - Debugging payment issues
+end note
+
+note right of osc_payment_webhook_log
+    **Webhook Event Log**
+
+    **Indexes:**
+    - PRIMARY KEY (OXID)
+    - UNIQUE KEY (OXEVENTID)
+    - INDEX idx_contract (OXCONTRACTID)
+
+    **Purpose:**
+    - Idempotency tracking
+    - Prevents duplicate processing
+    - Audit log for debugging
+    - Compliance/reporting
+
+    **Status Values:**
+    - processed: Successfully processed
+    - failed: Processing failed
+    - skipped: Duplicate (already processed)
+
+    **Event Types (Stripe Examples):**
+    - payment_intent.succeeded
+    - payment_intent.payment_failed
+    - payment_intent.canceled
+    - charge.captured
+    - charge.refunded
+    - charge.failed
+
+    **Error Tracking:**
+    - OXERROR stores exception message
+    - Stack traces for debugging
+    - Provider-specific error codes
+end note
+
+package "Query Patterns" {
+    note as N1
+        **Common Queries**
+
+        Find active contract by user:
+        SELECT * FROM osc_payment_contract
+        WHERE OXUSERID = ?
+          AND OXSTATE NOT IN (
+            'fulfilled', 'cancelled',
+            'expired', 'failed'
+          )
+        ORDER BY OXCREATED DESC
+        LIMIT 1
+    end note
+
+    note as N2
+        Find expired contracts:
+        SELECT * FROM osc_payment_contract
+        WHERE OXEXPIRESAT < NOW()
+          AND OXSTATE NOT IN (
+            'fulfilled', 'cancelled',
+            'expired', 'failed'
+          )
+    end note
+
+    note as N3
+        Calculate total refunded:
+        SELECT SUM(OXAMOUNT)
+        FROM osc_payment_transaction
+        WHERE OXCONTRACTID = ?
+          AND OXTYPE = 'refund'
+          AND OXSTATUS = 'succeeded'
+    end note
+
+    note as N4
+        Check webhook processed:
+        SELECT EXISTS(
+          SELECT 1
+          FROM osc_payment_webhook_log
+          WHERE OXEVENTID = ?
+        )
+    end note
+}
+
+package "Data Relationships" {
+    note as R1
+        **Contract → Transaction (1:N)**
+        One contract can have many transactions:
+        - 1 authorization
+        - 1 capture
+        - Multiple refunds
+        - 1 void
+    end note
+
+    note as R2
+        **Contract → Webhook Log (1:N)**
+        One contract receives many webhooks:
+        - payment_intent.created
+        - payment_intent.succeeded
+        - charge.captured
+        - charge.refunded
+    end note
+
+    note as R3
+        **Transaction → Transaction (1:N)**
+        Parent-child relationships:
+        - Capture → Refund(s)
+        - Authorization → Void
+    end note
+}
+
+@enduml

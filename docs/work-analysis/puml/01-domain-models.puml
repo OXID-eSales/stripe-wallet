@@ -1,0 +1,191 @@
+@startuml Domain Models - Payment Contract
+!theme plain
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+
+title Domain Model - Payment Contract Aggregate
+
+package "Component\Model" {
+    interface ModelInterface {
+        +getId(): ?string
+        +toArray(): array
+    }
+
+    abstract class AbstractModel {
+        #id: ?string
+        +getId(): ?string
+        #generateId(prefix: string): string
+        {abstract} +toArray(): array
+    }
+
+    AbstractModel ..|> ModelInterface
+}
+
+package "Component\Contract" {
+    interface PaymentContractInterface {
+        +getState(): ContractState
+        +getStateValue(): string
+        +getAmount(): float
+        +getCurrency(): string
+        +isInState(state: string): bool
+        +getOrderId(): ?string
+        +getProviderOrderId(): ?string
+        +getCreatedAt(): DateTimeInterface
+        +getUpdatedAt(): DateTimeInterface
+        +getUserId(): string
+        +getBasketSnapshot(): BasketSnapshot
+        +areAllConditionsFulfilled(): bool
+        +commitToOrder(orderId: string): void
+        +fulfill(): void
+    }
+
+    class PaymentContract <<Aggregate Root>> {
+        -id: string
+        -shopId: int
+        -userId: string
+        -orderId: ?string
+        -state: ContractState
+        -basketSnapshot: BasketSnapshot
+        -conditions: ContractCondition[]
+        -provider: ?string
+        -providerOrderId: ?string
+        -providerRedirectUrl: ?string
+        -expiresAt: ?DateTimeInterface
+        -createdAt: DateTimeInterface
+        -updatedAt: DateTimeInterface
+        -fulfilledAt: ?DateTimeInterface
+        ..
+        +__construct(shopId, userId, basket, ?id)
+        +addCondition(condition): void
+        +transitionToPending(): void
+        +fulfillCondition(type, data): void
+        +failCondition(type, reason): void
+        +areAllConditionsFulfilled(): bool
+        +commitToOrder(orderId): void
+        +fulfill(): void
+        +cancel(reason): void
+        +fail(reason): void
+        +expire(): void
+        +setProvider(provider, orderId, ?url): void
+        -findCondition(type): ?ContractCondition
+        -touch(): void
+        +toArray(): array
+        +fromArray(data): self
+    }
+
+    class ContractState <<Value Object>> {
+        -value: string
+        ..
+        +draft(): self
+        +pending(): self
+        +readyToCommit(): self
+        +committed(): self
+        +fulfilled(): self
+        +cancelled(): self
+        +expired(): self
+        +failed(): self
+        ..
+        +isDraft(): bool
+        +isPending(): bool
+        +isReadyToCommit(): bool
+        +isCommitted(): bool
+        +isFulfilled(): bool
+        +isTerminal(): bool
+        +getValue(): string
+        +equals(other): bool
+        +fromValue(value): self
+    }
+
+    class ContractCondition <<Value Object>> {
+        +TYPE_PAYMENT_AUTHORIZED
+        +TYPE_FRAUD_CHECK
+        +TYPE_STOCK_RESERVED
+        +TYPE_COMPLIANCE_CHECK
+        +TYPE_ADDRESS_VALIDATED
+        ..
+        +STATUS_PENDING
+        +STATUS_FULFILLED
+        +STATUS_FAILED
+        ..
+        -type: string
+        -status: string
+        -data: array
+        -fulfilledAt: ?DateTimeInterface
+        -failureReason: ?string
+        ..
+        +fulfill(data): void
+        +fail(reason): void
+        +isFulfilled(): bool
+        +isPending(): bool
+        +isFailed(): bool
+        +getType(): string
+        +getStatus(): string
+        +getData(): array
+        +toArray(): array
+        +fromArray(data): self
+        ..
+        +paymentAuthorized(): self
+        +fraudCheck(): self
+        +stockReserved(): self
+        +complianceCheck(): self
+        +addressValidated(): self
+    }
+
+    class BasketSnapshot <<Value Object>> {
+        -items: array
+        -discounts: array
+        -totalGross: float
+        -totalNet: float
+        -totalVat: float
+        -currency: string
+        -capturedAt: DateTimeInterface
+        ..
+        +getItems(): array
+        +getDiscounts(): array
+        +getTotalGross(): float
+        +getTotalNet(): float
+        +getTotalVat(): float
+        +getCurrency(): string
+        +getCapturedAt(): DateTimeInterface
+        +toArray(): array
+        +fromArray(data): self
+    }
+
+    PaymentContract ..|> PaymentContractInterface
+    PaymentContract --|> AbstractModel
+    PaymentContract *-- "1" ContractState : contains
+    PaymentContract *-- "1" BasketSnapshot : contains
+    PaymentContract *-- "0..*" ContractCondition : contains
+
+    note right of PaymentContract
+        **Aggregate Root**
+
+        State Machine:
+        DRAFT → PENDING → READY_TO_COMMIT
+          → COMMITTED → FULFILLED
+
+        Terminal States:
+        CANCELLED, EXPIRED, FAILED
+
+        Invariants:
+        - Conditions only added in DRAFT
+        - Cannot transition without conditions
+        - All conditions must be fulfilled
+          before READY_TO_COMMIT
+    end note
+
+    note right of ContractState
+        **Type-Safe Enum Pattern**
+
+        Valid transitions:
+        draft → pending
+        pending → ready_to_commit
+        ready_to_commit → committed
+        committed → fulfilled
+
+        Any non-terminal → cancelled/failed
+        Any non-terminal → expired
+    end note
+}
+
+@enduml
