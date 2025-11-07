@@ -178,6 +178,7 @@ jobs:
         run: composer install --no-interaction
 
       - name: Run style check
+        working-directory: source/test-module
         run: |
           ./bin/pre-commit-check.sh
 
