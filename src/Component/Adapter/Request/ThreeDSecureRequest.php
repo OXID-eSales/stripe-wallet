@@ -29,12 +29,12 @@ readonly class ThreeDSecureRequest
 {
     /**
      * @param string $paymentId Payment/authorization ID requiring 3DS
-     * @param string $returnUrl URL to return after 3DS authentication
+     * @param string|null $returnUrl Optional URL to return after 3DS authentication
      * @param array<string, mixed> $metadata Additional metadata
      */
     public function __construct(
         public string $paymentId,
-        public string $returnUrl,
+        public ?string $returnUrl = null,
         public array $metadata = [],
     ) {
     }

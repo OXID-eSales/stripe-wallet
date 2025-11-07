@@ -28,15 +28,15 @@ readonly class CreatePaymentMethodRequest
 {
     /**
      * @param string $paymentMethod Generic payment method type ('card', 'sepa_debit', etc.)
-     * @param string $customerId Provider's customer ID to attach payment method to
+     * @param string|null $customerId Provider's customer ID to attach payment method to (null if not attaching)
      * @param array<string, mixed> $paymentMethodData Provider-specific payment method data
      * @param array<string, string>|null $billingAddress Billing address
      * @param array<string, mixed> $metadata Additional metadata
      */
     public function __construct(
         public string $paymentMethod,
-        public string $customerId,
-        public array $paymentMethodData,
+        public ?string $customerId = null,
+        public array $paymentMethodData = [],
         public ?array $billingAddress = null,
         public array $metadata = [],
     ) {

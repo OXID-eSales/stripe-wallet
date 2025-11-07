@@ -33,6 +33,7 @@ use OxidSolutionCatalysts\Payments\Component\Adapter\Exception\PaymentAdapterExc
 use Stripe\StripeClient;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Webhook;
+use DateTimeImmutable;
 
 /**
  * Stripe adapter implementing the payment provider interface.
@@ -75,9 +76,23 @@ final class StripeAdapter implements PaymentAdapterInterface
             ];
 
             // Add payment method if provided (for saved cards)
+            $willConfirm = $request->paymentMethodId !== null;
             if ($request->paymentMethodId !== null) {
                 $params['payment_method'] = $request->paymentMethodId;
                 $params['confirm'] = true; // Auto-confirm with saved payment method
+
+                // Stripe requires return_url when confirming a PaymentIntent
+                if ($request->returnUrl === null) {
+                    throw new PaymentAdapterException(
+                        providerName: 'stripe',
+                        errorCode: 'missing_return_url',
+                        message: 'return_url is required when confirming a PaymentIntent with a saved payment method',
+                        context: [
+                            'payment_method_id' => $request->paymentMethodId,
+                            'order_id' => $request->orderId,
+                        ]
+                    );
+                }
             }
 
             // Add customer if provided
@@ -85,8 +100,9 @@ final class StripeAdapter implements PaymentAdapterInterface
                 $params['customer'] = $request->customerId;
             }
 
-            // Add return URLs for redirect-based payment methods
-            if ($request->returnUrl !== null) {
+            // Add return URL when confirming
+            // Note: return_url is required when confirm=true
+            if ($request->returnUrl !== null && $willConfirm) {
                 $params['return_url'] = $request->returnUrl;
             }
 
@@ -131,13 +147,16 @@ final class StripeAdapter implements PaymentAdapterInterface
 
             $amountCaptured = $paymentIntent->amount_received / 100;
 
+            // Get capture timestamp from first charge, or use current time if not available
+            $capturedAtTimestamp = $paymentIntent->charges->data[0]->created ?? time();
+
             return new CaptureResponse(
                 providerPaymentId: $paymentIntent->id,
                 captureId: $paymentIntent->charges->data[0]->id ?? $paymentIntent->id,
                 amountCaptured: $amountCaptured,
                 currency: strtoupper($paymentIntent->currency),
                 status: 'succeeded',
-                capturedAt: new \DateTimeImmutable('@' . $paymentIntent->charges->data[0]->created),
+                capturedAt: new DateTimeImmutable('@' . $capturedAtTimestamp),
                 providerData: $paymentIntent->toArray(),
                 metadata: $request->metadata
             );
@@ -174,7 +193,7 @@ final class StripeAdapter implements PaymentAdapterInterface
                 amountRefunded: $refund->amount / 100,
                 currency: strtoupper($refund->currency),
                 status: $refund->status,
-                refundedAt: new \DateTimeImmutable('@' . $refund->created),
+                refundedAt: new DateTimeImmutable('@' . $refund->created),
                 reason: $request->reason,
                 providerData: $refund->toArray(),
                 metadata: $request->metadata
@@ -201,7 +220,7 @@ final class StripeAdapter implements PaymentAdapterInterface
             return new VoidResponse(
                 providerPaymentId: $paymentIntent->id,
                 status: 'succeeded',
-                voidedAt: new \DateTimeImmutable(),
+                voidedAt: new DateTimeImmutable(),
                 reason: $request->reason,
                 providerData: $paymentIntent->toArray(),
                 metadata: $request->metadata
@@ -228,8 +247,8 @@ final class StripeAdapter implements PaymentAdapterInterface
             }
 
             $capturedAt = null;
-            if (!empty($paymentIntent->charges->data)) {
-                $capturedAt = new \DateTimeImmutable('@' . $paymentIntent->charges->data[0]->created);
+            if (!empty($paymentIntent->charges->data) && isset($paymentIntent->charges->data[0]->created)) {
+                $capturedAt = new DateTimeImmutable('@' . $paymentIntent->charges->data[0]->created);
             }
 
             return new PaymentDetailsResponse(
@@ -242,7 +261,7 @@ final class StripeAdapter implements PaymentAdapterInterface
                 isCaptured: StripeStatusMapper::isCaptured($paymentIntent->status),
                 isRefunded: $amountRefunded > 0,
                 isCancelled: StripeStatusMapper::isCancelled($paymentIntent->status),
-                createdAt: new \DateTimeImmutable('@' . $paymentIntent->created),
+                createdAt: new DateTimeImmutable('@' . $paymentIntent->created),
                 capturedAt: $capturedAt,
                 providerData: $paymentIntent->toArray()
             );
@@ -270,23 +289,39 @@ final class StripeAdapter implements PaymentAdapterInterface
                 ]),
             ];
 
+            $willConfirm = $request->paymentMethodId !== null;
             if ($request->paymentMethodId !== null) {
                 $params['payment_method'] = $request->paymentMethodId;
                 $params['confirm'] = true;
+
+                // Stripe requires return_url when confirming a PaymentIntent
+                if ($request->returnUrl === null) {
+                    throw new PaymentAdapterException(
+                        providerName: 'stripe',
+                        errorCode: 'missing_return_url',
+                        message: 'return_url is required when confirming a PaymentIntent with a saved payment method',
+                        context: [
+                            'payment_method_id' => $request->paymentMethodId,
+                            'order_id' => $request->orderId,
+                        ]
+                    );
+                }
             }
 
             if ($request->customerId !== null) {
                 $params['customer'] = $request->customerId;
             }
 
-            if ($request->returnUrl !== null) {
+            // Add return URL when confirming
+            // Note: return_url is required when confirm=true
+            if ($request->returnUrl !== null && $willConfirm) {
                 $params['return_url'] = $request->returnUrl;
             }
 
             $paymentIntent = $this->stripeClient->paymentIntents->create($params);
 
             // Stripe authorizations expire after 7 days
-            $expiresAt = new \DateTimeImmutable('+7 days');
+            $expiresAt = new DateTimeImmutable('+7 days');
 
             return new AuthorizationResponse(
                 authorizationId: $paymentIntent->id,
@@ -294,7 +329,7 @@ final class StripeAdapter implements PaymentAdapterInterface
                 status: StripeStatusMapper::toNormalized($paymentIntent->status),
                 amount: $request->amount,
                 currency: $request->currency,
-                authorizedAt: new \DateTimeImmutable('@' . $paymentIntent->created),
+                authorizedAt: new DateTimeImmutable('@' . $paymentIntent->created),
                 expiresAt: $expiresAt,
                 requiresAction: StripeStatusMapper::requiresAction($paymentIntent->status),
                 clientSecret: $paymentIntent->client_secret,
@@ -381,7 +416,7 @@ final class StripeAdapter implements PaymentAdapterInterface
                 type: $request->paymentMethod,
                 details: $this->extractPaymentMethodDetails($paymentMethod),
                 isDefault: false,
-                createdAt: new \DateTimeImmutable('@' . $paymentMethod->created),
+                createdAt: new DateTimeImmutable('@' . $paymentMethod->created),
                 providerData: $paymentMethod->toArray(),
                 metadata: $request->metadata
             );
@@ -406,7 +441,7 @@ final class StripeAdapter implements PaymentAdapterInterface
                     type: 'card',
                     details: $this->extractPaymentMethodDetails($pm),
                     isDefault: false,
-                    createdAt: new \DateTimeImmutable('@' . $pm->created),
+                    createdAt: new DateTimeImmutable('@' . $pm->created),
                     providerData: $pm->toArray()
                 );
             }
@@ -438,12 +473,15 @@ final class StripeAdapter implements PaymentAdapterInterface
             // We retrieve the payment and check if it requires action
             $paymentIntent = $this->stripeClient->paymentIntents->retrieve($request->paymentId);
 
-            $requiresAction = $paymentIntent->status === 'requires_action';
             $redirectUrl = $paymentIntent->next_action->redirect_to_url->url ?? null;
+
+            // Payment is authenticated if it's succeeded or requires_capture
+            // (requires_capture means authorization was successful)
+            $authenticated = in_array($paymentIntent->status, ['succeeded', 'requires_capture'], true);
 
             return new ThreeDSecureResponse(
                 paymentId: $paymentIntent->id,
-                authenticated: $paymentIntent->status === 'succeeded',
+                authenticated: $authenticated,
                 status: $this->map3DSecureStatus($paymentIntent->status),
                 redirectUrl: $redirectUrl,
                 authenticationId: $paymentIntent->id,

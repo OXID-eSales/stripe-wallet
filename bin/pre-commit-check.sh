@@ -3,8 +3,23 @@
 # Pre-commit check script
 # Runs tests and checks to ensure code is ready for commit
 # Works both locally (with Docker) and on GitHub Actions (without Docker)
+#
+# Usage: ./bin/pre-commit-check.sh [OPTIONS]
+# Options:
+#   --no-phpunit    Skip PHPUnit tests
 
 set +e  # Don't exit on error, we want to collect all results
+
+# Parse command line arguments
+SKIP_PHPUNIT=false
+for arg in "$@"; do
+    case $arg in
+        --no-phpunit)
+            SKIP_PHPUNIT=true
+            shift
+            ;;
+    esac
+done
 
 # Get the script directory (module root)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -72,24 +87,31 @@ fi
 echo ""
 
 # 2. PHPUnit - All Tests
-echo ">>> Running PHPUnit Tests (All)..."
-if [ "$ENVIRONMENT" = "github" ]; then
-  echo "skip on github"
+if [ "$SKIP_PHPUNIT" = true ]; then
+    echo ">>> Skipping PHPUnit Tests (--no-phpunit flag set)"
+    echo -e "${YELLOW}⊘ PHPUnit tests skipped${NC}"
+    echo ""
 else
-    # Local: Run in Docker with shop bootstrap
-    docker compose exec -w /var/www/extensions/stripe -T php \
-        vendor/bin/phpunit -c tests/phpunit.xml --bootstrap=/var/www/source/bootstrap.php
-    PHPUNIT_STATUS=$?
-fi
+    echo ">>> Running PHPUnit Tests (All)..."
+    if [ "$ENVIRONMENT" = "github" ]; then
+      echo "skip on github"
+      PHPUNIT_STATUS=0
+    else
+        # Local: Run in Docker with shop bootstrap
+        docker compose exec -w /var/www/extensions/stripe -T php \
+            vendor/bin/phpunit -c tests/phpunit.xml --bootstrap=/var/www/source/bootstrap.php
+        PHPUNIT_STATUS=$?
+    fi
 
-if [ $PHPUNIT_STATUS -ne 0 ]; then
-    OVERALL_STATUS=1
-    FAILED_CHECKS+=("PHPUnit Tests")
-    echo -e "${RED}✗ PHPUnit tests failed${NC}"
-else
-    echo -e "${GREEN}✓ PHPUnit tests passed${NC}"
+    if [ $PHPUNIT_STATUS -ne 0 ]; then
+        OVERALL_STATUS=1
+        FAILED_CHECKS+=("PHPUnit Tests")
+        echo -e "${RED}✗ PHPUnit tests failed${NC}"
+    else
+        echo -e "${GREEN}✓ PHPUnit tests passed${NC}"
+    fi
+    echo ""
 fi
-echo ""
 
 # 3. Style Commit Check
 echo ">>> Running style-commit check..."

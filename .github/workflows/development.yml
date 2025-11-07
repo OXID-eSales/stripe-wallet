@@ -258,6 +258,12 @@ jobs:
         run: |
           docker compose exec -T php vendor/bin/oe-eshop-db_migrate migrations:migrate STRIPE --no-interaction
 
+      - name: Create .env
+        run: |          
+          echo "STRIPE_TEST_PUBLISHABLE_KEY=${{ secrets.STRIPE_TEST_PUBLISHABLE_KEY }}" >> ./source/test-module/tests/.env
+          echo "STRIPE_TEST_SECRET_KEY=${{ secrets.STRIPE_TEST_SECRET_KEY }}" >> ./source/test-module/tests/.env
+          
+
       - name: Run integration tests with shop bootstrap
         run: |
           docker compose exec -T -e XDEBUG_MODE=coverage php vendor/bin/phpunit \

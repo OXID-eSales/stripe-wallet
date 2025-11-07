@@ -20,7 +20,7 @@ readonly class PaymentMethodResponse
 {
     /**
      * @param string $paymentMethodId Provider's payment method ID
-     * @param string $customerId Provider's customer ID this payment method belongs to
+     * @param string|null $customerId Provider's customer ID this payment method belongs to (null if not attached)
      * @param string $type Payment method type ('card', 'sepa_debit', 'paypal', etc.)
      * @param array<string, mixed> $details Payment method details (last4, brand, exp_month, exp_year, etc.)
      * @param bool $isDefault Whether this is the default payment method
@@ -30,7 +30,7 @@ readonly class PaymentMethodResponse
      */
     public function __construct(
         public string $paymentMethodId,
-        public string $customerId,
+        public ?string $customerId,
         public string $type,
         public array $details,
         public bool $isDefault = false,
