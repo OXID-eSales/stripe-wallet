@@ -9,6 +9,8 @@ declare(strict_types=1);
 use OxidSolutionCatalysts\Payments\Component\Controller\Http\WebhookController;
 use OxidSolutionCatalysts\Payments\Component\Controller\Http\PaymentController;
 use OxidSolutionCatalysts\Payments\Stripe\Core\Events;
+use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\StripeConnect;
+use OxidSolutionCatalysts\Payments\Stripe\Extend\Application\Controller\Admin\ModuleConfiguration;
 
 /**
  * Metadata version
@@ -28,19 +30,23 @@ $aModule = [
         'de' => 'Stripe-Zahlungsintegration mit Smart Contracts für OXID eShop 7',
         'en' => 'Stripe payment integration with Smart Contracts for OXID eShop 7',
     ],
-    'thumbnail' => 'logo.png',
+    'thumbnail' => 'img/stripe_logo.png',
     'version' => '1.0.0',
     'author' => 'OXID Solution Catalysts',
     'url' => 'https://www.oxid-esales.com',
     'email' => 'info@oxid-esales.com',
-    'extend' => [],
+    'extend' => [
+        \OxidEsales\Eshop\Application\Controller\Admin\ModuleConfiguration::class => ModuleConfiguration::class,
+    ],
     'controllers' => [
         'osc_stripe_webhook' => WebhookController::class,
         'osc_stripe_payment' => PaymentController::class,
+        'StripeConnect' => StripeConnect::class,
     ],
     'templates' => [
         'osc_stripe_payment.tpl' => 'osc/stripe/views/tpl/payment.tpl',
         'osc_stripe_admin_config.tpl' => 'osc/stripe/views/admin/tpl/config.tpl',
+        '@osc_stripe_wallet/admin/stripe_connect' => 'osc/stripe/views/admin_twig/twig/stripe_connect.html.twig',
     ],
     'blocks' => [
         [

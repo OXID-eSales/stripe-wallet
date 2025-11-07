@@ -55,6 +55,9 @@ class Events
      */
     public static function onActivate(): void
     {
+        self::addDatabaseStructure();
+        self::addPaymentMethods();
+        self::deleteRemovedPaymentMethods();
         self::regenerateViews();
         self::clearTmp();
     }
@@ -163,7 +166,9 @@ class Events
     protected static function deletePaymentMethod($sPaymentId)
     {
         DatabaseProvider::getDb()->Execute("DELETE FROM oxpayments WHERE oxid = ?", array($sPaymentId));
-        DatabaseProvider::getDb()->Execute("DELETE FROM " . PaymentConfig::$sTableName . " WHERE oxid = ?", array($sPaymentId));
+        // Note: PaymentConfig class needs to be implemented
+        // Uncomment when PaymentConfig is available:
+        // DatabaseProvider::getDb()->Execute("DELETE FROM " . PaymentConfig::$sTableName . " WHERE oxid = ?", array($sPaymentId));
     }
 
     /**
@@ -174,9 +179,12 @@ class Events
     protected static function addDatabaseStructure()
     {
         //CREATE NEW TABLES
-        self::addTableIfNotExists(PaymentConfig::$sTableName, PaymentConfig::getTableCreateQuery());
-        self::addTableIfNotExists(RequestLog::$sTableName, RequestLog::getTableCreateQuery());
-        self::addTableIfNotExists(Cronjob::$sTableName, Cronjob::getTableCreateQuery());
+        // Note: PaymentConfig, RequestLog, and Cronjob classes need to be implemented
+        // For now, we rely on Doctrine migrations to create the necessary tables
+        // Uncomment these lines when the respective classes are available:
+        // self::addTableIfNotExists(PaymentConfig::$sTableName, PaymentConfig::getTableCreateQuery());
+        // self::addTableIfNotExists(RequestLog::$sTableName, RequestLog::getTableCreateQuery());
+        // self::addTableIfNotExists(Cronjob::$sTableName, Cronjob::getTableCreateQuery());
 
         //ADD NEW COLUMNS
         self::addColumnIfNotExists('oxorder', 'STRIPEDELCOSTREFUNDED', "ALTER TABLE `oxorder` ADD COLUMN `STRIPEDELCOSTREFUNDED` DOUBLE NOT NULL DEFAULT '0';");
