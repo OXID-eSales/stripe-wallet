@@ -14,7 +14,21 @@ use OxidSolutionCatalysts\Payments\Component\Adapter\Request\AuthorizePaymentReq
 use OxidSolutionCatalysts\Payments\Component\Adapter\Exception\PaymentAdapterException;
 use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapter;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\MockObject\MockObject;
 use Stripe\StripeClient;
+
+/**
+ * Test double for StripeClient that allows setting paymentIntents property.
+ */
+class TestStripeClient extends StripeClient
+{
+    public $paymentIntents;
+
+    public function __construct()
+    {
+        // Don't call parent constructor to avoid API initialization
+    }
+}
 
 /**
  * Unit tests for StripeAdapter return_url validation.
@@ -31,20 +45,14 @@ use Stripe\StripeClient;
  */
 final class StripeAdapterReturnUrlTest extends TestCase
 {
-    private StripeClient $stripeClient;
+    private TestStripeClient $stripeClient;
     private StripeAdapter $adapter;
 
     protected function setUp(): void
     {
-        // Create a stub Stripe client that allows property assignment
-        $this->stripeClient = new class('fake_key') extends StripeClient {
-            // Declare property to avoid PHP 8.2 dynamic property deprecation warning
-            public $paymentIntents;
+        // Create a test double for StripeClient
+        $this->stripeClient = new TestStripeClient();
 
-            public function __construct(string $apiKey) {
-                // Don't call parent constructor to avoid real API initialization
-            }
-        };
         $this->adapter = new StripeAdapter();
         $this->adapter->setStripeClient($this->stripeClient);
     }
