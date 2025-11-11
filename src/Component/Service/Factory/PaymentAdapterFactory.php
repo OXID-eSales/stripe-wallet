@@ -12,6 +12,7 @@ namespace OxidSolutionCatalysts\Payments\Component\Service\Factory;
 use OxidSolutionCatalysts\Payments\Component\Adapter\PaymentAdapterInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapter;
 use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeClientFactory;
+use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 
 /**
  * Factory for creating payment adapter instances.
@@ -20,10 +21,19 @@ use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeClientFactory;
  */
 class PaymentAdapterFactory
 {
+    private string $secretKey;
+    private bool $testMode;
+
+    /**
+     * @param string $secretKey Stripe secret key (test or live)
+     * @param bool $testMode Whether to use test mode
+     */
     public function __construct(
-        private readonly string $secretKey,
-        private readonly bool $testMode = true
+        private readonly ModuleConfigurationService $configurationService,
+        private readonly StripeClientFactory $clientFactory
     ) {
+        $this->secretKey = $this->configurationService->getSecretKey();
+        $this->testMode = $this->configurationService->isTestMode();
     }
 
     /**
@@ -45,14 +55,14 @@ class PaymentAdapterFactory
         return $this->createStripeAdapter();
     }
 
-    private function createStripeAdapter(): StripeAdapter
+    private function createStripeAdapter(): ?StripeAdapter
     {
-        $clientFactory = new StripeClientFactory(
-            secretKey: $this->secretKey,
-            testMode: $this->testMode
-        );
+        $stripeClient = $this->clientFactory->create();
 
-        return new StripeAdapter($clientFactory->create());
+        $adapter = new StripeAdapter();
+        $adapter->setStripeClient($stripeClient);
+
+        return $adapter;
     }
 
     public function isProviderSupported(string $providerName): bool

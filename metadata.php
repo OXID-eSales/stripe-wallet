@@ -58,9 +58,9 @@ $aModule = [
     'settings'      => [
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeMode',                        'type' => 'select',     'value' => 'test',      'position' => 10, 'constraints' => 'live|test'],
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeTestToken',                   'type' => 'password',   'value' => '',          'position' => 20],
-        ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeTestPk',                      'type' => 'str',        'value' => '',          'position' => 21],
+        ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeTestPk',                      'type' => 'password',   'value' => '',          'position' => 21],
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeLiveToken',                   'type' => 'password',   'value' => '',          'position' => 30],
-        ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeLivePk',                      'type' => 'str',        'value' => '',          'position' => 31],
+        ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeLivePk',                      'type' => 'password',   'value' => '',          'position' => 31],
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeTestKey',                     'type' => 'password',   'value' => '',          'position' => 32],
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeLiveKey',                     'type' => 'password',   'value' => '',          'position' => 33],
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeLogTransactionInfo',         'type' => 'bool',       'value' => '1',         'position' => 34],

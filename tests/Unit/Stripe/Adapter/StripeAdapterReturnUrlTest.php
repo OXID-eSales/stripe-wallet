@@ -38,11 +38,15 @@ final class StripeAdapterReturnUrlTest extends TestCase
     {
         // Create a stub Stripe client that allows property assignment
         $this->stripeClient = new class('fake_key') extends StripeClient {
+            // Declare property to avoid PHP 8.2 dynamic property deprecation warning
+            public $paymentIntents;
+
             public function __construct(string $apiKey) {
                 // Don't call parent constructor to avoid real API initialization
             }
         };
-        $this->adapter = new StripeAdapter($this->stripeClient);
+        $this->adapter = new StripeAdapter();
+        $this->adapter->setStripeClient($this->stripeClient);
     }
 
     /**

@@ -140,6 +140,7 @@ final class Stripe3DSecureIntegrationTest extends StripeIntegrationTestCase
 
         // Assert - Check redirect URL structure
         // For unconfirmed payment, there should be no redirect URL yet
+        $this->assertNotNull($threeDSResponse);
         if ($threeDSResponse->redirectUrl !== null) {
             $this->assertStringContainsString('stripe.com', $threeDSResponse->redirectUrl);
         }
