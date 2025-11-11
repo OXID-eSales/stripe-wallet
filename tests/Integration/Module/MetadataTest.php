@@ -298,10 +298,10 @@ class MetadataTest extends TestCase
 
             if ($isSensitive) {
                 $this->assertEquals(
-                    'password',
+                    'str',
                     $setting['type'],
                     sprintf(
-                        'Sensitive setting "%s" must use password type, got: %s',
+                        'Sensitive setting "%s" must use string type, got: %s',
                         $setting['name'],
                         $setting['type']
                     )

@@ -12,7 +12,10 @@ namespace OxidSolutionCatalysts\Payments\Tests\Unit\Component\Service\Factory;
 use OxidSolutionCatalysts\Payments\Component\Adapter\PaymentAdapterInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory;
 use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapter;
+use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeClientFactory;
+use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\MockObject\MockObject;
 
 /**
  * @covers \OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory
@@ -20,14 +23,27 @@ use PHPUnit\Framework\TestCase;
 final class PaymentAdapterFactoryTest extends TestCase
 {
     private PaymentAdapterFactory $factory;
+    private ModuleConfigurationService|MockObject $configurationService;
+    private StripeClientFactory $clientFactory;
 
     protected function setUp(): void
     {
         parent::setUp();
 
+        $this->configurationService = $this->createMock(ModuleConfigurationService::class);
+        $this->configurationService
+            ->method('getSecretKey')
+            ->willReturn('sk_test_4242424242424242424242424242424242424242424242424242424242424242');
+        $this->configurationService
+            ->method('isTestMode')
+            ->willReturn(true);
+
+        // Use real StripeClientFactory since it's final and cannot be mocked
+        $this->clientFactory = new StripeClientFactory($this->configurationService);
+
         $this->factory = new PaymentAdapterFactory(
-            secretKey: 'sk_test_example_key_123',
-            testMode: true
+            $this->configurationService,
+            $this->clientFactory
         );
     }
 
@@ -85,10 +101,12 @@ final class PaymentAdapterFactoryTest extends TestCase
 
     public function testFactoryCreatesAdapterWithProvidedConfiguration(): void
     {
-        $factory = new PaymentAdapterFactory(
-            secretKey: 'sk_test_custom_key',
-            testMode: true
-        );
+        $configService = $this->createMock(ModuleConfigurationService::class);
+        $configService->method('getSecretKey')->willReturn('sk_test_4242424242424242424242424242424242424242424242424242424242424242');
+        $configService->method('isTestMode')->willReturn(true);
+
+        $clientFactory = new StripeClientFactory($configService);
+        $factory = new PaymentAdapterFactory($configService, $clientFactory);
 
         $adapter = $factory->createAdapter('stripe');
 
@@ -97,10 +115,12 @@ final class PaymentAdapterFactoryTest extends TestCase
 
     public function testFactorySupportsTestMode(): void
     {
-        $testFactory = new PaymentAdapterFactory(
-            secretKey: 'sk_test_key',
-            testMode: true
-        );
+        $configService = $this->createMock(ModuleConfigurationService::class);
+        $configService->method('getSecretKey')->willReturn('sk_test_4242424242424242424242424242424242424242424242424242424242424242');
+        $configService->method('isTestMode')->willReturn(true);
+
+        $clientFactory = new StripeClientFactory($configService);
+        $testFactory = new PaymentAdapterFactory($configService, $clientFactory);
 
         $adapter = $testFactory->createDefaultAdapter();
         $this->assertInstanceOf(PaymentAdapterInterface::class, $adapter);
@@ -108,10 +128,12 @@ final class PaymentAdapterFactoryTest extends TestCase
 
     public function testFactorySupportsLiveMode(): void
     {
-        $liveFactory = new PaymentAdapterFactory(
-            secretKey: 'sk_live_key',
-            testMode: false
-        );
+        $configService = $this->createMock(ModuleConfigurationService::class);
+        $configService->method('getSecretKey')->willReturn('sk_live_4242424242424242424242424242424242424242424242424242424242424242');
+        $configService->method('isTestMode')->willReturn(false);
+
+        $clientFactory = new StripeClientFactory($configService);
+        $liveFactory = new PaymentAdapterFactory($configService, $clientFactory);
 
         $adapter = $liveFactory->createDefaultAdapter();
         $this->assertInstanceOf(PaymentAdapterInterface::class, $adapter);

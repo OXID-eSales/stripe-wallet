@@ -53,7 +53,8 @@ abstract class StripeIntegrationTestCase extends TestCase
         $this->stripeClient = new StripeClient($this->testSecretKey);
 
         // Create adapter
-        $this->adapter = new StripeAdapter($this->stripeClient);
+        $this->adapter = new StripeAdapter();
+        $this->adapter->setStripeClient($this->stripeClient);
     }
 
     protected function tearDown(): void

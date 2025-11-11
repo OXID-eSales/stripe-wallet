@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Adapter;
 
+use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use Stripe\StripeClient;
 
 /**
@@ -20,14 +21,18 @@ use Stripe\StripeClient;
  */
 final class StripeClientFactory
 {
+    private string $secretKey;
+    private bool $testMode;
+
     /**
      * @param string $secretKey Stripe secret key (test or live)
      * @param bool $testMode Whether to use test mode
      */
     public function __construct(
-        private readonly string $secretKey,
-        private readonly bool $testMode = true
+        private readonly ModuleConfigurationService $configurationService
     ) {
+        $this->secretKey = $this->configurationService->getSecretKey();
+        $this->testMode = $this->configurationService->isTestMode();
     }
 
     /**
@@ -35,12 +40,12 @@ final class StripeClientFactory
      *
      * @return StripeClient Configured Stripe client
      */
-    public function create(): StripeClient
+    public function create(): ?StripeClient
     {
-        return new StripeClient([
+        return !empty($this->secretKey) ? new StripeClient([
             'api_key' => $this->secretKey,
             'stripe_version' => '2024-11-20.acacia', // Use latest API version
-        ]);
+        ]) : null;
     }
 
     /**

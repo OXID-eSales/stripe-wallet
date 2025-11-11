@@ -8,6 +8,7 @@ services:
     resource: 'src/Stripe/Service/*'
     public: true
 
+
   # ==========================================
   # Payment Adapter Layer (Provider-Agnostic)
   # ==========================================
@@ -29,9 +30,6 @@ services:
   # Stripe Client Factory - Creates configured Stripe SDK clients
   # Gets API credentials from ModuleConfigurationService
   OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeClientFactory:
-    arguments:
-      $secretKey: '@=service("OxidSolutionCatalysts\\\\Payments\\\\Stripe\\\\Service\\\\ModuleConfigurationService").getSecretKey()'
-      $testMode: '@=service("OxidSolutionCatalysts\\\\Payments\\\\Stripe\\\\Service\\\\ModuleConfigurationService").isTestMode()'
     public: false
 
   # Stripe Client - Actual Stripe SDK client instance
@@ -41,17 +39,18 @@ services:
     factory: ['@OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeClientFactory', 'create']
     public: false
 
-  # Stripe Adapter - Implements PaymentAdapterInterface for Stripe
-  OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapter:
-    arguments:
-      $stripeClient: '@stripe.payment.adapter.client'
-    public: true
-
   # Payment Adapter Factory - Creates adapters for different providers
   # This is the main entry point for getting payment adapters
   # Gets API credentials from ModuleConfigurationService
   OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory:
-    arguments:
-      $secretKey: '@=service("OxidSolutionCatalysts\\\\Payments\\\\Stripe\\\\Service\\\\ModuleConfigurationService").getSecretKey()'
-      $testMode: '@=service("OxidSolutionCatalysts\\\\Payments\\\\Stripe\\\\Service\\\\ModuleConfigurationService").isTestMode()'
     public: true
+
+  # ==========================================
+  # Twig Extensions
+  # ==========================================
+
+  # Dump Extension - Provides dump() and dd() functions for debugging templates
+  OxidSolutionCatalysts\Payments\Stripe\Twig\DumpExtension:
+    tags:
+      - { name: twig.extension }
+    public: false
