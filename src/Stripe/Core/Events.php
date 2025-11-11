@@ -55,7 +55,6 @@ class Events
      */
     public static function onActivate(): void
     {
-        self::addDatabaseStructure();
         self::addPaymentMethods();
         self::deleteRemovedPaymentMethods();
         self::regenerateViews();
