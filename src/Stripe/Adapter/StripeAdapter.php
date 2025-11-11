@@ -49,7 +49,8 @@ final class StripeAdapter implements PaymentAdapterInterface
 {
     private StripeClient $stripeClient;
 
-    public function __construct() {
+    public function __construct()
+    {
     }
 
     // ==========================================

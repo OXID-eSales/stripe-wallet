@@ -13,7 +13,6 @@ use OxidEsales\Eshop\Core\Registry;
 use OxidSolutionCatalysts\Payments\Component\Traits\ServiceContainer;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 
-
 class ModuleConfiguration extends ModuleConfiguration_parent
 {
     use ServiceContainer;
