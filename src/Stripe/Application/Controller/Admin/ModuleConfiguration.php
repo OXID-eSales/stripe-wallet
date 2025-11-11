@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Extend\Application\Controller\Admin;
+namespace OxidSolutionCatalysts\Payments\Stripe\Application\Controller\Admin;
 
 use OxidEsales\Eshop\Core\Registry;
 use OxidSolutionCatalysts\Payments\Component\Traits\ServiceContainer;

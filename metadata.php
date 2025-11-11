@@ -10,7 +10,7 @@ use OxidSolutionCatalysts\Payments\Component\Controller\Http\WebhookController;
 use OxidSolutionCatalysts\Payments\Component\Controller\Http\PaymentController;
 use OxidSolutionCatalysts\Payments\Stripe\Core\Events;
 use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\StripeConnect;
-use OxidSolutionCatalysts\Payments\Stripe\Extend\Application\Controller\Admin\ModuleConfiguration;
+use OxidSolutionCatalysts\Payments\Stripe\Application\Controller\Admin\ModuleConfiguration;
 
 /**
  * Metadata version
