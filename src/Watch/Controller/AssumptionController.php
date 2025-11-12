@@ -61,7 +61,6 @@ class AssumptionController extends BaseController
      */
     public function assume(): void
     {
-        $startTime = microtime(true);
         $requestId = $this->getRequestId();
 
         try {
@@ -121,16 +120,18 @@ class AssumptionController extends BaseController
     private function getClientIp(): string
     {
         // Check for forwarded IP (proxy/load balancer)
-        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR']) && is_string($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $forwarded = $_SERVER['HTTP_X_FORWARDED_FOR'];
+            $ips = explode(',', $forwarded);
             return trim($ips[0]);
         }
 
-        if (!empty($_SERVER['HTTP_X_REAL_IP'])) {
+        if (!empty($_SERVER['HTTP_X_REAL_IP']) && is_string($_SERVER['HTTP_X_REAL_IP'])) {
             return $_SERVER['HTTP_X_REAL_IP'];
         }
 
-        return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+        $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+        return is_string($remoteAddr) ? $remoteAddr : '0.0.0.0';
     }
 
     /**
@@ -143,7 +144,7 @@ class AssumptionController extends BaseController
     {
         $apiKey = $_SERVER['HTTP_X_API_KEY'] ?? '';
 
-        if (empty($apiKey)) {
+        if (!is_string($apiKey) || empty($apiKey)) {
             throw new AuthenticationException('Missing X-API-Key header');
         }
 
@@ -157,7 +158,8 @@ class AssumptionController extends BaseController
      */
     private function getRequestId(): string
     {
-        return $_SERVER['HTTP_X_REQUEST_ID'] ?? uniqid('pwreq_', true);
+        $requestId = $_SERVER['HTTP_X_REQUEST_ID'] ?? uniqid('pwreq_', true);
+        return is_string($requestId) ? $requestId : uniqid('pwreq_', true);
     }
 
     /**
@@ -184,6 +186,7 @@ class AssumptionController extends BaseController
             throw new ValidationException('Request body must be a JSON object');
         }
 
+        /** @var array<string, mixed> $body */
         return $body;
     }
 

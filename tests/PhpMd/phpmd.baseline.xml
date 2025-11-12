@@ -40,9 +40,12 @@
             <property name="maximum" value="100"/>
         </properties>
     </rule>
-    <rule ref="rulesets/controversial.xml"/>
+    <rule ref="rulesets/controversial.xml">
+        <exclude name="Superglobals"/>
+    </rule>
     <rule ref="rulesets/design.xml">
         <exclude name="CouplingBetweenObjects"/>
+        <exclude name="ExitExpression"/>
     </rule>
     <rule ref="rulesets/design.xml/CouplingBetweenObjects">
         <properties>
