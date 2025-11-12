@@ -33,6 +33,10 @@ get_changed_files() {
 run_phpcs() {
     echo "Running PHP CodeSniffer..."
     phpcs --standard=tests/phpcs.xml --warning-severity=0 || EXIT_CODE=$?
+    # Exit code 16 means "no files to check" which is acceptable
+    if [ $EXIT_CODE -eq 16 ]; then
+        EXIT_CODE=0
+    fi
 }
 
 # Function to run PHPStan

@@ -89,7 +89,6 @@ class AssumptionController extends BaseController
 
             // 5. Return JSON response
             $this->sendJsonResponse($response->toArray(), 200);
-
         } catch (AuthenticationException $e) {
             $this->auditLogger->logAuthenticationFailure(
                 $requestId,
@@ -97,7 +96,6 @@ class AssumptionController extends BaseController
                 $e->getMessage()
             );
             $this->sendJsonResponse(['error' => 'Unauthorized'], 401);
-
         } catch (ValidationException $e) {
             $this->auditLogger->logValidationError(
                 $requestId,
@@ -105,7 +103,6 @@ class AssumptionController extends BaseController
                 $e->getMessage()
             );
             $this->sendJsonResponse(['error' => $e->getMessage()], 400);
-
         } catch (\Throwable $e) {
             $this->logger->error('PaymentWatch error', [
                 'request_id' => $requestId,
