@@ -21,6 +21,7 @@ use PHPUnit\Framework\TestCase;
  * indexes, and foreign keys as specified in the architecture documentation.
  *
  * @group database
+ * @group migration
  */
 class MigrationStructureTest extends TestCase
 {
