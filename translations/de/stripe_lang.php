@@ -39,4 +39,8 @@ $aLang = [
     'STRIPE_WEBHOOK_CREATE_ERROR'               => 'Der Webhook-Endpunkt konnte nicht erstellt werden.',
     'STRIPE_WEBHOOK_CREATE_ERROR_DELETE_FAILED' => 'Der Webhook-Endpunkt konnte nicht erstellt werden. Das Löschen des vorhandenen WH-Endpunkts ist fehlgeschlagen.',
     'STRIPE_CREDIT_CARD'                        => 'Kreditkarte',
+
+    // Buy Now feature
+    'STRIPE_BUY_NOW'                            => 'Jetzt kaufen',
+    'STRIPE_BUY_NOW_HINT'                       => 'Schnellkauf - Warenkorb überspringen und sofort bezahlen',
 ];

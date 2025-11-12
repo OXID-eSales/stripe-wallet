@@ -39,4 +39,8 @@ $aLang = [
     'STRIPE_WEBHOOK_CREATE_ERROR'               => 'The Webhook Endpoint could not be created.',
     'STRIPE_WEBHOOK_CREATE_ERROR_DELETE_FAILED' => 'The Webhook Endpoint could not be created. Deletion of existing WH Endpoint failed.',
     'STRIPE_CREDIT_CARD'                        => 'Credit card',
+
+    // Buy Now feature
+    'STRIPE_BUY_NOW'                            => 'Buy Now',
+    'STRIPE_BUY_NOW_HINT'                       => 'Fast checkout - Skip the cart and pay instantly',
 ];

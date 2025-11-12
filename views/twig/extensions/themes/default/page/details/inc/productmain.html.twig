@@ -1,0 +1,22 @@
+{#
+    Stripe Module - Product Main Override
+    Extends the default product main template to add "Buy Now" button
+    that allows direct checkout with a single product
+#}
+
+{% extends "page/details/inc/productmain.html.twig" %}
+
+{% block details_productmain_tobasket %}
+    {{ parent() }}
+
+    {# Buy Now button - Direct to One-Page Checkout #}
+    {% hasrights { ident: "TOBASKET" } %}
+        {% if not oDetailsProduct.isNotBuyable() and blCanBuy %}
+            {% include "@osc_stripe_wallet/frontend/buy_now_button.html.twig" with {
+                productId: oDetailsProduct.oxarticles__oxid.value,
+                productNid: oDetailsProduct.oxarticles__oxnid.value,
+                parentId: oDetailsProduct.oxarticles__oxparentid.value ? oDetailsProduct.oxarticles__oxparentid.value : oDetailsProduct.oxarticles__oxid.value
+            } %}
+        {% endif %}
+    {% endhasrights %}
+{% endblock %}

@@ -42,6 +42,7 @@ $aModule = [
         'osc_stripe_webhook' => WebhookController::class,
         'osc_stripe_payment' => PaymentController::class,
         'StripeConnect' => StripeConnect::class,
+        'stripe_checkout_onepage' => \OxidEsales\StripeWallet\Component\Controller\CheckoutOnePageController::class,
     ],
     'templates' => [
         'osc_stripe_payment.tpl' => 'osc/stripe/views/tpl/payment.tpl',

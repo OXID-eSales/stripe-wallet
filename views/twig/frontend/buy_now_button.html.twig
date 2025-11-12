@@ -1,0 +1,119 @@
+{#
+    Stripe Buy Now Button Component
+    Displays the "Buy Now" button and handles click events
+#}
+
+{# CSS #}
+<link rel="stylesheet" href="{{ oViewConf.getModuleUrl('osc_stripe_wallet', 'out/css/buy-now.css') }}">
+
+{# Button HTML #}
+<div class="buy-now-wrapper mt-3 mb-3">
+    <button
+        id="buyNowButton"
+        type="button"
+        class="btn btn-success btn-lg w-100 stripe-buy-now"
+        data-product-id="{{ productId }}"
+        data-product-nid="{{ productNid }}"
+        data-parent-id="{{ parentId }}"
+    >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-lightning-charge-fill me-2" viewBox="0 0 16 16">
+            <path d="M11.251.068a.5.5 0 0 1 .227.58L9.677 6.5H13a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H3a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09z"/>
+        </svg>
+        {{ translate({ ident: "STRIPE_BUY_NOW" }) }}
+    </button>
+    <small class="text-muted d-block text-center mt-2">
+        {{ translate({ ident: "STRIPE_BUY_NOW_HINT" }) }}
+    </small>
+</div>
+
+{# JavaScript - Inline to ensure it loads after button #}
+<script>
+(function() {
+    'use strict';
+
+    // Wait for DOM to be ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initBuyNow);
+    } else {
+        initBuyNow();
+    }
+
+    function initBuyNow() {
+        const buyNowButton = document.getElementById('buyNowButton');
+        if (!buyNowButton) {
+            console.warn('Stripe Buy Now: Button not found');
+            return;
+        }
+
+        console.log('Stripe Buy Now: Initializing button');
+
+        buyNowButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Stripe Buy Now: Button clicked');
+
+            // Get product data from button attributes
+            const productId = this.dataset.productId;
+            const productNid = this.dataset.productNid;
+            const parentId = this.dataset.parentId;
+
+            // Get quantity from the amount input
+            const amountInput = document.getElementById('amountToBasket');
+            const amount = amountInput ? amountInput.value : 1;
+
+            // Get form data for variants/selections if they exist
+            const productForm = document.querySelector('.js-oxProductForm');
+            const formData = productForm ? new FormData(productForm) : new FormData();
+
+            // Show loading state
+            const originalHTML = buyNowButton.innerHTML;
+            buyNowButton.disabled = true;
+            buyNowButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Processing...';
+
+            // Create a hidden form to submit
+            const buyNowForm = document.createElement('form');
+            buyNowForm.method = 'POST';
+            buyNowForm.action = '{{ oViewConf.getSelfActionLink()|raw }}';
+            buyNowForm.style.display = 'none';
+
+            // Add required fields
+            const fields = {
+                'cl': 'stripe_checkout_onepage',
+                'fnc': 'addProductAndCheckout',
+                'aid': productId,
+                'anid': productNid,
+                'parentid': parentId,
+                'am': amount,
+                'stoken': '{{ oViewConf.getSessionChallengeToken() }}'
+            };
+
+            // Add all form fields (for variant selections, etc.)
+            for (let [key, value] of formData.entries()) {
+                if (!fields[key] && key !== 'fnc') {
+                    fields[key] = value;
+                }
+            }
+
+            // Create hidden inputs
+            Object.entries(fields).forEach(([name, value]) => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = name;
+                input.value = value;
+                buyNowForm.appendChild(input);
+            });
+
+            // Add form to page and submit
+            document.body.appendChild(buyNowForm);
+
+            console.log('Stripe Buy Now: Submitting form', fields);
+
+            // Small delay to ensure form is in DOM
+            setTimeout(function() {
+                buyNowForm.submit();
+            }, 100);
+        });
+
+        console.log('Stripe Buy Now: Event listener attached');
+    }
+})();
+</script>

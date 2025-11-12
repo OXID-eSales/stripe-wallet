@@ -267,6 +267,70 @@ class CheckoutOnePageController extends FrontendController
     }
 
     /**
+     * Add product to basket and redirect to checkout
+     * Handler for "Buy Now" button
+     *
+     * This method adds a single product directly to the basket and redirects
+     * to the one-page checkout, providing a streamlined purchase flow.
+     */
+    public function addProductAndCheckout(): void
+    {
+        // Validate CSRF token
+        if (!$this->isValidRequest()) {
+            Registry::getUtils()->showMessageAndExit('Invalid request token');
+            return;
+        }
+
+        $request = Registry::getRequest();
+        $basket = Registry::getSession()->getBasket();
+
+        // Get product data from request
+        $productId = $request->getRequestParameter('aid');
+        $productNid = $request->getRequestParameter('anid');
+        $amount = (float) $request->getRequestParameter('am', 1);
+        $selectionList = $request->getRequestParameter('sel');
+        $persistentParams = $request->getRequestParameter('persparam');
+
+        // Clear basket for "Buy Now" behavior (optional - can be configured)
+        // Comment out the next line if you want to add to existing basket instead
+        $basket->deleteBasket();
+
+        try {
+            // Add product to basket
+            $basket->addToBasket(
+                $productId,
+                $amount,
+                $selectionList,
+                $persistentParams
+            );
+
+            // Calculate basket
+            $basket->calculateBasket(true);
+
+            // Set flag to indicate this is a "Buy Now" purchase
+            Registry::getSession()->setVariable('isBuyNowCheckout', true);
+
+            // Redirect to one-page checkout
+            $checkoutUrl = Registry::getConfig()->getShopUrl() . 'cl=stripe_checkout_onepage';
+            Registry::getUtils()->redirect($checkoutUrl, false);
+
+        } catch (\Exception $e) {
+            // Log error
+            Registry::getLogger()->error('Buy Now failed', [
+                'productId' => $productId,
+                'error' => $e->getMessage()
+            ]);
+
+            // Show error message and redirect back to product
+            Registry::getUtilsView()->addErrorToDisplay($e);
+            Registry::getUtils()->redirect(
+                Registry::getConfig()->getShopUrl() . 'cl=details&anid=' . $productNid,
+                false
+            );
+        }
+    }
+
+    /**
      * Output JSON response
      *
      * @param array $data
