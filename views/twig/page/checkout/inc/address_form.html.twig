@@ -1,0 +1,224 @@
+{#
+    Address Form Component
+    Handles billing and shipping address input
+#}
+
+<form id="address-form" class="checkout-form" method="post" action="{{ oViewConf.getSelfLink() }}" novalidate>
+    <input type="hidden" name="cl" value="checkout_onepage">
+    <input type="hidden" name="fnc" value="updateAddress">
+    <input type="hidden" name="stoken" value="{{ oViewConf.getSessionChallengeToken() }}">
+
+    {# Billing Address #}
+    <div class="form-section">
+        <h3>{{ "CHECKOUT_BILLING_ADDRESS"|translate }}</h3>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="billingFirstName" class="form-label required">
+                    {{ "CHECKOUT_FIRST_NAME"|translate }}
+                </label>
+                <input
+                    type="text"
+                    id="billingFirstName"
+                    name="billingAddress[firstName]"
+                    class="form-input"
+                    value="{{ deliveryAddress.oxaddress__oxfname.value|default('') }}"
+                    required
+                    autocomplete="given-name"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="billingLastName" class="form-label required">
+                    {{ "CHECKOUT_LAST_NAME"|translate }}
+                </label>
+                <input
+                    type="text"
+                    id="billingLastName"
+                    name="billingAddress[lastName]"
+                    class="form-input"
+                    value="{{ deliveryAddress.oxaddress__oxlname.value|default('') }}"
+                    required
+                    autocomplete="family-name"
+                >
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="billingEmail" class="form-label required">
+                {{ "CHECKOUT_EMAIL"|translate }}
+            </label>
+            <input
+                type="email"
+                id="billingEmail"
+                name="billingAddress[email]"
+                class="form-input"
+                value="{{ oxcmp_user.oxuser__oxusername.value|default('') }}"
+                required
+                autocomplete="email"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="billingPhone" class="form-label">
+                {{ "CHECKOUT_PHONE"|translate }}
+            </label>
+            <input
+                type="tel"
+                id="billingPhone"
+                name="billingAddress[phone]"
+                class="form-input"
+                value="{{ deliveryAddress.oxaddress__oxfon.value|default('') }}"
+                autocomplete="tel"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="billingStreet" class="form-label required">
+                {{ "CHECKOUT_STREET"|translate }}
+            </label>
+            <input
+                type="text"
+                id="billingStreet"
+                name="billingAddress[street]"
+                class="form-input"
+                value="{{ deliveryAddress.oxaddress__oxstreet.value|default('') }}"
+                required
+                autocomplete="street-address"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="billingStreetNo" class="form-label">
+                {{ "CHECKOUT_STREET_NO"|translate }}
+            </label>
+            <input
+                type="text"
+                id="billingStreetNo"
+                name="billingAddress[streetNo]"
+                class="form-input"
+                value="{{ deliveryAddress.oxaddress__oxstreetnr.value|default('') }}"
+            >
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="billingCity" class="form-label required">
+                    {{ "CHECKOUT_CITY"|translate }}
+                </label>
+                <input
+                    type="text"
+                    id="billingCity"
+                    name="billingAddress[city]"
+                    class="form-input"
+                    value="{{ deliveryAddress.oxaddress__oxcity.value|default('') }}"
+                    required
+                    autocomplete="address-level2"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="billingZip" class="form-label required">
+                    {{ "CHECKOUT_ZIP"|translate }}
+                </label>
+                <input
+                    type="text"
+                    id="billingZip"
+                    name="billingAddress[zip]"
+                    class="form-input"
+                    value="{{ deliveryAddress.oxaddress__oxzip.value|default('') }}"
+                    required
+                    autocomplete="postal-code"
+                >
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="billingCountry" class="form-label required">
+                {{ "CHECKOUT_COUNTRY"|translate }}
+            </label>
+            <select
+                id="billingCountry"
+                name="billingAddress[countryCode]"
+                class="form-input"
+                required
+                autocomplete="country"
+            >
+                <option value="">{{ "CHECKOUT_SELECT_COUNTRY"|translate }}</option>
+                {% for country in oView.getCountryList() %}
+                    <option
+                        value="{{ country.oxcountry__oxisoalpha2.value }}"
+                        {% if country.oxcountry__oxid.value == deliveryAddress.oxaddress__oxcountryid.value %}selected{% endif %}
+                    >
+                        {{ country.oxcountry__oxtitle.value }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    {# Shipping Address Toggle #}
+    <div class="form-section">
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input
+                    type="checkbox"
+                    name="useBillingAsShipping"
+                    id="useBillingAsShipping"
+                    checked
+                >
+                <span>{{ "CHECKOUT_USE_BILLING_AS_SHIPPING"|translate }}</span>
+            </label>
+        </div>
+
+        {# Shipping Address (Hidden by default) #}
+        <div id="shipping-address-section" style="display: none;">
+            <h3>{{ "CHECKOUT_SHIPPING_ADDRESS"|translate }}</h3>
+            {# Similar fields as billing address #}
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="shippingFirstName" class="form-label required">
+                        {{ "CHECKOUT_FIRST_NAME"|translate }}
+                    </label>
+                    <input
+                        type="text"
+                        id="shippingFirstName"
+                        name="shippingAddress[firstName]"
+                        class="form-input"
+                        autocomplete="given-name"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="shippingLastName" class="form-label required">
+                        {{ "CHECKOUT_LAST_NAME"|translate }}
+                    </label>
+                    <input
+                        type="text"
+                        id="shippingLastName"
+                        name="shippingAddress[lastName]"
+                        class="form-input"
+                        autocomplete="family-name"
+                    >
+                </div>
+            </div>
+            {# Add remaining shipping fields as needed #}
+        </div>
+    </div>
+
+    {# Submit Button #}
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary btn-large" id="address-submit-btn">
+            {{ "CHECKOUT_CONTINUE_TO_PAYMENT"|translate }}
+            <span class="btn-icon">→</span>
+        </button>
+    </div>
+</form>
+
+{# Toggle shipping address visibility #}
+<script>
+    document.getElementById('useBillingAsShipping').addEventListener('change', function(e) {
+        const shippingSection = document.getElementById('shipping-address-section');
+        shippingSection.style.display = e.target.checked ? 'none' : 'block';
+    });
+</script>

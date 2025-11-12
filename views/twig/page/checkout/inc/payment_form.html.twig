@@ -1,0 +1,285 @@
+{#
+    Payment Form Component
+    Handles payment method selection and card input
+#}
+
+<form id="payment-form" class="checkout-form" method="post" action="{{ oViewConf.getSelfLink() }}" novalidate>
+    <input type="hidden" name="cl" value="checkout_onepage">
+    <input type="hidden" name="fnc" value="processPayment">
+    <input type="hidden" name="stoken" value="{{ oViewConf.getSessionChallengeToken() }}">
+
+    {# Payment Method Selection #}
+    <div class="form-section">
+        <h3>{{ "CHECKOUT_PAYMENT_METHOD"|translate }}</h3>
+
+        <div class="payment-methods">
+            {% for paymentMethod in oView.getPaymentList() %}
+                <label class="payment-method-option">
+                    <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="{{ paymentMethod.oxpayments__oxid.value }}"
+                        {% if loop.first %}checked{% endif %}
+                        data-payment-type="{{ paymentMethod.oxpayments__oxid.value }}"
+                    >
+                    <div class="payment-method-content">
+                        <div class="payment-method-header">
+                            <strong>{{ paymentMethod.oxpayments__oxdesc.value }}</strong>
+                            {% if paymentMethod.getPaymentIcon() %}
+                                <img
+                                    src="{{ paymentMethod.getPaymentIcon() }}"
+                                    alt="{{ paymentMethod.oxpayments__oxdesc.value }}"
+                                    class="payment-icon"
+                                >
+                            {% endif %}
+                        </div>
+                        {% if paymentMethod.oxpayments__oxlongdesc.value %}
+                            <p class="payment-method-description">
+                                {{ paymentMethod.oxpayments__oxlongdesc.value }}
+                            </p>
+                        {% endif %}
+                    </div>
+                </label>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# Credit Card Form (Stripe) #}
+    <div class="form-section" id="credit-card-form">
+        <h3>{{ "CHECKOUT_CARD_DETAILS"|translate }}</h3>
+
+        <div class="form-group">
+            <label for="cardholderName" class="form-label required">
+                {{ "CHECKOUT_CARDHOLDER_NAME"|translate }}
+            </label>
+            <input
+                type="text"
+                id="cardholderName"
+                name="cardholderName"
+                class="form-input"
+                value="{{ oxcmp_user.oxuser__oxfname.value ~ ' ' ~ oxcmp_user.oxuser__oxlname.value }}"
+                required
+                autocomplete="cc-name"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="cardNumber" class="form-label required">
+                {{ "CHECKOUT_CARD_NUMBER"|translate }}
+            </label>
+            <div class="card-input-wrapper">
+                <input
+                    type="text"
+                    id="cardNumber"
+                    name="cardNumber"
+                    class="form-input"
+                    placeholder="4242 4242 4242 4242"
+                    maxlength="19"
+                    required
+                    autocomplete="cc-number"
+                >
+                <div class="card-brand-icon" id="card-brand-icon"></div>
+            </div>
+            <p class="form-help">{{ "CHECKOUT_CARD_NUMBER_HELP"|translate }}</p>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="expMonth" class="form-label required">
+                    {{ "CHECKOUT_EXPIRY_DATE"|translate }}
+                </label>
+                <div class="expiry-inputs">
+                    <input
+                        type="text"
+                        id="expMonth"
+                        name="expMonth"
+                        class="form-input"
+                        placeholder="MM"
+                        maxlength="2"
+                        required
+                        autocomplete="cc-exp-month"
+                    >
+                    <span class="expiry-separator">/</span>
+                    <input
+                        type="text"
+                        id="expYear"
+                        name="expYear"
+                        class="form-input"
+                        placeholder="YYYY"
+                        maxlength="4"
+                        required
+                        autocomplete="cc-exp-year"
+                    >
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="cvc" class="form-label required">
+                    {{ "CHECKOUT_CVC"|translate }}
+                    <span
+                        class="tooltip-trigger"
+                        data-tooltip="{{ "CHECKOUT_CVC_HELP"|translate }}"
+                    >ℹ️</span>
+                </label>
+                <input
+                    type="text"
+                    id="cvc"
+                    name="cvc"
+                    class="form-input"
+                    placeholder="123"
+                    maxlength="4"
+                    required
+                    autocomplete="cc-csc"
+                >
+            </div>
+        </div>
+
+        {# Save Card Option #}
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input
+                    type="checkbox"
+                    name="saveCard"
+                    id="saveCard"
+                    {% if oxcmp_user.oxuser__oxid.value %}{% else %}disabled{% endif %}
+                >
+                <span>
+                    {{ "CHECKOUT_SAVE_CARD"|translate }}
+                    {% if not oxcmp_user.oxuser__oxid.value %}
+                        <small>({{ "CHECKOUT_LOGIN_REQUIRED"|translate }})</small>
+                    {% endif %}
+                </span>
+            </label>
+        </div>
+
+        {# Saved Cards (for logged-in users) #}
+        {% if oxcmp_user.oxuser__oxid.value and oView.getSavedPaymentMethods()|length > 0 %}
+            <div class="saved-cards">
+                <h4>{{ "CHECKOUT_SAVED_CARDS"|translate }}</h4>
+                {% for savedCard in oView.getSavedPaymentMethods() %}
+                    <label class="saved-card-option">
+                        <input
+                            type="radio"
+                            name="savedPaymentMethod"
+                            value="{{ savedCard.id }}"
+                        >
+                        <div class="saved-card-content">
+                            <span class="card-brand">{{ savedCard.brand|upper }}</span>
+                            <span class="card-last4">•••• {{ savedCard.last4 }}</span>
+                            <span class="card-expiry">{{ savedCard.exp_month }}/{{ savedCard.exp_year }}</span>
+                        </div>
+                    </label>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+
+    {# Security Badges #}
+    <div class="payment-security">
+        <div class="security-badge">
+            <span class="security-icon">🔒</span>
+            <span class="security-text">{{ "CHECKOUT_SECURE_ENCRYPTION"|translate }}</span>
+        </div>
+        <div class="security-badge">
+            <span class="security-icon">✓</span>
+            <span class="security-text">{{ "CHECKOUT_PCI_COMPLIANT"|translate }}</span>
+        </div>
+    </div>
+
+    {# Terms and Conditions #}
+    <div class="form-section">
+        <label class="checkbox-label">
+            <input
+                type="checkbox"
+                name="agreeTerms"
+                id="agreeTerms"
+                required
+            >
+            <span>
+                {{ "CHECKOUT_I_AGREE"|translate }}
+                <a href="{{ oViewConf.getLink('cl=info&tpl=terms.tpl') }}" target="_blank">
+                    {{ "CHECKOUT_TERMS_AND_CONDITIONS"|translate }}
+                </a>
+            </span>
+        </label>
+    </div>
+
+    {# Form Actions #}
+    <div class="form-actions">
+        <button
+            type="button"
+            class="btn btn-secondary"
+            id="back-to-address-btn"
+        >
+            <span class="btn-icon">←</span>
+            {{ "CHECKOUT_BACK"|translate }}
+        </button>
+
+        <button
+            type="submit"
+            class="btn btn-primary btn-large"
+            id="payment-submit-btn"
+            disabled
+        >
+            <span class="lock-icon">🔒</span>
+            {{ "CHECKOUT_PAY_NOW"|translate }}
+            {{ oxcmp_basket.getPrice().getBruttoPrice()|number_format(2, ',', '.') }}
+            {{ oxcmp_basket.getBasketCurrency().sign|raw }}
+        </button>
+    </div>
+</form>
+
+{# Client-side validation and formatting #}
+<script>
+    (function() {
+        // Format card number
+        const cardNumberInput = document.getElementById('cardNumber');
+        cardNumberInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\s/g, '');
+            let formatted = value.match(/.{1,4}/g)?.join(' ') || value;
+            e.target.value = formatted;
+
+            // Detect card brand
+            detectCardBrand(value);
+        });
+
+        // Format expiry inputs
+        const expMonthInput = document.getElementById('expMonth');
+        const expYearInput = document.getElementById('expYear');
+
+        expMonthInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length >= 2) {
+                expYearInput.focus();
+            }
+        });
+
+        // CVC input - numbers only
+        const cvcInput = document.getElementById('cvc');
+        cvcInput.addEventListener('input', function(e) {
+            e.target.value = e.target.value.replace(/\D/g, '');
+        });
+
+        // Enable submit button when terms are agreed
+        const agreeTerms = document.getElementById('agreeTerms');
+        const submitBtn = document.getElementById('payment-submit-btn');
+
+        agreeTerms.addEventListener('change', function(e) {
+            submitBtn.disabled = !e.target.checked;
+        });
+
+        // Card brand detection
+        function detectCardBrand(number) {
+            const brandIcon = document.getElementById('card-brand-icon');
+            const firstDigit = number.charAt(0);
+
+            let brand = '';
+            if (/^4/.test(number)) brand = 'visa';
+            else if (/^5[1-5]/.test(number)) brand = 'mastercard';
+            else if (/^3[47]/.test(number)) brand = 'amex';
+            else if (/^6(?:011|5)/.test(number)) brand = 'discover';
+
+            brandIcon.className = 'card-brand-icon ' + brand;
+        }
+    })();
+</script>

@@ -1,0 +1,176 @@
+{#
+    One-Page Checkout Template
+
+    This template renders the complete one-page checkout flow.
+    Uses progressive enhancement: works without JavaScript, enhanced with JS.
+#}
+
+{% extends "layout/page.html.twig" %}
+
+{% block head_meta_robots %}
+    <meta name="robots" content="noindex, nofollow">
+{% endblock %}
+
+{% block head_title %}
+    {{ "CHECKOUT_TITLE"|translate }} | {{ parent() }}
+{% endblock %}
+
+{% block head_css %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ oViewConf.getModuleUrl('stripe', 'out/css/checkout-onepage.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="checkout-onepage-container">
+
+    {# Checkout Header #}
+    <div class="checkout-header">
+        <h1>{{ "CHECKOUT_TITLE"|translate }}</h1>
+        <p>{{ "CHECKOUT_SUBTITLE"|translate }}</p>
+
+        {# Progress Indicator #}
+        <div class="checkout-progress">
+            <div class="progress-step active" data-step="address">
+                <span class="step-number">1</span>
+                <span class="step-label">{{ "CHECKOUT_STEP_ADDRESS"|translate }}</span>
+            </div>
+            <div class="progress-step" data-step="payment">
+                <span class="step-number">2</span>
+                <span class="step-label">{{ "CHECKOUT_STEP_PAYMENT"|translate }}</span>
+            </div>
+            <div class="progress-step" data-step="review">
+                <span class="step-number">3</span>
+                <span class="step-label">{{ "CHECKOUT_STEP_REVIEW"|translate }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="checkout-grid">
+        {# Main Checkout Forms #}
+        <div class="checkout-main">
+
+            {# Cart Summary Section (Mobile) #}
+            <div class="checkout-section cart-summary-mobile">
+                {% include "page/checkout/inc/cart_summary.html.twig" %}
+            </div>
+
+            {# Address Section #}
+            <div class="checkout-section" id="address-section">
+                <div class="section-header">
+                    <span class="section-number">1</span>
+                    <h2>{{ "CHECKOUT_ADDRESS_TITLE"|translate }}</h2>
+                </div>
+
+                {% include "page/checkout/inc/address_form.html.twig" %}
+            </div>
+
+            {# Payment Section #}
+            <div class="checkout-section section-disabled" id="payment-section">
+                <div class="section-header">
+                    <span class="section-number">2</span>
+                    <h2>{{ "CHECKOUT_PAYMENT_TITLE"|translate }}</h2>
+                </div>
+
+                {% include "page/checkout/inc/payment_form.html.twig" %}
+            </div>
+
+            {# Review Section #}
+            <div class="checkout-section section-disabled" id="review-section">
+                <div class="section-header">
+                    <span class="section-number">3</span>
+                    <h2>{{ "CHECKOUT_REVIEW_TITLE"|translate }}</h2>
+                </div>
+
+                {% include "page/checkout/inc/review_summary.html.twig" %}
+            </div>
+
+            {# Success Section (Hidden) #}
+            <div class="checkout-section" id="success-section" style="display: none;">
+                {% include "page/checkout/inc/order_success.html.twig" %}
+            </div>
+        </div>
+
+        {# Sidebar - Cart Summary (Desktop) #}
+        <aside class="checkout-sidebar">
+            <div class="sidebar-sticky">
+                {% include "page/checkout/inc/cart_summary.html.twig" %}
+
+                {# Trust Badges #}
+                <div class="trust-badges">
+                    <div class="trust-badge">
+                        <span class="badge-icon">🔒</span>
+                        <span class="badge-text">{{ "CHECKOUT_SECURE_PAYMENT"|translate }}</span>
+                    </div>
+                    <div class="trust-badge">
+                        <span class="badge-icon">✓</span>
+                        <span class="badge-text">{{ "CHECKOUT_FREE_RETURNS"|translate }}</span>
+                    </div>
+                    <div class="trust-badge">
+                        <span class="badge-icon">🚚</span>
+                        <span class="badge-text">{{ "CHECKOUT_FAST_SHIPPING"|translate }}</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    {# Toast Notification Container #}
+    <div id="checkout-toast-container"></div>
+
+</div>
+{% endblock %}
+
+{% block footer_js %}
+    {{ parent() }}
+
+    {# Core checkout scripts #}
+    <script src="{{ oViewConf.getModuleUrl('stripe', 'out/js/one-page-checkout-client.js') }}"></script>
+    <script src="{{ oViewConf.getModuleUrl('stripe', 'out/js/error-handling-system.js') }}"></script>
+    <script src="{{ oViewConf.getModuleUrl('stripe', 'out/js/checkout-abandonment-tracking.js') }}"></script>
+
+    {# Checkout initialization #}
+    <script>
+        (function() {
+            // Configuration from server
+            const checkoutConfig = {
+                graphqlEndpoint: '{{ oViewConf.getGraphQLEndpoint() }}',
+                encryptionKey: '{{ oViewConf.getEncryptionKey() }}',
+                sessionId: '{{ oView.getCheckoutSessionId() }}',
+                customerId: '{{ oxcmp_user.oxuser__oxid.value }}',
+                cartTotal: {{ oxcmp_basket.getPrice().getBruttoPrice() }},
+                currency: '{{ oxcmp_basket.getBasketCurrency().name }}',
+                returnUrl: '{{ oViewConf.getSelfLink()|cat:"cl=checkout_onepage&fnc=handleReturn" }}',
+                locale: '{{ oView.getActiveLangAbbr() }}'
+            };
+
+            // Initialize checkout
+            const checkout = new EnhancedCheckoutClient(
+                checkoutConfig.graphqlEndpoint,
+                checkoutConfig.encryptionKey,
+                {
+                    toastDuration: 5000,
+                    enableRetry: true,
+                    maxRetries: 3
+                }
+            );
+
+            // Initialize abandonment tracking
+            const abandonmentTracker = new CheckoutAbandonmentTracker(checkout, {
+                timeoutMinutes: 15,
+                trackNavigation: true,
+                trackPageUnload: true
+            });
+
+            // Set cart data for abandonment tracking
+            abandonmentTracker.updateState({
+                cartItems: {{ oView.getCartItemsJson()|raw }},
+                cartTotal: checkoutConfig.cartTotal,
+                currency: checkoutConfig.currency,
+                stage: 'address'
+            });
+
+            // Initialize checkout flow
+            window.oxCheckout = new CheckoutFlow(checkout, abandonmentTracker, checkoutConfig);
+        })();
+    </script>
+{% endblock %}
