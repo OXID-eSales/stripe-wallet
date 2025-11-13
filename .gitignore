@@ -2,9 +2,9 @@
 .DS_Store
 
 vendor/
-composer.lock
 
 .php_cs.cache
 tests/.phpunit.result.cache
 tests/.phpunit.cache
 /source/
+node_modules

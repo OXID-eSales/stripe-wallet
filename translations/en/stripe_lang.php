@@ -43,4 +43,8 @@ $aLang = [
     // Buy Now feature
     'STRIPE_BUY_NOW'                            => 'Buy Now',
     'STRIPE_BUY_NOW_HINT'                       => 'Fast checkout - Skip the cart and pay instantly',
+
+    // Module settings
+    'SHOP_MODULE_sStripeDevMode'                => 'Development Mode',
+    'HELP_SHOP_MODULE_sStripeDevMode'           => 'Enable to load JavaScript files separately for easier debugging. Automatically enabled on .local, .dev, .test domains.',
 ];
