@@ -1,8 +1,32 @@
 # Template Integration Guide
 
 **Frontend Implementation with Stripe.js**
-**Version:** 1.0.0
-**Date:** 2025-11-13
+**Version:** 1.1.0
+**Date:** 2025-01-14
+**Updated:** Converted to Twig syntax for OXID 7.0+
+
+---
+
+## ⚠️ Important: Twig Template Syntax
+
+**This guide uses Twig syntax for OXID eShop 7.0+** (not Smarty). All templates use `.html.twig` extension.
+
+### Smarty to Twig Conversion Reference
+
+| Feature | Smarty (Old) | Twig (OXID 7.0+) |
+|---------|--------------|------------------|
+| **Comments** | `[{* comment *}]` | `{# comment #}` |
+| **Variables** | `[{$variable}]` | `{{ variable }}` |
+| **Translation** | `[{oxmultilang ident="KEY"}]` | `{{ 'KEY'\|translate }}` |
+| **Method call** | `[{$object->method()}]` | `{{ object.method() }}` |
+| **Property** | `[{$object->property}]` | `{{ object.property }}` |
+| **Concatenation** | `[{$var\|cat:"text"}]` | `{{ var ~ "text" }}` |
+| **If statement** | `[{if $condition}]...[{/if}]` | `{% if condition %}...{% endif %}` |
+| **For loop** | `[{foreach from=$array item=item}]...[{/foreach}]` | `{% for item in array %}...{% endfor %}` |
+| **Set variable** | `[{assign var="name" value="value"}]` | `{% set name = "value" %}` |
+| **Include** | `[{include file="template.tpl"}]` | `{% include "template.html.twig" %}` |
+| **Block** | `[{block name="content"}]...[{/block}]` | `{% block content %}...{% endblock %}` |
+| **Parent block** | `[{$smarty.block.parent}]` | `{{ parent() }}` |
 
 ---
 
@@ -15,18 +39,18 @@ This guide covers the frontend implementation of Stripe payments in OXID templat
 ## Template Architecture
 
 ```
-OXID Templates
+OXID Templates (Twig)
       │
-      ├── page/checkout/payment.tpl (OXID core)
+      ├── page/checkout/payment.html.twig (OXID core)
       │        │
       │        └── Block: select_payment
       │                  │
-      │                  └── payment_stripe_method.tpl (your block)
+      │                  └── payment_stripe_method.html.twig (your block)
       │                           - Display Stripe option
       │                           - Load Stripe.js
-      │                           - Create Card Element
+      │                           - Create Payment Element
       │
-      └── page/checkout/order.tpl (OXID core)
+      └── page/checkout/order.html.twig (OXID core)
                │
                └── Your modifications
                         - Handle payment confirmation
@@ -39,16 +63,16 @@ OXID Templates
 
 Add Stripe as a payment option on the payment selection page.
 
-### File: `views/blocks/payment_stripe_method.tpl`
+### File: `views/twig/blocks/payment_stripe_method.html.twig`
 
-```smarty
-[{* Stripe payment method block *}]
-[{$smarty.block.parent}]
+```twig
+{# Stripe payment method block #}
+{{ parent() }}
 
-[{if $oViewConf->getActiveClassName() == 'payment'}]
-    [{assign var="payment" value=$oView->getPayment()}]
+{% if oViewConf.getActiveClassName() == 'payment' %}
+    {% set payment = oView.getPayment() %}
 
-    [{if $payment && $payment->oxpayments__oxid->value == 'osc_stripe_card'}]
+    {% if payment and payment.oxpayments__oxid.value == 'osc_stripe_card' %}
         <div class="stripe-payment-container" id="stripe-payment-form">
             <div class="payment-description">
                 <p>[{oxmultilang ident="OSC_STRIPE_PAYMENT_DESC"}]</p>

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace OxidEsales\StripeWallet\Component\EventSystem\EventHandler;
+namespace OxidSolutionCatalysts\Payments\Stripe\Component\EventSystem\EventHandler;
 
-use OxidEsales\StripeWallet\Component\EventSystem\Event\PaymentInitiatedEvent;
-use OxidEsales\StripeWallet\Component\EventSystem\Event\PaymentCompletedEvent;
-use OxidEsales\StripeWallet\Component\EventSystem\EventDispatcher;
+use OxidSolutionCatalysts\Payments\Stripe\Component\EventSystem\Event\PaymentInitiatedEvent;
+use OxidSolutionCatalysts\Payments\Stripe\Component\EventSystem\Event\PaymentCompletedEvent;
+use OxidSolutionCatalysts\Payments\Stripe\Component\EventSystem\EventDispatcher;
 use OxidSolutionCatalysts\Payments\Component\Adapter\PaymentAdapterInterface;
 use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreatePaymentRequest;
 use OxidSolutionCatalysts\Payments\Component\Repository\TransactionRepository;

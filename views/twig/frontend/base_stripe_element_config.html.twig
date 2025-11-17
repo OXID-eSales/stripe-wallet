@@ -1,0 +1,41 @@
+{% set sSelfLink = oViewConf.getSslSelfLink()|replace({"&amp;": "&"}) %}
+<script>
+    (function (){
+        const StripeElementStyleConfigurator = function(){
+            return {
+                base: {
+                    color: '#32325d',
+                    fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                    fontSmoothing: 'antialiased',
+                    fontSize: '16px',
+                    '::placeholder': {
+                        color: '#aab7c4'
+                    }
+                },
+                invalid: {
+                    color: '#fa755a',
+                    iconColor: '#fa755a'
+                }
+            }
+        }
+        window.StripeElementStyle = new StripeElementStyleConfigurator();
+
+        const StripeI18nConfigurator = function(){
+            return {
+                OSC_STRIPE_CARD_NUMBER : "{{ translate({ ident: 'OSC_STRIPE_CARD_NUMBER' }) }}",
+                OSC_STRIPE_CARD_EXDATE : "{{ translate({ ident: 'OSC_STRIPE_CARD_EXDATE' }) }}",
+                OSC_STRIPE_CARD_CVC : "{{ translate({ ident: 'OSC_STRIPE_CARD_CVC' }) }}",
+                OSC_STRIPE_CARD_NAME : "{{ translate({ ident: 'OSC_STRIPE_CARD_NAME' }) }}",
+                OSC_STRIPE_ERROR_MISSING_NAME: "{{ translate({ ident: 'OSC_STRIPE_ERROR_MISSING_NAME' }) }}",
+                OSC_STRIPE_ERROR_MISSING_NUMBER: "{{ translate({ ident: 'OSC_STRIPE_ERROR_MISSING_NUMBER' }) }}",
+                OSC_STRIPE_ERROR_MISSING_CVC: "{{ translate({ ident: 'OSC_STRIPE_ERROR_MISSING_CVC' }) }}",
+                OSC_STRIPE_ERROR_MISSING_EXDATE: "{{ translate({ ident: 'OSC_STRIPE_ERROR_MISSING_EXDATE' }) }}",
+                OSC_STRIPE_ERROR_INBOX: "{{ translate({ ident: 'OSC_STRIPE_ERROR_INBOX' }) }}",
+                OSC_STRIPE_UNKNOWN_ERROR: "{{ translate({ ident: 'OSC_STRIPE_UNKNOWN_ERROR' }) }}",
+                OSC_STRIPE_AUTHORIZATION_DENIED_ERROR: "{{ translate({ ident: 'OSC_STRIPE_AUTHORIZATION_DENIED_ERROR' }) }}",
+                READ_AND_CONFIRM_TERMS: "{{ translate({ ident: 'READ_AND_CONFIRM_TERMS' }) }}",
+            }
+        }
+        window.StripeI18n = new StripeI18nConfigurator();
+    })();
+</script>

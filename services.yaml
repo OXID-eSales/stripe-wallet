@@ -54,3 +54,13 @@ services:
     tags:
       - { name: twig.extension }
     public: false
+
+  # ==========================================
+  # Controllers
+  # ==========================================
+
+  # PaymentController - Extended OXID PaymentController with Stripe payment integration
+  OxidSolutionCatalysts\Payments\Stripe\Controller\PaymentController:
+    tags:
+      - { name: oxid.view_controller, controller_key: payment }
+    public: true

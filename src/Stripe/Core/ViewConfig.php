@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
-namespace OxidEsales\StripeWallet\Core;
+namespace OxidSolutionCatalysts\Payments\Stripe\Core;
 
 use OxidEsales\Eshop\Core\Registry;
+use OxidSolutionCatalysts\Payments\Component\Traits\ServiceContainer;
+use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 
 /**
  * ViewConfig extension for Stripe module
@@ -13,6 +15,19 @@ use OxidEsales\Eshop\Core\Registry;
  */
 class ViewConfig extends ViewConfig_parent
 {
+
+    use ServiceContainer;
+
+    private ModuleConfigurationService $stripeConfig;
+
+    public function __construct()
+    {
+        parent::__construct();
+
+
+        $this->stripeConfig =$this->getServiceFromContainer(ModuleConfigurationService::class);
+    }
+
     /**
      * Check if module is in development mode
      *
@@ -95,5 +110,16 @@ class ViewConfig extends ViewConfig_parent
 
         // Use module version in production
         return '1.0.0';
+    }
+
+
+    /**
+     * @TODO probably needs to be enhanced, more values should be checked
+     *
+     * @return bool
+     */
+    public function isStripeCheckoutActive(): bool
+    {
+        return !empty($this->stripeConfig->getPublishableKey());
     }
 }

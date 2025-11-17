@@ -10,6 +10,8 @@
 
 - 🚀 [**Quick Start Guide**](QUICK_START.md) - Get running in 30 minutes
 - 📖 [**Implementation Guide**](IMPLEMENTATION_GUIDE.md) - Complete step-by-step
+- 🔄 [**Component Event System**](COMPONENT_EVENT_SYSTEM.md) - Event-driven architecture ⭐ New!
+- ✅ [**Manual Testing Guide**](MANUAL_TESTING_GUIDE.md) - Test your implementation
 - 🎯 [**README**](README.md) - Overview and architecture
 
 ---
@@ -91,51 +93,77 @@
    - Backup recommendations
    - **Time to read:** 30 minutes
 
+9. **[COMPONENT_EVENT_SYSTEM.md](COMPONENT_EVENT_SYSTEM.md)** 🔄 Event System
+   - Component EventSystem integration
+   - Event flow diagrams
+   - Available events (PaymentInitiated, OrderCreated, etc.)
+   - EventContext usage
+   - Creating custom event listeners
+   - Service integration patterns
+   - **Time to read:** 45 minutes
+
+10. **[COMPONENT_REUSE_STRATEGY.md](COMPONENT_REUSE_STRATEGY.md)** ♻️ Component Reuse ⭐ **IMPORTANT**
+    - Existing Component tables (transactions, contracts)
+    - What to reuse vs what to create
+    - Component Transaction repository usage
+    - Migration from custom tables
+    - Dependency injection configuration
+    - **Time to read:** 30 minutes
+    - **🚨 READ BEFORE implementing database!**
+
 ---
 
 ### Additional Resources (Reference)
 
-9. **[CONFIGURATION.md](CONFIGURATION.md)** ⚙️ Settings Reference
-   - Module configuration
-   - API key management
-   - Environment variables
-   - Admin settings
-   - Multi-shop setup
+11. **[CONFIGURATION.md](CONFIGURATION.md)** ⚙️ Settings Reference
+    - Module configuration
+    - API key management
+    - Environment variables
+    - Admin settings
+    - Multi-shop setup
 
-10. **[ERROR_HANDLING.md](ERROR_HANDLING.md)** 🚨 Error Management
+12. **[ERROR_HANDLING.md](ERROR_HANDLING.md)** 🚨 Error Management
     - Error types and codes
     - User-friendly messages
     - Logging strategies
     - Retry mechanisms
     - Edge case handling
 
-11. **[SECURITY_GUIDE.md](SECURITY_GUIDE.md)** 🔒 Security Best Practices
+13. **[SECURITY_GUIDE.md](SECURITY_GUIDE.md)** 🔒 Security Best Practices
     - PCI compliance
     - Data encryption
     - Webhook security
     - API key protection
     - GDPR compliance
 
-12. **[TESTING_GUIDE.md](TESTING_GUIDE.md)** 🧪 Testing Strategies
+14. **[MANUAL_TESTING_GUIDE.md](MANUAL_TESTING_GUIDE.md)** ✅ Manual Testing
+    - Complete setup instructions
+    - Step-by-step test scenarios
+    - Webhook testing guide
+    - Verification queries
+    - Troubleshooting guide
+    - Test card reference
+    - **Time to test:** 2-4 hours
+
+15. **[TESTING_GUIDE.md](TESTING_GUIDE.md)** 🧪 Automated Testing
     - Unit testing
     - Integration testing
     - E2E testing
-    - Test cards reference
     - CI/CD integration
 
-13. **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** 🔄 Migration Paths
+16. **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** 🔄 Migration Paths
     - From other payment modules
     - Version upgrades
     - Data migration
     - Rollback procedures
 
-14. **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** 🔧 Problem Solving
+17. **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** 🔧 Problem Solving
     - Common issues
     - Debug techniques
     - Log analysis
     - Support resources
 
-15. **[FAQ.md](FAQ.md)** ❓ Frequently Asked Questions
+18. **[FAQ.md](FAQ.md)** ❓ Frequently Asked Questions
     - General questions
     - Technical questions
     - Business questions
@@ -216,9 +244,24 @@
 ### For QA Engineers
 
 **Read These (3 hours):**
-1. [TESTING_GUIDE.md](TESTING_GUIDE.md) - Test strategies
-2. [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Known issues
-3. [TEMPLATE_GUIDE.md](TEMPLATE_GUIDE.md) - UI elements
+1. [MANUAL_TESTING_GUIDE.md](MANUAL_TESTING_GUIDE.md) ⭐ **Start Here** - Complete manual testing
+2. [TESTING_GUIDE.md](TESTING_GUIDE.md) - Automated test strategies
+3. [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Known issues
+4. [TEMPLATE_GUIDE.md](TEMPLATE_GUIDE.md) - UI elements
+
+**Manual Testing Checklist (from MANUAL_TESTING_GUIDE.md):**
+- [ ] Module activation and configuration
+- [ ] Successful payment (basic flow)
+- [ ] Payment with 3D Secure authentication
+- [ ] Declined card handling
+- [ ] Insufficient funds error
+- [ ] Expired card rejection
+- [ ] Minimum order amount validation
+- [ ] Refund processing
+- [ ] Webhook reception and processing
+- [ ] Database verification
+- [ ] Log verification
+- [ ] Stripe Dashboard verification
 
 **Test Scenarios:**
 - [ ] Successful payment

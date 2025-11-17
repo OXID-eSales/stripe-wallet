@@ -65,11 +65,16 @@ source/modules/osc/stripe/
 │   └── Core/
 │       └── Events.php
 ├── views/
-│   ├── tpl/
-│   │   ├── payment_stripe.tpl
-│   │   └── stripe_3ds.tpl
+│   ├── twig/                              # Twig templates (OXID 7.0+)
+│   │   ├── payment_stripe.html.twig
+│   │   └── stripe_3ds.html.twig
 │   └── js/
 │       └── stripe_checkout.js
+├── translations/
+│   ├── en/
+│   │   └── stripe_lang.php
+│   └── de/
+│       └── stripe_lang.php
 ├── config/
 │   └── services.yaml
 ├── migrations/
@@ -127,6 +132,8 @@ source/modules/osc/stripe/
 
 ### Step 1.4: Create metadata.php
 
+**Note:** This guide targets OXID eShop 7.0+, which uses **Twig templates** (.html.twig) instead of Smarty (.tpl).
+
 ```php
 <?php
 
@@ -163,15 +170,15 @@ $aModule = [
         'stripe_return' => \OxidSolutionCatalysts\Stripe\Controller\ReturnController::class,
     ],
     'templates'   => [
-        // Template overrides
-        'payment_stripe.tpl' => 'osc/stripe/views/tpl/payment_stripe.tpl',
+        // Twig template overrides (OXID 7.0+)
+        'payment_stripe.html.twig' => 'osc/stripe/views/twig/payment_stripe.html.twig',
     ],
     'blocks'      => [
-        // Template blocks
+        // Template blocks (Twig)
         [
-            'template' => 'page/checkout/payment.tpl',
+            'template' => 'page/checkout/payment.html.twig',
             'block'    => 'select_payment',
-            'file'     => 'views/blocks/payment_stripe_method.tpl',
+            'file'     => 'views/twig/blocks/payment_stripe_method.html.twig',
         ],
     ],
     'settings'    => [
@@ -238,68 +245,140 @@ $aModule = [
 
 ## Phase 2: Database Setup (1-2 hours)
 
+### Important: Component Reuse Strategy ⚠️
+
+**Standard checkout REUSES Component tables** to avoid duplication and ensure consistency:
+- ✅ **REUSE:** `osc_payment_transaction` (Component table for all providers)
+- ❌ **SKIP:** `osc_payment_contract` (not used in standard checkout)
+- ➕ **CREATE:** Stripe-specific tables only
+
+See [COMPONENT_REUSE_STRATEGY.md](COMPONENT_REUSE_STRATEGY.md) for details.
+
+---
+
 ### Step 2.1: Create Migration SQL
 
 Create file: `migrations/001_create_payment_tables.sql`
 
 ```sql
--- Payment Transaction Table
+-- ========================================
+-- Component Transaction Table (Provider-Agnostic)
+-- ✅ REUSES Component table structure
+-- ========================================
 CREATE TABLE IF NOT EXISTS `osc_payment_transaction` (
     `OXID` CHAR(32) NOT NULL COMMENT 'Transaction ID',
     `OXSHOPID` INT(11) NOT NULL DEFAULT 1 COMMENT 'Shop ID',
     `OXORDERID` CHAR(32) NOT NULL COMMENT 'Order ID (FK to oxorder)',
-    `OXUSERID` CHAR(32) NOT NULL COMMENT 'User ID (FK to oxuser)',
+    `OXCONTRACTID` CHAR(32) NULL COMMENT 'Contract ID (NULL for standard checkout)',
 
     -- Provider Information
-    `OXPROVIDER` VARCHAR(50) NOT NULL DEFAULT 'stripe' COMMENT 'Payment provider name',
-    `OXPROVIDERORDERID` VARCHAR(255) NULL COMMENT 'Provider payment ID (Stripe PaymentIntent)',
-    `OXPROVIDERTRANSACTIONID` VARCHAR(255) NULL COMMENT 'Provider transaction ID (Stripe Charge)',
+    `OXPROVIDER` VARCHAR(50) NOT NULL COMMENT 'Payment provider (stripe, paypal, etc)',
+    `OXPROVIDERORDERID` VARCHAR(255) NULL COMMENT 'Provider order/payment ID (PaymentIntent ID)',
+    `OXTRANSACTIONID` VARCHAR(255) NULL COMMENT 'Provider transaction ID (Charge ID)',
 
     -- Transaction Details
+    `OXTYPE` VARCHAR(50) NOT NULL COMMENT 'Transaction type (payment, refund, authorization)',
+    `OXSTATUS` VARCHAR(50) NOT NULL COMMENT 'Transaction status (pending, completed, failed)',
     `OXAMOUNT` DECIMAL(10,2) NOT NULL COMMENT 'Transaction amount',
     `OXCURRENCY` VARCHAR(3) NOT NULL COMMENT 'Currency code (ISO 4217)',
-    `OXSTATUS` VARCHAR(50) NOT NULL COMMENT 'Transaction status',
-    `OXTYPE` VARCHAR(50) NOT NULL DEFAULT 'payment' COMMENT 'Transaction type (payment, refund, etc)',
 
-    -- Payment Method Details
-    `OXPAYMENTMETHOD` VARCHAR(50) NULL COMMENT 'Payment method type (card, sepa, etc)',
-    `OXCARDLAST4` VARCHAR(4) NULL COMMENT 'Last 4 digits of card',
-    `OXCARDBRAND` VARCHAR(20) NULL COMMENT 'Card brand (visa, mastercard, etc)',
+    -- Payment Method
+    `OXPAYMENTMETHODID` VARCHAR(255) NULL COMMENT 'Payment method ID',
+    `OXPAYMENTMETHODTYPE` VARCHAR(50) NULL COMMENT 'Payment method type (card, sepa, etc)',
 
-    -- 3D Secure / SCA
-    `OX3DSECURE` TINYINT(1) DEFAULT 0 COMMENT '3D Secure used (0=no, 1=yes)',
-
-    -- Metadata (JSON)
-    `OXMETADATA` TEXT NULL COMMENT 'Additional metadata (JSON)',
-
-    -- Error Handling
-    `OXERRORCODE` VARCHAR(100) NULL COMMENT 'Error code if failed',
-    `OXERRORMESSAGE` TEXT NULL COMMENT 'Error message if failed',
+    -- Parent Transaction (for refunds)
+    `OXPARENTTRANSACTIONID` VARCHAR(255) NULL COMMENT 'Parent transaction ID',
 
     -- Timestamps
     `OXCREATED` DATETIME NOT NULL COMMENT 'Created timestamp',
-    `OXUPDATED` DATETIME NULL COMMENT 'Last updated timestamp',
+    `OXUPDATED` DATETIME NOT NULL COMMENT 'Updated timestamp',
 
     PRIMARY KEY (`OXID`),
-    KEY `IDX_ORDER` (`OXORDERID`),
-    KEY `IDX_USER` (`OXUSERID`),
-    KEY `IDX_PROVIDER_ORDER` (`OXPROVIDERORDERID`),
+    KEY `IDX_SHOPID` (`OXSHOPID`),
+    KEY `IDX_ORDERID` (`OXORDERID`),
+    KEY `IDX_CONTRACTID` (`OXCONTRACTID`),
+    KEY `IDX_PROVIDERORDERID` (`OXPROVIDERORDERID`),
+    KEY `IDX_TRANSACTIONID` (`OXTRANSACTIONID`),
     KEY `IDX_STATUS` (`OXSTATUS`),
-    KEY `IDX_CREATED` (`OXCREATED`),
 
     CONSTRAINT `FK_TRANSACTION_ORDER`
         FOREIGN KEY (`OXORDERID`)
         REFERENCES `oxorder` (`OXID`)
-        ON DELETE CASCADE,
+        ON DELETE CASCADE
 
-    CONSTRAINT `FK_TRANSACTION_USER`
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Component payment transactions (provider-agnostic)';
+
+-- ========================================
+-- Stripe-Specific Payment Details
+-- ➕ NEW: Stripe-only data (card info, 3DS, risk)
+-- ========================================
+CREATE TABLE IF NOT EXISTS `osc_stripe_payment_details` (
+    `OXID` CHAR(32) NOT NULL COMMENT 'Primary key',
+    `OXTRANSACTIONID` CHAR(32) NOT NULL COMMENT 'FK: osc_payment_transaction.OXID',
+
+    -- Card Details
+    `OXCARDLAST4` VARCHAR(4) NULL COMMENT 'Last 4 digits of card',
+    `OXCARDBRAND` VARCHAR(20) NULL COMMENT 'Card brand (visa, mastercard, amex)',
+    `OXCARDEXPMONTH` VARCHAR(2) NULL COMMENT 'Card expiration month',
+    `OXCARDEXPYEAR` VARCHAR(4) NULL COMMENT 'Card expiration year',
+    `OXCARDFUNDING` VARCHAR(20) NULL COMMENT 'Card funding type (credit, debit, prepaid)',
+    `OXCARDCOUNTRY` VARCHAR(2) NULL COMMENT 'Card country code',
+
+    -- 3D Secure / SCA
+    `OX3DSECURE` TINYINT(1) DEFAULT 0 COMMENT '3D Secure used (0=no, 1=yes)',
+    `OX3DSVERSION` VARCHAR(10) NULL COMMENT '3DS version (1.0, 2.0)',
+    `OX3DSAUTHENTICATED` TINYINT(1) NULL COMMENT '3DS authentication result',
+
+    -- Risk / Fraud
+    `OXRISKSCORE` INT(3) NULL COMMENT 'Risk score (0-100)',
+    `OXRISKLEVEL` VARCHAR(20) NULL COMMENT 'Risk level (normal, elevated, highest)',
+
+    -- Metadata
+    `OXMETADATA` TEXT NULL COMMENT 'Additional metadata (JSON)',
+
+    -- Timestamps
+    `OXCREATED` DATETIME NOT NULL COMMENT 'Created timestamp',
+    `OXUPDATED` DATETIME NULL COMMENT 'Updated timestamp',
+
+    PRIMARY KEY (`OXID`),
+    UNIQUE KEY `UNQ_TRANSACTION` (`OXTRANSACTIONID`),
+
+    CONSTRAINT `FK_DETAILS_TRANSACTION`
+        FOREIGN KEY (`OXTRANSACTIONID`)
+        REFERENCES `osc_payment_transaction` (`OXID`)
+        ON DELETE CASCADE
+
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Stripe-specific payment details';
+
+-- ========================================
+-- Stripe Customer Mapping
+-- ➕ RENAMED: osc_payment_customer → osc_stripe_customer_mapping
+-- ========================================
+CREATE TABLE IF NOT EXISTS `osc_stripe_customer_mapping` (
+    `OXID` CHAR(32) NOT NULL COMMENT 'Primary key',
+    `OXSHOPID` INT(11) NOT NULL DEFAULT 1 COMMENT 'Shop ID',
+    `OXUSERID` CHAR(32) NOT NULL COMMENT 'FK: oxuser.OXID',
+    `OXSTRIPECUSTOMERID` VARCHAR(255) NOT NULL COMMENT 'Stripe Customer ID',
+
+    -- Timestamps
+    `OXCREATED` DATETIME NOT NULL COMMENT 'Created timestamp',
+    `OXUPDATED` DATETIME NULL COMMENT 'Updated timestamp',
+
+    PRIMARY KEY (`OXID`),
+    UNIQUE KEY `UNQ_USERID` (`OXUSERID`),
+    KEY `IDX_SHOPID` (`OXSHOPID`),
+    KEY `IDX_STRIPECUSTOMERID` (`OXSTRIPECUSTOMERID`),
+
+    CONSTRAINT `FK_CUSTOMER_USER`
         FOREIGN KEY (`OXUSERID`)
         REFERENCES `oxuser` (`OXID`)
         ON DELETE CASCADE
 
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Payment transactions from all providers';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Stripe customer mapping';
 
--- Payment Order State Table (1:1 with order)
+-- ========================================
+-- Payment Order State (Standard Checkout)
+-- ========================================
 CREATE TABLE IF NOT EXISTS `osc_payment_order_state` (
     `OXID` CHAR(32) NOT NULL COMMENT 'State ID',
     `OXSHOPID` INT(11) NOT NULL DEFAULT 1 COMMENT 'Shop ID',
@@ -329,74 +408,38 @@ CREATE TABLE IF NOT EXISTS `osc_payment_order_state` (
     `OXUPDATED` DATETIME NULL COMMENT 'Last updated timestamp',
 
     PRIMARY KEY (`OXID`),
-    UNIQUE KEY `UNQ_ORDER` (`OXORDERID`),
-    KEY `IDX_STATE` (`OXPAYMENTSTATE`),
+    UNIQUE KEY `UNQ_ORDERID` (`OXORDERID`),
+    KEY `IDX_SHOPID` (`OXSHOPID`),
+    KEY `IDX_PAYMENTSTATE` (`OXPAYMENTSTATE`),
 
     CONSTRAINT `FK_STATE_ORDER`
         FOREIGN KEY (`OXORDERID`)
         REFERENCES `oxorder` (`OXID`)
         ON DELETE CASCADE
 
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Payment state per order (1:1)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Payment state per order';
 
--- Payment Customer Table (1:1 with user)
-CREATE TABLE IF NOT EXISTS `osc_payment_customer` (
-    `OXID` CHAR(32) NOT NULL COMMENT 'Customer ID',
-    `OXSHOPID` INT(11) NOT NULL DEFAULT 1 COMMENT 'Shop ID',
-    `OXUSERID` CHAR(32) NOT NULL COMMENT 'User ID (FK to oxuser) - UNIQUE',
-
-    -- Stripe Customer
-    `OXSTRIPECUSTOMERID` VARCHAR(255) NULL COMMENT 'Stripe Customer ID',
-
-    -- Metadata
-    `OXMETADATA` TEXT NULL COMMENT 'Additional metadata (JSON)',
-
-    -- Timestamps
-    `OXCREATED` DATETIME NOT NULL COMMENT 'Created timestamp',
-    `OXUPDATED` DATETIME NULL COMMENT 'Last updated timestamp',
-
-    PRIMARY KEY (`OXID`),
-    UNIQUE KEY `UNQ_USER` (`OXUSERID`),
-    KEY `IDX_STRIPE_CUSTOMER` (`OXSTRIPECUSTOMERID`),
-
-    CONSTRAINT `FK_CUSTOMER_USER`
-        FOREIGN KEY (`OXUSERID`)
-        REFERENCES `oxuser` (`OXID`)
-        ON DELETE CASCADE
-
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Payment customer data (1:1 with user)';
-
--- Webhook Log Table
+-- ========================================
+-- Webhook Log (Shared across providers)
+-- ========================================
 CREATE TABLE IF NOT EXISTS `osc_payment_webhook_log` (
     `OXID` CHAR(32) NOT NULL COMMENT 'Log ID',
     `OXSHOPID` INT(11) NOT NULL DEFAULT 1 COMMENT 'Shop ID',
-
-    -- Webhook Details
     `OXEVENTID` VARCHAR(255) NOT NULL COMMENT 'Webhook event ID (idempotency)',
-    `OXEVENTTYPE` VARCHAR(100) NOT NULL COMMENT 'Event type (payment_intent.succeeded, etc)',
-    `OXPROVIDER` VARCHAR(50) NOT NULL DEFAULT 'stripe' COMMENT 'Provider name',
-
-    -- Related Entities
-    `OXORDERID` CHAR(32) NULL COMMENT 'Related order ID',
-    `OXTRANSACTIONID` CHAR(32) NULL COMMENT 'Related transaction ID',
-
-    -- Payload
+    `OXEVENTTYPE` VARCHAR(100) NOT NULL COMMENT 'Event type',
+    `OXPROVIDER` VARCHAR(50) NOT NULL COMMENT 'Payment provider (stripe, paypal, etc)',
     `OXPAYLOAD` MEDIUMTEXT NOT NULL COMMENT 'Full webhook payload (JSON)',
-
-    -- Processing
     `OXSTATUS` VARCHAR(50) NOT NULL DEFAULT 'received' COMMENT 'Processing status',
-    `OXPROCESSEDAT` DATETIME NULL COMMENT 'Processing timestamp',
-    `OXERROR` TEXT NULL COMMENT 'Error message if processing failed',
-
-    -- Timestamps
+    `OXERRORMESSAGE` TEXT NULL COMMENT 'Error message if processing failed',
     `OXCREATED` DATETIME NOT NULL COMMENT 'Received timestamp',
+    `OXUPDATED` DATETIME NULL COMMENT 'Updated timestamp',
 
     PRIMARY KEY (`OXID`),
-    UNIQUE KEY `UNQ_EVENT` (`OXEVENTID`),
-    KEY `IDX_EVENT_TYPE` (`OXEVENTTYPE`),
-    KEY `IDX_ORDER` (`OXORDERID`),
-    KEY `IDX_STATUS` (`OXSTATUS`),
-    KEY `IDX_CREATED` (`OXCREATED`)
+    UNIQUE KEY `UNQ_EVENTID` (`OXEVENTID`),
+    KEY `IDX_SHOPID` (`OXSHOPID`),
+    KEY `IDX_EVENTTYPE` (`OXEVENTTYPE`),
+    KEY `IDX_PROVIDER` (`OXPROVIDER`),
+    KEY `IDX_STATUS` (`OXSTATUS`)
 
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Webhook event log';
 ```
@@ -405,11 +448,11 @@ CREATE TABLE IF NOT EXISTS `osc_payment_webhook_log` (
 
 ### Step 2.2: Run Migration
 
-```bash
-# Via OXID CLI (if available)
-php vendor/bin/oe-console oe:module:install-configuration osc_stripe
+**Option 1: Automatic (via Events.php)**
+Module activation automatically creates tables via `Events::addStandardCheckoutTables()`.
 
-# Or manually via MySQL
+**Option 2: Manual SQL**
+```bash
 mysql -u [username] -p [database_name] < migrations/001_create_payment_tables.sql
 ```
 
@@ -419,16 +462,58 @@ mysql -u [username] -p [database_name] < migrations/001_create_payment_tables.sq
 
 ```sql
 -- Check tables exist
-SHOW TABLES LIKE 'osc_payment%';
+SHOW TABLES LIKE 'osc_%';
 
 -- Should return:
--- osc_payment_transaction
--- osc_payment_order_state
--- osc_payment_customer
--- osc_payment_webhook_log
+-- osc_payment_transaction (Component)
+-- osc_stripe_payment_details (Stripe-specific)
+-- osc_stripe_customer_mapping (Stripe-specific)
+-- osc_payment_order_state (Standard checkout)
+-- osc_payment_webhook_log (Shared)
 
--- Check table structure
+-- Verify Component-compatible transaction table
 DESCRIBE osc_payment_transaction;
+-- Must have: OXSHOPID, OXCONTRACTID, OXPAYMENTMETHODID, OXPAYMENTMETHODTYPE, OXPARENTTRANSACTIONID
+
+-- Verify Stripe details table
+DESCRIBE osc_stripe_payment_details;
+-- Must have: OXTRANSACTIONID (FK), OXCARDLAST4, OXCARDBRAND, OX3DSECURE, etc.
+```
+
+---
+
+### Step 2.4: Table Relationships
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                    Component Layer                          │
+├────────────────────────────────────────────────────────────┤
+│                                                             │
+│  osc_payment_transaction (Component - Provider-Agnostic)   │
+│  ├─ OXID (PK)                                              │
+│  ├─ OXORDERID → oxorder.OXID (FK)                          │
+│  ├─ OXCONTRACTID (NULL for standard checkout)              │
+│  └─ OXPROVIDER = 'stripe'                                  │
+│                                                             │
+└─────────────────────┬──────────────────────────────────────┘
+                      │
+                      │ 1:1
+                      ▼
+┌────────────────────────────────────────────────────────────┐
+│              Stripe Provider Layer                          │
+├────────────────────────────────────────────────────────────┤
+│                                                             │
+│  osc_stripe_payment_details (Stripe-specific)              │
+│  ├─ OXTRANSACTIONID → osc_payment_transaction.OXID (FK)   │
+│  ├─ OXCARDLAST4                                            │
+│  ├─ OX3DSECURE                                             │
+│  └─ OXRISKSCORE                                            │
+│                                                             │
+│  osc_stripe_customer_mapping (Stripe customers)            │
+│  ├─ OXUSERID → oxuser.OXID (FK)                            │
+│  └─ OXSTRIPECUSTOMERID                                     │
+│                                                             │
+└────────────────────────────────────────────────────────────┘
 ```
 
 ---

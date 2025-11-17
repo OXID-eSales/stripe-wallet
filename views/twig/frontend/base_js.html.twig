@@ -1,0 +1,7 @@
+{% if oViewConf.isStripeCheckoutActive() %}
+    <script src="https://js.stripe.com/v3/"></script>
+
+    {% include '@osc_stripe_wallet/frontend/base_stripe_payment_controller_config.html.twig' %}
+    {% include '@osc_stripe_wallet/frontend/base_stripe_element_config.html.twig' %}
+{% endif %}
+

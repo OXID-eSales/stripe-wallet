@@ -8,6 +8,7 @@
 declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Tests\Integration\Infrastructure;
 
+use OxidSolutionCatalysts\Payments\Stripe\Module;
 use PHPUnit\Framework\TestCase;
 
 class ModuleStructureTest extends TestCase
@@ -44,7 +45,7 @@ class ModuleStructureTest extends TestCase
         $aModule = [];
         include $metadataFile;
 
-        $this->assertEquals('osc_stripe_wallet', $aModule['id']);
+        $this->assertEquals(Module::MODULE_ID, $aModule['id']);
         $this->assertEquals('2.1', $GLOBALS['sMetadataVersion'] ?? $sMetadataVersion);
     }
 

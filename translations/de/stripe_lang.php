@@ -47,4 +47,42 @@ $aLang = [
     // Module settings
     'SHOP_MODULE_sStripeDevMode'                => 'Entwicklungsmodus',
     'HELP_SHOP_MODULE_sStripeDevMode'           => 'Aktivieren, um JavaScript-Dateien separat zu laden für einfacheres Debugging. Wird automatisch auf .local, .dev, .test Domains aktiviert.',
+
+    // Payment Element - Standard Checkout
+    'OSC_STRIPE_CARD_PAYMENT'                   => 'Kreditkartenzahlung',
+    'OSC_STRIPE_PAYMENT_DESC'                   => 'Zahlen Sie sicher mit Ihrer Kredit- oder Debitkarte. Ihre Zahlungsinformationen sind verschlüsselt und sicher.',
+    'OSC_STRIPE_CARD_DETAILS'                   => 'Kartendetails',
+    'OSC_STRIPE_PAY_NOW'                        => 'Jetzt bezahlen',
+    'OSC_STRIPE_PROCESSING'                     => 'Verarbeitung',
+    'OSC_STRIPE_PROCESSING_PAYMENT'             => 'Ihre Zahlung wird verarbeitet. Bitte warten...',
+    'OSC_STRIPE_SECURE_PAYMENT'                 => 'Sichere Zahlung powered by Stripe',
+
+    // Error Messages - Payment Element
+    'OSC_STRIPE_CONFIG_ERROR'                   => 'Stripe ist nicht richtig konfiguriert. Bitte kontaktieren Sie den Support.',
+    'OSC_STRIPE_INTENT_ERROR'                   => 'Zahlung konnte nicht initialisiert werden. Bitte laden Sie die Seite neu und versuchen Sie es erneut.',
+    'OSC_STRIPE_UNEXPECTED_ERROR'               => 'Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.',
+    'OSC_STRIPE_PAYMENT_FAILED'                 => 'Zahlung fehlgeschlagen. Bitte überprüfen Sie Ihre Kartendaten und versuchen Sie es erneut.',
+    'OSC_STRIPE_PAYMENT_DECLINED'               => 'Ihre Zahlung wurde abgelehnt. Bitte versuchen Sie eine andere Karte.',
+    'OSC_STRIPE_INSUFFICIENT_FUNDS'             => 'Nicht ausreichende Deckung. Bitte überprüfen Sie Ihr Kartenguthaben.',
+    'OSC_STRIPE_CARD_ERROR'                     => 'Bei der Verarbeitung Ihrer Karte ist ein Fehler aufgetreten. Bitte überprüfen Sie Ihre Angaben.',
+    'OSC_STRIPE_NETWORK_ERROR'                  => 'Netzwerkfehler. Bitte überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+
+    // 3D Secure - Payment Element
+    'OSC_STRIPE_3DS_TITLE'                      => 'Sichere Zahlungsauthentifizierung',
+    'OSC_STRIPE_3DS_INFO'                       => 'Ihre Bank benötigt eine zusätzliche Authentifizierung, um diese Zahlung abzuschließen.',
+    'OSC_STRIPE_AUTHENTICATING'                 => 'Ihre Zahlung wird authentifiziert...',
+    'OSC_STRIPE_3DS_COMPLETE'                   => 'Authentifizierung abgeschlossen. Ihre Bestellung wird verarbeitet...',
+    'OSC_STRIPE_3DS_FAILED'                     => 'Authentifizierung fehlgeschlagen. Bitte versuchen Sie es erneut.',
+
+    // Success Messages
+    'OSC_STRIPE_PAYMENT_SUCCESS'                => 'Zahlung erfolgreich!',
+    'OSC_STRIPE_ORDER_CREATED'                  => 'Ihre Bestellung wurde erfolgreich erstellt.',
+
+    // Transaction Details
+    'OSC_STRIPE_TRANSACTION_ID'                 => 'Transaktions-ID',
+    'OSC_STRIPE_PAYMENT_ID'                     => 'Zahlungs-ID',
+    'OSC_STRIPE_CARD_BRAND'                     => 'Kartenmarke',
+    'OSC_STRIPE_CARD_LAST4'                     => 'Karte endet auf',
+    'OSC_STRIPE_PAYMENT_DATE'                   => 'Zahlungsdatum',
+    'OSC_STRIPE_PAYMENT_AMOUNT'                 => 'Zahlungsbetrag',
 ];

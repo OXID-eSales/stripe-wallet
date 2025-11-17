@@ -47,4 +47,42 @@ $aLang = [
     // Module settings
     'SHOP_MODULE_sStripeDevMode'                => 'Development Mode',
     'HELP_SHOP_MODULE_sStripeDevMode'           => 'Enable to load JavaScript files separately for easier debugging. Automatically enabled on .local, .dev, .test domains.',
+
+    // Payment Element - Standard Checkout
+    'OSC_STRIPE_CARD_PAYMENT'                   => 'Credit Card Payment',
+    'OSC_STRIPE_PAYMENT_DESC'                   => 'Pay securely with your credit or debit card. Your payment information is encrypted and secure.',
+    'OSC_STRIPE_CARD_DETAILS'                   => 'Card Details',
+    'OSC_STRIPE_PAY_NOW'                        => 'Pay Now',
+    'OSC_STRIPE_PROCESSING'                     => 'Processing',
+    'OSC_STRIPE_PROCESSING_PAYMENT'             => 'Processing your payment. Please wait...',
+    'OSC_STRIPE_SECURE_PAYMENT'                 => 'Secure payment powered by Stripe',
+
+    // Error Messages - Payment Element
+    'OSC_STRIPE_CONFIG_ERROR'                   => 'Stripe is not properly configured. Please contact support.',
+    'OSC_STRIPE_INTENT_ERROR'                   => 'Unable to initialize payment. Please refresh the page and try again.',
+    'OSC_STRIPE_UNEXPECTED_ERROR'               => 'An unexpected error occurred. Please try again.',
+    'OSC_STRIPE_PAYMENT_FAILED'                 => 'Payment failed. Please check your card details and try again.',
+    'OSC_STRIPE_PAYMENT_DECLINED'               => 'Your payment was declined. Please try a different card.',
+    'OSC_STRIPE_INSUFFICIENT_FUNDS'             => 'Insufficient funds. Please check your card balance.',
+    'OSC_STRIPE_CARD_ERROR'                     => 'There was an error processing your card. Please check your details.',
+    'OSC_STRIPE_NETWORK_ERROR'                  => 'Network error. Please check your connection and try again.',
+
+    // 3D Secure - Payment Element
+    'OSC_STRIPE_3DS_TITLE'                      => 'Secure Payment Authentication',
+    'OSC_STRIPE_3DS_INFO'                       => 'Your bank requires additional authentication to complete this payment.',
+    'OSC_STRIPE_AUTHENTICATING'                 => 'Authenticating your payment...',
+    'OSC_STRIPE_3DS_COMPLETE'                   => 'Authentication complete. Processing your order...',
+    'OSC_STRIPE_3DS_FAILED'                     => 'Authentication failed. Please try again.',
+
+    // Success Messages
+    'OSC_STRIPE_PAYMENT_SUCCESS'                => 'Payment successful!',
+    'OSC_STRIPE_ORDER_CREATED'                  => 'Your order has been created successfully.',
+
+    // Transaction Details
+    'OSC_STRIPE_TRANSACTION_ID'                 => 'Transaction ID',
+    'OSC_STRIPE_PAYMENT_ID'                     => 'Payment ID',
+    'OSC_STRIPE_CARD_BRAND'                     => 'Card Brand',
+    'OSC_STRIPE_CARD_LAST4'                     => 'Card ending in',
+    'OSC_STRIPE_PAYMENT_DATE'                   => 'Payment Date',
+    'OSC_STRIPE_PAYMENT_AMOUNT'                 => 'Payment Amount',
 ];

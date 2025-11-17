@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidEsales\StripeWallet\Component\EventSystem\Event;
+namespace OxidSolutionCatalysts\Payments\Stripe\Component\EventSystem\Event;
 
 /**
  * Event dispatched when a payment is initiated by the customer

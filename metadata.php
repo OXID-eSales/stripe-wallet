@@ -6,11 +6,20 @@
 
 declare(strict_types=1);
 
-use OxidSolutionCatalysts\Payments\Component\Controller\Http\WebhookController;
-use OxidSolutionCatalysts\Payments\Component\Controller\Http\PaymentController;
-use OxidSolutionCatalysts\Payments\Stripe\Core\Events;
+use OxidEsales\Eshop\Application\Controller\Admin\ModuleConfiguration;
+use OxidEsales\Eshop\Core\ViewConfig;
+use OxidSolutionCatalysts\Payments\Stripe\Controller\OrderController as StripeOrderController;
+use OxidSolutionCatalysts\Payments\Stripe\Controller\PaymentController as StripePaymentController;
+use OxidSolutionCatalysts\Payments\Stripe\Controller\WebhookController as StripeWebhookController;
+use OxidSolutionCatalysts\Payments\Stripe\Core\ViewConfig as StripeViewConfig;
+use OxidSolutionCatalysts\Payments\Component\Controller\Http\WebhookController as PaymentComponentWebhookController;
+use OxidSolutionCatalysts\Payments\Component\Controller\Http\PaymentController as PaymentComponentPaymentController;
+use OxidSolutionCatalysts\Payments\Stripe\Core\Events as StripeEvents;
 use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\StripeConnect;
-use OxidSolutionCatalysts\Payments\Stripe\Application\Controller\Admin\ModuleConfiguration;
+use OxidSolutionCatalysts\Payments\Stripe\Application\Controller\Admin\ModuleConfiguration as StripeModuleConfiguration;
+use \OxidEsales\Eshop\Application\Controller\PaymentController;
+use \OxidEsales\Eshop\Application\Controller\OrderController;
+use OxidSolutionCatalysts\Payments\Stripe\Module;
 
 /**
  * Metadata version
@@ -21,7 +30,7 @@ $sMetadataVersion = '2.1';
  * Module information
  */
 $aModule = [
-    'id' => 'osc_stripe_wallet',
+    'id' => Module::MODULE_ID,
     'title' => [
         'de' => 'Stripe Payment Gateway',
         'en' => 'Stripe Payment Gateway',
@@ -36,27 +45,26 @@ $aModule = [
     'url' => 'https://www.oxid-esales.com',
     'email' => 'info@oxid-esales.com',
     'extend' => [
-        \OxidEsales\Eshop\Application\Controller\Admin\ModuleConfiguration::class => ModuleConfiguration::class,
-        \OxidEsales\Eshop\Core\ViewConfig::class => \OxidEsales\StripeWallet\Core\ViewConfig::class,
+        ModuleConfiguration::class => StripeModuleConfiguration::class,
+        ViewConfig::class => StripeViewConfig::class,
+
+        PaymentController::class => StripePaymentController::class,
+        OrderController::class => StripeOrderController::class,
     ],
     'controllers' => [
-        'osc_stripe_webhook' => WebhookController::class,
-        'osc_stripe_payment' => PaymentController::class,
+        'osc_stripe_webhook' => PaymentComponentWebhookController::class,
+        'osc_stripe_payment' => PaymentComponentPaymentController::class,
         'StripeConnect' => StripeConnect::class,
-        'stripe_checkout_onepage' => \OxidEsales\StripeWallet\Component\Controller\CheckoutOnePageController::class,
+        //'stripe_checkout_onepage' => \OxidEsales\StripeWallet\Component\Controller\CheckoutOnePageController::class,
+        // Standard checkout webhook endpoint
+        'stripe_webhook' => StripeWebhookController::class,
     ],
-    'templates' => [
-        'osc_stripe_payment.tpl' => 'osc/stripe/views/tpl/payment.tpl',
-        'osc_stripe_admin_config.tpl' => 'osc/stripe/views/admin/tpl/config.tpl',
-        '@osc_stripe_wallet/admin/stripe_connect' => 'osc/stripe/views/admin_twig/twig/stripe_connect.html.twig',
+    'events' => [
+        'onActivate' => StripeEvents::class . '::onActivate',
+        'onDeactivate' => StripeEvents::class . '::onDeactivate',
     ],
-    'blocks' => [
-        [
-            'template' => 'page/checkout/payment.tpl',
-            'block' => 'checkout_payment_main',
-            'file' => '/views/blocks/checkout_payment.tpl',
-        ],
-    ],
+    'templates' => [],
+    'blocks' => [],
     'settings'      => [
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeDevMode',                     'type' => 'bool',       'value' => '0',         'position' => 5],
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeMode',                        'type' => 'select',     'value' => 'test',      'position' => 10, 'constraints' => 'live|test'],
@@ -80,9 +88,5 @@ $aModule = [
         ['group' => 'STRIPE_CRONJOBS',          'name' => 'sStripeCronSecureKey',               'type' => 'str',        'value' => '',          'position' => 120],
         ['group' => 'STRIPE_WEBHOOKS',          'name' => 'sStripeWebhookEndpoint',             'type' => 'str',        'value' => '',          'position' => 130],
         ['group' => 'STRIPE_WEBHOOKS',          'name' => 'sStripeWebhookEndpointSecret',       'type' => 'str',        'value' => '',          'position' => 140],
-    ],
-    'events' => [
-        'onActivate' => Events::class . '::onActivate',
-        'onDeactivate' => Events::class . '::onDeactivate',
     ],
 ];

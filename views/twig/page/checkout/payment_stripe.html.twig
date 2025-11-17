@@ -1,0 +1,380 @@
+{#
+/**
+ * Stripe Payment Element Template
+ * OXID eShop 7.0+ (Twig)
+ *
+ * Implements Stripe Payment Element for secure card payments
+ * Following best practices from Stripe Payment Element documentation
+ */
+#}
+
+<div class="stripe-payment-wrapper" id="stripe-payment-wrapper">
+    {# Payment Element Form #}
+    <form id="stripe-payment-form" method="post" action="{{ oViewConf.getSslSelfLink() }}">
+
+        {# Hidden fields for OXID #}
+        {{ oViewConf.getHiddenSid()|raw }}
+        <input type="hidden" name="cl" value="order">
+        <input type="hidden" name="fnc" value="execute">
+        <input type="hidden" name="sDeliveryAddressMD5" value="{{ oView.getDeliveryAddressMD5() }}">
+
+        {# Payment description #}
+        <div class="payment-description">
+            <h3>{{ 'OSC_STRIPE_CARD_PAYMENT'|translate }}</h3>
+            <p class="text-muted">{{ 'OSC_STRIPE_PAYMENT_DESC'|translate }}</p>
+        </div>
+
+        {# Payment Element Container - Stripe will inject the form here #}
+        <div id="payment-element" class="stripe-payment-element">
+            {# Stripe Payment Element will be mounted here #}
+        </div>
+
+        {# Error message display #}
+        <div id="payment-errors" class="stripe-errors alert alert-danger" style="display: none;" role="alert">
+            <i class="fa fa-exclamation-circle"></i>
+            <span id="payment-error-message"></span>
+        </div>
+
+        {# Loading indicator #}
+        <div id="payment-loading" class="stripe-loading" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="sr-only">{{ 'OSC_STRIPE_PROCESSING'|translate }}</span>
+            </div>
+            <p>{{ 'OSC_STRIPE_PROCESSING_PAYMENT'|translate }}</p>
+        </div>
+
+        {# Submit button (managed by OXID checkout flow) #}
+        <div class="stripe-submit-info">
+            <p class="text-muted small">
+                <i class="fa fa-lock"></i>
+                {{ 'OSC_STRIPE_SECURE_PAYMENT'|translate }}
+            </p>
+        </div>
+
+    </form>
+</div>
+
+{# Load Stripe.js from CDN #}
+<script src="https://js.stripe.com/v3/"></script>
+
+<script>
+(function() {
+    'use strict';
+
+    // Configuration from OXID backend
+    const stripeConfig = {
+        publishableKey: '{{ oViewConf.getStripePublishableKey() }}',
+        clientSecret: '{{ clientSecret|default('') }}',
+        returnUrl: '{{ oViewConf.getSslSelfLink() ~ "cl=order&fnc=stripeReturn" }}',
+        locale: '{{ oView.getActLanguageAbbr() }}'
+    };
+
+    // Check if we have necessary configuration
+    if (!stripeConfig.publishableKey) {
+        console.error('Stripe publishable key not configured');
+        document.getElementById('payment-errors').style.display = 'block';
+        document.getElementById('payment-error-message').textContent = '{{ 'OSC_STRIPE_CONFIG_ERROR'|translate }}';
+        return;
+    }
+
+    if (!stripeConfig.clientSecret) {
+        console.error('Stripe client secret not available');
+        document.getElementById('payment-errors').style.display = 'block';
+        document.getElementById('payment-error-message').textContent = '{{ 'OSC_STRIPE_INTENT_ERROR'|translate }}';
+        return;
+    }
+
+    // Initialize Stripe
+    const stripe = Stripe(stripeConfig.publishableKey, {
+        locale: stripeConfig.locale
+    });
+
+    // Create Elements instance with styling
+    const appearance = {
+        theme: 'stripe',
+        variables: {
+            colorPrimary: '{{ oViewConf.getStripePrimaryColor()|default('#0570de') }}',
+            colorBackground: '#ffffff',
+            colorText: '#30313d',
+            colorDanger: '#df1b41',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+            spacingUnit: '4px',
+            borderRadius: '4px',
+            fontSizeBase: '16px'
+        },
+        rules: {
+            '.Input': {
+                border: '1px solid #e0e0e0',
+                boxShadow: 'none',
+                padding: '12px'
+            },
+            '.Input:focus': {
+                border: '1px solid #0570de',
+                boxShadow: '0 0 0 3px rgba(5, 112, 222, 0.1)',
+                outline: 'none'
+            },
+            '.Label': {
+                fontSize: '14px',
+                fontWeight: '500',
+                marginBottom: '8px',
+                color: '#30313d'
+            },
+            '.Error': {
+                fontSize: '13px',
+                color: '#df1b41'
+            }
+        }
+    };
+
+    const elements = stripe.elements({
+        clientSecret: stripeConfig.clientSecret,
+        appearance: appearance
+    });
+
+    // Create and mount Payment Element
+    const paymentElement = elements.create('payment', {
+        layout: {
+            type: 'tabs',
+            defaultCollapsed: false
+        }
+    });
+
+    paymentElement.mount('#payment-element');
+
+    // Handle element ready event
+    paymentElement.on('ready', function() {
+        console.log('Payment Element ready');
+        // Hide loading if visible
+        const loadingDiv = document.getElementById('payment-loading');
+        if (loadingDiv) {
+            loadingDiv.style.display = 'none';
+        }
+    });
+
+    // Handle validation errors
+    paymentElement.on('change', function(event) {
+        const errorDiv = document.getElementById('payment-errors');
+        const errorMessage = document.getElementById('payment-error-message');
+
+        if (event.error) {
+            errorDiv.style.display = 'block';
+            errorMessage.textContent = event.error.message;
+        } else {
+            errorDiv.style.display = 'none';
+            errorMessage.textContent = '';
+        }
+    });
+
+    // Intercept OXID's order form submission
+    const form = document.getElementById('stripe-payment-form');
+    const orderForm = document.getElementById('orderConfirmAgbBottom') ||
+                     document.querySelector('form[name="order"]') ||
+                     document.querySelector('button[name="userform"]')?.closest('form');
+
+    if (orderForm) {
+        // Store original submit handler
+        const originalSubmit = orderForm.onsubmit;
+
+        // Override form submission
+        orderForm.addEventListener('submit', async function(event) {
+            // Only intercept if Stripe is selected
+            const paymentMethod = document.querySelector('input[name="paymentid"]:checked');
+            if (!paymentMethod || paymentMethod.value !== 'osc_stripe_card') {
+                return true; // Let OXID handle other payment methods
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            // Show loading
+            const loadingDiv = document.getElementById('payment-loading');
+            const errorDiv = document.getElementById('payment-errors');
+            const submitButton = event.target.querySelector('button[type="submit"]');
+
+            if (loadingDiv) loadingDiv.style.display = 'block';
+            if (errorDiv) errorDiv.style.display = 'none';
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.dataset.originalText = submitButton.textContent;
+                submitButton.textContent = '{{ 'OSC_STRIPE_PROCESSING'|translate }}...';
+            }
+
+            try {
+                // Confirm payment with Stripe
+                const { error } = await stripe.confirmPayment({
+                    elements,
+                    confirmParams: {
+                        return_url: stripeConfig.returnUrl,
+                        payment_method_data: {
+                            billing_details: {
+                                name: '{{ oView.getUser().getFieldData("oxfname") }} {{ oView.getUser().getFieldData("oxlname") }}',
+                                email: '{{ oView.getUser().getFieldData("oxusername") }}',
+                                phone: '{{ oView.getUser().getFieldData("oxfon")|default("") }}'
+                            }
+                        }
+                    }
+                });
+
+                // This code only runs if there's an immediate error
+                if (error) {
+                    console.error('Payment error:', error);
+
+                    if (loadingDiv) loadingDiv.style.display = 'none';
+                    if (errorDiv) {
+                        errorDiv.style.display = 'block';
+                        document.getElementById('payment-error-message').textContent = error.message;
+                    }
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.textContent = submitButton.dataset.originalText;
+                    }
+                }
+                // If no error, customer will be redirected to return_url
+
+            } catch (error) {
+                console.error('Unexpected error:', error);
+
+                if (loadingDiv) loadingDiv.style.display = 'none';
+                if (errorDiv) {
+                    errorDiv.style.display = 'block';
+                    document.getElementById('payment-error-message').textContent = '{{ 'OSC_STRIPE_UNEXPECTED_ERROR'|translate }}';
+                }
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = submitButton.dataset.originalText;
+                }
+            }
+
+            return false;
+        });
+    }
+
+})();
+</script>
+
+<style>
+/* Stripe Payment Wrapper */
+.stripe-payment-wrapper {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px 0;
+}
+
+/* Payment Description */
+.payment-description {
+    margin-bottom: 24px;
+}
+
+.payment-description h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #30313d;
+}
+
+.payment-description .text-muted {
+    font-size: 14px;
+    color: #697386;
+    margin: 0;
+}
+
+/* Payment Element Container */
+.stripe-payment-element {
+    margin-bottom: 20px;
+    min-height: 80px;
+}
+
+/* Error Display */
+.stripe-errors {
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    background-color: #fff5f5;
+    border: 1px solid #df1b41;
+    border-radius: 4px;
+    color: #df1b41;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stripe-errors i {
+    font-size: 16px;
+}
+
+/* Loading Indicator */
+.stripe-loading {
+    text-align: center;
+    padding: 24px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.stripe-loading .spinner-border {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 12px;
+}
+
+.stripe-loading p {
+    margin: 0;
+    font-size: 14px;
+    color: #697386;
+}
+
+/* Secure Payment Info */
+.stripe-submit-info {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.stripe-submit-info p {
+    margin: 0;
+    font-size: 13px;
+    color: #697386;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.stripe-submit-info i {
+    color: #51a351;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .stripe-payment-wrapper {
+        padding: 16px;
+    }
+
+    .payment-description h3 {
+        font-size: 16px;
+    }
+}
+
+/* Override OXID default styles if needed */
+.stripe-payment-wrapper .form-control {
+    border: 1px solid #e0e0e0;
+}
+
+.stripe-payment-wrapper .btn-primary {
+    background-color: #0570de;
+    border-color: #0570de;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.stripe-payment-wrapper .btn-primary:hover {
+    background-color: #0052b4;
+    border-color: #0052b4;
+}
+
+.stripe-payment-wrapper .btn-primary:disabled {
+    background-color: #aab7c4;
+    border-color: #aab7c4;
+    cursor: not-allowed;
+}
+</style>

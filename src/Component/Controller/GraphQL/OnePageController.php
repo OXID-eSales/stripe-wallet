@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace OxidEsales\StripeWallet\Component\Controller\GraphQL;
+namespace OxidSolutionCatalysts\Payments\Stripe\Component\Controller\GraphQL;
 
-use OxidEsales\StripeWallet\Component\EventSystem\EventDispatcher;
-use OxidEsales\StripeWallet\Component\EventSystem\Event\AddressUpdatedEvent;
-use OxidEsales\StripeWallet\Component\EventSystem\Event\PaymentInitiatedEvent;
-use OxidEsales\StripeWallet\Component\EventSystem\Event\CheckoutAbandonedEvent;
-use OxidEsales\StripeWallet\Component\Service\EncryptionService;
-use OxidEsales\StripeWallet\Component\Service\ErrorResponseFactory;
+use OxidSolutionCatalysts\Payments\Stripe\Component\EventSystem\EventDispatcher;
+use OxidSolutionCatalysts\Payments\Stripe\Component\EventSystem\Event\AddressUpdatedEvent;
+use OxidSolutionCatalysts\Payments\Stripe\Component\EventSystem\Event\PaymentInitiatedEvent;
+use OxidSolutionCatalysts\Payments\Stripe\Component\EventSystem\Event\CheckoutAbandonedEvent;
+use OxidSolutionCatalysts\Payments\Stripe\Component\Service\EncryptionService;
+use OxidSolutionCatalysts\Payments\Stripe\Component\Service\ErrorResponseFactory;
 use Psr\Log\LoggerInterface;
 
 /**

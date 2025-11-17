@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OxidEsales\StripeWallet\Component\EventSystem\EventHandler;
+namespace OxidSolutionCatalysts\Payments\Stripe\Component\EventSystem\EventHandler;
 
-use OxidEsales\StripeWallet\Component\EventSystem\Event\CheckoutAbandonedEvent;
+use OxidSolutionCatalysts\Payments\Stripe\Component\EventSystem\Event\CheckoutAbandonedEvent;
 use Psr\Log\LoggerInterface;
 
 /**

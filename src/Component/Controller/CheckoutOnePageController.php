@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidEsales\StripeWallet\Component\Controller;
+namespace OxidSolutionCatalysts\Payments\Stripe\Component\Controller;
 
 use OxidEsales\Eshop\Application\Controller\FrontendController;
 use OxidEsales\Eshop\Core\Registry;
