@@ -8,10 +8,12 @@ declare(strict_types=1);
 
 use OxidEsales\Eshop\Application\Controller\Admin\ModuleConfiguration;
 use OxidEsales\Eshop\Core\ViewConfig;
+use OxidEsales\Eshop\Application\Model\Payment as CorePayment;
 use OxidSolutionCatalysts\Payments\Stripe\Controller\OrderController as StripeOrderController;
 use OxidSolutionCatalysts\Payments\Stripe\Controller\PaymentController as StripePaymentController;
 use OxidSolutionCatalysts\Payments\Stripe\Controller\WebhookController as StripeWebhookController;
 use OxidSolutionCatalysts\Payments\Stripe\Core\ViewConfig as StripeViewConfig;
+use OxidSolutionCatalysts\Payments\Stripe\Model\Payment as StripePayment;
 use OxidSolutionCatalysts\Payments\Component\Controller\Http\WebhookController as PaymentComponentWebhookController;
 use OxidSolutionCatalysts\Payments\Component\Controller\Http\PaymentController as PaymentComponentPaymentController;
 use OxidSolutionCatalysts\Payments\Stripe\Core\Events as StripeEvents;
@@ -47,6 +49,7 @@ $aModule = [
     'extend' => [
         ModuleConfiguration::class => StripeModuleConfiguration::class,
         ViewConfig::class => StripeViewConfig::class,
+        CorePayment::class => StripePayment::class,
 
         PaymentController::class => StripePaymentController::class,
         OrderController::class => StripeOrderController::class,

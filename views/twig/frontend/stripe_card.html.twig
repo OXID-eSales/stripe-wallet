@@ -1,29 +1,7 @@
-{# Stripe Card Payment Form - Inspired by PayPal ACDC template #}
-<div id="stripe_card_container" class="stripe-card-container">
-    <div id="stripe_card_form">
-        <div class="form-floating mb-3">
-            <div id="stripe-card-number-field-container"></div>
-        </div>
-        <div class="form-floating mb-3">
-            <div id="stripe-card-expiry-field-container"></div>
-        </div>
-        <div class="form-floating mb-3">
-            <div id="stripe-card-cvc-field-container"></div>
-        </div>
-        <div class="form-floating mb-3">
-            <div id="stripe-card-name-field-container"></div>
-        </div>
-        {% if oViewConf.isStripeVaultingPossible() %}
-            <input type="checkbox" id="oscStripeVaultPaymentCheckbox" disabled>
-            <label for="oscStripeVaultPaymentCheckbox">{{ translate({ ident: "OSC_STRIPE_VAULTING_SAVE" }) }}</label>
-        {% endif %}
-        <div class="hidden">
-            <input type="hidden" id="stripe-billing-address-street" name="stripe-billing-address-street" value="{% if oxcmp_user.oxuser__oxstreet.value %}{{ oxcmp_user.oxuser__oxstreet.value }}{% endif %} {% if oxcmp_user.oxuser__oxstreetnr.value %}{{ oxcmp_user.oxuser__oxstreetnr.value }}{% endif %}" />
-            <input type="hidden" id="stripe-billing-address-unit" name="stripe-billing-address-unit" value=""/>
-            <input type="hidden" id="stripe-billing-address-city" name="stripe-billing-address-city" value="{% if oxcmp_user.oxuser__oxcity.value %}{{ oxcmp_user.oxuser__oxcity.value }}{% endif %}" />
-            <input type="hidden" id="stripe-billing-address-state" name="stripe-billing-address-state" value="{{ oView.getUserStateIso() }}" />
-            <input type="hidden" id="stripe-billing-address-zip" name="stripe-billing-address-zip" value="{% if oxcmp_user.oxuser__oxzip.value %}{{ oxcmp_user.oxuser__oxzip.value }}{% endif %}" />
-            <input type="hidden" id="stripe-billing-address-country" name="stripe-billing-address-country" value="{{ oView.getUserCountryIso() }}"/>
-        </div>
-    </div>
+<div id="card-element"
+     class="stripe-payment-section"
+     data-controller="stripe-order"
+     data-stripe-order-publishable-key-value="{{ oViewConf.getStripeWalletConfig().getPublishableKey() }}"
+     data-buy-button-selector-value=""
+>
 </div>
