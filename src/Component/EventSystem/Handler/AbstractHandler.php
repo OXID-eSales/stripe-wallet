@@ -62,4 +62,12 @@ abstract class AbstractHandler implements HandlerInterface
      * @return void
      */
     abstract public function handle(object $event): void;
+
+    /**
+     * Returns the fully qualified class name of the event this handler handles.
+     * Concrete implementations must override this method.
+     *
+     * @return string The event class name
+     */
+    abstract public static function getHandledEventClass(): string;
 }

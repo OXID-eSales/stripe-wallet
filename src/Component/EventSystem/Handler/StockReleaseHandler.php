@@ -33,6 +33,15 @@ class StockReleaseHandler implements HandlerInterface
     ) {
     }
 
+    /**
+     * Returns ContractFailedEvent as the primary handled event class.
+     * Note: This handler also handles ContractCancelledEvent via the handle() method check.
+     */
+    public static function getHandledEventClass(): string
+    {
+        return ContractFailedEvent::class;
+    }
+
     public function handle(object $event): void
     {
         if (!$event instanceof ContractFailedEvent && !$event instanceof ContractCancelledEvent) {

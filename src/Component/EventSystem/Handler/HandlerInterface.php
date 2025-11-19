@@ -26,6 +26,11 @@ namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Handler;
  *     {
  *         // Handler logic here
  *     }
+ *
+ *     public static function getHandledEventClass(): string
+ *     {
+ *         return PaymentInitiatedEvent::class;
+ *     }
  * }
  * </code>
  *
@@ -43,4 +48,11 @@ interface HandlerInterface
      * @return void
      */
     public function handle(object $event): void;
+
+    /**
+     * Returns the fully qualified class name of the event this handler handles.
+     *
+     * @return string The event class name
+     */
+    public static function getHandledEventClass(): string;
 }

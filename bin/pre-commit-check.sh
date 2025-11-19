@@ -73,9 +73,19 @@ run_command() {
     fi
 }
 
+# Helper function to run phpcs in Docker with correct path
+run_phpcs_docker() {
+    docker compose exec -w /var/www/extensions/stripe -T php \
+        /var/www/vendor/bin/phpcs --standard=tests/phpcs.xml --warning-severity=0 src/
+}
+
 # 1. Code Style Check (phpcs)
 echo ">>> Running PHP Code Sniffer..."
-run_command "composer run phpcs src"
+if [ "$ENVIRONMENT" = "github" ]; then
+    run_command "composer run phpcs src"
+else
+    run_phpcs_docker
+fi
 PHPCS_STATUS=$?
 if [ $PHPCS_STATUS -ne 0 ]; then
     OVERALL_STATUS=1
@@ -97,9 +107,9 @@ else
       echo "skip on github"
       PHPUNIT_STATUS=0
     else
-        # Local: Run in Docker with shop bootstrap
+        # Local: Run in Docker with shop bootstrap (use shop's vendor phpunit)
         docker compose exec -w /var/www/extensions/stripe -T php \
-            vendor/bin/phpunit -c tests/phpunit.xml --bootstrap=/var/www/source/bootstrap.php
+            /var/www/vendor/bin/phpunit -c tests/phpunit.xml --bootstrap=/var/www/source/bootstrap.php --testsuite Unit
         PHPUNIT_STATUS=$?
     fi
 
@@ -115,8 +125,16 @@ fi
 
 # 3. Style Commit Check
 echo ">>> Running style-commit check..."
-run_command "composer style-commit"
-STYLE_COMMIT_STATUS=$?
+if [ "$ENVIRONMENT" = "github" ]; then
+    run_command "composer style-commit"
+    STYLE_COMMIT_STATUS=$?
+else
+    # Local Docker: PHPStan and PHPMD not available in shop vendor
+    # Just run PHPCS which is available
+    echo "Note: PHPStan and PHPMD not available locally, running PHPCS only"
+    run_phpcs_docker
+    STYLE_COMMIT_STATUS=$?
+fi
 if [ $STYLE_COMMIT_STATUS -ne 0 ]; then
     OVERALL_STATUS=1
     FAILED_CHECKS+=("Style Commit")

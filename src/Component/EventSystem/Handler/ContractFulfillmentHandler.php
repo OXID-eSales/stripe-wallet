@@ -35,6 +35,11 @@ class ContractFulfillmentHandler extends AbstractHandler
         parent::__construct($contractRepository, $eventDispatcher);
     }
 
+    public static function getHandledEventClass(): string
+    {
+        return WebhookReceivedEvent::class;
+    }
+
     public function handle(object $event): void
     {
         if (!$event instanceof WebhookReceivedEvent || !$this->isFulfillmentEvent($event)) {

@@ -9,6 +9,12 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventInterface;
 class EventDispatcher implements EventDispatcherInterface
 {
     private array $listeners = [];
+    private ?EventListenerProviderInterface $listenerProvider;
+
+    public function __construct(?EventListenerProviderInterface $listenerProvider = null)
+    {
+        $this->listenerProvider = $listenerProvider;
+    }
 
     public function addListener(string $eventClass, callable $listener, int $priority = 0): void
     {
@@ -38,11 +44,16 @@ class EventDispatcher implements EventDispatcherInterface
     {
         $eventClass = get_class($event);
 
-        if (!isset($this->listeners[$eventClass])) {
-            return $event;
-        }
+        // Get listeners from provider first (DI-registered handlers)
+        $listeners = $this->listenerProvider
+            ? $this->listenerProvider->getListenersForEvent($eventClass)
+            : [];
 
-        $listeners = $this->getSortedListeners($eventClass);
+        // Merge with locally added listeners
+        if (isset($this->listeners[$eventClass])) {
+            $localListeners = $this->getSortedListeners($eventClass);
+            $listeners = array_merge($listeners, $localListeners);
+        }
 
         foreach ($listeners as $listener) {
             if ($this->isStoppableEvent($event) && $event->isPropagationStopped()) {

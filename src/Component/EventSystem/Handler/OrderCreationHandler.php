@@ -30,6 +30,11 @@ class OrderCreationHandler extends AbstractHandler
         parent::__construct($contractRepository, $eventDispatcher);
     }
 
+    public static function getHandledEventClass(): string
+    {
+        return ContractReadyToCommitEvent::class;
+    }
+
     public function handle(object $event): void
     {
         if (!$event instanceof ContractReadyToCommitEvent) {

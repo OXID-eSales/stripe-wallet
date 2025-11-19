@@ -8,10 +8,83 @@ services:
     resource: 'src/Stripe/Service/*'
     public: true
 
+  # ===========================================
+  # Event System (Component Level)
+  # ===========================================
 
-  # ==========================================
+  # Event Listener Provider - Collects all tagged handlers
+  OxidSolutionCatalysts\Payments\Component\EventSystem\EventListenerProviderInterface:
+    class: OxidSolutionCatalysts\Payments\Component\EventSystem\EventListenerProvider
+    arguments:
+      - !tagged_iterator payment.event_handler
+    public: false
+
+  # Event Dispatcher - Uses provider for listener lookup
+  OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface:
+    class: OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher
+    arguments:
+      - '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventListenerProviderInterface'
+    public: true
+
+  # ===========================================
+  # Checkout Orchestrator (Sprint 2)
+  # ===========================================
+
+  # Checkout Orchestrator - Coordinates checkout accounting
+  # Note: Does NOT call Stripe API - only backend accounting
+  OxidSolutionCatalysts\Payments\Component\Service\CheckoutOrchestratorInterface:
+    class: OxidSolutionCatalysts\Payments\Component\Service\CheckoutOrchestrator
+    arguments:
+      - '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      - null  # Logger - optional, can be injected if available
+    public: true
+
+  # ===========================================
+  # Event Handlers (Tagged for auto-registration)
+  # ===========================================
+  # Note: Handlers are commented out until their dependencies
+  # (ContractServiceInterface, ContractRepositoryInterface, etc.) are registered.
+  # They will be enabled in Sprint 2 when the orchestrator and services are ready.
+
+  # # Contract Creation Handler - Creates payment contracts on PaymentInitiatedEvent
+  # OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractCreationHandler:
+  #   tags:
+  #     - { name: payment.event_handler }
+  #   public: false
+
+  # # Contract Condition Resolver Handler - Transitions contracts to PENDING state
+  # OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractConditionResolverHandler:
+  #   tags:
+  #     - { name: payment.event_handler }
+  #   public: false
+
+  # # Contract Fulfillment Handler - Handles webhook-triggered fulfillment
+  # OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractFulfillmentHandler:
+  #   tags:
+  #     - { name: payment.event_handler }
+  #   public: false
+
+  # # Contract Cleanup Handler - Cleans up terminated contracts
+  # OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractCleanupHandler:
+  #   tags:
+  #     - { name: payment.event_handler }
+  #   public: false
+
+  # # Order Creation Handler - Creates orders from committed contracts
+  # OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\OrderCreationHandler:
+  #   tags:
+  #     - { name: payment.event_handler }
+  #   public: false
+
+  # # Payment Authorization Handler - Handles payment authorization
+  # OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\PaymentAuthorizationHandler:
+  #   tags:
+  #     - { name: payment.event_handler }
+  #   public: false
+
+  # ===========================================
   # Payment Adapter Layer (Provider-Agnostic)
-  # ==========================================
+  # ===========================================
   #
   # This layer provides a provider-agnostic payment integration architecture
   # that supports multiple payment providers (Stripe, Unzer, PayPal, etc.)
@@ -44,13 +117,3 @@ services:
   # Gets API credentials from ModuleConfigurationService
   OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory:
     public: true
-
-  # ==========================================
-  # Twig Extensions
-  # ==========================================
-
-  # Dump Extension - Provides dump() and dd() functions for debugging templates
-  OxidSolutionCatalysts\Payments\Stripe\Twig\DumpExtension:
-    tags:
-      - { name: twig.extension }
-    public: false

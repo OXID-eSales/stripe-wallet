@@ -93,7 +93,7 @@ class Events
      */
     protected static function clearTmp()
     {
-        shell_exec(VENDOR_PATH . '/bin/oe-console oe:cache:clear');
+        shell_exec(VENDOR_PATH . 'bin/oe-console oe:cache:clear');
     }
 
     /**

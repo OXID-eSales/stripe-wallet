@@ -19,6 +19,11 @@ use OxidSolutionCatalysts\Payments\Component\Contract\ContractCondition;
  */
 class PaymentAuthorizationHandler extends AbstractHandler
 {
+    public static function getHandledEventClass(): string
+    {
+        return ContractTransitionedToPendingEvent::class;
+    }
+
     public function handle(object $event): void
     {
         if (!$event instanceof ContractTransitionedToPendingEvent) {

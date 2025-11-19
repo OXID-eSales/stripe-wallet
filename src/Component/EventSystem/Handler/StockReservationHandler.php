@@ -37,6 +37,11 @@ class StockReservationHandler implements HandlerInterface
     ) {
     }
 
+    public static function getHandledEventClass(): string
+    {
+        return PaymentInitiatedEvent::class;
+    }
+
     public function handle(object $event): void
     {
         if (!$event instanceof PaymentInitiatedEvent) {

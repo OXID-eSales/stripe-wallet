@@ -17,6 +17,11 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\Contract
  */
 class ContractConditionResolverHandler extends AbstractHandler
 {
+    public static function getHandledEventClass(): string
+    {
+        return ContractCreatedEvent::class;
+    }
+
     public function handle(object $event): void
     {
         if (!$event instanceof ContractCreatedEvent) {

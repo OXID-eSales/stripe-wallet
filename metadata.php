@@ -12,6 +12,7 @@ use OxidSolutionCatalysts\Payments\Watch\Controller\AssumptionController;
 use OxidSolutionCatalysts\Payments\Stripe\Core\Events;
 use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\StripeConnect;
 use OxidSolutionCatalysts\Payments\Stripe\Application\Controller\Admin\ModuleConfiguration;
+use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\OrderRefund;
 
 /**
  * Metadata version
@@ -44,18 +45,11 @@ $aModule = [
         'osc_stripe_payment' => PaymentController::class,
         'paymentwatch_assumption' => AssumptionController::class,
         'StripeConnect' => StripeConnect::class,
+        'OrderRefund' => OrderRefund::class,
     ],
     'templates' => [
-        'osc_stripe_payment.tpl' => 'osc/stripe/views/tpl/payment.tpl',
-        'osc_stripe_admin_config.tpl' => 'osc/stripe/views/admin/tpl/config.tpl',
-        '@osc_stripe_wallet/admin/stripe_connect' => 'osc/stripe/views/admin_twig/twig/stripe_connect.html.twig',
-    ],
-    'blocks' => [
-        [
-            'template' => 'page/checkout/payment.tpl',
-            'block' => 'checkout_payment_main',
-            'file' => '/views/blocks/checkout_payment.tpl',
-        ],
+        '@osc_stripe_wallet/admin/stripe_connect' => 'views/twig/admin/stripe_connect.html.twig',
+        '@osc_stripe_wallet/admin/stripe_order' => 'views/twig/admin/stripe_order_refund.html.twig',
     ],
     'settings'      => [
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeMode',                        'type' => 'select',     'value' => 'test',      'position' => 10, 'constraints' => 'live|test'],
