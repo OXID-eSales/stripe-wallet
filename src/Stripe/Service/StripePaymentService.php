@@ -99,7 +99,7 @@ class StripePaymentService implements InitializableServiceInterface
      */
     protected function doInitialize(): void
     {
-        $secretKey = $this->config->getSecretKey();
+        $secretKey = $this->config->getToken();
 
         if (empty($secretKey)) {
             throw new \RuntimeException('Stripe secret key is not configured');
@@ -137,6 +137,7 @@ class StripePaymentService implements InitializableServiceInterface
 
             // Create PaymentIntent
             $paymentIntent = $this->stripe->paymentIntents->create([
+'PaymentMethodHere!!!' => 123,
                 'amount' => $amount,
                 'currency' => $currency,
                 'customer' => $stripeCustomerId,

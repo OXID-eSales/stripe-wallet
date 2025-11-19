@@ -75,7 +75,7 @@ class StripeCustomerService implements InitializableServiceInterface
      */
     protected function doInitialize(): void
     {
-        $secretKey = $this->config->getSecretKey();
+        $secretKey = $this->config->getToken();
 
         if (empty($secretKey)) {
             throw new \RuntimeException('Stripe secret key is not configured');

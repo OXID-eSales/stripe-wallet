@@ -1,7 +1,7 @@
 {% extends "page/checkout/payment.html.twig" %}
 
 {% block select_payment %}
-    {% set config = oViewConf.getStripeCheckoutConfig() %}
+    {% set config = oViewConf.getStripeWalletConfig() %}
     {% if sPaymentID == "oscstripe_card" %}
         {% if config.isActive() %}
             <div class="payment-option">

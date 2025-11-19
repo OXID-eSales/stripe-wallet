@@ -1,9 +1,20 @@
+{#
+This file is to move some of the values from backend to JS at front, the example is from PaypPal, needs to ajusted
+#}
+
+
+
+
+
+{#
+
+    This maybe not neede in stripe,  Clude ported it from paypal
+
 {% if oViewConf.getTopActiveClassName() == 'order' %}
     {% set payment = oView.getPayment() %}
     {% set paymentId = payment.getId() %}
     {% set sToken = oViewConf.getSessionChallengeToken() %}
     {% set sSelfLink = oViewConf.getSslSelfLink()|replace({"&amp;": "&"}) %}
-    {% set vaultedPaymentSource = oView.getVaultedPaymentSource() %}
     {% set oStripeConfig = oViewConf.getStripeCheckoutConfig() %}
     {% set customerId = oView.getStripeCustomerId() %}
     {% set isSandBox = oStripeConfig.isSandbox() %}
@@ -58,3 +69,4 @@
         }
     </script>
 {% endif %}
+#}

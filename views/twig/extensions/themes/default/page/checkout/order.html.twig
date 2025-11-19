@@ -1,0 +1,95 @@
+{% extends "page/checkout/order.html.twig" %}
+
+{% block shippingAndPayment %}
+    <form action="{{ oViewConf.getSslSelfLink()|raw }}" method="post"
+          id="orderShipping">
+        {{ oViewConf.getHiddenSid()|raw }}
+        <input type="hidden" name="cl" value="payment">
+        <input type="hidden" name="fnc" value="">
+        <h4 class="card-header card-title card-header-edit d-flex justify-content-between align-items-center">
+            {{ translate({ ident: "SHIPPING_CARRIER" }) }}
+            <button type="submit" class="btn"
+                    title="{{ translate({ ident: "EDIT" }) }}">
+                <svg aria-hidden="true">
+                    <use xlink:href="#pencil"></use>
+                </svg>
+            </button>
+        </h4>
+        {% set oShipSet = oView.getShipSet() %}
+        <div class="card-body">
+            {{ oShipSet.oxdeliveryset__oxtitle.value }}
+        </div>
+    </form>
+    <form action="{{ oViewConf.getSslSelfLink()|raw }}" method="post"
+          id="orderPayment">
+        {{ oViewConf.getHiddenSid()|raw }}
+        <input type="hidden" name="cl" value="payment">
+        <input type="hidden" name="fnc" value="">
+        <h4 class="card-header card-title card-header-edit d-flex justify-content-between align-items-center">
+            {{ translate({ ident: "PAYMENT_METHOD" }) }}
+            <button type="submit" class="btn"
+                    title="{{ translate({ ident: "EDIT" }) }}">
+                <svg aria-hidden="true">
+                    <use xlink:href="#pencil"></use>
+                </svg>
+            </button>
+        </h4>
+        <div class="card-body">
+            {% set payment = oView.getPayment() %}
+            {% if payment.getId() == 'osc_stripe_card' %}
+                {# Debug: Show if client secret is available #}
+                {% if oViewData.stripeError %}
+                    <div class="alert alert-danger">
+                        <strong>Stripe Error:</strong> {{ oViewData.stripeError }}
+                    </div>
+                {% endif %}
+
+                {# Stripe Payment Form with Stimulus Controller #}
+                <div id="stripe-payment-container"
+                     class="stripe-payment-section"
+                     data-controller="stripe-order"
+                     data-stripe-order-publishable-key-value="{{ oViewConf.getStripeWalletConfig().getPublishableKey() }}"
+                     data-stripe-order-client-secret-value="{{ oViewConf.getStripeWalletConfig().getSecretKey()|default(123) }}"
+                >
+                    <div class="mb-3">
+                        <strong>{{ payment.oxpayments__oxdesc.value }}</strong>
+                    </div>
+
+                    {# Loading Indicator #}
+                    <div data-stripe-order-target="loading" class="text-center my-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading payment form...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Initializing secure payment form...</p>
+                    </div>
+
+                    {# Payment Element Container #}
+                    <div id="payment-element" class="mb-3">
+                        {# Stripe Payment Element will be mounted here #}
+                    </div>
+
+                    {# Error Display #}
+                    <div id="payment-errors" class="alert alert-danger" style="display: none;" role="alert">
+                        <span data-stripe-order-target="errorMessage"></span>
+                    </div>
+                </div>
+
+                <style>
+                    .stripe-payment-section {
+                        padding: 15px 0;
+                    }
+
+                    #payment-element {
+                        min-height: 80px;
+                    }
+                </style>
+            {% else %}
+                {# Non-Stripe payment methods #}
+                {{ payment.oxpayments__oxdesc.value }}
+            {% endif %}
+        </div>
+    </form>
+
+
+
+{% endblock %}

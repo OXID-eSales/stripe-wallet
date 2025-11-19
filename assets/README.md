@@ -1,16 +1,20 @@
 # Stripe Module - Frontend Assets
 
-This directory contains the frontend JavaScript and CSS source files for the Stripe payment module.
+This directory contains the **compiled and minified** frontend assets for the Stripe payment module.
+
+**Note:** This directory contains only build outputs. Source files are located in `resources/build/`.
 
 ## Structure
 
 ```
 assets/
-├── src/
-│   └── js/
-│       ├── app.js                          # Main entry point
-│       └── controllers/
-│           └── buy_now_controller.js       # Stimulus controller for Buy Now button
+├── js/
+│   ├── stripe-frontend.min.js              # Production bundle (minified)
+│   ├── stripe-frontend.js                  # Development bundle
+│   ├── stripe-admin.min.js                 # Admin bundle (minified)
+│   └── controllers/                        # Development controller files
+└── img/
+    └── stripe_logo.png                     # Static images
 ```
 
 ## Technology Stack
@@ -19,46 +23,41 @@ assets/
 - **[esbuild](https://esbuild.github.io/)** - Fast JavaScript bundler
 - **ES6 Modules** - Modern JavaScript module system
 
-## Getting Started
+## Build Process
 
-### 1. Install Dependencies
+**IMPORTANT:** Source files are now located in `resources/build/js/`. See `resources/README.md` for full documentation.
+
+### Quick Start
 
 ```bash
 cd /home/gaad/PhpStormProjects/OXID/Stripe/stripe-wallet/source/extensions/stripe
+
+# Install dependencies
 npm install
-```
 
-This will install:
-- `@hotwired/stimulus` - Stimulus.js framework
-- `esbuild` - JavaScript bundler
+# Production build (outputs to assets/src/js/)
+npm run build:prod
 
-### 2. Build JavaScript
+# Development build
+npm run build:dev
 
-```bash
-# Production build (minified)
-npm run build
-
-# Development build (with source maps, no minification)
-npm run dev
-
-# Watch mode (rebuilds on file changes)
+# Watch mode (auto-rebuild on changes)
 npm run watch
 ```
 
-### 3. Output
+### Build Output
 
-Built files are placed in:
-```
-out/js/
-└── stripe.min.js       # Bundled and minified JavaScript
-└── stripe.min.js.map   # Source map for debugging
-```
+- **Production:** `assets/js/stripe-frontend.min.js` (minified)
+- **Development:** `assets/js/stripe-frontend.js` (with sourcemaps)
+- **Controllers:** `assets/js/controllers/*.js` (development only)
 
 ## Stimulus Controllers
 
+**Note:** Controller source files are in `resources/build/js/controllers/`
+
 ### Buy Now Controller
 
-**Location:** `assets/src/js/controllers/buy_now_controller.js`
+**Location:** `resources/build/js/controllers/buy_now_controller.js`
 
 **Purpose:** Handles "Buy Now" button clicks and form submission
 
@@ -104,7 +103,7 @@ out/js/
 ### 1. Create Controller File
 
 ```bash
-touch assets/src/js/controllers/my_new_controller.js
+touch resources/build/js/controllers/my_new_controller.js
 ```
 
 ### 2. Write Controller
@@ -125,7 +124,7 @@ export default class extends Controller {
 }
 ```
 
-### 3. Register in app.js
+### 3. Register in resources/build/js/app.js
 
 ```javascript
 import MyNewController from "./controllers/my_new_controller"
@@ -173,7 +172,7 @@ npm run build
 
 ### Enable Stimulus Debug Mode
 
-Edit `assets/src/js/app.js`:
+Edit `resources/build/js/app.js`:
 
 ```javascript
 // Always enable debug in development
@@ -220,17 +219,18 @@ npm run build
 ### 2. Verify Output
 
 ```bash
-ls -lh out/js/
+ls -lh assets/js/
 # Should show:
-# stripe.min.js      - Minified bundle
-# stripe.min.js.map  - Source map
+# stripe-frontend.min.js      - Minified bundle
+# stripe-frontend.min.js.map  - Source map
+# stripe-admin.min.js         - Admin bundle
 ```
 
 ### 3. Commit Built Files
 
 ```bash
-git add out/js/stripe.min.js
-git add out/js/stripe.min.js.map
+git add assets/js/stripe-frontend.min.js*
+git add assets/js/stripe-admin.min.js*
 git commit -m "Build Stripe module JavaScript"
 ```
 
@@ -241,9 +241,9 @@ git commit -m "Build Stripe module JavaScript"
 **Problem:** No console log "controller connected"
 
 **Solutions:**
-1. Check JavaScript is loaded: View Page Source → Look for `stripe.min.js`
+1. Check JavaScript is loaded: View Page Source → Look for `stripe-frontend.min.js`
 2. Check data-controller attribute: `data-controller="buy-now"` (must match registered name)
-3. Rebuild JavaScript: `npm run build`
+3. Rebuild JavaScript: `npm run build:prod`
 4. Clear browser cache: Ctrl+Shift+R
 
 ### Actions Not Firing

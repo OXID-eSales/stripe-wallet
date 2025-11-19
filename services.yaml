@@ -46,6 +46,40 @@ services:
     public: true
 
   # ==========================================
+  # Repositories (Data Access Layer)
+  # ==========================================
+
+  # Doctrine DBAL Connection - Required for repositories
+  doctrine.dbal.connection:
+    class: Doctrine\DBAL\Connection
+    factory: ['@OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionProviderInterface', 'get']
+    public: false
+
+  # Transaction Repository - Stores payment transactions
+  OxidSolutionCatalysts\Payments\Component\Repository\TransactionRepositoryInterface:
+    class: OxidSolutionCatalysts\Payments\Component\Repository\DoctrineTransactionRepository
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+    public: false
+
+  # Alias for easier reference
+  OxidSolutionCatalysts\Payments\Component\Repository\DoctrineTransactionRepository:
+    alias: OxidSolutionCatalysts\Payments\Component\Repository\TransactionRepositoryInterface
+
+  # ==========================================
+  # Event System (Optional)
+  # ==========================================
+
+  # Event Dispatcher - Dispatches domain events (optional)
+  OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface:
+    class: OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher
+    public: false
+
+  # Alias for easier reference
+  OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher:
+    alias: OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface
+
+  # ==========================================
   # Twig Extensions
   # ==========================================
 
@@ -63,4 +97,10 @@ services:
   OxidSolutionCatalysts\Payments\Stripe\Controller\PaymentController:
     tags:
       - { name: oxid.view_controller, controller_key: payment }
+    public: true
+
+  # OrderController - Extended OXID OrderController with Stripe payment integration
+  OxidSolutionCatalysts\Payments\Stripe\Controller\OrderController:
+    tags:
+      - { name: oxid.view_controller, controller_key: order }
     public: true

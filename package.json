@@ -2,17 +2,14 @@
   "name": "oxid-stripe-wallet",
   "version": "1.0.0",
   "description": "Stripe Payment Module with Stimulus.js for OXID eShop",
-  "main": "assets/src/js/app.js",
+  "main": "assets/js/stripe-frontend.min.js",
   "scripts": {
     "build": "npm run build:prod",
-    "build:prod": "esbuild assets/src/js/app.js --bundle --outfile=out/js/stripe.min.js --minify --sourcemap && chmod -R 755 out",
-    "build:dev": "npm run copy:stimulus && esbuild assets/src/js/app.js --bundle --outfile=out/js/stripe.dev.js --sourcemap --define:process.env.NODE_ENV='\"development\"' && esbuild assets/src/js/controllers/*.js --outdir=out/js/controllers --sourcemap --format=esm && chmod -R 755 out",
-    "copy:stimulus": "mkdir -p out/js/vendors && cp node_modules/@hotwired/stimulus/dist/stimulus.js out/js/vendors/ && chmod 644 out/js/vendors/stimulus.js",
-    "watch": "npm run build:dev && concurrently \"npm run watch:app\" \"npm run watch:controllers\"",
-    "watch:app": "esbuild assets/src/js/app.js --bundle --outfile=out/js/stripe.dev.js --sourcemap --watch --define:process.env.NODE_ENV='\"development\"'",
-    "watch:controllers": "esbuild assets/src/js/controllers/*.js --outdir=out/js/controllers --sourcemap --format=esm --watch",
+    "build:prod": "node resources/build.js production && chmod -R 755 assets/js 2>/dev/null || true",
+    "build:dev": "node resources/build.js development && chmod -R 755 assets/js 2>/dev/null || true",
+    "watch": "node resources/build.js watch",
     "dev": "npm run build:dev",
-    "postinstall": "chmod -R 755 out 2>/dev/null || true"
+    "postinstall": "npm run build:prod"
   },
   "keywords": [
     "oxid",

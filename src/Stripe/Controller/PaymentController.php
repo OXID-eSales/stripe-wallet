@@ -47,9 +47,9 @@ class PaymentController extends CorePaymentController
     public function render()
     {
         $template = parent::render();
-return $template;
-        // Check if Stripe payment is available
-        if ($this->isStripeAvailable()) {
+
+/*        // Check if Stripe payment is available
+        if ($this->stripeConfig->isConfigured()) {
             $basket = Registry::getSession()->getBasket();
             $user = $basket->getBasketUser();
             $clientSecret = '';
@@ -91,13 +91,13 @@ return $template;
                         'trace' => $e->getTraceAsString()
                     ]);
                 }
-            }
+            }*/
 
             // Build Stripe configuration for JavaScript and inject script
-            $stripeConfig = $this->buildStripeConfig($clientSecret);
-            $this->addTplParam('stripeConfigScript', $this->getStripeConfigScript($stripeConfig));
-            $this->addTplParam('stripeCssUrl', $this->getStripeCssUrl());
-        }
+       //     $stripeConfig = $this->buildStripeConfig($clientSecret);
+         //   $this->addTplParam('stripeConfigScript', $this->getStripeConfigScript($stripeConfig));
+        //    $this->addTplParam('stripeCssUrl', $this->getStripeCssUrl());
+   //     }
 
         return $template;
     }
@@ -256,16 +256,6 @@ return $template;
         }
 
         exit;
-    }
-
-    /**
-     * Check if Stripe payment is available
-     *
-     * @return bool
-     */
-    private function isStripeAvailable(): bool
-    {
-        return $this->stripeConfig->isConfigured();
     }
 
     /**

@@ -92,11 +92,11 @@ class ModuleConfigurationService implements ServiceInterface
     public function getSecretKey(): string
     {
         if ($this->isTestMode()) {
-            $key = $this->get('sStripeTestKey');
+            $key = $this->get('sStripeTestToken');
             return is_string($key) ? $key : '';
         }
 
-        $key = $this->get('sStripeLiveKey');
+        $key = $this->get('sStripeLiveToken');
         return is_string($key) ? $key : '';
     }
 
@@ -248,7 +248,7 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function isConfigured(): bool
     {
-        return !empty($this->getSecretKey()) && !empty($this->getWebhookSecret());
+        return !empty($this->getToken())/* && !empty($this->getSecretKey())/* && !empty($this->getWebhookSecret())*/;
     }
 
     /**

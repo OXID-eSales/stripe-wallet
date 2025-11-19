@@ -47,10 +47,12 @@ use DateTimeImmutable;
  */
 final class StripeAdapter implements PaymentAdapterInterface
 {
-    private StripeClient $stripeClient;
-
-    public function __construct()
-    {
+    /**
+     * @param StripeClient $stripeClient Configured Stripe SDK client
+     */
+    public function __construct(
+        private readonly StripeClient $stripeClient
+    ) {
     }
 
     // ==========================================
@@ -639,19 +641,4 @@ final class StripeAdapter implements PaymentAdapterInterface
         };
     }
 
-    /**
-     * @return \Stripe\StripeClient
-     */
-    public function getStripeClient(): StripeClient
-    {
-        return $this->stripeClient;
-    }
-
-    /**
-     * @param \Stripe\StripeClient $stripeClient
-     */
-    public function setStripeClient(StripeClient $stripeClient): void
-    {
-        $this->stripeClient = $stripeClient;
-    }
 }

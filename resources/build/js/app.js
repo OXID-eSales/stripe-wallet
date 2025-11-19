@@ -8,12 +8,14 @@ import { Application } from "@hotwired/stimulus"
 
 // Import controllers
 import BuyNowController from "./controllers/buy_now_controller"
+import StripeOrderController from "./controllers/stripe_order_controller"
 
 // Start Stimulus application
 window.Stimulus = Application.start()
 
 // Register controllers
 Stimulus.register("buy-now", BuyNowController)
+Stimulus.register("stripe-order", StripeOrderController)
 
 // Debug mode in development
 if (process.env.NODE_ENV === 'development') {

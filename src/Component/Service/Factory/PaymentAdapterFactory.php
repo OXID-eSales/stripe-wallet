@@ -55,14 +55,18 @@ class PaymentAdapterFactory
         return $this->createStripeAdapter();
     }
 
-    private function createStripeAdapter(): ?StripeAdapter
+    private function createStripeAdapter(): StripeAdapter
     {
         $stripeClient = $this->clientFactory->create();
 
-        $adapter = new StripeAdapter();
-        $adapter->setStripeClient($stripeClient);
+        if ($stripeClient === null) {
+            throw new \RuntimeException(
+                'Stripe API key is not configured. Please configure the Stripe secret key in module settings. ' .
+                'Expected format: sk_test_... (test mode) or sk_live_... (live mode)'
+            );
+        }
 
-        return $adapter;
+        return new StripeAdapter($stripeClient);
     }
 
     public function isProviderSupported(string $providerName): bool

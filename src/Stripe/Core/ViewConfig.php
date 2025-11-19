@@ -80,10 +80,10 @@ class ViewConfig extends ViewConfig_parent
     public function getStripeJsPath(): string
     {
         if ($this->isStripeDevelopmentMode()) {
-            return 'js/stripe.dev.js';
+            return 'js/stripe-frontend.js';
         }
 
-        return 'js/stripe.min.js';
+        return 'js/stripe-frontend.min.js';
     }
 
     /**
@@ -121,5 +121,9 @@ class ViewConfig extends ViewConfig_parent
     public function isStripeCheckoutActive(): bool
     {
         return !empty($this->stripeConfig->getPublishableKey());
+    }
+    public function getStripeWalletConfig(): ModuleConfigurationService
+    {
+        return $this->stripeConfig;
     }
 }
