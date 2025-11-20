@@ -14,6 +14,10 @@ use OxidEsales\Eshop\Core\Registry;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use OxidSolutionCatalysts\Payments\Stripe\Service\StripePaymentService;
 use OxidSolutionCatalysts\Payments\Stripe\Module;
+use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory;
+use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreatePaymentRequest;
+use OxidSolutionCatalysts\Payments\Component\Adapter\Exception\PaymentAdapterException;
+use OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface;
 
 /**
  * Extended payment controller for Stripe integration
@@ -23,19 +27,28 @@ class PaymentController extends CorePaymentController
 {
     private ModuleConfigurationService $stripeConfig;
     private StripePaymentService $paymentService;
+    private PaymentAdapterFactory $adapterFactory;
+    private ShopAdapterInterface $shopAdapter;
 
     /**
      * @param \OxidSolutionCatalysts\Payments\Stripe\Service\StripePaymentService $paymentService
+     * @param \OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService $stripeConfig
+     * @param \OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory $adapterFactory
+     * @param \OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface $shopAdapter
      */
     public function __construct(
         StripePaymentService $paymentService,
-        ModuleConfigurationService $stripeConfig
+        ModuleConfigurationService $stripeConfig,
+        PaymentAdapterFactory $adapterFactory,
+        ShopAdapterInterface $shopAdapter
     )
     {
         parent::__construct();
 
         $this->paymentService = $paymentService;
         $this->stripeConfig = $stripeConfig;
+        $this->adapterFactory = $adapterFactory;
+        $this->shopAdapter = $shopAdapter;
     }
 
     /**
@@ -105,30 +118,32 @@ class PaymentController extends CorePaymentController
     /**
      * Build Stripe configuration object for JavaScript
      *
+     * Refactored to use ShopAdapterInterface for translations.
+     * Replaces deprecated Registry::getLang() usage.
+     *
      * @param string $clientSecret
      * @return array
      */
     private function buildStripeConfig(string $clientSecret): array
     {
         $viewConfig = Registry::get(\OxidSolutionCatalysts\Stripe\Core\ViewConfig::class);
-        $lang = Registry::getLang();
 
         return [
             'publishableKey' => $this->stripeConfig->getPublishableKey(),
             'clientSecret' => $clientSecret,
             'returnUrl' => $viewConfig->getStripeReturnUrl(),
-            'locale' => $lang->getLanguageAbbr(),
+            'locale' => $this->shopAdapter->getCurrentLanguageAbbr(),
             'testMode' => $this->stripeConfig->isTestMode(),
             'primaryColor' => $viewConfig->getStripePrimaryColor(),
             'labels' => [
-                'cardPayment' => $lang->translateString('OSC_STRIPE_CARD_PAYMENT'),
-                'paymentDesc' => $lang->translateString('OSC_STRIPE_PAYMENT_DESC'),
-                'processing' => $lang->translateString('OSC_STRIPE_PROCESSING'),
-                'processingPayment' => $lang->translateString('OSC_STRIPE_PROCESSING_PAYMENT'),
-                'securePayment' => $lang->translateString('OSC_STRIPE_SECURE_PAYMENT'),
-                'configError' => $lang->translateString('OSC_STRIPE_CONFIG_ERROR'),
-                'intentError' => $lang->translateString('OSC_STRIPE_INTENT_ERROR'),
-                'unexpectedError' => $lang->translateString('OSC_STRIPE_UNEXPECTED_ERROR'),
+                'cardPayment' => $this->shopAdapter->translateString('OSC_STRIPE_CARD_PAYMENT'),
+                'paymentDesc' => $this->shopAdapter->translateString('OSC_STRIPE_PAYMENT_DESC'),
+                'processing' => $this->shopAdapter->translateString('OSC_STRIPE_PROCESSING'),
+                'processingPayment' => $this->shopAdapter->translateString('OSC_STRIPE_PROCESSING_PAYMENT'),
+                'securePayment' => $this->shopAdapter->translateString('OSC_STRIPE_SECURE_PAYMENT'),
+                'configError' => $this->shopAdapter->translateString('OSC_STRIPE_CONFIG_ERROR'),
+                'intentError' => $this->shopAdapter->translateString('OSC_STRIPE_INTENT_ERROR'),
+                'unexpectedError' => $this->shopAdapter->translateString('OSC_STRIPE_UNEXPECTED_ERROR'),
             ]
         ];
     }
@@ -216,6 +231,9 @@ class PaymentController extends CorePaymentController
      * AJAX endpoint: Create PaymentIntent
      * Called from frontend JavaScript
      *
+     * Use Stripe Adapter pattern for provider-agnostic payment processing.
+     * See docs/payment-component/04-sdk-adapter-layer.md for architecture details.
+     *
      * @return void
      */
     public function createPaymentIntent(): void
@@ -233,29 +251,87 @@ class PaymentController extends CorePaymentController
                 exit;
             }
 
-            $paymentIntent = $this->paymentService->createPaymentIntent($basket, $user);
+            // Create adapter for Stripe provider
+            $adapter = $this->adapterFactory->createDefaultAdapter();
 
-            // Store in session
-            Registry::getSession()->setVariable('stripe_payment_intent_id', $paymentIntent['id']);
+            // Build provider-agnostic payment request
+            $createPaymentRequest = new CreatePaymentRequest(
+                amount: (float) $basket->getPrice()->getBruttoPrice(),
+                currency: $basket->getBasketCurrency()->name,
+                orderId: (string) $basket->getOrderId() ?: 'basket-' . time(),
+                shopId: (string) Registry::getConfig()->getShopId(),
+                paymentMethod: 'card',
+                directCapture: $this->stripeConfig->getCaptureMode() === 'automatic',
+                customerId: $user->getFieldData('stripe_customer_id') ?: null,
+                returnUrl: $this->getReturnUrl(),
+                cancelUrl: $this->getCancelUrl(),
+                metadata: [
+                    'oxid_user_id' => $user->getId(),
+                    'customer_email' => $user->getFieldData('oxusername'),
+                    'customer_name' => $user->getFieldData('oxfname') . ' ' . $user->getFieldData('oxlname'),
+                    'basket_id' => $basket->getId(),
+                ]
+            );
 
+            // Use adapter to create payment (provider-agnostic)
+            $paymentResponse = $adapter->createPayment($createPaymentRequest);
+
+            // Store payment intent ID in session
+            Registry::getSession()->setVariable('stripe_payment_intent_id', $paymentResponse->providerPaymentId);
+
+            // Return normalized response
             echo json_encode([
                 'success' => true,
-                'clientSecret' => $paymentIntent['client_secret'],
-                'amount' => $paymentIntent['amount'],
-                'currency' => $paymentIntent['currency'],
+                'clientSecret' => $paymentResponse->clientSecret,
+                'amount' => (int) ($paymentResponse->amount * 100), // Convert to cents for frontend
+                'currency' => $paymentResponse->currency,
+                'status' => $paymentResponse->status,
+                'requiresAction' => $paymentResponse->requiresAction,
             ]);
 
-        } catch (\RuntimeException $e) {
-            Registry::getLogger()->error('PaymentIntent creation failed', [
+        } catch (PaymentAdapterException $e) {
+            Registry::getLogger()->error('PaymentIntent creation failed via adapter', [
                 'error' => $e->getMessage(),
+                'error_code' => $e->getErrorCode(),
+                'provider' => $e->getProviderName(),
             ]);
 
             echo json_encode([
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'error_code' => $e->getErrorCode(),
+            ]);
+        } catch (\Throwable $e) {
+            Registry::getLogger()->error('Unexpected error during PaymentIntent creation', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            echo json_encode([
+                'error' => 'An unexpected error occurred. Please try again.',
             ]);
         }
 
         exit;
+    }
+
+    /**
+     * Get return URL for payment processing
+     *
+     * @return string
+     */
+    private function getReturnUrl(): string
+    {
+        return Registry::getConfig()->getShopCurrentURL() . 'cl=order&fnc=execute';
+    }
+
+    /**
+     * Get cancel URL for payment processing
+     *
+     * @return string
+     */
+    private function getCancelUrl(): string
+    {
+        return Registry::getConfig()->getShopCurrentURL() . 'cl=payment';
     }
 
     /**

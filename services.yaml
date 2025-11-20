@@ -46,6 +46,31 @@ services:
     public: true
 
   # ==========================================
+  # Shop Adapter Layer (Platform-Agnostic)
+  # ==========================================
+  #
+  # Provides abstraction layer for shop-specific operations like translations,
+  # configuration, session management, etc. This allows the Payment Component
+  # to remain platform-agnostic while working with different shop systems
+  # (OXID, Shopware, Magento, etc.)
+  #
+  # Key Features:
+  # - Platform-agnostic ShopAdapterInterface
+  # - Translation service (replaces deprecated Registry::getLang())
+  # - Shop configuration access
+  # - Language and currency management
+  #
+
+  # Shop Adapter Interface - Bind to OXID implementation
+  OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface:
+    class: OxidSolutionCatalysts\Payments\Stripe\Adapter\OxidShopAdapter
+    public: false
+
+  # OXID Shop Adapter - OXID eShop specific implementation
+  OxidSolutionCatalysts\Payments\Stripe\Adapter\OxidShopAdapter:
+    alias: OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface
+
+  # ==========================================
   # Repositories (Data Access Layer)
   # ==========================================
 
