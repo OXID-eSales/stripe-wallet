@@ -54,7 +54,7 @@ The standard checkout implementation uses the **Component EventSystem** (`/src/C
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 2. createPaymentIntent() → StripePaymentService             │
+│ 2. createPayment() → StripeAdapter via Factory              │
 │    ├─ Create PaymentIntent with Stripe API                  │
 │    └─ Dispatch: PaymentInitiatedEvent ✨                    │
 └─────────────────────────────────────────────────────────────┘
@@ -75,9 +75,9 @@ The standard checkout implementation uses the **Component EventSystem** (`/src/C
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 5. createOrderAfterPayment() → StripePaymentService         │
+│ 5. createOrderAfterPayment() → OrderController              │
 │    ├─ ✅ Order::finalizeOrder() (OXID standard method)      │
-│    ├─ Store transaction                                      │
+│    ├─ Store transaction via adapter                          │
 │    ├─ Dispatch: OrderCreatedEvent ✨                        │
 │    └─ Dispatch: PaymentCapturedEvent ✨                     │
 └─────────────────────────────────────────────────────────────┘
@@ -105,7 +105,7 @@ The standard checkout implementation uses the **Component EventSystem** (`/src/C
 ### 1. PaymentInitiatedEvent
 
 **When:** After Stripe PaymentIntent is created
-**Location:** `StripePaymentService::createPaymentIntent()`
+**Location:** `StripeAdapter::createPayment()` or `PaymentController::createPaymentIntent()`
 **Purpose:** Notify listeners that payment process has started
 
 **Properties:**
@@ -139,7 +139,7 @@ $eventDispatcher->dispatch($event);
 ### 2. OrderCreatedEvent
 
 **When:** After `Order::finalizeOrder()` succeeds
-**Location:** `StripePaymentService::createOrderAfterPayment()`
+**Location:** `OrderController::execute()` or similar order creation logic
 **Purpose:** Notify listeners that order was created successfully
 
 **Properties:**
@@ -167,7 +167,7 @@ $eventDispatcher->dispatch($event);
 ### 3. PaymentCapturedEvent
 
 **When:** After payment is captured (during order creation)
-**Location:** `StripePaymentService::createOrderAfterPayment()`
+**Location:** `StripeAdapter::capturePayment()` or `OrderController::execute()`
 **Purpose:** Notify listeners that funds were captured
 
 **Properties:**
@@ -197,7 +197,7 @@ $eventDispatcher->dispatch($event);
 ### 4. PaymentRefundedEvent
 
 **When:** After refund is processed
-**Location:** `StripePaymentService::createRefund()` (when implemented)
+**Location:** `StripeAdapter::refundPayment()`
 **Purpose:** Notify listeners that refund was issued
 
 **Properties:**
@@ -290,14 +290,14 @@ $allData = $context->all();
 
 ## Service Integration
 
-### StripePaymentService
+### StripeAdapter
 
 **Event Dispatcher Injection:**
 
 ```php
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
 
-class StripePaymentService
+class StripeAdapter implements PaymentAdapterInterface
 {
     private ?EventDispatcherInterface $eventDispatcher;
 
@@ -337,7 +337,7 @@ class WebhookProcessingService
     private ?EventDispatcherInterface $eventDispatcher;
 
     public function __construct(
-        StripePaymentService $paymentService,
+        PaymentAdapterFactory $adapterFactory,
         ?EventDispatcherInterface $eventDispatcher = null
     ) {
         $this->eventDispatcher = $eventDispatcher;

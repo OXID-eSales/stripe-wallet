@@ -111,13 +111,14 @@ public function render()
     $template = parent::render();
 
     if ($this->isStripeAvailable()) {
-        // Create PaymentIntent
-        $paymentIntent = $this->paymentService->createPaymentIntent($basket, $user);
+        // Create PaymentIntent using adapter
+        $adapter = $this->adapterFactory->createDefaultAdapter();
+        $paymentResponse = $adapter->createPayment($createPaymentRequest);
 
         // Build configuration
         $stripeConfig = [
             'publishableKey' => $this->stripeConfig->getPublicKey(),
-            'clientSecret' => $paymentIntent['client_secret'],
+            'clientSecret' => $paymentResponse->clientSecret,
             'returnUrl' => $viewConfig->getStripeReturnUrl(),
             'locale' => $lang->getLanguageAbbr(),
             'labels' => [/* translations */]
@@ -171,8 +172,7 @@ source/extensions/stripe/
 │   ├── Stripe/Core/
 │   │   └── ViewConfig.php                 # Template helpers
 │   └── Service/
-│       ├── StripeConfigurationService.php
-│       └── StripePaymentService.php
+│       └── StripeConfigurationService.php
 ├── out/src/
 │   ├── js/
 │   │   └── stripe_payment_element.js      # ✅ NEW - Payment logic

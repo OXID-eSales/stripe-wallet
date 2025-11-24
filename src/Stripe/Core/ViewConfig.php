@@ -126,4 +126,14 @@ class ViewConfig extends ViewConfig_parent
     {
         return $this->stripeConfig;
     }
+
+    /**
+     * Get Stripe publishable key for JavaScript integration
+     *
+     * @return string
+     */
+    public function getStripePublishableKey(): string
+    {
+        return $this->stripeConfig->getPublishableKey();
+    }
 }

@@ -1,8 +1,8 @@
 # Standard Checkout Implementation Guide
 
 **Complete Step-by-Step Implementation**
-**Version:** 1.0.0
-**Date:** 2025-11-13
+**Version:** 2.0.0
+**Date:** 2025-11-24
 **Estimated Time:** 40-60 hours
 
 ---
@@ -55,9 +55,12 @@ source/modules/osc/stripe/
 │   │   ├── PaymentController.php
 │   │   ├── OrderController.php
 │   │   └── WebhookController.php
+│   ├── Adapter/
+│   │   ├── StripeAdapter.php
+│   │   └── StripeClientFactory.php
 │   ├── Service/
-│   │   ├── StripePaymentService.php
-│   │   └── StripeConfigurationService.php
+│   │   ├── ModuleConfigurationService.php
+│   │   └── StripeCustomerService.php
 │   ├── Model/
 │   │   └── PaymentTransaction.php
 │   ├── Repository/

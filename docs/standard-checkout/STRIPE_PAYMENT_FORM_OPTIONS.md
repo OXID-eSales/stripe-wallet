@@ -877,16 +877,21 @@ form.addEventListener('submit', async (event) => {
 namespace OxidSolutionCatalysts\Stripe\Controller;
 
 use OxidEsales\Eshop\Application\Controller\PaymentController as CorePaymentController;
-use OxidSolutionCatalysts\Stripe\Service\StripePaymentService;
+use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory;
 
 class PaymentController extends CorePaymentController
 {
-    private StripePaymentService $stripeService;
+    private ModuleConfigurationService $stripeConfig;
+    private PaymentAdapterFactory $adapterFactory;
 
-    public function __construct()
-    {
+    public function __construct(
+        ModuleConfigurationService $stripeConfig,
+        PaymentAdapterFactory $adapterFactory
+    ) {
         parent::__construct();
-        $this->stripeService = oxNew(StripePaymentService::class);
+        $this->stripeConfig = $stripeConfig;
+        $this->adapterFactory = $adapterFactory;
     }
 
     /**

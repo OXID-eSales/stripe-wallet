@@ -55,14 +55,11 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentFa
  */
 class WebhookProcessingService
 {
-    private StripePaymentService $paymentService;
     private ?EventDispatcherInterface $eventDispatcher;
 
     public function __construct(
-        StripePaymentService $paymentService,
         ?EventDispatcherInterface $eventDispatcher = null
     ) {
-        $this->paymentService = $paymentService;
         $this->eventDispatcher = $eventDispatcher;
     }
 

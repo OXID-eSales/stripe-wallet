@@ -71,6 +71,29 @@ services:
     alias: OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface
 
   # ==========================================
+  # Shop Order Service (Order Operations)
+  # ==========================================
+  #
+  # Provides platform-agnostic interface for order operations.
+  # Phase 1 implements order creation from basket/cart.
+  #
+  # Key Features:
+  # - Creates orders via Order::finalizeOrder()
+  # - Maps OXID order states to normalized statuses
+  # - Associates payment transactions with orders
+  # - Stores order metadata
+  #
+
+  # Shop Order Service Interface - Bind to OXID implementation
+  OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface:
+    class: OxidSolutionCatalysts\Payments\Stripe\Adapter\OxidShopOrderService
+    public: true
+
+  # OXID Shop Order Service - OXID eShop specific implementation
+  OxidSolutionCatalysts\Payments\Stripe\Adapter\OxidShopOrderService:
+    alias: OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface
+
+  # ==========================================
   # Repositories (Data Access Layer)
   # ==========================================
 

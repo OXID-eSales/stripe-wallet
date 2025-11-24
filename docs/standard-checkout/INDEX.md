@@ -48,9 +48,9 @@
    - Phase 6: Templates (➡️ covered in TEMPLATE_GUIDE.md)
    - **Time to implement:** 40-60 hours
 
-4. **[SERVICE_LAYER.md](SERVICE_LAYER.md)** 💼 Business Logic
-   - StripePaymentService implementation
-   - StripeCustomerService implementation
+4. **[SERVICE_LAYER.md](SERVICE_LAYER.md)** 💼 Payment Adapter Layer
+   - PaymentAdapterFactory implementation
+   - StripeAdapter implementation (PaymentAdapterInterface)
    - Payment processing methods
    - Error handling
    - Usage examples

@@ -195,7 +195,7 @@ CREATE TABLE `osc_payment_webhook_log` (
 **Before (Custom implementation):**
 ```php
 // ❌ DON'T DO THIS
-class StripePaymentService
+class StripeAdapter
 {
     private function storeTransaction(Order $order, array $paymentIntent): void
     {
@@ -212,7 +212,7 @@ class StripePaymentService
 use OxidSolutionCatalysts\Payments\Component\Repository\TransactionRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Transaction\Transaction;
 
-class StripePaymentService
+class StripeAdapter
 {
     public function __construct(
         private TransactionRepositoryInterface $transactionRepository
@@ -363,9 +363,10 @@ Inject `TransactionRepositoryInterface` instead of using raw SQL:
 ```yaml
 # services.yaml
 services:
-  OxidSolutionCatalysts\Stripe\Service\StripePaymentService:
+  OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapter:
     arguments:
-      - '@OxidSolutionCatalysts\Stripe\Service\StripeConfigurationService'
+      - '@stripe.payment.adapter.client'
+      - '@OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService'
       - '@OxidSolutionCatalysts\Stripe\Service\StripeCustomerService'
       - '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
       - '@OxidSolutionCatalysts\Payments\Component\Repository\TransactionRepositoryInterface'
@@ -402,7 +403,7 @@ $this->transactionRepository->save($transaction);
 ## Next Steps
 
 1. ✅ **Update Events.php** - Remove duplicate table, use Component structure
-2. ✅ **Update StripePaymentService** - Inject TransactionRepository
+2. ✅ **Update StripeAdapter** - Uses Component TransactionRepository via adapter pattern
 3. ✅ **Update IMPLEMENTATION_GUIDE.md** - Document Component reuse
 4. ✅ **Update DATABASE_SCHEMA.md** - Show final table structure
 5. ✅ **Create migration** - Alter existing tables if needed

@@ -399,11 +399,12 @@ AND OXORDERNR IS NOT NULL;
 2. **Create refund via service** (or admin interface if implemented)
    ```php
    // In OXID console or admin
-   $paymentService = \OxidEsales\Eshop\Core\Registry::get(
-       \OxidSolutionCatalysts\Stripe\Service\StripePaymentService::class
+   $adapterFactory = \OxidEsales\Eshop\Core\Registry::get(
+       \OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory::class
    );
 
-   $refund = $paymentService->createRefund(
+   $adapter = $adapterFactory->createDefaultAdapter();
+   $refund = $adapter->refundPayment(
        'pi_xxxxx',  // PaymentIntent ID
        null,        // null = full refund
        'requested_by_customer'
@@ -716,7 +717,7 @@ SHOW VARIABLES LIKE 'general_log_file';
 -- View the file path and check for failed INSERTs
 ```
 
-**Check Code:** `/src/Service/StripePaymentService.php:201-236`
+**Check Code:** `/src/Stripe/Adapter/StripeAdapter.php` (payment adapter implementation)
 
 ### Issue: 3D Secure Modal Not Appearing
 
@@ -752,7 +753,7 @@ grep "Order creation failed" /var/log/oxideshop.log
 # - Order::ORDER_STATE_ORDEREXISTS
 ```
 
-**Check:** `/src/Service/StripePaymentService.php:174-177`
+**Check:** `/src/Stripe/Adapter/StripeAdapter.php` (payment adapter implementation)
 
 ### Issue: Refund Not Updating Order State
 

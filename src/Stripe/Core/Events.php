@@ -11,6 +11,8 @@ namespace OxidSolutionCatalysts\Payments\Stripe\Core;
 
 use OxidEsales\Eshop\Core\DatabaseProvider;
 use OxidEsales\Eshop\Core\Registry;
+use OxidSolutionCatalysts\Payments\Stripe\Service\StaticContent;
+use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 
 /**
  * Activation and deactivation handler
@@ -40,6 +42,14 @@ class Events
     );
 
     /**
+     * Standard checkout payment methods configuration
+     * @deprecated Use StripeDefinitions::getStripeDefinitions() instead
+     *
+     * @var array<string, array<string, mixed>>
+     */
+    public static $aStandardCheckoutPaymentMethods = [];
+
+    /**
      * List of all removed payment methods
      *
      * @var array<string>
@@ -57,7 +67,7 @@ class Events
     {
         self::addDatabaseStructure();
         self::addStandardCheckoutTables();
-        self::addPaymentMethods();
+        self::ensureStripePaymentMethods();
         self::deleteRemovedPaymentMethods();
         self::regenerateViews();
         self::clearTmp();
@@ -99,51 +109,17 @@ class Events
     }
 
     /**
-     * Get all available stripe payment methods from payment helper
-     *
-     * @return array<string, string>
-     */
-    protected static function getStripePaymentMethods()
-    {
-        /** @var array<string, string> */
-        return Payment::getInstance()->getStripePaymentMethods();
-    }
-
-    /**
-     * Adding Stripe payments.
+     * Ensure all Stripe payment methods are installed using StaticContent service
      *
      * @return void
      */
-    protected static function addPaymentMethods()
+    protected static function ensureStripePaymentMethods(): void
     {
-        foreach (self::getStripePaymentMethods() as $sPaymentId => $sPaymentTitle) {
-            self::addPaymentMethod($sPaymentId, $sPaymentTitle);
-        }
-    }
+        $container = ContainerFactory::getInstance()->getContainer();
+        $queryBuilderFactory = $container->get(\OxidEsales\EshopCommunity\Internal\Framework\Database\QueryBuilderFactoryInterface::class);
 
-    /**
-     * Add payment-methods and a basic configuration to the database
-     *
-     * @param string $sPaymentId
-     * @param string $sPaymentTitle
-     * @return void
-     */
-    protected static function addPaymentMethod($sPaymentId, $sPaymentTitle)
-    {
-        $blNewlyAdded = self::insertRowIfNotExists('oxpayments', array('OXID' => $sPaymentId), "INSERT INTO oxpayments(OXID,OXACTIVE,OXDESC,OXADDSUM,OXADDSUMTYPE,OXFROMBONI,OXFROMAMOUNT,OXTOAMOUNT,OXVALDESC,OXCHECKED,OXDESC_1,OXVALDESC_1,OXDESC_2,OXVALDESC_2,OXDESC_3,OXVALDESC_3,OXLONGDESC,OXLONGDESC_1,OXLONGDESC_2,OXLONGDESC_3,OXSORT) VALUES ('{$sPaymentId}', 0, '{$sPaymentTitle}', 0, 'abs', 0, 0, 1000000, '', 0, '{$sPaymentTitle}', '', '', '', '', '', '', '', '', '', 0);");
-
-        if ($blNewlyAdded === true) {
-            //Insert basic payment method configuration
-            foreach (self::$aGroupsToAdd as $sGroupId) {
-                DatabaseProvider::getDb()->Execute("INSERT INTO oxobject2group(OXID,OXSHOPID,OXOBJECTID,OXGROUPSID) values (REPLACE(UUID(),'-',''), :shopid, :paymentid, :groupid);", [
-                    ':shopid' => Registry::getConfig()->getShopId(),
-                    ':paymentid' => $sPaymentId,
-                    ':groupid' => $sGroupId,
-                ]);
-            }
-
-            self::insertRowIfNotExists('oxobject2payment', array('OXPAYMENTID' => $sPaymentId, 'OXTYPE' => 'oxdelset'), "INSERT INTO oxobject2payment(OXID,OXPAYMENTID,OXOBJECTID,OXTYPE) values (REPLACE(UUID(),'-',''), :paymentid, 'oxidstandard', 'oxdelset');", [':paymentid' => $sPaymentId]);
-        }
+        $staticContentService = new StaticContent($queryBuilderFactory);
+        $staticContentService->ensureStripePaymentMethods();
     }
 
     /**
@@ -276,12 +252,13 @@ class Events
     }
 
     /**
-     * Deactivates Stripe paymethods on module deactivation.
+     * Deactivates Stripe payment methods on module deactivation
      *
      * @return void
      */
-    protected static function deactivatePaymentMethods()
+    protected static function deactivatePaymentMethods(): void
     {
+        // Optionally deactivate payment methods here if needed
     }
 
     /**
@@ -427,35 +404,5 @@ class Events
                 KEY `IDX_CREATED` (`OXCREATED`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Webhook event log (shared across providers)';
         ");
-
-        // Add standard checkout payment method (osc_stripe_card)
-        self::insertRowIfNotExists('oxpayments',
-            array('OXID' => 'osc_stripe_card'),
-            "INSERT INTO oxpayments(OXID, OXACTIVE, OXDESC, OXADDSUM, OXADDSUMTYPE, OXFROMBONI, OXFROMAMOUNT, OXTOAMOUNT, OXVALDESC, OXCHECKED, OXDESC_1, OXVALDESC_1, OXDESC_2, OXVALDESC_2, OXDESC_3, OXVALDESC_3, OXLONGDESC, OXLONGDESC_1, OXLONGDESC_2, OXLONGDESC_3, OXSORT)
-             VALUES ('osc_stripe_card', 1, 'Credit/Debit Card (Stripe)', 0, 'abs', 0, 0, 1000000, '', 0, 'Credit/Debit Card (Stripe)', '', '', '', '', '', 'Pay securely with your credit or debit card via Stripe', 'Pay securely with your credit or debit card via Stripe', '', '', 100);"
-        );
-
-        // Add payment method to all customer groups
-        $blNewlyAdded = self::insertRowIfNotExists('oxpayments', array('OXID' => 'osc_stripe_card'), "");
-        if ($blNewlyAdded === false) { // Payment method already exists, add to groups
-            foreach (self::$aGroupsToAdd as $sGroupId) {
-                self::insertRowIfNotExists('oxobject2group',
-                    array('OXOBJECTID' => 'osc_stripe_card', 'OXGROUPSID' => $sGroupId),
-                    "INSERT INTO oxobject2group(OXID, OXSHOPID, OXOBJECTID, OXGROUPSID) VALUES (REPLACE(UUID(),'-',''), :shopid, :paymentid, :groupid);",
-                    [
-                        ':shopid' => Registry::getConfig()->getShopId(),
-                        ':paymentid' => 'osc_stripe_card',
-                        ':groupid' => $sGroupId,
-                    ]
-                );
-            }
-
-            // Add to standard delivery set
-            self::insertRowIfNotExists('oxobject2payment',
-                array('OXPAYMENTID' => 'osc_stripe_card', 'OXTYPE' => 'oxdelset'),
-                "INSERT INTO oxobject2payment(OXID, OXPAYMENTID, OXOBJECTID, OXTYPE) VALUES (REPLACE(UUID(),'-',''), :paymentid, 'oxidstandard', 'oxdelset');",
-                [':paymentid' => 'osc_stripe_card']
-            );
-        }
     }
 }

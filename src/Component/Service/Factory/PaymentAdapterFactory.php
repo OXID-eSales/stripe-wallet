@@ -81,4 +81,23 @@ class PaymentAdapterFactory
     {
         return ['stripe'];
     }
+
+    /**
+     * Get Stripe SDK client for direct API access
+     * Useful for operations not covered by the adapter (e.g., Checkout Sessions)
+     *
+     * @return \Stripe\StripeClient
+     */
+    public function getStripeClient(): \Stripe\StripeClient
+    {
+        $client = $this->clientFactory->create();
+
+        if ($client === null) {
+            throw new \RuntimeException(
+                'Stripe API key is not configured. Please configure the Stripe secret key in module settings.'
+            );
+        }
+
+        return $client;
+    }
 }

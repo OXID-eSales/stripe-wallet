@@ -58,12 +58,22 @@
 {% block checkout_order_next_step_side %}
     {% set displayBasketOrderButton = oViewConf.getViewThemeParam('basketLowOrderDisplayOrderButton') %}
     {% if not oView.isLowOrderPrice() or (displayBasketOrderButton == 'show' or displayBasketOrderButton == 'disabled') %}
-        <button id="{{ paymentId }}" type="button" class="btn btn-highlight btn-lg w-100"
+        {% set createCheckoutSessionUrl = oViewConf.getSslSelfLink() ~ "cl=order&fnc=createCheckoutSession" %}
+        <button id="stripe-checkout-btn"
+                type="button"
+                class="btn btn-highlight btn-lg w-100"
+                data-controller="order-submit"
+                data-action="click->order-submit#handleSubmit"
+                data-order-submit-url-value="{{ createCheckoutSessionUrl | raw }}"
+                data-order-submit-payment-type-value="wallet"
+                data-order-submit-publishable-key-value="{{ oViewConf.getStripePublishableKey() | raw }}"
+                data-order-submit-target="button"
                 {% if oView.isLowOrderPrice() and displayBasketOrderButton == 'disabled' %}
                     disabled="disabled"
                 {% endif %}
         >
             {{ translate({ ident: "SUBMIT_ORDER" }) }}
         </button>
+        <div data-order-submit-target="status" class="mt-2 text-center"></div>
     {% endif %}
 {% endblock %}

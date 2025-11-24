@@ -1,14 +1,14 @@
-# Service Layer Implementation
+# Payment Adapter Layer Implementation
 
-**Payment Service and Business Logic**
-**Version:** 1.0.0
-**Date:** 2025-11-13
+**Payment Adapter and Business Logic**
+**Version:** 2.0.0
+**Date:** 2025-11-24
 
 ---
 
 ## Overview
 
-The service layer contains all business logic for payment processing, keeping controllers thin and focused on HTTP request/response handling. This document covers the complete implementation of the Stripe payment service.
+The payment adapter layer provides provider-agnostic payment processing through a unified interface. Controllers use `PaymentAdapterFactory` to create adapters for specific payment providers (Stripe, PayPal, etc.), keeping business logic decoupled from payment provider implementations.
 
 ---
 
@@ -22,25 +22,23 @@ The service layer contains all business logic for payment processing, keeping co
                          │
                          ▼
 ┌────────────────────────────────────────────────────────┐
-│                   Service Layer                         │
+│              Payment Adapter Layer                      │
 │  ┌──────────────────────────────────────────────────┐ │
-│  │  StripePaymentService                             │ │
-│  │  - createPaymentIntent()                          │ │
-│  │  - confirmPaymentIntent()                         │ │
-│  │  - handlePaymentSuccess()                         │ │
-│  │  - handle3DSecure()                               │ │
-│  │  - storeTransaction()                             │ │
+│  │  PaymentAdapterFactory                            │ │
+│  │  - createDefaultAdapter()                         │ │
+│  │  - createAdapter(provider)                        │ │
+│  └──────────────────────────────────────────────────┘ │
+│  ┌──────────────────────────────────────────────────┐ │
+│  │  StripeAdapter (PaymentAdapterInterface)         │ │
+│  │  - createPayment()                                │ │
+│  │  - capturePayment()                               │ │
+│  │  - refundPayment()                                │ │
+│  │  - getPaymentStatus()                             │ │
 │  └──────────────────────────────────────────────────┘ │
 │  ┌──────────────────────────────────────────────────┐ │
 │  │  StripeCustomerService                            │ │
 │  │  - getOrCreateStripeCustomer()                    │ │
 │  │  - syncCustomerData()                             │ │
-│  └──────────────────────────────────────────────────┘ │
-│  ┌──────────────────────────────────────────────────┐ │
-│  │  PaymentTransactionService                        │ │
-│  │  - createTransaction()                            │ │
-│  │  - updateTransaction()                            │ │
-│  │  - getTransactionByOrderId()                      │ │
 │  └──────────────────────────────────────────────────┘ │
 └────────────────────────────────────────────────────────┘
                          │
@@ -58,46 +56,44 @@ The service layer contains all business logic for payment processing, keeping co
 
 ---
 
-## StripePaymentService
+## StripeAdapter Implementation
 
-Complete implementation of the main payment service.
+Complete implementation of the Stripe payment adapter.
 
-### File: `src/Service/StripePaymentService.php`
+### File: `src/Stripe/Adapter/StripeAdapter.php`
 
 ```php
 <?php
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Stripe\Service;
+namespace OxidSolutionCatalysts\Payments\Stripe\Adapter;
 
 use Stripe\StripeClient;
 use Stripe\Exception\ApiErrorException;
-use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\Eshop\Application\Model\Order;
-use OxidEsales\Eshop\Application\Model\Basket;
-use OxidEsales\Eshop\Application\Model\User;
-use OxidSolutionCatalysts\Stripe\Repository\PaymentTransactionRepository;
+use OxidSolutionCatalysts\Payments\Component\Adapter\PaymentAdapterInterface;
+use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreatePaymentRequest;
+use OxidSolutionCatalysts\Payments\Component\Adapter\Response\PaymentResponse;
+use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidSolutionCatalysts\Payments\Stripe\Service\StripeCustomerService;
 
 /**
- * Stripe payment processing service
+ * Stripe payment adapter implementation
  */
-class StripePaymentService
+class StripeAdapter implements PaymentAdapterInterface
 {
     private StripeClient $stripe;
-    private StripeConfigurationService $config;
+    private ModuleConfigurationService $config;
     private StripeCustomerService $customerService;
-    private PaymentTransactionRepository $transactionRepo;
 
     public function __construct(
-        StripeConfigurationService $config,
-        StripeCustomerService $customerService,
-        PaymentTransactionRepository $transactionRepo
+        StripeClient $stripe,
+        ModuleConfigurationService $config,
+        StripeCustomerService $customerService
     ) {
+        $this->stripe = $stripe;
         $this->config = $config;
         $this->customerService = $customerService;
-        $this->transactionRepo = $transactionRepo;
-        $this->initializeStripeClient();
     }
 
     /**

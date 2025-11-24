@@ -12,19 +12,26 @@ namespace OxidSolutionCatalysts\Payments\Stripe\Controller;
 use OxidEsales\Eshop\Application\Controller\OrderController as CoreOrderController;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Eshop\Application\Model\Order;
-use OxidEsales\Eshop\Core\UtilsObject;
-use OxidEsales\Eshop\Core\DatabaseProvider;
+use OxidEsales\Eshop\Application\Model\Basket;
+use OxidEsales\Eshop\Application\Model\User;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use OxidSolutionCatalysts\Payments\Stripe\Service\StripeCustomerService;
+use OxidSolutionCatalysts\Payments\Stripe\Repository\StripePaymentDetailsRepository;
+use OxidSolutionCatalysts\Payments\Stripe\Repository\PaymentOrderStateRepository;
 use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreatePaymentRequest;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Exception\PaymentAdapterException;
 use OxidSolutionCatalysts\Payments\Component\Repository\TransactionRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Transaction\Transaction;
+use OxidEsales\Eshop\Core\UtilsObject;
+use OxidSolutionCatalysts\Payments\Component\Adapter\PaymentAdapterInterface;
+use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreatePaymentRequest;
+use OxidSolutionCatalysts\Payments\Component\Adapter\Exception\PaymentAdapterException;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\OrderCreatedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentCapturedEvent;
+use OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface;
+use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreateOrderRequest as OrderCreateRequest;
+use OxidSolutionCatalysts\Payments\Component\Adapter\Exception\ShopOrderException;
 
 /**
  * Extended order controller for Stripe payment processing
@@ -39,6 +46,7 @@ class OrderController extends CoreOrderController
         private readonly ModuleConfigurationService $config,
         private readonly StripeCustomerService $customerService,
         private readonly TransactionRepositoryInterface $transactionRepository,
+        private readonly ShopOrderServiceInterface $orderService,
         private readonly ?EventDispatcherInterface $eventDispatcher = null
     )
     {
@@ -284,13 +292,25 @@ class OrderController extends CoreOrderController
                 throw new \RuntimeException('Payment not successful: ' . $paymentDetails->status);
             }
 
-            // 3. Create order using STANDARD OXID METHOD
-            $basket->setPayment('osc_stripe_card');
-            $order = oxNew(Order::class);
-            $orderState = $order->finalizeOrder($basket, $user);
+            // 3. Create order via ShopOrderService
+            $orderRequest = new OrderCreateRequest(
+                basketId: $basket->getId(),
+                userId: $user->getId(),
+                paymentId: $basket->getPaymentId(),
+                paymentTransactionId: $paymentIntentId,
+                orderRemark: $session->getVariable('ordRem'),
+                metadata: [
+                    'stripe_payment_intent_id' => $paymentIntentId,
+                    'payment_status' => $paymentDetails->status,
+                ]
+            );
 
-            if ($orderState !== Order::ORDER_STATE_OK) {
-                throw new \RuntimeException('Order creation failed with state: ' . $orderState);
+            $orderResponse = $this->orderService->createOrder($orderRequest);
+
+            // Get OXID Order object for legacy compatibility
+            $order = oxNew(Order::class);
+            if (!$order->load($orderResponse->orderId)) {
+                throw new \RuntimeException('Failed to load created order: ' . $orderResponse->orderId);
             }
 
             // 4. Store transaction and Stripe-specific details
@@ -318,6 +338,19 @@ class OrderController extends CoreOrderController
             // Redirect to thank you page
             return 'thankyou';
 
+        } catch (ShopOrderException $e) {
+            Registry::getLogger()->error('Order creation failed via ShopOrderService', [
+                'error' => $e->getMessage(),
+                'error_code' => $e->getErrorCode(),
+                'context' => $e->getContext(),
+                'payment_intent_id' => $paymentIntentId,
+            ]);
+
+            Registry::getUtilsView()->addErrorToDisplay(
+                'Order could not be created. Please contact support with payment ID: ' . $paymentIntentId
+            );
+
+            return 'payment';
         } catch (\RuntimeException | PaymentAdapterException $e) {
             Registry::getLogger()->error('Order creation failed after successful payment', [
                 'error' => $e->getMessage(),
@@ -509,7 +542,7 @@ class OrderController extends CoreOrderController
 
     /**
      * Store transaction and Stripe-specific details
-     * Uses repository for transaction, direct SQL for Stripe details
+     * ✅ Uses repositories directly (no service layer)
      *
      * @param Order $order
      * @param \OxidSolutionCatalysts\Payments\Component\Adapter\Response\PaymentDetailsResponse $paymentDetails
@@ -517,7 +550,7 @@ class OrderController extends CoreOrderController
      */
     private function storeTransactionAndDetails(Order $order, $paymentDetails): void
     {
-        // 1. Create and save transaction via repository
+        // 1. Create and save transaction via Component repository
         $transaction = new Transaction(
             id: UtilsObject::getInstance()->generateUId(),
             shopId: (int) Registry::getConfig()->getShopId(),
@@ -533,99 +566,28 @@ class OrderController extends CoreOrderController
         $transaction->setProviderOrderId($paymentDetails->providerPaymentId);
         $transaction->setPaymentMethodId('osc_stripe_card');
 
-        // Extract transaction ID from provider data
-        if (isset($paymentDetails->providerData['charges']['data'][0]['id'])) {
-            $transaction->setTransactionId($paymentDetails->providerData['charges']['data'][0]['id']);
-        }
-
-        // Extract payment method type
-        if (isset($paymentDetails->providerData['charges']['data'][0]['payment_method_details']['type'])) {
-            $transaction->setPaymentMethodType(
-                $paymentDetails->providerData['charges']['data'][0]['payment_method_details']['type']
-            );
+        // Extract transaction ID and payment method type from charges
+        $charge = $paymentDetails->providerData['charges']['data'][0] ?? null;
+        if ($charge) {
+            $transaction->setTransactionId($charge['id']);
+            $transaction->setPaymentMethodType($charge['payment_method_details']['type'] ?? 'card');
         }
 
         $this->transactionRepository->save($transaction);
 
-        // 2. Store Stripe-specific details in separate table
-        $this->storeStripeSpecificDetails($transaction->getId(), $paymentDetails);
-
-        // 3. Update payment order state
-        $this->updatePaymentOrderState($order->getId(), $paymentDetails);
-    }
-
-    /**
-     * Store Stripe-specific payment details
-     *
-     * @param string $transactionId
-     * @param \OxidSolutionCatalysts\Payments\Component\Adapter\Response\PaymentDetailsResponse $paymentDetails
-     * @return void
-     */
-    private function storeStripeSpecificDetails(string $transactionId, $paymentDetails): void
-    {
-        $charge = $paymentDetails->providerData['charges']['data'][0] ?? null;
-
-        if (!$charge) {
-            return;
+        // 2. Store Stripe-specific details
+        if ($charge) {
+            $this->stripeDetailsRepository->storePaymentDetails($transaction->getId(), $charge);
         }
 
-        $db = DatabaseProvider::getDb();
-        $card = $charge['payment_method_details']['card'] ?? null;
-        $threeDSecure = $card['three_d_secure'] ?? null;
-
-        $sql = "INSERT INTO osc_stripe_payment_details
-                (OXID, OXTRANSACTIONID, OXCARDLAST4, OXCARDBRAND, OXCARDEXPMONTH, OXCARDEXPYEAR,
-                 OXCARDFUNDING, OXCARDCOUNTRY, OX3DSECURE, OX3DSVERSION, OX3DSAUTHENTICATED,
-                 OXRISKSCORE, OXRISKLEVEL, OXCREATED)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
-
-        $db->execute($sql, [
-            UtilsObject::getInstance()->generateUId(),
-            $transactionId,
-            $card['last4'] ?? null,
-            $card['brand'] ?? null,
-            $card['exp_month'] ?? null,
-            $card['exp_year'] ?? null,
-            $card['funding'] ?? null,
-            $card['country'] ?? null,
-            $threeDSecure ? 1 : 0,
-            $threeDSecure['version'] ?? null,
-            $threeDSecure['authenticated'] ?? null,
-            $charge['outcome']['risk_score'] ?? null,
-            $charge['outcome']['risk_level'] ?? null,
-        ]);
-    }
-
-    /**
-     * Update payment order state table
-     *
-     * @param string $orderId
-     * @param \OxidSolutionCatalysts\Payments\Component\Adapter\Response\PaymentDetailsResponse $paymentDetails
-     * @return void
-     */
-    private function updatePaymentOrderState(string $orderId, $paymentDetails): void
-    {
-        $db = DatabaseProvider::getDb();
-
-        $sql = "INSERT INTO osc_payment_order_state
-                (OXID, OXORDERID, OXPAYMENTSTATE, OXPAYMENTMETHOD, OXCAPTURED,
-                 OXCAPTUREDAMOUNT, OXCAPTUREDAT, OXCREATED)
-                VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
-                ON DUPLICATE KEY UPDATE
-                OXPAYMENTSTATE = VALUES(OXPAYMENTSTATE),
-                OXCAPTURED = VALUES(OXCAPTURED),
-                OXCAPTUREDAMOUNT = VALUES(OXCAPTUREDAMOUNT),
-                OXCAPTUREDAT = VALUES(OXCAPTUREDAT),
-                OXUPDATED = NOW()";
-
-        $db->execute($sql, [
-            UtilsObject::getInstance()->generateUId(),
-            $orderId,
-            'paid',
-            'stripe',
-            $paymentDetails->isCaptured ? 1 : 0,
-            $paymentDetails->amountCaptured ?? $paymentDetails->amount,
-        ]);
+        // 3. Update payment order state
+        $paymentIntentArray = [
+            'id' => $paymentDetails->providerPaymentId,
+            'status' => $paymentDetails->status,
+            'amount' => (int) ($paymentDetails->amount * 100), // Convert to cents
+            'currency' => $paymentDetails->currency,
+        ];
+        $this->orderStateRepository->updateOrderState($order->getId(), $paymentIntentArray);
     }
 
     /**
@@ -778,5 +740,234 @@ class OrderController extends CoreOrderController
             Registry::getUtilsView()->addErrorToDisplay('Payment processing error. Please contact support.');
             return 'payment';
         }
+    }
+
+    /**
+     * Create Stripe Checkout Session (AJAX endpoint)
+     * Returns JSON with session ID for client-side redirect
+     *
+     * @return void
+     */
+    public function createCheckoutSession(): void
+    {
+        header('Content-Type: application/json');
+
+        try {
+            $session = Registry::getSession();
+            $basket = $session->getBasket();
+
+            // Validate basket
+            if (!$basket || $basket->getProductsCount() == 0) {
+                throw new \RuntimeException('Basket is empty');
+            }
+
+            $user = $basket->getBasketUser();
+            if (!$user || !$user->getId()) {
+                throw new \RuntimeException('User not found');
+            }
+
+            // Get capture mode from request (automatic or manual)
+            $captureMode = Registry::getRequest()->getRequestParameter('capture') ?? 'automatic';
+            $captureMode = ($captureMode === 'manual') ? 'manual' : 'automatic';
+
+            // Build line items from basket
+            $lineItems = $this->buildCheckoutLineItems($basket);
+
+            // Get Stripe SDK client
+            $stripeClient = $this->adapterFactory->getStripeClient();
+
+            // Build success and cancel URLs
+            $shopUrl = Registry::getConfig()->getShopUrl();
+            $successUrl = $shopUrl . 'index.php?cl=order&fnc=checkoutSuccess&session_id={CHECKOUT_SESSION_ID}&sDeliveryAddressMD5=' . $this->getDeliveryAddressMD5();
+            $cancelUrl = $shopUrl . 'index.php?cl=order';
+
+            // Create Checkout Session
+            $checkoutSession = $stripeClient->checkout->sessions->create([
+                'mode' => 'payment',
+                'line_items' => $lineItems,
+                'success_url' => $successUrl,
+                'cancel_url' => $cancelUrl,
+                'locale' => $this->getStripeLocale(),
+                'allow_promotion_codes' => false,
+                'customer_email' => $user->getFieldData('oxusername'),
+                'payment_intent_data' => [
+                    'capture_method' => $captureMode,
+                    'metadata' => [
+                        'user_id' => $user->getId()
+                    ]
+                ],
+                'metadata' => [
+                    'user_id' => $user->getId()
+                ]
+            ]);
+
+            // Store session ID for later verification
+            $session->setVariable('stripe_checkout_session_id', $checkoutSession->id);
+
+            Registry::getLogger()->info('Stripe Checkout Session created', [
+                'session_id' => $checkoutSession->id,
+                'amount' => $basket->getPrice()->getBruttoPrice(),
+                'capture_mode' => $captureMode
+            ]);
+
+            echo json_encode([
+                'id' => $checkoutSession->id,
+                'capture' => $captureMode
+            ]);
+
+        } catch (\Throwable $e) {
+            http_response_code(500);
+
+            Registry::getLogger()->error('Failed to create Checkout Session', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            echo json_encode([
+                'error' => 'Failed to create checkout session: ' . $e->getMessage() . ': ' . $e->getLine()
+            ]);
+        }
+
+        exit;
+    }
+
+    /**
+     * Handle successful Stripe Checkout return
+     * Called when user completes payment on Stripe hosted page
+     *
+     * @return string
+     */
+    public function checkoutSuccess(): string
+    {
+        $sessionId = Registry::getRequest()->getRequestParameter('session_id');
+
+        if (!$sessionId) {
+            Registry::getLogger()->error('No session_id in Checkout success callback');
+            Registry::getUtilsView()->addErrorToDisplay('Payment information missing');
+            return 'payment';
+        }
+
+        try {
+            // Get Stripe SDK client
+            $stripeClient = $this->adapterFactory->getStripeClient();
+
+            // Retrieve the Checkout Session
+            $checkoutSession = $stripeClient->checkout->sessions->retrieve($sessionId, [
+                'expand' => ['payment_intent']
+            ]);
+
+            Registry::getLogger()->info('Checkout Session retrieved', [
+                'session_id' => $sessionId,
+                'payment_status' => $checkoutSession->payment_status,
+                'payment_intent' => $checkoutSession->payment_intent
+            ]);
+
+            // Verify payment was successful
+            if ($checkoutSession->payment_status !== 'paid') {
+                throw new \RuntimeException('Payment not completed: ' . $checkoutSession->payment_status);
+            }
+
+            // Get the PaymentIntent ID
+            $paymentIntentId = is_string($checkoutSession->payment_intent)
+                ? $checkoutSession->payment_intent
+                : $checkoutSession->payment_intent->id;
+
+            // Process the order with the PaymentIntent
+            Registry::getSession()->setVariable('stripe_payment_intent_id', $paymentIntentId);
+
+            return $this->handleSuccessfulPayment($paymentIntentId);
+
+        } catch (\Exception $e) {
+            Registry::getLogger()->error('Error processing Checkout success', [
+                'error' => $e->getMessage(),
+                'session_id' => $sessionId
+            ]);
+
+            Registry::getUtilsView()->addErrorToDisplay('Order processing error. Please contact support.');
+            return 'payment';
+        }
+    }
+
+    /**
+     * Build line items for Stripe Checkout from basket
+     *
+     * @param \OxidEsales\Eshop\Application\Model\Basket $basket
+     * @return array
+     */
+    private function buildCheckoutLineItems($basket): array
+    {
+        $lineItems = [];
+        $currency = strtolower($basket->getBasketCurrency()->name);
+
+        // Add basket products
+        foreach ($basket->getContents() as $basketItem) {
+            $article = $basketItem->getArticle();
+            $lineItems[] = [
+                'price_data' => [
+                    'currency' => $currency,
+                    'unit_amount' => (int) round($basketItem->getUnitPrice()->getBruttoPrice() * 100),
+                    'product_data' => [
+                        'name' => $article->getFieldData('oxtitle'),
+                        'description' => $article->getFieldData('oxshortdesc'),
+                    ],
+                ],
+                'quantity' => (int) $basketItem->getAmount(),
+            ];
+        }
+
+        // Add delivery cost if present
+        $deliveryCost = $basket->getDeliveryCost();
+        if ($deliveryCost && $deliveryCost->getBruttoPrice() > 0) {
+            $lineItems[] = [
+                'price_data' => [
+                    'currency' => $currency,
+                    'unit_amount' => (int) round($deliveryCost->getBruttoPrice() * 100),
+                    'product_data' => [
+                        'name' => 'Shipping',
+                    ],
+                ],
+                'quantity' => 1,
+            ];
+        }
+
+        // Add payment cost if present
+        $paymentCost = $basket->getPaymentCost();
+        if ($paymentCost && $paymentCost->getBruttoPrice() > 0) {
+            $lineItems[] = [
+                'price_data' => [
+                    'currency' => $currency,
+                    'unit_amount' => (int) round($paymentCost->getBruttoPrice() * 100),
+                    'product_data' => [
+                        'name' => 'Payment Fee',
+                    ],
+                ],
+                'quantity' => 1,
+            ];
+        }
+
+        return $lineItems;
+    }
+
+    /**
+     * Get Stripe locale from current shop language
+     *
+     * @return string
+     */
+    private function getStripeLocale(): string
+    {
+        $language = Registry::getLang()->getLanguageAbbr();
+
+        // Map OXID language codes to Stripe locales
+        $localeMap = [
+            'de' => 'de',
+            'en' => 'en',
+            'fr' => 'fr',
+            'es' => 'es',
+            'it' => 'it',
+            'nl' => 'nl',
+            'pl' => 'pl',
+        ];
+
+        return $localeMap[$language] ?? 'auto';
     }
 }

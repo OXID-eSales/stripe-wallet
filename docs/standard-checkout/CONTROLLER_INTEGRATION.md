@@ -53,26 +53,32 @@ namespace OxidSolutionCatalysts\Stripe\Controller;
 
 use OxidEsales\Eshop\Application\Controller\PaymentController as CorePaymentController;
 use OxidEsales\Eshop\Core\Registry;
-use OxidSolutionCatalysts\Stripe\Service\StripeConfigurationService;
-use OxidSolutionCatalysts\Stripe\Service\StripePaymentService;
+use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory;
+use OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface;
 
 /**
  * Extended payment controller for Stripe integration
  */
 class PaymentController extends CorePaymentController
 {
-    private StripeConfigurationService $stripeConfig;
-    private StripePaymentService $paymentService;
+    private ModuleConfigurationService $stripeConfig;
+    private PaymentAdapterFactory $adapterFactory;
+    private ShopAdapterInterface $shopAdapter;
 
     /**
-     * Initialize services
+     * Constructor with dependency injection
      */
-    public function init(): void
-    {
-        parent::init();
+    public function __construct(
+        ModuleConfigurationService $stripeConfig,
+        PaymentAdapterFactory $adapterFactory,
+        ShopAdapterInterface $shopAdapter
+    ) {
+        parent::__construct();
 
-        $this->stripeConfig = Registry::get(StripeConfigurationService::class);
-        $this->paymentService = Registry::get(StripePaymentService::class);
+        $this->stripeConfig = $stripeConfig;
+        $this->adapterFactory = $adapterFactory;
+        $this->shopAdapter = $shopAdapter;
     }
 
     /**
@@ -251,23 +257,28 @@ namespace OxidSolutionCatalysts\Stripe\Controller;
 use OxidEsales\Eshop\Application\Controller\OrderController as CoreOrderController;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Eshop\Application\Model\Order;
-use OxidSolutionCatalysts\Stripe\Service\StripePaymentService;
+use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory;
 
 /**
  * Extended order controller for Stripe payment processing
  */
 class OrderController extends CoreOrderController
 {
-    private StripePaymentService $paymentService;
+    private ModuleConfigurationService $stripeConfig;
+    private PaymentAdapterFactory $adapterFactory;
 
     /**
-     * Initialize services
+     * Constructor with dependency injection
      */
-    public function init(): void
-    {
-        parent::init();
+    public function __construct(
+        ModuleConfigurationService $stripeConfig,
+        PaymentAdapterFactory $adapterFactory
+    ) {
+        parent::__construct();
 
-        $this->paymentService = Registry::get(StripePaymentService::class);
+        $this->stripeConfig = $stripeConfig;
+        $this->adapterFactory = $adapterFactory;
     }
 
     /**

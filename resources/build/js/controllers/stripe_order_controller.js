@@ -83,8 +83,8 @@ export default class extends Controller {
         appearance: appearance
       })
 
-      const card = this.elements.create('card');
-      card.mount('#card-element');
+      this.card = this.elements.create('card');
+      this.card.mount('#card-element');
 
       console.log('Stripe Payment Element initialized successfully')
 

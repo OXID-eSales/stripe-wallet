@@ -1,8 +1,8 @@
 # Event-Driven Architecture for Standard Checkout
 
 **Complete Guide to Event-Based Payment Processing**
-**Version:** 1.0.0
-**Date:** 2025-11-13
+**Version:** 2.0.0
+**Date:** 2025-11-24
 
 ---
 
@@ -52,8 +52,8 @@ The payment component uses an **event-driven architecture** where business logic
 │                    SERVICE LAYER                             │
 │              (Reusable Business Logic)                       │
 │                                                               │
-│  • StripePaymentService                                      │
-│  • OrderManager                                              │
+│  • PaymentAdapterFactory                                     │
+│  • StripeAdapter (PaymentAdapterInterface)                   │
 │  • TransactionService                                        │
 └────────────────────┬────────────────────────────────────────┘
                      │ persists

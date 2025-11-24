@@ -148,14 +148,20 @@ final class StripeAdapter implements PaymentAdapterInterface
                 $params
             );
 
+            // Retrieve with expanded latest_charge to get charge details
+            $paymentIntent = $this->stripeClient->paymentIntents->retrieve(
+                $request->providerPaymentId,
+                ['expand' => ['latest_charge']]
+            );
+
             $amountCaptured = $paymentIntent->amount_received / 100;
 
-            // Get capture timestamp from first charge, or use current time if not available
-            $capturedAtTimestamp = $paymentIntent->charges->data[0]->created ?? time();
+            // Get capture timestamp from latest charge, or use current time if not available
+            $capturedAtTimestamp = $paymentIntent->latest_charge?->created ?? time();
 
             return new CaptureResponse(
                 providerPaymentId: $paymentIntent->id,
-                captureId: $paymentIntent->charges->data[0]->id ?? $paymentIntent->id,
+                captureId: $paymentIntent->latest_charge?->id ?? $paymentIntent->id,
                 amountCaptured: $amountCaptured,
                 currency: strtoupper($paymentIntent->currency),
                 status: 'succeeded',
@@ -233,25 +239,27 @@ final class StripeAdapter implements PaymentAdapterInterface
         }
     }
 
-    public function getPaymentDetails(string $providerPaymentId): PaymentDetailsResponse
+    public function  getPaymentDetails(string $providerPaymentId): PaymentDetailsResponse
     {
         try {
-            $paymentIntent = $this->stripeClient->paymentIntents->retrieve($providerPaymentId);
+            // Retrieve with expanded latest_charge to get charge details
+            $paymentIntent = $this->stripeClient->paymentIntents->retrieve(
+                $providerPaymentId,
+                ['expand' => ['latest_charge']]
+            );
 
             $amountCaptured = $paymentIntent->amount_received / 100;
             $amount = $paymentIntent->amount / 100;
 
-            // Calculate refunded amount from charges
+            // Get refunded amount from latest charge
             $amountRefunded = 0.0;
-            if ($paymentIntent->charges->data) {
-                foreach ($paymentIntent->charges->data as $charge) {
-                    $amountRefunded += $charge->amount_refunded / 100;
-                }
+            if ($paymentIntent->latest_charge) {
+                $amountRefunded = ($paymentIntent->latest_charge->amount_refunded ?? 0) / 100;
             }
 
             $capturedAt = null;
-            if (!empty($paymentIntent->charges->data) && isset($paymentIntent->charges->data[0]->created)) {
-                $capturedAt = new DateTimeImmutable('@' . $paymentIntent->charges->data[0]->created);
+            if ($paymentIntent->latest_charge && isset($paymentIntent->latest_charge->created)) {
+                $capturedAt = new DateTimeImmutable('@' . $paymentIntent->latest_charge->created);
             }
 
             return new PaymentDetailsResponse(

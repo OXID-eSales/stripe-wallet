@@ -12,7 +12,6 @@ namespace OxidSolutionCatalysts\Payments\Stripe\Controller;
 use OxidEsales\Eshop\Application\Controller\PaymentController as CorePaymentController;
 use OxidEsales\Eshop\Core\Registry;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
-use OxidSolutionCatalysts\Payments\Stripe\Service\StripePaymentService;
 use OxidSolutionCatalysts\Payments\Stripe\Module;
 use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory;
 use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreatePaymentRequest;
@@ -26,18 +25,15 @@ use OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface;
 class PaymentController extends CorePaymentController
 {
     private ModuleConfigurationService $stripeConfig;
-    private StripePaymentService $paymentService;
     private PaymentAdapterFactory $adapterFactory;
     private ShopAdapterInterface $shopAdapter;
 
     /**
-     * @param \OxidSolutionCatalysts\Payments\Stripe\Service\StripePaymentService $paymentService
      * @param \OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService $stripeConfig
      * @param \OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory $adapterFactory
      * @param \OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface $shopAdapter
      */
     public function __construct(
-        StripePaymentService $paymentService,
         ModuleConfigurationService $stripeConfig,
         PaymentAdapterFactory $adapterFactory,
         ShopAdapterInterface $shopAdapter
@@ -45,7 +41,6 @@ class PaymentController extends CorePaymentController
     {
         parent::__construct();
 
-        $this->paymentService = $paymentService;
         $this->stripeConfig = $stripeConfig;
         $this->adapterFactory = $adapterFactory;
         $this->shopAdapter = $shopAdapter;

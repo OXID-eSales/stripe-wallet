@@ -176,16 +176,21 @@ namespace OxidSolutionCatalysts\Stripe\Controller;
 use OxidEsales\Eshop\Application\Controller\OrderController as CoreOrderController;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Eshop\Application\Model\Order;
-use OxidSolutionCatalysts\Stripe\Service\StripePaymentService;
+use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory;
 
 class OrderController extends CoreOrderController
 {
-    private StripePaymentService $paymentService;
+    private ModuleConfigurationService $stripeConfig;
+    private PaymentAdapterFactory $adapterFactory;
 
-    public function init(): void
-    {
-        parent::init();
-        $this->paymentService = Registry::get(StripePaymentService::class);
+    public function __construct(
+        ModuleConfigurationService $stripeConfig,
+        PaymentAdapterFactory $adapterFactory
+    ) {
+        parent::__construct();
+        $this->stripeConfig = $stripeConfig;
+        $this->adapterFactory = $adapterFactory;
     }
 
     /**
@@ -419,18 +424,19 @@ if ($paymentId === 'amazonpay') {
 
 ## Payment Service Layer
 
-### StripePaymentService - Helper Methods
+### Payment Adapter Pattern - Helper Methods
 
 ```php
 <?php
 
-namespace OxidSolutionCatalysts\Stripe\Service;
+namespace OxidSolutionCatalysts\Payments\Stripe\Adapter;
 
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Application\Model\Basket;
 use OxidEsales\Eshop\Application\Model\User;
+use OxidSolutionCatalysts\Payments\Component\Adapter\PaymentAdapterInterface;
 
-class StripePaymentService
+class StripeAdapter implements PaymentAdapterInterface
 {
     /**
      * Helper method: Create order with payment verification
