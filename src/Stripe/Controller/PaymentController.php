@@ -264,7 +264,7 @@ class PaymentController extends CorePaymentController
                     'oxid_user_id' => $user->getId(),
                     'customer_email' => $user->getFieldData('oxusername'),
                     'customer_name' => $user->getFieldData('oxfname') . ' ' . $user->getFieldData('oxlname'),
-                    'basket_id' => $basket->getId(),
+                    'basket_id' => Registry::getSession()->getId(),
                 ]
             );
 

@@ -14,10 +14,15 @@ use OxidEsales\Eshop\Application\Model\Basket;
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Application\Model\User;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\Eshop\Core\UtilsObject;
 use OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface;
 use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreateOrderRequest;
 use OxidSolutionCatalysts\Payments\Component\Adapter\Response\OrderResponse;
+use OxidSolutionCatalysts\Payments\Component\Adapter\Response\PaymentDetailsResponse;
 use OxidSolutionCatalysts\Payments\Component\Adapter\Exception\ShopOrderException;
+use OxidSolutionCatalysts\Payments\Component\Repository\TransactionRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Transaction\Transaction;
+use OxidSolutionCatalysts\Payments\Stripe\Repository\StripePaymentDetailsRepository;
 
 /**
  * OXID eShop implementation of ShopOrderServiceInterface.
@@ -33,22 +38,27 @@ use OxidSolutionCatalysts\Payments\Component\Adapter\Exception\ShopOrderExceptio
  */
 final class OxidShopOrderService implements ShopOrderServiceInterface
 {
+    public function __construct(
+        private readonly TransactionRepositoryInterface $transactionRepository,
+        private readonly StripePaymentDetailsRepository $stripeDetailsRepository
+    ) {
+    }
+
     /**
      * @inheritDoc
      */
     public function createOrder(CreateOrderRequest $request): OrderResponse
     {
         try {
-            // 1. Get basket and user from session
-            $session = Registry::getSession();
-            $basket = $session->getBasket();
+            // 1. Get basket and user from request
+            $basket = $request->getBasket();
             $user = $basket?->getBasketUser();
 
             if (!$basket) {
                 throw new ShopOrderException(
                     message: 'Basket not found in session',
                     errorCode: 'basket_not_found',
-                    context: ['basket_id' => $request->basketId]
+                    context: ['session_id' => $request->sessionId]
                 );
             }
 
@@ -60,44 +70,54 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
                 );
             }
 
-            // 2. Set payment transaction ID if provided
-            if ($request->paymentTransactionId !== null) {
-                $basket->setOrderPaymentTransactionId($request->paymentTransactionId);
-            }
-
-            // 3. Set order remark if provided
+            // 2. Set order remark if provided
             if ($request->orderRemark !== null) {
-                $session->setVariable('ordRem', $request->orderRemark);
+                Registry::getSession()->setVariable('ordRem', $request->orderRemark);
             }
 
-            // 4. Create order using OXID's standard method
+            // 3. Create order using OXID's standard method
             $order = oxNew(Order::class);
             $orderState = $order->finalizeOrder($basket, $user);
 
-            // 5. Validate order creation
+            // 4. Validate order creation
             if (!in_array($orderState, [Order::ORDER_STATE_OK, Order::ORDER_STATE_ORDEREXISTS], true)) {
                 throw new ShopOrderException(
                     message: 'Order finalization failed',
                     errorCode: $this->mapOrderStateToErrorCode($orderState),
                     context: [
                         'order_state' => $orderState,
-                        'basket_id' => $request->basketId,
+                        'session_id' => $request->sessionId,
                         'user_id' => $request->userId,
                     ]
                 );
             }
 
-            // 6. Store metadata if provided
+            // 5. Set payment transaction ID on order if provided
+            if ($request->paymentTransactionId !== null) {
+                $order->oxorder__oxtransid = new \OxidEsales\Eshop\Core\Field(
+                    $request->paymentTransactionId,
+                    \OxidEsales\Eshop\Core\Field::T_RAW
+                );
+                $order->save();
+            }
+
+            // 6. Ensure order number is always set after successful finalization
+            // This MUST be called before accessing oxordernr field
+            // The Stripe Order extension overrides setOrderNumber() to ensure it's always set
+            $order->setOrderNumber();
+
+            // 7. Store metadata if provided
             if (!empty($request->metadata)) {
                 $this->storeOrderMetadata($order, $request->metadata);
             }
 
-            // 7. Build and return response
+            // 8. Build and return response
+            // Use basket total directly as source of truth to avoid field loading issues
             return new OrderResponse(
                 orderId: $order->getId(),
                 orderNumber: $order->getFieldData('oxordernr'),
                 userId: $user->getId(),
-                totalAmount: (float) $order->getTotalOrderSum(),
+                totalAmount: (float) $basket->getPrice()->getBruttoPrice(),
                 currency: $basket->getBasketCurrency()->name,
                 status: $this->mapOrderStateToStatus($orderState),
                 paymentId: $request->paymentId,
@@ -119,7 +139,7 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
                 errorCode: 'unexpected_error',
                 context: [
                     'exception_class' => get_class($e),
-                    'basket_id' => $request->basketId,
+                    'session_id' => $request->sessionId,
                 ],
                 previous: $e
             );
@@ -201,6 +221,76 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
         Registry::getLogger()->debug('Order metadata', [
             'order_id' => $order->getId(),
             'metadata' => $metadata,
+        ]);
+    }
+
+    /**
+     * Store transaction and Stripe-specific payment details.
+     *
+     * Stores payment-related data using Component-level persistence:
+     * - Component transaction entity (provider-agnostic)
+     * - Stripe-specific payment details (provider-specific)
+     * - Order payment date (OXPAID) when payment is captured
+     *
+     * The Transaction entity already contains all necessary payment state information
+     * (status, amount, currency, provider order ID) making separate order state
+     * persistence redundant at this level.
+     *
+     * @param Order $order OXID order object
+     * @param PaymentDetailsResponse $paymentDetails Payment details from adapter
+     * @return void
+     */
+    public function storePaymentDetails(Order $order, PaymentDetailsResponse $paymentDetails): void
+    {
+        // 1. Create and save transaction via Component repository (provider-agnostic)
+        $transaction = new Transaction(
+            id: UtilsObject::getInstance()->generateUId(),
+            shopId: (int) Registry::getConfig()->getShopId(),
+            orderId: $order->getId(),
+            contractId: null,
+            provider: 'stripe',
+            type: $paymentDetails->isCaptured ? 'capture' : 'authorization',
+            status: $paymentDetails->status,
+            amount: $paymentDetails->amount,
+            currency: $paymentDetails->currency
+        );
+
+        $transaction->setProviderOrderId($paymentDetails->providerPaymentId);
+        $transaction->setPaymentMethodId($order->getFieldData('oxpaymenttype'));
+
+        // Extract transaction ID and payment method type from charges
+        $charge = $paymentDetails->providerData['charges']['data'][0] ?? null;
+        if ($charge) {
+            $transaction->setTransactionId($charge['id']);
+            $transaction->setPaymentMethodType($charge['payment_method_details']['type'] ?? 'card');
+        }
+
+        // Save transaction - this is the single source of truth for payment state
+        $this->transactionRepository->save($transaction);
+
+        // 2. Store Stripe-specific payment details (provider-specific metadata)
+        if ($charge) {
+            $this->stripeDetailsRepository->storePaymentDetails($transaction->getId(), $charge);
+        }
+
+        // 3. Update order payment date if payment is captured
+        if ($paymentDetails->isCaptured && $paymentDetails->capturedAt) {
+            $order->oxorder__oxpaid = new \OxidEsales\Eshop\Core\Field(
+                $paymentDetails->capturedAt->format('Y-m-d H:i:s'),
+                \OxidEsales\Eshop\Core\Field::T_RAW
+            );
+            $order->save();
+        }
+
+        Registry::getLogger()->debug('Payment details stored via Component-level transaction', [
+            'order_id' => $order->getId(),
+            'transaction_id' => $transaction->getId(),
+            'provider_payment_id' => $paymentDetails->providerPaymentId,
+            'status' => $paymentDetails->status,
+            'amount' => $paymentDetails->amount,
+            'currency' => $paymentDetails->currency,
+            'is_captured' => $paymentDetails->isCaptured,
+            'captured_at' => $paymentDetails->capturedAt?->format('Y-m-d H:i:s'),
         ]);
     }
 }

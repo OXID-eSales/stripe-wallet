@@ -164,7 +164,7 @@ final class StripeAdapter implements PaymentAdapterInterface
                 captureId: $paymentIntent->latest_charge?->id ?? $paymentIntent->id,
                 amountCaptured: $amountCaptured,
                 currency: strtoupper($paymentIntent->currency),
-                status: 'succeeded',
+                status: StripeStatusMapper::STATUS_CAPTURED,
                 capturedAt: new DateTimeImmutable('@' . $capturedAtTimestamp),
                 providerData: $paymentIntent->toArray(),
                 metadata: $request->metadata
@@ -228,7 +228,7 @@ final class StripeAdapter implements PaymentAdapterInterface
 
             return new VoidResponse(
                 providerPaymentId: $paymentIntent->id,
-                status: 'succeeded',
+                status: StripeStatusMapper::STATUS_CANCELLED,
                 voidedAt: new DateTimeImmutable(),
                 reason: $request->reason,
                 providerData: $paymentIntent->toArray(),
@@ -488,7 +488,10 @@ final class StripeAdapter implements PaymentAdapterInterface
 
             // Payment is authenticated if it's succeeded or requires_capture
             // (requires_capture means authorization was successful)
-            $authenticated = in_array($paymentIntent->status, ['succeeded', 'requires_capture'], true);
+            $authenticated = in_array($paymentIntent->status, [
+                StripeStatusMapper::STRIPE_SUCCEEDED,
+                StripeStatusMapper::STRIPE_REQUIRES_CAPTURE
+            ], true);
 
             return new ThreeDSecureResponse(
                 paymentId: $paymentIntent->id,
@@ -509,8 +512,8 @@ final class StripeAdapter implements PaymentAdapterInterface
             $paymentIntent = $this->stripeClient->paymentIntents->retrieve($providerPaymentId);
 
             // Check if payment succeeded after 3DS authentication
-            return $paymentIntent->status === 'succeeded'
-                || $paymentIntent->status === 'requires_capture';
+            return $paymentIntent->status === StripeStatusMapper::STRIPE_SUCCEEDED
+                || $paymentIntent->status === StripeStatusMapper::STRIPE_REQUIRES_CAPTURE;
         } catch (ApiErrorException $e) {
             throw $this->convertStripeException($e);
         }
@@ -642,9 +645,10 @@ final class StripeAdapter implements PaymentAdapterInterface
     private function map3DSecureStatus(string $stripeStatus): string
     {
         return match ($stripeStatus) {
-            'succeeded', 'requires_capture' => 'authenticated',
-            'requires_action' => 'pending',
-            'canceled', 'payment_failed' => 'failed',
+            StripeStatusMapper::STRIPE_SUCCEEDED,
+            StripeStatusMapper::STRIPE_REQUIRES_CAPTURE => 'authenticated',
+            StripeStatusMapper::STRIPE_REQUIRES_ACTION => 'pending',
+            StripeStatusMapper::STRIPE_CANCELED => 'failed',
             default => 'not_required',
         };
     }

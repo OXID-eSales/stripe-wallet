@@ -9,6 +9,9 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\Adapter\Request;
 
+use OxidEsales\Eshop\Application\Model\Basket;
+use OxidEsales\Eshop\Core\Registry;
+
 /**
  * Request DTO for creating an order.
  *
@@ -20,7 +23,7 @@ namespace OxidSolutionCatalysts\Payments\Component\Adapter\Request;
 final readonly class CreateOrderRequest
 {
     /**
-     * @param string $basketId Basket/Cart identifier
+     * @param string $sessionId Session identifier for retrieving basket
      * @param string $userId User/Customer identifier
      * @param string $paymentId Payment method identifier
      * @param string|null $paymentTransactionId External payment transaction ID (e.g., PaymentIntent ID)
@@ -28,12 +31,22 @@ final readonly class CreateOrderRequest
      * @param array<string, mixed> $metadata Additional metadata to store with order
      */
     public function __construct(
-        public string $basketId,
+        public string $sessionId,
         public string $userId,
         public string $paymentId,
         public ?string $paymentTransactionId = null,
         public ?string $orderRemark = null,
         public array $metadata = []
     ) {
+    }
+
+    /**
+     * Get the basket from session.
+     *
+     * @return Basket|null
+     */
+    public function getBasket(): ?Basket
+    {
+        return Registry::getSession()->getBasket();
     }
 }

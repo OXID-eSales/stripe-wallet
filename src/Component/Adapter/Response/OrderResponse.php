@@ -35,7 +35,7 @@ final readonly class OrderResponse
      */
     public function __construct(
         public string $orderId,
-        public string $orderNumber,
+        public int $orderNumber,
         public string $userId,
         public float $totalAmount,
         public string $currency,

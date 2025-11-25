@@ -114,6 +114,17 @@ services:
   OxidSolutionCatalysts\Payments\Component\Repository\DoctrineTransactionRepository:
     alias: OxidSolutionCatalysts\Payments\Component\Repository\TransactionRepositoryInterface
 
+  # Stripe Payment Details Repository - Stores Stripe-specific payment data
+  OxidSolutionCatalysts\Payments\Stripe\Repository\StripePaymentDetailsRepository:
+    public: false
+
+  # Payment Order State Repository - DEPRECATED (No longer used)
+  # Payment state is now tracked via Component-level TransactionRepository
+  # which provides provider-agnostic transaction persistence.
+  # Keeping this definition for backwards compatibility but it's no longer injected.
+  # OxidSolutionCatalysts\Payments\Stripe\Repository\PaymentOrderStateRepository:
+  #   public: false
+
   # ==========================================
   # Event System (Optional)
   # ==========================================

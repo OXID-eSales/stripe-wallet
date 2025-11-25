@@ -16,12 +16,7 @@ use OxidEsales\Eshop\Application\Model\Basket;
 use OxidEsales\Eshop\Application\Model\User;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use OxidSolutionCatalysts\Payments\Stripe\Service\StripeCustomerService;
-use OxidSolutionCatalysts\Payments\Stripe\Repository\StripePaymentDetailsRepository;
-use OxidSolutionCatalysts\Payments\Stripe\Repository\PaymentOrderStateRepository;
 use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory;
-use OxidSolutionCatalysts\Payments\Component\Repository\TransactionRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Component\Transaction\Transaction;
-use OxidEsales\Eshop\Core\UtilsObject;
 use OxidSolutionCatalysts\Payments\Component\Adapter\PaymentAdapterInterface;
 use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreatePaymentRequest;
 use OxidSolutionCatalysts\Payments\Component\Adapter\Exception\PaymentAdapterException;
@@ -32,11 +27,13 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentCa
 use OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface;
 use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreateOrderRequest as OrderCreateRequest;
 use OxidSolutionCatalysts\Payments\Component\Adapter\Exception\ShopOrderException;
+use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeStatusMapper;
 
 /**
  * Extended order controller for Stripe payment processing
  * ✅ Uses StripeAdapter via PaymentAdapterFactory (SDK-Adapter pattern)
  * ✅ Uses standard Order::finalizeOrder() method for compatibility
+ * ✅ Uses unified OxidShopOrderService for all order operations
  * ✅ Follows Single Responsibility Principle
  */
 class OrderController extends CoreOrderController
@@ -45,7 +42,6 @@ class OrderController extends CoreOrderController
         private readonly PaymentAdapterFactory $adapterFactory,
         private readonly ModuleConfigurationService $config,
         private readonly StripeCustomerService $customerService,
-        private readonly TransactionRepositoryInterface $transactionRepository,
         private readonly ShopOrderServiceInterface $orderService,
         private readonly ?EventDispatcherInterface $eventDispatcher = null
     )
@@ -223,28 +219,36 @@ class OrderController extends CoreOrderController
             $adapter = $this->adapterFactory->createDefaultAdapter();
             $paymentDetails = $adapter->getPaymentDetails($paymentIntentId);
 
-            // Handle different payment statuses
+            // Handle different payment statuses (normalized)
             switch ($paymentDetails->status) {
-                case 'succeeded':
-                case 'captured':
+                case StripeStatusMapper::STATUS_CAPTURED:
                     return $this->handleSuccessfulPayment($paymentIntentId);
 
-                case 'requires_action':
-                case 'requires_confirmation':
-                    return $this->handle3DSecure($paymentIntentId, $paymentDetails);
-
-                case 'processing':
-                    return $this->handleProcessingPayment($paymentIntentId);
-
-                case 'authorized':
+                case StripeStatusMapper::STATUS_AUTHORIZED:
                     // Payment authorized but not captured yet
                     // This is valid for manual capture mode
                     return $this->handleSuccessfulPayment($paymentIntentId);
 
-                case 'requires_payment_method':
-                case 'cancelled':
-                case 'canceled':
-                case 'failed':
+                case StripeStatusMapper::STATUS_PENDING:
+                    // Check provider data to determine specific action needed
+                    $stripeStatus = $paymentDetails->providerData['status'] ?? '';
+
+                    if (in_array($stripeStatus, [
+                        StripeStatusMapper::STRIPE_REQUIRES_ACTION,
+                        StripeStatusMapper::STRIPE_REQUIRES_CONFIRMATION
+                    ], true)) {
+                        return $this->handle3DSecure($paymentIntentId, $paymentDetails);
+                    }
+
+                    if ($stripeStatus === StripeStatusMapper::STRIPE_PROCESSING) {
+                        return $this->handleProcessingPayment($paymentIntentId);
+                    }
+
+                    // requires_payment_method or other pending states
+                    return $this->handleFailedPayment($paymentDetails);
+
+                case StripeStatusMapper::STATUS_CANCELLED:
+                case StripeStatusMapper::STATUS_FAILED:
                 default:
                     return $this->handleFailedPayment($paymentDetails);
             }
@@ -265,9 +269,8 @@ class OrderController extends CoreOrderController
 
     /**
      * Handle successful payment
-     * ✅ USES STANDARD Order::finalizeOrder() METHOD
-     * ✅ Uses adapter for payment retrieval
-     * ✅ Uses repository for transaction storage
+     * ✅ USES STANDARD Order::finalizeOrder() METHOD via ShopOrderService
+     * ✅ Uses unified service for all order and transaction operations
      *
      * @param string $paymentIntentId
      * @return string
@@ -288,13 +291,16 @@ class OrderController extends CoreOrderController
             $paymentDetails = $adapter->getPaymentDetails($paymentIntentId);
 
             // 2. Verify payment succeeded
-            if (!in_array($paymentDetails->status, ['captured', 'succeeded', 'authorized'])) {
+            if (!in_array($paymentDetails->status, [
+                StripeStatusMapper::STATUS_CAPTURED,
+                StripeStatusMapper::STATUS_AUTHORIZED,
+            ], true)) {
                 throw new \RuntimeException('Payment not successful: ' . $paymentDetails->status);
             }
 
-            // 3. Create order via ShopOrderService
+            // 3. Create order via unified ShopOrderService (handles finalizeOrder + order number)
             $orderRequest = new OrderCreateRequest(
-                basketId: $basket->getId(),
+                sessionId: $session->getId(),
                 userId: $user->getId(),
                 paymentId: $basket->getPaymentId(),
                 paymentTransactionId: $paymentIntentId,
@@ -307,31 +313,31 @@ class OrderController extends CoreOrderController
 
             $orderResponse = $this->orderService->createOrder($orderRequest);
 
-            // Get OXID Order object for legacy compatibility
+            // 4. Get OXID Order object for event dispatching and payment details storage
             $order = oxNew(Order::class);
             if (!$order->load($orderResponse->orderId)) {
                 throw new \RuntimeException('Failed to load created order: ' . $orderResponse->orderId);
             }
 
-            // 4. Store transaction and Stripe-specific details
-            $this->storeTransactionAndDetails($order, $paymentDetails);
+            // 5. Store transaction and Stripe-specific details via unified service
+            $this->orderService->storePaymentDetails($order, $paymentDetails);
 
-            // 5. Dispatch events
+            // 6. Dispatch events
             $this->dispatchOrderCreatedEvent($order, $paymentIntentId);
             if ($paymentDetails->isCaptured) {
                 $this->dispatchPaymentCapturedEvent($order, $paymentDetails);
             }
 
             // Set order ID in session for thank you page
-            $session->setVariable('sess_challenge', $order->getId());
+            $session->setVariable('sess_challenge', $orderResponse->orderId);
 
             // Clear Stripe session variables
             $session->deleteVariable('stripe_payment_intent_id');
             $session->deleteVariable('stripe_client_secret');
 
             Registry::getLogger()->info('Stripe payment successful, order created', [
-                'order_id' => $order->getId(),
-                'order_number' => $order->getFieldData('oxordernr'),
+                'order_id' => $orderResponse->orderId,
+                'order_number' => $orderResponse->orderNumber,
                 'payment_intent_id' => $paymentIntentId,
             ]);
 
@@ -421,14 +427,17 @@ class OrderController extends CoreOrderController
         $errorMessage = 'Payment failed';
 
         switch ($paymentDetails->status) {
-            case 'requires_payment_method':
-                $errorMessage = 'Payment method declined. Please try a different card.';
+            case StripeStatusMapper::STATUS_PENDING:
+                // Check if it's requires_payment_method specifically
+                $stripeStatus = $paymentDetails->providerData['status'] ?? '';
+                if ($stripeStatus === StripeStatusMapper::STRIPE_REQUIRES_PAYMENT_METHOD) {
+                    $errorMessage = 'Payment method declined. Please try a different card.';
+                }
                 break;
-            case 'canceled':
-            case 'cancelled':
+            case StripeStatusMapper::STATUS_CANCELLED:
                 $errorMessage = 'Payment was canceled. Please try again.';
                 break;
-            case 'failed':
+            case StripeStatusMapper::STATUS_FAILED:
                 $errorMessage = 'Payment failed. Please check your card details.';
                 break;
         }
@@ -538,56 +547,6 @@ class OrderController extends CoreOrderController
         }
 
         return 'Payment initialization failed. Please try again or contact support.';
-    }
-
-    /**
-     * Store transaction and Stripe-specific details
-     * ✅ Uses repositories directly (no service layer)
-     *
-     * @param Order $order
-     * @param \OxidSolutionCatalysts\Payments\Component\Adapter\Response\PaymentDetailsResponse $paymentDetails
-     * @return void
-     */
-    private function storeTransactionAndDetails(Order $order, $paymentDetails): void
-    {
-        // 1. Create and save transaction via Component repository
-        $transaction = new Transaction(
-            id: UtilsObject::getInstance()->generateUId(),
-            shopId: (int) Registry::getConfig()->getShopId(),
-            orderId: $order->getId(),
-            contractId: null,
-            provider: 'stripe',
-            type: $paymentDetails->isCaptured ? 'capture' : 'authorization',
-            status: $paymentDetails->status,
-            amount: $paymentDetails->amount,
-            currency: $paymentDetails->currency
-        );
-
-        $transaction->setProviderOrderId($paymentDetails->providerPaymentId);
-        $transaction->setPaymentMethodId('osc_stripe_card');
-
-        // Extract transaction ID and payment method type from charges
-        $charge = $paymentDetails->providerData['charges']['data'][0] ?? null;
-        if ($charge) {
-            $transaction->setTransactionId($charge['id']);
-            $transaction->setPaymentMethodType($charge['payment_method_details']['type'] ?? 'card');
-        }
-
-        $this->transactionRepository->save($transaction);
-
-        // 2. Store Stripe-specific details
-        if ($charge) {
-            $this->stripeDetailsRepository->storePaymentDetails($transaction->getId(), $charge);
-        }
-
-        // 3. Update payment order state
-        $paymentIntentArray = [
-            'id' => $paymentDetails->providerPaymentId,
-            'status' => $paymentDetails->status,
-            'amount' => (int) ($paymentDetails->amount * 100), // Convert to cents
-            'currency' => $paymentDetails->currency,
-        ];
-        $this->orderStateRepository->updateOrderState($order->getId(), $paymentIntentArray);
     }
 
     /**
@@ -721,9 +680,10 @@ class OrderController extends CoreOrderController
             ]);
 
             // Handle based on redirect_status if available
-            if ($redirectStatus === 'succeeded') {
+            // Note: redirect_status comes from Stripe URL parameters and uses Stripe-specific values
+            if ($redirectStatus === StripeStatusMapper::STRIPE_SUCCEEDED) {
                 return $this->handleSuccessfulPayment($paymentIntentId);
-            } elseif ($redirectStatus === 'failed') {
+            } elseif ($redirectStatus === StripeStatusMapper::STATUS_FAILED) {
                 Registry::getUtilsView()->addErrorToDisplay('Payment failed. Please try again.');
                 return 'payment';
             }
