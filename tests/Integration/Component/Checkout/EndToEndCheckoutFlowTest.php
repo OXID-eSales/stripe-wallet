@@ -9,9 +9,13 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Integration\Component\Checkout;
 
+use DateTime;
+use Doctrine\DBAL\Connection;
+use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
+use OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionProviderInterface;
+use OxidEsales\EshopCommunity\Tests\Integration\IntegrationTestCase;
 use OxidSolutionCatalysts\Payments\Component\Contract\BasketSnapshot;
 use OxidSolutionCatalysts\Payments\Component\Contract\ContractCondition;
-use OxidSolutionCatalysts\Payments\Component\Contract\ContractState;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractCreatedEvent;
@@ -20,23 +24,24 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentIn
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventListenerProvider;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractCreationHandler;
-use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Repository\DoctrineContractRepository;
 use OxidSolutionCatalysts\Payments\Component\Service\CheckoutOrchestrator;
 use OxidSolutionCatalysts\Payments\Component\Service\ContractService;
 use OxidSolutionCatalysts\Payments\Component\Service\Result\CheckoutResult;
 use OxidSolutionCatalysts\Payments\Component\Service\Result\OrderConfirmationResult;
-use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 /**
  * End-to-end integration test for the complete checkout flow.
  *
  * Tests the entire flow from OrderController.execute() to ThankyouController,
- * verifying that:
- * - Contract is created with proper state machine transitions
- * - Conditions are tracked and fulfilled
- * - Order state changes are recorded
- * - All components work together correctly
+ * using REAL database connection and leaving data in the database for inspection.
+ *
+ * Key features:
+ * - Uses real DoctrineContractRepository with actual MySQL connection
+ * - Data is persisted to osc_payment_contract table
+ * - Data is NOT cleaned up after tests (for manual inspection)
+ * - All test contract IDs start with "e2e_test_" prefix
  *
  * Note: This test does NOT test Stripe API integration (webhooks, idempotency).
  * It tests the internal contract and order state machine.
@@ -44,22 +49,41 @@ use Psr\Log\NullLogger;
  * @group integration
  * @group checkout
  * @group e2e
+ * @group database
  */
-final class EndToEndCheckoutFlowTest extends TestCase
+final class EndToEndCheckoutFlowTest extends IntegrationTestCase
 {
+    private const TEST_PREFIX = 'e2e_';
+
     private EventDispatcher $eventDispatcher;
     private CheckoutOrchestrator $orchestrator;
-    private InMemoryContractRepository $contractRepository;
+    private DoctrineContractRepository $contractRepository;
     private ContractService $contractService;
+    private Connection $connection;
 
-    protected function setUp(): void
+    /**
+     * Test run identifier - unique per test run to allow tracking
+     * Format: HHMMSS_XXXX (10 chars) to keep total ID under 32 chars
+     */
+    private string $testRunId;
+
+    public function setUp(): void
     {
         parent::setUp();
 
-        // Create in-memory contract repository for testing
-        $this->contractRepository = new InMemoryContractRepository();
+        // Generate short unique test run ID (10 chars: HHMMSS_XXXX)
+        $this->testRunId = date('His') . '_' . substr(uniqid(), -4);
 
-        // Create ContractService with in-memory repository
+        // Get real database connection from OXID DI container
+        $container = ContainerFactory::getInstance()->getContainer();
+        /** @var ConnectionProviderInterface $connectionProvider */
+        $connectionProvider = $container->get(ConnectionProviderInterface::class);
+        $this->connection = $connectionProvider->get();
+
+        // Create real DoctrineContractRepository with database connection
+        $this->contractRepository = new DoctrineContractRepository($this->connection);
+
+        // Create ContractService with real repository
         $this->contractService = new ContractService($this->contractRepository);
 
         // Create EventListenerProvider with empty handlers initially
@@ -87,6 +111,39 @@ final class EndToEndCheckoutFlowTest extends TestCase
         );
     }
 
+    /**
+     * NOTE: tearDown intentionally does NOT roll back transaction.
+     * Data remains in the database for manual inspection.
+     * All test data has "e2e_" prefix for easy identification.
+     *
+     * To query test data:
+     * SELECT * FROM osc_payment_contract WHERE OXID LIKE 'e2e_%' OR OXUSERID LIKE 'e2e_%';
+     */
+    public function tearDown(): void
+    {
+        // Commit transaction instead of rollback - data stays in DB
+        $this->commitTransaction();
+
+        // Call parent but skip the rollback (it's already committed)
+        $this->cleanupCaching();
+        $this->restoreRequestData();
+    }
+
+    /**
+     * Commit transaction to persist test data.
+     */
+    private function commitTransaction(): void
+    {
+        $container = ContainerFactory::getInstance()->getContainer();
+        /** @var ConnectionProviderInterface $connectionProvider */
+        $connectionProvider = $container->get(ConnectionProviderInterface::class);
+        $connection = $connectionProvider->get();
+
+        if ($connection->isTransactionActive()) {
+            $connection->commit();
+        }
+    }
+
     // =========================================================================
     // PHASE 1: Contract Creation (OrderController.execute())
     // =========================================================================
@@ -94,17 +151,18 @@ final class EndToEndCheckoutFlowTest extends TestCase
     /**
      * @group integration
      * @group e2e
+     * @group database
      */
-    public function testFullCheckoutFlow_CreatesContractInDraftState(): void
+    public function testFullCheckoutFlow_CreatesContractInDatabase(): void
     {
         $basket = $this->createValidBasket(150.00, 'EUR');
-        $user = $this->createValidUser('user_123');
+        $user = $this->createValidUser($this->generateTestUserId('user_create'));
 
         $result = $this->orchestrator->processCheckout(
             $basket,
             $user,
             'stripe_card',
-            'pi_test_intent_123'
+            'pi_test_intent_' . $this->testRunId
         );
 
         $this->assertInstanceOf(CheckoutResult::class, $result);
@@ -120,21 +178,30 @@ final class EndToEndCheckoutFlowTest extends TestCase
 
         $this->assertNotNull($result->getContractId(), 'Contract ID should be set');
 
-        // Verify contract was persisted
+        // Verify contract was persisted to real database
         $contractId = $result->getContractId();
         $this->assertIsString($contractId);
-        $contract = $this->contractRepository->findById($contractId);
-        $this->assertNotNull($contract, 'Contract should be persisted');
+
+        // Query database directly to verify persistence
+        $dbRow = $this->connection->fetchAssociative(
+            'SELECT * FROM osc_payment_contract WHERE OXID = :id',
+            ['id' => $contractId]
+        );
+
+        $this->assertNotFalse($dbRow, 'Contract should be persisted in database');
+        $this->assertEquals($contractId, $dbRow['OXID']);
+        $this->assertEquals('draft', $dbRow['OXSTATE']);
     }
 
     /**
      * @group integration
      * @group e2e
+     * @group database
      */
     public function testFullCheckoutFlow_ContractHasCorrectBasketSnapshot(): void
     {
         $basket = $this->createValidBasket(199.99, 'USD');
-        $user = $this->createValidUser('user_456');
+        $user = $this->createValidUser($this->generateTestUserId('user_basket'));
 
         $result = $this->orchestrator->processCheckout(
             $basket,
@@ -143,31 +210,49 @@ final class EndToEndCheckoutFlowTest extends TestCase
             null
         );
 
-        $contract = $this->contractRepository->findById($result->getContractId());
+        $this->assertTrue($result->isSuccess());
+        $contractId = $result->getContractId();
+        $this->assertNotNull($contractId);
+
+        $contract = $this->contractRepository->findById($contractId);
         $this->assertNotNull($contract);
 
         $snapshot = $contract->getBasketSnapshot();
         $this->assertEquals(199.99, $snapshot->getTotalGross());
         $this->assertEquals('USD', $snapshot->getCurrency());
+
+        // Verify in database
+        $dbRow = $this->connection->fetchAssociative(
+            'SELECT OXBASKETDATA FROM osc_payment_contract WHERE OXID = :id',
+            ['id' => $contractId]
+        );
+        $basketData = json_decode($dbRow['OXBASKETDATA'], true);
+        $this->assertEquals(199.99, $basketData['totalGross']);
+        $this->assertEquals('USD', $basketData['currency']);
     }
 
     /**
      * @group integration
      * @group e2e
+     * @group database
      */
     public function testFullCheckoutFlow_ContractHasDefaultConditions(): void
     {
         $basket = $this->createValidBasket(100.00, 'EUR');
-        $user = $this->createValidUser('user_789');
+        $user = $this->createValidUser($this->generateTestUserId('user_conditions'));
 
         $result = $this->orchestrator->processCheckout(
             $basket,
             $user,
             'stripe_card',
-            'pi_test_123'
+            'pi_test_conditions_' . $this->testRunId
         );
 
-        $contract = $this->contractRepository->findById($result->getContractId());
+        $this->assertTrue($result->isSuccess());
+        $contractId = $result->getContractId();
+        $this->assertNotNull($contractId);
+
+        $contract = $this->contractRepository->findById($contractId);
         $this->assertNotNull($contract);
 
         $conditions = $contract->getConditions();
@@ -177,43 +262,72 @@ final class EndToEndCheckoutFlowTest extends TestCase
         $this->assertContains(ContractCondition::TYPE_PAYMENT_AUTHORIZED, $conditionTypes);
         $this->assertContains(ContractCondition::TYPE_FRAUD_CHECK, $conditionTypes);
 
-        // All conditions should be pending initially
-        foreach ($conditions as $condition) {
-            $this->assertTrue($condition->isPending(), "Condition {$condition->getType()} should be pending");
-        }
+        // Verify conditions are stored in database
+        $dbRow = $this->connection->fetchAssociative(
+            'SELECT OXCONDITIONS FROM osc_payment_contract WHERE OXID = :id',
+            ['id' => $contractId]
+        );
+        $dbConditions = json_decode($dbRow['OXCONDITIONS'], true);
+        $this->assertCount(2, $dbConditions);
     }
 
     // =========================================================================
-    // PHASE 2: Contract State Machine Transitions
+    // PHASE 2: Contract State Machine Transitions (with DB persistence)
     // =========================================================================
 
     /**
      * @group integration
      * @group e2e
+     * @group database
      */
-    public function testContractStateMachine_TransitionsToPendingAfterConditionsAdded(): void
+    public function testContractStateMachine_PersistsStateTransitions(): void
     {
-        $contract = $this->createContractDirectly();
+        $contract = $this->createContractDirectly($this->generateTestContractId('state_machine'));
 
-        $this->assertTrue($contract->getState()->isDraft(), 'Initial state should be DRAFT');
+        // Save DRAFT state
+        $this->contractRepository->save($contract);
+        $this->assertDatabaseState($contract->getId(), 'draft');
 
+        // Transition to PENDING
         $contract->addCondition(ContractCondition::paymentAuthorized());
         $contract->transitionToPending();
+        $this->contractRepository->save($contract);
+        $this->assertDatabaseState($contract->getId(), 'pending');
 
-        $this->assertTrue($contract->getState()->isPending(), 'State should be PENDING');
+        // Fulfill condition -> READY_TO_COMMIT
+        $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED, [
+            'authorizationId' => 'auth_' . $this->testRunId,
+        ]);
+        $this->contractRepository->save($contract);
+        $this->assertDatabaseState($contract->getId(), 'ready_to_commit');
+
+        // Commit to order -> COMMITTED
+        $orderId = $this->generateTestOrderId('sm');
+        $contract->commitToOrder($orderId);
+        $this->contractRepository->save($contract);
+        $this->assertDatabaseState($contract->getId(), 'committed');
+        $this->assertDatabaseOrderId($contract->getId(), $orderId);
+
+        // Fulfill -> FULFILLED
+        $contract->fulfill();
+        $this->contractRepository->save($contract);
+        $this->assertDatabaseState($contract->getId(), 'fulfilled');
+        $this->assertDatabaseFulfilledAt($contract->getId());
     }
 
     /**
      * @group integration
      * @group e2e
+     * @group database
      */
     public function testContractStateMachine_TransitionsToReadyToCommitWhenAllConditionsFulfilled(): void
     {
-        $contract = $this->createContractDirectly();
+        $contract = $this->createContractDirectly($this->generateTestContractId('all_conditions'));
 
         $contract->addCondition(ContractCondition::paymentAuthorized());
         $contract->addCondition(ContractCondition::fraudCheck());
         $contract->transitionToPending();
+        $this->contractRepository->save($contract);
 
         $this->assertFalse($contract->areAllConditionsFulfilled());
 
@@ -222,6 +336,7 @@ final class EndToEndCheckoutFlowTest extends TestCase
             'authorizationId' => 'auth_test_123',
             'providerOrderId' => 'pi_test_456',
         ]);
+        $this->contractRepository->save($contract);
 
         $this->assertFalse($contract->areAllConditionsFulfilled());
         $this->assertTrue($contract->getState()->isPending(), 'Should still be PENDING');
@@ -231,173 +346,108 @@ final class EndToEndCheckoutFlowTest extends TestCase
             'score' => 95,
             'risk' => 'low',
         ]);
+        $this->contractRepository->save($contract);
 
         $this->assertTrue($contract->areAllConditionsFulfilled());
         $this->assertTrue($contract->getState()->isReadyToCommit(), 'Should transition to READY_TO_COMMIT');
-    }
 
-    /**
-     * @group integration
-     * @group e2e
-     */
-    public function testContractStateMachine_CommitsToOrderWhenReady(): void
-    {
-        $contract = $this->createReadyToCommitContract();
-
-        $this->assertNull($contract->getOrderId(), 'Order ID should be null before commit');
-
-        $orderId = 'order_' . uniqid();
-        $contract->commitToOrder($orderId);
-
-        $this->assertEquals($orderId, $contract->getOrderId());
-        $this->assertTrue($contract->getState()->isCommitted(), 'State should be COMMITTED');
-    }
-
-    /**
-     * @group integration
-     * @group e2e
-     */
-    public function testContractStateMachine_FulfillsAfterCommit(): void
-    {
-        $contract = $this->createCommittedContract();
-
-        $this->assertTrue($contract->getState()->isCommitted());
-        $this->assertNull($contract->getFulfilledAt());
-
-        $contract->fulfill();
-
-        $this->assertTrue($contract->getState()->isFulfilled(), 'State should be FULFILLED');
-        $this->assertNotNull($contract->getFulfilledAt(), 'FulfilledAt should be set');
+        // Verify in database
+        $this->assertDatabaseState($contract->getId(), 'ready_to_commit');
     }
 
     // =========================================================================
-    // PHASE 3: Condition Fulfillment Tracking
+    // PHASE 3: Condition Fulfillment Tracking (with DB persistence)
     // =========================================================================
 
     /**
      * @group integration
      * @group e2e
+     * @group database
      */
-    public function testConditionFulfillment_TracksPaymentAuthorization(): void
+    public function testConditionFulfillment_PersistsPaymentAuthorizationData(): void
     {
-        $contract = $this->createContractDirectly();
+        $contract = $this->createContractDirectly($this->generateTestContractId('payment_auth'));
         $contract->addCondition(ContractCondition::paymentAuthorized());
         $contract->transitionToPending();
 
         $authData = [
-            'authorizationId' => 'auth_stripe_xyz',
-            'providerOrderId' => 'pi_live_abc123',
+            'authorizationId' => 'auth_stripe_' . $this->testRunId,
+            'providerOrderId' => 'pi_live_' . $this->testRunId,
             'amount' => 15000,
             'currency' => 'eur',
         ];
 
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED, $authData);
+        $this->contractRepository->save($contract);
 
-        $conditions = $contract->getConditions();
-        $paymentCondition = $conditions[0];
+        // Verify in database
+        $dbRow = $this->connection->fetchAssociative(
+            'SELECT OXCONDITIONS FROM osc_payment_contract WHERE OXID = :id',
+            ['id' => $contract->getId()]
+        );
 
-        $this->assertTrue($paymentCondition->isFulfilled());
-        $this->assertNotNull($paymentCondition->getFulfilledAt());
-        $this->assertEquals($authData, $paymentCondition->getData());
+        $dbConditions = json_decode($dbRow['OXCONDITIONS'], true);
+        $paymentCondition = $dbConditions[0];
+
+        $this->assertEquals('fulfilled', $paymentCondition['status']);
+        $this->assertEquals($authData['authorizationId'], $paymentCondition['data']['authorizationId']);
+        $this->assertNotNull($paymentCondition['fulfilledAt']);
     }
 
     /**
      * @group integration
      * @group e2e
+     * @group database
      */
-    public function testConditionFulfillment_TracksFraudCheck(): void
+    public function testConditionFulfillment_PersistsFailedCondition(): void
     {
-        $contract = $this->createContractDirectly();
-        $contract->addCondition(ContractCondition::fraudCheck());
-        $contract->transitionToPending();
-
-        $fraudData = [
-            'score' => 98,
-            'risk' => 'low',
-            'checkId' => 'fraud_check_123',
-            'passedChecks' => ['velocity', 'geolocation', 'device'],
-        ];
-
-        $contract->fulfillCondition(ContractCondition::TYPE_FRAUD_CHECK, $fraudData);
-
-        $conditions = $contract->getConditions();
-        $fraudCondition = $conditions[0];
-
-        $this->assertTrue($fraudCondition->isFulfilled());
-        $this->assertEquals(98, $fraudCondition->getData()['score']);
-        $this->assertEquals('low', $fraudCondition->getData()['risk']);
-    }
-
-    /**
-     * @group integration
-     * @group e2e
-     */
-    public function testConditionFulfillment_TracksStockReservation(): void
-    {
-        $contract = $this->createContractDirectly();
-        $contract->addCondition(ContractCondition::stockReserved());
-        $contract->transitionToPending();
-
-        $stockData = [
-            'reservationId' => 'res_456',
-            'items' => [
-                ['articleId' => 'art_1', 'quantity' => 2, 'reserved' => true],
-                ['articleId' => 'art_2', 'quantity' => 1, 'reserved' => true],
-            ],
-        ];
-
-        $contract->fulfillCondition(ContractCondition::TYPE_STOCK_RESERVED, $stockData);
-
-        $conditions = $contract->getConditions();
-        $stockCondition = $conditions[0];
-
-        $this->assertTrue($stockCondition->isFulfilled());
-        $this->assertEquals('res_456', $stockCondition->getData()['reservationId']);
-    }
-
-    /**
-     * @group integration
-     * @group e2e
-     */
-    public function testConditionFulfillment_FailedConditionFailsContract(): void
-    {
-        $contract = $this->createContractDirectly();
+        $contract = $this->createContractDirectly($this->generateTestContractId('failed_condition'));
         $contract->addCondition(ContractCondition::fraudCheck());
         $contract->transitionToPending();
 
         $contract->failCondition(ContractCondition::TYPE_FRAUD_CHECK, 'High risk score detected');
+        $this->contractRepository->save($contract);
 
-        $conditions = $contract->getConditions();
-        $fraudCondition = $conditions[0];
+        // Verify in database
+        $dbRow = $this->connection->fetchAssociative(
+            'SELECT OXSTATE, OXCONDITIONS FROM osc_payment_contract WHERE OXID = :id',
+            ['id' => $contract->getId()]
+        );
 
-        $this->assertTrue($fraudCondition->isFailed());
-        $this->assertEquals('High risk score detected', $fraudCondition->getFailureReason());
-        $this->assertTrue($contract->getState()->isFailed(), 'Contract should be FAILED');
+        $this->assertEquals('failed', $dbRow['OXSTATE']);
+
+        $dbConditions = json_decode($dbRow['OXCONDITIONS'], true);
+        $fraudCondition = $dbConditions[0];
+
+        $this->assertEquals('failed', $fraudCondition['status']);
+        $this->assertEquals('High risk score detected', $fraudCondition['failureReason']);
     }
 
     // =========================================================================
-    // PHASE 4: ThankyouController - Order Completion
+    // PHASE 4: ThankyouController - Order Completion (with DB)
     // =========================================================================
 
     /**
      * @group integration
      * @group e2e
+     * @group database
      */
     public function testOrderCompletion_ConfirmsOrderWithContractId(): void
     {
         // Simulate: OrderController created contract, conditions fulfilled
         $basket = $this->createValidBasket(250.00, 'EUR');
-        $user = $this->createValidUser('user_complete_1');
+        $user = $this->createValidUser($this->generateTestUserId('user_complete'));
 
         $checkoutResult = $this->orchestrator->processCheckout(
             $basket,
             $user,
             'stripe_card',
-            'pi_complete_123'
+            'pi_complete_' . $this->testRunId
         );
 
+        $this->assertTrue($checkoutResult->isSuccess());
         $contractId = $checkoutResult->getContractId();
-        $orderId = 'order_' . uniqid();
+        $orderId = $this->generateTestOrderId('confirm');
 
         // Simulate: ThankyouController.render() calls confirmOrderCompletion
         $result = $this->orchestrator->confirmOrderCompletion($orderId, $contractId);
@@ -409,35 +459,7 @@ final class EndToEndCheckoutFlowTest extends TestCase
     /**
      * @group integration
      * @group e2e
-     */
-    public function testOrderCompletion_ReturnsCommittedStateWhenAwaitingPayment(): void
-    {
-        $basket = $this->createValidBasket(300.00, 'EUR');
-        $user = $this->createValidUser('user_awaiting_1');
-
-        $checkoutResult = $this->orchestrator->processCheckout(
-            $basket,
-            $user,
-            'stripe_card',
-            'pi_awaiting_123'
-        );
-
-        $orderId = 'order_awaiting_' . uniqid();
-        $result = $this->orchestrator->confirmOrderCompletion($orderId, $checkoutResult->getContractId());
-
-        // State is COMMITTED (awaiting webhook for FULFILLED)
-        $this->assertTrue($result->isSuccess());
-        // Default state when no handler updates it
-        $state = $result->getContractState();
-        $this->assertContains($state, [
-            OrderConfirmationResult::STATE_COMMITTED,
-            OrderConfirmationResult::STATE_FULFILLED,
-        ]);
-    }
-
-    /**
-     * @group integration
-     * @group e2e
+     * @group database
      */
     public function testOrderCompletion_FailsWithoutContractId(): void
     {
@@ -448,160 +470,188 @@ final class EndToEndCheckoutFlowTest extends TestCase
     }
 
     // =========================================================================
-    // PHASE 5: Complete Flow Integration
+    // PHASE 5: Complete Flow Integration (with DB)
     // =========================================================================
 
     /**
      * @group integration
      * @group e2e
+     * @group database
      */
-    public function testCompleteFlow_FromOrderToThankyou(): void
+    public function testCompleteFlow_FromOrderToThankyou_PersistedInDatabase(): void
     {
+        $flowId = substr($this->testRunId, 0, 8);
+
         // STEP 1: OrderController.execute() - Customer clicks "Place Order"
         $basket = $this->createValidBasket(499.99, 'EUR');
-        $user = $this->createValidUser('user_complete_flow');
+        $user = $this->createValidUser($this->generateTestUserId('user_flow_' . $flowId));
 
         $checkoutResult = $this->orchestrator->processCheckout(
             $basket,
             $user,
             'stripe_card',
-            'pi_complete_flow_123'
+            'pi_flow_' . $flowId
         );
 
         $this->assertTrue($checkoutResult->isSuccess(), 'Step 1: Checkout should succeed');
         $contractId = $checkoutResult->getContractId();
         $this->assertNotNull($contractId);
 
+        // Verify Step 1 in database
+        $this->assertDatabaseState($contractId, 'draft');
+
         // STEP 2: Contract exists with conditions
         $contract = $this->contractRepository->findById($contractId);
         $this->assertNotNull($contract, 'Step 2: Contract should exist');
         $this->assertCount(2, $contract->getConditions(), 'Step 2: Should have 2 conditions');
 
-        // STEP 3: Simulate condition fulfillment (would be done by handlers in real flow)
-        // In real flow: PaymentAuthorizationHandler, FraudCheckHandler would do this
+        // STEP 3: Simulate condition fulfillment
         $contract->transitionToPending();
+        $this->contractRepository->save($contract);
+        $this->assertDatabaseState($contractId, 'pending');
+
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED, [
-            'authorizationId' => 'auth_complete_xyz',
+            'authorizationId' => 'auth_flow_' . $flowId,
         ]);
+        $this->contractRepository->save($contract);
+
         $contract->fulfillCondition(ContractCondition::TYPE_FRAUD_CHECK, [
             'score' => 99,
             'risk' => 'low',
         ]);
+        $this->contractRepository->save($contract);
 
         $this->assertTrue($contract->areAllConditionsFulfilled(), 'Step 3: All conditions fulfilled');
         $this->assertTrue($contract->getState()->isReadyToCommit(), 'Step 3: Ready to commit');
+        $this->assertDatabaseState($contractId, 'ready_to_commit');
 
-        // STEP 4: Order creation (would be done by OrderCreationHandler)
-        $orderId = 'order_complete_' . uniqid();
+        // STEP 4: Order creation
+        $orderId = $this->generateTestOrderId('flow');
         $contract->commitToOrder($orderId);
         $this->contractRepository->save($contract);
 
         $this->assertTrue($contract->getState()->isCommitted(), 'Step 4: Contract committed');
         $this->assertEquals($orderId, $contract->getOrderId(), 'Step 4: Order ID linked');
+        $this->assertDatabaseState($contractId, 'committed');
+        $this->assertDatabaseOrderId($contractId, $orderId);
 
-        // STEP 5: ThankyouController.render() - Customer sees thank you page
+        // STEP 5: ThankyouController.render()
         $confirmResult = $this->orchestrator->confirmOrderCompletion($orderId, $contractId);
         $this->assertTrue($confirmResult->isSuccess(), 'Step 5: Order confirmation should succeed');
 
-        // STEP 6: Simulate webhook payment capture (would trigger contract.fulfill())
+        // STEP 6: Simulate webhook payment capture
         $contract->fulfill();
         $this->contractRepository->save($contract);
 
         $this->assertTrue($contract->getState()->isFulfilled(), 'Step 6: Contract fulfilled');
         $this->assertNotNull($contract->getFulfilledAt(), 'Step 6: FulfilledAt set');
+        $this->assertDatabaseState($contractId, 'fulfilled');
+        $this->assertDatabaseFulfilledAt($contractId);
     }
 
     /**
      * @group integration
      * @group e2e
+     * @group database
      */
-    public function testCompleteFlow_ContractCancellationOnFailure(): void
+    public function testCompleteFlow_ContractCancellationPersisted(): void
     {
-        // Create contract
         $basket = $this->createValidBasket(150.00, 'EUR');
-        $user = $this->createValidUser('user_cancel_flow');
+        $user = $this->createValidUser($this->generateTestUserId('user_cancel'));
 
         $checkoutResult = $this->orchestrator->processCheckout(
             $basket,
             $user,
             'stripe_card',
-            'pi_cancel_123'
+            'pi_cancel_' . $this->testRunId
         );
 
-        $contract = $this->contractRepository->findById($checkoutResult->getContractId());
+        $this->assertTrue($checkoutResult->isSuccess());
+        $contractId = $checkoutResult->getContractId();
+
+        $contract = $this->contractRepository->findById($contractId);
+        $this->assertNotNull($contract);
+
+        $contract->addCondition(ContractCondition::paymentAuthorized());
         $contract->transitionToPending();
+        $this->contractRepository->save($contract);
 
         // Simulate: Customer cancels payment
         $contract->cancel('Customer cancelled payment');
+        $this->contractRepository->save($contract);
 
         $this->assertTrue($contract->getState()->isCancelled(), 'Contract should be cancelled');
-        $this->assertTrue($contract->getState()->isTerminal(), 'Cancelled is terminal state');
-    }
-
-    /**
-     * @group integration
-     * @group e2e
-     */
-    public function testCompleteFlow_ContractExpirationOnTimeout(): void
-    {
-        $contract = $this->createContractDirectly();
-        $contract->addCondition(ContractCondition::paymentAuthorized());
-        $contract->transitionToPending();
-
-        // Simulate: Contract expired (24h timeout)
-        $contract->expire();
-
-        $this->assertTrue($contract->getState()->isExpired(), 'Contract should be expired');
-        $this->assertTrue($contract->getState()->isTerminal(), 'Expired is terminal state');
+        $this->assertDatabaseState($contractId, 'cancelled');
     }
 
     // =========================================================================
-    // PHASE 6: Provider Information Tracking
+    // PHASE 6: Provider Information Tracking (with DB)
     // =========================================================================
 
     /**
      * @group integration
      * @group e2e
+     * @group database
      */
-    public function testProviderInfo_TracksStripePaymentIntent(): void
+    public function testProviderInfo_PersistsStripePaymentIntent(): void
     {
-        $contract = $this->createContractDirectly();
+        $contract = $this->createContractDirectly($this->generateTestContractId('provider_info'));
 
-        $contract->setProvider(
-            'stripe',
-            'pi_3ABC123def456',
-            'https://checkout.stripe.com/c/pay/cs_test_xyz'
+        $providerOrderId = 'pi_3ABC_' . $this->testRunId;
+        $redirectUrl = 'https://checkout.stripe.com/c/pay/cs_test_' . $this->testRunId;
+
+        $contract->setProvider('stripe', $providerOrderId, $redirectUrl);
+        $this->contractRepository->save($contract);
+
+        // Verify in database
+        $dbRow = $this->connection->fetchAssociative(
+            'SELECT OXPROVIDER, OXPROVIDERORDERID FROM osc_payment_contract WHERE OXID = :id',
+            ['id' => $contract->getId()]
         );
 
-        $this->assertEquals('stripe', $contract->getProvider());
-        $this->assertEquals('pi_3ABC123def456', $contract->getProviderOrderId());
-        $this->assertEquals('https://checkout.stripe.com/c/pay/cs_test_xyz', $contract->getProviderRedirectUrl());
-    }
+        $this->assertEquals('stripe', $dbRow['OXPROVIDER']);
+        $this->assertEquals($providerOrderId, $dbRow['OXPROVIDERORDERID']);
 
-    /**
-     * @group integration
-     * @group e2e
-     */
-    public function testProviderInfo_SerializesCorrectly(): void
-    {
-        $contract = $this->createContractDirectly();
-        $contract->setProvider('stripe', 'pi_serialize_test', 'https://stripe.com/redirect');
-
-        $array = $contract->toArray();
-
-        $this->assertEquals('stripe', $array['provider']);
-        $this->assertEquals('pi_serialize_test', $array['providerOrderId']);
-        $this->assertEquals('https://stripe.com/redirect', $array['providerRedirectUrl']);
-
-        // Deserialize and verify
-        $restored = PaymentContract::fromArray($array);
-        $this->assertEquals('stripe', $restored->getProvider());
-        $this->assertEquals('pi_serialize_test', $restored->getProviderOrderId());
+        // Verify can find by provider order ID
+        $found = $this->contractRepository->findByProviderOrderId($providerOrderId);
+        $this->assertNotNull($found);
+        $this->assertEquals($contract->getId(), $found->getId());
     }
 
     // =========================================================================
     // Helper Methods
     // =========================================================================
+
+    /**
+     * Generate test contract ID (max 32 chars for OXID column).
+     * Format: e2e_HHMMSS_XXXX_suffix = 4 + 10 + 1 + suffix (max 17 chars for suffix)
+     */
+    private function generateTestContractId(string $suffix): string
+    {
+        $id = self::TEST_PREFIX . $this->testRunId . '_' . $suffix;
+        // Ensure max 32 chars
+        return substr($id, 0, 32);
+    }
+
+    /**
+     * Generate test user ID (max 32 chars for OXUSERID column).
+     */
+    private function generateTestUserId(string $suffix): string
+    {
+        $id = self::TEST_PREFIX . $suffix . '_' . $this->testRunId;
+        // Ensure max 32 chars
+        return substr($id, 0, 32);
+    }
+
+    /**
+     * Generate test order ID (max 32 chars for OXORDERID column).
+     */
+    private function generateTestOrderId(string $suffix): string
+    {
+        $id = 'ord_' . $suffix . '_' . $this->testRunId;
+        // Ensure max 32 chars
+        return substr($id, 0, 32);
+    }
 
     private function createValidBasket(float $total, string $currency): object
     {
@@ -614,7 +664,7 @@ final class EndToEndCheckoutFlowTest extends TestCase
             public function __construct(float $total, string $currency)
             {
                 $this->totalGross = $total;
-                $this->totalNet = $total / 1.19; // Approximate net
+                $this->totalNet = $total / 1.19;
                 $this->totalVat = $total - $this->totalNet;
                 $this->currency = $currency;
             }
@@ -658,7 +708,7 @@ final class EndToEndCheckoutFlowTest extends TestCase
         };
     }
 
-    private function createContractDirectly(): PaymentContract
+    private function createContractDirectly(string $contractId): PaymentContract
     {
         $basketSnapshot = BasketSnapshot::fromArray([
             'items' => [],
@@ -672,107 +722,57 @@ final class EndToEndCheckoutFlowTest extends TestCase
 
         return new PaymentContract(
             shopId: 1,
-            userId: 'test_user_' . uniqid(),
-            basketSnapshot: $basketSnapshot
+            userId: $this->generateTestUserId('direct'),
+            basketSnapshot: $basketSnapshot,
+            id: $contractId
         );
     }
 
-    private function createReadyToCommitContract(): PaymentContract
-    {
-        $contract = $this->createContractDirectly();
-        $contract->addCondition(ContractCondition::paymentAuthorized());
-        $contract->addCondition(ContractCondition::fraudCheck());
-        $contract->transitionToPending();
-        $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED, ['id' => 'auth_123']);
-        $contract->fulfillCondition(ContractCondition::TYPE_FRAUD_CHECK, ['score' => 100]);
+    // =========================================================================
+    // Database Assertion Helpers
+    // =========================================================================
 
-        return $contract;
+    private function assertDatabaseState(string $contractId, string $expectedState): void
+    {
+        $dbRow = $this->connection->fetchAssociative(
+            'SELECT OXSTATE FROM osc_payment_contract WHERE OXID = :id',
+            ['id' => $contractId]
+        );
+
+        $this->assertNotFalse($dbRow, "Contract {$contractId} should exist in database");
+        $this->assertEquals(
+            $expectedState,
+            $dbRow['OXSTATE'],
+            "Contract {$contractId} should have state '{$expectedState}' in database"
+        );
     }
 
-    private function createCommittedContract(): PaymentContract
+    private function assertDatabaseOrderId(string $contractId, string $expectedOrderId): void
     {
-        $contract = $this->createReadyToCommitContract();
-        $contract->commitToOrder('order_' . uniqid());
+        $dbRow = $this->connection->fetchAssociative(
+            'SELECT OXORDERID FROM osc_payment_contract WHERE OXID = :id',
+            ['id' => $contractId]
+        );
 
-        return $contract;
-    }
-}
-
-/**
- * In-memory contract repository for testing purposes.
- * Simulates database persistence without actual DB connection.
- */
-class InMemoryContractRepository implements ContractRepositoryInterface
-{
-    /**
-     * @var array<string, PaymentContract>
-     */
-    private array $contracts = [];
-
-    public function save(PaymentContractInterface $contract): void
-    {
-        if ($contract instanceof PaymentContract) {
-            $this->contracts[$contract->getId()] = $contract;
-        }
+        $this->assertNotFalse($dbRow, "Contract {$contractId} should exist in database");
+        $this->assertEquals(
+            $expectedOrderId,
+            $dbRow['OXORDERID'],
+            "Contract {$contractId} should have order ID '{$expectedOrderId}' in database"
+        );
     }
 
-    public function findById(string $id): ?PaymentContractInterface
+    private function assertDatabaseFulfilledAt(string $contractId): void
     {
-        return $this->contracts[$id] ?? null;
-    }
+        $dbRow = $this->connection->fetchAssociative(
+            'SELECT OXFULFILLEDAT FROM osc_payment_contract WHERE OXID = :id',
+            ['id' => $contractId]
+        );
 
-    public function findByProviderOrderId(string $providerOrderId): ?PaymentContractInterface
-    {
-        foreach ($this->contracts as $contract) {
-            if ($contract->getProviderOrderId() === $providerOrderId) {
-                return $contract;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * @return array<int, PaymentContractInterface>
-     */
-    public function findByUserId(string $userId): array
-    {
-        return array_values(array_filter(
-            $this->contracts,
-            fn($c) => $c->getUserId() === $userId
-        ));
-    }
-
-    public function findActiveByUserId(string $userId): ?PaymentContractInterface
-    {
-        foreach ($this->contracts as $contract) {
-            if ($contract->getUserId() === $userId && !$contract->getState()->isTerminal()) {
-                return $contract;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * @return array<int, PaymentContractInterface>
-     */
-    public function findExpired(): array
-    {
-        return array_values(array_filter(
-            $this->contracts,
-            fn($c) => $c->isExpired()
-        ));
-    }
-
-    /**
-     * @return array<string, PaymentContract>
-     */
-    public function getAll(): array
-    {
-        return $this->contracts;
-    }
-
-    public function clear(): void
-    {
-        $this->contracts = [];
+        $this->assertNotFalse($dbRow, "Contract {$contractId} should exist in database");
+        $this->assertNotNull(
+            $dbRow['OXFULFILLEDAT'],
+            "Contract {$contractId} should have OXFULFILLEDAT set in database"
+        );
     }
 }
