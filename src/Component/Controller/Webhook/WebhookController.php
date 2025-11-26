@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Component\Controller\Http;
+namespace OxidSolutionCatalysts\Payments\Component\Controller\Webhook;
 
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookProcessorInterface;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookSignatureVerifierInterface;

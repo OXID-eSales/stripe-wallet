@@ -142,7 +142,7 @@ class OrderController extends OxidOrderController
     {
         try {
             return $this->executeParent();
-        } catch (NoArticleException|OutOfStockException|ArticleInputException $e) {
+        } catch (NoArticleException | OutOfStockException | ArticleInputException $e) {
             Registry::getSession()->setVariable('OrderException', $e);
             $this->setViewConfigParam('bOrderStepError', true);
 

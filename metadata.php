@@ -6,13 +6,13 @@
 
 declare(strict_types=1);
 
-use OxidSolutionCatalysts\Payments\Component\Controller\Http\WebhookController;
 use OxidSolutionCatalysts\Payments\Component\Controller\Http\PaymentController;
-use OxidSolutionCatalysts\Payments\Watch\Controller\AssumptionController;
-use OxidSolutionCatalysts\Payments\Stripe\Core\Events;
-use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\StripeConnect;
+use OxidSolutionCatalysts\Payments\Component\Controller\Webhook\WebhookController;
 use OxidSolutionCatalysts\Payments\Stripe\Application\Controller\Admin\ModuleConfiguration;
 use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\OrderRefund;
+use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\StripeConnect;
+use OxidSolutionCatalysts\Payments\Stripe\Core\Events;
+use OxidSolutionCatalysts\Payments\Watch\Controller\AssumptionController;
 
 /**
  * Metadata version

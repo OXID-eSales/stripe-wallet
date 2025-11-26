@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Unit\Component\Controller\Http;
 
-use OxidSolutionCatalysts\Payments\Component\Controller\Http\WebhookController;
+use OxidSolutionCatalysts\Payments\Component\Controller\Webhook\WebhookController;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookProcessorInterface;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookSignatureVerifierInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 /**
- * @covers \OxidSolutionCatalysts\Payments\Component\Controller\Http\WebhookController
+ * @covers \OxidSolutionCatalysts\Payments\Component\Controller\Webhook\WebhookController
  */
 final class WebhookControllerTest extends TestCase
 {
