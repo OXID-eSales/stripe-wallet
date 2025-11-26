@@ -151,7 +151,7 @@ class ContractLifecycleIntegrationTest extends TestCase
 
         $this->dispatcher->dispatch($paymentInitiatedEvent);
 
-        $contract = $context->get('contract');
+        $contract = $context->getContract();
         $this->assertNotNull($contract, 'Contract should be created');
 
         // Reload contract from repository to get latest state after all handlers
@@ -210,7 +210,7 @@ class ContractLifecycleIntegrationTest extends TestCase
 
         $this->dispatcher->dispatch($paymentInitiatedEvent);
 
-        $contract = $context->get('contract');
+        $contract = $context->getContract();
         $this->assertNotNull($contract, 'Contract should be created');
 
         // Reload to get latest state - contract auto-commits even without explicit auth
@@ -251,7 +251,7 @@ class ContractLifecycleIntegrationTest extends TestCase
 
         $this->dispatcher->dispatch($paymentInitiatedEvent);
 
-        $contract = $context->get('contract');
+        $contract = $context->getContract();
         $this->assertNotNull($contract, 'Contract should be created');
 
         // Reload to get latest state - contract auto-commits
@@ -300,7 +300,7 @@ class ContractLifecycleIntegrationTest extends TestCase
 
         $this->dispatcher->dispatch($paymentInitiatedEvent);
 
-        $contract = $context->get('contract');
+        $contract = $context->getContract();
         $this->assertNotNull($contract, 'Contract should be created');
 
         // Reload to get latest state - contract auto-commits

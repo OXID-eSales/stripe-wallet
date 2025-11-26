@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Copyright © OXID eSales AG. All rights reserved.
  * See LICENSE file for license details.
@@ -174,12 +175,14 @@ class OrderRefund extends AdminDetailsController
             }
         }
 
-        if ($oOrder->oxorder__stripedelcostrefunded->value > 0
+        if (
+            $oOrder->oxorder__stripedelcostrefunded->value > 0
             || $oOrder->oxorder__stripepaycostrefunded->value > 0
             || $oOrder->oxorder__stripewrapcostrefunded->value > 0
             || $oOrder->oxorder__stripegiftcardrefunded->value > 0
             || $oOrder->oxorder__stripevoucherdiscountrefunded->value > 0
-            || $oOrder->oxorder__stripediscountrefunded->value > 0) {
+            || $oOrder->oxorder__stripediscountrefunded->value > 0
+        ) {
             return false;
         }
         return true;
@@ -302,7 +305,7 @@ class OrderRefund extends AdminDetailsController
      */
     protected function getStripeApiOrder($blRefresh = false)
     {
-        try{
+        try {
             if ($this->_oStripeApiOrder === null || $blRefresh === true) {
                 $this->_oStripeApiOrder = $this->getStripeApiRequestModel()->paymentIntents->retrieve($this->getOrder()->oxorder__oxtransid->value);
             }
@@ -318,9 +321,8 @@ class OrderRefund extends AdminDetailsController
      */
     protected function getStripeApiOrderLastCharge($blRefresh = false)
     {
-        try{
+        try {
             if ($this->_oStripeApiCharge === null || $blRefresh === true) {
-
                 $oApiOrder = $this->getStripeApiOrder($blRefresh);
                 $sLastChargeId = $oApiOrder ? $oApiOrder->latest_charge : null;
 

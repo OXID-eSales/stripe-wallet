@@ -7,15 +7,21 @@
 # Usage: ./bin/pre-commit-check.sh [OPTIONS]
 # Options:
 #   --no-phpunit    Skip PHPUnit tests
+#   --full          Run all tests including Integration tests (slower)
 
 set +e  # Don't exit on error, we want to collect all results
 
 # Parse command line arguments
 SKIP_PHPUNIT=false
+FULL_TESTS=false
 for arg in "$@"; do
     case $arg in
         --no-phpunit)
             SKIP_PHPUNIT=true
+            shift
+            ;;
+        --full)
+            FULL_TESTS=true
             shift
             ;;
     esac
@@ -96,20 +102,27 @@ else
 fi
 echo ""
 
-# 2. PHPUnit - All Tests
+# 2. PHPUnit Tests
 if [ "$SKIP_PHPUNIT" = true ]; then
     echo ">>> Skipping PHPUnit Tests (--no-phpunit flag set)"
     echo -e "${YELLOW}⊘ PHPUnit tests skipped${NC}"
     echo ""
 else
-    echo ">>> Running PHPUnit Tests (All)..."
+    if [ "$FULL_TESTS" = true ]; then
+        echo ">>> Running PHPUnit Tests (Full: Unit + Integration)..."
+        TESTSUITE_ARG=""
+    else
+        echo ">>> Running PHPUnit Tests (Unit only, use --full for all)..."
+        TESTSUITE_ARG="--testsuite Unit"
+    fi
+
     if [ "$ENVIRONMENT" = "github" ]; then
       echo "skip on github"
       PHPUNIT_STATUS=0
     else
         # Local: Run in Docker with shop bootstrap (use shop's vendor phpunit)
         docker compose exec -w /var/www/extensions/stripe -T php \
-            /var/www/vendor/bin/phpunit -c tests/phpunit.xml --bootstrap=/var/www/source/bootstrap.php --testsuite Unit
+            /var/www/vendor/bin/phpunit -c tests/phpunit.xml --bootstrap=/var/www/source/bootstrap.php $TESTSUITE_ARG
         PHPUNIT_STATUS=$?
     fi
 

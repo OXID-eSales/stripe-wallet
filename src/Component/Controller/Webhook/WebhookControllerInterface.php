@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\Controller\Webhook;
 
-interface
-WebhookControllerInterface
+interface WebhookControllerInterface
 {
     /**
      * @return array<string, mixed>
