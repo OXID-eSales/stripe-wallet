@@ -55,7 +55,7 @@ class ContractCreationHandler implements HandlerInterface
             $validatedConditionTypes
         );
 
-        $context->set('contract', $contract);
+        $context->setContract($contract);
 
         $contractCreatedEvent = new ContractCreatedEvent($contract, $context);
         $this->eventDispatcher->dispatch($contractCreatedEvent);

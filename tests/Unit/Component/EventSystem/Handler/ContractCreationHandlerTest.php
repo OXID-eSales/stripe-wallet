@@ -61,7 +61,7 @@ class ContractCreationHandlerTest extends TestCase
 
         $this->handler->handle($event);
 
-        $contract = $event->getContext()->get('contract');
+        $contract = $event->getContext()->getContract();
 
         $this->assertNotNull($contract);
         $this->assertEquals('user123', $contract->getUserId());
@@ -87,7 +87,8 @@ class ContractCreationHandlerTest extends TestCase
 
         $this->handler->handle($event);
 
-        $contract = $event->getContext()->get('contract');
+        $contract = $event->getContext()->getContract();
+        $this->assertNotNull($contract);
         $conditions = $contract->getConditions();
 
         $this->assertCount(2, $conditions);
@@ -118,7 +119,8 @@ class ContractCreationHandlerTest extends TestCase
 
         $this->handler->handle($event);
 
-        $contract = $event->getContext()->get('contract');
+        $contract = $event->getContext()->getContract();
+        $this->assertNotNull($contract);
         $conditions = $contract->getConditions();
 
         $this->assertCount(2, $conditions);
@@ -145,7 +147,8 @@ class ContractCreationHandlerTest extends TestCase
 
         $this->handler->handle($event);
 
-        $contract = $event->getContext()->get('contract');
+        $contract = $event->getContext()->getContract();
+        $this->assertNotNull($contract);
         $found = $this->repository->findById($contract->getId());
 
         $this->assertNotNull($found);
