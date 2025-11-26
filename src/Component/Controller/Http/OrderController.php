@@ -13,7 +13,7 @@ use OxidEsales\Eshop\Core\Exception\ArticleInputException;
 use OxidEsales\Eshop\Core\Exception\NoArticleException;
 use OxidEsales\Eshop\Core\Exception\OutOfStockException;
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\EshopCommunity\Application\Controller\OrderController as OxidOrderController;
+use OxidEsales\Eshop\Application\Controller\OrderController as OxidOrderController;
 use OxidSolutionCatalysts\Payments\Component\Service\CheckoutOrchestratorInterface;
 use OxidSolutionCatalysts\Payments\Component\Traits\ServiceContainer;
 
