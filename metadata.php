@@ -6,7 +6,9 @@
 
 declare(strict_types=1);
 
-use OxidSolutionCatalysts\Payments\Component\Controller\Http\PaymentController;
+use OxidEsales\Eshop\Application\Controller\Admin\ModuleConfiguration as CoreAdminModuleConfiguration;
+use OxidEsales\Eshop\Application\Controller\OrderController;
+use OxidSolutionCatalysts\Payments\Component\Controller\Core\PaymentController;
 use OxidSolutionCatalysts\Payments\Component\Controller\Webhook\WebhookController;
 use OxidSolutionCatalysts\Payments\Stripe\Application\Controller\Admin\ModuleConfiguration;
 use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\OrderRefund;
@@ -38,7 +40,8 @@ $aModule = [
     'url' => 'https://www.oxid-esales.com',
     'email' => 'info@oxid-esales.com',
     'extend' => [
-        \OxidEsales\Eshop\Application\Controller\Admin\ModuleConfiguration::class => ModuleConfiguration::class,
+        CoreAdminModuleConfiguration::class => ModuleConfiguration::class,
+        OrderController::class => \OxidSolutionCatalysts\Payments\Component\Controller\Core\OrderController::class,
     ],
     'controllers' => [
         'osc_stripe_webhook' => WebhookController::class,
@@ -46,6 +49,7 @@ $aModule = [
         'paymentwatch_assumption' => AssumptionController::class,
         'StripeConnect' => StripeConnect::class,
         'OrderRefund' => OrderRefund::class,
+        'OrderController' => \OxidSolutionCatalysts\Payments\Component\Controller\Core\OrderController::class,
     ],
     'templates' => [
         '@osc_stripe_wallet/admin/stripe_connect' => 'views/twig/admin/stripe_connect.html.twig',

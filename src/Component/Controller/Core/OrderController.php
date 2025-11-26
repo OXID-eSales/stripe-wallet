@@ -7,12 +7,14 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Component\Controller\Http;
+namespace OxidSolutionCatalysts\Payments\Component\Controller\Core;
 
+use OxidEsales\Eshop\Application\Model\Basket;
 use OxidEsales\Eshop\Core\Exception\ArticleInputException;
 use OxidEsales\Eshop\Core\Exception\NoArticleException;
 use OxidEsales\Eshop\Core\Exception\OutOfStockException;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\Eshop\Core\Session;
 use OxidEsales\Eshop\Application\Controller\OrderController as OxidOrderController;
 use OxidSolutionCatalysts\Payments\Component\Service\CheckoutOrchestratorInterface;
 use OxidSolutionCatalysts\Payments\Component\Traits\ServiceContainer;
@@ -59,10 +61,10 @@ class OrderController extends OxidOrderController
      */
     protected function executeWithStripeAccounting(): mixed
     {
-        $session = $this->getSession();
-        $basket = $session->getBasket();
+        /** @var Basket $basket */
+        $basket = $this->getBasketFromSession();
         $user = $this->getUser();
-        $paymentId = $basket->getPaymentId();
+        $paymentId = (string) $basket->getPaymentId();
 
         // Get payment_intent_id from request (set by frontend Stripe.js)
         $paymentIntentId = $this->getPaymentIntentIdFromRequest();
@@ -82,6 +84,8 @@ class OrderController extends OxidOrderController
         // Store contract ID for ThankyouController
         $contractId = $result->getContractId();
         if ($contractId !== null) {
+            /** @var Session $session */
+            $session = $this->getSessionForVariables();
             $session->setVariable(self::SESSION_CONTRACT_ID, $contractId);
         }
 
@@ -90,17 +94,40 @@ class OrderController extends OxidOrderController
     }
 
     /**
+     * Gets the basket from session.
+     * Extracted for easier testing.
+     *
+     * @return Basket|object
+     */
+    protected function getBasketFromSession(): object
+    {
+        return $this->getOxidSession()->getBasket();
+    }
+
+    /**
+     * Gets session for storing variables.
+     * Extracted for easier testing.
+     *
+     * @return Session|object
+     */
+    protected function getSessionForVariables(): object
+    {
+        return $this->getOxidSession();
+    }
+
+    /**
      * Checks if the selected payment method is a Stripe method.
      */
     protected function isStripePaymentMethod(): bool
     {
-        $paymentId = $this->getSession()->getBasket()->getPaymentId();
+        $basket = $this->getOxidSession()->getBasket();
+        $paymentId = $basket->getPaymentId();
 
-        if ($paymentId === null) {
+        if ($paymentId === null || $paymentId === '') {
             return false;
         }
 
-        return str_starts_with($paymentId, self::STRIPE_PAYMENT_PREFIX);
+        return str_starts_with((string) $paymentId, self::STRIPE_PAYMENT_PREFIX);
     }
 
     /**
@@ -108,15 +135,21 @@ class OrderController extends OxidOrderController
      */
     protected function getPaymentIntentIdFromRequest(): ?string
     {
-        return Registry::getRequest()->getRequestParameter('stripe_payment_intent_id');
+        /** @var string|null $value */
+        $value = Registry::getRequest()->getRequestParameter('stripe_payment_intent_id');
+        return $value;
     }
 
     /**
-     * Gets the session.
+     * Gets the OXID session.
+     *
+     * @return Session
      */
-    protected function getSession(): object
+    protected function getOxidSession(): Session
     {
-        return Registry::getSession();
+        /** @var Session $session */
+        $session = Registry::getSession();
+        return $session;
     }
 
     /**
@@ -144,6 +177,7 @@ class OrderController extends OxidOrderController
             return $this->executeParent();
         } catch (NoArticleException | OutOfStockException | ArticleInputException $e) {
             Registry::getSession()->setVariable('OrderException', $e);
+            /** @phpstan-ignore-next-line method.notFound - setViewConfigParam exists in parent */
             $this->setViewConfigParam('bOrderStepError', true);
 
             return $this->getViewName();

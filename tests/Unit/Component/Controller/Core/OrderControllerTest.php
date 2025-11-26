@@ -9,14 +9,14 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Unit\Component\Controller\Http;
 
-use OxidSolutionCatalysts\Payments\Component\Controller\Http\OrderController;
+use OxidSolutionCatalysts\Payments\Component\Controller\Core\OrderController;
 use OxidSolutionCatalysts\Payments\Component\Service\CheckoutOrchestratorInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\Result\CheckoutResult;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @covers \OxidSolutionCatalysts\Payments\Component\Controller\Http\OrderController
+ * @covers \OxidSolutionCatalysts\Payments\Component\Controller\Core\OrderController
  */
 final class OrderControllerTest extends TestCase
 {
@@ -215,17 +215,28 @@ final class OrderControllerTest extends TestCase
         $basket = $this->createBasketMock($paymentId, 0.0);
         $session = $this->createSessionMock($basket, null);
 
-        return new class ($session) extends OrderController {
+        return new class ($session, $basket) extends OrderController {
             private object $mockSession;
+            private object $mockBasket;
 
-            public function __construct(object $mockSession)
+            public function __construct(object $mockSession, object $mockBasket)
             {
                 $this->mockSession = $mockSession;
+                $this->mockBasket = $mockBasket;
             }
 
-            protected function getSession(): object
+            /**
+             * Override to return mock basket directly (bypassing session type check).
+             */
+            protected function isStripePaymentMethod(): bool
             {
-                return $this->mockSession;
+                $paymentId = $this->mockBasket->getPaymentId();
+
+                if ($paymentId === null || $paymentId === '') {
+                    return false;
+                }
+
+                return str_starts_with((string) $paymentId, 'stripe_');
             }
         };
     }
@@ -258,7 +269,18 @@ final class OrderControllerTest extends TestCase
                 $this->mockPaymentIntentId = $mockPaymentIntentId;
             }
 
-            protected function getSession(): object
+            /**
+             * Override to return mock basket directly.
+             */
+            protected function getBasketFromSession(): object
+            {
+                return $this->mockBasket;
+            }
+
+            /**
+             * Override to return mock session.
+             */
+            protected function getSessionForVariables(): object
             {
                 return $this->mockSession;
             }

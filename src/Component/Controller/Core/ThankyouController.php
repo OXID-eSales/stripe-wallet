@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Component\Controller\Http;
+namespace OxidSolutionCatalysts\Payments\Component\Controller\Core;
 
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Application\Controller\ThankYouController as OxidThankyouController;

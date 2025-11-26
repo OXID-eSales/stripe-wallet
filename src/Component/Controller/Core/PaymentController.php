@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Component\Controller\Http;
+namespace OxidSolutionCatalysts\Payments\Component\Controller\Core;
 
 class PaymentController
 {

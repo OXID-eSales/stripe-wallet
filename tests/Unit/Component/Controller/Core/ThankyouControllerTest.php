@@ -9,14 +9,14 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Unit\Component\Controller\Http;
 
-use OxidSolutionCatalysts\Payments\Component\Controller\Http\ThankyouController;
+use OxidSolutionCatalysts\Payments\Component\Controller\Core\ThankyouController;
 use OxidSolutionCatalysts\Payments\Component\Service\CheckoutOrchestratorInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\Result\OrderConfirmationResult;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @covers \OxidSolutionCatalysts\Payments\Component\Controller\Http\ThankyouController
+ * @covers \OxidSolutionCatalysts\Payments\Component\Controller\Core\ThankyouController
  */
 final class ThankyouControllerTest extends TestCase
 {
