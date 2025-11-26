@@ -77,7 +77,7 @@ docker compose exec -T php bin/oe-console oe:setup:demodata
 
 docker compose exec -T php bin/oe-console oe:theme:activate apex
 docker compose exec -T php bin/oe-console oe:module:install extensions/stripe
-docker compose exec -T php bin/oe-console oe:module:activate stripe
+docker compose exec -T php bin/oe-console oe:module:activate osc_stripe_wallet
 
 $PROJECT_ROOT/source/extensions/stripe/recipe/parts/shared/create_admin.sh
 # Register all related project packages git repositories
