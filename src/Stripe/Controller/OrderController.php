@@ -705,6 +705,7 @@ class OrderController extends CoreOrderController
     /**
      * Create Stripe Checkout Session (AJAX endpoint)
      * Returns JSON with session ID for client-side redirect
+     * ✅ Creates order BEFORE payment so order number can be passed to Stripe
      *
      * @return void
      */
@@ -730,6 +731,42 @@ class OrderController extends CoreOrderController
             $captureMode = Registry::getRequest()->getRequestParameter('capture') ?? 'automatic';
             $captureMode = ($captureMode === 'manual') ? 'manual' : 'automatic';
 
+            // ===== CREATE ORDER BEFORE PAYMENT =====
+            // Check if we already created an order for this session (idempotency)
+            $existingOrderId = $session->getVariable('stripe_checkout_pending_order_id');
+
+            // Create order request
+            $orderRequest = new OrderCreateRequest(
+                sessionId: $session->getId(),
+                userId: $user->getId(),
+                paymentId: $basket->getPaymentId(),
+                paymentTransactionId: null, // Will be set after payment confirmation
+                orderRemark: $session->getVariable('ordRem'),
+                metadata: [
+                    'stripe_checkout' => true,
+                    'payment_status' => 'pending',
+                    'capture_mode' => $captureMode,
+                ]
+            );
+
+            $_POST['sDeliveryAddressMD5'] = $this->orderService->getDeliveryAddressMD5($user);
+            // Create or reuse order via service
+            $orderResponse = $this->orderService->createOrderForCheckout($orderRequest, $existingOrderId);
+            $orderId = $orderResponse->orderId;
+
+            // Get custom ID parameter (order number or structured JSON based on settings)
+            $orderNumber = $this->orderService->getCustomIdParameter($orderId);
+
+            // Store order ID in session for idempotency
+            $session->setVariable('stripe_checkout_pending_order_id', $orderId);
+
+            Registry::getLogger()->info('Order created before Stripe Checkout Session', [
+                'order_id' => $orderId,
+                'order_number' => $orderNumber,
+                'amount' => $basket->getPrice()->getBruttoPrice(),
+                'reused' => $orderResponse->metadata['reused'] ?? false
+            ]);
+
             // Build line items from basket
             $lineItems = $this->buildCheckoutLineItems($basket);
 
@@ -739,9 +776,9 @@ class OrderController extends CoreOrderController
             // Build success and cancel URLs
             $shopUrl = Registry::getConfig()->getShopUrl();
             $successUrl = $shopUrl . 'index.php?cl=order&fnc=checkoutSuccess&session_id={CHECKOUT_SESSION_ID}&sDeliveryAddressMD5=' . $this->getDeliveryAddressMD5();
-            $cancelUrl = $shopUrl . 'index.php?cl=order';
+            $cancelUrl = $shopUrl . 'index.php?cl=order&session_id={CHECKOUT_SESSION_ID}';
 
-            // Create Checkout Session
+            // Create Checkout Session with order number in metadata
             $checkoutSession = $stripeClient->checkout->sessions->create([
                 'mode' => 'payment',
                 'line_items' => $lineItems,
@@ -753,26 +790,33 @@ class OrderController extends CoreOrderController
                 'payment_intent_data' => [
                     'capture_method' => $captureMode,
                     'metadata' => [
-                        'user_id' => $user->getId()
+                        'user_id' => $user->getId(),
+                        'order_id' => $orderId,
+                        'order_number' => (string)$orderNumber, // ✅ Order number in payment intent
                     ]
                 ],
                 'metadata' => [
-                    'user_id' => $user->getId()
+                    'user_id' => $user->getId(),
+                    'order_id' => $orderId,
+                    'order_number' => (string)$orderNumber, // ✅ Order number in checkout session
                 ]
             ]);
 
-            // Store session ID for later verification
+            // Store checkout session ID for later verification
             $session->setVariable('stripe_checkout_session_id', $checkoutSession->id);
 
-            Registry::getLogger()->info('Stripe Checkout Session created', [
+            Registry::getLogger()->info('Stripe Checkout Session created with order number', [
                 'session_id' => $checkoutSession->id,
+                'order_id' => $orderId,
+                'order_number' => $orderNumber,
                 'amount' => $basket->getPrice()->getBruttoPrice(),
                 'capture_mode' => $captureMode
             ]);
 
             echo json_encode([
                 'id' => $checkoutSession->id,
-                'capture' => $captureMode
+                'capture' => $captureMode,
+                'order_number' => $orderNumber
             ]);
 
         } catch (\Throwable $e) {
@@ -794,6 +838,7 @@ class OrderController extends CoreOrderController
     /**
      * Handle successful Stripe Checkout return
      * Called when user completes payment on Stripe hosted page
+     * ✅ Uses the order that was created in createCheckoutSession()
      *
      * @return string
      */
@@ -808,6 +853,8 @@ class OrderController extends CoreOrderController
         }
 
         try {
+            $session = Registry::getSession();
+
             // Get Stripe SDK client
             $stripeClient = $this->adapterFactory->getStripeClient();
 
@@ -832,10 +879,64 @@ class OrderController extends CoreOrderController
                 ? $checkoutSession->payment_intent
                 : $checkoutSession->payment_intent->id;
 
-            // Process the order with the PaymentIntent
-            Registry::getSession()->setVariable('stripe_payment_intent_id', $paymentIntentId);
+            // Get the order ID from Stripe metadata (more reliable than PHP session)
+            $pendingOrderId = $checkoutSession->metadata->order_id ?? null;
 
-            return $this->handleSuccessfulPayment($paymentIntentId);
+            // Fallback to PHP session if not in metadata
+            if (!$pendingOrderId) {
+                $pendingOrderId = $session->getVariable('stripe_checkout_pending_order_id');
+            }
+
+            if ($pendingOrderId) {
+                // ===== UPDATE EXISTING ORDER WITH PAYMENT DETAILS =====
+                $order = oxNew(Order::class);
+                if (!$order->load($pendingOrderId)) {
+                    throw new \RuntimeException('Order not found: ' . $pendingOrderId);
+                }
+
+                // Update order with payment transaction ID
+                $this->orderService->updateOrderPaymentTransaction($pendingOrderId, $paymentIntentId);
+
+                // Get payment details from adapter
+                $adapter = $this->adapterFactory->createDefaultAdapter();
+                $paymentDetails = $adapter->getPaymentDetails($paymentIntentId);
+
+                // Store transaction and Stripe-specific details
+                $this->orderService->storePaymentDetails($order, $paymentDetails);
+
+                // Dispatch events
+                $this->dispatchOrderCreatedEvent($order, $paymentIntentId);
+                if ($paymentDetails->isCaptured) {
+                    $this->dispatchPaymentCapturedEvent($order, $paymentDetails);
+                }
+
+                // Set order ID in session for thank you page
+                $session->setVariable('sess_challenge', $pendingOrderId);
+
+                // Clear Stripe session variables
+                $session->deleteVariable('stripe_payment_intent_id');
+                $session->deleteVariable('stripe_client_secret');
+                $session->deleteVariable('stripe_checkout_session_id');
+                $session->deleteVariable('stripe_checkout_pending_order_id');
+
+                Registry::getLogger()->info('Stripe Checkout successful, order updated', [
+                    'order_id' => $pendingOrderId,
+                    'order_number' => $order->getFieldData('oxordernr'),
+                    'payment_intent_id' => $paymentIntentId,
+                ]);
+
+                // Redirect to thank you page
+                return 'thankyou';
+            } else {
+                // Fallback: No pending order found, use old flow (backward compatibility)
+                Registry::getLogger()->warning('No pending order found, creating new order', [
+                    'session_id' => $sessionId,
+                    'payment_intent_id' => $paymentIntentId
+                ]);
+
+                $session->setVariable('stripe_payment_intent_id', $paymentIntentId);
+                return $this->handleSuccessfulPayment($paymentIntentId);
+            }
 
         } catch (\Exception $e) {
             Registry::getLogger()->error('Error processing Checkout success', [

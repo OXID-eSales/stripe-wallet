@@ -13,6 +13,7 @@ use OxidEsales\Eshop\Application\Model\Order;
 use OxidSolutionCatalysts\Payments\Component\Repository\TransactionRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Adapter\OxidShopOrderService;
 use OxidSolutionCatalysts\Payments\Stripe\Repository\StripePaymentDetailsRepository;
+use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -23,6 +24,7 @@ final class OxidShopOrderServiceTest extends TestCase
     private OxidShopOrderService $service;
     private TransactionRepositoryInterface $transactionRepository;
     private StripePaymentDetailsRepository $stripeDetailsRepository;
+    private ModuleConfigurationService $moduleConfig;
 
     protected function setUp(): void
     {
@@ -31,10 +33,12 @@ final class OxidShopOrderServiceTest extends TestCase
         // Mock dependencies
         $this->transactionRepository = $this->createMock(TransactionRepositoryInterface::class);
         $this->stripeDetailsRepository = $this->createMock(StripePaymentDetailsRepository::class);
+        $this->moduleConfig = $this->createMock(ModuleConfigurationService::class);
 
         $this->service = new OxidShopOrderService(
             $this->transactionRepository,
-            $this->stripeDetailsRepository
+            $this->stripeDetailsRepository,
+            $this->moduleConfig
         );
     }
 

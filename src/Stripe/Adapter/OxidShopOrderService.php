@@ -23,6 +23,9 @@ use OxidSolutionCatalysts\Payments\Component\Adapter\Exception\ShopOrderExceptio
 use OxidSolutionCatalysts\Payments\Component\Repository\TransactionRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Transaction\Transaction;
 use OxidSolutionCatalysts\Payments\Stripe\Repository\StripePaymentDetailsRepository;
+use OxidSolutionCatalysts\Payments\Stripe\Module;
+use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Eshop\Core\ShopVersion;
 
 /**
  * OXID eShop implementation of ShopOrderServiceInterface.
@@ -40,7 +43,8 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
 {
     public function __construct(
         private readonly TransactionRepositoryInterface $transactionRepository,
-        private readonly StripePaymentDetailsRepository $stripeDetailsRepository
+        private readonly StripePaymentDetailsRepository $stripeDetailsRepository,
+        private readonly ModuleConfigurationService $moduleConfig
     ) {
     }
 
@@ -76,8 +80,13 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
             }
 
             // 3. Create order using OXID's standard method
+            // Note: Using false for $blRecalculatingOrder ensures:
+            // - Order ID is set from session
+            // - Order validation runs
+            // - Products and customer data are properly saved
+            // - executePayment() is called BUT overridden in Stripe\Model\Order to skip payment gateway
             $order = oxNew(Order::class);
-            $orderState = $order->finalizeOrder($basket, $user);
+            $orderState = $order->finalizeOrder($basket, $user, false);
 
             // 4. Validate order creation
             if (!in_array($orderState, [Order::ORDER_STATE_OK, Order::ORDER_STATE_ORDEREXISTS], true)) {
@@ -92,26 +101,34 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
                 );
             }
 
-            // 5. Set payment transaction ID on order if provided
+            // 5. Set order folder to NEW (default for new orders)
+            $order->oxorder__oxfolder = new \OxidEsales\Eshop\Core\Field(
+                'ORDERFOLDER_NEW',
+                \OxidEsales\Eshop\Core\Field::T_RAW
+            );
+
+            // 6. Set payment transaction ID on order if provided
             if ($request->paymentTransactionId !== null) {
                 $order->oxorder__oxtransid = new \OxidEsales\Eshop\Core\Field(
                     $request->paymentTransactionId,
                     \OxidEsales\Eshop\Core\Field::T_RAW
                 );
-                $order->save();
             }
 
-            // 6. Ensure order number is always set after successful finalization
+            // 7. Save order with folder and optional transaction ID
+            $order->save();
+
+            // 8. Ensure order number is always set after successful finalization
             // This MUST be called before accessing oxordernr field
             // The Stripe Order extension overrides setOrderNumber() to ensure it's always set
             $order->setOrderNumber();
 
-            // 7. Store metadata if provided
+            // 9. Store metadata if provided
             if (!empty($request->metadata)) {
                 $this->storeOrderMetadata($order, $request->metadata);
             }
 
-            // 8. Build and return response
+            // 10. Build and return response
             // Use basket total directly as source of truth to avoid field loading issues
             return new OrderResponse(
                 orderId: $order->getId(),
@@ -225,6 +242,99 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
     }
 
     /**
+     * Create order for Stripe Checkout session (before payment confirmation).
+     *
+     * This method creates the order upfront so we can pass the order number
+     * to Stripe in the payment intent metadata. The order is created with a
+     * pending payment status.
+     *
+     * Implements idempotency: if an order already exists for this session,
+     * it returns the existing order instead of creating a duplicate.
+     *
+     * @param CreateOrderRequest $request Order creation parameters
+     * @param string|null $existingOrderId Optional order ID to check for idempotency
+     * @return OrderResponse Created or existing order details
+     * @throws ShopOrderException
+     */
+    public function createOrderForCheckout(CreateOrderRequest $request, ?string $existingOrderId = null): OrderResponse
+    {
+        // Idempotency check: verify if order already exists
+        if ($existingOrderId) {
+            $existingOrder = oxNew(Order::class);
+            if ($existingOrder->load($existingOrderId)) {
+                Registry::getLogger()->info('Reusing existing order for Stripe Checkout', [
+                    'order_id' => $existingOrderId,
+                    'order_number' => $existingOrder->getFieldData('oxordernr')
+                ]);
+
+                // Return existing order details
+                return new OrderResponse(
+                    orderId: $existingOrder->getId(),
+                    orderNumber: (int)$existingOrder->getFieldData('oxordernr'),
+                    userId: $existingOrder->getFieldData('oxuserid'),
+                    totalAmount: (float)$existingOrder->getFieldData('oxtotalordersum'),
+                    currency: $existingOrder->getFieldData('oxcurrency'),
+                    status: 'pending',
+                    paymentId: $existingOrder->getFieldData('oxpaymenttype'),
+                    paymentTransactionId: $existingOrder->getFieldData('oxtransid') ?: null,
+                    createdAt: $this->getOrderCreationDate($existingOrder),
+                    metadata: array_merge($request->metadata, ['reused' => true])
+                );
+            }
+        }
+
+        // Create new order using standard flow
+        return $this->createOrder($request);
+    }
+
+    /**
+     * Update existing order with payment transaction ID.
+     *
+     * Used after Stripe Checkout payment is confirmed to link the payment
+     * to the previously created order.
+     *
+     * @param string $orderId OXID order ID
+     * @param string $paymentTransactionId Payment intent ID from Stripe
+     * @return void
+     * @throws ShopOrderException
+     */
+    public function updateOrderPaymentTransaction(string $orderId, string $paymentTransactionId): void
+    {
+        try {
+            $order = oxNew(Order::class);
+            if (!$order->load($orderId)) {
+                throw new ShopOrderException(
+                    message: 'Order not found for payment transaction update',
+                    errorCode: 'order_not_found',
+                    context: ['order_id' => $orderId]
+                );
+            }
+
+            // Update transaction ID
+            $order->oxorder__oxtransid = new \OxidEsales\Eshop\Core\Field(
+                $paymentTransactionId,
+                \OxidEsales\Eshop\Core\Field::T_RAW
+            );
+            $order->save();
+
+            Registry::getLogger()->info('Order payment transaction updated', [
+                'order_id' => $orderId,
+                'transaction_id' => $paymentTransactionId
+            ]);
+
+        } catch (ShopOrderException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            throw new ShopOrderException(
+                message: 'Failed to update order payment transaction: ' . $e->getMessage(),
+                errorCode: 'update_failed',
+                context: ['order_id' => $orderId],
+                previous: $e
+            );
+        }
+    }
+
+    /**
      * Store transaction and Stripe-specific payment details.
      *
      * Stores payment-related data using Component-level persistence:
@@ -292,5 +402,115 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
             'is_captured' => $paymentDetails->isCaptured,
             'captured_at' => $paymentDetails->capturedAt?->format('Y-m-d H:i:s'),
         ]);
+    }
+
+    /**
+     * Set order folder status.
+     *
+     * @param string $orderId OXID order ID
+     * @param string $folder Folder identifier (e.g., 'ORDERFOLDER_NEW', 'ORDERFOLDER_FINISHED')
+     * @return void
+     */
+    private function setOrderFolder(string $orderId, string $folder): void
+    {
+        $order = oxNew(Order::class);
+        if (!$order->load($orderId)) {
+            Registry::getLogger()->warning('Order not found for folder update', [
+                'order_id' => $orderId
+            ]);
+            return;
+        }
+
+        $order->oxorder__oxfolder = new \OxidEsales\Eshop\Core\Field(
+            $folder,
+            \OxidEsales\Eshop\Core\Field::T_RAW
+        );
+        $order->save();
+
+        Registry::getLogger()->debug('Order folder updated', [
+            'order_id' => $orderId,
+            'folder' => $folder
+        ]);
+    }
+
+    /**
+     * Get custom ID parameter for Stripe payment metadata.
+     *
+     * This generates an identifier to be sent to Stripe for tracking purposes.
+     * Can return either a simple order number or a structured JSON with additional
+     * version information for debugging.
+     *
+     * @param string $orderId OXID order ID
+     * @return string Order number or JSON-encoded metadata
+     */
+    public function getCustomIdParameter(string $orderId): string
+    {
+        // Load order object
+        $order = oxNew(Order::class);
+        if (!$order->load($orderId)) {
+            // If order not found, return empty string
+            return '';
+        }
+
+        // Extract order number
+        $orderNumber = (int) $order->getFieldData('oxordernr');
+
+        // Ensure order number is set
+        if ($orderNumber === 0) {
+            $order->setOrderNumber();
+            $orderNumber = (int) $order->getFieldData('oxordernr');
+        }
+
+        // Check if structured format is enabled (via module setting)
+        // Default to false if setting not configured
+        $useStructuredFormat = (bool) $this->moduleConfig->get('blStripeUseStructuredCustomId');
+
+        if ($useStructuredFormat) {
+            // Return structured JSON with version information for debugging
+            $module = oxNew(\OxidEsales\Eshop\Core\Module\Module::class);
+            $module->load(Module::MODULE_ID);
+
+            $customID = [
+                'oxordernr' => $orderNumber,
+                'moduleVersion' => $module->getInfo('version'),
+                'oxidVersion' => ShopVersion::getVersion()
+            ];
+
+            return json_encode($customID);
+        }
+
+        // Return simple order number as string
+        return (string) $orderNumber;
+    }
+
+
+    /**
+     * Calculate MD5 hash of delivery address for change detection.
+     *
+     * This method generates a hash of the user's billing and delivery addresses
+     * to detect if the address changed during checkout (e.g., between payment
+     * initiation and order finalization).
+     *
+     * @param User $user The user whose addresses to hash
+     * @param string|null $deliveryAddressId Optional delivery address ID (if different from billing)
+     * @return string MD5 hash of the combined address data
+     */
+    public function getDeliveryAddressMD5(User $user, ?string $deliveryAddressId = null): string
+    {
+        // Start with billing address
+        $addressData = $user->getEncodedDeliveryAddress();
+
+        // Add delivery address if specified
+        $deliveryAddressId = $deliveryAddressId ?? Registry::getSession()->getVariable('deladrid');
+
+        if ($deliveryAddressId) {
+            $deliveryAddress = oxNew(\OxidEsales\Eshop\Application\Model\Address::class);
+            if ($deliveryAddress->load($deliveryAddressId)) {
+                $addressData .= $deliveryAddress->getEncodedDeliveryAddress();
+            }
+        }
+
+        // Return MD5 hash as the method name implies
+        return $addressData;
     }
 }
