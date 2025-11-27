@@ -434,22 +434,27 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
     }
 
     /**
-     * Get custom ID parameter for Stripe payment metadata.
+     * Build Stripe metadata from order information.
      *
-     * This generates an identifier to be sent to Stripe for tracking purposes.
-     * Can return either a simple order number or a structured JSON with additional
-     * version information for debugging.
+     * Generates metadata to be sent to Stripe's metadata system for tracking
+     * and debugging purposes. Stripe's metadata accepts key-value pairs,
+     * allowing each piece of information to be stored separately.
      *
      * @param string $orderId OXID order ID
-     * @return string Order number or JSON-encoded metadata
+     * @param bool $includeVersionInfo Whether to include module/OXID version info for debugging
+     * @return array<string, string|int> Metadata array for Stripe
      */
-    public function getCustomIdParameter(string $orderId): string
+    public function buildStripeMetadata(string $orderId, bool $includeVersionInfo = false): array
     {
         // Load order object
         $order = oxNew(Order::class);
         if (!$order->load($orderId)) {
-            // If order not found, return empty string
-            return '';
+            // If order not found, return minimal metadata
+            return [
+                'order_id' => $orderId,
+                'order_number' => 0,
+                'error' => 'order_not_found'
+            ];
         }
 
         // Extract order number
@@ -461,26 +466,33 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
             $orderNumber = (int) $order->getFieldData('oxordernr');
         }
 
-        // Check if structured format is enabled (via module setting)
-        // Default to false if setting not configured
-        $useStructuredFormat = (bool) $this->moduleConfig->get('blStripeUseStructuredCustomId');
+        // Build base metadata
+        $metadata = [
+            'order_id' => $orderId,
+            'order_number' => $orderNumber,
+            'shop_id' => Registry::getConfig()->getShopId(),
+        ];
 
-        if ($useStructuredFormat) {
-            // Return structured JSON with version information for debugging
+        // Add version information if requested (useful for debugging/support)
+        if ($includeVersionInfo) {
             $module = oxNew(\OxidEsales\Eshop\Core\Module\Module::class);
             $module->load(Module::MODULE_ID);
 
-            $customID = [
-                'oxordernr' => $orderNumber,
-                'moduleVersion' => $module->getInfo('version'),
-                'oxidVersion' => ShopVersion::getVersion()
-            ];
-
-            return json_encode($customID);
+            $metadata['module_version'] = $module->getInfo('version') ?: 'unknown';
+            $metadata['oxid_version'] = ShopVersion::getVersion();
         }
 
-        // Return simple order number as string
-        return (string) $orderNumber;
+        return $metadata;
+    }
+
+    /**
+     * @deprecated Use buildStripeMetadata() instead
+     * @see buildStripeMetadata()
+     */
+    public function getCustomIdParameter(string $orderId): string
+    {
+        $metadata = $this->buildStripeMetadata($orderId, false);
+        return (string) $metadata['order_number'];
     }
 
 

@@ -754,15 +754,17 @@ class OrderController extends CoreOrderController
             $orderResponse = $this->orderService->createOrderForCheckout($orderRequest, $existingOrderId);
             $orderId = $orderResponse->orderId;
 
-            // Get custom ID parameter (order number or structured JSON based on settings)
-            $orderNumber = $this->orderService->getCustomIdParameter($orderId);
+            // Build Stripe metadata with order info (includes order_id, order_number, shop_id, versions)
+            // Check config to determine if version info should be included
+            $includeVersionInfo = (bool) $this->config->get('blStripeIncludeVersionMetadata');
+            $stripeMetadata = $this->orderService->buildStripeMetadata($orderId, $includeVersionInfo);
 
             // Store order ID in session for idempotency
             $session->setVariable('stripe_checkout_pending_order_id', $orderId);
 
             Registry::getLogger()->info('Order created before Stripe Checkout Session', [
                 'order_id' => $orderId,
-                'order_number' => $orderNumber,
+                'order_number' => $stripeMetadata['order_number'],
                 'amount' => $basket->getPrice()->getBruttoPrice(),
                 'reused' => $orderResponse->metadata['reused'] ?? false
             ]);
@@ -775,10 +777,20 @@ class OrderController extends CoreOrderController
 
             // Build success and cancel URLs
             $shopUrl = Registry::getConfig()->getShopUrl();
-            $successUrl = $shopUrl . 'index.php?cl=order&fnc=checkoutSuccess&session_id={CHECKOUT_SESSION_ID}&sDeliveryAddressMD5=' . $this->getDeliveryAddressMD5();
+            $deliveryAddressMD5 = $this->orderService->getDeliveryAddressMD5($user);
+            $successUrl = $shopUrl . 'index.php?cl=order&fnc=checkoutSuccess&session_id={CHECKOUT_SESSION_ID}&sDeliveryAddressMD5=' . $deliveryAddressMD5;
             $cancelUrl = $shopUrl . 'index.php?cl=order&session_id={CHECKOUT_SESSION_ID}';
 
-            // Create Checkout Session with order number in metadata
+            // Build complete metadata with user info
+            $paymentIntentMetadata = array_merge($stripeMetadata, [
+                'user_id' => $user->getId(),
+            ]);
+
+            $checkoutSessionMetadata = array_merge($stripeMetadata, [
+                'user_id' => $user->getId(),
+            ]);
+
+            // Create Checkout Session with metadata as separate key-value pairs
             $checkoutSession = $stripeClient->checkout->sessions->create([
                 'mode' => 'payment',
                 'line_items' => $lineItems,
@@ -789,17 +801,9 @@ class OrderController extends CoreOrderController
                 'customer_email' => $user->getFieldData('oxusername'),
                 'payment_intent_data' => [
                     'capture_method' => $captureMode,
-                    'metadata' => [
-                        'user_id' => $user->getId(),
-                        'order_id' => $orderId,
-                        'order_number' => (string)$orderNumber, // ✅ Order number in payment intent
-                    ]
+                    'metadata' => $paymentIntentMetadata, // ✅ All metadata fields separately
                 ],
-                'metadata' => [
-                    'user_id' => $user->getId(),
-                    'order_id' => $orderId,
-                    'order_number' => (string)$orderNumber, // ✅ Order number in checkout session
-                ]
+                'metadata' => $checkoutSessionMetadata, // ✅ All metadata fields separately
             ]);
 
             // Store checkout session ID for later verification
@@ -808,7 +812,7 @@ class OrderController extends CoreOrderController
             Registry::getLogger()->info('Stripe Checkout Session created with order number', [
                 'session_id' => $checkoutSession->id,
                 'order_id' => $orderId,
-                'order_number' => $orderNumber,
+                'order_number' => $stripeMetadata['order_number'],
                 'amount' => $basket->getPrice()->getBruttoPrice(),
                 'capture_mode' => $captureMode
             ]);
@@ -816,7 +820,7 @@ class OrderController extends CoreOrderController
             echo json_encode([
                 'id' => $checkoutSession->id,
                 'capture' => $captureMode,
-                'order_number' => $orderNumber
+                'order_number' => $stripeMetadata['order_number']
             ]);
 
         } catch (\Throwable $e) {
