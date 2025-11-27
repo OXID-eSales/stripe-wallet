@@ -1,3 +1,59 @@
+{# ============================================================================
+   MOCK DATA - Static values for template development
+   Replace these with real data bindings when integrating with controllers
+   ============================================================================ #}
+
+{# --- oView (StripeOrderRefundController) ---
+   isStripeOrder: true if order paid with Stripe payment method
+   wasRefundSuccessful: true after successful refund, shows success alert
+   errorMessage: error string if refund failed, false otherwise
+   isOrderRefundable: true if payment captured and not fully refunded
+   isFullRefundAvailable: true if no partial refunds made yet
+   remainingRefundableAmount: amount left to refund (total - already refunded)
+   formattedPrice: price formatted with currency symbol (e.g., "149,99 €")
+#}
+{% set mock_isStripeOrder = true %}
+{% set mock_wasRefundSuccessful = false %}
+{% set mock_errorMessage = false %}
+{% set mock_isOrderRefundable = true %}
+{% set mock_isFullRefundAvailable = true %}
+{% set mock_remainingRefundableAmount = 49.99 %}
+
+{# --- oViewConf (ViewConfig) ---
+   hiddenSid: CSRF token hidden input for secure form submission
+#}
+{% set mock_hiddenSid = '<input type="hidden" name="stoken" value="mock_csrf_token_abc123">' %}
+
+{# --- edit (Order in form context) ---
+   oxid: unique 32-char hex order ID
+   oxtotalordersum: total order amount with VAT and shipping
+   oxcurrency: 3-letter ISO currency code (EUR, USD, GBP)
+#}
+{% set mock_edit_oxid = 'order_abc123def456ghi789' %}
+{% set mock_edit_oxtotalordersum = 149.99 %}
+{% set mock_edit_oxcurrency = 'EUR' %}
+
+{# --- order (Order object) ---
+   oxtransid: Stripe PaymentIntent ID (pi_xxx)
+   stripeexternaltransid: Stripe Charge ID (ch_xxx) or empty
+   stripesecondchancemailsent: timestamp or "0000-00-00 00:00:00" if never sent
+   paymentTypeDesc: human-readable payment method name
+   extraInfo: card brand/last4, bank name, or empty
+   isEligibleForPaymentFinish: true if payment pending completion
+   paymentFinishUrl: URL for customer to complete payment
+#}
+{% set mock_order_oxtransid = 'pi_3ABC123DEF456GHI789' %}
+{% set mock_order_stripeexternaltransid = 'ch_1XYZ789ABC123DEF' %}
+{% set mock_order_stripesecondchancemailsent = '0000-00-00 00:00:00' %}
+{% set mock_order_paymentTypeDesc = 'Stripe Credit Card' %}
+{% set mock_order_extraInfo = 'Visa •••• 4242' %}
+{% set mock_order_isEligibleForPaymentFinish = false %}
+{% set mock_order_paymentFinishUrl = 'https://shop.example.com/payment/finish?id=order_abc123' %}
+
+{# ============================================================================
+   END MOCK DATA
+   ============================================================================ #}
+
 <style>
     .refundTable TD {
         padding-top: 10px;
@@ -42,25 +98,24 @@
 <div class="container-fluid admin-order-refund">
     <div class="card">
         <div class="card-body">
-            {% if oView.isStripeOrder() %}
+            {% if mock_isStripeOrder %}
                 {# Success Message #}
-                {% if oView.wasRefundSuccessful() == true %}
+                {% if mock_wasRefundSuccessful == true %}
                     <div class="alert alert-success">
                         <strong>{{ "STRIPE_REFUND_SUCCESSFUL"|translate }}</strong>
                     </div>
                 {% endif %}
 
                 {# Error Message #}
-                {% if oView.getErrorMessage() != false %}
+                {% if mock_errorMessage != false %}
                     <div class="alert alert-danger">
                         <strong>{{ "GENERAL_ERROR"|translate }}</strong>
-                        {{ oView.getErrorMessage() }}
+                        {{ mock_errorMessage }}
                     </div>
                 {% endif %}
 
                 {# Order Not Refundable Notice #}
-                {% set blIsOrderRefundable = oView.isOrderRefundable() %}
-                {% if blIsOrderRefundable == false %}
+                {% if mock_isOrderRefundable == false %}
                     <div class="alert alert-info">
                         <strong>{{ "STRIPE_NOTICE"|translate }}</strong>
                         {{ "STRIPE_ORDER_NOT_REFUNDABLE"|translate }}
@@ -68,32 +123,28 @@
                 {% endif %}
 
                 {# Payment Details Section #}
-                {% set order = oView.getOrder() %}
-                {% set paymentType = order.getPaymentType() %}
-                {% set paymentExtraInfo = order.stripeGetExtraInfo() %}
-
                 <fieldset class="form-group">
                     <legend class="fieldset-legend">{{ "STRIPE_PAYMENT_DETAILS"|translate }}</legend>
                     <table class="table table-sm table-bordered">
                         <tbody>
                             <tr>
                                 <td class="label">{{ "STRIPE_PAYMENT_TYPE"|translate }}:</td>
-                                <td class="value">{{ paymentType.oxpayments__oxdesc.value }}</td>
+                                <td class="value">{{ mock_order_paymentTypeDesc }}</td>
                             </tr>
                             <tr>
                                 <td class="label">{{ "STRIPE_TRANSACTION_ID"|translate }}:</td>
-                                <td class="value">{{ order.oxorder__oxtransid.value }}</td>
+                                <td class="value">{{ mock_order_oxtransid }}</td>
                             </tr>
-                            {% if order.oxorder__stripeexternaltransid.value != "" %}
+                            {% if mock_order_stripeexternaltransid != "" %}
                                 <tr>
                                     <td class="label">{{ "STRIPE_EXTERNAL_TRANSACTION_ID"|translate }}:</td>
-                                    <td class="value">{{ order.oxorder__stripeexternaltransid.value }}</td>
+                                    <td class="value">{{ mock_order_stripeexternaltransid }}</td>
                                 </tr>
                             {% endif %}
-                            {% if paymentExtraInfo != "" %}
+                            {% if mock_order_extraInfo != "" %}
                                 <tr>
                                     <td class="label">{{ "STRIPE_ORDER_EXTRA_INFO"|translate }}:</td>
-                                    <td class="value">{{ paymentExtraInfo }}</td>
+                                    <td class="value">{{ mock_order_extraInfo }}</td>
                                 </tr>
                             {% endif %}
                         </tbody>
@@ -101,27 +152,27 @@
                 </fieldset>
 
                 {# Payment Finish Section #}
-                {% if order.stripeIsEligibleForPaymentFinish() %}
+                {% if mock_order_isEligibleForPaymentFinish %}
                     <fieldset class="form-group">
                         <legend class="fieldset-legend">{{ "STRIPE_SUBSEQUENT_ORDER_COMPLETION"|translate }}</legend>
                         <p>
                             <strong>{{ "STRIPE_ORDER_PAYMENT_URL"|translate }}:</strong>
-                            <a href="{{ order.stripeGetPaymentFinishUrl() }}" target="_blank" rel="noopener noreferrer">
-                                {{ order.stripeGetPaymentFinishUrl() }}
+                            <a href="{{ mock_order_paymentFinishUrl }}" target="_blank" rel="noopener noreferrer">
+                                {{ mock_order_paymentFinishUrl }}
                             </a>
                         </p>
                         <form method="post" class="form-inline">
-                            {{ oViewConf.getHiddenSid()|raw }}
+                            {{ mock_hiddenSid|raw }}
                             <input type="hidden" name="cl" value="stripe_order_refund">
-                            <input type="hidden" name="oxid" value="{{ edit.oxorder__oxid.value }}">
+                            <input type="hidden" name="oxid" value="{{ mock_edit_oxid }}">
                             <input type="hidden" name="fnc" value="sendSecondChanceEmail">
                             <button type="submit" class="btn btn-primary">
                                 {{ "STRIPE_SEND_SECOND_CHANCE_MAIL"|translate }}
                             </button>
-                            {% if order.oxorder__stripesecondchancemailsent.value != "0000-00-00 00:00:00" %}
+                            {% if mock_order_stripesecondchancemailsent != "0000-00-00 00:00:00" %}
                                 <span class="text-danger">
                                     {{ "STRIPE_SECOND_CHANCE_MAIL_ALREADY_SENT"|translate }}
-                                    ({{ order.oxorder__stripesecondchancemailsent.value }})
+                                    ({{ mock_order_stripesecondchancemailsent }})
                                 </span>
                             {% endif %}
                         </form>
@@ -129,32 +180,30 @@
                 {% endif %}
 
                 {# Full Refund Section #}
-                {% if blIsOrderRefundable == true %}
+                {% if mock_isOrderRefundable == true %}
                     <fieldset class="form-group refund-section">
                         <legend class="fieldset-legend">{{ "STRIPE_FULL_REFUND"|translate }}</legend>
 
                         <form method="post" class="refund-form">
-                            {{ oViewConf.getHiddenSid()|raw }}
+                            {{ mock_hiddenSid|raw }}
                             <input type="hidden" name="cl" value="stripe_order_refund">
-                            <input type="hidden" name="oxid" value="{{ edit.oxorder__oxid.value }}">
+                            <input type="hidden" name="oxid" value="{{ mock_edit_oxid }}">
                             <input type="hidden" name="fnc" value="fullRefund">
-
-                            {% set blIsFullRefundAvailable = oView.isFullRefundAvailable() %}
 
                             {# Refund Amount Display #}
                             <div class="form-group">
-                                {% if blIsFullRefundAvailable == true %}
+                                {% if mock_isFullRefundAvailable == true %}
                                     <p class="refund-amount">
                                         <strong>{{ "STRIPE_FULL_REFUND_TEXT"|translate }}:</strong>
-                                        {{ oView.getFormatedPrice(edit.oxorder__oxtotalordersum.value) }}
-                                        <small>({{ edit.oxorder__oxcurrency.value }})</small>
+                                        {{ mock_edit_oxtotalordersum|number_format(2, ',', '.') }} €
+                                        <small>({{ mock_edit_oxcurrency }})</small>
                                     </p>
                                 {% else %}
                                     <input type="hidden" name="refundRemaining" value="1">
                                     <p class="refund-amount">
                                         <strong>{{ "STRIPE_REFUND_REMAINING"|translate }}:</strong>
-                                        {{ oView.getFormatedPrice(oView.getRemainingRefundableAmount()) }}
-                                        <small>({{ edit.oxorder__oxcurrency.value }})</small>
+                                        {{ mock_remainingRefundableAmount|number_format(2, ',', '.') }} €
+                                        <small>({{ mock_edit_oxcurrency }})</small>
                                     </p>
                                 {% endif %}
                             </div>
