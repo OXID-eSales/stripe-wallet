@@ -11,6 +11,8 @@ namespace OxidSolutionCatalysts\Payments\Stripe\Core;
 
 use OxidEsales\Eshop\Core\DatabaseProvider;
 use OxidEsales\Eshop\Core\Registry;
+use OxidSolutionCatalysts\Payments\Stripe\Service\StaticContent;
+use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 
 /**
  * Activation and deactivation handler
@@ -40,6 +42,14 @@ class Events
     );
 
     /**
+     * Standard checkout payment methods configuration
+     * @deprecated Use StripeDefinitions::getStripeDefinitions() instead
+     *
+     * @var array<string, array<string, mixed>>
+     */
+    public static $aStandardCheckoutPaymentMethods = [];
+
+    /**
      * List of all removed payment methods
      *
      * @var array<string>
@@ -55,7 +65,9 @@ class Events
      */
     public static function onActivate(): void
     {
-        self::addPaymentMethods();
+        self::addDatabaseStructure();
+        self::addStandardCheckoutTables();
+        self::ensureStripePaymentMethods();
         self::deleteRemovedPaymentMethods();
         self::regenerateViews();
         self::clearTmp();
@@ -97,51 +109,17 @@ class Events
     }
 
     /**
-     * Get all available stripe payment methods from payment helper
-     *
-     * @return array<string, string>
-     */
-    protected static function getStripePaymentMethods()
-    {
-        /** @var array<string, string> */
-        return Payment::getInstance()->getStripePaymentMethods();
-    }
-
-    /**
-     * Adding Stripe payments.
+     * Ensure all Stripe payment methods are installed using StaticContent service
      *
      * @return void
      */
-    protected static function addPaymentMethods()
+    protected static function ensureStripePaymentMethods(): void
     {
-        foreach (self::getStripePaymentMethods() as $sPaymentId => $sPaymentTitle) {
-            self::addPaymentMethod($sPaymentId, $sPaymentTitle);
-        }
-    }
+        $container = ContainerFactory::getInstance()->getContainer();
+        $queryBuilderFactory = $container->get(\OxidEsales\EshopCommunity\Internal\Framework\Database\QueryBuilderFactoryInterface::class);
 
-    /**
-     * Add payment-methods and a basic configuration to the database
-     *
-     * @param string $sPaymentId
-     * @param string $sPaymentTitle
-     * @return void
-     */
-    protected static function addPaymentMethod($sPaymentId, $sPaymentTitle)
-    {
-        $blNewlyAdded = self::insertRowIfNotExists('oxpayments', array('OXID' => $sPaymentId), "INSERT INTO oxpayments(OXID,OXACTIVE,OXDESC,OXADDSUM,OXADDSUMTYPE,OXFROMBONI,OXFROMAMOUNT,OXTOAMOUNT,OXVALDESC,OXCHECKED,OXDESC_1,OXVALDESC_1,OXDESC_2,OXVALDESC_2,OXDESC_3,OXVALDESC_3,OXLONGDESC,OXLONGDESC_1,OXLONGDESC_2,OXLONGDESC_3,OXSORT) VALUES ('{$sPaymentId}', 0, '{$sPaymentTitle}', 0, 'abs', 0, 0, 1000000, '', 0, '{$sPaymentTitle}', '', '', '', '', '', '', '', '', '', 0);");
-
-        if ($blNewlyAdded === true) {
-            //Insert basic payment method configuration
-            foreach (self::$aGroupsToAdd as $sGroupId) {
-                DatabaseProvider::getDb()->Execute("INSERT INTO oxobject2group(OXID,OXSHOPID,OXOBJECTID,OXGROUPSID) values (REPLACE(UUID(),'-',''), :shopid, :paymentid, :groupid);", [
-                    ':shopid' => Registry::getConfig()->getShopId(),
-                    ':paymentid' => $sPaymentId,
-                    ':groupid' => $sGroupId,
-                ]);
-            }
-
-            self::insertRowIfNotExists('oxobject2payment', array('OXPAYMENTID' => $sPaymentId, 'OXTYPE' => 'oxdelset'), "INSERT INTO oxobject2payment(OXID,OXPAYMENTID,OXOBJECTID,OXTYPE) values (REPLACE(UUID(),'-',''), :paymentid, 'oxidstandard', 'oxdelset');", [':paymentid' => $sPaymentId]);
-        }
+        $staticContentService = new StaticContent($queryBuilderFactory);
+        $staticContentService->ensureStripePaymentMethods();
     }
 
     /**
@@ -274,11 +252,157 @@ class Events
     }
 
     /**
-     * Deactivates Stripe paymethods on module deactivation.
+     * Deactivates Stripe payment methods on module deactivation
      *
      * @return void
      */
-    protected static function deactivatePaymentMethods()
+    protected static function deactivatePaymentMethods(): void
     {
+        // Optionally deactivate payment methods here if needed
+    }
+
+    /**
+     * Create standard checkout database tables
+     * ✅ Uses Component-compatible transaction table structure
+     * ✅ Adds Stripe-specific details in separate table
+     *
+     * @return void
+     */
+    protected static function addStandardCheckoutTables()
+    {
+        // ✅ COMPONENT-COMPATIBLE: Create payment transaction table (shared across all payment methods)
+        self::addTableIfNotExists('osc_payment_transaction', "
+            CREATE TABLE `osc_payment_transaction` (
+                `OXID` char(32) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL COMMENT 'Transaction ID',
+                `OXSHOPID` int(11) NOT NULL DEFAULT 1 COMMENT 'Shop ID',
+                `OXORDERID` char(32) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL COMMENT 'FK: oxorder.OXID',
+                `OXCONTRACTID` char(32) CHARACTER SET latin1 COLLATE latin1_general_ci DEFAULT NULL COMMENT 'FK: osc_payment_contract.OXID (NULL for standard checkout)',
+                `OXPROVIDER` varchar(50) NOT NULL COMMENT 'Payment provider (stripe, paypal, etc)',
+                `OXPROVIDERORDERID` varchar(255) DEFAULT NULL COMMENT 'Provider order/payment ID (e.g., PaymentIntent ID)',
+                `OXTRANSACTIONID` varchar(255) DEFAULT NULL COMMENT 'Provider transaction ID (e.g., Charge ID)',
+                `OXTYPE` varchar(50) NOT NULL COMMENT 'Transaction type (payment, refund, authorization)',
+                `OXSTATUS` varchar(50) NOT NULL COMMENT 'Transaction status (pending, completed, failed)',
+                `OXAMOUNT` decimal(10,2) NOT NULL COMMENT 'Transaction amount',
+                `OXCURRENCY` varchar(3) NOT NULL COMMENT 'Currency code (ISO 4217)',
+                `OXPAYMENTMETHODID` varchar(255) DEFAULT NULL COMMENT 'Payment method ID',
+                `OXPAYMENTMETHODTYPE` varchar(50) DEFAULT NULL COMMENT 'Payment method type',
+                `OXPARENTTRANSACTIONID` varchar(255) DEFAULT NULL COMMENT 'Parent transaction ID (for refunds)',
+                `OXCREATED` datetime NOT NULL COMMENT 'Created timestamp',
+                `OXUPDATED` datetime NOT NULL COMMENT 'Updated timestamp',
+                PRIMARY KEY (`OXID`),
+                KEY `IDX_SHOPID` (`OXSHOPID`),
+                KEY `IDX_ORDERID` (`OXORDERID`),
+                KEY `IDX_CONTRACTID` (`OXCONTRACTID`),
+                KEY `IDX_PROVIDERORDERID` (`OXPROVIDERORDERID`),
+                KEY `IDX_TRANSACTIONID` (`OXTRANSACTIONID`),
+                KEY `IDX_TYPE_STATUS` (`OXTYPE`, `OXSTATUS`),
+                KEY `IDX_CREATED` (`OXCREATED`),
+                CONSTRAINT `FK_TRANSACTION_ORDER`
+                    FOREIGN KEY (`OXORDERID`)
+                    REFERENCES `oxorder` (`OXID`)
+                    ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Component payment transactions (provider-agnostic)';
+        ");
+
+        // ➕ STRIPE-SPECIFIC: Payment details table (card info, 3DS, risk)
+        self::addTableIfNotExists('osc_stripe_payment_details', "
+            CREATE TABLE `osc_stripe_payment_details` (
+                `OXID` char(32) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL COMMENT 'Primary key',
+                `OXTRANSACTIONID` char(32) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL COMMENT 'FK: osc_payment_transaction.OXID',
+                `OXCARDLAST4` varchar(4) DEFAULT NULL COMMENT 'Last 4 digits of card',
+                `OXCARDBRAND` varchar(20) DEFAULT NULL COMMENT 'Card brand (visa, mastercard, amex)',
+                `OXCARDEXPMONTH` varchar(2) DEFAULT NULL COMMENT 'Card expiration month',
+                `OXCARDEXPYEAR` varchar(4) DEFAULT NULL COMMENT 'Card expiration year',
+                `OXCARDFUNDING` varchar(20) DEFAULT NULL COMMENT 'Card funding (credit, debit, prepaid)',
+                `OXCARDCOUNTRY` varchar(2) DEFAULT NULL COMMENT 'Card country code',
+                `OX3DSECURE` tinyint(1) DEFAULT 0 COMMENT '3D Secure used (0=no, 1=yes)',
+                `OX3DSVERSION` varchar(10) DEFAULT NULL COMMENT '3DS version (1.0, 2.0)',
+                `OX3DSAUTHENTICATED` tinyint(1) DEFAULT NULL COMMENT '3DS authentication result',
+                `OXRISKSCORE` int(3) DEFAULT NULL COMMENT 'Risk score (0-100)',
+                `OXRISKLEVEL` varchar(20) DEFAULT NULL COMMENT 'Risk level (normal, elevated, highest)',
+                `OXMETADATA` text COMMENT 'Additional metadata (JSON)',
+                `OXCREATED` datetime NOT NULL COMMENT 'Created timestamp',
+                `OXUPDATED` datetime DEFAULT NULL COMMENT 'Updated timestamp',
+                PRIMARY KEY (`OXID`),
+                UNIQUE KEY `UNQ_TRANSACTION` (`OXTRANSACTIONID`),
+                CONSTRAINT `FK_DETAILS_TRANSACTION`
+                    FOREIGN KEY (`OXTRANSACTIONID`)
+                    REFERENCES `osc_payment_transaction` (`OXID`)
+                    ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Stripe-specific payment details';
+        ");
+
+        // ➕ STANDARD CHECKOUT: Payment order state table (authorization, capture, refund tracking)
+        self::addTableIfNotExists('osc_payment_order_state', "
+            CREATE TABLE `osc_payment_order_state` (
+                `OXID` char(32) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL COMMENT 'Primary key',
+                `OXSHOPID` int(11) NOT NULL DEFAULT 1 COMMENT 'Shop ID',
+                `OXORDERID` char(32) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL COMMENT 'FK: oxorder.OXID',
+                `OXPAYMENTSTATE` varchar(50) NOT NULL DEFAULT 'pending' COMMENT 'Payment state (pending, authorized, paid, refunded)',
+                `OXPAYMENTMETHOD` varchar(50) NOT NULL COMMENT 'Payment method',
+                `OXAUTHORIZED` tinyint(1) DEFAULT 0 COMMENT 'Payment authorized',
+                `OXAUTHORIZEDAMOUNT` decimal(10,2) DEFAULT NULL COMMENT 'Authorized amount',
+                `OXAUTHORIZEDAT` datetime DEFAULT NULL COMMENT 'Authorization timestamp',
+                `OXCAPTURED` tinyint(1) DEFAULT 0 COMMENT 'Payment captured',
+                `OXCAPTUREDAMOUNT` decimal(10,2) DEFAULT NULL COMMENT 'Captured amount',
+                `OXCAPTUREDAT` datetime DEFAULT NULL COMMENT 'Capture timestamp',
+                `OXREFUNDED` tinyint(1) DEFAULT 0 COMMENT 'Payment refunded',
+                `OXREFUNDEDAMOUNT` decimal(10,2) DEFAULT 0.00 COMMENT 'Total refunded amount',
+                `OXREFUNDEDAT` datetime DEFAULT NULL COMMENT 'Last refund timestamp',
+                `OXCREATED` datetime NOT NULL COMMENT 'Created timestamp',
+                `OXUPDATED` datetime DEFAULT NULL COMMENT 'Updated timestamp',
+                PRIMARY KEY (`OXID`),
+                UNIQUE KEY `UNQ_ORDERID` (`OXORDERID`),
+                KEY `IDX_SHOPID` (`OXSHOPID`),
+                KEY `IDX_PAYMENTSTATE` (`OXPAYMENTSTATE`),
+                CONSTRAINT `FK_STATE_ORDER`
+                    FOREIGN KEY (`OXORDERID`)
+                    REFERENCES `oxorder` (`OXID`)
+                    ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Payment state per order (1:1 relationship)';
+        ");
+
+        // ➕ STRIPE-SPECIFIC: Customer mapping table (OXID user → Stripe customer)
+        self::addTableIfNotExists('osc_stripe_customer_mapping', "
+            CREATE TABLE `osc_stripe_customer_mapping` (
+                `OXID` char(32) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL COMMENT 'Primary key',
+                `OXSHOPID` int(11) NOT NULL DEFAULT 1 COMMENT 'Shop ID',
+                `OXUSERID` char(32) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL COMMENT 'FK: oxuser.OXID',
+                `OXSTRIPECUSTOMERID` varchar(255) NOT NULL COMMENT 'Stripe Customer ID (cus_xxxxx)',
+                `OXCREATED` datetime NOT NULL COMMENT 'Created timestamp',
+                `OXUPDATED` datetime DEFAULT NULL COMMENT 'Updated timestamp',
+                PRIMARY KEY (`OXID`),
+                UNIQUE KEY `UNQ_USERID` (`OXUSERID`),
+                KEY `IDX_STRIPECUSTOMERID` (`OXSTRIPECUSTOMERID`),
+                KEY `IDX_SHOPID` (`OXSHOPID`),
+                CONSTRAINT `FK_CUSTOMER_USER`
+                    FOREIGN KEY (`OXUSERID`)
+                    REFERENCES `oxuser` (`OXID`)
+                    ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Stripe customer mapping (provider-specific)';
+        ");
+
+        // ➕ SHARED: Webhook log table (all payment providers)
+        self::addTableIfNotExists('osc_payment_webhook_log', "
+            CREATE TABLE `osc_payment_webhook_log` (
+                `OXID` char(32) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL COMMENT 'Primary key',
+                `OXSHOPID` int(11) NOT NULL DEFAULT 1 COMMENT 'Shop ID',
+                `OXEVENTID` varchar(255) NOT NULL COMMENT 'Webhook event ID (idempotency key)',
+                `OXEVENTTYPE` varchar(100) NOT NULL COMMENT 'Event type (payment_intent.succeeded, etc)',
+                `OXPROVIDER` varchar(50) NOT NULL COMMENT 'Payment provider (stripe, paypal, etc)',
+                `OXPAYLOAD` mediumtext NOT NULL COMMENT 'Full webhook payload (JSON)',
+                `OXSTATUS` varchar(50) NOT NULL DEFAULT 'received' COMMENT 'Processing status (received, processed, failed)',
+                `OXERRORMESSAGE` text COMMENT 'Error message if processing failed',
+                `OXCREATED` datetime NOT NULL COMMENT 'Received timestamp',
+                `OXUPDATED` datetime DEFAULT NULL COMMENT 'Updated timestamp',
+                PRIMARY KEY (`OXID`),
+                UNIQUE KEY `UNQ_EVENTID` (`OXEVENTID`),
+                KEY `IDX_SHOPID` (`OXSHOPID`),
+                KEY `IDX_EVENTTYPE` (`OXEVENTTYPE`),
+                KEY `IDX_PROVIDER` (`OXPROVIDER`),
+                KEY `IDX_STATUS` (`OXSTATUS`),
+                KEY `IDX_CREATED` (`OXCREATED`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Webhook event log (shared across providers)';
+        ");
     }
 }

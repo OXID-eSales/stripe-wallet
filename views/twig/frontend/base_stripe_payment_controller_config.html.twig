@@ -1,0 +1,72 @@
+{#
+This file is to move some of the values from backend to JS at front, the example is from PaypPal, needs to ajusted
+#}
+
+
+
+
+
+{#
+
+    This maybe not neede in stripe,  Clude ported it from paypal
+
+{% if oViewConf.getTopActiveClassName() == 'order' %}
+    {% set payment = oView.getPayment() %}
+    {% set paymentId = payment.getId() %}
+    {% set sToken = oViewConf.getSessionChallengeToken() %}
+    {% set sSelfLink = oViewConf.getSslSelfLink()|replace({"&amp;": "&"}) %}
+    {% set oStripeConfig = oViewConf.getStripeCheckoutConfig() %}
+    {% set customerId = oView.getStripeCustomerId() %}
+    {% set isSandBox = oStripeConfig.isSandbox() %}
+    {% set captureStrategy = oStripeConfig.getStripeCaptureStrategy() %}
+    {% set currency = oView.getActCurrency() %}
+
+    {% if isSandBox %}
+        {% set debug = '&XDEBUG_SESSION=PHPSTORM' %}
+    {% else %}
+        {% set debug = '' %}
+    {% endif %}
+
+    <script>
+        const StripePaymentControllerConfiguratorDefaults = {
+            shopOrderErrorUrl: '{{ (sSelfLink ~ "cl=ajaxpay&fnc=logError&aid=" ~ aid ~ "&stoken=" ~ sToken ~ debug)|replace({'&amp;': '&'})|raw }}',
+            shopOrderCancelUrl: '{{ (sSelfLink ~ "cl=ajaxpay&fnc=cancelShopOrder&aid=" ~ aid ~ "&stoken=" ~ sToken ~ debug)|replace({'&amp;': '&'})|raw }}',
+            shopOrderFinalizeUrl: '{{ (sSelfLink ~ "cl=ajaxpay&fnc=finalizeStripeSession&aid=" ~ aid ~ "&stoken=" ~ sToken ~ debug)|replace({'&amp;': '&'})|raw }}',
+            stripePaymentDetailsUrl: '{{ (sSelfLink ~ "cl=ajaxpay&fnc=fetchStripePaymentDetails&aid=" ~ aid ~ "&stoken=" ~ sToken ~ debug)|replace({'&amp;': '&'})|raw }}',
+            errorLogUrl: '{{ (sSelfLink ~ "cl=payment&payerror=2&aid=" ~ aid ~ "&stoken=" ~ sToken ~ debug)|replace({'&amp;': '&'})|raw }}',
+            shopThankYouPageUrl: '{{ (sSelfLink ~ "cl=thankyou&aid=" ~ aid ~ "&stoken=" ~ sToken ~ debug)|replace({'&amp;': '&'})|raw }}',
+            shopOrderAuthorizeUrl: '{{ (sSelfLink ~ "cl=ajaxpay&fnc=authorizePayment&aid=" ~ aid ~ "&stoken=" ~ sToken ~ debug)|replace({'&amp;': '&'})|raw }}',
+            deliveryAddressId: '{{ oView.getDeliveryAddressMD5() }}',
+            vaultedPaymentSource: {{ vaultedPaymentSource|raw }},
+            language: '{{ oView.getActiveLangAbbr()|lower }}',
+            currency: '{{ currency.name }}',
+            customerId: '{{ customerId }}',
+            captureStrategy: '{% if captureStrategy == 'directly' %}CAPTURE{% else %}AUTHORIZE{% endif %}',
+            trackingId: '{{ oView.getCurrentTrackingId() }}',
+            confirmAGBForIntangibleRequired: {% if oViewConf.isFunctionalityEnabled('blEnableIntangibleProdAgreement') and oView.isNonMaterialItemInBasket() %}1{% else %}0{% endif %} === 1,
+            confirmAGBRequired: {% if oViewConf.isFunctionalityEnabled('blConfirmAGB') %}1{% else %}0{% endif %} === 1,
+        };
+
+        {% if paymentId == 'oscstripe_card' %}
+            window.StripePaymentControllerConfigurator = function () {
+                return Object.assign(StripePaymentControllerConfiguratorDefaults, {
+                    shopOrderCaptureUrl: '{{ (sSelfLink ~ "cl=ajaxpay&fnc=captureOrder&aid=" ~ aid ~ "&stoken=" ~ sToken ~ debug)|replace({'&amp;': '&'})|raw }}',
+                    shopOrderCreateUrl: '{{ (sSelfLink ~ "cl=ajaxpay&fnc=createStripeCardOrder&aid=" ~ aid ~ "&stoken=" ~ sToken ~ debug)|replace({'&amp;': '&'})|raw }}',
+                    shopOrderCompleteUrl: '{{ (sSelfLink ~ "cl=ajaxpay&fnc=completeOrder&aid=" ~ aid ~ "&stoken=" ~ sToken ~ debug)|replace({'&amp;': '&'})|raw }}',
+                    shopOrderApproveUrl: '{{ (sSelfLink ~ "cl=oscstripeproxy&fnc=approveOrder&aid=" ~ aid ~ "&stoken=" ~ sToken ~ debug)|replace({'&amp;': '&'})|raw }}',
+                    cardFields: true,
+                    paymentId: '{{ paymentId }}',
+                    buttonSelector: 'button#{{ paymentId }}'
+                });
+            };
+        {% endif %}
+
+        if ('undefined' !== typeof StripePaymentControllerConfigurator) {
+            window.StripePaymentControllerConfig = new StripePaymentControllerConfigurator();
+            document.dispatchEvent(
+                new CustomEvent('StripePaymentControllerConfigCreated', {detail: window.StripePaymentControllerConfig})
+            );
+        }
+    </script>
+{% endif %}
+#}

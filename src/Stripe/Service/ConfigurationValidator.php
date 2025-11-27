@@ -14,7 +14,24 @@ use Stripe\StripeClient;
 
 /**
  * Validator for Stripe API configuration
- * Validates API keys, webhook secrets, and tests Stripe connectivity
+ *
+ * This service validates Stripe API credentials and configuration settings to ensure
+ * the module is properly configured before processing payments.
+ *
+ * Responsibilities:
+ * - Validates API key formats (test vs live mode)
+ * - Ensures test keys start with 'sk_test_' and live keys with 'sk_live_'
+ * - Validates webhook secret format (must start with 'whsec_')
+ * - Tests connection to Stripe API to verify credentials work
+ * - Returns detailed validation errors for debugging
+ *
+ * Usage:
+ * Called during module configuration in admin panel and before payment initialization
+ * to prevent configuration errors that would cause runtime failures.
+ *
+ * @package OxidSolutionCatalysts\Payments\Stripe\Service
+ * @author OXID eSales AG
+ * @since 1.0.0
  */
 class ConfigurationValidator implements ServiceInterface
 {

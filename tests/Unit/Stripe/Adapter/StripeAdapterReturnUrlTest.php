@@ -53,8 +53,8 @@ final class StripeAdapterReturnUrlTest extends TestCase
         // Create a test double for StripeClient
         $this->stripeClient = new TestStripeClient();
 
-        $this->adapter = new StripeAdapter();
-        $this->adapter->setStripeClient($this->stripeClient);
+        // Create adapter with injected client (constructor injection - SOLID principle)
+        $this->adapter = new StripeAdapter($this->stripeClient);
     }
 
     /**

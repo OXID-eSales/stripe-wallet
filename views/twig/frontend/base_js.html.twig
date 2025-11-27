@@ -1,0 +1,11 @@
+{% if oViewConf.isStripeCheckoutActive() %}
+    <script src="https://js.stripe.com/v3/"></script>
+    {% set stripeJsPath = oViewConf.getStripeJsPath() %}
+    {% set stripeVersion = oViewConf.getStripeModuleVersion() %}
+
+    <script src="{{ oViewConf.getModuleUrl('osc_stripe_wallet', stripeJsPath) }}?v={{ stripeVersion }}"></script>  
+
+    {% include '@osc_stripe_wallet/frontend/base_stripe_payment_controller_config.html.twig' %}
+    {% include '@osc_stripe_wallet/frontend/base_stripe_element_config.html.twig' %}
+{% endif %}
+

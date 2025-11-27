@@ -6,13 +6,25 @@
 
 declare(strict_types=1);
 
-use OxidEsales\Eshop\Application\Controller\Admin\ModuleConfiguration as CoreAdminModuleConfiguration;
-use OxidEsales\Eshop\Application\Controller\OrderController;
-use OxidSolutionCatalysts\Payments\Component\Controller\Core\PaymentController;
-use OxidSolutionCatalysts\Payments\Component\Controller\Webhook\WebhookController;
-use OxidSolutionCatalysts\Payments\Stripe\Application\Controller\Admin\ModuleConfiguration;
-use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\OrderRefund;
+use OxidEsales\Eshop\Application\Controller\Admin\ModuleConfiguration;
+use OxidEsales\Eshop\Core\ViewConfig;
+use OxidEsales\Eshop\Application\Model\Payment as CorePayment;
+use OxidEsales\Eshop\Application\Model\Order as CoreOrder;
+use OxidSolutionCatalysts\Payments\Stripe\Controller\OrderController as StripeOrderController;
+use OxidSolutionCatalysts\Payments\Stripe\Controller\PaymentController as StripePaymentController;
+use OxidSolutionCatalysts\Payments\Stripe\Controller\WebhookController as StripeWebhookController;
+use OxidSolutionCatalysts\Payments\Stripe\Core\ViewConfig as StripeViewConfig;
+use OxidSolutionCatalysts\Payments\Stripe\Model\Payment as StripePayment;
+use OxidSolutionCatalysts\Payments\Stripe\Model\Order as StripeOrder;
+use OxidSolutionCatalysts\Payments\Component\Controller\Http\WebhookController as PaymentComponentWebhookController;
+use OxidSolutionCatalysts\Payments\Component\Controller\Http\PaymentController as PaymentComponentPaymentController;
+use OxidSolutionCatalysts\Payments\Stripe\Core\Events as StripeEvents;
 use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\StripeConnect;
+use OxidSolutionCatalysts\Payments\Stripe\Application\Controller\Admin\ModuleConfiguration as StripeModuleConfiguration;
+use \OxidEsales\Eshop\Application\Controller\PaymentController;
+use \OxidEsales\Eshop\Application\Controller\OrderController;
+use OxidSolutionCatalysts\Payments\Component\Controller\Webhook\WebhookController;
+use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\OrderRefund;
 use OxidSolutionCatalysts\Payments\Stripe\Core\Events;
 use OxidSolutionCatalysts\Payments\Watch\Controller\AssumptionController;
 
@@ -25,7 +37,7 @@ $sMetadataVersion = '2.1';
  * Module information
  */
 $aModule = [
-    'id' => 'osc_stripe_wallet',
+    'id' => Module::MODULE_ID,
     'title' => [
         'de' => 'Stripe Payment Gateway',
         'en' => 'Stripe Payment Gateway',
@@ -40,14 +52,30 @@ $aModule = [
     'url' => 'https://www.oxid-esales.com',
     'email' => 'info@oxid-esales.com',
     'extend' => [
-        CoreAdminModuleConfiguration::class => ModuleConfiguration::class,
-        OrderController::class => \OxidSolutionCatalysts\Payments\Component\Controller\Core\OrderController::class,
+        ModuleConfiguration::class => StripeModuleConfiguration::class,
+        ViewConfig::class => StripeViewConfig::class,
+        CorePayment::class => StripePayment::class,
+        CoreOrder::class => StripeOrder::class,
+
+        PaymentController::class => StripePaymentController::class,
+        OrderController::class => StripeOrderController::class,
     ],
     'controllers' => [
+        'osc_stripe_webhook' => PaymentComponentWebhookController::class,
+        'osc_stripe_payment' => PaymentComponentPaymentController::class,
         'osc_stripe_webhook' => WebhookController::class,
         'osc_stripe_payment' => PaymentController::class,
         'paymentwatch_assumption' => AssumptionController::class,
         'StripeConnect' => StripeConnect::class,
+        //'stripe_checkout_onepage' => \OxidEsales\StripeWallet\Component\Controller\CheckoutOnePageController::class,
+        // Standard checkout webhook endpoint
+        'stripe_webhook' => StripeWebhookController::class,
+        'OrderRefund' => OrderRefund::class,
+        'OrderController' => \OxidSolutionCatalysts\Payments\Component\Controller\Core\OrderController::class,
+    ],
+    'events' => [
+        'onActivate' => StripeEvents::class . '::onActivate',
+        'onDeactivate' => StripeEvents::class . '::onDeactivate',
         'OrderRefund' => OrderRefund::class,
         'OrderController' => \OxidSolutionCatalysts\Payments\Component\Controller\Core\OrderController::class,
     ],
@@ -55,7 +83,10 @@ $aModule = [
         '@osc_stripe_wallet/admin/stripe_connect' => 'views/twig/admin/stripe_connect.html.twig',
         '@osc_stripe_wallet/admin/stripe_order' => 'views/twig/admin/stripe_order_refund.html.twig',
     ],
+    'templates' => [],
+    'blocks' => [],
     'settings'      => [
+        ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeDevMode',                     'type' => 'bool',       'value' => '0',         'position' => 5],
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeMode',                        'type' => 'select',     'value' => 'test',      'position' => 10, 'constraints' => 'live|test'],
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeTestToken',                   'type' => 'str',        'value' => '',          'position' => 20],
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeTestPk',                      'type' => 'str',        'value' => '',          'position' => 21],
@@ -67,6 +98,7 @@ $aModule = [
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeRemoveByBillingCountry',     'type' => 'bool',       'value' => '1',         'position' => 35],
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeRemoveByBasketCurrency',     'type' => 'bool',       'value' => '1',         'position' => 36],
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeProvideCustomerEmailAddress','type' => 'bool',       'value' => '0',         'position' => 37],
+        ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeUseStructuredCustomId',      'type' => 'bool',       'value' => '0',         'position' => 38],
         ['group' => 'STRIPE_STATUS_MAPPING',    'name' => 'sStripeStatusPending',               'type' => 'select',     'value' => '',          'position' => 50],
         ['group' => 'STRIPE_STATUS_MAPPING',    'name' => 'sStripeStatusProcessing',            'type' => 'select',     'value' => '',          'position' => 60],
         ['group' => 'STRIPE_STATUS_MAPPING',    'name' => 'sStripeStatusCancelled',             'type' => 'select',     'value' => '',          'position' => 70],

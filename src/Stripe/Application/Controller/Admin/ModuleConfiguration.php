@@ -11,6 +11,7 @@ namespace OxidSolutionCatalysts\Payments\Stripe\Application\Controller\Admin;
 
 use OxidEsales\Eshop\Core\Registry;
 use OxidSolutionCatalysts\Payments\Component\Traits\ServiceContainer;
+use OxidSolutionCatalysts\Payments\Stripe\Module;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 
 class ModuleConfiguration extends ModuleConfiguration_parent
@@ -76,7 +77,7 @@ class ModuleConfiguration extends ModuleConfiguration_parent
      */
     public function stripeIsStripe(): bool
     {
-        return $this->getEditObjectId() == 'osc_stripe_wallet';
+        return $this->getEditObjectId() == Module::MODULE_ID;
     }
 
     /**

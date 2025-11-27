@@ -47,10 +47,12 @@ use DateTimeImmutable;
  */
 final class StripeAdapter implements PaymentAdapterInterface
 {
-    private StripeClient $stripeClient;
-
-    public function __construct()
-    {
+    /**
+     * @param StripeClient $stripeClient Configured Stripe SDK client
+     */
+    public function __construct(
+        private readonly StripeClient $stripeClient
+    ) {
     }
 
     // ==========================================
@@ -146,17 +148,23 @@ final class StripeAdapter implements PaymentAdapterInterface
                 $params
             );
 
+            // Retrieve with expanded latest_charge to get charge details
+            $paymentIntent = $this->stripeClient->paymentIntents->retrieve(
+                $request->providerPaymentId,
+                ['expand' => ['latest_charge']]
+            );
+
             $amountCaptured = $paymentIntent->amount_received / 100;
 
-            // Get capture timestamp from first charge, or use current time if not available
-            $capturedAtTimestamp = $paymentIntent->charges->data[0]->created ?? time();
+            // Get capture timestamp from latest charge, or use current time if not available
+            $capturedAtTimestamp = $paymentIntent->latest_charge?->created ?? time();
 
             return new CaptureResponse(
                 providerPaymentId: $paymentIntent->id,
-                captureId: $paymentIntent->charges->data[0]->id ?? $paymentIntent->id,
+                captureId: $paymentIntent->latest_charge?->id ?? $paymentIntent->id,
                 amountCaptured: $amountCaptured,
                 currency: strtoupper($paymentIntent->currency),
-                status: 'succeeded',
+                status: StripeStatusMapper::STATUS_CAPTURED,
                 capturedAt: new DateTimeImmutable('@' . $capturedAtTimestamp),
                 providerData: $paymentIntent->toArray(),
                 metadata: $request->metadata
@@ -220,7 +228,7 @@ final class StripeAdapter implements PaymentAdapterInterface
 
             return new VoidResponse(
                 providerPaymentId: $paymentIntent->id,
-                status: 'succeeded',
+                status: StripeStatusMapper::STATUS_CANCELLED,
                 voidedAt: new DateTimeImmutable(),
                 reason: $request->reason,
                 providerData: $paymentIntent->toArray(),
@@ -231,25 +239,27 @@ final class StripeAdapter implements PaymentAdapterInterface
         }
     }
 
-    public function getPaymentDetails(string $providerPaymentId): PaymentDetailsResponse
+    public function  getPaymentDetails(string $providerPaymentId): PaymentDetailsResponse
     {
         try {
-            $paymentIntent = $this->stripeClient->paymentIntents->retrieve($providerPaymentId);
+            // Retrieve with expanded latest_charge to get charge details
+            $paymentIntent = $this->stripeClient->paymentIntents->retrieve(
+                $providerPaymentId,
+                ['expand' => ['latest_charge']]
+            );
 
             $amountCaptured = $paymentIntent->amount_received / 100;
             $amount = $paymentIntent->amount / 100;
 
-            // Calculate refunded amount from charges
+            // Get refunded amount from latest charge
             $amountRefunded = 0.0;
-            if ($paymentIntent->charges->data) {
-                foreach ($paymentIntent->charges->data as $charge) {
-                    $amountRefunded += $charge->amount_refunded / 100;
-                }
+            if ($paymentIntent->latest_charge) {
+                $amountRefunded = ($paymentIntent->latest_charge->amount_refunded ?? 0) / 100;
             }
 
             $capturedAt = null;
-            if (!empty($paymentIntent->charges->data) && isset($paymentIntent->charges->data[0]->created)) {
-                $capturedAt = new DateTimeImmutable('@' . $paymentIntent->charges->data[0]->created);
+            if ($paymentIntent->latest_charge && isset($paymentIntent->latest_charge->created)) {
+                $capturedAt = new DateTimeImmutable('@' . $paymentIntent->latest_charge->created);
             }
 
             return new PaymentDetailsResponse(
@@ -478,7 +488,10 @@ final class StripeAdapter implements PaymentAdapterInterface
 
             // Payment is authenticated if it's succeeded or requires_capture
             // (requires_capture means authorization was successful)
-            $authenticated = in_array($paymentIntent->status, ['succeeded', 'requires_capture'], true);
+            $authenticated = in_array($paymentIntent->status, [
+                StripeStatusMapper::STRIPE_SUCCEEDED,
+                StripeStatusMapper::STRIPE_REQUIRES_CAPTURE
+            ], true);
 
             return new ThreeDSecureResponse(
                 paymentId: $paymentIntent->id,
@@ -499,8 +512,8 @@ final class StripeAdapter implements PaymentAdapterInterface
             $paymentIntent = $this->stripeClient->paymentIntents->retrieve($providerPaymentId);
 
             // Check if payment succeeded after 3DS authentication
-            return $paymentIntent->status === 'succeeded'
-                || $paymentIntent->status === 'requires_capture';
+            return $paymentIntent->status === StripeStatusMapper::STRIPE_SUCCEEDED
+                || $paymentIntent->status === StripeStatusMapper::STRIPE_REQUIRES_CAPTURE;
         } catch (ApiErrorException $e) {
             throw $this->convertStripeException($e);
         }
@@ -632,26 +645,12 @@ final class StripeAdapter implements PaymentAdapterInterface
     private function map3DSecureStatus(string $stripeStatus): string
     {
         return match ($stripeStatus) {
-            'succeeded', 'requires_capture' => 'authenticated',
-            'requires_action' => 'pending',
-            'canceled', 'payment_failed' => 'failed',
+            StripeStatusMapper::STRIPE_SUCCEEDED,
+            StripeStatusMapper::STRIPE_REQUIRES_CAPTURE => 'authenticated',
+            StripeStatusMapper::STRIPE_REQUIRES_ACTION => 'pending',
+            StripeStatusMapper::STRIPE_CANCELED => 'failed',
             default => 'not_required',
         };
     }
 
-    /**
-     * @return \Stripe\StripeClient
-     */
-    public function getStripeClient(): StripeClient
-    {
-        return $this->stripeClient;
-    }
-
-    /**
-     * @param \Stripe\StripeClient $stripeClient
-     */
-    public function setStripeClient(StripeClient $stripeClient): void
-    {
-        $this->stripeClient = $stripeClient;
-    }
 }

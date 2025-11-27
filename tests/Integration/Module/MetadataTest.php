@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Tests\Integration\Module;
 
 use PHPUnit\Framework\TestCase;
+use OxidSolutionCatalysts\Payments\Stripe\Module;
 
 /**
  * Integration tests for module metadata
@@ -55,9 +56,9 @@ class MetadataTest extends TestCase
         );
 
         $this->assertEquals(
-            'osc_stripe_wallet',
+            Module::MODULE_ID,
             $this->moduleData['id'],
-            'Module ID must be "osc_stripe_wallet"'
+            'Module ID must be "'. Module::MODULE_ID .'"'
         );
     }
 

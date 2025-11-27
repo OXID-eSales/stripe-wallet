@@ -14,11 +14,12 @@ use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Bridge\ModuleSettingBridge;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Bridge\ModuleSettingBridgeInterface;
 use OxidEsales\Eshop\Core\Registry;
+use OxidSolutionCatalysts\Payments\Stripe\Module;
 
 class StripeConnect extends AdminController
 {
     /** @var string */
-    protected $_sThisTemplate = "@osc_stripe_wallet/admin/stripe_connect";
+    protected $_sThisTemplate = "/admin/stripe_connectModule::MODULE_ID";
 
     /** @var ModuleSettingBridge */
     private ModuleSettingBridge $moduleSettingService;
@@ -49,11 +50,11 @@ class StripeConnect extends AdminController
             $blSuccess = false;
         } else {
             if ($sMode == 'live') {
-                $this->moduleSettingService->save('sStripeLiveToken', $sAccessToken, 'osc_stripe_wallet');
-                $this->moduleSettingService->save('sStripeLivePk', $sPublishableKey, 'osc_stripe_wallet');
+                $this->moduleSettingService->save('sStripeLiveToken', $sAccessToken, Module::MODULE_ID);
+                $this->moduleSettingService->save('sStripeLivePk', $sPublishableKey, Module::MODULE_ID);
             } else {
-                $this->moduleSettingService->save('sStripeTestToken', $sAccessToken, 'osc_stripe_wallet');
-                $this->moduleSettingService->save('sStripeTestPk', $sPublishableKey, 'osc_stripe_wallet');
+                $this->moduleSettingService->save('sStripeTestToken', $sAccessToken, Module::MODULE_ID);
+                $this->moduleSettingService->save('sStripeTestPk', $sPublishableKey, Module::MODULE_ID);
             }
         }
 

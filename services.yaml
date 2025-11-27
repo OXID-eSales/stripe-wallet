@@ -117,3 +117,122 @@ services:
   # Gets API credentials from ModuleConfigurationService
   OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory:
     public: true
+
+  # ==========================================
+  # Shop Adapter Layer (Platform-Agnostic)
+  # ==========================================
+  #
+  # Provides abstraction layer for shop-specific operations like translations,
+  # configuration, session management, etc. This allows the Payment Component
+  # to remain platform-agnostic while working with different shop systems
+  # (OXID, Shopware, Magento, etc.)
+  #
+  # Key Features:
+  # - Platform-agnostic ShopAdapterInterface
+  # - Translation service (replaces deprecated Registry::getLang())
+  # - Shop configuration access
+  # - Language and currency management
+  #
+
+  # Shop Adapter Interface - Bind to OXID implementation
+  OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface:
+    class: OxidSolutionCatalysts\Payments\Stripe\Adapter\OxidShopAdapter
+    public: false
+
+  # OXID Shop Adapter - OXID eShop specific implementation
+  OxidSolutionCatalysts\Payments\Stripe\Adapter\OxidShopAdapter:
+    alias: OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface
+
+  # ==========================================
+  # Shop Order Service (Order Operations)
+  # ==========================================
+  #
+  # Provides platform-agnostic interface for order operations.
+  # Phase 1 implements order creation from basket/cart.
+  #
+  # Key Features:
+  # - Creates orders via Order::finalizeOrder()
+  # - Maps OXID order states to normalized statuses
+  # - Associates payment transactions with orders
+  # - Stores order metadata
+  #
+
+  # Shop Order Service Interface - Bind to OXID implementation
+  OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface:
+    class: OxidSolutionCatalysts\Payments\Stripe\Adapter\OxidShopOrderService
+    public: true
+
+  # OXID Shop Order Service - OXID eShop specific implementation
+  OxidSolutionCatalysts\Payments\Stripe\Adapter\OxidShopOrderService:
+    alias: OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface
+
+  # ==========================================
+  # Repositories (Data Access Layer)
+  # ==========================================
+
+  # Doctrine DBAL Connection - Required for repositories
+  doctrine.dbal.connection:
+    class: Doctrine\DBAL\Connection
+    factory: ['@OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionProviderInterface', 'get']
+    public: false
+
+  # Transaction Repository - Stores payment transactions
+  OxidSolutionCatalysts\Payments\Component\Repository\TransactionRepositoryInterface:
+    class: OxidSolutionCatalysts\Payments\Component\Repository\DoctrineTransactionRepository
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+    public: false
+
+  # Alias for easier reference
+  OxidSolutionCatalysts\Payments\Component\Repository\DoctrineTransactionRepository:
+    alias: OxidSolutionCatalysts\Payments\Component\Repository\TransactionRepositoryInterface
+
+  # Stripe Payment Details Repository - Stores Stripe-specific payment data
+  OxidSolutionCatalysts\Payments\Stripe\Repository\StripePaymentDetailsRepository:
+    public: false
+
+  # Payment Order State Repository - DEPRECATED (No longer used)
+  # Payment state is now tracked via Component-level TransactionRepository
+  # which provides provider-agnostic transaction persistence.
+  # Keeping this definition for backwards compatibility but it's no longer injected.
+  # OxidSolutionCatalysts\Payments\Stripe\Repository\PaymentOrderStateRepository:
+  #   public: false
+
+  # ==========================================
+  # Event System (Optional)
+  # ==========================================
+
+  # Event Dispatcher - Dispatches domain events (optional)
+  OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface:
+    class: OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher
+    public: false
+
+  # Alias for easier reference
+  OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher:
+    alias: OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface
+
+  # ==========================================
+  # Twig Extensions
+  # ==========================================
+
+  # Dump Extension - Provides dump() and dd() functions for debugging templates
+  OxidSolutionCatalysts\Payments\Stripe\Twig\DumpExtension:
+    tags:
+      - { name: twig.extension }
+    public: false
+
+  # ==========================================
+  # Controllers
+  # ==========================================
+
+  # PaymentController - Extended OXID PaymentController with Stripe payment integration
+  OxidSolutionCatalysts\Payments\Stripe\Controller\PaymentController:
+    tags:
+      - { name: oxid.view_controller, controller_key: payment }
+    public: true
+
+  # OrderController - Extended OXID OrderController with Stripe payment integration
+  OxidSolutionCatalysts\Payments\Stripe\Controller\OrderController:
+    tags:
+      - { name: oxid.view_controller, controller_key: order }
+    public: true

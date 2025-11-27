@@ -12,42 +12,68 @@ namespace OxidSolutionCatalysts\Payments\Stripe\Twig;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFunction;
 
+/**
+ * Twig extension to provide dump functionality for debugging templates
+ */
 class DumpExtension extends AbstractExtension
 {
+    /**
+     * Returns a list of functions to add to the existing list.
+     *
+     * @return TwigFunction[]
+     */
     public function getFunctions(): array
     {
         return [
             new TwigFunction('dump', [$this, 'dump'], ['is_safe' => ['html']]),
-            new TwigFunction('dd', [$this, 'dd'], ['is_safe' => ['html']]),
+            new TwigFunction('dd', [$this, 'dumpAndDie'], ['is_safe' => ['html']]),
         ];
     }
 
     /**
-     * Dumps variable(s) for debugging
+     * Dumps variables using var_dump with HTML formatting
      *
-     * @param mixed ...$vars
-     * @return string
+     * @param mixed ...$vars Variables to dump
+     * @return string HTML formatted dump output
      */
     public function dump(...$vars): string
     {
+        if (empty($vars)) {
+            return '';
+        }
+
         ob_start();
-        echo '<pre style="background:#1e1e1e;color:#dcdcdc;padding:10px;margin:10px;border-radius:5px;overflow:auto;font-size:12px;">';
+        echo '<pre style="background: #f5f5f5; border: 1px solid #ddd; padding: 10px; margin: 10px 0; overflow: auto; font-size: 12px; line-height: 1.4;">';
+
         foreach ($vars as $var) {
             var_dump($var);
         }
+
         echo '</pre>';
+
         return ob_get_clean();
     }
 
     /**
-     * Dumps variable(s) and dies
+     * Dumps variables and terminates script execution
+     * Useful for debugging - "dump and die"
      *
-     * @param mixed ...$vars
-     * @return never
+     * @param mixed ...$vars Variables to dump
+     * @return string HTML formatted dump output (but script will die after)
      */
-    public function dd(...$vars): never
+    public function dumpAndDie(...$vars): string
     {
-        echo $this->dump(...$vars);
-        exit(1);
+        $output = $this->dump(...$vars);
+        die($output);
+    }
+
+    /**
+     * Returns the name of the extension.
+     *
+     * @return string The extension name
+     */
+    public function getName(): string
+    {
+        return 'stripe_dump_extension';
     }
 }

@@ -1,0 +1,79 @@
+{% extends "page/checkout/order.html.twig" %}
+
+{% set payment = oView.getPayment() %}
+{% set paymentId = payment.getId() %}
+
+{% block shippingAndPayment %}
+    {% if payment.isStripePaymentMethod() == false %}
+        {{ parent() }}
+    {% else %}
+        <form action="{{ oViewConf.getSslSelfLink()|raw }}" method="post"
+              id="orderShipping">
+            {{ oViewConf.getHiddenSid()|raw }}
+            <input type="hidden" name="cl" value="payment">
+            <input type="hidden" name="fnc" value="">
+            <h4 class="card-header card-title card-header-edit d-flex justify-content-between align-items-center">
+                {{ translate({ ident: "SHIPPING_CARRIER" }) }}
+                <button type="submit" class="btn"
+                        title="{{ translate({ ident: "EDIT" }) }}">
+                    <svg aria-hidden="true">
+                        <use xlink:href="#pencil"></use>
+                    </svg>
+                </button>
+            </h4>
+            {% set oShipSet = oView.getShipSet() %}
+            <div class="card-body">
+                {{ oShipSet.oxdeliveryset__oxtitle.value }}
+            </div>
+        </form>
+        <form action="{{ oViewConf.getSslSelfLink()|raw }}" method="post"
+              id="orderPayment">
+            {{ oViewConf.getHiddenSid()|raw }}
+            <input type="hidden" name="cl" value="payment">
+            <input type="hidden" name="fnc" value="">
+            <h4 class="card-header card-title card-header-edit d-flex justify-content-between align-items-center">
+                {{ translate({ ident: "PAYMENT_METHOD" }) }}
+                <button type="submit" class="btn"
+                        title="{{ translate({ ident: "EDIT" }) }}">
+                    <svg aria-hidden="true">
+                        <use xlink:href="#pencil"></use>
+                    </svg>
+                </button>
+            </h4>
+            <div class="card-body">
+                {% set payment_id_template = paymentId|replace({'osc_': ''}) %}
+                {% include [
+                    "@osc_stripe_wallet/frontend/" ~ payment_id_template ~ ".html.twig",
+                    "@osc_stripe_wallet/frontend/payment_method_unsupported.html.twig"]
+                    with {
+                    'payment': payment,
+                    'oViewData': oViewData,
+                    'oViewConf': oViewConf
+                } only %}
+            </div>
+        </form>
+    {% endif %}
+{% endblock %}
+
+{% block checkout_order_next_step_side %}
+    {% set displayBasketOrderButton = oViewConf.getViewThemeParam('basketLowOrderDisplayOrderButton') %}
+    {% if not oView.isLowOrderPrice() or (displayBasketOrderButton == 'show' or displayBasketOrderButton == 'disabled') %}
+        {% set createCheckoutSessionUrl = oViewConf.getSslSelfLink() ~ "cl=order&fnc=createCheckoutSession" %}
+        <button id="stripe-checkout-btn"
+                type="button"
+                class="btn btn-highlight btn-lg w-100"
+                data-controller="order-submit"
+                data-action="click->order-submit#handleSubmit"
+                data-order-submit-url-value="{{ createCheckoutSessionUrl | raw }}"
+                data-order-submit-payment-type-value="wallet"
+                data-order-submit-publishable-key-value="{{ oViewConf.getStripePublishableKey() | raw }}"
+                data-order-submit-target="button"
+                {% if oView.isLowOrderPrice() and displayBasketOrderButton == 'disabled' %}
+                    disabled="disabled"
+                {% endif %}
+        >
+            {{ translate({ ident: "SUBMIT_ORDER" }) }}
+        </button>
+        <div data-order-submit-target="status" class="mt-2 text-center"></div>
+    {% endif %}
+{% endblock %}

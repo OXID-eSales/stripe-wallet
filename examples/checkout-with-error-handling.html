@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>One-Page Checkout - Error Handling Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+
+        .checkout-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .checkout-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .checkout-header h1 {
+            font-size: 32px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .checkout-header p {
+            color: #666;
+        }
+
+        /* Checkout Sections */
+        .checkout-section {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-header {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+
+        .section-number {
+            width: 32px;
+            height: 32px;
+            background: #007bff;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-weight: 700;
+        }
+
+        .section-disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        /* Form Styles */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 6px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+        }
+
+        .form-input.error {
+            border-color: #dc3545 !important;
+            background-color: #fff5f5;
+        }
+
+        .field-error {
+            color: #dc3545;
+            font-size: 12px;
+            margin-top: 4px;
+            display: block;
+            font-weight: 500;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #0056b3;
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.6s linear infinite;
+            margin-left: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Success State */
+        .success-message {
+            text-align: center;
+            padding: 48px 24px;
+        }
+
+        .success-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .success-message h2 {
+            font-size: 24px;
+            color: #28a745;
+            margin-bottom: 8px;
+        }
+
+        .success-message p {
+            color: #666;
+        }
+
+        /* Toast Container (from error-handling-system.js) */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            max-width: 400px;
+        }
+
+        /* Cart Summary */
+        .cart-summary {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .cart-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .cart-total {
+            display: flex;
+            justify-content: space-between;
+            font-size: 18px;
+            font-weight: 700;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 2px solid #dee2e6;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .checkout-container {
+                padding: 10px;
+            }
+
+            .checkout-section {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="checkout-container">
+        <!-- Header -->
+        <div class="checkout-header">
+            <h1>Checkout</h1>
+            <p>Complete your purchase securely</p>
+        </div>
+
+        <!-- Cart Summary -->
+        <div class="checkout-section">
+            <div class="section-header">
+                <span class="section-number">🛒</span>
+                <span>Your Order</span>
+            </div>
+            <div class="cart-summary">
+                <div class="cart-item">
+                    <div>
+                        <strong>Product A</strong><br>
+                        <small>Quantity: 2</small>
+                    </div>
+                    <div>€59.98</div>
+                </div>
+                <div class="cart-item">
+                    <div>
+                        <strong>Product B</strong><br>
+                        <small>Quantity: 1</small>
+                    </div>
+                    <div>€49.99</div>
+                </div>
+                <div class="cart-total">
+                    <span>Total</span>
+                    <span>€109.97</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Address Section -->
+        <div class="checkout-section" id="address-section">
+            <div class="section-header">
+                <span class="section-number">1</span>
+                <span>Shipping Address</span>
+            </div>
+            <form id="address-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="firstName">First Name *</label>
+                        <input
+                            type="text"
+                            id="firstName"
+                            name="firstName"
+                            class="form-input"
+                            required
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="lastName">Last Name *</label>
+                        <input
+                            type="text"
+                            id="lastName"
+                            name="lastName"
+                            class="form-input"
+                            required
+                        >
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="email">Email *</label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        class="form-input"
+                        required
+                    >
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="street">Street Address *</label>
+                    <input
+                        type="text"
+                        id="street"
+                        name="street"
+                        class="form-input"
+                        required
+                    >
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="city">City *</label>
+                        <input
+                            type="text"
+                            id="city"
+                            name="city"
+                            class="form-input"
+                            required
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="zip">ZIP Code *</label>
+                        <input
+                            type="text"
+                            id="zip"
+                            name="zip"
+                            class="form-input"
+                            required
+                        >
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="countryCode">Country *</label>
+                    <select id="countryCode" name="countryCode" class="form-input" required>
+                        <option value="">Select country...</option>
+                        <option value="DE">Germany</option>
+                        <option value="AT">Austria</option>
+                        <option value="CH">Switzerland</option>
+                        <option value="FR">France</option>
+                        <option value="NL">Netherlands</option>
+                    </select>
+                </div>
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary" id="address-submit-btn">
+                        Continue to Payment
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Payment Section (Initially Disabled) -->
+        <div class="checkout-section section-disabled" id="payment-section">
+            <div class="section-header">
+                <span class="section-number">2</span>
+                <span>Payment Details</span>
+            </div>
+            <form id="payment-form">
+                <div class="form-group">
+                    <label class="form-label" for="cardNumber">Card Number *</label>
+                    <input
+                        type="text"
+                        id="cardNumber"
+                        name="cardNumber"
+                        class="form-input"
+                        placeholder="4242 4242 4242 4242"
+                        maxlength="19"
+                    >
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="expMonth">Expiry Month *</label>
+                        <input
+                            type="text"
+                            id="expMonth"
+                            name="expMonth"
+                            class="form-input"
+                            placeholder="12"
+                            maxlength="2"
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="expYear">Expiry Year *</label>
+                        <input
+                            type="text"
+                            id="expYear"
+                            name="expYear"
+                            class="form-input"
+                            placeholder="2025"
+                            maxlength="4"
+                        >
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cvc">Security Code (CVC) *</label>
+                    <input
+                        type="text"
+                        id="cvc"
+                        name="cvc"
+                        class="form-input"
+                        placeholder="123"
+                        maxlength="4"
+                    >
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cardholderName">Cardholder Name *</label>
+                    <input
+                        type="text"
+                        id="cardholderName"
+                        name="cardholderName"
+                        class="form-input"
+                    >
+                </div>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-secondary" id="back-to-address-btn">
+                        Back
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="payment-submit-btn">
+                        Pay €109.97
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Success Section (Initially Hidden) -->
+        <div class="checkout-section" id="success-section" style="display: none;">
+            <div class="success-message">
+                <div class="success-icon">✅</div>
+                <h2>Order Confirmed!</h2>
+                <p>Thank you for your purchase. You will receive a confirmation email shortly.</p>
+                <p style="margin-top: 16px; color: #666;">
+                    Order ID: <strong id="order-id"></strong>
+                </p>
+            </div>
+        </div>
+
+        <!-- Toast Container (injected by JS) -->
+        <div id="checkout-toast-container"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="one-page-checkout-client.js"></script>
+    <script src="error-handling-system.js"></script>
+    <script src="checkout-abandonment-tracking.js"></script>
+    <script>
+        // Initialize checkout client with error handling
+        const checkout = new EnhancedCheckoutClient('/graphql', 'encryption-key', {
+            toastDuration: 5000,
+            enableRetry: true,
+            maxRetries: 3
+        });
+
+        // Initialize abandonment tracking
+        const abandonmentTracker = new CheckoutAbandonmentTracker(checkout, {
+            timeoutMinutes: 15
+        });
+
+        // Set cart data
+        abandonmentTracker.updateState({
+            cartItems: [
+                { productId: 'P123', productName: 'Product A', quantity: 2, price: 29.99 },
+                { productId: 'P456', productName: 'Product B', quantity: 1, price: 49.99 }
+            ],
+            cartTotal: 109.97,
+            currency: 'EUR',
+            stage: 'address'
+        });
+
+        // Address form submission
+        document.getElementById('address-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('address-submit-btn');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Processing...<span class="spinner"></span>';
+
+            const formData = new FormData(e.target);
+            const addressData = {
+                firstName: formData.get('firstName'),
+                lastName: formData.get('lastName'),
+                street: formData.get('street'),
+                city: formData.get('city'),
+                zip: formData.get('zip'),
+                countryCode: formData.get('countryCode'),
+                email: formData.get('email')
+            };
+
+            try {
+                const result = await checkout.updateAddress(addressData);
+
+                if (result.updateAddress.success) {
+                    // Update abandonment tracker
+                    abandonmentTracker.updateState({
+                        stage: 'payment',
+                        addressCompleted: true,
+                        email: addressData.email,
+                        billingAddress: addressData
+                    });
+
+                    // Enable payment section
+                    document.getElementById('payment-section').classList.remove('section-disabled');
+                    document.getElementById('payment-section').scrollIntoView({ behavior: 'smooth' });
+                }
+            } catch (error) {
+                console.error('Address submission failed:', error);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+        });
+
+        // Payment form submission
+        document.getElementById('payment-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('payment-submit-btn');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Processing Payment...<span class="spinner"></span>';
+
+            abandonmentTracker.updateState({ paymentAttempted: true });
+
+            const formData = new FormData(e.target);
+            const cardData = {
+                card: {
+                    number: formData.get('cardNumber').replace(/\s/g, ''),
+                    exp_month: parseInt(formData.get('expMonth')),
+                    exp_year: parseInt(formData.get('expYear')),
+                    cvc: formData.get('cvc'),
+                    name: formData.get('cardholderName')
+                }
+            };
+
+            try {
+                const result = await checkout.processPayment(
+                    cardData,
+                    10997, // €109.97 in cents
+                    'EUR',
+                    { returnUrl: window.location.href }
+                );
+
+                const payment = result.processPayment;
+
+                if (payment.success) {
+                    if (payment.status === 'REQUIRES_ACTION' && payment.redirectUrl) {
+                        window.location.href = payment.redirectUrl;
+                    } else if (payment.status === 'SUCCEEDED') {
+                        abandonmentTracker.markComplete();
+                        showSuccess(payment.orderId || 'ORDER-' + Date.now());
+                    }
+                }
+            } catch (error) {
+                console.error('Payment failed:', error);
+                abandonmentTracker.trackPaymentFailure(error.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+        });
+
+        // Back button
+        document.getElementById('back-to-address-btn').addEventListener('click', () => {
+            abandonmentTracker.updateState({ stage: 'address' });
+            document.getElementById('payment-section').classList.add('section-disabled');
+            document.getElementById('address-section').scrollIntoView({ behavior: 'smooth' });
+        });
+
+        // Show success page
+        function showSuccess(orderId) {
+            document.getElementById('order-id').textContent = orderId;
+            document.getElementById('address-section').style.display = 'none';
+            document.getElementById('payment-section').style.display = 'none';
+            document.getElementById('success-section').style.display = 'block';
+        }
+
+        // Format card number input
+        document.getElementById('cardNumber').addEventListener('input', (e) => {
+            let value = e.target.value.replace(/\s/g, '');
+            let formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
+            e.target.value = formattedValue;
+        });
+    </script>
+</body>
+</html>

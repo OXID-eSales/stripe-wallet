@@ -10,25 +10,65 @@ declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Stripe\Service;
 
 use OxidEsales\Eshop\Core\Config;
+use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Dao\ModuleConfigurationDaoInterface;
+use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\DataObject\ModuleConfiguration;
+use OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\ServiceInterface;
+use OxidSolutionCatalysts\Payments\Stripe\Module;
+use Throwable;
 
 /**
  * Service for managing Stripe module configuration settings
- * Handles test/live mode switching and retrieval of API credentials
+ *
+ * This service acts as a centralized configuration manager for the Stripe module,
+ * providing type-safe access to all module settings and credentials.
+ *
+ * Responsibilities:
+ * - Manages test/live mode switching
+ * - Retrieves API keys (publishable and secret) based on current mode
+ * - Provides access to webhook configuration
+ * - Handles order status mappings
+ * - Manages cron job settings
+ * - Controls payment method restrictions (country, currency)
+ * - Provides transaction logging settings
+ *
+ * Benefits:
+ * - Single source of truth for all configuration
+ * - Abstracts away OXID's Config class complexity
+ * - Ensures type-safe access to settings
+ * - Makes it easy to switch between test and live mode
+ * - Reduces code duplication across controllers and services
+ *
+ * @package OxidSolutionCatalysts\Payments\Stripe\Service
+ * @author OXID eSales AG
+ * @since 1.0.0
  */
 class ModuleConfigurationService implements ServiceInterface
 {
+    private ModuleConfiguration $config;
+
     public function __construct(
-        private Config $config
+        private ContextInterface $context,
+        private ModuleConfigurationDaoInterface $moduleConfigurationDao,
     ) {
+        $this->config = $this->moduleConfigurationDao->get(Module::MODULE_ID, $this->context->getCurrentShopId());
     }
 
+    public function get(string $name): mixed
+    {
+        try {
+            return $this->config->getModuleSetting($name)->getValue();
+        } catch (Throwable $e) {
+            return '';
+        }
+    }
+    
     /**
      * Check if the module is in test mode
      */
     public function isTestMode(): bool
     {
-        $mode = $this->config->getConfigParam('sStripeMode');
+        $mode = $this->get('sStripeMode');
         return is_string($mode) && $mode === 'test';
     }
 
@@ -38,11 +78,11 @@ class ModuleConfigurationService implements ServiceInterface
     public function getPublishableKey(): string
     {
         if ($this->isTestMode()) {
-            $key = $this->config->getConfigParam('sStripeTestPk');
+            $key = $this->get('sStripeTestPk');
             return is_string($key) ? $key : '';
         }
 
-        $key = $this->config->getConfigParam('sStripeLivePk');
+        $key = $this->get('sStripeLivePk');
         return is_string($key) ? $key : '';
     }
 
@@ -52,11 +92,11 @@ class ModuleConfigurationService implements ServiceInterface
     public function getSecretKey(): string
     {
         if ($this->isTestMode()) {
-            $key = $this->config->getConfigParam('sStripeTestKey');
+            $key = $this->get('sStripeTestToken');
             return is_string($key) ? $key : '';
         }
 
-        $key = $this->config->getConfigParam('sStripeLiveKey');
+        $key = $this->get('sStripeLiveToken');
         return is_string($key) ? $key : '';
     }
 
@@ -66,11 +106,11 @@ class ModuleConfigurationService implements ServiceInterface
     public function getToken(): string
     {
         if ($this->isTestMode()) {
-            $token = $this->config->getConfigParam('sStripeTestToken');
+            $token = $this->get('sStripeTestToken');
             return is_string($token) ? $token : '';
         }
 
-        $token = $this->config->getConfigParam('sStripeLiveToken');
+        $token = $this->get('sStripeLiveToken');
         return is_string($token) ? $token : '';
     }
 
@@ -79,7 +119,7 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function getWebhookSecret(): string
     {
-        $secret = $this->config->getConfigParam('sStripeWebhookEndpointSecret');
+        $secret = $this->get('sStripeWebhookEndpointSecret');
         return is_string($secret) ? $secret : '';
     }
 
@@ -88,7 +128,7 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function getWebhookEndpoint(): string
     {
-        $endpoint = $this->config->getConfigParam('sStripeWebhookEndpoint');
+        $endpoint = $this->get('sStripeWebhookEndpoint');
         return is_string($endpoint) ? $endpoint : '';
     }
 
@@ -97,7 +137,7 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function isTransactionLoggingEnabled(): bool
     {
-        return (bool) $this->config->getConfigParam('blStripeLogTransactionInfo');
+        return (bool) $this->get('blStripeLogTransactionInfo');
     }
 
     /**
@@ -105,7 +145,7 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function getStatusPending(): string
     {
-        $status = $this->config->getConfigParam('sStripeStatusPending');
+        $status = $this->get('sStripeStatusPending');
         return is_string($status) ? $status : '';
     }
 
@@ -114,7 +154,7 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function getStatusProcessing(): string
     {
-        $status = $this->config->getConfigParam('sStripeStatusProcessing');
+        $status = $this->get('sStripeStatusProcessing');
         return is_string($status) ? $status : '';
     }
 
@@ -123,7 +163,7 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function getStatusCancelled(): string
     {
-        $status = $this->config->getConfigParam('sStripeStatusCancelled');
+        $status = $this->get('sStripeStatusCancelled');
         return is_string($status) ? $status : '';
     }
 
@@ -132,7 +172,7 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function isRemoveByBillingCountry(): bool
     {
-        return (bool) $this->config->getConfigParam('blStripeRemoveByBillingCountry');
+        return (bool) $this->get('blStripeRemoveByBillingCountry');
     }
 
     /**
@@ -140,7 +180,7 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function isRemoveByBasketCurrency(): bool
     {
-        return (bool) $this->config->getConfigParam('blStripeRemoveByBasketCurrency');
+        return (bool) $this->get('blStripeRemoveByBasketCurrency');
     }
 
     /**
@@ -148,7 +188,7 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function shouldProvideCustomerEmail(): bool
     {
-        return (bool) $this->config->getConfigParam('blStripeProvideCustomerEmailAddress');
+        return (bool) $this->get('blStripeProvideCustomerEmailAddress');
     }
 
     /**
@@ -156,7 +196,7 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function isCronFinishOrdersActive(): bool
     {
-        return (bool) $this->config->getConfigParam('sStripeCronFinishOrdersActive');
+        return (bool) $this->get('sStripeCronFinishOrdersActive');
     }
 
     /**
@@ -164,7 +204,7 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function isCronSecondChanceActive(): bool
     {
-        return (bool) $this->config->getConfigParam('sStripeCronSecondChanceActive');
+        return (bool) $this->get('sStripeCronSecondChanceActive');
     }
 
     /**
@@ -172,7 +212,7 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function getCronSecondChanceTimeDiff(): int
     {
-        $value = $this->config->getConfigParam('iStripeCronSecondChanceTimeDiff');
+        $value = $this->get('iStripeCronSecondChanceTimeDiff');
         return is_numeric($value) ? (int)$value : 1;
     }
 
@@ -181,7 +221,7 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function isCronOrderShipmentActive(): bool
     {
-        return (bool) $this->config->getConfigParam('sStripeCronOrderShipmentActive');
+        return (bool) $this->get('sStripeCronOrderShipmentActive');
     }
 
     /**
@@ -189,7 +229,7 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function getCronSecureKey(): string
     {
-        $key = $this->config->getConfigParam('sStripeCronSecureKey');
+        $key = $this->get('sStripeCronSecureKey');
         return is_string($key) ? $key : '';
     }
 
@@ -208,6 +248,49 @@ class ModuleConfigurationService implements ServiceInterface
      */
     public function isConfigured(): bool
     {
-        return !empty($this->getSecretKey()) && !empty($this->getWebhookSecret());
+        return !empty($this->getToken())/* && !empty($this->getSecretKey())/* && !empty($this->getWebhookSecret())*/;
+    }
+
+    /**
+     * Get capture mode (automatic or manual)
+     */
+    public function getCaptureMode(): string
+    {
+        $mode = $this->get('sStripeCapture');
+        return is_string($mode) && !empty($mode) ? $mode : 'automatic';
+    }
+
+    /**
+     * Check if 3D Secure is enabled
+     */
+    public function is3DSecureEnabled(): bool
+    {
+        return (bool) $this->get('blStripe3DSecure');
+    }
+
+    /**
+     * Get minimum order amount for Stripe
+     * Returns 0.50 as default (Stripe minimum)
+     */
+    public function getMinimumOrderAmount(): float
+    {
+        $amount = $this->get('fStripeMinimumOrderAmount');
+        return is_numeric($amount) ? (float) $amount : 0.50;
+    }
+
+    /**
+     * Check if logging is enabled
+     */
+    public function isLoggingEnabled(): bool
+    {
+        return (bool) $this->get('blStripeEnableLogging');
+    }
+
+    /**
+     * Check module health (basic validation)
+     */
+    public function checkHealth(): bool
+    {
+        return !empty($this->getWebhookSecret());
     }
 }

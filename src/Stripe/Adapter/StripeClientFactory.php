@@ -31,7 +31,7 @@ final class StripeClientFactory
     public function __construct(
         private readonly ModuleConfigurationService $configurationService
     ) {
-        $this->secretKey = $this->configurationService->getSecretKey();
+        $this->secretKey = $this->configurationService->getToken();
         $this->testMode = $this->configurationService->isTestMode();
     }
 
