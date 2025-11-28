@@ -20,9 +20,9 @@ use Psr\Log\LoggerInterface;
 use Throwable;
 
 /**
- * Orchestrates checkout accounting for Stripe payments.
+ * Orchestrates checkout accounting for external payment providers.
  *
- * Note: No Stripe API calls here - payment happens on frontend.
+ * Note: No provider API calls here - payment happens on frontend.
  * This service only handles backend accounting (contract creation, event dispatch).
  *
  * @since 1.0.0
@@ -39,7 +39,7 @@ class CheckoutOrchestrator implements CheckoutOrchestratorInterface
         object $basket,
         object $user,
         string $paymentMethodId,
-        ?string $paymentIntentId = null
+        ?string $providerTransactionId = null
     ): CheckoutResult {
         // Validate basket
         if ($this->isBasketEmpty($basket)) {
@@ -58,7 +58,7 @@ class CheckoutOrchestrator implements CheckoutOrchestratorInterface
                 'user' => $user,
                 'userId' => $this->getUserId($user),
                 'paymentMethodId' => $paymentMethodId,
-                'paymentIntentId' => $paymentIntentId,
+                'providerTransactionId' => $providerTransactionId,
             ]);
 
             // Get basket data for event

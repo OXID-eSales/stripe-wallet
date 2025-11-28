@@ -13,10 +13,10 @@ use OxidSolutionCatalysts\Payments\Component\Service\Result\CheckoutResult;
 use OxidSolutionCatalysts\Payments\Component\Service\Result\OrderConfirmationResult;
 
 /**
- * Orchestrates checkout accounting for Stripe payments.
+ * Orchestrates checkout accounting for external payment providers.
  *
  * Note: This service handles BACKEND ACCOUNTING only.
- * Actual payment processing happens on the frontend via Stripe.js.
+ * Actual payment processing happens on the frontend via provider SDKs.
  *
  * Responsibilities:
  * - Create payment contracts
@@ -34,27 +34,27 @@ interface CheckoutOrchestratorInterface
      * Called from OrderController::execute() BEFORE parent::execute().
      *
      * Does NOT:
-     * - Call Stripe API
+     * - Call provider APIs directly
      * - Process payments
      * - Handle redirects
      *
      * Does:
      * - Create PaymentContract
      * - Snapshot basket data
-     * - Store payment_intent_id for later webhook matching
+     * - Store provider transaction ID for later webhook matching
      * - Emit PaymentInitiatedEvent
      *
      * @param object $basket OXID basket object
      * @param object $user OXID user object
-     * @param string $paymentMethodId Payment method (e.g., 'stripe_card')
-     * @param string|null $paymentIntentId Stripe PaymentIntent ID from frontend (optional)
+     * @param string $paymentMethodId Payment method (e.g., 'stripe_card', 'paypal_express')
+     * @param string|null $providerTransactionId Provider transaction ID from frontend (optional)
      * @return CheckoutResult Result containing contract_id or error
      */
     public function processCheckout(
         object $basket,
         object $user,
         string $paymentMethodId,
-        ?string $paymentIntentId = null
+        ?string $providerTransactionId = null
     ): CheckoutResult;
 
     /**

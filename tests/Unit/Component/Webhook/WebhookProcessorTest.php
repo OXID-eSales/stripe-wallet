@@ -56,7 +56,8 @@ final class WebhookProcessorTest extends TestCase
             $this->eventDispatcher,
             $this->idempotencyChecker,
             $this->logRepository,
-            $this->logger
+            $this->logger,
+            'stripe'
         );
     }
 

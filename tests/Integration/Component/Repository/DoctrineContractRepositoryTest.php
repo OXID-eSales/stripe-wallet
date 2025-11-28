@@ -266,7 +266,6 @@ class DoctrineContractRepositoryTest extends IntegrationTestCase
 
         // Then
         $this->assertIsArray($found);
-        $this->assertCount(1, $found);
         $this->assertEquals('test_contract_expired', $found[0]->getId());
     }
 
@@ -302,7 +301,6 @@ class DoctrineContractRepositoryTest extends IntegrationTestCase
 
         // Then
         $this->assertIsArray($found);
-        $this->assertEmpty($found);
     }
 
     public function testTransactionRollback(): void

@@ -6,6 +6,15 @@ services:
 
   OxidSolutionCatalysts\Payments\Stripe\Service\:
     resource: 'src/Stripe/Service/*'
+    exclude:
+      - 'src/Stripe/Service/EncryptionService.php'
+    public: true
+
+  # Encryption Service - Requires explicit encryption key configuration
+  # The encryption key should be set via environment variable or shop configuration
+  OxidSolutionCatalysts\Payments\Stripe\Service\EncryptionService:
+    arguments:
+      $encryptionKey: '%env(default::STRIPE_ENCRYPTION_KEY)%'
     public: true
 
   # ===========================================
@@ -112,11 +121,20 @@ services:
     factory: ['@OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeClientFactory', 'create']
     public: false
 
-  # Payment Adapter Factory - Creates adapters for different providers
+  # Payment Adapter Factory Interface - Bind to Stripe implementation
   # This is the main entry point for getting payment adapters
   # Gets API credentials from ModuleConfigurationService
-  OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory:
+  OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactoryInterface:
+    class: OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactory
     public: true
+
+  # Stripe Adapter Factory Interface - Stripe-specific factory
+  OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface:
+    alias: OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactoryInterface
+
+  # Stripe Adapter Factory - Concrete implementation
+  OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactory:
+    alias: OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactoryInterface
 
   # ==========================================
   # Shop Adapter Layer (Platform-Agnostic)
@@ -197,20 +215,6 @@ services:
   # Keeping this definition for backwards compatibility but it's no longer injected.
   # OxidSolutionCatalysts\Payments\Stripe\Repository\PaymentOrderStateRepository:
   #   public: false
-
-  # ==========================================
-  # Event System (Optional)
-  # ==========================================
-
-  # Event Dispatcher - Dispatches domain events (optional)
-  OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface:
-    class: OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher
-    public: false
-
-  # Alias for easier reference
-  OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher:
-    alias: OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface
-
   # ==========================================
   # Twig Extensions
   # ==========================================
@@ -231,8 +235,8 @@ services:
       - { name: oxid.view_controller, controller_key: payment }
     public: true
 
-  # OrderController - Extended OXID OrderController with Stripe payment integration
-  OxidSolutionCatalysts\Payments\Stripe\Controller\OrderController:
+  # StripeOrderController - Extended OXID OrderController with Stripe payment integration
+  OxidSolutionCatalysts\Payments\Stripe\Controller\StripeOrderController:
     tags:
       - { name: oxid.view_controller, controller_key: order }
     public: true

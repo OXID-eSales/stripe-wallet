@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Component\Service;
+namespace OxidSolutionCatalysts\Payments\Stripe\Service;
 
 /**
  * ErrorResponseFactory - Standardizes error responses across the application

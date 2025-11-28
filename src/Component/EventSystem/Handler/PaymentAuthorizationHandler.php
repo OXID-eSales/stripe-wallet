@@ -43,8 +43,10 @@ class PaymentAuthorizationHandler extends AbstractHandler
             ]
         );
 
-        if ($providerOrderId) {
-            $contract->setProvider('stripe', $providerOrderId);
+        // Set provider info from context (provider name is set by provider-specific handlers)
+        $providerName = $context->get('providerName');
+        if ($providerOrderId && $providerName) {
+            $contract->setProvider($providerName, $providerOrderId);
         }
 
         $this->contractRepository->save($contract);

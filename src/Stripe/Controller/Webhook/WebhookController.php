@@ -7,14 +7,14 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Controller;
+namespace OxidSolutionCatalysts\Payments\Stripe\Controller\Webhook;
 
 use OxidEsales\Eshop\Application\Controller\FrontendController;
 use OxidEsales\Eshop\Core\Registry;
-use Stripe\Webhook;
-use Stripe\Exception\SignatureVerificationException;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService;
+use Stripe\Exception\SignatureVerificationException;
+use Stripe\Webhook;
 
 /**
  * Webhook endpoint controller

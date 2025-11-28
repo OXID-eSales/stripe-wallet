@@ -2,14 +2,12 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Component\Controller\GraphQL;
+namespace OxidSolutionCatalysts\Payments\Stripe\Controller\GraphQL;
 
-use OxidSolutionCatalysts\Payments\Stripe\Component\EventSystem\EventDispatcher;
-use OxidSolutionCatalysts\Payments\Stripe\Component\EventSystem\Event\AddressUpdatedEvent;
-use OxidSolutionCatalysts\Payments\Stripe\Component\EventSystem\Event\PaymentInitiatedEvent;
-use OxidSolutionCatalysts\Payments\Stripe\Component\EventSystem\Event\CheckoutAbandonedEvent;
-use OxidSolutionCatalysts\Payments\Stripe\Component\Service\EncryptionService;
-use OxidSolutionCatalysts\Payments\Stripe\Component\Service\ErrorResponseFactory;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentInitiatedEvent;
+use OxidSolutionCatalysts\Payments\Stripe\Service\EncryptionService;
+use OxidSolutionCatalysts\Payments\Stripe\Service\ErrorResponseFactory;
 use Psr\Log\LoggerInterface;
 
 /**

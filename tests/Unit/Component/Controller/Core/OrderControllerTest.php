@@ -33,57 +33,57 @@ final class OrderControllerTest extends TestCase
         $this->orchestrator = $this->createMock(CheckoutOrchestratorInterface::class);
     }
 
-    public function testIsStripePaymentMethod_WithStripeCardPayment_ReturnsTrue(): void
+    public function testIsExternalPaymentMethod_WithStripeCardPayment_ReturnsTrue(): void
     {
         $controller = $this->createControllerWithPaymentId('stripe_card');
 
-        $reflection = new \ReflectionMethod($controller, 'isStripePaymentMethod');
+        $reflection = new \ReflectionMethod($controller, 'isExternalPaymentMethod');
         $result = $reflection->invoke($controller);
 
         $this->assertTrue($result);
     }
 
-    public function testIsStripePaymentMethod_WithStripeSepaPayment_ReturnsTrue(): void
+    public function testIsExternalPaymentMethod_WithStripeSepaPayment_ReturnsTrue(): void
     {
         $controller = $this->createControllerWithPaymentId('stripe_sepa');
 
-        $reflection = new \ReflectionMethod($controller, 'isStripePaymentMethod');
+        $reflection = new \ReflectionMethod($controller, 'isExternalPaymentMethod');
         $result = $reflection->invoke($controller);
 
         $this->assertTrue($result);
     }
 
-    public function testIsStripePaymentMethod_WithCashOnDelivery_ReturnsFalse(): void
+    public function testIsExternalPaymentMethod_WithCashOnDelivery_ReturnsFalse(): void
     {
         $controller = $this->createControllerWithPaymentId('oxidcashondel');
 
-        $reflection = new \ReflectionMethod($controller, 'isStripePaymentMethod');
+        $reflection = new \ReflectionMethod($controller, 'isExternalPaymentMethod');
         $result = $reflection->invoke($controller);
 
         $this->assertFalse($result);
     }
 
-    public function testIsStripePaymentMethod_WithPayPal_ReturnsFalse(): void
+    public function testIsExternalPaymentMethod_WithPayPal_ReturnsFalse(): void
     {
         $controller = $this->createControllerWithPaymentId('oxidpaypal');
 
-        $reflection = new \ReflectionMethod($controller, 'isStripePaymentMethod');
+        $reflection = new \ReflectionMethod($controller, 'isExternalPaymentMethod');
         $result = $reflection->invoke($controller);
 
         $this->assertFalse($result);
     }
 
-    public function testIsStripePaymentMethod_WithNullPaymentId_ReturnsFalse(): void
+    public function testIsExternalPaymentMethod_WithNullPaymentId_ReturnsFalse(): void
     {
         $controller = $this->createControllerWithPaymentId(null);
 
-        $reflection = new \ReflectionMethod($controller, 'isStripePaymentMethod');
+        $reflection = new \ReflectionMethod($controller, 'isExternalPaymentMethod');
         $result = $reflection->invoke($controller);
 
         $this->assertFalse($result);
     }
 
-    public function testExecute_WithStripePayment_CallsOrchestrator(): void
+    public function testExecute_WithExternalPayment_CallsOrchestrator(): void
     {
         $basket = $this->createBasketMock('stripe_card', 100.0);
         $user = $this->createUserMock('user_123');
@@ -107,7 +107,7 @@ final class OrderControllerTest extends TestCase
 
         // We can't easily call execute() without parent dependencies
         // Instead, test the private method directly
-        $reflection = new \ReflectionMethod($controller, 'executeWithStripeAccounting');
+        $reflection = new \ReflectionMethod($controller, 'executeWithContractAccounting');
         $result = $reflection->invoke($controller);
 
         // Parent returns 'thankyou' or similar, but since we mock we just check no exception
@@ -129,7 +129,7 @@ final class OrderControllerTest extends TestCase
         $controller = $this->createControllerWithMocks($basket, $user, $session);
         $controller->addServiceMock(CheckoutOrchestratorInterface::class, $this->orchestrator);
 
-        $reflection = new \ReflectionMethod($controller, 'executeWithStripeAccounting');
+        $reflection = new \ReflectionMethod($controller, 'executeWithContractAccounting');
         $result = $reflection->invoke($controller);
 
         $this->assertEquals('order', $result);
@@ -147,9 +147,10 @@ final class OrderControllerTest extends TestCase
         $session->method('getBasket')->willReturn($basket);
         $session->method('getVariable')->willReturn(null);
 
+        // Updated session key to payment_contract_id (provider-agnostic)
         $session->expects($this->once())
             ->method('setVariable')
-            ->with('stripe_contract_id', $contractId);
+            ->with('payment_contract_id', $contractId);
 
         $this->orchestrator
             ->method('processCheckout')
@@ -158,17 +159,17 @@ final class OrderControllerTest extends TestCase
         $controller = $this->createControllerWithMocks($basket, $user, $session);
         $controller->addServiceMock(CheckoutOrchestratorInterface::class, $this->orchestrator);
 
-        $reflection = new \ReflectionMethod($controller, 'executeWithStripeAccounting');
+        $reflection = new \ReflectionMethod($controller, 'executeWithContractAccounting');
         $reflection->invoke($controller);
     }
 
-    public function testExecute_WithPaymentIntentId_PassesToOrchestrator(): void
+    public function testExecute_WithProviderTransactionId_PassesToOrchestrator(): void
     {
         $basket = $this->createBasketMock('stripe_card', 150.0);
         $user = $this->createUserMock('user_456');
-        $paymentIntentId = 'pi_test_intent_id_12345';
+        $providerTransactionId = 'pi_test_intent_id_12345';
 
-        $session = $this->createSessionMock($basket, $paymentIntentId);
+        $session = $this->createSessionMock($basket, $providerTransactionId);
 
         $successResult = CheckoutResult::success('contract_999');
 
@@ -179,18 +180,18 @@ final class OrderControllerTest extends TestCase
                 $basket,
                 $user,
                 'stripe_card',
-                $paymentIntentId
+                $providerTransactionId
             )
             ->willReturn($successResult);
 
-        $controller = $this->createControllerWithMocks($basket, $user, $session, $paymentIntentId);
+        $controller = $this->createControllerWithMocks($basket, $user, $session, $providerTransactionId);
         $controller->addServiceMock(CheckoutOrchestratorInterface::class, $this->orchestrator);
 
-        $reflection = new \ReflectionMethod($controller, 'executeWithStripeAccounting');
+        $reflection = new \ReflectionMethod($controller, 'executeWithContractAccounting');
         $reflection->invoke($controller);
     }
 
-    public function testExecute_WithNonStripePayment_DoesNotCallOrchestrator(): void
+    public function testExecute_WithNonExternalPayment_DoesNotCallOrchestrator(): void
     {
         $controller = $this->createControllerWithPaymentId('oxidcashondel');
 
@@ -200,11 +201,11 @@ final class OrderControllerTest extends TestCase
 
         $controller->addServiceMock(CheckoutOrchestratorInterface::class, $this->orchestrator);
 
-        // isStripePaymentMethod returns false, so orchestrator is not called
-        $reflection = new \ReflectionMethod($controller, 'isStripePaymentMethod');
-        $isStripe = $reflection->invoke($controller);
+        // isExternalPaymentMethod returns false, so orchestrator is not called
+        $reflection = new \ReflectionMethod($controller, 'isExternalPaymentMethod');
+        $isExternal = $reflection->invoke($controller);
 
-        $this->assertFalse($isStripe);
+        $this->assertFalse($isExternal);
     }
 
     /**
@@ -228,7 +229,7 @@ final class OrderControllerTest extends TestCase
             /**
              * Override to return mock basket directly (bypassing session type check).
              */
-            protected function isStripePaymentMethod(): bool
+            protected function isExternalPaymentMethod(): bool
             {
                 $paymentId = $this->mockBasket->getPaymentId();
 
@@ -236,7 +237,15 @@ final class OrderControllerTest extends TestCase
                     return false;
                 }
 
-                return str_starts_with((string) $paymentId, 'stripe_');
+                return $this->isPaymentMethodSupported((string) $paymentId);
+            }
+
+            /**
+             * Override for test - check if payment method is Stripe
+             */
+            protected function isPaymentMethodSupported(string $paymentId): bool
+            {
+                return str_starts_with($paymentId, 'stripe_');
             }
         };
     }
@@ -248,25 +257,25 @@ final class OrderControllerTest extends TestCase
         object $basket,
         object $user,
         object $session,
-        ?string $paymentIntentId = null
+        ?string $providerTransactionId = null
     ): OrderController {
-        return new class ($basket, $user, $session, $paymentIntentId) extends OrderController {
+        return new class ($basket, $user, $session, $providerTransactionId) extends OrderController {
             private object $mockBasket;
             private object $mockUser;
             private object $mockSession;
-            private ?string $mockPaymentIntentId;
+            private ?string $mockProviderTransactionId;
             private bool $errorAdded = false;
 
             public function __construct(
                 object $mockBasket,
                 object $mockUser,
                 object $mockSession,
-                ?string $mockPaymentIntentId
+                ?string $mockProviderTransactionId
             ) {
                 $this->mockBasket = $mockBasket;
                 $this->mockUser = $mockUser;
                 $this->mockSession = $mockSession;
-                $this->mockPaymentIntentId = $mockPaymentIntentId;
+                $this->mockProviderTransactionId = $mockProviderTransactionId;
             }
 
             /**
@@ -290,9 +299,9 @@ final class OrderControllerTest extends TestCase
                 return $this->mockUser;
             }
 
-            protected function getPaymentIntentIdFromRequest(): ?string
+            protected function getProviderTransactionIdFromRequest(): ?string
             {
-                return $this->mockPaymentIntentId;
+                return $this->mockProviderTransactionId;
             }
 
             protected function addErrorToDisplay(string $message): void
@@ -308,6 +317,14 @@ final class OrderControllerTest extends TestCase
             public function wasErrorAdded(): bool
             {
                 return $this->errorAdded;
+            }
+
+            /**
+             * Override for test - check if payment method is Stripe
+             */
+            protected function isPaymentMethodSupported(string $paymentId): bool
+            {
+                return str_starts_with($paymentId, 'stripe_');
             }
         };
     }
@@ -366,14 +383,14 @@ final class OrderControllerTest extends TestCase
     /**
      * Creates a session mock.
      */
-    private function createSessionMock(object $basket, ?string $paymentIntentId): object
+    private function createSessionMock(object $basket, ?string $providerTransactionId): object
     {
-        return new class ($basket, $paymentIntentId) {
+        return new class ($basket, $providerTransactionId) {
             private array $variables = [];
 
             public function __construct(
                 private object $basket,
-                private ?string $paymentIntentId
+                private ?string $providerTransactionId
             ) {
             }
 

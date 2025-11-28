@@ -15,12 +15,16 @@ use Psr\Log\LoggerInterface;
 
 class WebhookProcessor implements WebhookProcessorInterface
 {
+    /**
+     * @param string $providerName Provider identifier (e.g., 'stripe', 'paypal')
+     */
     public function __construct(
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly WebhookIdempotencyCheckerInterface $idempotencyChecker,
         private readonly WebhookLogRepositoryInterface $logRepository,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly string $providerName = 'unknown'
     ) {
     }
 
@@ -154,7 +158,7 @@ class WebhookProcessor implements WebhookProcessorInterface
 
         $event = new WebhookReceivedEvent(
             $context,
-            'stripe',
+            $this->providerName,
             $eventType,
             $eventData,
             $eventId

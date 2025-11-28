@@ -10,94 +10,48 @@ declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Component\Service\Factory;
 
 use OxidSolutionCatalysts\Payments\Component\Adapter\PaymentAdapterInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapter;
-use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeClientFactory;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 
 /**
- * Factory for creating payment adapter instances.
+ * Abstract factory for creating payment adapter instances.
+ *
+ * This is a provider-agnostic base class implementing PaymentAdapterFactoryInterface.
+ * Provider-specific factories (e.g., StripeAdapterFactory, PayPalAdapterFactory)
+ * should extend this class and implement the abstract methods.
+ *
+ * For DI constructors, always use PaymentAdapterFactoryInterface (LSP principle).
  *
  * @since 1.0.0
  */
-class PaymentAdapterFactory
+abstract class PaymentAdapterFactory implements PaymentAdapterFactoryInterface
 {
-    private string $secretKey;
-    private bool $testMode;
-
     /**
-     * @param string $secretKey Stripe secret key (test or live)
-     * @param bool $testMode Whether to use test mode
-     */
-    public function __construct(
-        private readonly ModuleConfigurationService $configurationService,
-        private readonly StripeClientFactory $clientFactory
-    ) {
-        $this->secretKey = $this->configurationService->getSecretKey();
-        $this->testMode = $this->configurationService->isTestMode();
-    }
-
-    /**
-     * @throws \InvalidArgumentException
-     */
-    public function createAdapter(string $providerName): PaymentAdapterInterface
-    {
-        return match ($providerName) {
-            'stripe' => $this->createStripeAdapter(),
-            default => throw new \InvalidArgumentException(
-                "Unsupported payment provider: {$providerName}. " .
-                "Currently supported providers: stripe"
-            ),
-        };
-    }
-
-    public function createDefaultAdapter(): PaymentAdapterInterface
-    {
-        return $this->createStripeAdapter();
-    }
-
-    private function createStripeAdapter(): StripeAdapter
-    {
-        $stripeClient = $this->clientFactory->create();
-
-        if ($stripeClient === null) {
-            throw new \RuntimeException(
-                'Stripe API key is not configured. Please configure the Stripe secret key in module settings. ' .
-                'Expected format: sk_test_... (test mode) or sk_live_... (live mode)'
-            );
-        }
-
-        return new StripeAdapter($stripeClient);
-    }
-
-    public function isProviderSupported(string $providerName): bool
-    {
-        return in_array($providerName, ['stripe'], true);
-    }
-
-    /**
-     * @return array<string>
-     */
-    public function getSupportedProviders(): array
-    {
-        return ['stripe'];
-    }
-
-    /**
-     * Get Stripe SDK client for direct API access
-     * Useful for operations not covered by the adapter (e.g., Checkout Sessions)
+     * Creates an adapter for the specified provider.
      *
-     * @return \Stripe\StripeClient
+     * @param string $providerName The provider identifier (e.g., 'stripe', 'paypal')
+     * @return PaymentAdapterInterface
+     * @throws \InvalidArgumentException If the provider is not supported
      */
-    public function getStripeClient(): \Stripe\StripeClient
-    {
-        $client = $this->clientFactory->create();
+    abstract public function createAdapter(string $providerName): PaymentAdapterInterface;
 
-        if ($client === null) {
-            throw new \RuntimeException(
-                'Stripe API key is not configured. Please configure the Stripe secret key in module settings.'
-            );
-        }
+    /**
+     * Creates the default adapter for this factory.
+     *
+     * @return PaymentAdapterInterface
+     */
+    abstract public function createDefaultAdapter(): PaymentAdapterInterface;
 
-        return $client;
-    }
+    /**
+     * Checks if a provider is supported by this factory.
+     *
+     * @param string $providerName The provider identifier to check
+     * @return bool
+     */
+    abstract public function isProviderSupported(string $providerName): bool;
+
+    /**
+     * Gets all providers supported by this factory.
+     *
+     * @return array<string> List of provider identifiers
+     */
+    abstract public function getSupportedProviders(): array;
 }

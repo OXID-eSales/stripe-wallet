@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Copyright © OXID eSales AG. All rights reserved.
  * See LICENSE file for license details.
@@ -7,25 +8,24 @@
 declare(strict_types=1);
 
 use OxidEsales\Eshop\Application\Controller\Admin\ModuleConfiguration;
-use OxidEsales\Eshop\Core\ViewConfig;
-use OxidEsales\Eshop\Application\Model\Payment as CorePayment;
+use OxidEsales\Eshop\Application\Controller\OrderController;
+use OxidEsales\Eshop\Application\Controller\PaymentController;
 use OxidEsales\Eshop\Application\Model\Order as CoreOrder;
-use OxidSolutionCatalysts\Payments\Stripe\Controller\OrderController as StripeOrderController;
-use OxidSolutionCatalysts\Payments\Stripe\Controller\PaymentController as StripePaymentController;
-use OxidSolutionCatalysts\Payments\Stripe\Controller\WebhookController as StripeWebhookController;
-use OxidSolutionCatalysts\Payments\Stripe\Core\ViewConfig as StripeViewConfig;
-use OxidSolutionCatalysts\Payments\Stripe\Model\Payment as StripePayment;
-use OxidSolutionCatalysts\Payments\Stripe\Model\Order as StripeOrder;
-use OxidSolutionCatalysts\Payments\Component\Controller\Http\WebhookController as PaymentComponentWebhookController;
-use OxidSolutionCatalysts\Payments\Component\Controller\Http\PaymentController as PaymentComponentPaymentController;
-use OxidSolutionCatalysts\Payments\Stripe\Core\Events as StripeEvents;
-use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\StripeConnect;
-use OxidSolutionCatalysts\Payments\Stripe\Application\Controller\Admin\ModuleConfiguration as StripeModuleConfiguration;
-use \OxidEsales\Eshop\Application\Controller\PaymentController;
-use \OxidEsales\Eshop\Application\Controller\OrderController;
+use OxidEsales\Eshop\Application\Model\Payment as CorePayment;
+use OxidEsales\Eshop\Core\ViewConfig;
+use OxidSolutionCatalysts\Payments\Component\Controller\Core\PaymentController as PaymentComponentPaymentController;
 use OxidSolutionCatalysts\Payments\Component\Controller\Webhook\WebhookController;
+use OxidSolutionCatalysts\Payments\Stripe\Application\Controller\Admin\ModuleConfiguration as StripeModuleConfiguration;
 use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\OrderRefund;
-use OxidSolutionCatalysts\Payments\Stripe\Core\Events;
+use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\StripeConnect;
+use OxidSolutionCatalysts\Payments\Stripe\Controller\StripeOrderController as StripeOrderController;
+use OxidSolutionCatalysts\Payments\Stripe\Controller\PaymentController as StripePaymentController;
+use OxidSolutionCatalysts\Payments\Stripe\Controller\Webhook\WebhookController as StripeWebhookController;
+use OxidSolutionCatalysts\Payments\Stripe\Core\Events as StripeEvents;
+use OxidSolutionCatalysts\Payments\Stripe\Core\ViewConfig as StripeViewConfig;
+use OxidSolutionCatalysts\Payments\Stripe\Model\Order as StripeOrderModel;
+use OxidSolutionCatalysts\Payments\Stripe\Model\Payment as StripePaymentModel;
+use OxidSolutionCatalysts\Payments\Stripe\Module;
 use OxidSolutionCatalysts\Payments\Watch\Controller\AssumptionController;
 
 /**
@@ -54,37 +54,28 @@ $aModule = [
     'extend' => [
         ModuleConfiguration::class => StripeModuleConfiguration::class,
         ViewConfig::class => StripeViewConfig::class,
-        CorePayment::class => StripePayment::class,
-        CoreOrder::class => StripeOrder::class,
-
+        CorePayment::class => StripePaymentModel::class,
+        CoreOrder::class => StripeOrderModel::class,
         PaymentController::class => StripePaymentController::class,
         OrderController::class => StripeOrderController::class,
     ],
     'controllers' => [
-        'osc_stripe_webhook' => PaymentComponentWebhookController::class,
         'osc_stripe_payment' => PaymentComponentPaymentController::class,
         'osc_stripe_webhook' => WebhookController::class,
-        'osc_stripe_payment' => PaymentController::class,
         'paymentwatch_assumption' => AssumptionController::class,
         'StripeConnect' => StripeConnect::class,
-        //'stripe_checkout_onepage' => \OxidEsales\StripeWallet\Component\Controller\CheckoutOnePageController::class,
-        // Standard checkout webhook endpoint
         'stripe_webhook' => StripeWebhookController::class,
         'OrderRefund' => OrderRefund::class,
-        'OrderController' => \OxidSolutionCatalysts\Payments\Component\Controller\Core\OrderController::class,
+        'orderController' => StripeOrderController::class,
     ],
     'events' => [
         'onActivate' => StripeEvents::class . '::onActivate',
         'onDeactivate' => StripeEvents::class . '::onDeactivate',
-        'OrderRefund' => OrderRefund::class,
-        'OrderController' => \OxidSolutionCatalysts\Payments\Component\Controller\Core\OrderController::class,
     ],
     'templates' => [
         '@osc_stripe_wallet/admin/stripe_connect' => 'views/twig/admin/stripe_connect.html.twig',
         '@osc_stripe_wallet/admin/stripe_order' => 'views/twig/admin/stripe_order_refund.html.twig',
     ],
-    'templates' => [],
-    'blocks' => [],
     'settings'      => [
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeDevMode',                     'type' => 'bool',       'value' => '0',         'position' => 5],
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeMode',                        'type' => 'select',     'value' => 'test',      'position' => 10, 'constraints' => 'live|test'],
@@ -113,9 +104,5 @@ $aModule = [
         ['group' => 'PAYMENTWATCH',             'name' => 'paywatchAllowedHosts',               'type' => 'arr',        'value' => '[]',        'position' => 210],
         ['group' => 'PAYMENTWATCH',             'name' => 'paywatchRateLimitEnabled',           'type' => 'bool',       'value' => '0',         'position' => 220],
         ['group' => 'PAYMENTWATCH',             'name' => 'paywatchRateLimitPerMinute',         'type' => 'str',        'value' => '100',       'position' => 230],
-    ],
-    'events' => [
-        'onActivate' => Events::class . '::onActivate',
-        'onDeactivate' => Events::class . '::onDeactivate',
-    ],
+    ]
 ];

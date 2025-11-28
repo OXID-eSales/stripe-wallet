@@ -16,7 +16,11 @@ use OxidSolutionCatalysts\Payments\Component\Traits\ServiceContainer;
 use Throwable;
 
 /**
- * Extended ThankyouController for Stripe order completion accounting.
+ * Extended ThankyouController for external payment order completion accounting.
+ *
+ * This is a provider-agnostic base controller that handles contract-based
+ * order completion. Provider-specific controllers can extend this class
+ * and override methods as needed.
  *
  * Note: Final payment confirmation happens via webhook.
  * This controller only confirms the order was placed and transitions contract state.
@@ -27,13 +31,22 @@ class ThankyouController extends OxidThankyouController
 {
     use ServiceContainer;
 
-    private const SESSION_CONTRACT_ID = 'stripe_contract_id';
-    private const SESSION_PAYMENT_INTENT_ID = 'stripe_payment_intent_id';
+    /**
+     * Session key for contract ID.
+     * Must match the key used in OrderController.
+     */
+    protected const SESSION_CONTRACT_ID = 'payment_contract_id';
+
+    /**
+     * Session key for provider transaction ID.
+     * Provider-agnostic naming.
+     */
+    protected const SESSION_PROVIDER_TRANSACTION_ID = 'payment_provider_transaction_id';
 
     /**
      * Renders the thankyou page.
      *
-     * For Stripe payments:
+     * For external payment methods:
      * 1. Confirms order completion via orchestrator
      * 2. Cleans up session variables
      * 3. Logs state for debugging
@@ -45,16 +58,17 @@ class ThankyouController extends OxidThankyouController
         $contractId = $this->getContractIdFromSession();
 
         if ($contractId !== null) {
-            $this->confirmStripeOrderCompletion($contractId);
+            $this->confirmOrderCompletion($contractId);
         }
 
         return $this->renderParent();
     }
 
     /**
-     * Confirms Stripe order completion.
+     * Confirms order completion for external payment.
+     * Provider-agnostic implementation.
      */
-    private function confirmStripeOrderCompletion(string $contractId): void
+    protected function confirmOrderCompletion(string $contractId): void
     {
         $order = $this->getOrder();
         if ($order === null) {
@@ -78,7 +92,7 @@ class ThankyouController extends OxidThankyouController
 
                 // Log state for debugging
                 if ($result->isAwaitingPaymentConfirmation()) {
-                    $this->logInfo('Stripe order awaiting payment confirmation via webhook', [
+                    $this->logInfo('Order awaiting payment confirmation via webhook', [
                         'orderId' => $orderId,
                         'contractId' => $contractId,
                         'state' => $result->getContractState(),
@@ -86,7 +100,7 @@ class ThankyouController extends OxidThankyouController
                 }
 
                 if ($result->isFullyCompleted()) {
-                    $this->logInfo('Stripe order fully completed', [
+                    $this->logInfo('Order fully completed', [
                         'orderId' => $orderId,
                         'contractId' => $contractId,
                     ]);
@@ -111,19 +125,20 @@ class ThankyouController extends OxidThankyouController
     /**
      * Gets contract ID from session.
      */
-    private function getContractIdFromSession(): ?string
+    protected function getContractIdFromSession(): ?string
     {
-        return $this->getSession()->getVariable(self::SESSION_CONTRACT_ID);
+        return $this->getSession()->getVariable(static::SESSION_CONTRACT_ID);
     }
 
     /**
      * Clears session variables after successful confirmation.
+     * Override in provider-specific controllers to clear additional variables.
      */
-    private function clearSessionVariables(): void
+    protected function clearSessionVariables(): void
     {
         $session = $this->getSession();
-        $session->deleteVariable(self::SESSION_CONTRACT_ID);
-        $session->deleteVariable(self::SESSION_PAYMENT_INTENT_ID);
+        $session->deleteVariable(static::SESSION_CONTRACT_ID);
+        $session->deleteVariable(static::SESSION_PROVIDER_TRANSACTION_ID);
     }
 
     /**
@@ -162,7 +177,7 @@ class ThankyouController extends OxidThankyouController
     /**
      * Gets the CheckoutOrchestrator from DI container.
      */
-    private function getCheckoutOrchestrator(): CheckoutOrchestratorInterface
+    protected function getCheckoutOrchestrator(): CheckoutOrchestratorInterface
     {
         return $this->getServiceFromContainer(CheckoutOrchestratorInterface::class);
     }

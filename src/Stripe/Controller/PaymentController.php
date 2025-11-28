@@ -13,7 +13,7 @@ use OxidEsales\Eshop\Application\Controller\PaymentController as CorePaymentCont
 use OxidEsales\Eshop\Core\Registry;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use OxidSolutionCatalysts\Payments\Stripe\Module;
-use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory;
+use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreatePaymentRequest;
 use OxidSolutionCatalysts\Payments\Component\Adapter\Exception\PaymentAdapterException;
 use OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface;
@@ -25,17 +25,17 @@ use OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface;
 class PaymentController extends CorePaymentController
 {
     private ModuleConfigurationService $stripeConfig;
-    private PaymentAdapterFactory $adapterFactory;
+    private PaymentAdapterFactoryInterface $adapterFactory;
     private ShopAdapterInterface $shopAdapter;
 
     /**
      * @param \OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService $stripeConfig
-     * @param \OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory $adapterFactory
+     * @param \OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactoryInterface $adapterFactory
      * @param \OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface $shopAdapter
      */
     public function __construct(
         ModuleConfigurationService $stripeConfig,
-        PaymentAdapterFactory $adapterFactory,
+        PaymentAdapterFactoryInterface $adapterFactory,
         ShopAdapterInterface $shopAdapter
     )
     {

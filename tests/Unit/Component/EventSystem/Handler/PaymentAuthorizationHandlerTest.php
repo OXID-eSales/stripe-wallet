@@ -82,6 +82,7 @@ class PaymentAuthorizationHandlerTest extends TestCase
         $context = new EventContext([
             'authorizationId' => 'auth_123',
             'providerOrderId' => 'pi_456',
+            'providerName' => 'stripe',
         ]);
 
         $event = new ContractTransitionedToPendingEvent(
@@ -114,6 +115,7 @@ class PaymentAuthorizationHandlerTest extends TestCase
         $context = new EventContext([
             'authorizationId' => 'auth_123',
             'providerOrderId' => 'pi_456',
+            'providerName' => 'stripe',
         ]);
 
         $event = new ContractTransitionedToPendingEvent(

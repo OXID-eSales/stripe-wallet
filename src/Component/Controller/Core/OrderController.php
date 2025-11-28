@@ -20,9 +20,13 @@ use OxidSolutionCatalysts\Payments\Component\Service\CheckoutOrchestratorInterfa
 use OxidSolutionCatalysts\Payments\Component\Traits\ServiceContainer;
 
 /**
- * Extended OrderController for Stripe payment accounting.
+ * Extended OrderController for external payment provider accounting.
  *
- * Note: Actual payment processing happens on the frontend via Stripe.js.
+ * This is a provider-agnostic base controller that handles contract-based
+ * payment processing. Provider-specific controllers (e.g., StripeOrderController)
+ * should extend this class and override methods as needed.
+ *
+ * Note: Actual payment processing happens on the frontend via provider SDKs.
  * This controller only handles backend accounting (contract creation, order linking).
  *
  * @since 1.0.0
@@ -31,49 +35,53 @@ class OrderController extends OxidOrderController
 {
     use ServiceContainer;
 
-    private const SESSION_CONTRACT_ID = 'stripe_contract_id';
-    private const STRIPE_PAYMENT_PREFIX = 'stripe_';
+    /**
+     * Session key for storing contract ID.
+     * Provider-agnostic naming.
+     */
+    protected const SESSION_CONTRACT_ID = 'payment_contract_id';
 
     /**
      * Executes order placement.
      *
-     * For Stripe payments:
+     * For external payment methods (managed by this component):
      * 1. Calls orchestrator to create contract
      * 2. Stores contract ID in session
      * 3. Calls parent to create OXID order
      *
-     * For non-Stripe payments:
+     * For standard payment methods:
      * - Falls back to parent behavior
      *
      * @return mixed View name or redirect
      */
     public function execute(): mixed
     {
-        if (!$this->isStripePaymentMethod()) {
+        if (!$this->isExternalPaymentMethod()) {
             return $this->executeParentWithExceptionHandling();
         }
 
-        return $this->executeWithStripeAccounting();
+        return $this->executeWithContractAccounting();
     }
 
     /**
-     * Processes checkout with Stripe contract accounting.
+     * Processes checkout with contract-based payment accounting.
+     * Provider-agnostic implementation.
      */
-    protected function executeWithStripeAccounting(): mixed
+    protected function executeWithContractAccounting(): mixed
     {
         /** @var Basket $basket */
         $basket = $this->getBasketFromSession();
         $user = $this->getUser();
         $paymentId = (string) $basket->getPaymentId();
 
-        // Get payment_intent_id from request (set by frontend Stripe.js)
-        $paymentIntentId = $this->getPaymentIntentIdFromRequest();
+        // Get provider transaction ID from request (set by frontend payment SDK)
+        $providerTransactionId = $this->getProviderTransactionIdFromRequest();
 
         $result = $this->getCheckoutOrchestrator()->processCheckout(
             $basket,
             $user,
             $paymentId,
-            $paymentIntentId
+            $providerTransactionId
         );
 
         if (!$result->isSuccess()) {
@@ -86,7 +94,7 @@ class OrderController extends OxidOrderController
         if ($contractId !== null) {
             /** @var Session $session */
             $session = $this->getSessionForVariables();
-            $session->setVariable(self::SESSION_CONTRACT_ID, $contractId);
+            $session->setVariable(static::SESSION_CONTRACT_ID, $contractId);
         }
 
         // Continue with standard OXID order creation
@@ -116,9 +124,15 @@ class OrderController extends OxidOrderController
     }
 
     /**
-     * Checks if the selected payment method is a Stripe method.
+     * Checks if the selected payment method is an external payment method
+     * managed by this component.
+     *
+     * Override this method in provider-specific controllers to define
+     * which payment method IDs are handled.
+     *
+     * @return bool
      */
-    protected function isStripePaymentMethod(): bool
+    protected function isExternalPaymentMethod(): bool
     {
         $basket = $this->getOxidSession()->getBasket();
         $paymentId = $basket->getPaymentId();
@@ -127,16 +141,39 @@ class OrderController extends OxidOrderController
             return false;
         }
 
-        return str_starts_with((string) $paymentId, self::STRIPE_PAYMENT_PREFIX);
+        return $this->isPaymentMethodSupported((string) $paymentId);
     }
 
     /**
-     * Gets payment intent ID from request.
+     * Checks if a specific payment method ID is supported by this component.
+     *
+     * Override this method in provider-specific controllers to define
+     * supported payment method prefixes/IDs.
+     *
+     * @param string $paymentId The payment method ID to check
+     * @return bool
      */
-    protected function getPaymentIntentIdFromRequest(): ?string
+    protected function isPaymentMethodSupported(string $paymentId): bool
     {
+        // Base implementation returns false - provider-specific controllers
+        // should override this to return true for their payment methods
+        return false;
+    }
+
+    /**
+     * Gets provider transaction ID from request.
+     *
+     * Override this method in provider-specific controllers to read
+     * the appropriate request parameter for that provider.
+     *
+     * @return string|null
+     */
+    protected function getProviderTransactionIdFromRequest(): ?string
+    {
+        // Base implementation reads generic parameter name
+        // Provider-specific controllers should override for their parameter names
         /** @var string|null $value */
-        $value = Registry::getRequest()->getRequestParameter('stripe_payment_intent_id');
+        $value = Registry::getRequest()->getRequestParameter('payment_transaction_id');
         return $value;
     }
 
@@ -196,7 +233,7 @@ class OrderController extends OxidOrderController
     /**
      * Gets the CheckoutOrchestrator from DI container.
      */
-    private function getCheckoutOrchestrator(): CheckoutOrchestratorInterface
+    protected function getCheckoutOrchestrator(): CheckoutOrchestratorInterface
     {
         return $this->getServiceFromContainer(CheckoutOrchestratorInterface::class);
     }

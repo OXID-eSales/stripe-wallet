@@ -9,14 +9,20 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Model;
 
+use OxidSolutionCatalysts\Payments\Stripe\Core\StripeDefinitions;
 use OxidSolutionCatalysts\Payments\Stripe\Model\Payment;
 use PHPUnit\Framework\TestCase;
 
 /**
  * Unit tests for Stripe Payment Model extension.
  *
- * Tests the isStripePowered() and related methods that determine
- * if a payment method is Stripe-powered or from another source.
+ * Tests the isStripePaymentMethod() and related methods that determine
+ * if a payment method is Stripe-powered (digital wallet) or from another source.
+ *
+ * Note: Legacy payment methods (stripecreditcard, stripesepa, etc.) are deprecated.
+ * Stripe now uses only digital wallet payment method (osc_stripe_wallet).
+ *
+ * These tests use mocking to avoid OXID Registry initialization issues.
  *
  * @group unit
  * @group stripe
@@ -26,29 +32,37 @@ use PHPUnit\Framework\TestCase;
  */
 final class PaymentTest extends TestCase
 {
-    private Payment $payment;
-
-    protected function setUp(): void
+    /**
+     * Create a mock Payment that returns a specific payment ID
+     */
+    private function createPaymentWithId(string $paymentId): Payment
     {
-        parent::setUp();
-        $this->payment = new Payment();
+        /** @var Payment $payment */
+        $payment = $this->getMockBuilder(Payment::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getId'])
+            ->getMock();
+
+        $payment->method('getId')->willReturn($paymentId);
+
+        return $payment;
     }
 
     // ==========================================
-    // isStripePowered() Tests
+    // isStripePaymentMethod() Tests
     // ==========================================
 
     /**
      * @test
      * @dataProvider stripePaymentMethodsProvider
      */
-    public function testIsStripePoweredReturnsTrueForStripePaymentMethods(string $paymentId): void
+    public function testIsStripePaymentMethodReturnsTrueForStripePaymentMethods(string $paymentId): void
     {
         // Arrange
-        $this->payment->setId($paymentId);
+        $payment = $this->createPaymentWithId($paymentId);
 
         // Act
-        $result = $this->payment->isStripePaymentMethod();
+        $result = $payment->isStripePaymentMethod();
 
         // Assert
         $this->assertTrue(
@@ -61,13 +75,13 @@ final class PaymentTest extends TestCase
      * @test
      * @dataProvider nonStripePaymentMethodsProvider
      */
-    public function testIsStripePoweredReturnsFalseForNonStripePaymentMethods(string $paymentId): void
+    public function testIsStripePaymentMethodReturnsFalseForNonStripePaymentMethods(string $paymentId): void
     {
         // Arrange
-        $this->payment->setId($paymentId);
+        $payment = $this->createPaymentWithId($paymentId);
 
         // Act
-        $result = $this->payment->isStripePaymentMethod();
+        $result = $payment->isStripePaymentMethod();
 
         // Assert
         $this->assertFalse(
@@ -79,13 +93,13 @@ final class PaymentTest extends TestCase
     /**
      * @test
      */
-    public function testIsStripePoweredReturnsFalseWhenPaymentIdIsEmpty(): void
+    public function testIsStripePaymentMethodReturnsFalseWhenPaymentIdIsEmpty(): void
     {
         // Arrange
-        $this->payment->setId('');
+        $payment = $this->createPaymentWithId('');
 
         // Act
-        $result = $this->payment->isStripePaymentMethod();
+        $result = $payment->isStripePaymentMethod();
 
         // Assert
         $this->assertFalse($result, 'Empty payment ID should return false');
@@ -94,18 +108,37 @@ final class PaymentTest extends TestCase
     /**
      * @test
      */
-    public function testIsStripePoweredReturnsTrueForCustomStripePaymentMethod(): void
+    public function testIsStripePaymentMethodReturnsTrueForCustomOscStripePaymentMethod(): void
     {
-        // Arrange - Custom Stripe payment method not in predefined list
-        $this->payment->setId('stripecustommethod');
+        // Arrange - Custom Stripe payment method with osc_stripe_ prefix
+        $payment = $this->createPaymentWithId('osc_stripe_custom');
 
         // Act
-        $result = $this->payment->isStripePaymentMethod();
+        $result = $payment->isStripePaymentMethod();
 
         // Assert
         $this->assertTrue(
             $result,
-            'Custom payment method starting with "stripe" should be recognized'
+            'Custom payment method starting with "osc_stripe_" should be recognized'
+        );
+    }
+
+    /**
+     * @test
+     * @dataProvider legacyPaymentMethodsProvider
+     */
+    public function testIsStripePaymentMethodReturnsFalseForLegacyPaymentMethods(string $paymentId): void
+    {
+        // Arrange
+        $payment = $this->createPaymentWithId($paymentId);
+
+        // Act
+        $result = $payment->isStripePaymentMethod();
+
+        // Assert - Legacy methods (stripe* prefix without osc_) are NOT recognized
+        $this->assertFalse(
+            $result,
+            "Legacy payment method '{$paymentId}' should NOT be recognized (use osc_stripe_* instead)"
         );
     }
 
@@ -120,10 +153,10 @@ final class PaymentTest extends TestCase
     public function testIsOtherSourcedReturnsFalseForStripePaymentMethods(string $paymentId): void
     {
         // Arrange
-        $this->payment->setId($paymentId);
+        $payment = $this->createPaymentWithId($paymentId);
 
         // Act
-        $result = $this->payment->isOtherSourced();
+        $result = $payment->isOtherSourced();
 
         // Assert
         $this->assertFalse(
@@ -139,10 +172,10 @@ final class PaymentTest extends TestCase
     public function testIsOtherSourcedReturnsTrueForNonStripePaymentMethods(string $paymentId): void
     {
         // Arrange
-        $this->payment->setId($paymentId);
+        $payment = $this->createPaymentWithId($paymentId);
 
         // Act
-        $result = $this->payment->isOtherSourced();
+        $result = $payment->isOtherSourced();
 
         // Assert
         $this->assertTrue(
@@ -162,10 +195,10 @@ final class PaymentTest extends TestCase
     public function testGetPaymentProviderReturnsStripeForStripePaymentMethods(string $paymentId): void
     {
         // Arrange
-        $this->payment->setId($paymentId);
+        $payment = $this->createPaymentWithId($paymentId);
 
         // Act
-        $provider = $this->payment->getPaymentProvider();
+        $provider = $payment->getPaymentProvider();
 
         // Assert
         $this->assertSame('stripe', $provider);
@@ -178,10 +211,10 @@ final class PaymentTest extends TestCase
     public function testGetPaymentProviderReturnsOtherForNonStripePaymentMethods(string $paymentId): void
     {
         // Arrange
-        $this->payment->setId($paymentId);
+        $payment = $this->createPaymentWithId($paymentId);
 
         // Act
-        $provider = $this->payment->getPaymentProvider();
+        $provider = $payment->getPaymentProvider();
 
         // Assert
         $this->assertSame('other', $provider);
@@ -198,10 +231,10 @@ final class PaymentTest extends TestCase
     public function testRequiresStripeConfigurationReturnsTrueForStripePaymentMethods(string $paymentId): void
     {
         // Arrange
-        $this->payment->setId($paymentId);
+        $payment = $this->createPaymentWithId($paymentId);
 
         // Act
-        $result = $this->payment->requiresStripeConfiguration();
+        $result = $payment->requiresStripeConfiguration();
 
         // Assert
         $this->assertTrue($result);
@@ -214,10 +247,10 @@ final class PaymentTest extends TestCase
     public function testRequiresStripeConfigurationReturnsFalseForNonStripePaymentMethods(string $paymentId): void
     {
         // Arrange
-        $this->payment->setId($paymentId);
+        $payment = $this->createPaymentWithId($paymentId);
 
         // Act
-        $result = $this->payment->requiresStripeConfiguration();
+        $result = $payment->requiresStripeConfiguration();
 
         // Assert
         $this->assertFalse($result);
@@ -229,20 +262,32 @@ final class PaymentTest extends TestCase
 
     /**
      * @test
-     * @dataProvider stripePaymentMethodTypesProvider
      */
-    public function testGetStripePaymentMethodTypeReturnsCorrectType(
-        string $paymentId,
-        string $expectedType
-    ): void {
+    public function testGetStripePaymentMethodTypeReturnsWalletForWalletPayment(): void
+    {
         // Arrange
-        $this->payment->setId($paymentId);
+        $payment = $this->createPaymentWithId(StripeDefinitions::STRIPE_WALLET_PAYMENT_ID);
 
         // Act
-        $type = $this->payment->getStripePaymentMethodType();
+        $type = $payment->getStripePaymentMethodType();
 
         // Assert
-        $this->assertSame($expectedType, $type);
+        $this->assertSame('wallet', $type);
+    }
+
+    /**
+     * @test
+     */
+    public function testGetStripePaymentMethodTypeReturnsCorrectTypeForCustomMethod(): void
+    {
+        // Arrange
+        $payment = $this->createPaymentWithId('osc_stripe_custom');
+
+        // Act
+        $type = $payment->getStripePaymentMethodType();
+
+        // Assert
+        $this->assertSame('custom', $type);
     }
 
     /**
@@ -253,10 +298,10 @@ final class PaymentTest extends TestCase
         string $paymentId
     ): void {
         // Arrange
-        $this->payment->setId($paymentId);
+        $payment = $this->createPaymentWithId($paymentId);
 
         // Act
-        $type = $this->payment->getStripePaymentMethodType();
+        $type = $payment->getStripePaymentMethodType();
 
         // Assert
         $this->assertNull($type);
@@ -269,48 +314,46 @@ final class PaymentTest extends TestCase
     /**
      * @test
      */
-    public function testSupportsStripeFeatureReturnsTrueForSavedCardsOnCreditCard(): void
+    public function testSupportsStripeFeatureReturnsTrueForSavedCardsOnWallet(): void
     {
         // Arrange
-        $this->payment->setId('stripecreditcard');
+        $payment = $this->createPaymentWithId(StripeDefinitions::STRIPE_WALLET_PAYMENT_ID);
 
         // Act
-        $result = $this->payment->supportsStripeFeature('saved_cards');
+        $result = $payment->supportsStripeFeature('saved_cards');
 
         // Assert
-        $this->assertTrue($result, 'Credit card should support saved_cards');
+        $this->assertTrue($result, 'Wallet should support saved_cards');
     }
 
     /**
      * @test
      */
-    public function testSupportsStripeFeatureReturnsFalseForSavedCardsOnSepa(): void
+    public function testSupportsStripeFeatureReturnsTrueForRefundsOnWallet(): void
     {
         // Arrange
-        $this->payment->setId('stripesepa');
+        $payment = $this->createPaymentWithId(StripeDefinitions::STRIPE_WALLET_PAYMENT_ID);
 
         // Act
-        $result = $this->payment->supportsStripeFeature('saved_cards');
+        $result = $payment->supportsStripeFeature('refunds');
 
         // Assert
-        $this->assertFalse($result, 'SEPA should not support saved_cards');
+        $this->assertTrue($result, 'Wallet should support refunds');
     }
 
     /**
      * @test
-     * @dataProvider stripePaymentMethodsProvider
      */
-    public function testSupportsStripeFeatureReturnsTrueForRefundsOnAllStripeMethods(
-        string $paymentId
-    ): void {
+    public function testSupportsStripeFeatureReturnsTrueForPartialRefundsOnWallet(): void
+    {
         // Arrange
-        $this->payment->setId($paymentId);
+        $payment = $this->createPaymentWithId(StripeDefinitions::STRIPE_WALLET_PAYMENT_ID);
 
         // Act
-        $result = $this->payment->supportsStripeFeature('refunds');
+        $result = $payment->supportsStripeFeature('partial_refunds');
 
         // Assert
-        $this->assertTrue($result, "All Stripe methods should support refunds");
+        $this->assertTrue($result, 'Wallet should support partial_refunds');
     }
 
     /**
@@ -321,10 +364,10 @@ final class PaymentTest extends TestCase
         string $paymentId
     ): void {
         // Arrange
-        $this->payment->setId($paymentId);
+        $payment = $this->createPaymentWithId($paymentId);
 
         // Act
-        $result = $this->payment->supportsStripeFeature('refunds');
+        $result = $payment->supportsStripeFeature('refunds');
 
         // Assert
         $this->assertFalse($result, "Non-Stripe methods should not support Stripe features");
@@ -336,10 +379,10 @@ final class PaymentTest extends TestCase
     public function testSupportsStripeFeatureReturnsFalseForUnknownFeature(): void
     {
         // Arrange
-        $this->payment->setId('stripecreditcard');
+        $payment = $this->createPaymentWithId(StripeDefinitions::STRIPE_WALLET_PAYMENT_ID);
 
         // Act
-        $result = $this->payment->supportsStripeFeature('unknown_feature');
+        $result = $payment->supportsStripeFeature('unknown_feature');
 
         // Assert
         $this->assertFalse($result, "Unknown features should return false");
@@ -348,33 +391,31 @@ final class PaymentTest extends TestCase
     /**
      * @test
      */
-    public function testSupportsStripeFeatureReturnsCorrectlyFor3DS(): void
+    public function testSupportsStripeFeatureReturnsFalseFor3DSOnWallet(): void
     {
-        // Credit card supports 3DS
-        $this->payment->setId('stripecreditcard');
-        $this->assertTrue($this->payment->supportsStripeFeature('3ds'));
+        // Arrange - 3DS is handled automatically by Stripe for wallet, not exposed as feature
+        $payment = $this->createPaymentWithId(StripeDefinitions::STRIPE_WALLET_PAYMENT_ID);
 
-        // SEPA does not support 3DS
-        $this->payment->setId('stripesepa');
-        $this->assertFalse($this->payment->supportsStripeFeature('3ds'));
+        // Act
+        $result = $payment->supportsStripeFeature('3ds');
+
+        // Assert
+        $this->assertFalse($result, 'Wallet does not expose 3DS as a separate feature');
     }
 
     /**
      * @test
      */
-    public function testSupportsStripeFeatureReturnsCorrectlyForRecurring(): void
+    public function testSupportsStripeFeatureReturnsFalseForRecurringOnWallet(): void
     {
-        // Credit card supports recurring
-        $this->payment->setId('stripecreditcard');
-        $this->assertTrue($this->payment->supportsStripeFeature('recurring'));
+        // Arrange - Recurring is not exposed as a feature for wallet
+        $payment = $this->createPaymentWithId(StripeDefinitions::STRIPE_WALLET_PAYMENT_ID);
 
-        // SEPA supports recurring
-        $this->payment->setId('stripesepa');
-        $this->assertTrue($this->payment->supportsStripeFeature('recurring'));
+        // Act
+        $result = $payment->supportsStripeFeature('recurring');
 
-        // iDEAL does not support recurring
-        $this->payment->setId('stripeideal');
-        $this->assertFalse($this->payment->supportsStripeFeature('recurring'));
+        // Assert
+        $this->assertFalse($result, 'Wallet does not expose recurring as a separate feature');
     }
 
     // ==========================================
@@ -382,21 +423,35 @@ final class PaymentTest extends TestCase
     // ==========================================
 
     /**
-     * Provides Stripe payment method IDs for testing.
+     * Provides current Stripe payment method IDs for testing.
+     * Only digital wallet is supported now.
      *
      * @return array<string, array<string>>
      */
     public static function stripePaymentMethodsProvider(): array
     {
         return [
-            'Credit Card' => ['stripecreditcard'],
-            'SEPA Direct Debit' => ['stripesepa'],
-            'iDEAL' => ['stripeideal'],
-            'giropay' => ['stripegiropay'],
-            'Bancontact' => ['stripebancontact'],
-            'Sofort' => ['stripesofort'],
-            'EPS' => ['stripeeps'],
-            'Przelewy24' => ['stripeprzelewy24'],
+            'Digital Wallet' => [StripeDefinitions::STRIPE_WALLET_PAYMENT_ID],
+        ];
+    }
+
+    /**
+     * Provides legacy Stripe payment method IDs that are no longer supported.
+     * These methods use the old 'stripe*' prefix instead of 'osc_stripe_*'.
+     *
+     * @return array<string, array<string>>
+     */
+    public static function legacyPaymentMethodsProvider(): array
+    {
+        return [
+            'Legacy Credit Card' => ['stripecreditcard'],
+            'Legacy SEPA Direct Debit' => ['stripesepa'],
+            'Legacy iDEAL' => ['stripeideal'],
+            'Legacy giropay' => ['stripegiropay'],
+            'Legacy Bancontact' => ['stripebancontact'],
+            'Legacy Sofort' => ['stripesofort'],
+            'Legacy EPS' => ['stripeeps'],
+            'Legacy Przelewy24' => ['stripeprzelewy24'],
         ];
     }
 
@@ -415,37 +470,7 @@ final class PaymentTest extends TestCase
             'Amazon Pay' => ['amazonpay'],
             'Klarna' => ['klarna'],
             'Unzer' => ['unzer'],
-        ];
-    }
-
-    /**
-     * Provides Stripe payment method IDs and their expected types.
-     *
-     * @return array<string, array<string, string>>
-     */
-    public static function stripePaymentMethodTypesProvider(): array
-    {
-        return [
-            'Credit Card' => [
-                'paymentId' => 'stripecreditcard',
-                'expectedType' => 'creditcard'
-            ],
-            'SEPA' => [
-                'paymentId' => 'stripesepa',
-                'expectedType' => 'sepa'
-            ],
-            'iDEAL' => [
-                'paymentId' => 'stripeideal',
-                'expectedType' => 'ideal'
-            ],
-            'giropay' => [
-                'paymentId' => 'stripegiropay',
-                'expectedType' => 'giropay'
-            ],
-            'Bancontact' => [
-                'paymentId' => 'stripebancontact',
-                'expectedType' => 'bancontact'
-            ],
+            'OXID Cash on Delivery' => ['oxidcashondel'],
         ];
     }
 }

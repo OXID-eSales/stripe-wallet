@@ -42,4 +42,13 @@ interface PaymentContractInterface extends ModelInterface
     public function commitToOrder(string $orderId): void;
 
     public function fulfill(): void;
+
+    /**
+     * Set payment provider information.
+     *
+     * @param string $provider Provider name (e.g., 'stripe')
+     * @param string $providerOrderId Provider-specific identifier (session ID, payment intent ID)
+     * @param string|null $redirectUrl Optional redirect URL for the payment
+     */
+    public function setProvider(string $provider, string $providerOrderId, ?string $redirectUrl = null): void;
 }

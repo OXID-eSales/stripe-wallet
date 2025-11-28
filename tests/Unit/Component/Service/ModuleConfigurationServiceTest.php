@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Unit\Service;
 
-use OxidEsales\Eshop\Core\Config;
+use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Dao\ModuleConfigurationDaoInterface;
+use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\DataObject\ModuleConfiguration;
+use OxidEsales\EshopCommunity\Internal\Framework\Module\Setting\Setting as ModuleSetting;
+use OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface;
+use OxidSolutionCatalysts\Payments\Stripe\Module;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -16,14 +20,53 @@ use PHPUnit\Framework\MockObject\MockObject;
 class ModuleConfigurationServiceTest extends TestCase
 {
     private ModuleConfigurationService $service;
-    private Config|MockObject $configMock;
+    private ContextInterface&MockObject $context;
+    private ModuleConfigurationDaoInterface&MockObject $moduleConfigDao;
+    private ModuleConfiguration&MockObject $moduleConfig;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->configMock = $this->createMock(Config::class);
-        $this->service = new ModuleConfigurationService($this->configMock);
+        // Mock ContextInterface
+        $this->context = $this->createMock(ContextInterface::class);
+        $this->context->method('getCurrentShopId')->willReturn(1);
+
+        // Mock ModuleConfiguration
+        $this->moduleConfig = $this->createMock(ModuleConfiguration::class);
+
+        // Mock ModuleConfigurationDaoInterface
+        $this->moduleConfigDao = $this->createMock(ModuleConfigurationDaoInterface::class);
+        $this->moduleConfigDao
+            ->method('get')
+            ->with(Module::MODULE_ID, 1)
+            ->willReturn($this->moduleConfig);
+
+        // Create service under test
+        $this->service = new ModuleConfigurationService($this->context, $this->moduleConfigDao);
+    }
+
+    /**
+     * Helper to create a ModuleSetting mock that returns a value
+     */
+    private function createSettingMock(mixed $value): ModuleSetting&MockObject
+    {
+        $setting = $this->createMock(ModuleSetting::class);
+        $setting->method('getValue')->willReturn($value);
+        return $setting;
+    }
+
+    /**
+     * Configure moduleConfig to return settings via callback
+     */
+    private function configureSettings(array $settings): void
+    {
+        $this->moduleConfig
+            ->method('getModuleSetting')
+            ->willReturnCallback(function (string $name) use ($settings): ModuleSetting {
+                $value = $settings[$name] ?? '';
+                return $this->createSettingMock($value);
+            });
     }
 
     /**
@@ -34,16 +77,10 @@ class ModuleConfigurationServiceTest extends TestCase
         // Given: Test mode enabled, test key configured
         $testSecretKey = 'sk_test_51ABC123';
 
-        $this->configMock
-            ->expects($this->exactly(2))
-            ->method('getConfigParam')
-            ->willReturnCallback(function ($param) use ($testSecretKey) {
-                return match ($param) {
-                    'sStripeMode' => 'test',
-                    'sStripeTestKey' => $testSecretKey,
-                    default => null
-                };
-            });
+        $this->configureSettings([
+            'sStripeMode' => 'test',
+            'sStripeTestToken' => $testSecretKey,
+        ]);
 
         // When: getSecretKey() called
         $result = $this->service->getSecretKey();
@@ -60,16 +97,10 @@ class ModuleConfigurationServiceTest extends TestCase
         // Given: Live mode enabled, live key configured
         $liveSecretKey = 'sk_live_51XYZ789';
 
-        $this->configMock
-            ->expects($this->exactly(2))
-            ->method('getConfigParam')
-            ->willReturnCallback(function ($param) use ($liveSecretKey) {
-                return match ($param) {
-                    'sStripeMode' => 'live',
-                    'sStripeLiveKey' => $liveSecretKey,
-                    default => null
-                };
-            });
+        $this->configureSettings([
+            'sStripeMode' => 'live',
+            'sStripeLiveToken' => $liveSecretKey,
+        ]);
 
         // When: getSecretKey() called
         $result = $this->service->getSecretKey();
@@ -86,11 +117,9 @@ class ModuleConfigurationServiceTest extends TestCase
         // Given: Webhook secret configured
         $webhookSecret = 'whsec_ABC123';
 
-        $this->configMock
-            ->expects($this->once())
-            ->method('getConfigParam')
-            ->with('sStripeWebhookEndpointSecret')
-            ->willReturn($webhookSecret);
+        $this->configureSettings([
+            'sStripeWebhookEndpointSecret' => $webhookSecret,
+        ]);
 
         // When: getWebhookSecret() called
         $result = $this->service->getWebhookSecret();
@@ -107,11 +136,9 @@ class ModuleConfigurationServiceTest extends TestCase
         // Given: Webhook endpoint configured
         $webhookEndpoint = 'https://example.com/webhook';
 
-        $this->configMock
-            ->expects($this->once())
-            ->method('getConfigParam')
-            ->with('sStripeWebhookEndpoint')
-            ->willReturn($webhookEndpoint);
+        $this->configureSettings([
+            'sStripeWebhookEndpoint' => $webhookEndpoint,
+        ]);
 
         // When: getWebhookEndpoint() called
         $result = $this->service->getWebhookEndpoint();
@@ -126,11 +153,9 @@ class ModuleConfigurationServiceTest extends TestCase
     public function testIsTestModeEnabled(): void
     {
         // Given: Mode setting = 'test'
-        $this->configMock
-            ->expects($this->once())
-            ->method('getConfigParam')
-            ->with('sStripeMode')
-            ->willReturn('test');
+        $this->configureSettings([
+            'sStripeMode' => 'test',
+        ]);
 
         // When: isTestMode() called
         $result = $this->service->isTestMode();
@@ -145,11 +170,9 @@ class ModuleConfigurationServiceTest extends TestCase
     public function testIsTestModeDisabled(): void
     {
         // Given: Mode setting = 'live'
-        $this->configMock
-            ->expects($this->once())
-            ->method('getConfigParam')
-            ->with('sStripeMode')
-            ->willReturn('live');
+        $this->configureSettings([
+            'sStripeMode' => 'live',
+        ]);
 
         // When: isTestMode() called
         $result = $this->service->isTestMode();
@@ -164,11 +187,9 @@ class ModuleConfigurationServiceTest extends TestCase
     public function testIsTransactionLoggingEnabled(): void
     {
         // Given: Transaction logging enabled
-        $this->configMock
-            ->expects($this->once())
-            ->method('getConfigParam')
-            ->with('blStripeLogTransactionInfo')
-            ->willReturn(true);
+        $this->configureSettings([
+            'blStripeLogTransactionInfo' => true,
+        ]);
 
         // When: isTransactionLoggingEnabled() called
         $result = $this->service->isTransactionLoggingEnabled();
@@ -183,11 +204,9 @@ class ModuleConfigurationServiceTest extends TestCase
     public function testGetsStatusPending(): void
     {
         // Given: Status pending = 'NOT_FINISHED'
-        $this->configMock
-            ->expects($this->once())
-            ->method('getConfigParam')
-            ->with('sStripeStatusPending')
-            ->willReturn('NOT_FINISHED');
+        $this->configureSettings([
+            'sStripeStatusPending' => 'NOT_FINISHED',
+        ]);
 
         // When: getStatusPending() called
         $result = $this->service->getStatusPending();
@@ -202,11 +221,9 @@ class ModuleConfigurationServiceTest extends TestCase
     public function testGetsStatusProcessing(): void
     {
         // Given: Status processing = 'OK'
-        $this->configMock
-            ->expects($this->once())
-            ->method('getConfigParam')
-            ->with('sStripeStatusProcessing')
-            ->willReturn('OK');
+        $this->configureSettings([
+            'sStripeStatusProcessing' => 'OK',
+        ]);
 
         // When: getStatusProcessing() called
         $result = $this->service->getStatusProcessing();
@@ -216,72 +233,17 @@ class ModuleConfigurationServiceTest extends TestCase
     }
 
     /**
-     * Test 10: Get webhook URL
-     */
-    public function testGetsWebhookUrl(): void
-    {
-        // Given: Shop URL configured
-        $shopUrl = 'https://example.com/';
-
-        $this->configMock
-            ->expects($this->once())
-            ->method('getShopUrl')
-            ->willReturn($shopUrl);
-
-        // When: getWebhookUrl() called
-        $result = $this->service->getWebhookUrl();
-
-        // Then: Returns properly formatted webhook URL
-        $this->assertEquals(
-            'https://example.com/index.php?cl=osc_stripe_webhook',
-            $result
-        );
-    }
-
-    /**
-     * Test 11: Get webhook URL removes trailing slash
-     */
-    public function testGetsWebhookUrlRemovesTrailingSlash(): void
-    {
-        // Given: Shop URL with trailing slash
-        $shopUrl = 'https://example.com/shop/';
-
-        $this->configMock
-            ->expects($this->once())
-            ->method('getShopUrl')
-            ->willReturn($shopUrl);
-
-        // When: getWebhookUrl() called
-        $result = $this->service->getWebhookUrl();
-
-        // Then: Trailing slash is removed
-        $this->assertEquals(
-            'https://example.com/shop/index.php?cl=osc_stripe_webhook',
-            $result
-        );
-        // Check no double slashes after protocol
-        $withoutProtocol = str_replace('https://', '', $result);
-        $this->assertStringNotContainsString('//', $withoutProtocol, 'URL should not contain double slashes');
-    }
-
-    /**
-     * Test 12: Get publishable key in test mode
+     * Test 10: Get publishable key in test mode
      */
     public function testGetsTestPublishableKey(): void
     {
         // Given: Test mode enabled, test publishable key configured
         $testPublishableKey = 'pk_test_ABC123';
 
-        $this->configMock
-            ->expects($this->exactly(2))
-            ->method('getConfigParam')
-            ->willReturnCallback(function ($param) use ($testPublishableKey) {
-                return match ($param) {
-                    'sStripeMode' => 'test',
-                    'sStripeTestPk' => $testPublishableKey,
-                    default => null
-                };
-            });
+        $this->configureSettings([
+            'sStripeMode' => 'test',
+            'sStripeTestPk' => $testPublishableKey,
+        ]);
 
         // When: getPublishableKey() called
         $result = $this->service->getPublishableKey();
@@ -291,23 +253,17 @@ class ModuleConfigurationServiceTest extends TestCase
     }
 
     /**
-     * Test 13: Get publishable key in live mode
+     * Test 11: Get publishable key in live mode
      */
     public function testGetsLivePublishableKey(): void
     {
         // Given: Live mode enabled, live publishable key configured
         $livePublishableKey = 'pk_live_XYZ789';
 
-        $this->configMock
-            ->expects($this->exactly(2))
-            ->method('getConfigParam')
-            ->willReturnCallback(function ($param) use ($livePublishableKey) {
-                return match ($param) {
-                    'sStripeMode' => 'live',
-                    'sStripeLivePk' => $livePublishableKey,
-                    default => null
-                };
-            });
+        $this->configureSettings([
+            'sStripeMode' => 'live',
+            'sStripeLivePk' => $livePublishableKey,
+        ]);
 
         // When: getPublishableKey() called
         $result = $this->service->getPublishableKey();
@@ -317,22 +273,15 @@ class ModuleConfigurationServiceTest extends TestCase
     }
 
     /**
-     * Test 14: Is configured returns true when keys are set
+     * Test 12: Is configured returns true when keys are set
      */
     public function testIsConfiguredReturnsTrueWhenKeysSet(): void
     {
-        // Given: Secret key and webhook secret configured
-        $this->configMock
-            ->expects($this->exactly(3))
-            ->method('getConfigParam')
-            ->willReturnCallback(function ($param) {
-                return match ($param) {
-                    'sStripeMode' => 'test',
-                    'sStripeTestKey' => 'sk_test_ABC123',
-                    'sStripeWebhookEndpointSecret' => 'whsec_ABC123',
-                    default => null
-                };
-            });
+        // Given: Token configured (isConfigured only checks token now)
+        $this->configureSettings([
+            'sStripeMode' => 'test',
+            'sStripeTestToken' => 'sk_test_ABC123',
+        ]);
 
         // When: isConfigured() called
         $result = $this->service->isConfigured();
@@ -342,21 +291,15 @@ class ModuleConfigurationServiceTest extends TestCase
     }
 
     /**
-     * Test 15: Is configured returns false when secret key is missing
+     * Test 13: Is configured returns false when token is missing
      */
     public function testIsConfiguredReturnsFalseWhenSecretKeyMissing(): void
     {
-        // Given: Secret key not configured, webhook secret is set
-        $this->configMock
-            ->expects($this->exactly(2))
-            ->method('getConfigParam')
-            ->willReturnCallback(function ($param) {
-                return match ($param) {
-                    'sStripeMode' => 'test',
-                    'sStripeTestKey' => '',
-                    default => null
-                };
-            });
+        // Given: Token not configured
+        $this->configureSettings([
+            'sStripeMode' => 'test',
+            'sStripeTestToken' => '',
+        ]);
 
         // When: isConfigured() called
         $result = $this->service->isConfigured();
@@ -366,48 +309,17 @@ class ModuleConfigurationServiceTest extends TestCase
     }
 
     /**
-     * Test 16: Is configured returns false when webhook secret is missing
-     */
-    public function testIsConfiguredReturnsFalseWhenWebhookSecretMissing(): void
-    {
-        // Given: Secret key configured, webhook secret not set
-        $this->configMock
-            ->expects($this->exactly(3))
-            ->method('getConfigParam')
-            ->willReturnCallback(function ($param) {
-                return match ($param) {
-                    'sStripeMode' => 'test',
-                    'sStripeTestKey' => 'sk_test_ABC123',
-                    'sStripeWebhookEndpointSecret' => '',
-                    default => null
-                };
-            });
-
-        // When: isConfigured() called
-        $result = $this->service->isConfigured();
-
-        // Then: Returns false
-        $this->assertFalse($result);
-    }
-
-    /**
-     * Test 17: Get token in test mode
+     * Test 14: Get token in test mode
      */
     public function testGetsTestToken(): void
     {
         // Given: Test mode enabled, test token configured
         $testToken = 'token_test_ABC123';
 
-        $this->configMock
-            ->expects($this->exactly(2))
-            ->method('getConfigParam')
-            ->willReturnCallback(function ($param) use ($testToken) {
-                return match ($param) {
-                    'sStripeMode' => 'test',
-                    'sStripeTestToken' => $testToken,
-                    default => null
-                };
-            });
+        $this->configureSettings([
+            'sStripeMode' => 'test',
+            'sStripeTestToken' => $testToken,
+        ]);
 
         // When: getToken() called
         $result = $this->service->getToken();
@@ -417,16 +329,14 @@ class ModuleConfigurationServiceTest extends TestCase
     }
 
     /**
-     * Test 18: Check if payment method should be removed by billing country
+     * Test 15: Check if payment method should be removed by billing country
      */
     public function testIsRemoveByBillingCountry(): void
     {
         // Given: Setting enabled
-        $this->configMock
-            ->expects($this->once())
-            ->method('getConfigParam')
-            ->with('blStripeRemoveByBillingCountry')
-            ->willReturn(true);
+        $this->configureSettings([
+            'blStripeRemoveByBillingCountry' => true,
+        ]);
 
         // When: isRemoveByBillingCountry() called
         $result = $this->service->isRemoveByBillingCountry();
@@ -436,16 +346,14 @@ class ModuleConfigurationServiceTest extends TestCase
     }
 
     /**
-     * Test 19: Check if payment method should be removed by basket currency
+     * Test 16: Check if payment method should be removed by basket currency
      */
     public function testIsRemoveByBasketCurrency(): void
     {
         // Given: Setting disabled
-        $this->configMock
-            ->expects($this->once())
-            ->method('getConfigParam')
-            ->with('blStripeRemoveByBasketCurrency')
-            ->willReturn(false);
+        $this->configureSettings([
+            'blStripeRemoveByBasketCurrency' => false,
+        ]);
 
         // When: isRemoveByBasketCurrency() called
         $result = $this->service->isRemoveByBasketCurrency();
@@ -455,16 +363,14 @@ class ModuleConfigurationServiceTest extends TestCase
     }
 
     /**
-     * Test 20: Check if customer email should be provided to Stripe
+     * Test 17: Check if customer email should be provided to Stripe
      */
     public function testShouldProvideCustomerEmail(): void
     {
         // Given: Setting enabled
-        $this->configMock
-            ->expects($this->once())
-            ->method('getConfigParam')
-            ->with('blStripeProvideCustomerEmailAddress')
-            ->willReturn(true);
+        $this->configureSettings([
+            'blStripeProvideCustomerEmailAddress' => true,
+        ]);
 
         // When: shouldProvideCustomerEmail() called
         $result = $this->service->shouldProvideCustomerEmail();
@@ -474,16 +380,14 @@ class ModuleConfigurationServiceTest extends TestCase
     }
 
     /**
-     * Test 21: Check if cron finish orders is active
+     * Test 18: Check if cron finish orders is active
      */
     public function testIsCronFinishOrdersActive(): void
     {
         // Given: Cron job active
-        $this->configMock
-            ->expects($this->once())
-            ->method('getConfigParam')
-            ->with('sStripeCronFinishOrdersActive')
-            ->willReturn(true);
+        $this->configureSettings([
+            'sStripeCronFinishOrdersActive' => true,
+        ]);
 
         // When: isCronFinishOrdersActive() called
         $result = $this->service->isCronFinishOrdersActive();
@@ -493,16 +397,14 @@ class ModuleConfigurationServiceTest extends TestCase
     }
 
     /**
-     * Test 22: Check if cron second chance is active
+     * Test 19: Check if cron second chance is active
      */
     public function testIsCronSecondChanceActive(): void
     {
         // Given: Cron job active
-        $this->configMock
-            ->expects($this->once())
-            ->method('getConfigParam')
-            ->with('sStripeCronSecondChanceActive')
-            ->willReturn(true);
+        $this->configureSettings([
+            'sStripeCronSecondChanceActive' => true,
+        ]);
 
         // When: isCronSecondChanceActive() called
         $result = $this->service->isCronSecondChanceActive();
@@ -512,16 +414,14 @@ class ModuleConfigurationServiceTest extends TestCase
     }
 
     /**
-     * Test 23: Get cron second chance time diff
+     * Test 20: Get cron second chance time diff
      */
     public function testGetsCronSecondChanceTimeDiff(): void
     {
         // Given: Time diff = 3 days
-        $this->configMock
-            ->expects($this->once())
-            ->method('getConfigParam')
-            ->with('iStripeCronSecondChanceTimeDiff')
-            ->willReturn('3');
+        $this->configureSettings([
+            'iStripeCronSecondChanceTimeDiff' => '3',
+        ]);
 
         // When: getCronSecondChanceTimeDiff() called
         $result = $this->service->getCronSecondChanceTimeDiff();
@@ -531,16 +431,14 @@ class ModuleConfigurationServiceTest extends TestCase
     }
 
     /**
-     * Test 24: Get cron second chance time diff with default
+     * Test 21: Get cron second chance time diff with default
      */
     public function testGetsCronSecondChanceTimeDiffDefault(): void
     {
         // Given: No value configured
-        $this->configMock
-            ->expects($this->once())
-            ->method('getConfigParam')
-            ->with('iStripeCronSecondChanceTimeDiff')
-            ->willReturn(null);
+        $this->configureSettings([
+            'iStripeCronSecondChanceTimeDiff' => null,
+        ]);
 
         // When: getCronSecondChanceTimeDiff() called
         $result = $this->service->getCronSecondChanceTimeDiff();
@@ -550,16 +448,14 @@ class ModuleConfigurationServiceTest extends TestCase
     }
 
     /**
-     * Test 25: Check if cron order shipment is active
+     * Test 22: Check if cron order shipment is active
      */
     public function testIsCronOrderShipmentActive(): void
     {
         // Given: Cron job active
-        $this->configMock
-            ->expects($this->once())
-            ->method('getConfigParam')
-            ->with('sStripeCronOrderShipmentActive')
-            ->willReturn(true);
+        $this->configureSettings([
+            'sStripeCronOrderShipmentActive' => true,
+        ]);
 
         // When: isCronOrderShipmentActive() called
         $result = $this->service->isCronOrderShipmentActive();
@@ -569,23 +465,72 @@ class ModuleConfigurationServiceTest extends TestCase
     }
 
     /**
-     * Test 26: Get cron secure key
+     * Test 23: Get cron secure key
      */
     public function testGetsCronSecureKey(): void
     {
         // Given: Secure key configured
         $secureKey = 'my_secure_key_123';
 
-        $this->configMock
-            ->expects($this->once())
-            ->method('getConfigParam')
-            ->with('sStripeCronSecureKey')
-            ->willReturn($secureKey);
+        $this->configureSettings([
+            'sStripeCronSecureKey' => $secureKey,
+        ]);
 
         // When: getCronSecureKey() called
         $result = $this->service->getCronSecureKey();
 
         // Then: Returns secure key
         $this->assertEquals($secureKey, $result);
+    }
+
+    /**
+     * Test 24: Get capture mode returns default 'automatic'
+     */
+    public function testGetsCaptureMode(): void
+    {
+        // Given: Capture mode configured
+        $this->configureSettings([
+            'sStripeCapture' => 'manual',
+        ]);
+
+        // When: getCaptureMode() called
+        $result = $this->service->getCaptureMode();
+
+        // Then: Returns 'manual'
+        $this->assertEquals('manual', $result);
+    }
+
+    /**
+     * Test 25: Get capture mode returns default when empty
+     */
+    public function testGetsCaptureModeDefault(): void
+    {
+        // Given: No capture mode configured
+        $this->configureSettings([
+            'sStripeCapture' => '',
+        ]);
+
+        // When: getCaptureMode() called
+        $result = $this->service->getCaptureMode();
+
+        // Then: Returns 'automatic' as default
+        $this->assertEquals('automatic', $result);
+    }
+
+    /**
+     * Test 26: Get method returns empty string on exception
+     */
+    public function testGetReturnsEmptyStringOnException(): void
+    {
+        // Given: Module setting throws exception
+        $this->moduleConfig
+            ->method('getModuleSetting')
+            ->willThrowException(new \Exception('Setting not found'));
+
+        // When: any config method is called
+        $result = $this->service->getSecretKey();
+
+        // Then: Returns empty string (not throwing)
+        $this->assertEquals('', $result);
     }
 }

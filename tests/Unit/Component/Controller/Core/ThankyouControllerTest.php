@@ -97,8 +97,8 @@ final class ThankyouControllerTest extends TestCase
 
         $controller->render();
 
-        $this->assertContains('stripe_contract_id', $deletedVariables);
-        $this->assertContains('stripe_payment_intent_id', $deletedVariables);
+        $this->assertContains('payment_contract_id', $deletedVariables);
+        $this->assertContains('payment_provider_transaction_id', $deletedVariables);
     }
 
     public function testRender_WithError_DoesNotClearSession(): void
@@ -126,7 +126,7 @@ final class ThankyouControllerTest extends TestCase
         $controller->render();
 
         // Session should NOT be cleared on failure
-        $this->assertNotContains('stripe_contract_id', $deletedVariables);
+        $this->assertNotContains('payment_contract_id', $deletedVariables);
     }
 
     public function testRender_WithException_DoesNotBreakPage(): void
@@ -312,9 +312,9 @@ final class ThankyouControllerTest extends TestCase
             public function __construct(?string $contractId)
             {
                 if ($contractId !== null) {
-                    $this->variables['stripe_contract_id'] = $contractId;
+                    $this->variables['payment_contract_id'] = $contractId;
                 }
-                $this->variables['stripe_payment_intent_id'] = 'pi_test_123';
+                $this->variables['payment_provider_transaction_id'] = 'pi_test_123';
             }
 
             public function getVariable(string $name): mixed

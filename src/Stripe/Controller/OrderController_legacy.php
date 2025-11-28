@@ -9,11 +9,8 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Controller;
 
-use OxidEsales\Eshop\Application\Controller\OrderController as CoreOrderController;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Eshop\Application\Model\Order;
-use OxidEsales\Eshop\Application\Model\Basket;
-use OxidEsales\Eshop\Application\Model\User;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use OxidSolutionCatalysts\Payments\Stripe\Service\StripeCustomerService;
 use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory;
@@ -36,7 +33,7 @@ use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeStatusMapper;
  * ✅ Uses unified OxidShopOrderService for all order operations
  * ✅ Follows Single Responsibility Principle
  */
-class OrderController extends CoreOrderController
+class OrderController extends \OxidEsales\Eshop\Application\Controller\OrderController
 {
     public function __construct(
         private readonly PaymentAdapterFactory $adapterFactory,
@@ -171,9 +168,9 @@ class OrderController extends CoreOrderController
      * Main order execution method
      * ✅ Uses standard OXID finalizeOrder() for compatibility with other modules
      *
-     * @return string Next page (thankyou, payment, or order)
+     * @return mixed Next page (thankyou, payment, or order)
      */
-    public function execute()
+    public function execute(): mixed
     {
         // Check if Stripe payment
         if ($this->isStripePayment()) {

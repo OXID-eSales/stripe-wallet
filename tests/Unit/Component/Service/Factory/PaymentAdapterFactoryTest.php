@@ -11,18 +11,23 @@ namespace OxidSolutionCatalysts\Payments\Tests\Unit\Component\Service\Factory;
 
 use OxidSolutionCatalysts\Payments\Component\Adapter\PaymentAdapterInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory;
+use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactoryInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapter;
 use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeClientFactory;
+use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactory;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 
 /**
+ * Tests for StripeAdapterFactory (concrete implementation of PaymentAdapterFactory).
+ *
+ * @covers \OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactory
  * @covers \OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory
  */
 final class PaymentAdapterFactoryTest extends TestCase
 {
-    private PaymentAdapterFactory $factory;
+    private StripeAdapterFactory $factory;
     private ModuleConfigurationService|MockObject $configurationService;
     private StripeClientFactory $clientFactory;
 
@@ -34,6 +39,10 @@ final class PaymentAdapterFactoryTest extends TestCase
         $this->configurationService
             ->method('getSecretKey')
             ->willReturn('sk_test_4242424242424242424242424242424242424242424242424242424242424242');
+        // getToken() is the actual method used by StripeClientFactory
+        $this->configurationService
+            ->method('getToken')
+            ->willReturn('sk_test_4242424242424242424242424242424242424242424242424242424242424242');
         $this->configurationService
             ->method('isTestMode')
             ->willReturn(true);
@@ -41,10 +50,20 @@ final class PaymentAdapterFactoryTest extends TestCase
         // Use real StripeClientFactory since it's final and cannot be mocked
         $this->clientFactory = new StripeClientFactory($this->configurationService);
 
-        $this->factory = new PaymentAdapterFactory(
+        $this->factory = new StripeAdapterFactory(
             $this->configurationService,
             $this->clientFactory
         );
+    }
+
+    public function testFactoryImplementsInterface(): void
+    {
+        $this->assertInstanceOf(PaymentAdapterFactoryInterface::class, $this->factory);
+    }
+
+    public function testFactoryExtendsAbstractClass(): void
+    {
+        $this->assertInstanceOf(PaymentAdapterFactory::class, $this->factory);
     }
 
     public function testCreateAdapterReturnsStripeAdapter(): void
@@ -103,10 +122,11 @@ final class PaymentAdapterFactoryTest extends TestCase
     {
         $configService = $this->createMock(ModuleConfigurationService::class);
         $configService->method('getSecretKey')->willReturn('sk_test_4242424242424242424242424242424242424242424242424242424242424242');
+        $configService->method('getToken')->willReturn('sk_test_4242424242424242424242424242424242424242424242424242424242424242');
         $configService->method('isTestMode')->willReturn(true);
 
         $clientFactory = new StripeClientFactory($configService);
-        $factory = new PaymentAdapterFactory($configService, $clientFactory);
+        $factory = new StripeAdapterFactory($configService, $clientFactory);
 
         $adapter = $factory->createAdapter('stripe');
 
@@ -117,10 +137,11 @@ final class PaymentAdapterFactoryTest extends TestCase
     {
         $configService = $this->createMock(ModuleConfigurationService::class);
         $configService->method('getSecretKey')->willReturn('sk_test_4242424242424242424242424242424242424242424242424242424242424242');
+        $configService->method('getToken')->willReturn('sk_test_4242424242424242424242424242424242424242424242424242424242424242');
         $configService->method('isTestMode')->willReturn(true);
 
         $clientFactory = new StripeClientFactory($configService);
-        $testFactory = new PaymentAdapterFactory($configService, $clientFactory);
+        $testFactory = new StripeAdapterFactory($configService, $clientFactory);
 
         $adapter = $testFactory->createDefaultAdapter();
         $this->assertInstanceOf(PaymentAdapterInterface::class, $adapter);
@@ -130,10 +151,11 @@ final class PaymentAdapterFactoryTest extends TestCase
     {
         $configService = $this->createMock(ModuleConfigurationService::class);
         $configService->method('getSecretKey')->willReturn('sk_live_4242424242424242424242424242424242424242424242424242424242424242');
+        $configService->method('getToken')->willReturn('sk_live_4242424242424242424242424242424242424242424242424242424242424242');
         $configService->method('isTestMode')->willReturn(false);
 
         $clientFactory = new StripeClientFactory($configService);
-        $liveFactory = new PaymentAdapterFactory($configService, $clientFactory);
+        $liveFactory = new StripeAdapterFactory($configService, $clientFactory);
 
         $adapter = $liveFactory->createDefaultAdapter();
         $this->assertInstanceOf(PaymentAdapterInterface::class, $adapter);
@@ -147,19 +169,27 @@ final class PaymentAdapterFactoryTest extends TestCase
         $this->factory->createAdapter('Stripe');
     }
 
-    public function testFactoryIsProviderAgnostic(): void
+    public function testStripeFactoryIsInCorrectNamespace(): void
     {
-        // The factory itself is in the Component namespace (provider-agnostic)
-        // It should be able to create adapters for ANY provider
+        // StripeAdapterFactory should be in Stripe namespace
+        $reflectionClass = new \ReflectionClass(StripeAdapterFactory::class);
+        $namespace = $reflectionClass->getNamespaceName();
 
+        $this->assertStringContainsString('Stripe', $namespace);
+    }
+
+    public function testAbstractFactoryIsProviderAgnostic(): void
+    {
+        // The abstract PaymentAdapterFactory should be in Component namespace
         $reflectionClass = new \ReflectionClass(PaymentAdapterFactory::class);
         $namespace = $reflectionClass->getNamespaceName();
 
-        // Verify factory is in Component namespace, not Stripe namespace
         $this->assertStringContainsString('Component', $namespace);
         $this->assertStringNotContainsString('Stripe\\', $namespace);
+    }
 
-        // Verify it returns provider-agnostic interface
+    public function testFactoryReturnsProviderAgnosticInterface(): void
+    {
         $adapter = $this->factory->createAdapter('stripe');
         $this->assertInstanceOf(PaymentAdapterInterface::class, $adapter);
     }
@@ -171,5 +201,17 @@ final class PaymentAdapterFactoryTest extends TestCase
 
         // Each call should create a new instance
         $this->assertNotSame($adapter1, $adapter2);
+    }
+
+    public function testGetStripeClientReturnsClient(): void
+    {
+        $client = $this->factory->getStripeClient();
+
+        $this->assertInstanceOf(\Stripe\StripeClient::class, $client);
+    }
+
+    public function testIsTestModeReturnsBool(): void
+    {
+        $this->assertTrue($this->factory->isTestMode());
     }
 }
