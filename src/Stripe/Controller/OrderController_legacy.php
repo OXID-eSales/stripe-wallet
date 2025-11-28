@@ -33,7 +33,7 @@ use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeStatusMapper;
  * ✅ Uses unified OxidShopOrderService for all order operations
  * ✅ Follows Single Responsibility Principle
  */
-class OrderController extends \OxidEsales\Eshop\Application\Controller\OrderController
+class OrderController_legacy extends \OxidEsales\Eshop\Application\Controller\OrderController
 {
     public function __construct(
         private readonly PaymentAdapterFactory $adapterFactory,

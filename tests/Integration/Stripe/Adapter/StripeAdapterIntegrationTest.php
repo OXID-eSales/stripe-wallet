@@ -252,7 +252,7 @@ final class StripeAdapterIntegrationTest extends StripeIntegrationTestCase
         );
         $this->assertEquals(30.00, $captureResponse->amountCaptured);
         $this->assertEquals('EUR', $captureResponse->currency);
-        $this->assertEquals('succeeded', $captureResponse->status);
+        $this->assertEquals('captured', $captureResponse->status);
         $this->assertInstanceOf(\DateTimeImmutable::class, $captureResponse->capturedAt);
 
         // Verify with Stripe API
@@ -426,7 +426,7 @@ final class StripeAdapterIntegrationTest extends StripeIntegrationTestCase
 
         // Assert
         $this->assertEquals($createResponse->providerPaymentId, $voidResponse->providerPaymentId);
-        $this->assertEquals('succeeded', $voidResponse->status);
+        $this->assertEquals('cancelled', $voidResponse->status);
         $this->assertEquals('requested_by_customer', $voidResponse->reason);
 
         // Verify with Stripe API
@@ -463,7 +463,7 @@ final class StripeAdapterIntegrationTest extends StripeIntegrationTestCase
         $voidResponse = $this->adapter->voidPayment($voidRequest);
 
         // Assert
-        $this->assertEquals('succeeded', $voidResponse->status);
+        $this->assertEquals('cancelled', $voidResponse->status);
 
         // Verify with Stripe API
         $paymentIntent = $this->stripeClient->paymentIntents->retrieve($createResponse->providerPaymentId);

@@ -75,7 +75,7 @@ class ModuleStructureTest extends TestCase
     public function stripe_directories_exist(): void
     {
         $requiredDirs = [
-            'src/Stripe/Handler',
+            'src/Stripe/EventSystem/Handler',
             'src/Stripe/Service',
             'src/Stripe/Controller/Webhook',
             'src/Stripe/Controller',

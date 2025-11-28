@@ -186,7 +186,7 @@ final class StripeAuthorizationFlowIntegrationTest extends StripeIntegrationTest
         // Assert
         $this->assertEquals($authResponse->authorizationId, $captureResponse->providerPaymentId);
         $this->assertEquals(100.00, $captureResponse->amountCaptured);
-        $this->assertEquals('succeeded', $captureResponse->status);
+        $this->assertEquals('captured', $captureResponse->status);
 
         // Verify with Stripe API
         $paymentIntent = $this->stripeClient->paymentIntents->retrieve($authResponse->authorizationId);
@@ -259,7 +259,7 @@ final class StripeAuthorizationFlowIntegrationTest extends StripeIntegrationTest
 
         // Assert
         $this->assertEquals($authResponse->authorizationId, $voidResponse->providerPaymentId);
-        $this->assertEquals('succeeded', $voidResponse->status);
+        $this->assertEquals('cancelled', $voidResponse->status);
 
         // Verify with Stripe API
         $paymentIntent = $this->stripeClient->paymentIntents->retrieve($authResponse->authorizationId);
@@ -298,7 +298,7 @@ final class StripeAuthorizationFlowIntegrationTest extends StripeIntegrationTest
         $voidResponse = $this->adapter->voidAuthorization($voidRequest);
 
         // Assert
-        $this->assertEquals('succeeded', $voidResponse->status);
+        $this->assertEquals('cancelled', $voidResponse->status);
 
         // Verify with Stripe API
         $paymentIntent = $this->stripeClient->paymentIntents->retrieve($authResponse->authorizationId);
@@ -373,7 +373,7 @@ final class StripeAuthorizationFlowIntegrationTest extends StripeIntegrationTest
 
         $captureResponse = $this->adapter->captureAuthorization($captureRequest);
 
-        $this->assertEquals('succeeded', $captureResponse->status);
+        $this->assertEquals('captured', $captureResponse->status);
         $this->assertEquals(125.50, $captureResponse->amountCaptured);
 
         // Step 4: Verify final state
@@ -418,7 +418,7 @@ final class StripeAuthorizationFlowIntegrationTest extends StripeIntegrationTest
 
         $voidResponse = $this->adapter->voidAuthorization($voidRequest);
 
-        $this->assertEquals('succeeded', $voidResponse->status);
+        $this->assertEquals('cancelled', $voidResponse->status);
 
         // Step 4: Verify final state
         $details = $this->adapter->getPaymentDetails($authResponse->authorizationId);

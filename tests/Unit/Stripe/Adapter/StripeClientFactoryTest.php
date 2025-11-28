@@ -33,7 +33,7 @@ final class StripeClientFactoryTest extends TestCase
     public function testCreateReturnsStripeClientWithTestKey(): void
     {
         $this->configurationService
-            ->method('getSecretKey')
+            ->method('getToken')
             ->willReturn('sk_test_4242424242424242424242424242424242424242424242424242424242424242');
         $this->configurationService
             ->method('isTestMode')
@@ -48,7 +48,7 @@ final class StripeClientFactoryTest extends TestCase
     public function testCreateReturnsStripeClientWithLiveKey(): void
     {
         $this->configurationService
-            ->method('getSecretKey')
+            ->method('getToken')
             ->willReturn('sk_live_4242424242424242424242424242424242424242424242424242424242424242');
         $this->configurationService
             ->method('isTestMode')
@@ -63,7 +63,7 @@ final class StripeClientFactoryTest extends TestCase
     public function testCreateReturnsNullWhenSecretKeyIsEmpty(): void
     {
         $this->configurationService
-            ->method('getSecretKey')
+            ->method('getToken')
             ->willReturn('');
         $this->configurationService
             ->method('isTestMode')
@@ -78,7 +78,7 @@ final class StripeClientFactoryTest extends TestCase
     public function testIsTestModeReturnsTrueWhenConfiguredForTestMode(): void
     {
         $this->configurationService
-            ->method('getSecretKey')
+            ->method('getToken')
             ->willReturn('sk_test_4242424242424242424242424242424242424242424242424242424242424242');
         $this->configurationService
             ->method('isTestMode')
@@ -92,7 +92,7 @@ final class StripeClientFactoryTest extends TestCase
     public function testIsTestModeReturnsFalseWhenConfiguredForLiveMode(): void
     {
         $this->configurationService
-            ->method('getSecretKey')
+            ->method('getToken')
             ->willReturn('sk_live_4242424242424242424242424242424242424242424242424242424242424242');
         $this->configurationService
             ->method('isTestMode')
@@ -106,7 +106,7 @@ final class StripeClientFactoryTest extends TestCase
     public function testIsValidSecretKeyReturnsTrueForTestKey(): void
     {
         $this->configurationService
-            ->method('getSecretKey')
+            ->method('getToken')
             ->willReturn('sk_test_4242424242424242424242424242424242424242424242424242424242424242');
         $this->configurationService
             ->method('isTestMode')
@@ -120,7 +120,7 @@ final class StripeClientFactoryTest extends TestCase
     public function testIsValidSecretKeyReturnsTrueForLiveKey(): void
     {
         $this->configurationService
-            ->method('getSecretKey')
+            ->method('getToken')
             ->willReturn('sk_live_4242424242424242424242424242424242424242424242424242424242424242');
         $this->configurationService
             ->method('isTestMode')
@@ -134,7 +134,7 @@ final class StripeClientFactoryTest extends TestCase
     public function testIsValidSecretKeyReturnsFalseForTestKeyInLiveMode(): void
     {
         $this->configurationService
-            ->method('getSecretKey')
+            ->method('getToken')
             ->willReturn('sk_test_4242424242424242424242424242424242424242424242424242424242424242');
         $this->configurationService
             ->method('isTestMode')
@@ -148,7 +148,7 @@ final class StripeClientFactoryTest extends TestCase
     public function testIsValidSecretKeyReturnsFalseForLiveKeyInTestMode(): void
     {
         $this->configurationService
-            ->method('getSecretKey')
+            ->method('getToken')
             ->willReturn('sk_live_4242424242424242424242424242424242424242424242424242424242424242');
         $this->configurationService
             ->method('isTestMode')
@@ -162,7 +162,7 @@ final class StripeClientFactoryTest extends TestCase
     public function testIsValidSecretKeyReturnsFalseForInvalidKeyFormat(): void
     {
         $this->configurationService
-            ->method('getSecretKey')
+            ->method('getToken')
             ->willReturn('invalid_key_format');
         $this->configurationService
             ->method('isTestMode')
@@ -176,7 +176,7 @@ final class StripeClientFactoryTest extends TestCase
     public function testIsValidSecretKeyReturnsFalseForEmptyKey(): void
     {
         $this->configurationService
-            ->method('getSecretKey')
+            ->method('getToken')
             ->willReturn('');
         $this->configurationService
             ->method('isTestMode')
@@ -192,7 +192,7 @@ final class StripeClientFactoryTest extends TestCase
         $testKey = 'sk_test_4242424242424242424242424242424242424242424242424242424242424242';
 
         $this->configurationService
-            ->method('getSecretKey')
+            ->method('getToken')
             ->willReturn($testKey);
         $this->configurationService
             ->method('isTestMode')

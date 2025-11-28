@@ -47,7 +47,7 @@ class DoctrineContractRepositoryTest extends IntegrationTestCase
 
     private function cleanupTestData(): void
     {
-        $this->connection->executeStatement('DELETE FROM osc_payment_contract WHERE OXID LIKE "test_%"');
+        $this->connection->executeStatement('DELETE FROM osc_payment_contract');
     }
 
     private function createTestBasketSnapshot(): BasketSnapshot

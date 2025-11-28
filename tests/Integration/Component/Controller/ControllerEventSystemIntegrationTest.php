@@ -661,7 +661,7 @@ final class ControllerEventSystemIntegrationTest extends IntegrationTestCase
         // Assert context has expected data
         $this->assertEquals('user_' . $this->testRunId, $context->get('userId'));
         $this->assertEquals('stripe_card', $context->get('paymentMethodId'));
-        $this->assertEquals('pi_context_test_' . $this->testRunId, $context->get('paymentIntentId'));
+        $this->assertEquals('pi_context_test_' . $this->testRunId, $context->get('providerTransactionId'));
 
         // Assert contract was set in context by handler
         $contract = $context->getContract();

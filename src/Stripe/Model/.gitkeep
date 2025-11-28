@@ -1,5 +1,0 @@
-# Stripe-specific models
-
-This directory is reserved for Stripe-specific model implementations if needed.
-
-Currently, all models are provider-agnostic and located in `src/Component/Model/`.
