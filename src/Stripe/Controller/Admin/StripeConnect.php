@@ -19,7 +19,7 @@ use OxidSolutionCatalysts\Payments\Stripe\Module;
 class StripeConnect extends AdminController
 {
     /** @var string */
-    protected $_sThisTemplate = "/admin/stripe_connectModule::MODULE_ID";
+    protected $_sThisTemplate = '@osc_stripe_wallet/admin/stripe_connect.html.twig';
 
     /** @var ModuleSettingBridge */
     private ModuleSettingBridge $moduleSettingService;
