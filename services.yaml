@@ -235,6 +235,48 @@ services:
     public: false
 
   # ==========================================
+  # Stripe Checkout Return Handlers
+  # ==========================================
+  # These handlers process the return flow when user comes back from Stripe.
+  # Event chain: StripeCheckoutReturnEvent → PaymentAuthorizedEvent → ContractReadyToCommitEvent
+
+  # Stripe Checkout Return Handler - Handles return from Stripe Checkout page
+  # Priority 100: Entry point for checkout return flow
+  # Retrieves Checkout Session, verifies payment, dispatches PaymentAuthorizedEvent
+  # NOTE: EventDispatcher is fetched lazily to avoid circular dependency
+  OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler:
+    arguments:
+      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+    tags:
+      - { name: payment.event_handler, priority: 100 }
+    public: false
+
+  # Payment Authorized Event Handler - Processes PaymentAuthorizedEvent
+  # Priority 90: Runs after StripeCheckoutReturnHandler
+  # Transitions contract to PENDING, fulfills payment_authorized condition
+  # Dispatches ContractReadyToCommitEvent if all conditions met
+  # NOTE: EventDispatcher is fetched lazily to avoid circular dependency
+  OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\PaymentAuthorizedEventHandler:
+    arguments:
+      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+    tags:
+      - { name: payment.event_handler, priority: 90 }
+    public: false
+
+  # Stripe Order Creation Handler - Creates OXID order from contract
+  # Priority 80: Runs after PaymentAuthorizedEventHandler
+  # Uses OxidShopOrderService for proper OXID integration
+  # NOTE: EventDispatcher is fetched lazily to avoid circular dependency
+  OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeOrderCreationHandler:
+    arguments:
+      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $shopOrderService: '@OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface'
+    tags:
+      - { name: payment.event_handler, priority: 80 }
+    public: false
+
+  # ==========================================
   # Repositories (Data Access Layer)
   # ==========================================
 

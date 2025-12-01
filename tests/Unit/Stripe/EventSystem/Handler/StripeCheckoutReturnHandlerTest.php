@@ -17,6 +17,27 @@ use PHPUnit\Framework\TestCase;
 use Stripe\StripeClient;
 use Stripe\Service\Checkout\SessionService;
 
+/**
+ * Testable subclass that allows injecting the event dispatcher for testing.
+ */
+class TestableStripeCheckoutReturnHandler extends StripeCheckoutReturnHandler
+{
+    private ?EventDispatcherInterface $testEventDispatcher = null;
+
+    public function setTestEventDispatcher(EventDispatcherInterface $dispatcher): void
+    {
+        $this->testEventDispatcher = $dispatcher;
+    }
+
+    protected function getEventDispatcher(): EventDispatcherInterface
+    {
+        if ($this->testEventDispatcher !== null) {
+            return $this->testEventDispatcher;
+        }
+        return parent::getEventDispatcher();
+    }
+}
+
 class StripeCheckoutReturnHandlerTest extends TestCase
 {
     private ContractRepositoryInterface $contractRepository;
@@ -34,13 +55,19 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         $this->sessionService = $this->createMock(SessionService::class);
     }
 
+    private function createHandler(): TestableStripeCheckoutReturnHandler
+    {
+        $handler = new TestableStripeCheckoutReturnHandler(
+            $this->contractRepository,
+            $this->adapterFactory
+        );
+        $handler->setTestEventDispatcher($this->eventDispatcher);
+        return $handler;
+    }
+
     public function testHandlerIgnoresNonStripeCheckoutReturnEvent(): void
     {
-        $handler = new StripeCheckoutReturnHandler(
-            $this->contractRepository,
-            $this->adapterFactory,
-            $this->eventDispatcher
-        );
+        $handler = $this->createHandler();
 
         $otherEvent = new class {
             public function getContext(): EventContext
@@ -78,12 +105,7 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         ]);
         $event = new StripeCheckoutReturnEvent($context);
 
-        $handler = new StripeCheckoutReturnHandler(
-            $this->contractRepository,
-            $this->adapterFactory,
-            $this->eventDispatcher
-        );
-
+        $handler = $this->createHandler();
         $handler->handle($event);
     }
 
@@ -112,12 +134,7 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         $context = new EventContext(['checkoutSessionId' => 'cs_test_paid']);
         $event = new StripeCheckoutReturnEvent($context);
 
-        $handler = new StripeCheckoutReturnHandler(
-            $this->contractRepository,
-            $this->adapterFactory,
-            $this->eventDispatcher
-        );
-
+        $handler = $this->createHandler();
         $handler->handle($event);
     }
 
@@ -143,12 +160,7 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         $context = new EventContext(['checkoutSessionId' => 'cs_test_load']);
         $event = new StripeCheckoutReturnEvent($context);
 
-        $handler = new StripeCheckoutReturnHandler(
-            $this->contractRepository,
-            $this->adapterFactory,
-            $this->eventDispatcher
-        );
-
+        $handler = $this->createHandler();
         $handler->handle($event);
     }
 
@@ -179,12 +191,7 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         $context = new EventContext(['checkoutSessionId' => 'cs_test_confirm']);
         $event = new StripeCheckoutReturnEvent($context);
 
-        $handler = new StripeCheckoutReturnHandler(
-            $this->contractRepository,
-            $this->adapterFactory,
-            $this->eventDispatcher
-        );
-
+        $handler = $this->createHandler();
         $handler->handle($event);
 
         $this->assertInstanceOf(PaymentAuthorizedEvent::class, $dispatchedEvent);
@@ -209,12 +216,7 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         $context = new EventContext(['checkoutSessionId' => 'cs_test_unpaid']);
         $event = new StripeCheckoutReturnEvent($context);
 
-        $handler = new StripeCheckoutReturnHandler(
-            $this->contractRepository,
-            $this->adapterFactory,
-            $this->eventDispatcher
-        );
-
+        $handler = $this->createHandler();
         $handler->handle($event);
 
         $this->assertNotNull($context->get('error'));
@@ -234,12 +236,7 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         $context = new EventContext(['checkoutSessionId' => 'cs_test_err']);
         $event = new StripeCheckoutReturnEvent($context);
 
-        $handler = new StripeCheckoutReturnHandler(
-            $this->contractRepository,
-            $this->adapterFactory,
-            $this->eventDispatcher
-        );
-
+        $handler = $this->createHandler();
         $handler->handle($event);
 
         $this->assertEquals('payment', $context->get('redirectTarget'));
@@ -263,12 +260,7 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         $context = new EventContext(['checkoutSessionId' => 'cs_test_ctx']);
         $event = new StripeCheckoutReturnEvent($context);
 
-        $handler = new StripeCheckoutReturnHandler(
-            $this->contractRepository,
-            $this->adapterFactory,
-            $this->eventDispatcher
-        );
-
+        $handler = $this->createHandler();
         $handler->handle($event);
 
         $this->assertSame($contract, $context->getContract());
@@ -300,12 +292,7 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         $context = new EventContext(['checkoutSessionId' => 'cs_test_pi']);
         $event = new StripeCheckoutReturnEvent($context);
 
-        $handler = new StripeCheckoutReturnHandler(
-            $this->contractRepository,
-            $this->adapterFactory,
-            $this->eventDispatcher
-        );
-
+        $handler = $this->createHandler();
         $handler->handle($event);
 
         $this->assertEquals('pi_test_xyz123', $context->get('paymentIntentId'));

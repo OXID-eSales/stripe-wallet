@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
 
+use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterface;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentAuthorizedEvent;
@@ -28,14 +29,23 @@ use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutReturn
  * Key difference from Bartek's OrderController::checkoutSuccess():
  * - Uses contract_id from metadata instead of order_id
  * - Order is created AFTER payment verification via event chain
+ *
+ * NOTE: EventDispatcher is fetched lazily to avoid circular dependency
+ * with EventListenerProvider during container initialization.
  */
 class StripeCheckoutReturnHandler implements HandlerInterface
 {
     public function __construct(
         private ContractRepositoryInterface $contractRepository,
-        private StripeAdapterFactoryInterface $adapterFactory,
-        private EventDispatcherInterface $eventDispatcher
+        private StripeAdapterFactoryInterface $adapterFactory
     ) {
+    }
+
+    protected function getEventDispatcher(): EventDispatcherInterface
+    {
+        return ContainerFactory::getInstance()
+            ->getContainer()
+            ->get(EventDispatcherInterface::class);
     }
 
     public static function getHandledEventClass(): string
@@ -112,7 +122,7 @@ class StripeCheckoutReturnHandler implements HandlerInterface
             currency: $checkoutSession->currency
         );
 
-        $this->eventDispatcher->dispatch($paymentAuthorizedEvent);
+        $this->getEventDispatcher()->dispatch($paymentAuthorizedEvent);
 
         // After event chain completes, check if order was created
         if ($context->get('orderId') !== null) {
