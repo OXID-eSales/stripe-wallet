@@ -15,7 +15,6 @@ use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
  */
 class ViewConfig extends ViewConfig_parent
 {
-
     use ServiceContainer;
 
     private ModuleConfigurationService $stripeConfig;
@@ -24,8 +23,7 @@ class ViewConfig extends ViewConfig_parent
     {
         parent::__construct();
 
-
-        $this->stripeConfig =$this->getServiceFromContainer(ModuleConfigurationService::class);
+        $this->stripeConfig = $this->getServiceFromContainer(ModuleConfigurationService::class);
     }
 
     /**

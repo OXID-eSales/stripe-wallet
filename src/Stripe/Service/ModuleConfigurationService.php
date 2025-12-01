@@ -62,7 +62,7 @@ class ModuleConfigurationService implements ServiceInterface
             return '';
         }
     }
-    
+
     /**
      * Check if the module is in test mode
      */

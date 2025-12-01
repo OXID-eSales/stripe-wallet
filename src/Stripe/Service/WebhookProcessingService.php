@@ -397,7 +397,6 @@ class WebhookProcessingService
                 $event->type,
                 json_encode($event->data->object->toArray()),
             ]);
-
         } catch (\Exception $e) {
             Registry::getLogger()->error('Failed to log webhook', [
                 'error' => $e->getMessage(),
@@ -423,7 +422,6 @@ class WebhookProcessingService
                     WHERE OXEVENTID = ?";
 
             $db->execute($sql, [$status, $eventId]);
-
         } catch (\Exception $e) {
             Registry::getLogger()->error('Failed to update webhook status', [
                 'error' => $e->getMessage(),

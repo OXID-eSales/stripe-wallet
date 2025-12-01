@@ -119,10 +119,12 @@ class StripePaymentStatusHandler implements HandlerInterface
     ): void {
         $stripeStatus = $paymentDetails->providerData['status'] ?? '';
 
-        if (in_array($stripeStatus, [
-            StripeStatusMapper::STRIPE_REQUIRES_ACTION,
-            StripeStatusMapper::STRIPE_REQUIRES_CONFIRMATION
-        ], true)) {
+        if (
+            in_array($stripeStatus, [
+                StripeStatusMapper::STRIPE_REQUIRES_ACTION,
+                StripeStatusMapper::STRIPE_REQUIRES_CONFIRMATION
+            ], true)
+        ) {
             // 3D Secure required
             $context->set('requires3DS', true);
             $context->set('clientSecret', $paymentDetails->providerData['client_secret'] ?? null);

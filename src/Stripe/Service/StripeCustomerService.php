@@ -147,7 +147,6 @@ class StripeCustomerService implements InitializableServiceInterface
             ]);
 
             return $customer->id;
-
         } catch (ApiErrorException $e) {
             Registry::getLogger()->error('Failed to create Stripe customer', [
                 'user_id' => $user->getId(),
@@ -229,7 +228,6 @@ class StripeCustomerService implements InitializableServiceInterface
             ]);
 
             return true;
-
         } catch (ApiErrorException $e) {
             Registry::getLogger()->error('Failed to update Stripe customer', [
                 'user_id' => $user->getId(),
