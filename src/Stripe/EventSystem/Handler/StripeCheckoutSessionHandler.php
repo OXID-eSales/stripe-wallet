@@ -96,6 +96,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
 
         // Store session ID in contract via setProvider
         $contract->setProvider('stripe', $checkoutSession->id, $successUrl);
+
         $this->contractRepository->save($contract);
 
         // Update context for controller

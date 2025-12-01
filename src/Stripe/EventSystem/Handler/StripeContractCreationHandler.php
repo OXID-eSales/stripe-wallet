@@ -40,12 +40,7 @@ class StripeContractCreationHandler implements HandlerInterface
 
     public function handle(object $event): void
     {
-        Registry::getLogger()->error('DEBUG: StripeContractCreationHandler::handle() called', [
-            'event_class' => get_class($event),
-        ]);
-
         if (!$event instanceof StripeCheckoutSessionRequestEvent) {
-            Registry::getLogger()->error('DEBUG: StripeContractCreationHandler: Wrong event type');
             return;
         }
 
@@ -53,7 +48,6 @@ class StripeContractCreationHandler implements HandlerInterface
 
         // Skip if contract already exists
         if ($context->getContract() !== null) {
-            Registry::getLogger()->error('DEBUG: StripeContractCreationHandler: Contract already exists, skipping');
             return;
         }
 
@@ -87,13 +81,7 @@ class StripeContractCreationHandler implements HandlerInterface
 
         // Save contract again to persist the metadata
         // (createContract already saved it, but metadata was added after)
-        Registry::getLogger()->error('DEBUG: About to save contract with metadata', [
-            'contract_id' => $contract->getId(),
-            'metadata' => $contract->getAllMetadata(),
-            'toArray_metadata' => $contract->toArray()['metadata'] ?? 'NOT SET',
-        ]);
         $this->contractRepository->save($contract);
-        Registry::getLogger()->error('DEBUG: Contract saved');
 
         $context->setContract($contract);
         $context->set('contractId', $contract->getId());
@@ -116,40 +104,18 @@ class StripeContractCreationHandler implements HandlerInterface
         $addressHash = $session->getVariable('sDelAddrMD5');
         $deliveryAddressId = $session->getVariable('deladrid');
 
-        Registry::getLogger()->error('DEBUG: StripeContractCreationHandler: Address hash debug', [
-            'contract_id' => $contract->getId(),
-            'session_hash' => $addressHash,
-            'session_deladrid' => $deliveryAddressId,
-        ]);
-
         // If no hash in session, compute from user
         if (empty($addressHash)) {
             /** @var User|null $user */
             $user = $basket->getBasketUser();
             if ($user !== null) {
                 $addressHash = $user->getEncodedDeliveryAddress();
-                Registry::getLogger()->error('DEBUG: StripeContractCreationHandler: Computed hash from user', [
-                    'contract_id' => $contract->getId(),
-                    'computed_hash' => $addressHash,
-                    'user_id' => $user->getId(),
-                ]);
-            } else {
-                Registry::getLogger()->error('DEBUG: StripeContractCreationHandler: No user in basket');
             }
         }
 
         // Store the hash in contract metadata
         if (!empty($addressHash)) {
             $contract->setMetadata('delivery_address_hash', $addressHash);
-            Registry::getLogger()->error('DEBUG: StripeContractCreationHandler: Stored address hash', [
-                'contract_id' => $contract->getId(),
-                'hash_length' => strlen($addressHash),
-                'hash_value' => $addressHash,
-            ]);
-        } else {
-            Registry::getLogger()->error('DEBUG: StripeContractCreationHandler: No address hash available', [
-                'contract_id' => $contract->getId(),
-            ]);
         }
 
         // Also store delivery address ID if present

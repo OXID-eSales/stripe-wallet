@@ -302,6 +302,29 @@ class DoctrineContractRepository implements ContractRepositoryInterface
         $this->setPrivateProperty($reflection, $contract, 'committedAt', $this->parseDateTime($data['OXCOMMITTEDAT']));
         $this->setPrivateProperty($reflection, $contract, 'fulfilledAt', $this->parseDateTime($data['OXFULFILLEDAT']));
         $this->setPrivateProperty($reflection, $contract, 'conditions', $conditions);
+
+        // Restore metadata from database
+        $metadata = $this->hydrateContractMetadata($data);
+        $this->setPrivateProperty($reflection, $contract, 'metadata', $metadata);
+    }
+
+    /**
+     * Hydrate metadata from database JSON.
+     *
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    private function hydrateContractMetadata(array $data): array
+    {
+        $metadataString = is_string($data['OXMETADATA']) ? $data['OXMETADATA'] : null;
+        if ($metadataString === null || $metadataString === '') {
+            return [];
+        }
+
+        /** @var array<string, mixed>|null $metadata */
+        $metadata = json_decode($metadataString, true);
+
+        return is_array($metadata) ? $metadata : [];
     }
 
     /**

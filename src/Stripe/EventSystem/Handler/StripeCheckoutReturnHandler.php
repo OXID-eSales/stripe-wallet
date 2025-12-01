@@ -153,13 +153,23 @@ class StripeCheckoutReturnHandler implements HandlerInterface
     {
         $session = Registry::getSession();
 
+        // DEBUG: Log what we're trying to restore
+        Registry::getLogger()->error('DEBUG: restoreDeliveryAddressHash called', [
+            'contract_id' => $contract->getId(),
+            'all_metadata' => $contract->getAllMetadata(),
+        ]);
+
         // Restore delivery address hash
         $deliveryAddressHash = $contract->getMetadata('delivery_address_hash');
         if ($deliveryAddressHash !== null) {
             $session->setVariable('sDelAddrMD5', $deliveryAddressHash);
-            Registry::getLogger()->debug('StripeCheckoutReturnHandler: Restored address hash', [
+            Registry::getLogger()->error('DEBUG: Restored address hash to session', [
                 'contract_id' => $contract->getId(),
-                'hash_length' => strlen((string)$deliveryAddressHash),
+                'hash_value' => $deliveryAddressHash,
+            ]);
+        } else {
+            Registry::getLogger()->error('DEBUG: No address hash in contract metadata', [
+                'contract_id' => $contract->getId(),
             ]);
         }
 
@@ -167,7 +177,7 @@ class StripeCheckoutReturnHandler implements HandlerInterface
         $deliveryAddressId = $contract->getMetadata('delivery_address_id');
         if ($deliveryAddressId !== null) {
             $session->setVariable('deladrid', $deliveryAddressId);
-            Registry::getLogger()->debug('StripeCheckoutReturnHandler: Restored delivery address ID', [
+            Registry::getLogger()->error('DEBUG: Restored delivery address ID', [
                 'contract_id' => $contract->getId(),
                 'delivery_address_id' => $deliveryAddressId,
             ]);
