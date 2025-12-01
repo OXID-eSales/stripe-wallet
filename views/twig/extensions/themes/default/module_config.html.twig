@@ -37,9 +37,10 @@
                 <div class="spacer"></div>
             </dl>
         {% else %}
+            {# Publishable key fields - editable to allow manual correction of mismatched keys #}
             <dl>
                 <dt>
-                    <input type="text" readonly disabled class="txt" style="width: 250px;" name="confstrs[{{ module_var }}]" value="{{ confstrs[module_var] }}" {{ readonly }}>
+                    <input type="text" class="txt" style="width: 250px;" name="confstrs[{{ module_var }}]" value="{{ confstrs[module_var] }}" {{ readonly }}>
                     {% include "inputhelp.html.twig" with {'sHelpId': help_id("HELP_SHOP_MODULE_" ~ module_var), 'sHelpText': help_text("HELP_SHOP_MODULE_" ~ module_var)} %}
                 </dt>
                 <dd style="white-space: nowrap;">

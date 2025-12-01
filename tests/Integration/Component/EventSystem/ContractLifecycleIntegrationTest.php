@@ -115,17 +115,47 @@ class ContractLifecycleIntegrationTest extends TestCase
 
     private function createBasket(): object
     {
-        return (object) [
-            'items' => [
-                ['productId' => 'prod1', 'quantity' => 2, 'price' => 50.0],
-                ['productId' => 'prod2', 'quantity' => 1, 'price' => 30.0],
-            ],
-            'discounts' => [],
-            'totalGross' => 130.0,
-            'totalNet' => 109.24,
-            'totalVat' => 20.76,
-            'currency' => 'EUR',
-        ];
+        return new class {
+            public function getPrice(): object
+            {
+                return new class {
+                    public function getBruttoPrice(): float
+                    {
+                        return 130.0;
+                    }
+
+                    public function getNettoPrice(): float
+                    {
+                        return 109.24;
+                    }
+
+                    public function getVatValue(): float
+                    {
+                        return 20.76;
+                    }
+                };
+            }
+
+            public function getBasketCurrency(): object
+            {
+                return (object)['name' => 'EUR'];
+            }
+
+            public function getContents(): array
+            {
+                return [];
+            }
+
+            public function getDiscounts(): array
+            {
+                return [];
+            }
+
+            public function getProductsCount(): int
+            {
+                return 3;
+            }
+        };
     }
 
     public function testCompleteContractLifecycleHappyPath(): void

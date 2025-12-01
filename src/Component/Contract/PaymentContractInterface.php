@@ -51,4 +51,25 @@ interface PaymentContractInterface extends ModelInterface
      * @param string|null $redirectUrl Optional redirect URL for the payment
      */
     public function setProvider(string $provider, string $providerOrderId, ?string $redirectUrl = null): void;
+
+    /**
+     * Set a metadata value.
+     *
+     * Used to store provider-specific data like delivery address hash.
+     */
+    public function setMetadata(string $key, mixed $value): void;
+
+    /**
+     * Get a metadata value.
+     *
+     * @return mixed The stored value, or null if not set
+     */
+    public function getMetadata(string $key): mixed;
+
+    /**
+     * Get all metadata.
+     *
+     * @return array<string, mixed>
+     */
+    public function getAllMetadata(): array;
 }

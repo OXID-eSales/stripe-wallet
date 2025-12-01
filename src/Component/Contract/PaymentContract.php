@@ -33,6 +33,12 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
     private ?string $providerOrderId = null;
     private ?string $providerRedirectUrl = null;
 
+    /**
+     * Arbitrary metadata storage for provider-specific data.
+     * @var array<string, mixed>
+     */
+    private array $metadata = [];
+
     public function __construct(
         int $shopId,
         string $userId,
@@ -245,6 +251,37 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
         return $this->providerRedirectUrl;
     }
 
+    /**
+     * Set a metadata value.
+     *
+     * Used to store provider-specific data like delivery address hash.
+     */
+    public function setMetadata(string $key, mixed $value): void
+    {
+        $this->metadata[$key] = $value;
+        $this->touch();
+    }
+
+    /**
+     * Get a metadata value.
+     *
+     * @return mixed The stored value, or null if not set
+     */
+    public function getMetadata(string $key): mixed
+    {
+        return $this->metadata[$key] ?? null;
+    }
+
+    /**
+     * Get all metadata.
+     *
+     * @return array<string, mixed>
+     */
+    public function getAllMetadata(): array
+    {
+        return $this->metadata;
+    }
+
     public function getExpiresAt(): ?DateTimeInterface
     {
         return $this->expiresAt;
@@ -321,6 +358,7 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
             'provider' => $this->provider,
             'providerOrderId' => $this->providerOrderId,
             'providerRedirectUrl' => $this->providerRedirectUrl,
+            'metadata' => $this->metadata,
             'expiresAt' => $this->expiresAt?->format('Y-m-d H:i:s'),
             'createdAt' => $this->createdAt->format('Y-m-d H:i:s'),
             'updatedAt' => $this->updatedAt->format('Y-m-d H:i:s'),
@@ -345,6 +383,7 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
         $contract->provider = self::extractOptionalString($data, 'provider');
         $contract->providerOrderId = self::extractOptionalString($data, 'providerOrderId');
         $contract->providerRedirectUrl = self::extractOptionalString($data, 'providerRedirectUrl');
+        $contract->metadata = self::extractMetadata($data);
         $contract->conditions = self::extractConditions($data);
         $contract->expiresAt = self::extractOptionalDateTime($data, 'expiresAt');
         $contract->createdAt = self::extractDateTime($data, 'createdAt');
@@ -451,5 +490,18 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
             return new DateTime($data[$key]);
         }
         return null;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    private static function extractMetadata(array $data): array
+    {
+        if (!isset($data['metadata']) || !is_array($data['metadata'])) {
+            return [];
+        }
+        /** @var array<string, mixed> */
+        return $data['metadata'];
     }
 }

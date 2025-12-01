@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
 
+use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
+use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterface;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentAuthorizedEvent;
@@ -103,6 +105,10 @@ class StripeCheckoutReturnHandler implements HandlerInterface
         $context->setContract($contract);
         $context->set('contractId', $contractId);
 
+        // CRITICAL: Restore delivery address hash BEFORE dispatching event
+        // This ensures OXID's address validation passes during order finalization
+        $this->restoreDeliveryAddressHash($contract);
+
         // Get PaymentIntent details
         $paymentIntent = $checkoutSession->payment_intent;
         $paymentIntentId = is_string($paymentIntent) ? $paymentIntent : ($paymentIntent->id ?? '');
@@ -127,6 +133,44 @@ class StripeCheckoutReturnHandler implements HandlerInterface
         // After event chain completes, check if order was created
         if ($context->get('orderId') !== null) {
             $context->set('redirectTarget', 'thankyou');
+        }
+    }
+
+    /**
+     * Restore delivery address hash from contract metadata to session.
+     *
+     * OXID validates that the delivery address hasn't changed between
+     * payment initiation and order finalization using the 'sDelAddrMD5'
+     * session variable. After returning from Stripe, this variable may be
+     * missing or stale. We restore it from the contract metadata that was
+     * saved when the checkout session was created.
+     *
+     * This must be called BEFORE dispatching PaymentAuthorizedEvent,
+     * as the event chain will trigger Order::finalizeOrder() which
+     * validates the address hash.
+     */
+    private function restoreDeliveryAddressHash(PaymentContractInterface $contract): void
+    {
+        $session = Registry::getSession();
+
+        // Restore delivery address hash
+        $deliveryAddressHash = $contract->getMetadata('delivery_address_hash');
+        if ($deliveryAddressHash !== null) {
+            $session->setVariable('sDelAddrMD5', $deliveryAddressHash);
+            Registry::getLogger()->debug('StripeCheckoutReturnHandler: Restored address hash', [
+                'contract_id' => $contract->getId(),
+                'hash_length' => strlen((string)$deliveryAddressHash),
+            ]);
+        }
+
+        // Restore delivery address ID if present
+        $deliveryAddressId = $contract->getMetadata('delivery_address_id');
+        if ($deliveryAddressId !== null) {
+            $session->setVariable('deladrid', $deliveryAddressId);
+            Registry::getLogger()->debug('StripeCheckoutReturnHandler: Restored delivery address ID', [
+                'contract_id' => $contract->getId(),
+                'delivery_address_id' => $deliveryAddressId,
+            ]);
         }
     }
 }

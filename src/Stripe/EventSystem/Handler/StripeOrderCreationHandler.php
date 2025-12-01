@@ -87,12 +87,12 @@ class StripeOrderCreationHandler implements HandlerInterface
             }
 
             // Create order request
+            // Note: CreateOrderRequest gets basket from session via getBasket() method
             $request = new CreateOrderRequest(
                 sessionId: Registry::getSession()->getId(),
                 userId: $contract->getUserId(),
                 paymentId: $basket->getPaymentId() ?? 'oxidstripe',
                 paymentTransactionId: $context->get('paymentIntentId') ?? $context->get('authorizationId'),
-                basket: $basket,
                 orderRemark: null,
                 metadata: [
                     'contract_id' => $contract->getId(),

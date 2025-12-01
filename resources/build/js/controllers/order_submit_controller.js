@@ -137,9 +137,16 @@ export default class extends Controller {
       throw new Error('Invalid checkout session response')
     }
 
-    console.log('Checkout Session created:', data.id)
+    console.log('Checkout Session created:', data.id, 'URL:', data.url)
+    console.log('Debug info:', data._debug)
 
-    // Redirect to Stripe Checkout
+    // Redirect to Stripe Checkout using direct URL (more reliable)
+    if (data.url) {
+      window.location.href = data.url
+      return
+    }
+
+    // Fallback to redirectToCheckout if URL not available
     const { error } = await stripe.redirectToCheckout({
       sessionId: data.id
     })

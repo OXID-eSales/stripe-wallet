@@ -219,6 +219,7 @@ services:
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeContractCreationHandler:
     arguments:
       $contractService: '@OxidSolutionCatalysts\Payments\Component\Service\ContractServiceInterface'
+      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
     tags:
       - { name: payment.event_handler, priority: 100 }
     public: false

@@ -90,9 +90,19 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
 
             // 4. Validate order creation
             if (!in_array($orderState, [Order::ORDER_STATE_OK, Order::ORDER_STATE_ORDEREXISTS], true)) {
+                $errorCode = $this->mapOrderStateToErrorCode($orderState);
+                Registry::getLogger()->error('OxidShopOrderService: Order finalization failed', [
+                    'order_state' => $orderState,
+                    'error_code' => $errorCode,
+                    'session_id' => $request->sessionId,
+                    'user_id' => $request->userId,
+                    'payment_id' => $request->paymentId,
+                    'basket_count' => $basket->getProductsCount(),
+                    'basket_total' => $basket->getPrice()->getBruttoPrice(),
+                ]);
                 throw new ShopOrderException(
-                    message: 'Order finalization failed',
-                    errorCode: $this->mapOrderStateToErrorCode($orderState),
+                    message: 'Order finalization failed with state: ' . $orderState . ' (' . $errorCode . ')',
+                    errorCode: $errorCode,
                     context: [
                         'order_state' => $orderState,
                         'session_id' => $request->sessionId,

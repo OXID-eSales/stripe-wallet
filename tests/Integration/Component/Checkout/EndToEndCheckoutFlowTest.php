@@ -684,9 +684,50 @@ final class EndToEndCheckoutFlowTest extends IntegrationTestCase
                 return $this->totalGross;
             }
 
+            public function getPrice(): object
+            {
+                $totalGross = $this->totalGross;
+                $totalNet = $this->totalNet;
+                $totalVat = $this->totalVat;
+
+                return new class ($totalGross, $totalNet, $totalVat) {
+                    public function __construct(
+                        private float $gross,
+                        private float $net,
+                        private float $vat
+                    ) {
+                    }
+
+                    public function getBruttoPrice(): float
+                    {
+                        return $this->gross;
+                    }
+
+                    public function getNettoPrice(): float
+                    {
+                        return $this->net;
+                    }
+
+                    public function getVatValue(): float
+                    {
+                        return $this->vat;
+                    }
+                };
+            }
+
             public function getBasketCurrency(): object
             {
                 return (object)['name' => $this->currency];
+            }
+
+            public function getContents(): array
+            {
+                return [];
+            }
+
+            public function getDiscounts(): array
+            {
+                return [];
             }
         };
     }
