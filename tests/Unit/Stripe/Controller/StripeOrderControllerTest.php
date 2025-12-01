@@ -9,6 +9,7 @@ use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripePaymentExecute
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
+use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
 use PHPUnit\Framework\TestCase;
@@ -403,6 +404,36 @@ class StripeOrderControllerTest extends TestCase
             protected function logError(string $message, \Throwable $e): void
             {
                 // Don't log in tests
+            }
+
+            protected function getServiceFromContainer(string $serviceName): object
+            {
+                // Return a mock ModuleConfigurationService with valid keys
+                if ($serviceName === ModuleConfigurationService::class) {
+                    return new class {
+                        public function getKeyValidationError(): ?string
+                        {
+                            return null; // Keys are valid
+                        }
+                        public function validateKeyPair(): bool
+                        {
+                            return true;
+                        }
+                        public function getPublishableKey(): string
+                        {
+                            return 'pk_test_51ABC12345DEF456GHI789';
+                        }
+                        public function getToken(): string
+                        {
+                            return 'sk_test_51ABC12345XYZ000111222';
+                        }
+                        public function isTestMode(): bool
+                        {
+                            return true;
+                        }
+                    };
+                }
+                throw new \RuntimeException("Unknown service: $serviceName");
             }
         };
     }

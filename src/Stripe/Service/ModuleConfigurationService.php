@@ -293,4 +293,96 @@ class ModuleConfigurationService implements ServiceInterface
     {
         return !empty($this->getWebhookSecret());
     }
+
+    /**
+     * Validate that publishable key and secret key are from the same Stripe account.
+     *
+     * Stripe keys follow the format: {type}_{mode}_{accountId}{randomChars}
+     * e.g., pk_test_51ABC123XYZ or sk_live_51ABC123XYZ
+     *
+     * The account ID portion (first ~8-10 chars after the mode prefix) should match
+     * for both keys to be from the same account.
+     *
+     * @return bool True if keys are from the same account
+     */
+    public function validateKeyPair(): bool
+    {
+        $publishableKey = $this->getPublishableKey();
+        $secretKey = $this->getToken();
+
+        if (empty($publishableKey) || empty($secretKey)) {
+            return false;
+        }
+
+        $pkAccountId = $this->extractAccountId($publishableKey);
+        $skAccountId = $this->extractAccountId($secretKey);
+
+        return $pkAccountId !== null
+            && $skAccountId !== null
+            && $pkAccountId === $skAccountId;
+    }
+
+    /**
+     * Get validation error message for API key configuration.
+     *
+     * @return string|null Error message or null if configuration is valid
+     */
+    public function getKeyValidationError(): ?string
+    {
+        $publishableKey = $this->getPublishableKey();
+        $secretKey = $this->getToken();
+
+        if (empty($publishableKey)) {
+            return 'Publishable key is not configured';
+        }
+
+        if (empty($secretKey)) {
+            return 'Secret key is not configured';
+        }
+
+        $pkAccountId = $this->extractAccountId($publishableKey);
+        $skAccountId = $this->extractAccountId($secretKey);
+
+        if ($pkAccountId === null) {
+            return 'Publishable key has invalid format';
+        }
+
+        if ($skAccountId === null) {
+            return 'Secret key has invalid format';
+        }
+
+        if ($pkAccountId !== $skAccountId) {
+            return sprintf(
+                'API keys appear to be from different Stripe accounts. ' .
+                'Publishable key account: %s, Secret key account: %s. ' .
+                'Please ensure both keys are from the same Stripe dashboard.',
+                $pkAccountId,
+                $skAccountId
+            );
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract account ID from Stripe key.
+     *
+     * Stripe keys have format: {type}_{mode}_{accountId}{randomChars}
+     * We extract the first 10 characters after the mode prefix for comparison.
+     *
+     * @param string $key Stripe API key
+     * @return string|null Account ID portion or null if invalid format
+     */
+    private function extractAccountId(string $key): ?string
+    {
+        // Stripe keys: pk_test_51ABC... or sk_live_51ABC...
+        // Account ID starts after the mode prefix (pk_test_ or sk_live_)
+        if (preg_match('/^[ps]k_(test|live)_([a-zA-Z0-9]+)/', $key, $matches)) {
+            // Return first 10 chars of account portion for comparison
+            // This captures the account ID without the random suffix
+            return substr($matches[2], 0, 10);
+        }
+
+        return null;
+    }
 }

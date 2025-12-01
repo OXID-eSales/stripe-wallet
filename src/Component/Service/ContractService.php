@@ -69,13 +69,79 @@ class ContractService implements ContractServiceInterface
 
     private function createBasketSnapshot(object $basket): BasketSnapshot
     {
+        $items = [];
+        $discounts = [];
+
+        // Extract items from OXID basket
+        if (method_exists($basket, 'getContents')) {
+            foreach ($basket->getContents() as $basketItem) {
+                $article = method_exists($basketItem, 'getArticle') ? $basketItem->getArticle() : null;
+                $unitPrice = method_exists($basketItem, 'getUnitPrice')
+                    ? $basketItem->getUnitPrice()->getBruttoPrice()
+                    : 0.0;
+                $amount = method_exists($basketItem, 'getAmount') ? (int) $basketItem->getAmount() : 1;
+
+                $title = 'Product';
+                if ($article !== null) {
+                    if (isset($article->oxarticles__oxtitle->value)) {
+                        $title = (string) $article->oxarticles__oxtitle->value;
+                    } elseif (method_exists($article, 'getTitle')) {
+                        $title = (string) $article->getTitle();
+                    }
+                }
+
+                $items[] = [
+                    'productId' => $article !== null ? $article->getId() : '',
+                    'title' => $title,
+                    'quantity' => $amount,
+                    'unitPrice' => (float) $unitPrice,
+                    'totalPrice' => (float) ($unitPrice * $amount),
+                ];
+            }
+        }
+
+        // Extract discounts from OXID basket
+        if (method_exists($basket, 'getDiscounts')) {
+            $basketDiscounts = $basket->getDiscounts();
+            if (is_array($basketDiscounts)) {
+                foreach ($basketDiscounts as $discount) {
+                    $discounts[] = [
+                        'name' => $discount->sDiscount ?? 'Discount',
+                        'amount' => $discount->dDiscount ?? 0.0,
+                    ];
+                }
+            }
+        }
+
+        // Get totals from OXID basket
+        $totalGross = 0.0;
+        $totalNet = 0.0;
+        $totalVat = 0.0;
+        $currency = 'EUR';
+
+        if (method_exists($basket, 'getPrice')) {
+            $price = $basket->getPrice();
+            if ($price !== null) {
+                $totalGross = (float) $price->getBruttoPrice();
+                $totalNet = (float) $price->getNettoPrice();
+                $totalVat = (float) $price->getVatValue();
+            }
+        }
+
+        if (method_exists($basket, 'getBasketCurrency')) {
+            $basketCurrency = $basket->getBasketCurrency();
+            if ($basketCurrency !== null && isset($basketCurrency->name)) {
+                $currency = (string) $basketCurrency->name;
+            }
+        }
+
         return BasketSnapshot::fromArray([
-            'items' => [],
-            'discounts' => [],
-            'totalGross' => $basket->totalGross ?? 0.0,
-            'totalNet' => $basket->totalNet ?? 0.0,
-            'totalVat' => $basket->totalVat ?? 0.0,
-            'currency' => $basket->currency ?? 'EUR',
+            'items' => $items,
+            'discounts' => $discounts,
+            'totalGross' => $totalGross,
+            'totalNet' => $totalNet,
+            'totalVat' => $totalVat,
+            'currency' => $currency,
             'capturedAt' => date('Y-m-d H:i:s'),
         ]);
     }

@@ -58,10 +58,12 @@ class EventListenerProvider implements EventListenerProviderInterface
 
     /**
      * Registers a handler by using its getHandledEventClass() method.
+     * Priority is determined by getPriority() if implemented, otherwise 0.
      */
     private function registerHandler(HandlerInterface $handler): void
     {
         $eventClass = $handler::getHandledEventClass();
-        $this->addListener($eventClass, [$handler, 'handle']);
+        $priority = method_exists($handler, 'getPriority') ? $handler->getPriority() : 0;
+        $this->addListener($eventClass, [$handler, 'handle'], $priority);
     }
 }

@@ -88,6 +88,13 @@ class StripeOrderController extends OrderController
         header('Content-Type: application/json');
 
         try {
+            // 0. Validate API key configuration
+            $config = $this->getServiceFromContainer(\OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService::class);
+            $keyValidationError = $config->getKeyValidationError();
+            if ($keyValidationError !== null) {
+                throw new \RuntimeException('Stripe configuration error: ' . $keyValidationError);
+            }
+
             // 1. Validate
             $basket = $this->getBasketFromSession();
             if ($basket->getProductsCount() === 0) {
@@ -123,9 +130,30 @@ class StripeOrderController extends OrderController
                 $this->setSessionVariable('stripe_contract_id', $contractId);
             }
 
+            // Debug: Log session creation details
+            $publishableKey = $config->getPublishableKey();
+            $secretKeyPrefix = substr($config->getToken(), 0, 12) . '...';
+
+            Registry::getLogger()->info('Checkout session created', [
+                'sessionId' => $context->get('checkoutSessionId'),
+                'contractId' => $context->get('contractId'),
+                'publishableKeyPrefix' => substr($publishableKey, 0, 12) . '...',
+                'secretKeyPrefix' => $secretKeyPrefix,
+                'isTestMode' => $config->isTestMode(),
+                'keysValid' => $config->validateKeyPair(),
+            ]);
+
             echo json_encode([
                 'id' => $context->get('checkoutSessionId'),
+                'url' => $context->get('checkoutUrl'), // Direct URL for redirect
                 'contract_id' => $context->get('contractId'),
+                // Debug info (remove in production)
+                '_debug' => [
+                    'pk_prefix' => substr($publishableKey, 0, 20),
+                    'sk_prefix' => $secretKeyPrefix,
+                    'testMode' => $config->isTestMode(),
+                    'keysValid' => $config->validateKeyPair(),
+                ],
             ]);
         } catch (\Throwable $e) {
             http_response_code(500);

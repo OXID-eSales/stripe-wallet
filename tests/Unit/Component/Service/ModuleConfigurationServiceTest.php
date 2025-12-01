@@ -533,4 +533,157 @@ class ModuleConfigurationServiceTest extends TestCase
         // Then: Returns empty string (not throwing)
         $this->assertEquals('', $result);
     }
+
+    /**
+     * Test 27: Validate key pair returns true when keys are from same account
+     */
+    public function testValidateKeyPairReturnsTrueForMatchingKeys(): void
+    {
+        // Given: Keys from the same Stripe account (same first 10 chars after prefix)
+        // Both keys have "51ABC12345" as the first 10 chars of the account portion
+        $this->configureSettings([
+            'sStripeMode' => 'test',
+            'sStripeTestPk' => 'pk_test_51ABC12345DEF456GHI789',
+            'sStripeTestToken' => 'sk_test_51ABC12345XYZ000111222',
+        ]);
+
+        // When: validateKeyPair() called
+        $result = $this->service->validateKeyPair();
+
+        // Then: Returns true (account IDs match)
+        $this->assertTrue($result);
+    }
+
+    /**
+     * Test 28: Validate key pair returns false when keys are from different accounts
+     */
+    public function testValidateKeyPairReturnsFalseForMismatchedKeys(): void
+    {
+        // Given: Keys from different Stripe accounts
+        $this->configureSettings([
+            'sStripeMode' => 'test',
+            'sStripeTestPk' => 'pk_test_51ABC123DEF456GHI789',
+            'sStripeTestToken' => 'sk_test_51XYZ789DEF456GHI789', // Different account ID
+        ]);
+
+        // When: validateKeyPair() called
+        $result = $this->service->validateKeyPair();
+
+        // Then: Returns false (account IDs don't match)
+        $this->assertFalse($result);
+    }
+
+    /**
+     * Test 29: Validate key pair returns false when publishable key is empty
+     */
+    public function testValidateKeyPairReturnsFalseWhenPublishableKeyEmpty(): void
+    {
+        // Given: Empty publishable key
+        $this->configureSettings([
+            'sStripeMode' => 'test',
+            'sStripeTestPk' => '',
+            'sStripeTestToken' => 'sk_test_51ABC123DEF456GHI789',
+        ]);
+
+        // When: validateKeyPair() called
+        $result = $this->service->validateKeyPair();
+
+        // Then: Returns false
+        $this->assertFalse($result);
+    }
+
+    /**
+     * Test 30: Validate key pair returns false when secret key is empty
+     */
+    public function testValidateKeyPairReturnsFalseWhenSecretKeyEmpty(): void
+    {
+        // Given: Empty secret key
+        $this->configureSettings([
+            'sStripeMode' => 'test',
+            'sStripeTestPk' => 'pk_test_51ABC123DEF456GHI789',
+            'sStripeTestToken' => '',
+        ]);
+
+        // When: validateKeyPair() called
+        $result = $this->service->validateKeyPair();
+
+        // Then: Returns false
+        $this->assertFalse($result);
+    }
+
+    /**
+     * Test 31: Validate key pair returns false for invalid key format
+     */
+    public function testValidateKeyPairReturnsFalseForInvalidKeyFormat(): void
+    {
+        // Given: Invalid key format (missing proper prefix)
+        $this->configureSettings([
+            'sStripeMode' => 'test',
+            'sStripeTestPk' => 'invalid_key_format',
+            'sStripeTestToken' => 'also_invalid',
+        ]);
+
+        // When: validateKeyPair() called
+        $result = $this->service->validateKeyPair();
+
+        // Then: Returns false
+        $this->assertFalse($result);
+    }
+
+    /**
+     * Test 32: Validate key pair works for live mode keys
+     */
+    public function testValidateKeyPairWorksForLiveModeKeys(): void
+    {
+        // Given: Live mode keys from same account (same first 10 chars after prefix)
+        $this->configureSettings([
+            'sStripeMode' => 'live',
+            'sStripeLivePk' => 'pk_live_51ABC12345DEF456GHI789',
+            'sStripeLiveToken' => 'sk_live_51ABC12345XYZ000111222',
+        ]);
+
+        // When: validateKeyPair() called
+        $result = $this->service->validateKeyPair();
+
+        // Then: Returns true
+        $this->assertTrue($result);
+    }
+
+    /**
+     * Test 33: Get key validation error message for mismatched keys
+     */
+    public function testGetKeyValidationErrorForMismatchedKeys(): void
+    {
+        // Given: Keys from different accounts
+        $this->configureSettings([
+            'sStripeMode' => 'test',
+            'sStripeTestPk' => 'pk_test_51ABC123DEF456GHI789',
+            'sStripeTestToken' => 'sk_test_51XYZ789DEF456GHI789',
+        ]);
+
+        // When: getKeyValidationError() called
+        $result = $this->service->getKeyValidationError();
+
+        // Then: Returns error message about mismatched keys
+        $this->assertStringContainsString('different Stripe accounts', $result);
+    }
+
+    /**
+     * Test 34: Get key validation error returns null for valid keys
+     */
+    public function testGetKeyValidationErrorReturnsNullForValidKeys(): void
+    {
+        // Given: Valid matching keys (same first 10 chars after prefix)
+        $this->configureSettings([
+            'sStripeMode' => 'test',
+            'sStripeTestPk' => 'pk_test_51ABC12345DEF456GHI789',
+            'sStripeTestToken' => 'sk_test_51ABC12345XYZ000111222',
+        ]);
+
+        // When: getKeyValidationError() called
+        $result = $this->service->getKeyValidationError();
+
+        // Then: Returns null (no error)
+        $this->assertNull($result);
+    }
 }

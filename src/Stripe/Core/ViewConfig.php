@@ -7,6 +7,7 @@ namespace OxidSolutionCatalysts\Payments\Stripe\Core;
 use OxidEsales\Eshop\Core\Registry;
 use OxidSolutionCatalysts\Payments\Component\Traits\ServiceContainer;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
+use Throwable;
 
 /**
  * ViewConfig extension for Stripe module
@@ -17,13 +18,23 @@ class ViewConfig extends ViewConfig_parent
 {
     use ServiceContainer;
 
-    private ModuleConfigurationService $stripeConfig;
+    private ?ModuleConfigurationService $stripeConfig = null;
 
-    public function __construct()
+    /**
+     * Get the ModuleConfigurationService lazily.
+     * Returns null if service is not available (e.g., during module deactivation).
+     */
+    private function getStripeConfig(): ?ModuleConfigurationService
     {
-        parent::__construct();
-
-        $this->stripeConfig = $this->getServiceFromContainer(ModuleConfigurationService::class);
+        if ($this->stripeConfig === null) {
+            try {
+                $this->stripeConfig = $this->getServiceFromContainer(ModuleConfigurationService::class);
+            } catch (Throwable $e) {
+                // Service not available (module being deactivated)
+                return null;
+            }
+        }
+        return $this->stripeConfig;
     }
 
     /**
@@ -118,11 +129,13 @@ class ViewConfig extends ViewConfig_parent
      */
     public function isStripeCheckoutActive(): bool
     {
-        return !empty($this->stripeConfig->getPublishableKey());
+        $config = $this->getStripeConfig();
+        return $config !== null && !empty($config->getPublishableKey());
     }
-    public function getStripeWalletConfig(): ModuleConfigurationService
+
+    public function getStripeWalletConfig(): ?ModuleConfigurationService
     {
-        return $this->stripeConfig;
+        return $this->getStripeConfig();
     }
 
     /**
@@ -132,6 +145,7 @@ class ViewConfig extends ViewConfig_parent
      */
     public function getStripePublishableKey(): string
     {
-        return $this->stripeConfig->getPublishableKey();
+        $config = $this->getStripeConfig();
+        return $config !== null ? $config->getPublishableKey() : '';
     }
 }

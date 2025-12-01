@@ -185,6 +185,56 @@ services:
     alias: OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface
 
   # ==========================================
+  # Contract Repository (Data Access Layer)
+  # ==========================================
+
+  # Contract Repository Interface - Bind to Doctrine implementation
+  OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface:
+    class: OxidSolutionCatalysts\Payments\Component\Repository\DoctrineContractRepository
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+    public: false
+
+  # Contract Repository - Alias
+  OxidSolutionCatalysts\Payments\Component\Repository\DoctrineContractRepository:
+    alias: OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface
+
+  # ==========================================
+  # Contract Service
+  # ==========================================
+
+  # Contract Service Interface - Bind to implementation
+  OxidSolutionCatalysts\Payments\Component\Service\ContractServiceInterface:
+    class: OxidSolutionCatalysts\Payments\Component\Service\ContractService
+    arguments:
+      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+    public: true
+
+  # ==========================================
+  # Stripe Checkout Session Handlers
+  # ==========================================
+
+  # Stripe Contract Creation Handler - Creates contract for checkout flow
+  # Priority 100: Runs BEFORE StripeCheckoutSessionHandler (priority 0)
+  OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeContractCreationHandler:
+    arguments:
+      $contractService: '@OxidSolutionCatalysts\Payments\Component\Service\ContractServiceInterface'
+    tags:
+      - { name: payment.event_handler, priority: 100 }
+    public: false
+
+  # Stripe Checkout Session Handler - Creates Stripe Checkout Session
+  # Priority 0 (default): Runs AFTER StripeContractCreationHandler
+  OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler:
+    arguments:
+      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $config: '@OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService'
+    tags:
+      - { name: payment.event_handler, priority: 0 }
+    public: false
+
+  # ==========================================
   # Repositories (Data Access Layer)
   # ==========================================
 

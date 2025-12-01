@@ -38,6 +38,11 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         return StripeCheckoutSessionRequestEvent::class;
     }
 
+    public function getPriority(): int
+    {
+        return 0;
+    }
+
     public function handle(object $event): void
     {
         if (!$event instanceof StripeCheckoutSessionRequestEvent) {
@@ -95,6 +100,8 @@ class StripeCheckoutSessionHandler implements HandlerInterface
 
         // Update context for controller
         $context->set('checkoutSessionId', $checkoutSession->id);
+        // Also provide the direct URL for redirect (more reliable than redirectToCheckout)
+        $context->set('checkoutUrl', $checkoutSession->url);
     }
 
     /**
