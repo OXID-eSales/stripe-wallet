@@ -1,211 +1,147 @@
-# Stripe Connection Issue - Project Status
+# Stripe Payment Module - Project Status
 
-**Project:** Stripe Connection Failure Investigation & Fix
-**Start Date:** December 1, 2025
+**Project:** Stripe Payment Module - Architecture Documentation
+**Date:** December 1, 2025
 **Developer:** Daniil (Claude Code)
 
 ---
 
-## Current Status
+## Today's Work Summary
 
-| Sprint | Status | Progress | Est. Hours |
-|--------|--------|----------|------------|
-| [Sprint 1: Fix StripeClientFactoryTest](todo/sprint-1-fix-stripe-client-factory-test.md) | **COMPLETE** | 100% | 0.5h |
-| [Sprint 2: Docker DNS Configuration](todo/sprint-2-docker-dns-configuration.md) | **COMPLETE** | 100% | 0.5h |
-| [Sprint 3: Fix Remaining Integration Tests](todo/sprint-3-fix-remaining-integration-tests.md) | **COMPLETE** | 100% | 1.5h |
-| Additional: Status Mapping Fixes | **COMPLETE** | 100% | 0.5h |
+### Architecture Documentation Created
 
-**Overall Progress:** 100% (All Sprints Complete)
+Created comprehensive PlantUML diagrams documenting the Stripe Payment Module architecture:
 
-> **Final Result:** All tests passing. See [Completion Report](done/COMPLETION_REPORT.md) for details.
+| Diagram | Description | File |
+|---------|-------------|------|
+| Complete Checkout Sequence | Full end-to-end checkout flow | `01-complete-checkout-sequence.puml` |
+| Contract State Machine | PaymentContract state transitions | `02-contract-state-machine.puml` |
+| Class Hierarchy | Interfaces and class relationships | `03-class-hierarchy.puml` |
+| Event Flow | Event handler chain with priorities | `04-event-flow.puml` |
+| Dependency Injection | Symfony DI container setup | `05-dependency-injection.puml` |
+| Data Flow Waterfall | Request-response timeline | `06-data-flow-waterfall.puml` |
+| Address Validation Fix | Bug fix documentation | `07-address-validation-fix.puml` |
+| Condition Fulfillment | Contract conditions system | `08-condition-fulfillment.puml` |
+| Test Architecture | Unit test structure | `09-test-architecture.puml` |
+| Component Overview | High-level component architecture | `10-component-overview.puml` |
+| Customer Journey | Button to Thank You page flow | `11-button-to-thankyou-journey.puml` |
+
+### Generated SVG Files
+
+All 14 SVG diagrams successfully generated in `_generated/` directory:
+
+- Address Validation Bug Fix.svg
+- Class Hierarchy and Interfaces.svg
+- Complete Stripe Checkout Sequence.svg
+- Component Overview.svg
+- Condition Fulfillment Sequence.svg
+- Contract Condition Fulfillment System.svg
+- Contract State Machine.svg
+- Data Flow Waterfall.svg
+- Dependency Injection Container.svg
+- Event Flow and Handler Chain.svg
+- Test Architecture and Coverage.svg
+- 09-test-architecture.svg (mind map)
+- 11-button-to-thankyou-journey.svg
+
+### Key Architecture Concepts Documented
+
+1. **Contract-First Payment Architecture**
+   - Order created AFTER payment is confirmed
+   - PaymentContract tracks intent before commitment
+   - State machine: DRAFT → PENDING → READY_TO_COMMIT → COMMITTED
+
+2. **Event-Driven Design**
+   - Custom EventDispatcher (not native OXID)
+   - Priority-based handler chain
+   - Loose coupling between components
+
+3. **Symfony DI Integration**
+   - ServiceContainer trait for controller access
+   - Tagged service collection for handlers
+   - Lazy loading to prevent circular dependencies
+
+4. **Address Validation Bug Fix**
+   - Problem: OXID reads hash from REQUEST (empty on GET redirect)
+   - Solution: Store hash in contract metadata, restore to session on return
+   - Files: DoctrineContractRepository, StripeContractCreationHandler, Order model
+
+### Color Scheme Applied
+
+- Pastel backgrounds with dark (black) text for readability
+- Stripe Integration layer: Dark green (#2E7D32) with white text
+- Notes: Yellow (#FFFACD) with black text
+- Success states: Light green (#C8E6C9)
+- Error states: Light red (#FFCDD2)
 
 ---
 
-## Test Status Summary
+## Previous Work (Earlier Today)
 
-### Before Fix (December 1, 2025)
+### Test Fixes Completed
+
+| Sprint | Status | Description |
+|--------|--------|-------------|
+| Sprint 1 | COMPLETE | Fix StripeClientFactoryTest (method name mismatch) |
+| Sprint 2 | COMPLETE | Docker DNS Configuration |
+| Sprint 3 | COMPLETE | Fix Remaining Integration Tests |
+| Status Mapping | COMPLETE | Additional status mapping fixes |
+
+### Test Results
 
 | Test Suite | Total | Pass | Fail | Error | Skip |
 |------------|-------|------|------|-------|------|
-| Unit Tests | 852 | 847 | 5 | 0 | 1 |
-| Integration Tests | 226 | 118 | 4 | 47 | 56 |
-
-### After Fix (December 1, 2025)
-
-| Test Suite | Total | Pass | Fail | Error | Skip |
-|------------|-------|------|------|-------|------|
-| Unit Tests | 852 | **852** | 0 | 0 | 1 |
-| Integration Tests | 226 | **169** | 0 | 0 | 56 |
-
-### Issues Identified
-
-1. **Unit Tests (5 failures)**: `StripeClientFactoryTest`
-   - Root cause: Method name mismatch (`getToken` vs `getSecretKey`)
-
-2. **Integration Tests (47 errors)**: DNS Resolution
-   - Root cause: Docker container cannot resolve `api.stripe.com`
-
-3. **Integration Tests (4 failures)**: Various
-   - EventContext data propagation
-   - Contract repository ID mismatch
-   - Missing directory structure
-   - Controller class registration
+| Unit Tests | 852 | 852 | 0 | 0 | 1 |
+| Integration Tests | 226 | 169 | 0 | 0 | 56 |
 
 ---
 
-## Problem Summary
+## Files Created/Modified Today
 
-### Primary Issue: Method Name Mismatch
+### New Files
+```
+puml/
+├── 01-complete-checkout-sequence.puml
+├── 02-contract-state-machine.puml
+├── 03-class-hierarchy.puml
+├── 04-event-flow.puml
+├── 05-dependency-injection.puml
+├── 06-data-flow-waterfall.puml
+├── 07-address-validation-fix.puml
+├── 08-condition-fulfillment.puml
+├── 09-test-architecture.puml
+├── 10-component-overview.puml
+└── 11-button-to-thankyou-journey.puml
 
-`StripeClientFactory` constructor uses:
-```php
-$this->secretKey = $this->configurationService->getToken();
+_generated/
+├── [14 SVG files generated]
 ```
 
-But `StripeClientFactoryTest` mocks:
-```php
-$this->configurationService->method('getSecretKey')->willReturn('sk_test_...');
-```
-
-The mock for `getToken()` is never set, so `secretKey` is empty.
-
-### Secondary Issue: Docker DNS
-
-```
-Error: Could not resolve host: api.stripe.com
-```
-
-Docker's internal DNS (127.0.0.11) is not properly forwarding to external DNS.
-
----
-
-## Architecture Context
-
-From previous sprints (20251128), the following was completed:
-
-- Sprint 1-3: Contract Infrastructure (VERIFIED - existed)
-- Sprint 4: Stripe Handlers (COMPLETE)
-- Sprint 5: Controller Refactoring (COMPLETE)
-- Sprint 6: Integration & E2E (COMPLETE)
-- Sprint 7: Provider-Agnostic Refactoring (COMPLETE)
-- Sprint 8-10: Test fixes (COMPLETE)
-
-The current issues are:
-1. **Test configuration issue** (mock method name)
-2. **Infrastructure issue** (Docker DNS)
-
-NOT related to:
-- Contract-first architecture (working correctly)
-- Event-driven handlers (working correctly)
-- Module activation (working correctly)
-
----
-
-## Test Commands
-
+### Build Command
 ```bash
-# Run Unit tests
-docker compose exec -T php vendor/bin/phpunit \
-    -c /var/www/extensions/stripe/tests/phpunit.xml \
-    --testsuite Unit
-
-# Run Integration tests
-docker compose exec -T -e XDEBUG_MODE=coverage php vendor/bin/phpunit \
-    -c /var/www/extensions/stripe/tests/phpunit.xml \
-    --testsuite Integration \
-    --bootstrap=/var/www/source/bootstrap.php \
-    --exclude-group migration
-
-# Run specific failing test
-docker compose exec -T php vendor/bin/phpunit \
-    /var/www/extensions/stripe/tests/Unit/Stripe/Adapter/StripeClientFactoryTest.php
-
-# Pre-commit check
-./source/extensions/stripe/bin/pre-commit-check.sh
+make svg
+# Uses: docker run --rm -v $(pwd):/workspace plantuml/plantuml -tsvg /workspace/puml/*.puml -o /workspace/_generated/
 ```
 
 ---
 
-## Key Files
+## Technical Notes
 
-### Source Files
-| File | Purpose | Issue |
-|------|---------|-------|
-| `src/Stripe/Adapter/StripeClientFactory.php` | Creates StripeClient | Uses `getToken()` |
-| `src/Stripe/Service/ModuleConfigurationService.php` | Config service | Has both methods |
+### PlantUML Compatibility Issues Resolved
 
-### Test Files
-| File | Purpose | Status |
-|------|---------|--------|
-| `tests/Unit/Stripe/Adapter/StripeClientFactoryTest.php` | Factory tests | 5 FAILING |
-| `tests/Integration/Stripe/Adapter/*.php` | Stripe integration | 47 ERRORS |
+1. **Activity diagrams with swimlanes**: Removed `<code>` blocks (caused Java bug)
+2. **Mind maps**: Added proper `@startmindmap`/`@endmindmap` wrapper
+3. **Sequence diagrams**: Simplified participant types (removed `boundary`, `control`, etc.)
+4. **Swimlane names**: Removed spaces and special characters
 
----
+### Event System Architecture
 
-## Key Principles (from 20251128)
-
-### 1. TDD-First
-```
-RED → GREEN → REFACTOR
-Write test → Make it pass → Clean up
-```
-
-### 2. SOLID Compliance
-- Single Responsibility: Each class one purpose
-- Open/Closed: Extend, don't modify
-- Liskov Substitution: Subtypes substitutable
-- Interface Segregation: Small, focused interfaces
-- Dependency Inversion: Depend on abstractions
-
-### 3. Contract-First Architecture
-```
-CONTRACT (Intent) → CONDITIONS FULFILLED → ORDER (Commitment)
-```
+The custom event system integrates with OXID via:
+- `EventDispatcher` registered as public service in `services.yaml`
+- Controllers use `ServiceContainer` trait to access DI container
+- Handlers tagged with `payment.event_handler` for auto-discovery
+- Lazy loading prevents circular dependencies
 
 ---
 
-## Sprint Details
-
-See `todo/` directory for detailed sprint breakdowns:
-
-```
-todo/
-├── README.md                                    # Sprint index
-├── sprint-1-fix-stripe-client-factory-test.md  # Unit test fix
-├── sprint-2-docker-dns-configuration.md        # Docker networking
-└── sprint-3-fix-remaining-integration-tests.md # Other failures
-```
-
----
-
-## Backend Admin Connection (WORKING)
-
-The user confirmed that backend admin Stripe connection works:
-- Stripe onboarding: SUCCESS
-- Connection confirmation: POSITIVE
-
-This indicates:
-- Stripe API credentials are valid
-- ModuleConfigurationService correctly retrieves credentials
-- The issue is test configuration, NOT actual Stripe connectivity
-
----
-
-## Known Issues (Pre-existing)
-
-From 20251128 status:
-- `StripeClientFactoryTest` - 5 failures (now understood: method mismatch)
-- These were listed as "pre-existing" but root cause now identified
-
----
-
-## Notes
-
-- The `getToken()` and `getSecretKey()` methods in ModuleConfigurationService are duplicates
-- Both return the same value (secret key based on test/live mode)
-- Consider consolidating to avoid confusion
-- Docker DNS issue is environment-specific (may not affect CI/CD)
-
----
-
-**Last Updated:** 2025-12-01 (Initial Issue Investigation Complete)
+**Last Updated:** 2025-12-01 16:15

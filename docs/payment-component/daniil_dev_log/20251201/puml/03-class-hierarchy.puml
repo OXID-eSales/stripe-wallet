@@ -1,0 +1,385 @@
+@startuml Class Hierarchy and Interfaces
+!theme plain
+title <font size=20><b>Class Hierarchy: Controllers, Handlers, Services & OXID Integration</b></font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 11
+skinparam classAttributeIconSize 0
+skinparam roundcorner 10
+
+skinparam class {
+    BackgroundColor<<interface>> #BBDEFB
+    FontColor<<interface>> #000000
+    BackgroundColor<<abstract>> #FFE0B2
+    FontColor<<abstract>> #000000
+    BackgroundColor<<oxid>> #E1BEE7
+    FontColor<<oxid>> #000000
+    BackgroundColor<<stripe>> #C8E6C9
+    FontColor<<stripe>> #000000
+    BackgroundColor<<component>> #FFF9C4
+    FontColor<<component>> #000000
+    BackgroundColor<<event>> #F8BBD0
+    FontColor<<event>> #000000
+    BorderColor #000000
+    BorderThickness 2
+}
+
+skinparam package {
+    BorderColor #000000
+    BorderThickness 2
+}
+
+skinparam note {
+    BackgroundColor #FFFACD
+    BorderColor #000000
+    FontColor #000000
+}
+
+package "OXID Framework (Shop Core)" #F3E5F5 {
+    abstract class "OxidEsales\\Eshop\\Application\\Controller\\FrontendController" as OxidFrontend <<oxid>> {
+        # _aViewData : array
+        + init() : void
+        + render() : string
+        + getViewData() : array
+    }
+
+    class "OxidEsales\\Eshop\\Application\\Controller\\OrderController" as OxidOrder <<oxid>> {
+        + render() : string
+        + execute() : string
+        + getPayment() : Payment
+        + getBasket() : Basket
+    }
+
+    class "OxidEsales\\Eshop\\Application\\Model\\Order" as OxidOrderModel <<oxid>> {
+        # _aOrderArticles : array
+        + finalizeOrder() : int
+        + validateDeliveryAddress() : int
+        # executePayment() : bool|int
+        # setNumber() : void
+        # getCounterIdent() : string
+        + ORDER_STATE_INVALIDDELADDRESSCHANGED : int = 7
+    }
+
+    class "OxidEsales\\Eshop\\Core\\Session" as OxidSession <<oxid>> {
+        + getBasket() : Basket
+        + getVariable(name) : mixed
+        + setVariable(name, value) : void
+    }
+
+    class "OxidEsales\\Eshop\\Core\\Registry" as OxidRegistry <<oxid>> {
+        {static} + getSession() : Session
+        {static} + getRequest() : Request
+        {static} + getLogger() : LoggerInterface
+    }
+}
+
+package "Stripe Module - Controllers" #E8F5E9 {
+    class "OrderController" as ModuleOrderController <<stripe>> {
+        + getUser() : User
+        + getBasket() : Basket
+        + getPaymentId() : string
+    }
+
+    class "StripeOrderController" as StripeOrderController <<stripe>> {
+        - eventDispatcher : EventDispatcherInterface
+        - stripeAdapterFactory : StripeAdapterFactoryInterface
+        --
+        + createCheckoutSession() : void
+        + checkoutSuccess() : string
+        - createEventContext() : EventContext
+        - processContextResults() : void
+        - clearStripeSessionVariables() : void
+    }
+}
+
+package "Stripe Module - Model Extension" #E8F5E9 {
+    class "Order\n(Stripe\\Model\\Order)" as StripeOrder <<stripe>> {
+        + setOrderNumber() : void
+        + hasOrderNumber() : bool
+        # executePayment(basket, userpayment) : bool|int
+        + validateDeliveryAddress(user) : int
+        --
+        **Stripe Override:**
+        - Skip payment gateway for Stripe
+        - Read address hash from session
+    }
+}
+
+package "Component - Interfaces" #E3F2FD {
+    interface "EventDispatcherInterface" as IEventDispatcher <<interface>> {
+        + dispatch(event : EventInterface) : EventInterface
+        + addListener(eventClass, listener, priority) : void
+        + removeListener(eventClass, listener) : void
+    }
+
+    interface "EventListenerProviderInterface" as IEventListenerProvider <<interface>> {
+        + getListenersForEvent(event) : iterable
+    }
+
+    interface "HandlerInterface" as IHandler <<interface>> {
+        + handle(event : object) : void
+        {static} + getHandledEventClass() : string
+    }
+
+    interface "ContractRepositoryInterface" as IContractRepository <<interface>> {
+        + findById(id) : ?PaymentContractInterface
+        + save(contract) : void
+        + delete(contract) : void
+    }
+
+    interface "ContractServiceInterface" as IContractService <<interface>> {
+        + createContract(userId, basket, conditionTypes) : PaymentContractInterface
+    }
+
+    interface "PaymentContractInterface" as IPaymentContract <<interface>> {
+        + getId() : ?string
+        + getState() : ContractState
+        + getUserId() : string
+        + getBasketSnapshot() : BasketSnapshot
+        + getConditions() : array
+        + fulfillCondition(type, data) : void
+        + areAllConditionsFulfilled() : bool
+        + transitionToPending() : void
+        + commitToOrder(orderId) : void
+        + getMetadata(key) : ?string
+        + setMetadata(key, value) : void
+    }
+
+    interface "EventInterface" as IEvent <<interface>> {
+        + getContext() : EventContext
+        + isPropagationStopped() : bool
+        + stopPropagation() : void
+    }
+}
+
+package "Component - Event System" #FFFDE7 {
+    class "EventDispatcher" as EventDispatcher <<component>> {
+        - listenerProvider : EventListenerProviderInterface
+        - listeners : array
+        --
+        + dispatch(event) : EventInterface
+        + addListener(eventClass, listener, priority) : void
+        - sortListeners() : void
+    }
+
+    class "EventListenerProvider" as EventListenerProvider <<component>> {
+        - handlers : iterable<HandlerInterface>
+        - listeners : array
+        --
+        + __construct(handlers : iterable)
+        + getListenersForEvent(event) : iterable
+        - registerHandler(handler) : void
+    }
+
+    class "EventContext" as EventContext <<component>> {
+        - data : array
+        - contract : ?PaymentContractInterface
+        --
+        + get(key, default) : mixed
+        + set(key, value) : void
+        + getContract() : ?PaymentContractInterface
+        + setContract(contract) : void
+    }
+}
+
+package "Component - Contract Domain" #FFFDE7 {
+    class "PaymentContract" as PaymentContract <<component>> {
+        - id : ?string
+        - userId : string
+        - state : ContractState
+        - basketSnapshot : BasketSnapshot
+        - conditions : array<ContractCondition>
+        - metadata : array<string, string>
+        - providerName : ?string
+        - providerOrderId : ?string
+        - orderId : ?string
+        --
+        + fulfillCondition(type, data) : void
+        + areAllConditionsFulfilled() : bool
+        + transitionToPending() : void
+        + commitToOrder(orderId) : void
+        + setProvider(name, orderId, url) : void
+    }
+
+    class "ContractState" as ContractState <<component>> {
+        - value : string
+        --
+        {static} + draft() : ContractState
+        {static} + pending() : ContractState
+        {static} + readyToCommit() : ContractState
+        {static} + committed() : ContractState
+        {static} + fulfilled() : ContractState
+        + isDraft() : bool
+        + isPending() : bool
+        + isReadyToCommit() : bool
+        + isCommitted() : bool
+    }
+
+    class "ContractCondition" as ContractCondition <<component>> {
+        - type : string
+        - status : string
+        - data : array
+        --
+        + TYPE_PAYMENT_AUTHORIZED : string
+        + TYPE_FRAUD_CHECK : string
+        + STATUS_PENDING : string
+        + STATUS_FULFILLED : string
+        --
+        + fulfill(data) : void
+        + isFulfilled() : bool
+    }
+
+    class "BasketSnapshot" as BasketSnapshot <<component>> {
+        - items : array
+        - total : float
+        - currency : string
+        - shippingCost : float
+        --
+        + getItems() : array
+        + getTotal() : float
+        + getCurrency() : string
+    }
+}
+
+package "Stripe - Event Handlers" #E8F5E9 {
+    class "StripeContractCreationHandler" as ContractCreationHandler <<stripe>> {
+        - contractService : ContractServiceInterface
+        - contractRepository : ContractRepositoryInterface
+        --
+        + handle(event) : void
+        + getPriority() : int = 100
+        {static} + getHandledEventClass() : string
+        - storeDeliveryAddressHash(contract, basket) : void
+    }
+
+    class "StripeCheckoutSessionHandler" as CheckoutSessionHandler <<stripe>> {
+        - contractRepository : ContractRepositoryInterface
+        - adapterFactory : StripeAdapterFactoryInterface
+        --
+        + handle(event) : void
+        + getPriority() : int = 0
+        {static} + getHandledEventClass() : string
+        - buildLineItems(snapshot) : array
+    }
+
+    class "StripeCheckoutReturnHandler" as CheckoutReturnHandler <<stripe>> {
+        - contractRepository : ContractRepositoryInterface
+        - adapterFactory : StripeAdapterFactoryInterface
+        --
+        + handle(event) : void
+        {static} + getHandledEventClass() : string
+        - restoreDeliveryAddressHash(contract) : void
+        # getEventDispatcher() : EventDispatcherInterface
+    }
+
+    class "PaymentAuthorizedEventHandler" as PaymentAuthorizedHandler <<stripe>> {
+        - contractRepository : ContractRepositoryInterface
+        - eventDispatcher : ?EventDispatcherInterface
+        --
+        + handle(event) : void
+        {static} + getHandledEventClass() : string
+    }
+
+    class "StripeOrderCreationHandler" as OrderCreationHandler <<stripe>> {
+        - contractRepository : ContractRepositoryInterface
+        - shopOrderService : ShopOrderServiceInterface
+        - eventDispatcher : ?EventDispatcherInterface
+        --
+        + handle(event) : void
+        {static} + getHandledEventClass() : string
+    }
+}
+
+package "Stripe - Events" #FCE4EC {
+    class "StripeCheckoutSessionRequestEvent" as SessionRequestEvent <<event>> {
+        - context : EventContext
+        --
+        + getContext() : EventContext
+    }
+
+    class "StripeCheckoutReturnEvent" as ReturnEvent <<event>> {
+        - context : EventContext
+        - checkoutSessionId : ?string
+        --
+        + getContext() : EventContext
+        + getCheckoutSessionId() : ?string
+    }
+
+    class "PaymentAuthorizedEvent" as PaymentAuthorizedEvent <<event>> {
+        - context : EventContext
+        - authorizationId : string
+        - providerOrderId : string
+        - amount : float
+        - currency : string
+    }
+
+    class "ContractReadyToCommitEvent" as ReadyToCommitEvent <<event>> {
+        - contract : PaymentContractInterface
+        - context : EventContext
+    }
+
+    class "ContractCommittedEvent" as CommittedEvent <<event>> {
+        - contract : PaymentContractInterface
+        - context : EventContext
+        - orderId : string
+    }
+}
+
+' Inheritance relationships
+OxidFrontend <|-- OxidOrder
+OxidOrder <|-- ModuleOrderController
+ModuleOrderController <|-- StripeOrderController
+
+OxidOrderModel <|-- StripeOrder : "extends via\nmetadata.php\nchain extension"
+
+' Interface implementations
+IEventDispatcher <|.. EventDispatcher
+IEventListenerProvider <|.. EventListenerProvider
+IPaymentContract <|.. PaymentContract
+
+IHandler <|.. ContractCreationHandler
+IHandler <|.. CheckoutSessionHandler
+IHandler <|.. CheckoutReturnHandler
+IHandler <|.. PaymentAuthorizedHandler
+IHandler <|.. OrderCreationHandler
+
+IEvent <|.. SessionRequestEvent
+IEvent <|.. ReturnEvent
+IEvent <|.. PaymentAuthorizedEvent
+IEvent <|.. ReadyToCommitEvent
+IEvent <|.. CommittedEvent
+
+' Composition
+PaymentContract *-- ContractState
+PaymentContract *-- BasketSnapshot
+PaymentContract *-- "0..*" ContractCondition
+
+EventDispatcher o-- IEventListenerProvider
+EventListenerProvider o-- "0..*" IHandler
+
+' Usage relationships
+StripeOrderController ..> EventDispatcher : uses
+StripeOrderController ..> EventContext : creates
+StripeOrderController ..> SessionRequestEvent : dispatches
+StripeOrderController ..> ReturnEvent : dispatches
+
+ContractCreationHandler ..> PaymentContract : creates
+CheckoutSessionHandler ..> "Stripe API" : calls
+CheckoutReturnHandler ..> PaymentAuthorizedEvent : dispatches
+PaymentAuthorizedHandler ..> ReadyToCommitEvent : dispatches
+OrderCreationHandler ..> CommittedEvent : dispatches
+
+StripeOrder ..> OxidRegistry : uses
+StripeOrder ..> OxidSession : reads session
+
+legend right
+    |= Color |= Stereotype |= Description |
+    | <#E1BEE7> | <<oxid>> | OXID Framework |
+    | <#C8E6C9> | <<stripe>> | Stripe Module |
+    | <#BBDEFB> | <<interface>> | Interfaces |
+    | <#FFF9C4> | <<component>> | Component |
+    | <#F8BBD0> | <<event>> | Events |
+endlegend
+
+@enduml

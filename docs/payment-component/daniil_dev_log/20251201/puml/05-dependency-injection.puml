@@ -1,0 +1,270 @@
+@startuml Dependency Injection Container
+!theme plain
+title <font size=20><b>Symfony DI Container Configuration for Stripe Payment Component</b></font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 11
+skinparam componentStyle rectangle
+skinparam roundcorner 10
+
+skinparam component {
+    BackgroundColor<<service>> #2E7D32
+    FontColor<<service>> #FFFFFF
+    BackgroundColor<<interface>> #1565C0
+    FontColor<<interface>> #FFFFFF
+    BackgroundColor<<tagged>> #F9A825
+    FontColor<<tagged>> #000000
+    BackgroundColor<<factory>> #E65100
+    FontColor<<factory>> #FFFFFF
+    BackgroundColor<<external>> #C62828
+    FontColor<<external>> #FFFFFF
+    BorderColor #000000
+    BorderThickness 2
+}
+
+skinparam package {
+    BorderColor #000000
+    BorderThickness 2
+}
+
+skinparam note {
+    BackgroundColor #FFFACD
+    BorderColor #000000
+    FontColor #000000
+}
+
+package "Symfony DI Container" #F5F5F5 {
+
+    package "Interfaces (Contracts)" #BBDEFB {
+        component "EventDispatcherInterface" as IED <<interface>>
+        component "EventListenerProviderInterface" as IELP <<interface>>
+        component "ContractRepositoryInterface" as ICR <<interface>>
+        component "ContractServiceInterface" as ICS <<interface>>
+        component "HandlerInterface" as IH <<interface>>
+        component "ShopOrderServiceInterface" as ISOS <<interface>>
+        component "StripeAdapterFactoryInterface" as ISAF <<interface>>
+    }
+
+    package "Core Services" #C8E6C9 {
+        component "EventDispatcher" as ED <<service>> {
+            note as N1
+                **Constructor DI:**
+                - EventListenerProviderInterface
+            end note
+        }
+
+        component "EventListenerProvider" as ELP <<service>> {
+            note as N2
+                **Constructor DI:**
+                - iterable<HandlerInterface>
+                  (tagged: 'payment.handler')
+            end note
+        }
+
+        component "ContractService" as CS <<service>> {
+            note as N3
+                **Constructor DI:**
+                - ContractRepositoryInterface
+            end note
+        }
+
+        component "DoctrineContractRepository" as DCR <<service>> {
+            note as N4
+                **Constructor DI:**
+                - Connection (Doctrine DBAL)
+            end note
+        }
+
+        component "ShopOrderService" as SOS <<service>> {
+            note as N5
+                **Uses OXID:**
+                - Registry::getSession()
+                - Order::finalizeOrder()
+            end note
+        }
+    }
+
+    package "Stripe Services" #FFE0B2 {
+        component "StripeAdapterFactory" as SAF <<factory>> {
+            note as N6
+                **Constructor DI:**
+                - ModuleConfigurationService
+                **Creates:**
+                - StripeClient (Stripe SDK)
+            end note
+        }
+
+        component "ModuleConfigurationService" as MCS <<service>> {
+            note as N7
+                **Provides:**
+                - API keys
+                - Webhook secrets
+                - Configuration
+            end note
+        }
+    }
+
+    package "Event Handlers (Tagged)" #FFF9C4 {
+        component "StripeContractCreationHandler" as CCH <<tagged>> {
+            note as N8
+                **Tag:** payment.handler
+                **Priority:** 100
+                **Event:** StripeCheckoutSessionRequestEvent
+                --
+                **DI:**
+                - ContractServiceInterface
+                - ContractRepositoryInterface
+            end note
+        }
+
+        component "StripeCheckoutSessionHandler" as CSH <<tagged>> {
+            note as N9
+                **Tag:** payment.handler
+                **Priority:** 0
+                **Event:** StripeCheckoutSessionRequestEvent
+                --
+                **DI:**
+                - ContractRepositoryInterface
+                - StripeAdapterFactoryInterface
+            end note
+        }
+
+        component "StripeCheckoutReturnHandler" as CRH <<tagged>> {
+            note as N10
+                **Tag:** payment.handler
+                **Event:** StripeCheckoutReturnEvent
+                --
+                **DI:**
+                - ContractRepositoryInterface
+                - StripeAdapterFactoryInterface
+                **Lazy:**
+                - EventDispatcherInterface (via container)
+            end note
+        }
+
+        component "PaymentAuthorizedEventHandler" as PAH <<tagged>> {
+            note as N11
+                **Tag:** payment.handler
+                **Event:** PaymentAuthorizedEvent
+                --
+                **DI:**
+                - ContractRepositoryInterface
+                - ?EventDispatcherInterface
+            end note
+        }
+
+        component "StripeOrderCreationHandler" as OCH <<tagged>> {
+            note as N12
+                **Tag:** payment.handler
+                **Event:** ContractReadyToCommitEvent
+                --
+                **DI:**
+                - ContractRepositoryInterface
+                - ShopOrderServiceInterface
+                - ?EventDispatcherInterface
+            end note
+        }
+    }
+
+    package "Controllers" #C8E6C9 {
+        component "StripeOrderController" as SOC <<service>> {
+            note as N13
+                **DI via ServiceContainer trait:**
+                - EventDispatcherInterface
+                - StripeAdapterFactoryInterface
+                - ContractRepositoryInterface
+            end note
+        }
+    }
+
+    package "External Dependencies" #FFCDD2 {
+        component "Doctrine\\DBAL\\Connection" as DBAL <<external>>
+        component "Stripe\\StripeClient" as SC <<external>>
+        component "OXID Registry" as OR <<external>>
+    }
+}
+
+' Interface implementations
+IED <|.. ED
+IELP <|.. ELP
+ICR <|.. DCR
+ICS <|.. CS
+ISAF <|.. SAF
+ISOS <|.. SOS
+
+IH <|.. CCH
+IH <|.. CSH
+IH <|.. CRH
+IH <|.. PAH
+IH <|.. OCH
+
+' Service dependencies
+ED --> IELP : injects
+ELP --> CCH : collects
+ELP --> CSH : collects
+ELP --> CRH : collects
+ELP --> PAH : collects
+ELP --> OCH : collects
+
+CS --> DCR : uses
+DCR --> DBAL : uses
+
+CCH --> CS : injects
+CCH --> DCR : injects
+
+CSH --> DCR : injects
+CSH --> SAF : injects
+
+CRH --> DCR : injects
+CRH --> SAF : injects
+
+PAH --> DCR : injects
+
+OCH --> DCR : injects
+OCH --> SOS : injects
+
+SAF --> SC : creates
+SAF --> MCS : uses
+
+SOS --> OR : uses
+
+SOC --> ED : injects
+SOC --> SAF : injects
+SOC --> DCR : injects
+
+note as ServiceConfig
+  **services.yaml excerpt:**
+  ```yaml
+  _defaults:
+    autowire: true
+    autoconfigure: true
+
+  # Auto-tag handlers
+  _instanceof:
+    HandlerInterface:
+      tags: ['payment.handler']
+
+  # Interface bindings
+  EventDispatcherInterface:
+    class: EventDispatcher
+  ContractRepositoryInterface:
+    class: DoctrineContractRepository
+
+  # Tagged handler collection
+  EventListenerProvider:
+    arguments:
+      $handlers: !tagged payment.handler
+  ```
+end note
+
+legend right
+    |= Color |= Stereotype |= Description |
+    | <#1565C0> | <<interface>> | Interfaces |
+    | <#2E7D32> | <<service>> | Core Services |
+    | <#E65100> | <<factory>> | Factories |
+    | <#F9A825> | <<tagged>> | Tagged Handlers |
+    | <#C62828> | <<external>> | External Deps |
+endlegend
+
+@enduml

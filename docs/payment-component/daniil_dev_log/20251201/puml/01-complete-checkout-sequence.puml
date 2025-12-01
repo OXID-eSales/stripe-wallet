@@ -1,0 +1,240 @@
+@startuml Complete Stripe Checkout Sequence
+!theme plain
+title <font size=20><b>Complete Stripe Checkout Flow: Button Click to Thank You Page</b></font>
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 10
+skinparam sequenceParticipant underline
+skinparam defaultFontSize 12
+skinparam defaultFontColor #000000
+
+skinparam participant {
+    FontStyle bold
+}
+
+skinparam note {
+    BackgroundColor #FFFACD
+    BorderColor #000000
+    FontColor #000000
+}
+
+skinparam sequence {
+    LifeLineBorderColor #333333
+    LifeLineBackgroundColor #EEEEEE
+}
+
+actor Customer as C #87CEEB
+
+box "Browser" #E3F2FD
+    participant "Checkout Page\n(JavaScript)" as JS #90CAF9
+end box
+
+box "OXID Shop" #E8F5E9
+    participant "StripeOrderController" as SOC #A5D6A7
+    participant "EventDispatcher" as ED #81C784
+end box
+
+box "Event Handlers (Priority Order)" #FFF8E1
+    participant "StripeContractCreationHandler\n(priority: 100)" as CCH #FFE082
+    participant "StripeCheckoutSessionHandler\n(priority: 0)" as CSH #FFCC80
+    participant "StripeCheckoutReturnHandler" as CRH #FFB74D
+    participant "PaymentAuthorizedEventHandler" as PAH #FFA726
+    participant "StripeOrderCreationHandler" as OCH #FF9800
+end box
+
+box "Services" #F3E5F5
+    participant "ContractService" as CS #CE93D8
+    participant "ContractRepository" as CR #BA68C8
+    participant "ShopOrderService" as SOS #AB47BC
+end box
+
+box "External" #FFEBEE
+    participant "Stripe API" as SA #EF9A9A
+    database "Database" as DB #E57373
+end box
+
+== Phase 1: Create Checkout Session ==
+
+C -> JS : Click "Zahlungspflichtig bestellen"
+activate JS #90CAF9
+JS -> SOC : POST /index.php?cl=order&fnc=createCheckoutSession
+activate SOC #A5D6A7
+
+SOC -> SOC : Validate API key, basket, user
+SOC -> ED : dispatch(StripeCheckoutSessionRequestEvent)
+activate ED #81C784
+
+note over ED : EventListenerProvider\nsorts handlers by priority
+
+ED -> CCH : handle(event) [priority: 100]
+activate CCH #FFE082
+CCH -> CS : createContract(userId, basket, conditionTypes)
+activate CS #CE93D8
+CS -> CS : Create BasketSnapshot
+CS -> CS : Create PaymentContract (DRAFT)
+CS -> CR : save(contract)
+activate CR #BA68C8
+CR -> DB : INSERT osc_stripe_contracts
+DB --> CR : OK
+CR --> CS : contract
+deactivate CR
+CS --> CCH : contract
+deactivate CS
+
+CCH -> CCH : storeDeliveryAddressHash()
+note right: Extract sDelAddrMD5 from session\nStore in contract.metadata
+CCH -> CR : save(contract)
+activate CR #BA68C8
+CR -> DB : UPDATE metadata
+DB --> CR : OK
+deactivate CR
+CCH -> CCH : context.setContract(contract)
+CCH --> ED : done
+deactivate CCH
+
+ED -> CSH : handle(event) [priority: 0]
+activate CSH #FFCC80
+CSH -> CSH : contract = context.getContract()
+CSH -> CSH : buildLineItems(basketSnapshot)
+CSH -> SA : checkout.sessions.create({...})
+activate SA #EF9A9A
+note right of SA
+  metadata: {
+    contract_id: "xxx",
+    shop_id: "1"
+  }
+end note
+SA --> CSH : CheckoutSession {id, url}
+deactivate SA
+
+CSH -> CSH : contract.setProvider('stripe', sessionId)
+CSH -> CR : save(contract)
+activate CR #BA68C8
+CR -> DB : UPDATE provider info
+DB --> CR : OK
+deactivate CR
+CSH -> CSH : context.set('checkoutUrl', url)
+CSH --> ED : done
+deactivate CSH
+
+ED --> SOC : event processed
+deactivate ED
+
+SOC -> SOC : Store in session:\n- stripe_checkout_session_id\n- stripe_contract_id
+SOC --> JS : JSON {id, url, contract_id}
+deactivate SOC
+
+JS -> JS : window.location.href = url
+JS --> C : Redirect to Stripe
+deactivate JS
+
+== Phase 2: Customer Pays on Stripe ==
+
+C -> SA : Enter payment details
+activate SA #EF9A9A
+SA -> SA : Process payment
+SA --> C : Payment successful
+SA -> C : Redirect to success_url
+deactivate SA
+
+== Phase 3: Return from Stripe & Order Creation ==
+
+C -> SOC : GET /index.php?cl=order&fnc=checkoutSuccess&session_id=xxx
+activate SOC #A5D6A7
+
+SOC -> ED : dispatch(StripeCheckoutReturnEvent)
+activate ED #81C784
+
+ED -> CRH : handle(event)
+activate CRH #FFB74D
+
+CRH -> SA : checkout.sessions.retrieve(sessionId)
+activate SA #EF9A9A
+SA --> CRH : CheckoutSession {payment_status: 'paid', metadata: {...}}
+deactivate SA
+
+CRH -> CRH : Verify payment_status === 'paid'
+CRH -> CR : findById(contract_id)
+activate CR #BA68C8
+CR -> DB : SELECT FROM osc_stripe_contracts
+DB --> CR : contract data
+CR --> CRH : contract
+deactivate CR
+
+CRH -> CRH : **restoreDeliveryAddressHash()**
+note right #FFD700
+  **CRITICAL for OXID validation!**
+  session.sDelAddrMD5 = contract.metadata.delivery_address_hash
+end note
+
+CRH -> CRH : context.setContract(contract)
+CRH -> ED : dispatch(PaymentAuthorizedEvent)
+activate ED #81C784
+
+ED -> PAH : handle(event)
+activate PAH #FFA726
+PAH -> PAH : contract.transitionToPending()
+note right: State: DRAFT -> PENDING
+PAH -> PAH : contract.fulfillCondition('payment_authorized', {...})
+note right #FFFACD
+  If all conditions fulfilled:
+  State: PENDING -> READY_TO_COMMIT
+end note
+PAH -> CR : save(contract)
+activate CR #BA68C8
+CR -> DB : UPDATE state, conditions
+DB --> CR : OK
+deactivate CR
+
+PAH -> ED : dispatch(ContractReadyToCommitEvent)
+activate ED #81C784
+
+ED -> OCH : handle(event)
+activate OCH #FF9800
+OCH -> OCH : Validate contract.state === READY_TO_COMMIT
+OCH -> SOS : createOrder(CreateOrderRequest)
+activate SOS #AB47BC
+SOS -> SOS : Order::finalizeOrder()
+note right #C8E6C9
+  **Order.validateDeliveryAddress()**
+  uses restored sDelAddrMD5
+end note
+SOS -> DB : INSERT oxorder
+DB --> SOS : orderId
+SOS --> OCH : OrderResponse {orderId, orderNumber}
+deactivate SOS
+
+OCH -> OCH : contract.commitToOrder(orderId)
+note right: State: READY_TO_COMMIT -> COMMITTED
+OCH -> CR : save(contract)
+activate CR #BA68C8
+CR -> DB : UPDATE order_id, state
+DB --> CR : OK
+deactivate CR
+OCH -> OCH : context.set('orderId', orderId)
+OCH --> ED : done
+deactivate OCH
+deactivate ED
+
+PAH --> ED : done
+deactivate PAH
+deactivate ED
+
+CRH -> CRH : context.set('redirectTarget', 'thankyou')
+CRH --> ED : done
+deactivate CRH
+
+ED --> SOC : event processed
+deactivate ED
+
+SOC -> SOC : session.sess_challenge = orderId
+SOC -> SOC : Clear Stripe session variables
+SOC --> C : Redirect to 'thankyou'
+deactivate SOC
+
+== Phase 4: Thank You Page ==
+
+C -> C : View order confirmation
+
+@enduml

@@ -1,0 +1,92 @@
+@startuml
+title Customer Journey: Button Click to Thank You Page
+
+actor Customer as C
+participant "Checkout Page" as CP
+participant JavaScript as JS
+participant "OXID Shop" as OXID
+participant "Event Handlers" as EH
+database "Contract DB" as DB
+participant Stripe as S
+participant "Thank You Page" as TY
+
+C -> CP : Click Payment Button
+activate CP
+
+CP -> JS : handleSubmit
+activate JS
+
+JS -> OXID : POST createCheckoutSession
+activate OXID
+
+OXID -> EH : StripeCheckoutSessionRequestEvent
+activate EH
+
+EH -> DB : Create PaymentContract DRAFT
+activate DB
+DB --> EH : contract saved
+deactivate DB
+
+EH -> S : POST checkout sessions
+activate S
+S --> EH : session id and url
+deactivate S
+
+EH --> OXID : event processed
+deactivate EH
+
+OXID --> JS : JSON response
+deactivate OXID
+
+JS -> JS : redirect to Stripe
+JS --> C : Browser redirects
+deactivate JS
+deactivate CP
+
+C -> S : Navigate to Stripe Checkout
+activate S
+
+C -> S : Enter payment and pay
+S -> S : Process payment
+
+S --> C : Redirect to success url
+deactivate S
+
+C -> OXID : GET checkoutSuccess
+activate OXID
+
+OXID -> EH : StripeCheckoutReturnEvent
+activate EH
+
+EH -> S : GET checkout session
+activate S
+S --> EH : payment status paid
+deactivate S
+
+EH -> DB : Load contract by ID
+activate DB
+DB --> EH : PaymentContract
+deactivate DB
+
+EH -> EH : PaymentAuthorizedEvent
+EH -> EH : ContractReadyToCommitEvent
+
+EH -> OXID : createOrder
+EH -> DB : Contract COMMITTED
+activate DB
+DB --> EH : saved
+deactivate DB
+
+EH --> OXID : orderId set
+deactivate EH
+
+OXID -> OXID : Store orderId in session
+OXID --> C : Redirect to thankyou
+deactivate OXID
+
+C -> TY : Display confirmation
+activate TY
+TY --> C : Show success
+deactivate TY
+
+@enduml

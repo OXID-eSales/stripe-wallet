@@ -1,0 +1,209 @@
+@startuml Component Overview
+!theme plain
+title <font size=20><b>Stripe Payment Module: Component Architecture Overview</b></font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 11
+skinparam componentStyle rectangle
+skinparam roundcorner 10
+
+skinparam component {
+    BorderColor #000000
+    BorderThickness 2
+}
+
+skinparam package {
+    BorderColor #000000
+    BorderThickness 2
+}
+
+skinparam note {
+    BackgroundColor #FFFACD
+    BorderColor #000000
+    FontColor #000000
+}
+
+' Package colors with light backgrounds for readability
+skinparam package<<browser>> {
+    BackgroundColor #E3F2FD
+}
+
+skinparam package<<oxid>> {
+    BackgroundColor #E1BEE7
+}
+
+skinparam package<<stripe>> {
+    BackgroundColor #FFF9C4
+}
+
+skinparam package<<component>> {
+    BackgroundColor #E3F2FD
+}
+
+skinparam package<<external>> {
+    BackgroundColor #FFCDD2
+}
+
+package "Customer Browser" <<browser>> #E3F2FD {
+    [<b>Checkout Page</b>] as CP
+    [<b>JavaScript</b>\n(Stimulus Controller)] as JS
+}
+
+package "OXID eShop 7" <<oxid>> #E1BEE7 {
+
+    package "Shop Core" <<oxid>> #E1BEE7 {
+        [<b>FrontendController</b>] as FC #D1C4E9
+        [<b>OrderController</b>] as OC #D1C4E9
+        [<b>Order Model</b>] as OM #D1C4E9
+        [<b>Session</b>] as SESS #D1C4E9
+        [<b>Registry</b>] as REG #D1C4E9
+        [<b>Basket</b>] as BASK #D1C4E9
+        [<b>User</b>] as USR #D1C4E9
+    }
+
+    package "Module: osc/stripe" <<stripe>> #FFF9C4 {
+
+        package "Controllers" <<stripe>> #FFECB3 {
+            [<b>StripeOrderController</b>] as SOC #FFE082
+            note bottom of SOC
+                Thin controller layer
+                - createCheckoutSession()
+                - checkoutSuccess()
+            end note
+        }
+
+        package "Model Extensions" <<stripe>> #FFECB3 {
+            [<b>Order</b>\n(Stripe Extension)] as SO #FFE082
+            note bottom of SO
+                - Skip payment gateway
+                - Read address from session
+            end note
+        }
+
+        package "Component Layer" <<component>> #E3F2FD {
+
+            package "Event System" #BBDEFB {
+                [<b>EventDispatcher</b>] as ED #90CAF9
+                [<b>EventListenerProvider</b>] as ELP #90CAF9
+                [<b>EventContext</b>] as EC #90CAF9
+            }
+
+            package "Contract Domain" #BBDEFB {
+                [<b>PaymentContract</b>] as PC #90CAF9
+                [<b>ContractCondition</b>] as CC #90CAF9
+                [<b>ContractState</b>] as CS #90CAF9
+                [<b>BasketSnapshot</b>] as BS #90CAF9
+            }
+
+            package "Repository" #BBDEFB {
+                [<b>DoctrineContractRepository</b>] as DCR #90CAF9
+            }
+
+            package "Services" #BBDEFB {
+                [<b>ContractService</b>] as CSS #90CAF9
+                [<b>ShopOrderService</b>] as SOS #90CAF9
+            }
+        }
+
+        package "Stripe Integration" <<stripe>> #2E7D32 {
+
+            package "Event Handlers" #1B5E20 {
+                [<b><color:white>StripeContractCreationHandler</color></b>\n<color:white>(priority: 100)</color>] as CCH #2E7D32
+                [<b><color:white>StripeCheckoutSessionHandler</color></b>\n<color:white>(priority: 0)</color>] as CSH #2E7D32
+                [<b><color:white>StripeCheckoutReturnHandler</color></b>] as CRH #2E7D32
+                [<b><color:white>PaymentAuthorizedEventHandler</color></b>] as PAH #2E7D32
+                [<b><color:white>StripeOrderCreationHandler</color></b>] as OCH #2E7D32
+            }
+
+            package "Stripe Services" #1B5E20 {
+                [<b><color:white>StripeAdapterFactory</color></b>] as SAF #2E7D32
+                [<b><color:white>ModuleConfigurationService</color></b>] as MCS #2E7D32
+            }
+
+            package "Events" #1B5E20 {
+                [<b><color:white>StripeCheckoutSessionRequestEvent</color></b>] as SCSRE #2E7D32
+                [<b><color:white>StripeCheckoutReturnEvent</color></b>] as SCRE #2E7D32
+                [<b><color:white>PaymentAuthorizedEvent</color></b>] as PAE #2E7D32
+                [<b><color:white>ContractReadyToCommitEvent</color></b>] as CRTCE #2E7D32
+            }
+        }
+    }
+}
+
+package "External Services" <<external>> #FFCDD2 {
+    [<b>Stripe API</b>] as SAPI #EF9A9A
+    database "<b>MySQL</b>\n<b>Database</b>" as DB #EF9A9A
+}
+
+' Browser interactions
+CP --> JS : click
+JS --> SOC : HTTP POST/GET
+
+' Controller to OXID
+SOC --|> OC : extends
+OC --|> FC : extends
+SO --|> OM : extends (chain)
+
+' Controller to Event System
+SOC --> ED : dispatch events
+ED --> ELP : get listeners
+ELP --> CCH : handle
+ELP --> CSH : handle
+ELP --> CRH : handle
+ELP --> PAH : handle
+ELP --> OCH : handle
+
+' Handler to Services
+CCH --> CSS : createContract
+CSH --> SAF : getStripeClient
+CRH --> SAF : getStripeClient
+OCH --> SOS : createOrder
+
+' Services to Repository
+CSS --> DCR : save
+CRH --> DCR : findById
+PAH --> DCR : save
+OCH --> DCR : save
+
+' Repository to Database
+DCR --> DB : SQL
+
+' Stripe integration
+CSH --> SAPI : POST sessions
+CRH --> SAPI : GET sessions
+SAF --> MCS : get config
+
+' Model interactions
+SO --> REG : getSession
+SO --> SESS : getVariable
+SOS --> OM : finalizeOrder
+SOS --> BASK : getBasket
+SOS --> USR : getUser
+
+' Event chain
+CCH ..> SCSRE : handles
+CSH ..> SCSRE : handles
+CRH ..> SCRE : handles
+CRH ..> PAE : dispatches
+PAH ..> PAE : handles
+PAH ..> CRTCE : dispatches
+OCH ..> CRTCE : handles
+
+legend right
+    **Layer Colors:**
+    |= Color |= Layer |
+    | <#E1BEE7> | OXID Shop Core |
+    | <#FFF9C4> | Stripe Module |
+    | <#E3F2FD> | Component (Reusable) |
+    | <#2E7D32> | Stripe Integration |
+    | <#FFCDD2> | External Services |
+
+    **Architecture Principles:**
+    - Contract-First: Order created AFTER payment
+    - Event-Driven: Loose coupling via events
+    - DI-Based: Services injected via Symfony DI
+    - Thin Controllers: Logic in handlers
+endlegend
+
+@enduml

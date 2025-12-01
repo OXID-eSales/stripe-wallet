@@ -1,0 +1,159 @@
+@startuml Contract State Machine
+!theme plain
+title <font size=20><b>Payment Contract State Machine</b></font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 12
+skinparam defaultFontStyle bold
+
+skinparam state {
+    BackgroundColor<<draft>> #2196F3
+    FontColor<<draft>> #FFFFFF
+    BackgroundColor<<pending>> #FF9800
+    FontColor<<pending>> #000000
+    BackgroundColor<<ready>> #4CAF50
+    FontColor<<ready>> #FFFFFF
+    BackgroundColor<<committed>> #8BC34A
+    FontColor<<committed>> #000000
+    BackgroundColor<<fulfilled>> #009688
+    FontColor<<fulfilled>> #FFFFFF
+    BackgroundColor<<cancelled>> #F44336
+    FontColor<<cancelled>> #FFFFFF
+    BackgroundColor<<expired>> #9E9E9E
+    FontColor<<expired>> #FFFFFF
+    BackgroundColor<<failed>> #E91E63
+    FontColor<<failed>> #FFFFFF
+    BorderColor #000000
+    BorderThickness 2
+}
+
+skinparam note {
+    BackgroundColor #FFFACD
+    BorderColor #000000
+    FontColor #000000
+}
+
+skinparam arrow {
+    Color #333333
+    FontColor #000000
+    FontStyle bold
+}
+
+state "**DRAFT**" as draft <<draft>> {
+    state "Contract Created" as draft_created
+}
+
+note right of draft
+  **Initial State**
+  - BasketSnapshot captured
+  - Conditions initialized
+  - Metadata stored
+  - Provider info empty
+end note
+
+state "**PENDING**" as pending <<pending>> {
+    state "Awaiting Conditions" as pending_await
+}
+
+note right of pending
+  **Conditions to fulfill:**
+  - payment_authorized
+  - fraud_check (if enabled)
+
+  **Fulfilled by:**
+  PaymentAuthorizedEventHandler
+end note
+
+state "**READY_TO_COMMIT**" as ready <<ready>> {
+    state "All Conditions Met" as ready_met
+}
+
+note right of ready
+  - All conditions = FULFILLED
+  - Ready for order creation
+  - Triggers OrderCreationHandler
+end note
+
+state "**COMMITTED**" as committed <<committed>> {
+    state "Order Created" as committed_order
+}
+
+note right of committed
+  - orderId stored in contract
+  - OXID Order exists in DB
+  - Payment captured/authorized
+end note
+
+state "**FULFILLED**" as fulfilled <<fulfilled>> {
+    state "Order Complete" as fulfilled_complete
+}
+
+note right of fulfilled
+  **Terminal state - SUCCESS**
+  - Payment captured
+  - Webhook confirmed
+end note
+
+state "**CANCELLED**" as cancelled <<cancelled>>
+
+note right of cancelled
+  **Terminal state**
+  - User cancelled checkout
+  - Payment voided/refunded
+end note
+
+state "**EXPIRED**" as expired <<expired>>
+
+note right of expired
+  **Terminal state**
+  - Contract TTL exceeded (24h)
+  - Session timeout
+end note
+
+state "**FAILED**" as failed <<failed>>
+
+note right of failed
+  **Terminal state - ERROR**
+  - Payment failed
+  - Fraud detected
+  - System error
+end note
+
+[*] --> draft : <b>ContractService::createContract()</b>
+
+draft --> pending : <b>transitionToPending()</b>\n[PaymentAuthorizedEventHandler]
+draft --> cancelled : <b>cancel()</b>
+draft --> expired : <b>expire()</b>\n[TTL exceeded]
+
+pending --> ready : <b>fulfillCondition()</b>\n[All conditions fulfilled]
+pending --> cancelled : <b>cancel()</b>
+pending --> expired : <b>expire()</b>
+pending --> failed : <b>fail()</b>
+
+ready --> committed : <b>commitToOrder(orderId)</b>\n[StripeOrderCreationHandler]
+ready --> cancelled : <b>cancel()</b>
+ready --> failed : <b>fail()</b>
+
+committed --> fulfilled : <b>fulfill()</b>\n[Webhook: payment_intent.succeeded]
+committed --> cancelled : <b>cancel()</b>\n[Refund requested]
+committed --> failed : <b>fail()</b>\n[Capture failed]
+
+fulfilled --> [*]
+cancelled --> [*]
+expired --> [*]
+failed --> [*]
+
+legend right
+  |= State |= Color |= Description |
+  | DRAFT | <#2196F3> | Initial state |
+  | PENDING | <#FF9800> | Awaiting conditions |
+  | READY_TO_COMMIT | <#4CAF50> | Ready for order |
+  | COMMITTED | <#8BC34A> | Order created |
+  | FULFILLED | <#009688> | Success |
+  | CANCELLED | <#F44336> | User cancelled |
+  | EXPIRED | <#9E9E9E> | Timeout |
+  | FAILED | <#E91E63> | Error |
+endlegend
+
+@enduml

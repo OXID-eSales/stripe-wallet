@@ -1,0 +1,168 @@
+@startuml Test Architecture and Coverage
+!theme plain
+title <font size=20><b>Test Architecture: Unit Tests for Payment Component</b></font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 11
+
+skinparam package {
+    BorderColor #000000
+    BorderThickness 2
+}
+
+skinparam component {
+    BorderColor #000000
+    BorderThickness 2
+}
+
+skinparam note {
+    BackgroundColor #FFFACD
+    BorderColor #000000
+    FontColor #000000
+}
+
+package "tests/Unit" #F5F5F5 {
+
+    package "Component/Contract" #BBDEFB {
+        component "PaymentContractTest" as PCT #90CAF9
+        component "ContractConditionTest" as CCT #90CAF9
+        component "ContractStateTest" as CST #90CAF9
+        component "BasketSnapshotTest" as BST #90CAF9
+    }
+
+    package "Component/Repository" #FFF9C4 {
+        component "MetadataPersistenceTest" as MPT #FFE082
+        component "DoctrineContractRepositoryTest" as DCRT #FFE082
+    }
+
+    package "Component/EventSystem" #E1BEE7 {
+        component "EventDispatcherTest" as EDT #CE93D8
+        component "EventListenerProviderTest" as ELPT #CE93D8
+        component "EventContextTest" as ECT #CE93D8
+    }
+
+    package "Stripe/EventSystem/Handler" #FFE0B2 {
+        component "StripeContractCreationHandlerTest" as SCCHT #FFCC80
+        component "StripeCheckoutSessionHandlerTest" as SCSHT #FFCC80
+        component "StripeCheckoutReturnHandlerTest" as SCRHT #FFCC80
+        component "PaymentAuthorizedEventHandlerTest" as PAEHT #FFCC80
+        component "StripeOrderCreationHandlerTest" as SOCT #FFCC80
+    }
+
+    package "Stripe/Model" #FFCDD2 {
+        component "OrderAddressValidationTest" as OAVT #EF9A9A
+        component "OrderTest" as OT #EF9A9A
+    }
+
+    package "Stripe/Controller" #C8E6C9 {
+        component "StripeOrderControllerTest" as SOCT2 #A5D6A7
+    }
+}
+
+note right of PCT
+    **Tests:**
+    - testCreateContract
+    - testFulfillCondition
+    - testTransitionToPending
+    - testTransitionToReadyWhenAllFulfilled
+    - testCommitToOrder
+    - testMetadataStorage
+end note
+
+note right of MPT #C8E6C9
+    **CRITICAL TESTS (Bug Fix):**
+    - testMetadataIsIncludedInPreparedData
+    - testMetadataIsRestoredFromDatabase
+    - testEmptyMetadataIsHandledCorrectly
+    - testNullMetadataIsHandledCorrectly
+end note
+
+note right of OAVT #C8E6C9
+    **CRITICAL TESTS (Bug Fix):**
+    - testValidateDeliveryAddressUsesSessionHashForStripePayments
+    - testExpectedBehaviorForStripeFix
+
+    **Documents the fix:**
+    - Request param empty (GET redirect)
+    - Session has hash (restored from contract)
+    - Stripe Order model reads from session
+end note
+
+note as Legend
+    **Test Categories:**
+
+    | Category | Purpose | Count |
+    |----------|---------|-------|
+    | Contract Domain | PaymentContract, Conditions, State | ~20 |
+    | Repository | Persistence, Hydration | ~10 |
+    | Event System | Dispatcher, Provider, Context | ~15 |
+    | Handlers | Event handling logic | ~25 |
+    | Model | OXID model extensions | ~10 |
+    | Controller | HTTP request handling | ~10 |
+
+    **Total: ~90 unit tests**
+
+    **Bug Fix Tests (Highlighted in green):**
+    - MetadataPersistenceTest: 4 tests
+    - OrderAddressValidationTest: 2 tests
+end note
+
+legend right
+    |= Color |= Category |
+    | <#BBDEFB> | Contract Domain |
+    | <#FFF9C4> | Repository |
+    | <#E1BEE7> | Event System |
+    | <#FFE0B2> | Handlers |
+    | <#FFCDD2> | Model |
+    | <#C8E6C9> | Controller |
+endlegend
+
+@enduml
+
+@startuml Test Coverage Mind Map
+!theme plain
+title Test Coverage Mind Map
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+
+@startmindmap
+* Stripe Payment Tests
+** Component
+*** Contract
+**** PaymentContractTest
+**** ContractConditionTest
+**** ContractStateTest
+**** BasketSnapshotTest
+*** Repository
+**** DoctrineContractRepositoryTest
+**** MetadataPersistenceTest
+*** EventSystem
+**** EventDispatcherTest
+**** EventListenerProviderTest
+**** EventContextTest
+*** Service
+**** ContractServiceTest
+**** ShopOrderServiceTest
+** Stripe
+*** EventSystem Handler
+**** StripeContractCreationHandlerTest
+**** StripeCheckoutSessionHandlerTest
+**** StripeCheckoutReturnHandlerTest
+**** PaymentAuthorizedEventHandlerTest
+**** StripeOrderCreationHandlerTest
+*** Model
+**** OrderAddressValidationTest
+**** OrderTest
+*** Controller
+**** StripeOrderControllerTest
+*** Service
+**** StripeAdapterFactoryTest
+**** ModuleConfigurationServiceTest
+** Integration
+*** CheckoutFlowTest
+*** WebhookHandlingTest
+@endmindmap
+
+@enduml

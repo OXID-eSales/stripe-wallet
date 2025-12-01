@@ -8,7 +8,7 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterfac
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
+use RuntimeException;
 
 /**
  * Creates Stripe Checkout Session for contract-first payment flow.
@@ -28,8 +28,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
 {
     public function __construct(
         private ContractRepositoryInterface $contractRepository,
-        private StripeAdapterFactoryInterface $adapterFactory,
-        private ModuleConfigurationService $config
+        private StripeAdapterFactoryInterface $adapterFactory
     ) {
     }
 
@@ -53,7 +52,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         $contract = $context->getContract();
 
         if ($contract === null) {
-            throw new \RuntimeException('Contract not found in context. ContractCreationHandler must run first.');
+            throw new RuntimeException('Contract not found in context. ContractCreationHandler must run first.');
         }
 
         // Build line items from CONTRACT's basket snapshot (not current basket!)
@@ -76,20 +75,26 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         // Get Stripe SDK client
         $stripeClient = $this->adapterFactory->getStripeClient();
 
+        // Get contract ID as non-null string
+        $contractId = $contract->getId() ?? '';
+        $shopId = $context->get('shopId', '1');
+        $shopIdString = is_string($shopId) ? $shopId : (string) $shopId;
+
         // Create Checkout Session with CONTRACT reference (not order!)
+        /** @var \Stripe\Checkout\Session $checkoutSession */
         $checkoutSession = $stripeClient->checkout->sessions->create([
             'mode' => 'payment',
             'line_items' => $lineItems,
             'success_url' => $successUrl,
             'cancel_url' => $cancelUrl,
             'metadata' => [
-                'contract_id' => $contract->getId(),
-                'shop_id' => (string) $context->get('shopId', '1'),
+                'contract_id' => $contractId,
+                'shop_id' => $shopIdString,
             ],
             'payment_intent_data' => [
                 'capture_method' => $captureMode,
                 'metadata' => [
-                    'contract_id' => $contract->getId(),
+                    'contract_id' => $contractId,
                 ],
             ],
         ]);

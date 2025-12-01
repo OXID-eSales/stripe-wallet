@@ -1,0 +1,170 @@
+@startuml Address Validation Bug Fix
+!theme plain
+title Address Hash Validation: The Bug and Its Fix
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 12
+
+skinparam note {
+    BackgroundColor #FFFACD
+    BorderColor #000000
+    FontColor #000000
+}
+
+skinparam activity {
+    BackgroundColor #E8F5E9
+    BorderColor #000000
+    FontColor #000000
+}
+
+skinparam activityDiamond {
+    BackgroundColor #FFF9C4
+    BorderColor #000000
+    FontColor #000000
+}
+
+skinparam swimlane {
+    BorderColor #000000
+}
+
+|#FFCDD2| OXIDCore |
+|#BBDEFB| ContractStorage |
+|#C8E6C9| SessionRestoration |
+|#FFE0B2| StripeOrderModel |
+
+|OXIDCore|
+start
+note right #FFCDD2
+  OXID Order::validateDeliveryAddress()
+  reads hash from REQUEST parameter.
+
+  When returning from Stripe via GET redirect,
+  there is NO form submission, so this is EMPTY!
+end note
+
+:OXID Order::finalizeOrder();
+
+:validateDeliveryAddress(user);
+
+:Get hash from REQUEST;
+
+note right #FFCDD2
+  REQUEST is EMPTY!
+  (GET redirect, no form data)
+end note
+
+if (Hash in request?) then (NO - Stripe return)
+    :Compare with computed address hash;
+    :Hash mismatch (empty vs computed);
+    #FFCDD2:Return ORDER_STATE_INVALIDDELADDRESSCHANGED (7);
+    #FFCDD2:Order fails!;
+    stop
+else (YES - normal checkout)
+    :Continue validation;
+endif
+
+|ContractStorage|
+partition "Part 1: Store Hash Before Redirect" #E3F2FD {
+    :User clicks Pay with Stripe;
+
+    :StripeContractCreationHandler\nstoreDeliveryAddressHash();
+
+    note right #C8E6C9
+      Before Stripe redirect:
+      Get hash from session or compute from user
+      Store in contract.metadata
+    end note
+
+    :Hash stored in contract.metadata;
+
+    :Contract saved to database;
+    note right #FFFACD
+      Database record:
+      OXMETADATA contains delivery_address_hash
+    end note
+}
+
+|ContractStorage|
+partition "Part 1b: Metadata Hydration Fix" #E3F2FD {
+    :User returns from Stripe;
+
+    :DoctrineContractRepository::findById();
+
+    note right #FFF9C4
+      BUG WAS HERE:
+      setContractPrivateProperties() did NOT
+      restore metadata when hydrating contract!
+
+      FIX: Added hydrateContractMetadata()
+    end note
+
+    :Metadata properly restored;
+}
+
+|SessionRestoration|
+partition "Part 2: Restore Hash After Return" #E8F5E9 {
+    :StripeCheckoutReturnHandler\nrestoreDeliveryAddressHash();
+
+    note right #C8E6C9
+      After Stripe return:
+      Get hash from contract metadata
+      Restore to session variable sDelAddrMD5
+    end note
+
+    :Hash restored to session;
+}
+
+|StripeOrderModel|
+partition "Part 3: Override Validation" #FFF3E0 {
+    :Order::finalizeOrder() called;
+
+    :Stripe Model Order::\nvalidateDeliveryAddress(user);
+
+    note right #FFF9C4
+      Override in Stripe Order model:
+      1. Try REQUEST first (standard OXID)
+      2. If empty, try SESSION (our fix!)
+      3. Compare hashes
+    end note
+
+    if (Is Stripe payment?) then (YES)
+        :Get hash from REQUEST;
+
+        if (Hash in REQUEST?) then (NO)
+            :Get hash from SESSION;
+            note right #C8E6C9
+              This is our restoration!
+              Hash was restored by
+              StripeCheckoutReturnHandler
+            end note
+        endif
+
+        :Compare with computed hash;
+
+        if (Hashes match?) then (YES)
+            #C8E6C9:Return 0 (OK);
+        else (NO)
+            #FFCDD2:Return 7 (address changed);
+        endif
+    else (NO)
+        :Use parent validation;
+    endif
+}
+
+|StripeOrderModel|
+#C8E6C9:Order finalizes successfully!;
+stop
+
+legend right
+  Summary of Fixes:
+
+  | Bug | Fix | File |
+  |-----|-----|------|
+  | Metadata not persisted | Added hydrateContractMetadata() | DoctrineContractRepository.php |
+  | OXID reads from REQUEST | Override validateDeliveryAddress() | Stripe/Model/Order.php |
+  | Hash lost after redirect | Store in contract metadata | StripeContractCreationHandler.php |
+  | Hash not restored | restoreDeliveryAddressHash() | StripeCheckoutReturnHandler.php |
+endlegend
+
+@enduml

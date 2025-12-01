@@ -85,6 +85,45 @@ run_phpcs_docker() {
         /var/www/vendor/bin/phpcs --standard=tests/phpcs.xml --warning-severity=0 src/
 }
 
+# Helper function to run phpstan in Docker using module's vendor
+run_phpstan_docker() {
+    local files="$1"
+    if [ -n "$files" ]; then
+        echo "Running PHPStan on changed files: $files"
+        docker compose exec -w /var/www/extensions/stripe -T php \
+            vendor/bin/phpstan analyse -c tests/PhpStan/phpstan.neon --level=max $files --memory-limit=1G
+    else
+        echo "No PHP files to check with PHPStan"
+        return 0
+    fi
+}
+
+# Helper function to run phpmd in Docker using module's vendor
+run_phpmd_docker() {
+    local files="$1"
+    if [ -n "$files" ]; then
+        echo "Running PHPMD on changed files: $files"
+        docker compose exec -w /var/www/extensions/stripe -T php \
+            vendor/bin/phpmd $files text tests/PhpMd/phpmd.baseline.xml --exclude tests/,migration/data/ --suffixes php --strict
+    else
+        echo "No PHP files to check with PHPMD"
+        return 0
+    fi
+}
+
+# Helper function to get changed PHP files (for local use)
+get_changed_files_local() {
+    cd "$MODULE_ROOT" || return
+    local files=""
+    # Get files changed from HEAD
+    files=$(git diff --name-only HEAD 2>/dev/null | grep -E '\.php$' | grep -vE '^tests/' | tr '\n' ' ')
+    # If no uncommitted changes, get files from last commit
+    if [ -z "$files" ]; then
+        files=$(git diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null | grep -E '\.php$' | grep -vE '^tests/' | tr '\n' ' ')
+    fi
+    echo "$files"
+}
+
 # 1. Code Style Check (phpcs)
 echo ">>> Running PHP Code Sniffer..."
 if [ "$ENVIRONMENT" = "github" ]; then
@@ -136,24 +175,45 @@ else
     echo ""
 fi
 
-# 3. Style Commit Check
-echo ">>> Running style-commit check..."
+# 3. PHPStan Static Analysis
+echo ">>> Running PHPStan static analysis..."
 if [ "$ENVIRONMENT" = "github" ]; then
-    run_command "composer style-commit"
-    STYLE_COMMIT_STATUS=$?
+    run_command "composer phpstan"
+    PHPSTAN_STATUS=$?
 else
-    # Local Docker: PHPStan and PHPMD not available in shop vendor
-    # Just run PHPCS which is available
-    echo "Note: PHPStan and PHPMD not available locally, running PHPCS only"
-    run_phpcs_docker
-    STYLE_COMMIT_STATUS=$?
+    # Get changed PHP files for local analysis
+    CHANGED_FILES=$(get_changed_files_local)
+    run_phpstan_docker "$CHANGED_FILES"
+    PHPSTAN_STATUS=$?
 fi
-if [ $STYLE_COMMIT_STATUS -ne 0 ]; then
+if [ $PHPSTAN_STATUS -ne 0 ]; then
     OVERALL_STATUS=1
-    FAILED_CHECKS+=("Style Commit")
-    echo -e "${RED}✗ Style commit check failed${NC}"
+    FAILED_CHECKS+=("PHPStan")
+    echo -e "${RED}✗ PHPStan failed${NC}"
 else
-    echo -e "${GREEN}✓ Style commit check passed${NC}"
+    echo -e "${GREEN}✓ PHPStan passed${NC}"
+fi
+echo ""
+
+# 4. PHPMD (PHP Mess Detector)
+echo ">>> Running PHPMD..."
+if [ "$ENVIRONMENT" = "github" ]; then
+    run_command "composer phpmd"
+    PHPMD_STATUS=$?
+else
+    # Use same changed files for PHPMD
+    if [ -z "$CHANGED_FILES" ]; then
+        CHANGED_FILES=$(get_changed_files_local)
+    fi
+    run_phpmd_docker "$CHANGED_FILES"
+    PHPMD_STATUS=$?
+fi
+if [ $PHPMD_STATUS -ne 0 ]; then
+    OVERALL_STATUS=1
+    FAILED_CHECKS+=("PHPMD")
+    echo -e "${RED}✗ PHPMD failed${NC}"
+else
+    echo -e "${GREEN}✓ PHPMD passed${NC}"
 fi
 echo ""
 

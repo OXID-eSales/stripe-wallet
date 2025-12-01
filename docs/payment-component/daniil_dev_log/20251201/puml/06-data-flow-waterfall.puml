@@ -1,0 +1,333 @@
+@startuml Data Flow Waterfall
+!theme plain
+title <font size=20><b>Data Flow Waterfall: Request to Response Timeline</b></font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 11
+skinparam sequenceArrowThickness 2
+
+skinparam participant {
+    BorderColor #000000
+    BorderThickness 2
+}
+
+skinparam note {
+    BackgroundColor #FFFACD
+    BorderColor #000000
+    FontColor #000000
+}
+
+skinparam sequence {
+    ArrowColor #333333
+    ArrowFontColor #000000
+    LifeLineBorderColor #333333
+    GroupBackgroundColor #F5F5F5
+}
+
+participant "Browser\n(JavaScript)" as Browser #BBDEFB
+participant "StripeOrder\nController" as Controller #C8E6C9
+participant "Event\nDispatcher" as Dispatcher #FFF9C4
+participant "Contract\nCreationHandler" as ContractHandler #FFE0B2
+participant "Checkout\nSessionHandler" as SessionHandler #FFCC80
+participant "Contract\nRepository" as Repository #E1BEE7
+participant "Stripe\nAPI" as Stripe #FFCDD2
+database "MySQL\nDatabase" as DB #F8BBD0
+
+== PHASE 1: Create Checkout Session (HTTP POST) ==
+
+Browser -> Controller: POST /index.php?cl=order&fnc=createCheckoutSession
+activate Controller #C8E6C9
+
+note over Controller
+  **Request Headers:**
+  Content-Type: application/json
+  X-Requested-With: XMLHttpRequest
+
+  **Session Data Available:**
+  - sess_basket (serialized Basket)
+  - sess_user (User object)
+  - usr (user ID)
+end note
+
+Controller -> Controller: Validate request
+Controller -> Controller: Create EventContext
+
+note right of Controller #FFFACD
+  **EventContext:**
+  {
+    basket: Basket,
+    user: User,
+    userId: "abc123",
+    sessionId: "sid_xxx",
+    shopId: 1,
+    shopUrl: "https://shop.de/",
+    conditionTypes: ["payment_authorized"]
+  }
+end note
+
+Controller -> Dispatcher: dispatch(StripeCheckoutSessionRequestEvent)
+activate Dispatcher #FFF9C4
+
+Dispatcher -> ContractHandler: handle(event) [priority: 100]
+activate ContractHandler #FFE0B2
+
+ContractHandler -> ContractHandler: Create BasketSnapshot from Basket
+
+note right of ContractHandler #FFFACD
+  **BasketSnapshot:**
+  {
+    items: [{title: "Product 1", unitPrice: 29.99, quantity: 2}],
+    total: 59.98,
+    currency: "EUR",
+    shippingCost: 4.99
+  }
+end note
+
+ContractHandler -> ContractHandler: Create PaymentContract (DRAFT)
+ContractHandler -> ContractHandler: Add ContractCondition(payment_authorized)
+ContractHandler -> ContractHandler: Extract delivery_address_hash from session
+
+note right of ContractHandler #FFE0B2
+  **Contract Metadata:**
+  {
+    delivery_address_hash: "e09dae058fb2...",
+    delivery_address_id: "addr_456"
+  }
+end note
+
+ContractHandler -> Repository: save(contract)
+activate Repository #E1BEE7
+Repository -> DB: INSERT INTO osc_stripe_contracts\n(id, user_id, state, basket_snapshot, metadata, ...)
+DB --> Repository: OK
+Repository --> ContractHandler: contract (with ID)
+deactivate Repository
+
+ContractHandler -> ContractHandler: context.setContract(contract)
+ContractHandler --> Dispatcher: done
+deactivate ContractHandler
+
+Dispatcher -> SessionHandler: handle(event) [priority: 0]
+activate SessionHandler #FFCC80
+
+SessionHandler -> SessionHandler: contract = context.getContract()
+SessionHandler -> SessionHandler: buildLineItems(basketSnapshot)
+
+note right of SessionHandler #FFFACD
+  **Stripe Line Items:**
+  [
+    {
+      "price_data": {
+        "currency": "eur",
+        "unit_amount": 2999,
+        "product_data": {"name": "Product 1"}
+      },
+      "quantity": 2
+    }
+  ]
+end note
+
+SessionHandler -> Stripe: POST /v1/checkout/sessions
+activate Stripe #FFCDD2
+
+note right of Stripe #FFCDD2
+  **Request Body:**
+  {
+    "mode": "payment",
+    "line_items": [...],
+    "success_url": "https://shop.de/...",
+    "cancel_url": "https://shop.de/...",
+    "metadata": {
+      "contract_id": "contract_789",
+      "shop_id": "1"
+    }
+  }
+end note
+
+Stripe --> SessionHandler: CheckoutSession {id: "cs_xxx", url: "https://checkout.stripe.com/..."}
+deactivate Stripe
+
+SessionHandler -> SessionHandler: contract.setProvider('stripe', sessionId, successUrl)
+SessionHandler -> Repository: save(contract)
+activate Repository #E1BEE7
+Repository -> DB: UPDATE osc_stripe_contracts SET provider_name, provider_order_id
+DB --> Repository: OK
+deactivate Repository
+
+SessionHandler -> SessionHandler: context.set('checkoutSessionId', id)
+SessionHandler -> SessionHandler: context.set('checkoutUrl', url)
+SessionHandler --> Dispatcher: done
+deactivate SessionHandler
+
+Dispatcher --> Controller: event processed
+deactivate Dispatcher
+
+Controller -> Controller: Store in PHP session:\n- stripe_checkout_session_id\n- stripe_contract_id
+
+Controller --> Browser: JSON Response
+deactivate Controller
+
+note right of Browser #BBDEFB
+  **Response:**
+  {
+    "id": "cs_xxx",
+    "url": "https://checkout.stripe.com/...",
+    "contract_id": "contract_789"
+  }
+end note
+
+Browser -> Browser: window.location.href = response.url
+
+== PHASE 2: Customer on Stripe Checkout ==
+
+Browser -> Stripe: Redirect to Stripe Checkout
+activate Stripe #FFCDD2
+Stripe -> Stripe: Customer enters payment details
+Stripe -> Stripe: Process payment
+Stripe --> Browser: Redirect to success_url
+deactivate Stripe
+
+== PHASE 3: Return from Stripe (HTTP GET) ==
+
+Browser -> Controller: GET /index.php?cl=order&fnc=checkoutSuccess&session_id=cs_xxx
+activate Controller #C8E6C9
+
+Controller -> Dispatcher: dispatch(StripeCheckoutReturnEvent)
+activate Dispatcher #FFF9C4
+
+note over Dispatcher
+  **Event carries:**
+  - checkoutSessionId: "cs_xxx"
+  - context (empty initially)
+end note
+
+Dispatcher -> SessionHandler: StripeCheckoutReturnHandler.handle(event)
+activate SessionHandler #FFCC80
+
+SessionHandler -> Stripe: GET /v1/checkout/sessions/cs_xxx?expand[]=payment_intent
+activate Stripe #FFCDD2
+
+Stripe --> SessionHandler: CheckoutSession {payment_status: "paid", metadata: {...}}
+deactivate Stripe
+
+note right of SessionHandler #FFFACD
+  **Retrieved Data:**
+  {
+    "id": "cs_xxx",
+    "payment_status": "paid",
+    "amount_total": 6497,
+    "currency": "eur",
+    "metadata": {
+      "contract_id": "contract_789"
+    },
+    "payment_intent": {
+      "id": "pi_yyy"
+    }
+  }
+end note
+
+SessionHandler -> Repository: findById("contract_789")
+activate Repository #E1BEE7
+Repository -> DB: SELECT * FROM osc_stripe_contracts WHERE id = "contract_789"
+DB --> Repository: contract data (with metadata!)
+Repository --> SessionHandler: PaymentContract
+deactivate Repository
+
+SessionHandler -> SessionHandler: **restoreDeliveryAddressHash()**
+
+note right of SessionHandler #C8E6C9
+  **CRITICAL:**
+  $hash = contract.getMetadata('delivery_address_hash');
+  session.setVariable('sDelAddrMD5', $hash);
+  // Now OXID Order::validateDeliveryAddress() will pass!
+end note
+
+SessionHandler -> SessionHandler: context.setContract(contract)
+SessionHandler -> Dispatcher: dispatch(PaymentAuthorizedEvent)
+
+note over Dispatcher #E1BEE7
+  **PaymentAuthorizedEvent:**
+  - authorizationId: "pi_yyy"
+  - providerOrderId: "cs_xxx"
+  - amount: 64.97
+  - currency: "eur"
+end note
+
+Dispatcher -> ContractHandler: PaymentAuthorizedEventHandler.handle()
+activate ContractHandler #FFE0B2
+
+ContractHandler -> ContractHandler: contract.transitionToPending()
+ContractHandler -> ContractHandler: contract.fulfillCondition('payment_authorized')
+
+note right of ContractHandler #C8E6C9
+  **State Transitions:**
+  DRAFT -> PENDING -> READY_TO_COMMIT
+  (auto-transition when all conditions fulfilled)
+end note
+
+ContractHandler -> Repository: save(contract)
+activate Repository #E1BEE7
+Repository -> DB: UPDATE state, conditions
+DB --> Repository: OK
+deactivate Repository
+
+ContractHandler -> Dispatcher: dispatch(ContractReadyToCommitEvent)
+
+Dispatcher -> ContractHandler: StripeOrderCreationHandler.handle()
+activate ContractHandler #FFE0B2
+
+ContractHandler -> ContractHandler: ShopOrderService.createOrder()
+
+note right of ContractHandler #C8E6C9
+  **Order Creation:**
+  1. Get basket from session
+  2. Call Order::finalizeOrder()
+  3. **validateDeliveryAddress() passes**
+     because sDelAddrMD5 was restored!
+  4. Create order in oxorder table
+end note
+
+ContractHandler -> DB: INSERT INTO oxorder
+DB --> ContractHandler: orderId
+
+ContractHandler -> ContractHandler: contract.commitToOrder(orderId)
+ContractHandler -> Repository: save(contract)
+activate Repository #E1BEE7
+Repository -> DB: UPDATE order_id, state = COMMITTED
+DB --> Repository: OK
+deactivate Repository
+
+ContractHandler -> ContractHandler: context.set('orderId', orderId)
+ContractHandler --> Dispatcher: done
+deactivate ContractHandler
+
+deactivate ContractHandler
+
+SessionHandler -> SessionHandler: context.set('redirectTarget', 'thankyou')
+SessionHandler --> Dispatcher: done
+deactivate SessionHandler
+
+Dispatcher --> Controller: event processed
+deactivate Dispatcher
+
+Controller -> Controller: session.sess_challenge = orderId
+Controller -> Controller: clearStripeSessionVariables()
+Controller --> Browser: Redirect to 'thankyou'
+deactivate Controller
+
+== PHASE 4: Thank You Page ==
+
+Browser -> Browser: Display order confirmation
+
+legend right
+    |= Color |= Layer |
+    | <#BBDEFB> | Browser |
+    | <#C8E6C9> | Controller |
+    | <#FFF9C4> | Dispatcher |
+    | <#FFE0B2> | Handlers |
+    | <#E1BEE7> | Repository |
+    | <#FFCDD2> | Stripe API |
+    | <#F8BBD0> | Database |
+endlegend
+
+@enduml

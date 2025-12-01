@@ -40,10 +40,14 @@ class Order extends Order_parent
     {
         if (!$this->hasOrderNumber()) {
             $this->setNumber();
-        } else {
-            oxNew(EshopCoreCounter::class)
-                ->update($this->getCounterIdent(), $this->getFieldData('oxordernr'));
+            return;
         }
+
+        /** @var EshopCoreCounter $counter */
+        $counter = oxNew(EshopCoreCounter::class);
+        /** @var mixed $orderNr */
+        $orderNr = $this->getFieldData('oxordernr');
+        $counter->update($this->getCounterIdent(), (int) $orderNr);
     }
 
     /**
@@ -53,7 +57,9 @@ class Order extends Order_parent
      */
     public function hasOrderNumber(): bool
     {
-        return 0 < (int) $this->getFieldData('oxordernr');
+        /** @var mixed $orderNr */
+        $orderNr = $this->getFieldData('oxordernr');
+        return 0 < (int) $orderNr;
     }
 
     /**
@@ -100,11 +106,14 @@ class Order extends Order_parent
      * @param \OxidEsales\Eshop\Application\Model\User $oUser User object
      * @return int Validation state (0 = OK, 7 = address changed)
      */
-    public function validateDeliveryAddress($oUser)
+    public function validateDeliveryAddress($oUser): int
     {
         // Get basket to check payment type
         $oBasket = Registry::getSession()->getBasket();
-        $paymentId = $oBasket ? $oBasket->getPaymentId() : '';
+        $paymentId = '';
+        if ($oBasket !== null) {
+            $paymentId = $oBasket->getPaymentId();
+        }
 
         // Check if this is a Stripe payment
         if (strpos($paymentId, 'osc_stripe_') === 0) {

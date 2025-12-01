@@ -1,0 +1,220 @@
+@startuml Event Flow and Handler Chain
+!theme plain
+title <font size=20><b>Event Dispatch Flow with Priority-Based Handler Execution</b></font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 12
+
+skinparam activity {
+    BackgroundColor #E8F5E9
+    BorderColor #000000
+    FontColor #000000
+}
+
+skinparam activityDiamond {
+    BackgroundColor #FFD700
+    BorderColor #000000
+    FontColor #000000
+}
+
+skinparam partition {
+    BorderColor #000000
+    FontColor #000000
+    BackgroundColor #F5F5F5
+}
+
+skinparam note {
+    BackgroundColor #FFFACD
+    BorderColor #000000
+    FontColor #000000
+}
+
+|#2196F3|<b>Controller</b>|
+|#FF9800|<b>EventDispatcher</b>|
+|#4CAF50|<b>Handlers (by Priority)</b>|
+|#F44336|<b>External Systems</b>|
+
+|<b>Controller</b>|
+start
+:<b>Customer clicks</b>\n"Zahlungspflichtig bestellen";
+
+:<b>Create EventContext</b>;
+note right #FFFACD
+  **EventContext Data:**
+  - basket: Basket object
+  - user: User object
+  - userId: string
+  - sessionId: string
+  - shopId: int
+  - shopUrl: string
+  - conditionTypes: ['payment_authorized']
+end note
+
+:<b>Create StripeCheckoutSessionRequestEvent</b>\nwith context;
+
+|<b>EventDispatcher</b>|
+:<b>dispatch(StripeCheckoutSessionRequestEvent)</b>;
+
+:<b>EventListenerProvider.getListenersForEvent()</b>;
+note right #FFFACD
+  **Sort handlers by priority:**
+  1. StripeContractCreationHandler (100)
+  2. StripeCheckoutSessionHandler (0)
+end note
+
+|<b>Handlers (by Priority)</b>|
+partition "**Handler Chain - Priority Order**" #E8F5E9 {
+    :<b>StripeContractCreationHandler</b>\n**(priority: 100)**;
+    note right #90EE90
+      **Actions:**
+      1. Create PaymentContract (DRAFT)
+      2. Create BasketSnapshot
+      3. Add conditions
+      4. Store delivery address hash in metadata
+      5. Save to database
+      6. context.setContract(contract)
+    end note
+
+    :<b>StripeCheckoutSessionHandler</b>\n**(priority: 0)**;
+    note right #90EE90
+      **Actions:**
+      1. Get contract from context
+      2. Build line items from BasketSnapshot
+      3. Call Stripe API
+      4. Store session ID in contract
+      5. context.set('checkoutUrl', url)
+    end note
+
+    |<b>External Systems</b>|
+    :<b>Stripe API</b>\ncheckout.sessions.create();
+    note right #FFB6C1
+      **Request includes:**
+      - metadata.contract_id
+      - metadata.shop_id
+      - success_url with {CHECKOUT_SESSION_ID}
+    end note
+
+    |<b>Handlers (by Priority)</b>|
+}
+
+|<b>EventDispatcher</b>|
+:<b>Return processed event</b>;
+
+|<b>Controller</b>|
+:<b>Store in session:</b>\n- stripe_checkout_session_id\n- stripe_contract_id;
+
+:<b>Return JSON response</b>\n{id, url, contract_id};
+
+:<b>Customer redirected to Stripe</b>;
+
+|<b>External Systems</b>|
+:<b>Customer pays on Stripe</b>;
+:<b>Stripe redirects to success_url</b>;
+
+|<b>Controller</b>|
+:<b>checkoutSuccess(session_id)</b>;
+
+:<b>Create StripeCheckoutReturnEvent</b>\nwith checkoutSessionId;
+
+|<b>EventDispatcher</b>|
+:<b>dispatch(StripeCheckoutReturnEvent)</b>;
+
+|<b>Handlers (by Priority)</b>|
+partition "**Return Handler Chain**" #E8F5E9 {
+    :<b>StripeCheckoutReturnHandler</b>;
+
+    |<b>External Systems</b>|
+    :<b>Stripe API</b>\ncheckout.sessions.retrieve();
+
+    |<b>Handlers (by Priority)</b>|
+    note right #90EE90
+      **Actions:**
+      1. Verify payment_status === 'paid'
+      2. Extract contract_id from metadata
+      3. Load contract from DB
+      4. **Restore delivery address hash to session**
+      5. context.setContract(contract)
+    end note
+
+    :<b>Create PaymentAuthorizedEvent</b>;
+    note right #DDA0DD
+      **Event Data:**
+      - authorizationId: paymentIntentId
+      - providerOrderId: sessionId
+      - amount: total / 100
+      - currency: EUR
+    end note
+
+    |<b>EventDispatcher</b>|
+    :<b>dispatch(PaymentAuthorizedEvent)</b>;
+
+    |<b>Handlers (by Priority)</b>|
+    :<b>PaymentAuthorizedEventHandler</b>;
+    note right #90EE90
+      **Actions:**
+      1. contract.transitionToPending()
+         State: DRAFT → PENDING
+      2. contract.fulfillCondition('payment_authorized')
+      3. If all conditions met:
+         State: PENDING → READY_TO_COMMIT
+      4. Save contract
+    end note
+
+    if (<b>All conditions fulfilled?</b>) then (<b>yes</b>)
+        :<b>Create ContractReadyToCommitEvent</b>;
+
+        |<b>EventDispatcher</b>|
+        :<b>dispatch(ContractReadyToCommitEvent)</b>;
+
+        |<b>Handlers (by Priority)</b>|
+        :<b>StripeOrderCreationHandler</b>;
+        note right #90EE90
+          **Actions:**
+          1. Create CreateOrderRequest
+          2. Call ShopOrderService.createOrder()
+          3. contract.commitToOrder(orderId)
+             State: READY_TO_COMMIT → COMMITTED
+          4. context.set('orderId', orderId)
+        end note
+
+        :<b>Create ContractCommittedEvent</b>;
+
+        |<b>EventDispatcher</b>|
+        :<b>dispatch(ContractCommittedEvent)</b>;
+
+        |<b>Handlers (by Priority)</b>|
+        :<b>Additional handlers</b>\n(webhooks, notifications, etc.);
+    else (<b>no</b>)
+        :<b>Wait for remaining conditions</b>;
+    endif
+}
+
+|<b>EventDispatcher</b>|
+:<b>Return to StripeCheckoutReturnHandler</b>;
+
+|<b>Handlers (by Priority)</b>|
+:<b>context.set('redirectTarget', 'thankyou')</b>;
+
+|<b>EventDispatcher</b>|
+:<b>Return processed event</b>;
+
+|<b>Controller</b>|
+:<b>session.sess_challenge = orderId</b>;
+:<b>Clear Stripe session variables</b>;
+:<b>Return 'thankyou'</b>;
+
+|<b>Controller</b>|
+:<b>Customer sees order confirmation</b>;
+stop
+
+legend right
+  |= Color |= Meaning |
+  | <#2196F3> | Controller Layer |
+  | <#FF9800> | Event Dispatcher |
+  | <#4CAF50> | Event Handlers |
+  | <#F44336> | External Systems |
+  | <#DDA0DD> | Events |
+endlegend
+
+@enduml

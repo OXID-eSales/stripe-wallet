@@ -1,0 +1,254 @@
+@startuml Contract Condition Fulfillment System
+!theme plain
+title <font size=20><b>Contract Condition Fulfillment: Payment Authorization Flow</b></font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 11
+
+skinparam class {
+    BackgroundColor #C8E6C9
+    FontColor #000000
+    BorderColor #000000
+    BorderThickness 2
+}
+
+skinparam note {
+    BackgroundColor #FFFACD
+    BorderColor #000000
+    FontColor #000000
+}
+
+class PaymentContract {
+    - id: string
+    - userId: string
+    - state: ContractState
+    - conditions: ContractCondition[]
+    - basketSnapshot: BasketSnapshot
+    - metadata: array
+    --
+    + fulfillCondition(type, data): void
+    + areAllConditionsFulfilled(): bool
+    + transitionToPending(): void
+    + commitToOrder(orderId): void
+    --
+    **State Transitions:**
+    DRAFT → PENDING → READY_TO_COMMIT → COMMITTED
+}
+
+class ContractCondition {
+    - type: string
+    - status: string
+    - data: array
+    - fulfilledAt: ?DateTime
+    --
+    {static} TYPE_PAYMENT_AUTHORIZED = "payment_authorized"
+    {static} TYPE_FRAUD_CHECK = "fraud_check"
+    {static} STATUS_PENDING = "pending"
+    {static} STATUS_FULFILLED = "fulfilled"
+    --
+    + fulfill(data): void
+    + isFulfilled(): bool
+    + getType(): string
+    + getData(): array
+}
+
+class ContractState {
+    - value: string
+    --
+    {static} + draft(): ContractState
+    {static} + pending(): ContractState
+    {static} + readyToCommit(): ContractState
+    {static} + committed(): ContractState
+    {static} + fulfilled(): ContractState
+    --
+    + isDraft(): bool
+    + isPending(): bool
+    + isReadyToCommit(): bool
+    + isCommitted(): bool
+}
+
+PaymentContract "1" *-- "1" ContractState : has
+PaymentContract "1" *-- "1..*" ContractCondition : contains
+
+note as N1
+  **Condition Types:**
+
+  | Type | When Fulfilled | By |
+  |------|----------------|-----|
+  | payment_authorized | Payment confirmed | PaymentAuthorizedEventHandler |
+  | fraud_check | Fraud check passed | FraudCheckHandler (optional) |
+
+  **Fulfillment Data:**
+  ```json
+  {
+    "authorizationId": "pi_xxx",
+    "providerOrderId": "cs_xxx",
+    "amount": 64.97,
+    "currency": "EUR"
+  }
+  ```
+end note
+
+@enduml
+
+@startuml Condition Fulfillment Sequence
+!theme plain
+title <font size=20><b>Condition Fulfillment: From Payment to Order</b></font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 11
+skinparam sequenceArrowThickness 2
+
+skinparam participant {
+    BorderColor #000000
+    BorderThickness 2
+}
+
+skinparam note {
+    BackgroundColor #FFFACD
+    BorderColor #000000
+    FontColor #000000
+}
+
+skinparam sequence {
+    ArrowColor #333333
+    ArrowFontColor #000000
+    LifeLineBorderColor #333333
+}
+
+participant "PaymentAuthorized\nEventHandler" as PAH #FFE0B2
+participant "PaymentContract" as PC #C8E6C9
+participant "ContractCondition\n(payment_authorized)" as CC #A5D6A7
+participant "ContractState" as CS #BBDEFB
+participant "ContractRepository" as CR #E1BEE7
+participant "EventDispatcher" as ED #FFF9C4
+
+== Initial State ==
+note over PC, CS #E3F2FD
+  Contract State: **DRAFT**
+  Condition: payment_authorized = **PENDING**
+end note
+
+== Payment Verification Complete ==
+
+PAH -> PC: transitionToPending()
+activate PC #C8E6C9
+
+PC -> CS: Check current state
+activate CS #BBDEFB
+CS --> PC: DRAFT
+PC -> CS: setState(PENDING)
+CS --> PC: OK
+deactivate CS
+
+note over PC, CS #FFF9C4
+  Contract State: **DRAFT → PENDING**
+end note
+
+PAH -> PC: fulfillCondition('payment_authorized', {...})
+
+PC -> CC: Find condition by type
+activate CC #A5D6A7
+CC --> PC: ContractCondition
+deactivate CC
+
+PC -> CC: fulfill(data)
+activate CC #A5D6A7
+
+note right of CC #FFFACD
+  **Fulfillment Data:**
+  ```php
+  [
+    'authorizationId' => 'pi_xxx',
+    'providerOrderId' => 'cs_xxx',
+    'amount' => 64.97,
+    'currency' => 'EUR'
+  ]
+  ```
+end note
+
+CC -> CC: status = FULFILLED
+CC -> CC: data = {...}
+CC -> CC: fulfilledAt = now()
+CC --> PC: done
+deactivate CC
+
+note over CC #C8E6C9
+  Condition: payment_authorized = **FULFILLED**
+end note
+
+PC -> PC: areAllConditionsFulfilled()
+note right of PC #FFFACD
+  ```php
+  foreach ($this->conditions as $condition) {
+      if (!$condition->isFulfilled()) {
+          return false;
+      }
+  }
+  return true;
+  ```
+end note
+
+alt All conditions fulfilled
+    PC -> CS: Check state is PENDING
+    activate CS #BBDEFB
+    CS --> PC: true
+    PC -> CS: setState(READY_TO_COMMIT)
+    CS --> PC: OK
+    deactivate CS
+
+    note over PC, CS #C8E6C9
+      Contract State: **PENDING → READY_TO_COMMIT**
+      (Auto-transition when all conditions met!)
+    end note
+else Some conditions still pending
+    note over PC #FFE0B2
+      State remains PENDING
+      Wait for remaining conditions
+    end note
+end
+
+PC --> PAH: done
+deactivate PC
+
+PAH -> CR: save(contract)
+activate CR #E1BEE7
+CR --> PAH: saved
+deactivate CR
+
+alt Contract is READY_TO_COMMIT
+    PAH -> PAH: Create ContractReadyToCommitEvent
+    PAH -> ED: dispatch(ContractReadyToCommitEvent)
+    activate ED #FFF9C4
+
+    note over ED #FFFACD
+      This triggers StripeOrderCreationHandler
+      which creates the OXID order
+    end note
+
+    ED --> PAH: event processed
+    deactivate ED
+end
+
+== Order Creation (Separate Handler) ==
+
+note over PAH #F3E5F5
+  StripeOrderCreationHandler:
+  1. Creates OXID Order
+  2. contract.commitToOrder(orderId)
+  3. State: READY_TO_COMMIT → COMMITTED
+end note
+
+legend right
+    |= Color |= Layer |
+    | <#FFE0B2> | Event Handler |
+    | <#C8E6C9> | Contract |
+    | <#A5D6A7> | Condition |
+    | <#BBDEFB> | State |
+    | <#E1BEE7> | Repository |
+    | <#FFF9C4> | Dispatcher |
+endlegend
+
+@enduml
