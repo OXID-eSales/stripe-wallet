@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Service;
 
+use DateTimeImmutable;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Eshop\Core\DatabaseProvider;
 use OxidEsales\Eshop\Core\UtilsObject;
@@ -19,6 +20,8 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\WebhookRe
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentCapturedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentRefundedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentFailedEvent;
+use OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookLog;
 
 /**
  * Webhook processing service
@@ -56,11 +59,14 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentFa
 class WebhookProcessingService
 {
     private ?EventDispatcherInterface $eventDispatcher;
+    private ?WebhookLogRepositoryInterface $webhookLogRepository;
 
     public function __construct(
-        ?EventDispatcherInterface $eventDispatcher = null
+        ?EventDispatcherInterface $eventDispatcher = null,
+        ?WebhookLogRepositoryInterface $webhookLogRepository = null
     ) {
         $this->eventDispatcher = $eventDispatcher;
+        $this->webhookLogRepository = $webhookLogRepository;
     }
 
     /**
@@ -72,6 +78,14 @@ class WebhookProcessingService
      */
     public function processEvent(\Stripe\Event $event): void
     {
+        // Check idempotency - skip if already processed
+        if ($this->webhookLogRepository !== null && $this->webhookLogRepository->existsByEventId($event->id)) {
+            Registry::getLogger()->info('Webhook event already processed (idempotency check)', [
+                'event_id' => $event->id,
+            ]);
+            return;
+        }
+
         // Log webhook event to database
         $this->logWebhookEvent($event);
 
@@ -381,6 +395,28 @@ class WebhookProcessingService
      */
     private function logWebhookEvent(\Stripe\Event $event): void
     {
+        // Use repository if available (preferred - LSP compliant)
+        if ($this->webhookLogRepository !== null) {
+            try {
+                $log = new WebhookLog(
+                    $event->id,
+                    new DateTimeImmutable(),
+                    'received'
+                );
+                $log->setEventType($event->type);
+                $log->setProvider('stripe');
+                $log->setPayload($event->data->object->toArray());
+
+                $this->webhookLogRepository->save($log);
+            } catch (\Exception $e) {
+                Registry::getLogger()->error('Failed to log webhook via repository', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+            return;
+        }
+
+        // Fallback to raw SQL (legacy - for backward compatibility)
         try {
             $db = DatabaseProvider::getDb();
 

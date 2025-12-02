@@ -6,6 +6,7 @@ namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
 
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use RuntimeException;
@@ -28,7 +29,8 @@ class StripeCheckoutSessionHandler implements HandlerInterface
 {
     public function __construct(
         private ContractRepositoryInterface $contractRepository,
-        private StripeAdapterFactoryInterface $adapterFactory
+        private StripeAdapterFactoryInterface $adapterFactory,
+        private TokenServiceInterface $tokenService
     ) {
     }
 
@@ -64,19 +66,39 @@ class StripeCheckoutSessionHandler implements HandlerInterface
             $captureMode = 'automatic';
         }
 
-        // Build URLs with contract ID
+        // Build URLs with contract ID and secure token
         $shopUrl = $context->get('shopUrl', 'https://shop.example.com/');
         if (!is_string($shopUrl)) {
             $shopUrl = 'https://shop.example.com/';
         }
-        $successUrl = $shopUrl . 'index.php?cl=order&fnc=checkoutSuccess&session_id={CHECKOUT_SESSION_ID}';
+
+        // Get contract ID
+        $contractId = $contract->getId() ?? '';
+
+        // Generate secure token for session restoration
+        $contractToken = $this->tokenService->generateToken($contractId);
+
+        // Success URL includes contract_id and contract_token for session restoration
+        // The {CHECKOUT_SESSION_ID} placeholder is replaced by Stripe with actual session ID
+        $successUrl = $shopUrl . 'index.php?cl=order&fnc=checkoutSuccess'
+            . '&session_id={CHECKOUT_SESSION_ID}'
+            . '&contract_id=' . urlencode($contractId)
+            . '&contract_token=' . urlencode($contractToken);
+
+        // DEBUG: Log the success URL being created
+        \OxidEsales\Eshop\Core\Registry::getLogger()->error('StripeCheckoutSessionHandler DEBUG', [
+            'contract_id' => $contractId,
+            'contract_token' => $contractToken ? 'generated (' . strlen($contractToken) . ' chars)' : 'FAILED',
+            'success_url' => $successUrl,
+        ]);
+
+        // Cancel URL just goes back to payment page (no token needed)
         $cancelUrl = $shopUrl . 'index.php?cl=payment';
 
         // Get Stripe SDK client
         $stripeClient = $this->adapterFactory->getStripeClient();
 
-        // Get contract ID as non-null string
-        $contractId = $contract->getId() ?? '';
+        // Get shop ID
         $shopId = $context->get('shopId', '1');
         $shopIdString = is_string($shopId) ? $shopId : (string) $shopId;
 

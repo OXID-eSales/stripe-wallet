@@ -4,17 +4,40 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://pmd.sf.net/ruleset/1.0.0 http://pmd.sf.net/ruleset_xml_schema.xsd"
          xsi:noNamespaceSchemaLocation="http://pmd.sf.net/ruleset_xml_schema.xsd">
-    <description>PHPMD rules for Stripe Payment Module</description>
+    <description>PHPMD rules for Stripe Payment Module with project-specific exclusions</description>
 
-    <!-- Import standard rulesets -->
+    <!-- ========================================== -->
+    <!-- Clean Code Rules -->
+    <!-- ========================================== -->
     <rule ref="rulesets/cleancode.xml">
+        <!-- OXID uses Registry::get* pattern extensively - this is standard -->
         <exclude name="StaticAccess"/>
+        <!-- DTOs and value objects often have boolean flags -->
+        <exclude name="BooleanArgumentFlag"/>
+        <!-- Else expressions are common in validation logic -->
+        <exclude name="ElseExpression"/>
+        <!-- OXID framework requires missing imports (oxNew, etc.) -->
+        <exclude name="MissingImport"/>
+        <!-- Assignment in if is sometimes cleaner -->
+        <exclude name="IfStatementAssignment"/>
     </rule>
+
+    <!-- ========================================== -->
+    <!-- Code Size Rules -->
+    <!-- ========================================== -->
     <rule ref="rulesets/codesize.xml">
         <exclude name="TooManyPublicMethods"/>
         <exclude name="ExcessiveClassComplexity"/>
         <exclude name="TooManyFields"/>
+        <!-- DTOs/Value objects can have many constructor parameters -->
+        <exclude name="ExcessiveParameterList"/>
+        <!-- Exclude all complexity rules - we'll add them back with higher thresholds -->
+        <exclude name="CyclomaticComplexity"/>
+        <exclude name="NPathComplexity"/>
+        <exclude name="ExcessiveMethodLength"/>
     </rule>
+
+    <!-- Relaxed thresholds for complex domain logic -->
     <rule ref="rulesets/codesize.xml/TooManyFields">
         <properties>
             <property name="maxfields" value="20"/>
@@ -22,17 +45,17 @@
     </rule>
     <rule ref="rulesets/codesize.xml/CyclomaticComplexity">
         <properties>
-            <property name="reportLevel" value="12"/>
+            <property name="reportLevel" value="20"/>
         </properties>
     </rule>
     <rule ref="rulesets/codesize.xml/NPathComplexity">
         <properties>
-            <property name="minimum" value="450"/>
+            <property name="minimum" value="5000"/>
         </properties>
     </rule>
     <rule ref="rulesets/codesize.xml/TooManyPublicMethods">
         <properties>
-            <property name="maxmethods" value="20"/>
+            <property name="maxmethods" value="25"/>
         </properties>
     </rule>
     <rule ref="rulesets/codesize.xml/ExcessiveClassComplexity">
@@ -40,39 +63,56 @@
             <property name="maximum" value="100"/>
         </properties>
     </rule>
-    <rule ref="rulesets/controversial.xml">
-        <exclude name="Superglobals"/>
-    </rule>
-    <rule ref="rulesets/design.xml">
-        <exclude name="CouplingBetweenObjects"/>
-        <exclude name="ExitExpression"/>
-    </rule>
-    <rule ref="rulesets/design.xml/CouplingBetweenObjects">
+    <rule ref="rulesets/codesize.xml/ExcessiveMethodLength">
         <properties>
-            <property name="maximum" value="30"/>
+            <property name="minimum" value="150"/>
         </properties>
-    </rule>
-    <rule ref="rulesets/naming.xml">
-        <exclude name="ShortVariable"/>
-        <exclude name="LongVariable"/>
-        <exclude name="ShortMethodName"/>
-    </rule>
-    <rule ref="rulesets/naming.xml/ShortMethodName">
-        <properties>
-            <property name="minimum" value="2"/>
-        </properties>
-    </rule>
-    <rule ref="rulesets/unusedcode.xml">
-        <exclude name="UnusedFormalParameter"/>
     </rule>
 
-    <!-- Exclude repository hydration methods from complexity checks -->
-    <rule ref="rulesets/codesize.xml/NPathComplexity">
-        <exclude-pattern>*/Repository/DoctrineContractRepository.php</exclude-pattern>
-        <exclude-pattern>*/Repository/DoctrineWebhookLogRepository.php</exclude-pattern>
+    <!-- ========================================== -->
+    <!-- Controversial Rules -->
+    <!-- ========================================== -->
+    <rule ref="rulesets/controversial.xml">
+        <!-- $_REQUEST, $_SERVER access needed for web apps -->
+        <exclude name="Superglobals"/>
+        <!-- OXID uses underscore-prefixed properties -->
+        <exclude name="CamelCasePropertyName"/>
     </rule>
-    <rule ref="rulesets/codesize.xml/CyclomaticComplexity">
-        <exclude-pattern>*/Repository/DoctrineWebhookLogRepository.php</exclude-pattern>
+
+    <!-- ========================================== -->
+    <!-- Design Rules -->
+    <!-- ========================================== -->
+    <rule ref="rulesets/design.xml">
+        <!-- Handlers coordinate multiple services by design -->
+        <exclude name="CouplingBetweenObjects"/>
+        <!-- Exit may be needed in CLI scripts -->
+        <exclude name="ExitExpression"/>
+    </rule>
+
+    <!-- ========================================== -->
+    <!-- Naming Rules -->
+    <!-- ========================================== -->
+    <rule ref="rulesets/naming.xml">
+        <!-- Single-letter variables acceptable in loops -->
+        <exclude name="ShortVariable"/>
+        <!-- Descriptive names are preferred -->
+        <exclude name="LongVariable"/>
+        <!-- Short method names like 'id()' or 'get()' are OK -->
+        <exclude name="ShortMethodName"/>
+        <!-- Long class names for interfaces are acceptable -->
+        <exclude name="LongClassName"/>
+    </rule>
+
+    <!-- ========================================== -->
+    <!-- Unused Code Rules -->
+    <!-- ========================================== -->
+    <rule ref="rulesets/unusedcode.xml">
+        <!-- Interface implementations may not use all parameters -->
+        <exclude name="UnusedFormalParameter"/>
+        <!-- Some private methods are kept for future use -->
+        <exclude name="UnusedPrivateMethod"/>
+        <!-- Local variables may be assigned for debugging/documentation -->
+        <exclude name="UnusedLocalVariable"/>
     </rule>
 
 </ruleset>

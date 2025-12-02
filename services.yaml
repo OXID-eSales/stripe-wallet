@@ -8,6 +8,7 @@ services:
     resource: 'src/Stripe/Service/*'
     exclude:
       - 'src/Stripe/Service/EncryptionService.php'
+      - 'src/Stripe/Service/Result/*'
     public: true
 
   # Encryption Service - Requires explicit encryption key configuration
@@ -211,6 +212,40 @@ services:
     public: true
 
   # ==========================================
+  # Token Service (Security)
+  # ==========================================
+  #
+  # Provides secure token generation and validation for contract-based
+  # payment flows. Used to prevent tampering with return URLs.
+  #
+
+  # Token Service Interface - Bind to implementation
+  # Derives secret from ModuleConfigurationService (no extra env var needed)
+  OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface:
+    class: OxidSolutionCatalysts\Payments\Stripe\Service\ContractTokenService
+    public: false
+
+  # Stripe Contract Token Service
+  OxidSolutionCatalysts\Payments\Stripe\Service\ContractTokenService:
+    alias: OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface
+
+  # ==========================================
+  # Security Validator (Fraud Prevention)
+  # ==========================================
+  #
+  # Validates return requests from payment providers to detect fraud.
+  #
+
+  # Security Validator Interface - Bind to implementation
+  OxidSolutionCatalysts\Payments\Component\Service\ReturnSecurityValidatorInterface:
+    class: OxidSolutionCatalysts\Payments\Stripe\Service\ReturnSessionSecurityService
+    public: false
+
+  # Stripe Return Security Service
+  OxidSolutionCatalysts\Payments\Stripe\Service\ReturnSessionSecurityService:
+    alias: OxidSolutionCatalysts\Payments\Component\Service\ReturnSecurityValidatorInterface
+
+  # ==========================================
   # Stripe Checkout Session Handlers
   # ==========================================
 
@@ -230,7 +265,7 @@ services:
     arguments:
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
       $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
-      $config: '@OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService'
+      $tokenService: '@OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface'
     tags:
       - { name: payment.event_handler, priority: 0 }
     public: false
@@ -249,6 +284,8 @@ services:
     arguments:
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
       $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $tokenService: '@OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface'
+      $securityValidator: '@OxidSolutionCatalysts\Payments\Component\Service\ReturnSecurityValidatorInterface'
     tags:
       - { name: payment.event_handler, priority: 100 }
     public: false

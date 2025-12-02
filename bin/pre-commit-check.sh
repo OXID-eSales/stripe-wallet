@@ -115,11 +115,11 @@ run_phpmd_docker() {
 get_changed_files_local() {
     cd "$MODULE_ROOT" || return
     local files=""
-    # Get files changed from HEAD
-    files=$(git diff --name-only HEAD 2>/dev/null | grep -E '\.php$' | grep -vE '^tests/' | tr '\n' ' ')
+    # Get files changed from HEAD (excluding deleted files with --diff-filter=d)
+    files=$(git diff --diff-filter=d --name-only HEAD 2>/dev/null | grep -E '\.php$' | grep -vE '^tests/' | tr '\n' ' ')
     # If no uncommitted changes, get files from last commit
     if [ -z "$files" ]; then
-        files=$(git diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null | grep -E '\.php$' | grep -vE '^tests/' | tr '\n' ' ')
+        files=$(git diff-tree --no-commit-id --diff-filter=d --name-only -r HEAD 2>/dev/null | grep -E '\.php$' | grep -vE '^tests/' | tr '\n' ' ')
     fi
     echo "$files"
 }

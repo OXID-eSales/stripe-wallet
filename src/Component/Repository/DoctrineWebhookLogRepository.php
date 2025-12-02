@@ -38,6 +38,9 @@ class DoctrineWebhookLogRepository implements WebhookLogRepositoryInterface
                 'OXSTATUS' => $log->getStatus(),
                 'OXRECEIVEDAT' => $log->getReceivedAt()->format('Y-m-d H:i:s'),
                 'OXERROR' => $log->getError(),
+                'OXPROVIDER' => $log->getProvider(),
+                'OXPAYLOAD' => $log->getPayload() !== null ? json_encode($log->getPayload()) : null,
+                'OXPROCESSEDAT' => $log->getProcessedAt()?->format('Y-m-d H:i:s'),
             ];
 
             $exists = $this->connection->fetchOne(
@@ -120,6 +123,24 @@ class DoctrineWebhookLogRepository implements WebhookLogRepositoryInterface
 
         if (!empty($data['OXERROR'])) {
             $log->setError($this->extractString($data, 'OXERROR'));
+        }
+
+        if (!empty($data['OXPROVIDER'])) {
+            $log->setProvider($this->extractString($data, 'OXPROVIDER'));
+        }
+
+        if (!empty($data['OXPAYLOAD'])) {
+            $payloadJson = $this->extractString($data, 'OXPAYLOAD');
+            $payload = json_decode($payloadJson, true);
+            if (is_array($payload)) {
+                /** @var array<string, mixed> $payload */
+                $log->setPayload($payload);
+            }
+        }
+
+        if (!empty($data['OXPROCESSEDAT'])) {
+            $processedAt = new DateTimeImmutable($this->extractString($data, 'OXPROCESSEDAT'));
+            $log->setProcessedAt($processedAt);
         }
     }
 

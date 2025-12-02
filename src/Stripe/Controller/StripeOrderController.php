@@ -171,7 +171,7 @@ class StripeOrderController extends OrderController
      */
     public function checkoutSuccess(): string
     {
-        // 1. Validate
+        // 1. Validate checkout session ID
         $sessionId = $this->getCheckoutSessionIdFromRequest();
 
         if ($sessionId === null) {
@@ -179,13 +179,30 @@ class StripeOrderController extends OrderController
             return 'payment';
         }
 
-        // 2. Create context - ONLY DATA
+        // 2. Get contract_id and contract_token from URL (passed in return URL)
+        $contractId = Registry::getRequest()->getRequestParameter('contract_id');
+        $contractToken = Registry::getRequest()->getRequestParameter('contract_token');
+
+        // DEBUG: Log what we received
+        Registry::getLogger()->error('checkoutSuccess DEBUG', [
+            'sessionId' => $sessionId,
+            'contract_id_from_url' => $contractId,
+            'contract_token_from_url' => $contractToken ? 'present (' . strlen($contractToken) . ' chars)' : 'MISSING',
+            'contract_id_from_session' => $this->getContractIdFromSession(),
+            'REQUEST' => array_keys($_REQUEST),
+            'GET' => array_keys($_GET),
+        ]);
+
+        // 3. Create context with URL parameters
         $context = new EventContext([
             'checkoutSessionId' => $sessionId,
+            'contract_id' => $contractId,
+            'contract_token' => $contractToken,
+            // Also pass session contract ID as fallback
             'contractId' => $this->getContractIdFromSession(),
         ]);
 
-        // 3. Dispatch event - HANDLERS DO THE WORK
+        // 4. Dispatch event - HANDLERS DO THE WORK
         $event = new StripeCheckoutReturnEvent($context);
         $this->getEventDispatcher()->dispatch($event);
 

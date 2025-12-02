@@ -10,6 +10,10 @@ class WebhookLog
     private ?string $eventType = null;
     private ?string $contractId = null;
     private ?string $error = null;
+    private ?string $provider = null;
+    /** @var array<string, mixed>|null */
+    private ?array $payload = null;
+    private ?\DateTimeImmutable $processedAt = null;
 
     public function __construct(
         private readonly string $eventId,
@@ -69,5 +73,41 @@ class WebhookLog
     public function setError(?string $error): void
     {
         $this->error = $error;
+    }
+
+    public function getProvider(): ?string
+    {
+        return $this->provider;
+    }
+
+    public function setProvider(string $provider): void
+    {
+        $this->provider = $provider;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getPayload(): ?array
+    {
+        return $this->payload;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public function setPayload(array $payload): void
+    {
+        $this->payload = $payload;
+    }
+
+    public function getProcessedAt(): ?\DateTimeImmutable
+    {
+        return $this->processedAt;
+    }
+
+    public function setProcessedAt(\DateTimeImmutable $processedAt): void
+    {
+        $this->processedAt = $processedAt;
     }
 }

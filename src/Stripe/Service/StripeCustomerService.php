@@ -9,12 +9,14 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Service;
 
+use RuntimeException;
 use Stripe\StripeClient;
 use Stripe\Exception\ApiErrorException;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Eshop\Application\Model\User;
 use OxidEsales\Eshop\Core\DatabaseProvider;
 use OxidEsales\Eshop\Core\UtilsObject;
+use OxidSolutionCatalysts\Payments\Component\Repository\PaymentCustomerRepositoryInterface;
 
 /**
  * Stripe customer management service
@@ -56,10 +58,14 @@ class StripeCustomerService implements InitializableServiceInterface
 
     private ?StripeClient $stripe = null;
     private ModuleConfigurationService $config;
+    private ?PaymentCustomerRepositoryInterface $customerRepository;
 
-    public function __construct(ModuleConfigurationService $config)
-    {
+    public function __construct(
+        ModuleConfigurationService $config,
+        ?PaymentCustomerRepositoryInterface $customerRepository = null
+    ) {
         $this->config = $config;
+        $this->customerRepository = $customerRepository;
     }
 
     /**
@@ -78,7 +84,7 @@ class StripeCustomerService implements InitializableServiceInterface
         $secretKey = $this->config->getToken();
 
         if (empty($secretKey)) {
-            throw new \RuntimeException('Stripe secret key is not configured');
+            throw new RuntimeException('Stripe secret key is not configured');
         }
 
         $this->stripe = new StripeClient($secretKey);
@@ -153,7 +159,7 @@ class StripeCustomerService implements InitializableServiceInterface
                 'error' => $e->getMessage(),
             ]);
 
-            throw new \RuntimeException(
+            throw new RuntimeException(
                 'Failed to create customer: ' . $e->getMessage(),
                 $e->getCode(),
                 $e
@@ -169,6 +175,12 @@ class StripeCustomerService implements InitializableServiceInterface
      */
     private function getStoredStripeCustomerId(string $userId): ?string
     {
+        // Use repository if available (preferred - LSP compliant)
+        if ($this->customerRepository !== null) {
+            return $this->customerRepository->findPaymentCustomerId($userId);
+        }
+
+        // Fallback to raw SQL (legacy - for backward compatibility)
         $db = DatabaseProvider::getDb();
 
         $customerId = $db->getOne(
@@ -187,6 +199,13 @@ class StripeCustomerService implements InitializableServiceInterface
      */
     private function storeStripeCustomerId(string $userId, string $stripeCustomerId): void
     {
+        // Use repository if available (preferred - LSP compliant)
+        if ($this->customerRepository !== null) {
+            $this->customerRepository->savePaymentCustomerId($userId, $stripeCustomerId);
+            return;
+        }
+
+        // Fallback to raw SQL (legacy - for backward compatibility)
         $db = DatabaseProvider::getDb();
 
         $sql = "INSERT INTO osc_stripe_customer_mapping

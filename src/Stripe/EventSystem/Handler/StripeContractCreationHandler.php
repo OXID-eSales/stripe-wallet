@@ -79,6 +79,9 @@ class StripeContractCreationHandler implements HandlerInterface
         // This is critical for order finalization after returning from Stripe
         $this->storeDeliveryAddressHash($contract, $basket);
 
+        // Store security metadata for session restoration validation
+        $this->storeSecurityMetadata($contract, $context);
+
         // Save contract again to persist the metadata
         // (createContract already saved it, but metadata was added after)
         $this->contractRepository->save($contract);
@@ -121,6 +124,40 @@ class StripeContractCreationHandler implements HandlerInterface
         // Also store delivery address ID if present
         if (!empty($deliveryAddressId)) {
             $contract->setMetadata('delivery_address_id', $deliveryAddressId);
+        }
+    }
+
+    /**
+     * Store security metadata for session restoration validation.
+     *
+     * This data is used by ReturnSessionSecurityService to validate
+     * that the returning user is the same person who initiated payment.
+     */
+    private function storeSecurityMetadata(
+        \OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface $contract,
+        \OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext $context
+    ): void {
+        // Store user IP address
+        $userIp = $_SERVER['REMOTE_ADDR'] ?? '';
+        $contract->setMetadata('user_ip', $userIp);
+
+        // Store user agent
+        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        $contract->setMetadata('user_agent', $userAgent);
+
+        // Store creation timestamp
+        $contract->setMetadata('created_timestamp', time());
+
+        // Store PHP session ID if provided in context
+        $phpSessionId = $context->get('phpSessionId');
+        if (is_string($phpSessionId) && $phpSessionId !== '') {
+            $contract->setMetadata('session_id', $phpSessionId);
+        }
+
+        // Store user country if provided in context
+        $userCountry = $context->get('userCountry');
+        if (is_string($userCountry) && $userCountry !== '') {
+            $contract->setMetadata('user_country', $userCountry);
         }
     }
 }

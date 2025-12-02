@@ -10,8 +10,8 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
 use OxidSolutionCatalysts\Payments\Component\Contract\BasketSnapshot;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use PHPUnit\Framework\TestCase;
 use Stripe\StripeClient;
 use Stripe\Service\Checkout\SessionService;
@@ -20,7 +20,7 @@ class StripeCheckoutSessionHandlerTest extends TestCase
 {
     private ContractRepositoryInterface $contractRepository;
     private StripeAdapterFactoryInterface $adapterFactory;
-    private ModuleConfigurationService $config;
+    private TokenServiceInterface $tokenService;
     private StripeClient $stripeClient;
     private SessionService $sessionService;
 
@@ -28,9 +28,14 @@ class StripeCheckoutSessionHandlerTest extends TestCase
     {
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
-        $this->config = $this->createMock(ModuleConfigurationService::class);
+        $this->tokenService = $this->createMock(TokenServiceInterface::class);
         $this->stripeClient = $this->createMock(StripeClient::class);
         $this->sessionService = $this->createMock(SessionService::class);
+
+        // Default token generation behavior
+        $this->tokenService
+            ->method('generateToken')
+            ->willReturnCallback(fn($contractId) => 'token_for_' . $contractId);
     }
 
     public function testHandlerIgnoresNonStripeCheckoutSessionRequestEvent(): void
@@ -38,7 +43,7 @@ class StripeCheckoutSessionHandlerTest extends TestCase
         $handler = new StripeCheckoutSessionHandler(
             $this->contractRepository,
             $this->adapterFactory,
-            $this->config
+            $this->tokenService
         );
 
         $otherEvent = new class {
@@ -67,7 +72,7 @@ class StripeCheckoutSessionHandlerTest extends TestCase
         $handler = new StripeCheckoutSessionHandler(
             $this->contractRepository,
             $this->adapterFactory,
-            $this->config
+            $this->tokenService
         );
 
         $this->contractRepository
@@ -104,7 +109,7 @@ class StripeCheckoutSessionHandlerTest extends TestCase
         $handler = new StripeCheckoutSessionHandler(
             $this->contractRepository,
             $this->adapterFactory,
-            $this->config
+            $this->tokenService
         );
 
         $handler->handle($event);
@@ -122,7 +127,7 @@ class StripeCheckoutSessionHandlerTest extends TestCase
         $handler = new StripeCheckoutSessionHandler(
             $this->contractRepository,
             $this->adapterFactory,
-            $this->config
+            $this->tokenService
         );
 
         $handler->handle($event);
@@ -167,7 +172,7 @@ class StripeCheckoutSessionHandlerTest extends TestCase
         $handler = new StripeCheckoutSessionHandler(
             $this->contractRepository,
             $this->adapterFactory,
-            $this->config
+            $this->tokenService
         );
 
         $handler->handle($event);
@@ -185,7 +190,7 @@ class StripeCheckoutSessionHandlerTest extends TestCase
         $handler = new StripeCheckoutSessionHandler(
             $this->contractRepository,
             $this->adapterFactory,
-            $this->config
+            $this->tokenService
         );
 
         $handler->handle($event);
@@ -210,7 +215,7 @@ class StripeCheckoutSessionHandlerTest extends TestCase
         $handler = new StripeCheckoutSessionHandler(
             $this->contractRepository,
             $this->adapterFactory,
-            $this->config
+            $this->tokenService
         );
 
         $handler->handle($event);
@@ -247,10 +252,120 @@ class StripeCheckoutSessionHandlerTest extends TestCase
         $handler = new StripeCheckoutSessionHandler(
             $this->contractRepository,
             $this->adapterFactory,
-            $this->config
+            $this->tokenService
         );
 
         $handler->handle($event);
+    }
+
+    // =========================================================================
+    // Contract Token in URL Tests (Sprint 1 - Session Restoration)
+    // =========================================================================
+
+    public function testSuccessUrlContainsContractToken(): void
+    {
+        $contract = $this->createContractMock('contract_token_test');
+        $context = $this->createContextWithContract($contract);
+        $context->set('shopUrl', 'https://shop.example.com/');
+        $event = new StripeCheckoutSessionRequestEvent($context);
+
+        $checkoutSession = $this->createCheckoutSessionMock('cs_test_token');
+
+        $capturedParams = null;
+        $this->sessionService
+            ->expects($this->once())
+            ->method('create')
+            ->with($this->callback(function (array $params) use (&$capturedParams) {
+                $capturedParams = $params;
+                return true;
+            }))
+            ->willReturn($checkoutSession);
+
+        $this->setupStripeClientMocksWithSessionService();
+
+        $handler = new StripeCheckoutSessionHandler(
+            $this->contractRepository,
+            $this->adapterFactory,
+            $this->tokenService
+        );
+
+        $handler->handle($event);
+
+        // Assert success URL contains contract_token
+        $this->assertNotNull($capturedParams);
+        $this->assertArrayHasKey('success_url', $capturedParams);
+        $this->assertStringContainsString('contract_token=', $capturedParams['success_url']);
+        $this->assertStringContainsString('token_for_contract_token_test', $capturedParams['success_url']);
+    }
+
+    public function testSuccessUrlContainsContractId(): void
+    {
+        $contract = $this->createContractMock('contract_id_in_url');
+        $context = $this->createContextWithContract($contract);
+        $context->set('shopUrl', 'https://shop.example.com/');
+        $event = new StripeCheckoutSessionRequestEvent($context);
+
+        $checkoutSession = $this->createCheckoutSessionMock('cs_test_id');
+
+        $capturedParams = null;
+        $this->sessionService
+            ->expects($this->once())
+            ->method('create')
+            ->with($this->callback(function (array $params) use (&$capturedParams) {
+                $capturedParams = $params;
+                return true;
+            }))
+            ->willReturn($checkoutSession);
+
+        $this->setupStripeClientMocksWithSessionService();
+
+        $handler = new StripeCheckoutSessionHandler(
+            $this->contractRepository,
+            $this->adapterFactory,
+            $this->tokenService
+        );
+
+        $handler->handle($event);
+
+        // Assert success URL contains contract_id
+        $this->assertNotNull($capturedParams);
+        $this->assertArrayHasKey('success_url', $capturedParams);
+        $this->assertStringContainsString('contract_id=contract_id_in_url', $capturedParams['success_url']);
+    }
+
+    public function testCancelUrlDoesNotContainToken(): void
+    {
+        $contract = $this->createContractMock('contract_cancel');
+        $context = $this->createContextWithContract($contract);
+        $context->set('shopUrl', 'https://shop.example.com/');
+        $event = new StripeCheckoutSessionRequestEvent($context);
+
+        $checkoutSession = $this->createCheckoutSessionMock('cs_test_cancel');
+
+        $capturedParams = null;
+        $this->sessionService
+            ->expects($this->once())
+            ->method('create')
+            ->with($this->callback(function (array $params) use (&$capturedParams) {
+                $capturedParams = $params;
+                return true;
+            }))
+            ->willReturn($checkoutSession);
+
+        $this->setupStripeClientMocksWithSessionService();
+
+        $handler = new StripeCheckoutSessionHandler(
+            $this->contractRepository,
+            $this->adapterFactory,
+            $this->tokenService
+        );
+
+        $handler->handle($event);
+
+        // Assert cancel URL does NOT contain contract_token
+        $this->assertNotNull($capturedParams);
+        $this->assertArrayHasKey('cancel_url', $capturedParams);
+        $this->assertStringNotContainsString('contract_token', $capturedParams['cancel_url']);
     }
 
     // --- Helper methods ---
