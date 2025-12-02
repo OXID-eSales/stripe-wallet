@@ -85,13 +85,6 @@ class StripeCheckoutSessionHandler implements HandlerInterface
             . '&contract_id=' . urlencode($contractId)
             . '&contract_token=' . urlencode($contractToken);
 
-        // DEBUG: Log the success URL being created
-        \OxidEsales\Eshop\Core\Registry::getLogger()->error('StripeCheckoutSessionHandler DEBUG', [
-            'contract_id' => $contractId,
-            'contract_token' => $contractToken ? 'generated (' . strlen($contractToken) . ' chars)' : 'FAILED',
-            'success_url' => $successUrl,
-        ]);
-
         // Cancel URL just goes back to payment page (no token needed)
         $cancelUrl = $shopUrl . 'index.php?cl=payment';
 

@@ -121,15 +121,6 @@ class StripeCheckoutReturnHandler implements HandlerInterface
         $contractToken = $context->get('contract_token');
         $contractIdFromUrl = $context->get('contract_id');
 
-        // DEBUG: Log what we received in the handler
-        $this->logger->error('StripeCheckoutReturnHandler::validateContractToken DEBUG', [
-            'contract_token' => $contractToken ? 'present (' . strlen((string)$contractToken) . ' chars)' : 'MISSING/NULL',
-            'contract_token_type' => gettype($contractToken),
-            'contract_id' => $contractIdFromUrl,
-            'contract_id_type' => gettype($contractIdFromUrl),
-            'session_id' => $sessionId,
-        ]);
-
         if (!is_string($contractToken) || $contractToken === '') {
             $context->set('error', 'Contract token is missing');
             $context->set('redirectTarget', 'payment');

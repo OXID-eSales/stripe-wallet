@@ -183,16 +183,6 @@ class StripeOrderController extends OrderController
         $contractId = Registry::getRequest()->getRequestParameter('contract_id');
         $contractToken = Registry::getRequest()->getRequestParameter('contract_token');
 
-        // DEBUG: Log what we received
-        Registry::getLogger()->error('checkoutSuccess DEBUG', [
-            'sessionId' => $sessionId,
-            'contract_id_from_url' => $contractId,
-            'contract_token_from_url' => $contractToken ? 'present (' . strlen($contractToken) . ' chars)' : 'MISSING',
-            'contract_id_from_session' => $this->getContractIdFromSession(),
-            'REQUEST' => array_keys($_REQUEST),
-            'GET' => array_keys($_GET),
-        ]);
-
         // 3. Create context with URL parameters
         $context = new EventContext([
             'checkoutSessionId' => $sessionId,
