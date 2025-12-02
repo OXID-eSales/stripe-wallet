@@ -334,6 +334,5 @@ class Events
                     ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Payment state per order (1:1 relationship)';
         ");
-
     }
 }

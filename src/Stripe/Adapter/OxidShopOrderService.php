@@ -157,7 +157,6 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
                     'oxid_order_nr' => $order->getFieldData('oxordernr'),
                 ]
             );
-
         } catch (ShopOrderException $e) {
             throw $e;
         } catch (\Throwable $e) {
@@ -331,7 +330,6 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
                 'order_id' => $orderId,
                 'transaction_id' => $paymentTransactionId
             ]);
-
         } catch (ShopOrderException $e) {
             throw $e;
         } catch (\Throwable $e) {

@@ -125,7 +125,6 @@ class StripeOrderCreationHandler implements HandlerInterface
                 $orderId
             );
             $this->getEventDispatcher()->dispatch($committedEvent);
-
         } catch (\Throwable $e) {
             Registry::getLogger()->error('StripeOrderCreationHandler: Order creation failed', [
                 'contract_id' => $contract->getId(),

@@ -92,7 +92,6 @@ class WebhookController extends FrontendController
             // Return success response
             http_response_code(200);
             echo json_encode(['received' => true]);
-
         } catch (SignatureVerificationException $e) {
             // Invalid signature
             Registry::getLogger()->error('Webhook signature verification failed', [
@@ -101,7 +100,6 @@ class WebhookController extends FrontendController
 
             http_response_code(400);
             echo json_encode(['error' => 'Invalid signature']);
-
         } catch (\Exception $e) {
             // Processing error
             Registry::getLogger()->error('Webhook processing failed', [
@@ -175,7 +173,6 @@ class WebhookController extends FrontendController
                 $event->type,
                 json_encode($event->data->object->toArray()),
             ]);
-
         } catch (\Exception $e) {
             Registry::getLogger()->error('Failed to log webhook', [
                 'error' => $e->getMessage(),

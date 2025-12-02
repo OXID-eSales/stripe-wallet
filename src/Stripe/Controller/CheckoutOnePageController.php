@@ -313,7 +313,6 @@ class CheckoutOnePageController extends FrontendController
             // Redirect to one-page checkout
             $checkoutUrl = Registry::getConfig()->getShopUrl() . 'cl=stripe_checkout_onepage';
             Registry::getUtils()->redirect($checkoutUrl, false);
-
         } catch (\Exception $e) {
             // Log error
             Registry::getLogger()->error('Buy Now failed', [

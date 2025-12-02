@@ -239,7 +239,7 @@ final class StripeAdapter implements PaymentAdapterInterface
         }
     }
 
-    public function  getPaymentDetails(string $providerPaymentId): PaymentDetailsResponse
+    public function getPaymentDetails(string $providerPaymentId): PaymentDetailsResponse
     {
         try {
             // Retrieve with expanded latest_charge to get charge details
@@ -652,5 +652,4 @@ final class StripeAdapter implements PaymentAdapterInterface
             default => 'not_required',
         };
     }
-
 }

@@ -37,8 +37,7 @@ class PaymentController extends CorePaymentController
         ModuleConfigurationService $stripeConfig,
         PaymentAdapterFactoryInterface $adapterFactory,
         ShopAdapterInterface $shopAdapter
-    )
-    {
+    ) {
         parent::__construct();
 
         $this->stripeConfig = $stripeConfig;
@@ -283,7 +282,6 @@ class PaymentController extends CorePaymentController
                 'status' => $paymentResponse->status,
                 'requiresAction' => $paymentResponse->requiresAction,
             ]);
-
         } catch (PaymentAdapterException $e) {
             Registry::getLogger()->error('PaymentIntent creation failed via adapter', [
                 'error' => $e->getMessage(),
