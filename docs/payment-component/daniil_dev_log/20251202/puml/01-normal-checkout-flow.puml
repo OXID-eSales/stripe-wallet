@@ -1,0 +1,114 @@
+@startuml Normal Checkout Flow
+!theme plain
+title Stripe Payment - Normal Checkout Flow (Success)
+
+skinparam backgroundColor #FEFEFE
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor Customer as C
+participant "PaymentController" as PC
+participant "ContractService" as CS
+participant "EventDispatcher" as ED
+participant "StripeCheckoutSessionHandler" as SCSH
+participant "StripeCheckoutReturnHandler" as SCRH
+participant "Stripe API" as S
+database "Database" as DB
+
+== Phase 1: Initiate Checkout ==
+
+C -> PC: Select Stripe Payment\n(click "Pay Now")
+activate PC
+
+PC -> CS: createContract(userId, basket)
+activate CS
+CS -> DB: Save contract (PENDING)
+CS --> PC: PaymentContract
+deactivate CS
+
+PC -> ED: dispatch(StripeCheckoutSessionRequestEvent)
+activate ED
+
+ED -> SCSH: handle(event)
+activate SCSH
+
+SCSH -> SCSH: Build line items\n(products + shipping + fees)
+SCSH -> SCSH: Generate contract token
+
+SCSH -> S: checkout.sessions.create({\n  mode: 'payment',\n  line_items: [...],\n  success_url: '...?contract_token=xxx',\n  cancel_url: '...',\n  metadata: { contract_id }\n})
+activate S
+S --> SCSH: CheckoutSession\n(id: cs_xxx, url: https://checkout.stripe.com/...)
+deactivate S
+
+SCSH -> DB: Update contract with session_id
+SCSH -> ED: context.set('checkoutUrl', url)
+deactivate SCSH
+
+ED --> PC: Event processed
+deactivate ED
+
+PC --> C: Redirect to Stripe Checkout
+deactivate PC
+
+== Phase 2: Customer on Stripe ==
+
+C -> S: Complete payment on Stripe Checkout
+note right of S
+  Customer enters card details
+  3DS authentication if required
+  Payment authorized
+end note
+S --> C: Redirect to success_url\n(?session_id=cs_xxx&contract_id=xxx&contract_token=xxx)
+
+== Phase 3: Return & Order Creation ==
+
+C -> PC: GET /order?fnc=checkoutSuccess&...
+activate PC
+
+PC -> ED: dispatch(StripeCheckoutReturnEvent)
+activate ED
+
+ED -> SCRH: handle(event)
+activate SCRH
+
+SCRH -> SCRH: Validate contract_token
+SCRH -> DB: Load contract by ID
+SCRH -> S: checkout.sessions.retrieve(cs_xxx)
+activate S
+S --> SCRH: Session (payment_status: 'paid')
+deactivate S
+
+SCRH -> S: paymentIntents.retrieve(pi_xxx)
+activate S
+S --> SCRH: PaymentIntent (status: 'succeeded')
+deactivate S
+
+SCRH -> SCRH: Satisfy payment condition
+SCRH -> SCRH: Check all conditions met
+
+group Contract Fulfillment
+  SCRH -> DB: Create OXID Order
+  SCRH -> DB: Link order to contract
+  SCRH -> DB: Update contract state: FULFILLED
+  SCRH -> DB: Clear basket
+end
+
+SCRH -> ED: context.set('orderId', oxid)\ncontext.set('orderNumber', 42)
+deactivate SCRH
+
+ED --> PC: Event processed
+deactivate ED
+
+PC --> C: Redirect to Thank You page
+deactivate PC
+
+== Result ==
+
+note over C, DB
+  ✅ Order created with order number
+  ✅ Contract fulfilled
+  ✅ Payment captured in Stripe
+  ✅ Customer sees confirmation
+end note
+
+@enduml

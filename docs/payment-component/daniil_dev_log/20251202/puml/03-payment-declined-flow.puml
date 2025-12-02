@@ -1,0 +1,127 @@
+@startuml Payment Declined Flow
+!theme plain
+title Stripe Payment - Authorization Declined Flow
+
+skinparam backgroundColor #FEFEFE
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor Customer as C
+participant "OrderController" as OC
+participant "EventDispatcher" as ED
+participant "StripeCheckoutReturnHandler" as SCRH
+participant "Stripe API" as S
+database "Database" as DB
+
+== Scenario A: Stripe Handles Decline Internally ==
+
+note over C, S #FFFFCC
+  **Most Common Case**
+  Stripe Checkout handles card declines
+  internally without redirecting to shop
+end note
+
+C -> S: Enter card details on Stripe Checkout
+activate S
+
+S -> S: Attempt authorization
+note right of S
+  Card issuer declines:
+  - Insufficient funds
+  - Card expired
+  - Fraud suspected
+  - etc.
+end note
+
+S --> C: "Your card was declined.\nPlease try a different payment method."
+deactivate S
+
+note over C
+  Customer stays on Stripe Checkout
+  Can try another card
+  Or click "Back" (cancel flow)
+end note
+
+== Scenario B: Redirect with Failed Status ==
+
+note over C, S #FFEEEE
+  **Less Common Case**
+  Some failure scenarios redirect
+  back to success_url with failed payment
+end note
+
+C -> S: Complete 3DS / processing
+S -> S: Payment fails after redirect initiated
+S --> C: Redirect to success_url\n(with session_id)
+
+C -> OC: GET /order?fnc=checkoutSuccess\n&session_id=cs_xxx&contract_id=xxx&contract_token=xxx
+activate OC
+
+OC -> ED: dispatch(StripeCheckoutReturnEvent)
+activate ED
+
+ED -> SCRH: handle(event)
+activate SCRH
+
+SCRH -> SCRH: Validate contract_token ✓
+SCRH -> DB: Load contract ✓
+
+SCRH -> S: checkout.sessions.retrieve(cs_xxx)
+activate S
+S --> SCRH: Session {\n  payment_status: 'unpaid',\n  status: 'open'\n}
+deactivate S
+
+alt Payment Intent exists
+  SCRH -> S: paymentIntents.retrieve(pi_xxx)
+  activate S
+  S --> SCRH: PaymentIntent {\n  status: 'requires_payment_method',\n  last_payment_error: {\n    code: 'card_declined',\n    message: 'Your card was declined'\n  }\n}
+  deactivate S
+end
+
+SCRH -> SCRH: Payment NOT successful
+
+SCRH -> ED: context.set('paymentFailed', true)\ncontext.set('error', 'Your card was declined')\ncontext.set('declineCode', 'card_declined')
+deactivate SCRH
+
+ED --> OC: Event processed
+deactivate ED
+
+OC -> OC: Check context for errors
+
+OC --> C: Redirect to payment page\nwith error message
+deactivate OC
+
+== Result ==
+
+note over C, DB #FFEEEE
+  ❌ No order created
+  ❌ Payment not captured
+  ⚠️ Contract remains PENDING
+  ✅ Customer sees error message
+  ✅ Customer can retry payment
+end note
+
+== Payment Intent Status Reference ==
+
+note over S
+  **PaymentIntent.status values:**
+
+  | Status | Meaning | Action |
+  |--------|---------|--------|
+  | succeeded | Payment OK | Create order |
+  | processing | Async processing | Wait for webhook |
+  | requires_payment_method | Declined | Show error |
+  | requires_action | 3DS needed | Redirect |
+  | requires_confirmation | Needs confirm | Confirm |
+  | canceled | Canceled | Show error |
+
+  **Common decline codes:**
+  - card_declined
+  - insufficient_funds
+  - expired_card
+  - incorrect_cvc
+  - processing_error
+  - fraudulent
+end note
+
+@enduml

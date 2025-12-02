@@ -1,0 +1,116 @@
+@startuml Canceled Checkout Flow
+!theme plain
+title Stripe Payment - Canceled Checkout Flow
+
+skinparam backgroundColor #FEFEFE
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor Customer as C
+participant "PaymentController" as PC
+participant "ContractService" as CS
+participant "EventDispatcher" as ED
+participant "StripeCheckoutSessionHandler" as SCSH
+participant "Stripe API" as S
+participant "Cron Job" as CRON
+database "Database" as DB
+
+== Phase 1: Initiate Checkout ==
+
+C -> PC: Select Stripe Payment
+activate PC
+
+PC -> CS: createContract(userId, basket)
+activate CS
+CS -> DB: Save contract (PENDING)
+CS --> PC: PaymentContract
+deactivate CS
+
+PC -> ED: dispatch(StripeCheckoutSessionRequestEvent)
+activate ED
+
+ED -> SCSH: handle(event)
+activate SCSH
+
+SCSH -> S: checkout.sessions.create({...})
+activate S
+S --> SCSH: CheckoutSession (cs_xxx)
+deactivate S
+
+SCSH -> DB: Update contract with session_id
+SCSH --> ED: context.set('checkoutUrl')
+deactivate SCSH
+
+ED --> PC: Event processed
+deactivate ED
+
+PC --> C: Redirect to Stripe Checkout
+deactivate PC
+
+== Phase 2: Customer Cancels ==
+
+C -> S: View Stripe Checkout page
+note right of C
+  Customer decides not to pay:
+  - Clicks browser back button
+  - Closes the tab
+  - Clicks "Back" link on Stripe
+end note
+
+S --> C: Redirect to cancel_url\n(index.php?cl=payment)
+
+== Phase 3: Return to Payment Page ==
+
+C -> PC: GET /payment (cancel_url)
+activate PC
+
+note over PC
+  **No event fired**
+
+  Customer simply returns
+  to payment selection.
+
+  Contract remains PENDING.
+end note
+
+PC --> C: Payment selection page\n(can select different method or retry)
+deactivate PC
+
+== Phase 4: Contract Cleanup (Later) ==
+
+note over CRON, DB
+  Contract has TTL (e.g., 30 minutes)
+  Cron job runs periodically
+end note
+
+CRON -> CS: cleanupExpiredContracts()
+activate CS
+CS -> DB: Find contracts where\ncreatedAt + TTL < now\nAND state = PENDING
+DB --> CS: [contract_xxx]
+CS -> DB: Update state: EXPIRED
+CS --> CRON: Cleaned up 1 contract
+deactivate CS
+
+== Alternative: Customer Retries ==
+
+C -> PC: Select Stripe Payment again
+activate PC
+note over PC
+  Can use same contract
+  if not expired,
+  OR create new contract
+end note
+PC --> C: Redirect to Stripe Checkout
+deactivate PC
+
+== Result ==
+
+note over C, DB #FFEEEE
+  ⚠️ No order created
+  ⚠️ Contract expires after TTL
+  ⚠️ Stripe Checkout Session expires after 24h
+  ✅ Customer can retry anytime
+  ✅ No payment was charged
+end note
+
+@enduml
