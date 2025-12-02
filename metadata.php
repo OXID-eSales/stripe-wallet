@@ -64,7 +64,7 @@ $aModule = [
         'paymentwatch_assumption' => AssumptionController::class,
         'StripeConnect' => StripeConnect::class,
         'stripe_webhook' => StripeWebhookController::class,
-        'OrderRefund' => OrderRefund::class,
+        'stripe_order_refund' => OrderRefund::class,
         'orderController' => StripeOrderController::class,
     ],
     'events' => [

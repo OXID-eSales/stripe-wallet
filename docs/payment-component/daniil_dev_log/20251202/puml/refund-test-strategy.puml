@@ -1,0 +1,195 @@
+@startuml refund-test-strategy
+!theme plain
+title Sprint 4: TDD Test Strategy - Test Pyramid
+
+skinparam backgroundColor #FEFEFE
+skinparam roundcorner 10
+
+' ========================================
+' TEST PYRAMID
+' ========================================
+
+rectangle "Test Pyramid" {
+
+    rectangle "Manual Testing" as Manual #LightCoral {
+        note as ManualNote
+            **Admin Panel Testing**
+            - Load refund page
+            - Execute full refund
+            - Execute partial refund
+            - Verify success/error messages
+        end note
+    }
+
+    rectangle "Integration Tests" as Integration #Gold {
+        note as IntNote
+            **Full Flow Tests**
+            - Event dispatch → Handler → Stripe Mock → DB
+            - Real DI container
+            - Database transactions
+        end note
+    }
+
+    rectangle "Unit Tests" as Unit #LightGreen {
+        note as UnitNote
+            **Isolated Component Tests**
+            - Event class tests
+            - Handler tests (mocked deps)
+            - Controller tests (mocked dispatcher)
+        end note
+    }
+}
+
+' ========================================
+' UNIT TEST DETAILS
+' ========================================
+
+package "Unit Tests (Phase 1-3)" #LightGreen {
+
+    rectangle "StripeRefundRequestEventTest" as EventTest {
+        card "testEventCarriesContextData()" as T1
+        card "testFullRefundHasNullAmount()" as T2
+        card "testIsFullRefundReturnsCorrectly()" as T3
+        card "testGettersReturnCorrectValues()" as T4
+    }
+
+    rectangle "StripeRefundRequestHandlerTest" as HandlerTest {
+        card "testHandlerProcessesFullRefundSuccessfully()" as H1
+        card "testHandlerSetsErrorOnStripeFailure()" as H2
+        card "testHandlerRejectsInvalidContractState()" as H3
+        card "testHandlerSupportsPartialRefund()" as H4
+        card "testHandlerImplementsCorrectInterface()" as H5
+        card "testHandlerUpdatesContractState()" as H6
+        card "testHandlerEmitsRefundedEvent()" as H7
+        card "testHandlerLogsRefundAttempt()" as H8
+    }
+
+    rectangle "OrderRefundControllerTest" as ControllerTest {
+        card "testFullRefundEmitsEvent()" as C1
+        card "testPartialRefundEmitsEventWithAmount()" as C2
+        card "testControllerProcessesSuccessResult()" as C3
+        card "testControllerProcessesErrorResult()" as C4
+        card "testRenderExposesViewData()" as C5
+        card "testNoOrderReturnsError()" as C6
+    }
+}
+
+' ========================================
+' INTEGRATION TEST DETAILS
+' ========================================
+
+package "Integration Tests (Phase 4)" #Gold {
+
+    rectangle "RefundFlowIntegrationTest" as IntegrationTest {
+        card "testFullRefundFlowViaEventSystem()" as I1
+        card "testPartialRefundPreservesContractState()" as I2
+        card "testRefundFailureRollsBackState()" as I3
+        card "testConcurrentRefundsAreIdempotent()" as I4
+        card "testRefundUpdatesOrderStatus()" as I5
+    }
+}
+
+' ========================================
+' TDD FLOW
+' ========================================
+
+package "TDD Development Order" #LavenderBlush {
+
+    rectangle "Step 1" as S1 #Pink {
+        note as S1Note
+            **Write Event Tests First**
+            Tests define the event contract
+            before implementation
+        end note
+    }
+
+    rectangle "Step 2" as S2 #Pink {
+        note as S2Note
+            **Write Handler Tests**
+            Define expected behavior:
+            - Success scenarios
+            - Error scenarios
+            - Edge cases
+        end note
+    }
+
+    rectangle "Step 3" as S3 #Pink {
+        note as S3Note
+            **Implement to Pass Tests**
+            Write minimal code to
+            make tests pass
+        end note
+    }
+
+    rectangle "Step 4" as S4 #Pink {
+        note as S4Note
+            **Write Controller Tests**
+            Verify event emission
+            and result processing
+        end note
+    }
+
+    rectangle "Step 5" as S5 #Pink {
+        note as S5Note
+            **Integration Tests**
+            Full flow verification
+            with real container
+        end note
+    }
+
+    S1 -right-> S2
+    S2 -right-> S3
+    S3 -down-> S4
+    S4 -left-> S5
+}
+
+' ========================================
+' MOCKING STRATEGY
+' ========================================
+
+package "Mocking Strategy" #LightGray {
+
+    rectangle "Handler Tests Mock:" as HMock {
+        card "StripeAdapterFactoryInterface" as M1
+        card "ContractRepositoryInterface" as M2
+        card "OrderRepositoryInterface" as M3
+        card "LoggerInterface" as M4
+    }
+
+    rectangle "Controller Tests Mock:" as CMock {
+        card "EventDispatcherInterface" as M5
+        card "getOrder() method" as M6
+        card "getContractId() method" as M7
+    }
+
+    rectangle "Integration Tests Mock:" as IMock {
+        card "Stripe API (HTTP Client)" as M8
+        note as IMockNote
+            Real DI container
+            Real database
+            Only external API mocked
+        end note
+    }
+}
+
+' ========================================
+' ASSERTIONS GUIDE
+' ========================================
+
+note bottom of Unit
+    **Unit Test Assertions:**
+    - assertTrue/assertFalse for success flag
+    - assertEquals for refund amounts
+    - assertInstanceOf for event types
+    - assertNull for error when success
+end note
+
+note bottom of Integration
+    **Integration Test Assertions:**
+    - Database state verification
+    - Contract state transitions
+    - Order status updates
+    - Event dispatch verification
+end note
+
+@enduml

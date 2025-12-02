@@ -1,0 +1,133 @@
+@startuml refund-flow-sequence
+!theme plain
+title Sprint 4: Admin Refund Flow - Sequence Diagram
+
+skinparam backgroundColor #FEFEFE
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 10
+skinparam maxmessagesize 200
+
+actor "Admin User" as Admin
+participant "OrderRefund\nController" as Controller #LightBlue
+participant "EventDispatcher" as Dispatcher #LightGreen
+participant "StripeRefund\nRequestHandler" as Handler #LightYellow
+participant "ContractRepository" as ContractRepo #LightGray
+participant "Stripe API" as Stripe #MediumPurple
+database "Database" as DB #LightCoral
+
+== Full Refund Flow ==
+
+Admin -> Controller: fullRefund()
+activate Controller
+
+note right of Controller
+  **THIN Controller**
+  Only validates & emits event
+end note
+
+Controller -> Controller: getOrder()
+Controller -> Controller: getContractId()
+Controller -> Controller: createRefundContext()
+
+note right of Controller
+  EventContext = {
+    orderId: "order_123"
+    contractId: "contract_456"
+    amount: null (full)
+    reason: "duplicate"
+    initiator: "admin"
+  }
+end note
+
+Controller -> Dispatcher: dispatch(StripeRefundRequestEvent)
+activate Dispatcher
+
+Dispatcher -> Handler: handle(event)
+activate Handler
+
+note right of Handler
+  **FAT Handler**
+  Contains all business logic
+end note
+
+== Step 1: Validate Contract State ==
+
+Handler -> ContractRepo: findById(contractId)
+activate ContractRepo
+ContractRepo --> Handler: PaymentContract
+deactivate ContractRepo
+
+Handler -> Handler: validateContractState()
+note right of Handler
+  Contract must be:
+  - COMMITTED or
+  - FULFILLED
+end note
+
+alt Contract Invalid State
+    Handler -> Handler: context.set('error', '...')
+    Handler -> Handler: context.set('refundSuccess', false)
+    Handler --> Dispatcher: return
+else Contract Valid
+end
+
+== Step 2: Execute Stripe Refund ==
+
+Handler -> Stripe: refunds.create({charge, amount})
+activate Stripe
+
+alt Stripe Success
+    Stripe --> Handler: Refund {id: "re_abc", status: "succeeded"}
+    deactivate Stripe
+
+    Handler -> Handler: context.set('refundId', 're_abc')
+    Handler -> Handler: context.set('refundSuccess', true)
+    Handler -> Handler: context.set('refundedAmount', 100.00)
+
+    == Step 3: Update Contract State ==
+
+    Handler -> ContractRepo: updateState(contract, 'REFUNDED')
+    activate ContractRepo
+    ContractRepo -> DB: UPDATE payment_contracts
+    ContractRepo --> Handler: success
+    deactivate ContractRepo
+
+    == Step 4: Emit Completion Event ==
+
+    Handler -> Dispatcher: dispatch(PaymentRefundedEvent)
+    note right of Handler
+      Allows other subscribers
+      to react (logging, notifications)
+    end note
+
+else Stripe Error
+    Stripe --> Handler: InvalidRequestException
+    Handler -> Handler: context.set('error', message)
+    Handler -> Handler: context.set('refundSuccess', false)
+end
+
+Handler --> Dispatcher: return
+deactivate Handler
+
+Dispatcher --> Controller: return
+deactivate Dispatcher
+
+== Step 5: Process Results ==
+
+Controller -> Controller: processContextResults()
+note right of Controller
+  Reads from EventContext:
+  - refundSuccess
+  - refundId / error
+  Sets view data for template
+end note
+
+alt Refund Successful
+    Controller -> Admin: render(wasRefundSuccessful: true)
+else Refund Failed
+    Controller -> Admin: render(errorMessage: "...")
+end
+
+deactivate Controller
+
+@enduml

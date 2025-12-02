@@ -132,10 +132,12 @@ services:
   # Stripe Adapter Factory Interface - Stripe-specific factory
   OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface:
     alias: OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactoryInterface
+    public: true
 
   # Stripe Adapter Factory - Concrete implementation
   OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactory:
     alias: OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactoryInterface
+    public: true
 
   # ==========================================
   # Shop Adapter Layer (Platform-Agnostic)
@@ -312,6 +314,20 @@ services:
       $shopOrderService: '@OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface'
     tags:
       - { name: payment.event_handler, priority: 80 }
+    public: false
+
+  # ==========================================
+  # Stripe Refund Handler (Sprint 4)
+  # ==========================================
+  # Handles StripeRefundRequestEvent from admin panel, webhook, or API.
+  # Processes refunds via Stripe API and updates order/contract state.
+
+  OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeRefundRequestHandler:
+    arguments:
+      $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+    tags:
+      - { name: payment.event_handler }
     public: false
 
   # ==========================================

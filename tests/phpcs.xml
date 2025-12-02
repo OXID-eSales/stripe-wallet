@@ -3,7 +3,10 @@
     <description>PHP CodeSniffer configuration for Stripe Payment Module</description>
 
     <!-- Use PSR-12 coding standard -->
-    <rule ref="PSR12"/>
+    <rule ref="PSR12">
+        <!-- Exclude underscore prefix rule - OXID framework convention -->
+        <exclude name="PSR2.Classes.PropertyDeclaration.Underscore"/>
+    </rule>
 
     <!-- Paths to check -->
     <file>../src</file>

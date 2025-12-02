@@ -1,0 +1,227 @@
+@startuml refund-class-diagram
+!theme plain
+title Sprint 4: Refund Classes - UML Class Diagram
+
+skinparam backgroundColor #FEFEFE
+skinparam classAttributeIconSize 0
+skinparam roundcorner 10
+
+' ========================================
+' INTERFACES
+' ========================================
+
+package "Interfaces" #LightGray {
+
+    interface HandlerInterface <<interface>> {
+        +{static} getHandledEventClass(): string
+        +handle(event: object): void
+    }
+
+    interface EventDispatcherInterface <<interface>> {
+        +dispatch(event: object): void
+    }
+
+    interface ContractRepositoryInterface <<interface>> {
+        +findById(id: string): ?PaymentContractInterface
+        +save(contract: PaymentContractInterface): void
+    }
+
+    interface OrderRepositoryInterface <<interface>> {
+        +findById(id: string): ?Order
+    }
+
+    interface StripeAdapterFactoryInterface <<interface>> {
+        +getStripeClient(): StripeClient
+    }
+}
+
+' ========================================
+' EVENTS
+' ========================================
+
+package "Events" #PaleGreen {
+
+    class EventContext {
+        -data: array<string, mixed>
+        --
+        +__construct(data: array)
+        +get(key: string): mixed
+        +set(key: string, value: mixed): void
+        +has(key: string): bool
+        +setContract(contract: PaymentContractInterface): void
+        +getContract(): ?PaymentContractInterface
+    }
+
+    class StripeRefundRequestEvent {
+        -context: EventContext
+        --
+        +__construct(context: EventContext)
+        +getContext(): EventContext
+        +getOrderId(): string
+        +getContractId(): string
+        +getAmount(): ?float
+        +getReason(): string
+        +getDescription(): ?string
+        +getInitiator(): string
+        +isFullRefund(): bool
+    }
+
+    class PaymentRefundedEvent {
+        -context: EventContext
+        -refundId: string
+        -amount: float
+        -currency: string
+        --
+        +__construct(context, refundId, amount, currency)
+        +getContext(): EventContext
+        +getRefundId(): string
+        +getAmount(): float
+        +getCurrency(): string
+    }
+}
+
+' ========================================
+' HANDLER
+' ========================================
+
+package "Handlers" #LightYellow {
+
+    class StripeRefundRequestHandler implements HandlerInterface {
+        -adapterFactory: StripeAdapterFactoryInterface
+        -contractRepository: ContractRepositoryInterface
+        -orderRepository: OrderRepositoryInterface
+        -logger: LoggerInterface
+        --
+        +__construct(adapterFactory, contractRepository, orderRepository, logger)
+        +{static} getHandledEventClass(): string
+        +handle(event: object): void
+        --
+        #validateRefundRequest(context: EventContext): bool
+        #loadContractAndOrder(context: EventContext): bool
+        #executeStripeRefund(context: EventContext): bool
+        #updateContractState(context: EventContext): void
+        #dispatchRefundCompletedEvent(context: EventContext): void
+        --
+        -getRefundAmount(context: EventContext, order: Order): int
+        -buildRefundMetadata(context: EventContext): array
+    }
+}
+
+' ========================================
+' CONTROLLER
+' ========================================
+
+package "Controllers" #LightBlue {
+
+    abstract class AdminDetailsController {
+        #_aViewData: array
+        --
+        +render(): string
+        +addTplParam(name: string, value: mixed): void
+        #getEditObjectId(): ?string
+    }
+
+    class OrderRefundController extends AdminDetailsController {
+        -eventDispatcher: EventDispatcherInterface
+        --
+        +__construct(eventDispatcher: EventDispatcherInterface)
+        +render(): string
+        +fullRefund(): void
+        +partialRefund(): void
+        --
+        #createRefundContext(): EventContext
+        #processContextResults(context: EventContext): void
+        #getOrder(): ?Order
+        #getContractId(): ?string
+        --
+        +isStripeOrder(): bool
+        +wasRefundSuccessful(): bool
+        +getErrorMessage(): ?string
+        +isOrderRefundable(): bool
+        +getRemainingRefundableAmount(): float
+        +formattedPrice(amount: float): string
+    }
+}
+
+' ========================================
+' DOMAIN
+' ========================================
+
+package "Domain" #LavenderBlush {
+
+    interface PaymentContractInterface <<interface>> {
+        +getId(): string
+        +getState(): string
+        +setState(state: string): void
+        +getMetadata(key: string): mixed
+        +setMetadata(key: string, value: mixed): void
+        +getOrderId(): ?string
+    }
+
+    class PaymentContract implements PaymentContractInterface {
+        -id: string
+        -state: string
+        -orderId: ?string
+        -metadata: array
+        -refundedAmount: float
+        --
+        +getRefundedAmount(): float
+        +addRefund(amount: float): void
+        +isFullyRefunded(): bool
+    }
+}
+
+' ========================================
+' RELATIONSHIPS
+' ========================================
+
+' Handler dependencies
+StripeRefundRequestHandler ..> StripeAdapterFactoryInterface : uses
+StripeRefundRequestHandler ..> ContractRepositoryInterface : uses
+StripeRefundRequestHandler ..> OrderRepositoryInterface : uses
+StripeRefundRequestHandler ..> StripeRefundRequestEvent : handles
+StripeRefundRequestHandler ..> PaymentRefundedEvent : creates
+
+' Event relationships
+StripeRefundRequestEvent *-- EventContext : contains
+PaymentRefundedEvent *-- EventContext : contains
+
+' Controller relationships
+OrderRefundController ..> EventDispatcherInterface : uses
+OrderRefundController ..> StripeRefundRequestEvent : creates
+OrderRefundController ..> EventContext : creates & reads
+
+' Contract relationships
+ContractRepositoryInterface ..> PaymentContractInterface : returns
+StripeRefundRequestHandler ..> PaymentContractInterface : updates
+
+' ========================================
+' NOTES
+' ========================================
+
+note right of StripeRefundRequestHandler
+    **FAT Handler Pattern**
+    All business logic here:
+    - Contract validation
+    - Stripe API calls
+    - State management
+    - Event emission
+end note
+
+note right of OrderRefundController
+    **THIN Controller Pattern**
+    Only:
+    - Validates input
+    - Creates EventContext
+    - Emits event
+    - Reads results
+end note
+
+note bottom of EventContext
+    **Bidirectional Data Flow**
+    Controller writes INPUT data
+    Handler writes OUTPUT data
+    Same instance throughout request
+end note
+
+@enduml

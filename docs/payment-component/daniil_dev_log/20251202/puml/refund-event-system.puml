@@ -1,0 +1,119 @@
+@startuml refund-event-system
+!theme plain
+title Sprint 4: Refund Event System Architecture
+
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle uml2
+skinparam roundcorner 10
+
+package "Event Triggers (Multi-Channel)" {
+    [Admin Controller] as AdminTrigger #LightBlue
+    [Webhook Handler] as WebhookTrigger #LightGreen
+    [API Controller] as APITrigger #LightYellow
+    [MCP Handler] as MCPTrigger #LightCoral
+}
+
+package "Event System" #LightGray {
+
+    rectangle "EventDispatcher" as Dispatcher #White {
+        note as N1
+            PSR-14 Style
+            dispatch(event)
+        end note
+    }
+
+    rectangle "EventListenerProvider" as Provider #White {
+        note as N2
+            Maps events to handlers:
+            StripeRefundRequestEvent
+              → StripeRefundRequestHandler
+        end note
+    }
+}
+
+package "Events" #PaleGreen {
+
+    rectangle "StripeRefundRequestEvent" as RefundRequest #LightGreen {
+        note as N3
+            **INPUT Event**
+            - orderId: string
+            - contractId: string
+            - amount: ?float
+            - reason: string
+            - initiator: string
+        end note
+    }
+
+    rectangle "PaymentRefundedEvent" as RefundComplete #DarkSeaGreen {
+        note as N4
+            **OUTPUT Event**
+            - refundId: string
+            - amount: float
+            - currency: string
+            - status: string
+        end note
+    }
+}
+
+package "Handlers" #LightYellow {
+
+    rectangle "StripeRefundRequestHandler" as RefundHandler #Gold {
+        note as N5
+            **Business Logic**
+            1. Validate contract state
+            2. Call Stripe Refund API
+            3. Update contract state
+            4. Emit RefundedEvent
+        end note
+    }
+}
+
+package "Event Context (Data Flow)" #LavenderBlush {
+
+    rectangle "EventContext" as Context #MistyRose {
+        note as N6
+            **Bidirectional Data Container**
+
+            INPUT (Controller sets):
+            ├── orderId
+            ├── contractId
+            ├── amount
+            ├── reason
+            └── initiator
+
+            OUTPUT (Handler sets):
+            ├── refundSuccess: bool
+            ├── refundId: string
+            ├── refundedAmount: float
+            ├── error: ?string
+            └── errorCode: ?string
+        end note
+    }
+}
+
+' Connections - Triggers to Dispatcher
+AdminTrigger -down-> RefundRequest : creates
+WebhookTrigger -down-> RefundRequest : creates
+APITrigger -down-> RefundRequest : creates
+MCPTrigger -down-> RefundRequest : creates
+
+RefundRequest -down-> Dispatcher : dispatched to
+
+Dispatcher -right-> Provider : lookups handler
+Provider -down-> RefundHandler : invokes
+
+RefundHandler -left-> RefundComplete : emits on success
+RefundHandler <-down-> Context : reads/writes
+
+RefundRequest -right-> Context : carries
+
+RefundComplete -up-> Dispatcher : dispatched to
+
+note bottom of Context
+    **Key Pattern:**
+    Same EventContext instance flows through
+    entire request lifecycle. Handler writes
+    results that controller reads after dispatch.
+end note
+
+@enduml

@@ -1,0 +1,188 @@
+@startuml refund-multi-channel
+!theme plain
+title Sprint 4: Multi-Channel Refund Architecture
+
+skinparam backgroundColor #FEFEFE
+skinparam roundcorner 10
+skinparam actorStyle awesome
+
+' ========================================
+' ACTORS
+' ========================================
+
+actor "Shop Admin" as Admin #LightBlue
+actor "Stripe Dashboard" as StripeAdmin #MediumPurple
+actor "External System" as External #LightGreen
+actor "AI Assistant" as AI #Gold
+
+' ========================================
+' TRIGGER CHANNELS
+' ========================================
+
+package "Trigger Channels" #LightGray {
+
+    rectangle "Backend Channel" as Backend #LightBlue {
+        [OrderRefund\nController] as AdminController
+        note bottom of AdminController
+            Admin panel UI
+            POST /admin/stripe_order_refund
+        end note
+    }
+
+    rectangle "Webhook Channel" as Webhook #MediumPurple {
+        [StripeWebhook\nController] as WebhookController
+        note bottom of WebhookController
+            charge.refunded event
+            POST /stripe/webhook
+        end note
+    }
+
+    rectangle "API Channel" as API #LightGreen {
+        [RefundAPI\nController] as APIController
+        note bottom of APIController
+            REST API endpoint
+            POST /api/v1/refunds
+        end note
+    }
+
+    rectangle "MCP Channel" as MCP #Gold {
+        [MCPRefund\nHandler] as MCPHandler
+        note bottom of MCPHandler
+            AI tool integration
+            mcp://stripe/refund
+        end note
+    }
+}
+
+' ========================================
+' EVENT SYSTEM
+' ========================================
+
+package "Unified Event System" #PaleGreen {
+
+    rectangle "StripeRefundRequestEvent" as RefundEvent #LightGreen {
+        note as EventNote
+            **Same Event Structure**
+            Regardless of trigger source:
+
+            - orderId: string
+            - contractId: string
+            - amount: ?float
+            - reason: string
+            - **initiator**: string
+              (admin|webhook|api|mcp)
+        end note
+    }
+
+    rectangle "StripeRefundRequestHandler" as RefundHandler #Gold {
+        note as HandlerNote
+            **Single Handler**
+            Processes all refund requests:
+
+            1. Validate contract state
+            2. Check idempotency
+            3. Call Stripe API
+            4. Update contract
+            5. Emit completion event
+        end note
+    }
+
+    rectangle "PaymentRefundedEvent" as CompletedEvent #DarkSeaGreen {
+        note as CompleteNote
+            **Completion Notification**
+            Subscribers can react:
+            - Logging
+            - Email notifications
+            - Inventory updates
+        end note
+    }
+}
+
+' ========================================
+' EXTERNAL SERVICES
+' ========================================
+
+cloud "Stripe API" as Stripe #MediumPurple {
+    [Refunds API] as StripeRefunds
+}
+
+database "Database" as DB #LightCoral {
+    [payment_contracts] as ContractsTable
+    [oxorder] as OrdersTable
+}
+
+' ========================================
+' CONNECTIONS - Triggers to Event
+' ========================================
+
+Admin --> AdminController : clicks\n"Full Refund"
+AdminController --> RefundEvent : creates\ninitiator='admin'
+
+StripeAdmin --> WebhookController : refund via\nStripe Dashboard
+WebhookController --> RefundEvent : creates\ninitiator='webhook'
+
+External --> APIController : API call
+APIController --> RefundEvent : creates\ninitiator='api'
+
+AI --> MCPHandler : "refund order 123"
+MCPHandler --> RefundEvent : creates\ninitiator='mcp'
+
+' ========================================
+' EVENT PROCESSING
+' ========================================
+
+RefundEvent --> RefundHandler : dispatched to
+
+RefundHandler --> Stripe : refunds.create()
+RefundHandler --> ContractsTable : UPDATE state
+RefundHandler --> OrdersTable : UPDATE oxtransstatus
+
+RefundHandler --> CompletedEvent : emits on success
+
+' ========================================
+' BENEFITS CALLOUT
+' ========================================
+
+note right of RefundHandler
+    **Benefits of Multi-Channel Pattern:**
+
+    1. **Single Source of Truth**
+       One handler = one business logic
+
+    2. **Consistent Behavior**
+       Same validation, same state machine
+
+    3. **Easy Testing**
+       Test handler once, covers all channels
+
+    4. **Audit Trail**
+       initiator field tracks source
+
+    5. **Idempotency**
+       Webhook safe (can receive duplicates)
+end note
+
+' ========================================
+' IDEMPOTENCY FLOW
+' ========================================
+
+package "Idempotency Check" #LavenderBlush {
+
+    rectangle "Before Stripe Call" as IdempotencyCheck {
+        note as IdempNote
+            Handler checks:
+            1. Contract not already REFUNDED
+            2. PaymentIntent not already refunded
+            3. Refund ID not in request_log
+
+            If already processed:
+            - Set refundSuccess = true
+            - Skip Stripe API call
+            - Return existing refundId
+        end note
+    }
+}
+
+RefundHandler --> IdempotencyCheck : validates
+
+@enduml

@@ -1,0 +1,137 @@
+@startuml refund-contract-states
+!theme plain
+title Sprint 4: Contract State Machine - Refund Transitions
+
+skinparam backgroundColor #FEFEFE
+skinparam roundcorner 10
+skinparam state {
+    BackgroundColor<<refundable>> LightGreen
+    BackgroundColor<<not_refundable>> LightCoral
+    BackgroundColor<<refunded>> LightBlue
+}
+
+' ========================================
+' STATE MACHINE
+' ========================================
+
+[*] --> DRAFT : Contract created
+
+state DRAFT <<not_refundable>> {
+    note right of DRAFT
+        Cart/checkout started
+        No payment yet
+        **Cannot refund**
+    end note
+}
+
+DRAFT --> PENDING : Checkout initiated
+
+state PENDING <<not_refundable>> {
+    note right of PENDING
+        Payment in progress
+        Waiting for Stripe
+        **Cannot refund**
+    end note
+}
+
+PENDING --> READY_TO_COMMIT : Payment authorized
+
+state READY_TO_COMMIT <<not_refundable>> {
+    note right of READY_TO_COMMIT
+        Payment ready
+        Order not yet created
+        **Cannot refund**
+    end note
+}
+
+READY_TO_COMMIT --> COMMITTED : Order created
+
+state COMMITTED <<refundable>> {
+    note right of COMMITTED
+        Order completed
+        Payment captured
+        **CAN REFUND**
+    end note
+}
+
+COMMITTED --> FULFILLED : Order shipped/completed
+
+state FULFILLED <<refundable>> {
+    note right of FULFILLED
+        Order delivered
+        All conditions met
+        **CAN REFUND**
+    end note
+}
+
+' Refund transitions
+COMMITTED --> PARTIALLY_REFUNDED : Partial refund
+FULFILLED --> PARTIALLY_REFUNDED : Partial refund
+
+state PARTIALLY_REFUNDED <<refundable>> {
+    note right of PARTIALLY_REFUNDED
+        Some amount refunded
+        Remaining amount > 0
+        **CAN REFUND MORE**
+    end note
+}
+
+PARTIALLY_REFUNDED --> PARTIALLY_REFUNDED : Another partial refund
+
+COMMITTED --> REFUNDED : Full refund
+FULFILLED --> REFUNDED : Full refund
+PARTIALLY_REFUNDED --> REFUNDED : Refund remaining
+
+state REFUNDED <<refunded>> {
+    note right of REFUNDED
+        Fully refunded
+        amount_refunded = amount_total
+        **Cannot refund more**
+    end note
+}
+
+' Error states
+PENDING --> FAILED : Payment failed
+
+state FAILED <<not_refundable>> {
+    note right of FAILED
+        Payment declined
+        No charge to refund
+        **Cannot refund**
+    end note
+}
+
+REFUNDED --> [*]
+FAILED --> [*]
+
+' ========================================
+' HANDLER VALIDATION LOGIC
+' ========================================
+
+note bottom of COMMITTED
+    **StripeRefundRequestHandler validates:**
+
+    ```php
+    private function isRefundable(PaymentContract $contract): bool
+    {
+        return in_array($contract->getState(), [
+            'COMMITTED',
+            'FULFILLED',
+            'PARTIALLY_REFUNDED',
+        ], true);
+    }
+    ```
+end note
+
+' ========================================
+' LEGEND
+' ========================================
+
+legend right
+    |= State Color |= Meaning |
+    | <#LightGreen> | Refundable |
+    | <#LightCoral> | Not Refundable |
+    | <#LightBlue> | Fully Refunded |
+endlegend
+
+@enduml
