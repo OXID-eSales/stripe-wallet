@@ -1,0 +1,157 @@
+@startuml Refund Flow
+!theme plain
+title Stripe Payment - Admin Refund Flow
+
+skinparam backgroundColor #FEFEFE
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor Admin as A
+participant "OrderRefund\nController" as ORC
+participant "ContainerFactory" as CF
+participant "StripeAdapterFactory" as SAF
+participant "Stripe API" as S
+database "Database" as DB
+
+== Phase 1: Load Refund Page ==
+
+A -> ORC: Open Order Details\n(Stripe tab)
+activate ORC
+
+ORC -> ORC: render()
+ORC -> DB: Load Order by oxid
+DB --> ORC: Order object
+
+ORC -> ORC: getStripeApiOrderLastCharge(false)
+activate ORC #LightBlue
+
+ORC -> CF: get(StripeAdapterFactoryInterface)
+activate CF
+CF --> ORC: StripeAdapterFactory
+deactivate CF
+
+ORC -> SAF: create(order)
+activate SAF
+SAF --> ORC: StripeAdapter
+deactivate SAF
+
+ORC -> S: paymentIntents.retrieve(pi_xxx)
+activate S
+S --> ORC: PaymentIntent {\n  latest_charge: ch_xxx\n}
+deactivate S
+
+ORC -> S: charges.retrieve(ch_xxx)
+activate S
+S --> ORC: Charge {\n  amount_captured: 9599,\n  amount_refunded: 0,\n  refunded: false\n}
+deactivate S
+
+deactivate ORC
+
+ORC -> ORC: isOrderRefundable()
+note right of ORC
+  Check:
+  - Charge exists?
+  - charge.refunded == false?
+  - amount_captured > amount_refunded?
+end note
+
+ORC -> ORC: getStripeCapturedAmount()
+note right of ORC
+  amount_captured / 100
+  = €95.99
+end note
+
+ORC --> A: Render refund form\nwith captured amount
+deactivate ORC
+
+== Phase 2: Execute Full Refund ==
+
+A -> ORC: Click "Execute Refund"\n(full refund)
+activate ORC
+
+ORC -> ORC: executeFullRefund()
+ORC -> ORC: getStripeApiOrderLastCharge(false)
+
+ORC -> S: refunds.create({\n  charge: ch_xxx,\n  amount: 9599\n})
+activate S
+
+alt Refund Successful
+  S --> ORC: Refund {\n  id: re_xxx,\n  status: 'succeeded',\n  amount: 9599\n}
+  deactivate S
+
+  ORC -> DB: Update order refund fields\n(oxstorno, etc.)
+
+  ORC --> A: Success message\n"Refund executed successfully"
+
+else Refund Failed
+  S --> ORC: StripeException {\n  code: 'charge_already_refunded',\n  message: '...'\n}
+
+  ORC -> ORC: Set error message
+  ORC --> A: Error message\n"Refund failed: ..."
+end
+
+deactivate ORC
+
+== Phase 3: Execute Partial Refund ==
+
+A -> ORC: Enter amount €50.00\nClick "Execute Refund"
+activate ORC
+
+ORC -> ORC: executePartialRefund(50.00)
+ORC -> ORC: Validate amount <= remaining
+
+ORC -> S: refunds.create({\n  charge: ch_xxx,\n  amount: 5000\n})
+activate S
+S --> ORC: Refund {\n  id: re_xxx,\n  status: 'succeeded',\n  amount: 5000\n}
+deactivate S
+
+ORC -> DB: Update order\npartial refund amount
+
+ORC --> A: Success message\n"Partial refund of €50.00"
+deactivate ORC
+
+== Error Scenario: API Unavailable ==
+
+A -> ORC: Open refund page
+activate ORC
+
+ORC -> ORC: getStripeApiOrderLastCharge(false)
+ORC -> CF: get(StripeAdapterFactoryInterface)
+activate CF
+CF --> ORC: Exception:\n"Service not public"
+deactivate CF
+
+ORC -> ORC: stripeApiError = error message
+ORC -> ORC: hasStripeApiError() = true
+
+ORC --> A: Show API error box\n(red warning message)
+deactivate ORC
+
+note over A, DB #FFEEEE
+  **API Error Display:**
+  "Stripe API Error: The service has been
+  removed or inlined when container compiled..."
+
+  (Instead of misleading "already refunded" message)
+end note
+
+== Stripe Charge Status Reference ==
+
+note over S
+  **Charge object fields:**
+
+  | Field | Description |
+  |-------|-------------|
+  | amount | Original charge amount (cents) |
+  | amount_captured | Amount captured (cents) |
+  | amount_refunded | Total refunded (cents) |
+  | refunded | true if fully refunded |
+
+  **Refund status values:**
+  - succeeded: Refund completed
+  - pending: Refund processing
+  - failed: Refund failed
+  - canceled: Refund canceled
+end note
+
+@enduml
