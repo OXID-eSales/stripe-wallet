@@ -294,6 +294,22 @@ class OrderRefund extends AdminDetailsController
     }
 
     /**
+     * Returns total captured amount from Stripe Api (what was actually charged)
+     *
+     * @return string
+     */
+    public function getStripeCapturedAmount(): string
+    {
+        $oApiCharge = $this->getStripeApiOrderLastCharge(false);
+
+        $dPrice = 0;
+        if ($oApiCharge && !empty($oApiCharge->amount_captured)) {
+            $dPrice = $oApiCharge->amount_captured / 100;
+        }
+        return $this->getFormatedPrice($dPrice);
+    }
+
+    /**
      * Get refunded amount formatted
      *
      * @param float $dPrice

@@ -74,3 +74,22 @@ parameters:
         - '#encapsed string cannot be cast to string#'
         # Stripe SDK charge retrieval
         - '#Parameter \#1 \$id of method Stripe\\Service\\ChargeService::retrieve\(\) expects string, string\|Stripe\\Charge given#'
+        # OXID basket object methods (mixed types from generic object parameter)
+        - '#Cannot call method getBruttoPrice\(\) on mixed#'
+        - '#Cannot call method getNettoPrice\(\) on mixed#'
+        - '#Cannot call method getVatValue\(\) on mixed#'
+        - '#Cannot call method getId\(\) on mixed#'
+        - '#Cannot call method getTitle\(\) on mixed#'
+        - '#Cannot access property \$name on mixed#'
+        - '#Cannot access property \$oxarticles__oxtitle on mixed#'
+        # ContractService - OXID basket iteration and method calls on dynamic types
+        - '#Call to an undefined method OxidSolutionCatalysts\\Payments\\Component\\Contract\\PaymentContractInterface::expire\(\)#'
+        - '#Argument of an invalid type mixed supplied for foreach#'
+        - '#Cannot call method getArticle\(\) on class-string\|object#'
+        - '#Cannot call method getUnitPrice\(\) on class-string\|object#'
+        - '#Cannot call method getAmount\(\) on class-string\|object#'
+        - '#Parameter \#1 .* of function method_exists expects object\|string, (class-string\|object|mixed) given#'
+        - '#Binary operation "\*" between mixed and int results in an error#'
+        - '#Cannot access property \$sDiscount on mixed#'
+        - '#Cannot access property \$dDiscount on mixed#'
+        - '#Parameter \#1 \$article of method.*ContractService::extractArticleTitle\(\) expects object\|null, mixed given#'

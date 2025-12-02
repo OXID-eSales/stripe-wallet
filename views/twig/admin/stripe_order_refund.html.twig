@@ -145,7 +145,8 @@
 
                 {% set blIsFullRefundAvailable = oView.isFullRefundAvailable() %}
                 {% if blIsFullRefundAvailable == true %}
-                    <span>{{ translate({ ident: "STRIPE_FULL_REFUND_TEXT" }) }}: {{ oView.getFormatedPrice(edit.getFieldData('oxtotalordersum')) }} <small>{{ edit.getFieldData('oxcurrency') }}</small></span><br><br>
+                    {# Use Stripe captured amount, not order total - they may differ due to discounts/vouchers #}
+                    <span>{{ translate({ ident: "STRIPE_FULL_REFUND_TEXT" }) }}: {{ oView.getStripeCapturedAmount() }} <small>{{ edit.getFieldData('oxcurrency') }}</small></span><br><br>
                 {% else %}
                     <input type="hidden" name="refundRemaining" value="1">
                     <span>{{ translate({ ident: "STRIPE_REFUND_REMAINING" }) }}: {{ oView.getRemainingRefundableAmount() }} <small>{{ edit.getFieldData('oxcurrency') }}</small></span><br><br>
