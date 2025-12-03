@@ -1,6 +1,6 @@
 # Status - December 3, 2025
 
-## Current Status: ALL SPRINTS COMPLETE
+## Current Status: INVESTIGATION COMPLETE - SPRINT 6 PLANNED
 
 ---
 
@@ -11,6 +11,10 @@
 | Sprint 1 | Webhook Tests for Stripe Events | **COMPLETED** | 100% |
 | Sprint 2 | OXORDER Field Persistence Tests | **COMPLETED** | 100% |
 | Sprint 3 | Playwright E2E Tests Setup | **COMPLETED** | 100% |
+| Sprint 4 | OXPAID Timestamp Bug Fix | **COMPLETED** | 100% |
+| Sprint 5 | DB Migration Architecture Cleanup | **COMPLETED** | 100% |
+| **Investigation** | Order State Machine Ambiguity | **COMPLETED** | 100% |
+| **Sprint 6** | Contract-Aware Webhook Processing | **PLANNED** | 0% |
 
 ---
 
@@ -135,6 +139,60 @@ docker compose exec php vendor/bin/phpunit \
 
 ---
 
+## Investigation: Order State Machine Ambiguity
+
+### Problem Identified
+
+Tests are "false green" - they pass but don't verify the documented architecture:
+
+| Flow | Uses Contract? | What Happens |
+|------|---------------|--------------|
+| Frontend | **YES** | DRAFT → PENDING → READY → COMMITTED |
+| Webhook | **NO** | Direct SQL updates, contract bypassed |
+
+### Root Cause
+
+`WebhookProcessingService` was implemented with legacy direct-DB approach:
+- Finds order by `osc_payment_transaction` or `oxorder.OXTRANSID`
+- Updates `osc_payment_order_state` directly
+- Updates `oxorder` via SQL
+- **NEVER touches osc_payment_contract!**
+
+### Impact
+
+- Contract stuck in `COMMITTED` state forever
+- Never transitions to `FULFILLED`
+- `ContractFulfilledEvent` never dispatched
+- Event subscribers don't fire
+
+### Solution: Sprint 6
+
+Make `WebhookProcessingService` contract-aware:
+1. Find contract by provider order ID
+2. Validate contract state (must be COMMITTED)
+3. Transition to FULFILLED
+4. Update order THROUGH contract
+5. Dispatch `ContractFulfilledEvent`
+
+See: `sprint-6-contract-aware-webhooks.md`
+
+---
+
+## PlantUML Diagrams Created
+
+| File | Description |
+|------|-------------|
+| `puml/01-documented-architecture-contract-aware.puml` | Architecture docs version |
+| `puml/02-actual-implementation-direct-db.puml` | WebhookProcessingService reality |
+| `puml/03-false-green-tests-gap.puml` | Why tests pass but don't verify architecture |
+| `puml/04-workflow-ambiguity-two-paths.puml` | Side-by-side comparison |
+| `puml/05-tdd-fix-approach.puml` | TDD plan for fix |
+| `puml/06-corrected-unified-flow.puml` | Target state |
+| `puml/07-actual-frontend-flow-contract-aware.puml` | Frontend works correctly |
+| `puml/08-frontend-vs-webhook-comparison.puml` | Final comparison |
+
+---
+
 ## Blockers
 
 None currently.
@@ -143,10 +201,11 @@ None currently.
 
 ## Notes
 
-- Previous day's work (Dec 2) established refund flow and Playwright planning
-- Webhook processing infrastructure exists in `WebhookProcessingService`
-- OXORDER field tests should reuse existing `FullDataPersistenceFlowTest` patterns
+- Frontend flow (checkout) correctly uses Event-Driven Architecture
+- Webhook flow bypasses contract entirely
+- Tests verify logging, not business logic
+- Fix requires TDD approach (Sprint 6)
 
 ---
 
-**Last Updated:** 2025-12-03 ALL SPRINTS COMPLETE
+**Last Updated:** 2025-12-03 INVESTIGATION COMPLETE, SPRINT 6 PLANNED

@@ -1,0 +1,194 @@
+@startuml TDD Fix Approach - Contract-Aware Webhook
+!theme plain
+title <font size=24 color="#1565C0"><b>TDD FIX: Contract-Aware Webhook Processing</b></font>\n<font size=14 color="#1976D2">Sprint 6 Implementation Plan</font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+
+skinparam rectangle {
+    roundCorner 15
+}
+
+' Phase 1: RED
+package "Phase 1: RED - Write Failing Tests" #FFCDD2 {
+    rectangle "Test 1: Contract Lookup" as Red1 #EF9A9A {
+        note as R1Note
+          <code>
+          /** @test */
+          public function webhookFindsContractByProviderOrderId(): void
+          {
+              $this->contractRepository
+                  ->expects($this->once())
+                  ->method('findByProviderOrderId')
+                  ->with('pi_xxx')
+                  ->willReturn($this->committedContract);
+
+              $this->service->processEvent($event);
+          }
+          </code>
+        end note
+    }
+
+    rectangle "Test 2: State Validation" as Red2 #EF9A9A {
+        note as R2Note
+          <code>
+          /** @test */
+          public function webhookValidatesContractIsCommitted(): void
+          {
+              $contract = $this->createMock(PaymentContract::class);
+              $contract->method('getState')->willReturn(
+                  ContractState::fulfilled()
+              );
+
+              // Should NOT process - already fulfilled
+              $this->orderRepository
+                  ->expects($this->never())
+                  ->method('save');
+
+              $this->service->processEvent($event);
+          }
+          </code>
+        end note
+    }
+
+    rectangle "Test 3: State Transition" as Red3 #EF9A9A {
+        note as R3Note
+          <code>
+          /** @test */
+          public function webhookTransitionsContractToFulfilled(): void
+          {
+              $this->committedContract
+                  ->expects($this->once())
+                  ->method('fulfill');
+
+              $this->contractRepository
+                  ->expects($this->once())
+                  ->method('save')
+                  ->with($this->callback(fn($c) =>
+                      $c->getState()->isFulfilled()
+                  ));
+
+              $this->service->processEvent($event);
+          }
+          </code>
+        end note
+    }
+
+    rectangle "Test 4: Event Dispatch" as Red4 #EF9A9A {
+        note as R4Note
+          <code>
+          /** @test */
+          public function webhookDispatchesContractFulfilledEvent(): void
+          {
+              $this->eventDispatcher
+                  ->expects($this->once())
+                  ->method('dispatch')
+                  ->with($this->isInstanceOf(
+                      ContractFulfilledEvent::class
+                  ));
+
+              $this->service->processEvent($event);
+          }
+          </code>
+        end note
+    }
+}
+
+' Phase 2: GREEN
+package "Phase 2: GREEN - Implement Contract-Aware Logic" #C8E6C9 {
+    rectangle "Refactor WebhookProcessingService" as Green1 #A5D6A7 {
+        note as G1Note
+          <code>
+          class WebhookProcessingService
+          {
+              public function __construct(
+                  private ContractRepositoryInterface $contractRepo,
+                  private EventDispatcherInterface $dispatcher,
+                  private WebhookLogRepositoryInterface $logRepo
+              ) {}
+
+              private function handlePaymentIntentSucceeded(Event $event): void
+              {
+                  $pi = $event->data->object;
+
+                  // 1. Find Contract (not order!)
+                  $contract = $this->contractRepo->findByProviderOrderId($pi->id);
+
+                  // 2. Validate state
+                  if ($contract->getState()->isFulfilled()) {
+                      return; // Idempotent
+                  }
+                  if (!$contract->getState()->isCommitted()) {
+                      throw new InvalidStateException();
+                  }
+
+                  // 3. Fulfill contract
+                  $contract->fulfill();
+                  $this->contractRepo->save($contract);
+
+                  // 4. Update order THROUGH contract
+                  $this->updateOrderFromContract($contract);
+
+                  // 5. Dispatch event
+                  $this->dispatcher->dispatch(
+                      new ContractFulfilledEvent($contract)
+                  );
+              }
+          }
+          </code>
+        end note
+    }
+}
+
+' Phase 3: REFACTOR
+package "Phase 3: REFACTOR - Clean Architecture" #E3F2FD {
+    rectangle "Extract WebhookContractHandler" as Refactor1 #90CAF9 {
+        note as Ref1Note
+          <b>Single Responsibility:</b>
+          WebhookProcessingService - routes events
+          WebhookContractHandler - contract logic
+        end note
+    }
+
+    rectangle "Integration Tests" as Refactor2 #90CAF9 {
+        note as Ref2Note
+          <b>Real DB Tests:</b>
+          1. Create contract in DB
+          2. Process webhook
+          3. Verify contract state = FULFILLED
+          4. Verify order updated
+        end note
+    }
+
+    rectangle "E2E Tests" as Refactor3 #90CAF9 {
+        note as Ref3Note
+          <b>Playwright Tests:</b>
+          1. Complete checkout
+          2. Trigger webhook (Stripe CLI)
+          3. Verify contract state in DB
+          4. Verify order paid
+        end note
+    }
+}
+
+Red1 -down-> Green1
+Red2 -down-> Green1
+Red3 -down-> Green1
+Red4 -down-> Green1
+Green1 -down-> Refactor1
+Refactor1 -down-> Refactor2
+Refactor2 -down-> Refactor3
+
+legend bottom
+  |= Phase |= Color |= Status |
+  | <#FFCDD2> RED | Pink | Tests fail (expected) |
+  | <#C8E6C9> GREEN | Green | Tests pass (minimal) |
+  | <#E3F2FD> REFACTOR | Blue | Clean up & integrate |
+
+  **SPRINT 6 GOAL:**
+  Make WebhookProcessingService contract-aware
+  Fix the order state machine ambiguity
+  Tests verify actual business logic
+endlegend
+
+@enduml

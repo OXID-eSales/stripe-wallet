@@ -1,0 +1,139 @@
+@startuml Workflow Ambiguity - Two Parallel Paths
+!theme plain
+title <font size=24 color="#1565C0"><b>ORDER STATE MACHINE AMBIGUITY</b></font>\n<font size=14 color="#1976D2">Two Parallel Workflows Creating Confusion</font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+
+skinparam swimlane {
+    BorderColor #000000
+}
+
+|#E8F5E9| Frontend Flow (Contract-Aware)
+|#FFEBEE| Webhook Flow (Direct DB)
+
+|Frontend Flow (Contract-Aware)|
+start
+:Customer clicks Pay;
+
+:StripeOrderController.createCheckoutSession();
+
+:Dispatch StripeCheckoutSessionRequestEvent;
+
+:StripeContractCreationHandler
+**Creates Contract (DRAFT)**;
+#C8E6C9:osc_payment_contract
+state = DRAFT;
+
+:StripeCheckoutSessionHandler
+**Stores provider info**;
+#C8E6C9:osc_payment_contract
+OXPROVIDERORDERID = 'pi_xxx';
+
+:Redirect to Stripe Checkout;
+
+:Customer pays on Stripe;
+
+:Return to shop;
+
+:StripeCheckoutReturnHandler
+**Validates payment**;
+
+:PaymentAuthorizedEventHandler
+**Transitions to PENDING**;
+#C8E6C9:osc_payment_contract
+state = PENDING;
+
+:fulfillCondition('payment_authorized')
+**All conditions met**;
+#C8E6C9:osc_payment_contract
+state = READY_TO_COMMIT;
+
+:StripeOrderCreationHandler
+**Creates OXID Order**;
+#FFF3E0:oxorder
+OXTRANSID = 'pi_xxx';
+
+#C8E6C9:osc_payment_contract
+state = COMMITTED
+OXORDERID = 'order123';
+
+:Customer sees Thank You page;
+
+note right
+  <font color="#2E7D32"><b>Contract State: COMMITTED</b></font>
+  Order created, awaiting payment confirmation
+  Contract knows order ID
+end note
+
+|Webhook Flow (Direct DB)|
+
+:Stripe sends webhook
+payment_intent.succeeded;
+
+:WebhookController receives;
+
+:WebhookProcessingService.processEvent();
+
+#FFCDD2:Does NOT look up Contract!;
+
+:findOrderByPaymentIntentId()
+**Direct DB lookup**;
+#FFF3E0:SELECT FROM oxorder
+WHERE OXTRANSID = 'pi_xxx';
+
+:updateOrderPaymentState()
+**Direct SQL**;
+#FFEBEE:UPDATE osc_payment_order_state
+SET OXPAYMENTSTATE = 'paid';
+
+:updateOrderPaidTimestamp()
+**Direct SQL**;
+#FFF3E0:UPDATE oxorder
+SET OXPAID = NOW();
+
+:updateOrderTransStatus()
+**Direct SQL**;
+#FFF3E0:UPDATE oxorder
+SET OXTRANSSTATUS = 'OK';
+
+#FFCDD2:Contract STILL COMMITTED!
+Never transitioned to FULFILLED;
+
+stop
+
+|Frontend Flow (Contract-Aware)|
+note right
+  <font color="#C62828"><b>PROBLEM!</b></font>
+  Contract state: COMMITTED (stuck!)
+  Order state: paid (via direct SQL)
+
+  **State Mismatch:**
+  - Contract thinks: "awaiting fulfillment"
+  - Order thinks: "paid"
+  - osc_payment_order_state: "paid"
+
+  **No ContractFulfilledEvent!**
+  - Subscribers don't fire
+  - Audit trail incomplete
+  - State machine broken
+end note
+
+legend bottom
+  |= Workflow |= Color |= What it Updates |
+  | <#E8F5E9> Frontend | Green | Contract + Order (correct) |
+  | <#FFEBEE> Webhook | Red | Order only (bypasses contract) |
+
+  **THE AMBIGUITY:**
+  Two different workflows update order state differently:
+  1. Frontend: Contract-first, event-driven
+  2. Webhook: Direct DB, bypasses contract
+
+  **RESULT:**
+  - Contract stuck in COMMITTED forever
+  - Order marked as paid
+  - State machine inconsistent
+  - Tests verify the broken behavior as "correct"
+endlegend
+
+@enduml

@@ -1,0 +1,170 @@
+@startuml Actual Frontend Flow - Contract-Aware (WORKS!)
+!theme plain
+title <font size=24 color="#2E7D32"><b>ACTUAL FRONTEND FLOW: Contract-Aware (Works Correctly!)</b></font>\n<font size=14 color="#388E3C">Event-driven architecture IS implemented in frontend</font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+
+skinparam participant {
+    BackgroundColor<<controller>> #E3F2FD
+    BackgroundColor<<handler>> #C8E6C9
+    BackgroundColor<<contract>> #FFF9C4
+    BackgroundColor<<stripe>> #FFCDD2
+}
+
+box "Controller Layer" #E3F2FD
+    participant "StripeOrderController" as SOC <<controller>>
+end box
+
+box "Event Handlers (Priority Order)" #C8E6C9
+    participant "StripeContractCreationHandler\n(priority: 100)" as CCH <<handler>>
+    participant "StripeCheckoutSessionHandler\n(priority: 0)" as CSH <<handler>>
+    participant "StripeCheckoutReturnHandler" as CRH <<handler>>
+    participant "PaymentAuthorizedEventHandler" as PAH <<handler>>
+    participant "StripeOrderCreationHandler" as OCH <<handler>>
+end box
+
+box "Contract Layer" #FFF9C4
+    participant "ContractService" as CS <<contract>>
+    participant "ContractRepository" as CR <<contract>>
+    participant "PaymentContract" as PC <<contract>>
+end box
+
+box "External" #FFCDD2
+    participant "Stripe API" as SA <<stripe>>
+end box
+
+== Phase 1: Create Checkout Session (Frontend) ==
+
+SOC -> SOC : createCheckoutSession()
+activate SOC #90CAF9
+
+SOC -> CCH : dispatch(StripeCheckoutSessionRequestEvent)
+activate CCH #A5D6A7
+
+note right of CCH #C8E6C9
+  **Contract Created!**
+  state = DRAFT
+end note
+
+CCH -> CS : createContract(userId, basket, conditionTypes)
+activate CS
+CS -> CR : save(contract)
+CR --> CS : contract (DRAFT)
+CS --> CCH : PaymentContract
+deactivate CS
+
+CCH -> CCH : storeDeliveryAddressHash()
+CCH -> CCH : storeSecurityMetadata()
+CCH -> CR : save(contract)
+CCH --> SOC : context.setContract(contract)
+deactivate CCH
+
+SOC -> CSH : handle(event) [priority: 0]
+activate CSH #81C784
+
+CSH -> SA : checkout.sessions.create()
+SA --> CSH : CheckoutSession {id, url}
+
+note right of CSH #FFF9C4
+  **Provider Info Stored!**
+  contract.OXPROVIDERORDERID = 'cs_xxx'
+end note
+
+CSH -> CR : save(contract)
+CSH --> SOC : context.set('checkoutUrl')
+deactivate CSH
+
+SOC --> SOC : Return JSON {url, contract_id}
+deactivate SOC
+
+== Phase 2: Customer Pays on Stripe ==
+
+note over SA #FFCDD2
+  Customer completes payment
+  Stripe redirects to success_url
+end note
+
+== Phase 3: Return from Stripe ==
+
+SOC -> CRH : dispatch(StripeCheckoutReturnEvent)
+activate CRH #FFA726
+
+CRH -> SA : sessions.retrieve(sessionId)
+SA --> CRH : {payment_status: 'paid'}
+
+CRH -> CR : findById(contract_id)
+CR --> CRH : PaymentContract
+
+note right of CRH #C8E6C9
+  **Contract Loaded & Validated!**
+  Token validated
+  Security check passed
+end note
+
+CRH -> CRH : restoreDeliveryAddressHash()
+
+CRH -> PAH : dispatch(PaymentAuthorizedEvent)
+activate PAH #FF9800
+
+note right of PAH #FFF9C4
+  **State Transition!**
+  DRAFT -> PENDING
+  Condition fulfilled
+end note
+
+PAH -> PC : transitionToPending()
+PAH -> PC : fulfillCondition('payment_authorized')
+PAH -> PC : setProvider('stripe', pi_xxx)
+PAH -> CR : save(contract)
+
+alt All conditions fulfilled
+    note right of PAH #C8E6C9
+      **PENDING -> READY_TO_COMMIT**
+    end note
+
+    PAH -> OCH : dispatch(ContractReadyToCommitEvent)
+    activate OCH #FF5722
+
+    note right of OCH #FFF9C4
+      **Order Created!**
+      state -> COMMITTED
+    end note
+
+    OCH -> OCH : createOrder()
+    OCH -> PC : commitToOrder(orderId)
+    OCH -> CR : save(contract)
+
+    OCH --> PAH : context.set('orderId')
+    deactivate OCH
+end
+
+PAH --> CRH : done
+deactivate PAH
+
+CRH --> SOC : redirectTarget = 'thankyou'
+deactivate CRH
+
+== Contract State at End of Frontend Flow ==
+
+note over PC #FFF9C4
+  <font color="#E65100"><b>CONTRACT STATE: COMMITTED</b></font>
+  - Order exists in oxorder
+  - OXTRANSID = 'pi_xxx'
+  - Contract knows order ID
+  - Awaiting webhook for FULFILLED
+end note
+
+legend bottom
+  |= Phase |= Contract State |= What Happens |
+  | Create Session | DRAFT | Contract created, provider info stored |
+  | Customer Pays | DRAFT | (No change - external) |
+  | Return Handler | PENDING | Payment authorized, condition fulfilled |
+  | Order Creation | COMMITTED | Order created, bound to contract |
+
+  <font color="#2E7D32"><b>FRONTEND FLOW WORKS CORRECTLY!</b></font>
+  Event system and contract state machine ARE used.
+  The problem is webhook flow doesn't continue this pattern.
+endlegend
+
+@enduml

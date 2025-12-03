@@ -1,0 +1,116 @@
+@startuml False Green Tests - Coverage Gap Analysis
+!theme plain
+title <font size=24 color="#FF6F00"><b>FALSE GREEN: Test Coverage Gap Analysis</b></font>\n<font size=14 color="#E65100">Tests pass but don't verify contract-aware flow!</font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+
+skinparam rectangle {
+    roundCorner 20
+}
+
+skinparam package {
+    BackgroundColor<<tested>> #C8E6C9
+    BackgroundColor<<untested>> #FFCDD2
+    BackgroundColor<<partial>> #FFF9C4
+}
+
+package "What Unit Tests Verify" <<tested>> {
+    rectangle "WebhookLog Saved" as T1 #A5D6A7
+    rectangle "Event Type Logged" as T2 #A5D6A7
+    rectangle "Payload Stored" as T3 #A5D6A7
+    rectangle "Idempotency Check\n(by event_id)" as T4 #A5D6A7
+    rectangle "Provider = 'stripe'" as T5 #A5D6A7
+}
+
+package "What Tests DON'T Verify" <<untested>> {
+    rectangle "Contract Found by\nProvider Order ID" as U1 #EF9A9A
+    rectangle "Contract State = COMMITTED\nBefore Processing" as U2 #EF9A9A
+    rectangle "Contract Transition\nCOMMITTED -> FULFILLED" as U3 #EF9A9A
+    rectangle "Order Found THROUGH\nContract (not direct)" as U4 #EF9A9A
+    rectangle "ContractFulfilledEvent\nDispatched" as U5 #EF9A9A
+    rectangle "Idempotency via\nContract State" as U6 #EF9A9A
+}
+
+package "Partially Tested" <<partial>> {
+    rectangle "Order Updated\n(oxorder.OXPAID)" as P1 #FFF59D
+    rectangle "Transaction State\n(osc_payment_order_state)" as P2 #FFF59D
+}
+
+' Relationships showing what leads to false green
+T1 -[hidden]down- T2
+T2 -[hidden]down- T3
+T3 -[hidden]down- T4
+T4 -[hidden]down- T5
+
+U1 -[hidden]down- U2
+U2 -[hidden]down- U3
+U3 -[hidden]down- U4
+U4 -[hidden]down- U5
+U5 -[hidden]down- U6
+
+note right of T1
+  <font color="#2E7D32"><b>GREEN: These pass!</b></font>
+  PaymentIntentWebhookTest.php
+  ChargeWebhookTest.php
+  DisputeWebhookTest.php
+
+  **50+ tests, 177+ assertions**
+  All verify logging, not business logic!
+end note
+
+note right of U1
+  <font color="#C62828"><b>RED: Not tested at all!</b></font>
+  WebhookProcessingService doesn't
+  even CALL ContractRepository!
+
+  Code path completely missing!
+end note
+
+note right of P1
+  <font color="#FF6F00"><b>YELLOW: Works but wrong way!</b></font>
+  Order updates happen via
+  direct SQL, not through
+  Contract state machine
+end note
+
+rectangle "Test File: PaymentIntentWebhookTest.php" as TestFile #E3F2FD {
+    note as TestNote
+      <code>
+      // What the test does:
+      $this->webhookLogRepository
+          ->expects($this->once())
+          ->method('save')
+          ->with($this->callback(function (WebhookLog $log) {
+              return $log->getEventType() === 'payment_intent.succeeded';
+          }));
+
+      // What it SHOULD also test:
+      $this->contractRepository
+          ->expects($this->once())
+          ->method('findByProviderOrderId')
+          ->with('pi_xxx')
+          ->willReturn($this->committedContract);
+
+      $this->committedContract
+          ->expects($this->once())
+          ->method('fulfill');
+      </code>
+    end note
+}
+
+legend bottom
+  |= Status |= Color |= Meaning |
+  | <#C8E6C9> GREEN | Tests pass | Verified, but only logging |
+  | <#FFCDD2> RED | Not tested | Critical business logic missing |
+  | <#FFF9C4> YELLOW | Partial | Works but wrong architecture |
+
+  **ROOT CAUSE:**
+  Tests verify WHAT the code DOES (logging)
+  Not WHAT the code SHOULD DO (contract flow)
+
+  **RESULT:**
+  1389 tests pass, but architecture is broken!
+endlegend
+
+@enduml

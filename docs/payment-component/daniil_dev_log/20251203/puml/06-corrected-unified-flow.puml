@@ -1,0 +1,84 @@
+@startuml Corrected Unified Flow - Event-Driven Architecture
+!theme plain
+title <font size=24 color="#2E7D32"><b>CORRECTED: Unified Event-Driven Architecture</b></font>\n<font size=14 color="#388E3C">Single source of truth: Contract State Machine</font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+
+skinparam state {
+    BackgroundColor<<draft>> #2196F3
+    FontColor<<draft>> #FFFFFF
+    BackgroundColor<<pending>> #FF9800
+    FontColor<<pending>> #000000
+    BackgroundColor<<ready>> #4CAF50
+    FontColor<<ready>> #FFFFFF
+    BackgroundColor<<committed>> #8BC34A
+    FontColor<<committed>> #000000
+    BackgroundColor<<fulfilled>> #009688
+    FontColor<<fulfilled>> #FFFFFF
+    BackgroundColor<<event>> #E3F2FD
+    FontColor<<event>> #000000
+}
+
+state "Contract State Machine" as StateMachine {
+    state "DRAFT" as Draft <<draft>>
+    state "PENDING" as Pending <<pending>>
+    state "READY_TO_COMMIT" as Ready <<ready>>
+    state "COMMITTED" as Committed <<committed>>
+    state "FULFILLED" as Fulfilled <<fulfilled>>
+
+    [*] --> Draft : ContractService.createContract()
+    Draft --> Pending : PaymentAuthorizedEventHandler
+    Pending --> Ready : All conditions fulfilled
+    Ready --> Committed : StripeOrderCreationHandler\n(Order created)
+    Committed --> Fulfilled : WebhookProcessingService\n(Payment confirmed)
+    Fulfilled --> [*]
+}
+
+note right of Draft
+  Frontend Trigger:
+  createCheckoutSession()
+end note
+
+note right of Pending
+  Event-Driven:
+  PaymentAuthorizedEvent
+end note
+
+note right of Committed
+  Order Exists:
+  oxorder created
+end note
+
+note right of Fulfilled
+  Webhook Trigger:
+  payment_intent.succeeded
+end note
+
+state "Event System" as Events {
+    state "ContractCreatedEvent" as E1 <<event>>
+    state "ContractPendingEvent" as E2 <<event>>
+    state "ContractReadyEvent" as E3 <<event>>
+    state "ContractCommittedEvent" as E4 <<event>>
+    state "ContractFulfilledEvent" as E5 <<event>>
+}
+
+E1 --> E2 : dispatches
+E2 --> E3 : dispatches
+E3 --> E4 : dispatches
+E4 --> E5 : dispatches
+
+note bottom of Events
+  All state transitions emit events!
+  Subscribers: Email, AuditLog, Analytics
+end note
+
+legend bottom
+  |= Component |= Responsibility |
+  | Contract State Machine | Single source of truth for payment lifecycle |
+  | Event System | Enables decoupled event-driven architecture |
+  | WebhookProcessingService | Contract-aware - finds contract first |
+  | osc_payment_contract | Central entity knows order and provider |
+endlegend
+
+@enduml

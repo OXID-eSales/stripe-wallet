@@ -1,0 +1,128 @@
+@startuml Documented Architecture - Contract-Aware Webhook Flow
+!theme plain
+title <font size=24 color="#2E7D32"><b>DOCUMENTED: Contract-Aware Webhook Flow</b></font>\n<font size=14 color="#558B2F">From 05-02-webhooks-with-smart-contracts.md</font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+
+skinparam participant {
+    BackgroundColor<<stripe>> #E3F2FD
+    BackgroundColor<<contract>> #C8E6C9
+    BackgroundColor<<order>> #FFF3E0
+    BackgroundColor<<db>> #F3E5F5
+}
+
+skinparam note {
+    BackgroundColor #FFFACD
+    BorderColor #FFA000
+    FontColor #000000
+}
+
+box "External" #ECEFF1
+    participant "Stripe" as Stripe <<stripe>>
+end box
+
+box "Webhook Layer" #E8F5E9
+    participant "WebhookController" as WC
+    participant "WebhookProcessingService" as WPS
+end box
+
+box "Contract Layer (Component)" #C8E6C9
+    participant "ContractRepository" as CR <<contract>>
+    participant "PaymentContract" as PC <<contract>>
+end box
+
+box "Order Layer" #FFF3E0
+    participant "OrderRepository" as OR <<order>>
+    participant "Order" as O <<order>>
+end box
+
+box "Database" #F3E5F5
+    database "osc_payment_contract" as DBContract <<db>>
+    database "osc_payment_transaction" as DBTrans <<db>>
+    database "oxorder" as DBOrder <<db>>
+end box
+
+== Documented Flow (Smart-Contract Pattern) ==
+
+Stripe -> WC : POST /webhook/stripe\nEvent: payment_intent.succeeded
+activate WC #90CAF9
+
+WC -> WC : Verify signature
+WC -> WPS : processEvent(event)
+activate WPS #A5D6A7
+
+note right of WPS #C8E6C9
+  **STEP 1: Find Contract**
+  Contract is the central entity!
+end note
+
+WPS -> CR : findByProviderOrderId("pi_xxx")
+activate CR #81C784
+CR -> DBContract : SELECT * FROM osc_payment_contract\nWHERE OXPROVIDERORDERID = 'pi_xxx'
+DBContract --> CR : contract_data
+CR --> WPS : PaymentContract
+deactivate CR
+
+note right of WPS #FFFDE7
+  **STEP 2: Validate State**
+  Only process COMMITTED contracts!
+end note
+
+WPS -> PC : getState()
+PC --> WPS : COMMITTED
+
+alt Contract State == FULFILLED
+    WPS --> WC : Already processed (idempotent)
+else Contract State == COMMITTED
+    note right of WPS #C8E6C9
+      **STEP 3: Fulfill Contract**
+      Transition: COMMITTED -> FULFILLED
+    end note
+
+    WPS -> PC : fulfill()
+    PC --> WPS : state = FULFILLED
+
+    WPS -> CR : save(contract)
+    CR -> DBContract : UPDATE state = 'FULFILLED'\nOXFULFILLEDAT = NOW()
+
+    note right of WPS #FFF3E0
+      **STEP 4: Update Order**
+      Order is updated THROUGH contract
+    end note
+
+    WPS -> OR : find(contract.getOrderId())
+    OR -> DBOrder : SELECT * FROM oxorder
+    DBOrder --> OR : order_data
+    OR --> WPS : Order
+
+    WPS -> O : markOrderPaid()
+    WPS -> O : setState('OK')
+
+    WPS -> OR : save(order)
+    OR -> DBOrder : UPDATE OXPAID, OXTRANSSTATUS
+
+    note right of WPS #E3F2FD
+      **STEP 5: Emit Event**
+      Event-driven architecture!
+    end note
+
+    WPS -> WPS : dispatch(ContractFulfilledEvent)
+end
+
+WPS --> WC : processed
+deactivate WPS
+
+WC --> Stripe : 200 OK
+deactivate WC
+
+legend right
+  |= Color |= Layer |= Responsibility |
+  | <#C8E6C9> | Contract | Central entity, state machine |
+  | <#FFF3E0> | Order | Updated through contract |
+  | <#E3F2FD> | Event System | Event-driven architecture |
+endlegend
+
+footer <font color="#2E7D32"><b>This is how it SHOULD work according to documentation</b></font>
+
+@enduml

@@ -1,0 +1,101 @@
+@startuml Frontend vs Webhook Flow Comparison
+!theme plain
+title <font size=24 color="#1565C0"><b>THE AMBIGUITY: Frontend vs Webhook Flow</b></font>\n<font size=14 color="#1976D2">Same state machine, different implementations!</font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+
+left to right direction
+
+rectangle "Frontend Flow\n<font color='#2E7D32'>(Contract-Aware - WORKS)</font>" as Frontend #C8E6C9 {
+    rectangle "1. StripeContractCreationHandler" as F1 #A5D6A7
+    rectangle "2. StripeCheckoutSessionHandler" as F2 #A5D6A7
+    rectangle "3. StripeCheckoutReturnHandler" as F3 #A5D6A7
+    rectangle "4. PaymentAuthorizedEventHandler" as F4 #A5D6A7
+    rectangle "5. StripeOrderCreationHandler" as F5 #A5D6A7
+
+    F1 --> F2
+    F2 --> F3
+    F3 --> F4
+    F4 --> F5
+}
+
+rectangle "Contract State Machine" as Contract #FFF9C4 {
+    rectangle "DRAFT" as Draft #2196F3
+    rectangle "PENDING" as Pending #FF9800
+    rectangle "READY_TO_COMMIT" as Ready #4CAF50
+    rectangle "COMMITTED" as Committed #8BC34A
+    rectangle "FULFILLED" as Fulfilled #009688
+
+    Draft --> Pending
+    Pending --> Ready
+    Ready --> Committed
+    Committed --> Fulfilled : <font color='#C62828'><b>MISSING!</b></font>
+}
+
+rectangle "Webhook Flow\n<font color='#C62828'>(Direct DB - BROKEN)</font>" as Webhook #FFCDD2 {
+    rectangle "WebhookController" as W1 #EF9A9A
+    rectangle "WebhookProcessingService" as W2 #EF9A9A
+    rectangle "Direct SQL Updates" as W3 #EF9A9A
+
+    W1 --> W2
+    W2 --> W3
+}
+
+' Connections from Frontend to Contract
+F1 ..> Draft : Creates
+F4 ..> Pending : Transitions to
+F4 ..> Ready : When conditions met
+F5 ..> Committed : After order created
+
+' Connection from Webhook (or lack thereof)
+W2 ..> Committed : <font color='#C62828'>Ignores!</font>
+W3 ..> Fulfilled : <font color='#C62828'>Doesn't transition!</font>
+
+note right of Frontend
+  <font color='#2E7D32'><b>Uses:</b></font>
+  - ContractRepository
+  - EventDispatcher
+  - Contract state machine
+  - PaymentContract model
+
+  <b>State Transitions:</b>
+  DRAFT -> PENDING -> READY -> COMMITTED
+end note
+
+note right of Webhook
+  <font color='#C62828'><b>Bypasses:</b></font>
+  - ContractRepository
+  - EventDispatcher
+  - Contract state machine
+  - PaymentContract model
+
+  <b>Direct SQL:</b>
+  UPDATE osc_payment_order_state
+  UPDATE oxorder (OXPAID, OXTRANSSTATUS)
+end note
+
+note bottom of Contract
+  <font color='#E65100'><b>THE GAP:</b></font>
+  Frontend reaches COMMITTED state correctly.
+  Webhook should transition COMMITTED -> FULFILLED.
+  But WebhookProcessingService doesn't touch contract!
+
+  <b>Result:</b>
+  Contract stuck in COMMITTED forever.
+  Order marked paid via direct SQL.
+  State machine broken.
+end note
+
+legend bottom
+  |= Flow |= Uses Contract? |= Updates Via |= State Transitions |
+  | <#C8E6C9> Frontend | YES | Repository + Events | DRAFT->PENDING->READY->COMMITTED |
+  | <#FFCDD2> Webhook | NO | Direct SQL | None (should be COMMITTED->FULFILLED) |
+
+  <font color='#C62828'><b>THIS IS WHY TESTS ARE "FALSE GREEN"!</b></font>
+  Unit tests verify WebhookProcessingService saves logs correctly.
+  But they don't verify it uses the contract state machine.
+  Integration tests don't check contract state after webhook.
+endlegend
+
+@enduml

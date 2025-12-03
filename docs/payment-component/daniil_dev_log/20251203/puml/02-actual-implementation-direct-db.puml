@@ -1,0 +1,117 @@
+@startuml Actual Implementation - Direct DB Flow
+!theme plain
+title <font size=24 color="#C62828"><b>ACTUAL: Direct DB Update Flow (Bypasses Contract!)</b></font>\n<font size=14 color="#D32F2F">From WebhookProcessingService.php - Lines 147-182</font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+
+skinparam participant {
+    BackgroundColor<<stripe>> #E3F2FD
+    BackgroundColor<<warning>> #FFCDD2
+    BackgroundColor<<db>> #F3E5F5
+    BackgroundColor<<bypass>> #FFCCBC
+}
+
+skinparam note {
+    BackgroundColor #FFCDD2
+    BorderColor #C62828
+    FontColor #000000
+}
+
+box "External" #ECEFF1
+    participant "Stripe" as Stripe <<stripe>>
+end box
+
+box "Webhook Layer" #FFEBEE
+    participant "WebhookController" as WC
+    participant "WebhookProcessingService" as WPS <<warning>>
+end box
+
+box "BYPASSED Contract Layer" #FFCCBC
+    participant "ContractRepository" as CR <<bypass>>
+    participant "PaymentContract" as PC <<bypass>>
+end box
+
+box "Database (Direct Access!)" #F3E5F5
+    database "osc_payment_contract" as DBContract <<db>>
+    database "osc_payment_transaction" as DBTrans <<db>>
+    database "osc_payment_order_state" as DBState <<db>>
+    database "oxorder" as DBOrder <<db>>
+end box
+
+== Actual Flow (Direct DB - Bypasses Contract!) ==
+
+Stripe -> WC : POST /webhook/stripe\nEvent: payment_intent.succeeded
+activate WC #90CAF9
+
+WC -> WC : Verify signature
+WC -> WPS : processEvent(event)
+activate WPS #EF9A9A
+
+note right of WPS #FFCDD2
+  **PROBLEM 1: No Contract Lookup!**
+  findOrderByPaymentIntentId() skips contract
+end note
+
+WPS -> DBTrans : SELECT OXORDERID FROM osc_payment_transaction\nWHERE OXPROVIDERORDERID = 'pi_xxx'
+DBTrans --> WPS : order_id (or null)
+
+alt Not found in transaction table
+    note right of WPS #FFCDD2
+      **FALLBACK: Direct oxorder lookup**
+      Bypasses contract entirely!
+    end note
+
+    WPS -> DBOrder : SELECT OXID FROM oxorder\nWHERE OXTRANSID = 'pi_xxx'
+    DBOrder --> WPS : order_id
+end
+
+note right of WPS #FFCDD2
+  **PROBLEM 2: No State Validation!**
+  No check if contract is COMMITTED
+  No idempotency via contract state
+end note
+
+note right of WPS #FFCDD2
+  **PROBLEM 3: Direct DB Updates!**
+  Bypasses Contract state machine
+end note
+
+WPS -> DBState : UPDATE osc_payment_order_state\nSET OXPAYMENTSTATE = 'paid'
+
+WPS -> DBOrder : UPDATE oxorder\nSET OXPAID = NOW()
+
+WPS -> DBOrder : UPDATE oxorder\nSET OXTRANSSTATUS = 'OK'
+
+WPS -> DBOrder : UPDATE oxorder\nSET OXTRANSID = 'pi_xxx'
+
+note over CR, PC #FFCCBC
+  <font color="#C62828"><b>CONTRACT NEVER TOUCHED!</b></font>
+  - No findByProviderOrderId()
+  - No state validation (COMMITTED?)
+  - No state transition (-> FULFILLED)
+  - No ContractFulfilledEvent dispatched
+end note
+
+WPS --> WC : processed
+deactivate WPS
+
+WC --> Stripe : 200 OK
+deactivate WC
+
+legend right
+  |= Symbol |= Meaning |
+  | <#FFCDD2> | Problem Area |
+  | <#FFCCBC> | Bypassed Component |
+  | <#F3E5F5> | Direct DB Access |
+
+  **CRITICAL ISSUES:**
+  1. Contract layer completely bypassed
+  2. No state machine validation
+  3. Direct SQL instead of repository pattern
+  4. No event-driven architecture
+endlegend
+
+footer <font color="#C62828"><b>This is how it ACTUALLY works - Contract is ignored!</b></font>
+
+@enduml
