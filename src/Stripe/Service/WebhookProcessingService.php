@@ -123,6 +123,10 @@ class WebhookProcessingService
                 $this->handleDisputeCreated($event);
                 break;
 
+            case 'checkout.session.completed':
+                $this->handleCheckoutSessionCompleted($event);
+                break;
+
             default:
                 Registry::getLogger()->debug('Unhandled webhook event type', [
                     'event_type' => $event->type,
@@ -156,6 +160,15 @@ class WebhookProcessingService
         if ($order) {
             // Update order payment state
             $this->updateOrderPaymentState($order->getId(), 'paid');
+
+            // Update OXPAID timestamp - payment has been confirmed
+            $this->updateOrderPaidTimestamp($order->getId());
+
+            // Update OXTRANSSTATUS to OK
+            $this->updateOrderTransStatus($order->getId(), 'OK');
+
+            // Update OXTRANSID with PaymentIntent ID
+            $this->updateOrderTransId($order->getId(), $paymentIntent->id);
 
             Registry::getLogger()->info('Order payment state updated', [
                 'order_id' => $order->getId(),
@@ -236,8 +249,12 @@ class WebhookProcessingService
         if ($order) {
             $this->updateOrderCaptureState($order->getId(), $charge->amount / 100);
 
-            // Dispatch PaymentCapturedEvent
-            // In a full implementation, this would use an event dispatcher
+            // Update OXPAID timestamp - payment has been captured
+            $this->updateOrderPaidTimestamp($order->getId());
+
+            // Update OXTRANSSTATUS to OK
+            $this->updateOrderTransStatus($order->getId(), 'OK');
+
             Registry::getLogger()->info('Payment captured for order', [
                 'order_id' => $order->getId(),
                 'captured_amount' => $charge->amount / 100,
@@ -267,7 +284,9 @@ class WebhookProcessingService
         if ($order) {
             $this->updateOrderRefundState($order->getId(), $charge->amount_refunded / 100);
 
-            // Dispatch PaymentRefundedEvent
+            // Update OXPAID timestamp to refund time
+            $this->updateOrderPaidTimestamp($order->getId());
+
             Registry::getLogger()->info('Payment refunded for order', [
                 'order_id' => $order->getId(),
                 'refunded_amount' => $charge->amount_refunded / 100,
@@ -298,7 +317,73 @@ class WebhookProcessingService
     }
 
     /**
+     * Handle checkout.session.completed event
+     * Checkout session has been completed (used by Stripe Wallet)
+     *
+     * @param \Stripe\Event $event
+     * @return void
+     */
+    private function handleCheckoutSessionCompleted(\Stripe\Event $event): void
+    {
+        $session = $event->data->object;
+
+        Registry::getLogger()->info('Checkout session completed', [
+            'session_id' => $session->id,
+            'payment_intent' => $session->payment_intent ?? null,
+            'payment_status' => $session->payment_status ?? null,
+        ]);
+
+        // Only process if payment was successful
+        $paymentStatus = $session->payment_status ?? '';
+        if ($paymentStatus !== 'paid') {
+            Registry::getLogger()->debug('Checkout session not paid, skipping OXPAID update', [
+                'payment_status' => $paymentStatus,
+            ]);
+            return;
+        }
+
+        // Find order by payment intent ID
+        $paymentIntentId = $session->payment_intent ?? null;
+        if (!$paymentIntentId) {
+            Registry::getLogger()->warning('No payment intent ID in checkout session', [
+                'session_id' => $session->id,
+            ]);
+            return;
+        }
+
+        $order = $this->findOrderByPaymentIntentId($paymentIntentId);
+
+        if ($order) {
+            // Update order payment state
+            $this->updateOrderPaymentState($order->getId(), 'paid');
+
+            // Update OXPAID timestamp - payment has been confirmed
+            $this->updateOrderPaidTimestamp($order->getId());
+
+            // Update OXTRANSSTATUS to OK
+            $this->updateOrderTransStatus($order->getId(), 'OK');
+
+            // Update OXTRANSID with PaymentIntent ID
+            $this->updateOrderTransId($order->getId(), $paymentIntentId);
+
+            Registry::getLogger()->info('Order updated from checkout session', [
+                'order_id' => $order->getId(),
+                'order_number' => $order->getFieldData('oxordernr'),
+            ]);
+        } else {
+            Registry::getLogger()->warning('Order not found for checkout session payment intent', [
+                'payment_intent_id' => $paymentIntentId,
+                'session_id' => $session->id,
+            ]);
+        }
+    }
+
+    /**
      * Find order by Stripe PaymentIntent ID
+     *
+     * Searches for order in two places:
+     * 1. osc_payment_transaction.OXPROVIDERORDERID (preferred - Component transaction records)
+     * 2. oxorder.OXTRANSID (fallback - direct OXID order field)
      *
      * @param string $paymentIntentId
      * @return Order|null
@@ -307,17 +392,33 @@ class WebhookProcessingService
     {
         $db = DatabaseProvider::getDb();
 
+        // First try: Look in osc_payment_transaction table
         $orderId = $db->getOne(
             "SELECT OXORDERID FROM osc_payment_transaction WHERE OXPROVIDERORDERID = ? LIMIT 1",
             [$paymentIntentId]
         );
 
+        // Fallback: Look directly in oxorder.OXTRANSID
         if (!$orderId) {
+            $orderId = $db->getOne(
+                "SELECT OXID FROM oxorder WHERE OXTRANSID = ? LIMIT 1",
+                [$paymentIntentId]
+            );
+        }
+
+        if (!$orderId) {
+            Registry::getLogger()->debug('Order not found for PaymentIntent ID', [
+                'payment_intent_id' => $paymentIntentId,
+            ]);
             return null;
         }
 
         $order = oxNew(Order::class);
         if (!$order->load($orderId)) {
+            Registry::getLogger()->error('Failed to load order', [
+                'order_id' => $orderId,
+                'payment_intent_id' => $paymentIntentId,
+            ]);
             return null;
         }
 
@@ -385,6 +486,94 @@ class WebhookProcessingService
                 WHERE OXORDERID = ?";
 
         $db->execute($sql, [$refundedAmount, $orderId]);
+    }
+
+    /**
+     * Update order OXPAID timestamp
+     *
+     * Sets the OXPAID field in oxorder table to current timestamp.
+     * This field stores "Time when order was paid".
+     *
+     * @param string $orderId
+     * @return void
+     */
+    private function updateOrderPaidTimestamp(string $orderId): void
+    {
+        try {
+            $db = DatabaseProvider::getDb();
+
+            $sql = "UPDATE oxorder SET OXPAID = NOW() WHERE OXID = ?";
+            $db->execute($sql, [$orderId]);
+
+            Registry::getLogger()->debug('OXPAID timestamp updated', [
+                'order_id' => $orderId,
+            ]);
+        } catch (\Exception $e) {
+            Registry::getLogger()->error('Failed to update OXPAID', [
+                'order_id' => $orderId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Update order OXTRANSSTATUS
+     *
+     * Sets the OXTRANSSTATUS field in oxorder table.
+     * Valid values: NOT_FINISHED, OK, ERROR
+     *
+     * @param string $orderId
+     * @param string $status
+     * @return void
+     */
+    private function updateOrderTransStatus(string $orderId, string $status): void
+    {
+        try {
+            $db = DatabaseProvider::getDb();
+
+            $sql = "UPDATE oxorder SET OXTRANSSTATUS = ? WHERE OXID = ?";
+            $db->execute($sql, [$status, $orderId]);
+
+            Registry::getLogger()->debug('OXTRANSSTATUS updated', [
+                'order_id' => $orderId,
+                'status' => $status,
+            ]);
+        } catch (\Exception $e) {
+            Registry::getLogger()->error('Failed to update OXTRANSSTATUS', [
+                'order_id' => $orderId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Update order OXTRANSID (transaction ID)
+     *
+     * Sets the OXTRANSID field in oxorder table to the PaymentIntent ID.
+     *
+     * @param string $orderId
+     * @param string $transactionId
+     * @return void
+     */
+    private function updateOrderTransId(string $orderId, string $transactionId): void
+    {
+        try {
+            $db = DatabaseProvider::getDb();
+
+            // Only update if OXTRANSID is currently empty
+            $sql = "UPDATE oxorder SET OXTRANSID = ? WHERE OXID = ? AND (OXTRANSID IS NULL OR OXTRANSID = '')";
+            $db->execute($sql, [$transactionId, $orderId]);
+
+            Registry::getLogger()->debug('OXTRANSID updated', [
+                'order_id' => $orderId,
+                'transaction_id' => $transactionId,
+            ]);
+        } catch (\Exception $e) {
+            Registry::getLogger()->error('Failed to update OXTRANSID', [
+                'order_id' => $orderId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

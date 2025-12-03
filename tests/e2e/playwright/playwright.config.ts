@@ -14,10 +14,7 @@ export default defineConfig({
   workers: 1,
   retries: process.env.CI ? 2 : 0,
 
-  reporter: [
-    ['html', { outputFolder: './reports/html-report', open: 'never' }],
-    ['list'],
-  ],
+
 
   use: {
     baseURL: process.env.SHOP_URL || 'https://localhost.local',
