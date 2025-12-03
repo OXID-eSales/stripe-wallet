@@ -32,12 +32,16 @@ test.describe.serial('Admin: Stripe Order Verification', () => {
       let foundValidDate = false;
 
       for (let i = 1; i < Math.min(rows.length, 5); i++) {
-        const cells = await rows[i].locator('td, a').allTextContents();
-        // Look for date patterns in the row
-        const dateCell = cells.find(c => c.match(/\d{4}-\d{2}-\d{2}/));
-        if (dateCell && dateCell !== '0000-00-00 00:00:00') {
-          console.log(`  Order ${i}: ${dateCell}`);
+        // Check the second column (index 1) which contains the Payment Date
+        // Column 0 = Order Creation Date, Column 1 = Payment Date
+        const paymentDateCell = await rows[i].locator('td').nth(1).textContent();
+        const paymentDate = (paymentDateCell || '').trim();
+
+        if (paymentDate.match(/\d{4}-\d{2}-\d{2}/) && paymentDate !== '0000-00-00 00:00:00') {
+          console.log(`  Order ${i}: Payment Date = ${paymentDate}`);
           foundValidDate = true;
+        } else if (paymentDate) {
+          console.log(`  Order ${i}: Payment Date = ${paymentDate} (invalid or not set)`);
         }
       }
 

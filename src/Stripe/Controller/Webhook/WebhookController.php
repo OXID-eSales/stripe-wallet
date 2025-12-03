@@ -160,12 +160,11 @@ class WebhookController extends FrontendController
         try {
             $db = \OxidEsales\Eshop\Core\DatabaseProvider::getDb();
 
-            $sql = "INSERT INTO osc_payment_webhook_log
-                    (OXID, OXEVENTID, OXEVENTTYPE, OXPROVIDER, OXPAYLOAD, OXSTATUS, OXCREATED)
+            $sql = "INSERT INTO osc_payment_webhooklogs
+                    (OXID, OXEVENTID, OXEVENTTYPE, OXPROVIDER, OXPAYLOAD, OXSTATUS, OXRECEIVEDAT)
                     VALUES (?, ?, ?, 'stripe', ?, 'received', NOW())
                     ON DUPLICATE KEY UPDATE
-                    OXSTATUS = 'duplicate',
-                    OXUPDATED = NOW()";
+                    OXSTATUS = 'duplicate'";
 
             $db->execute($sql, [
                 \OxidEsales\Eshop\Core\UtilsObject::getInstance()->generateUId(),

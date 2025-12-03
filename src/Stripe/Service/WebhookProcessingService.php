@@ -609,12 +609,11 @@ class WebhookProcessingService
         try {
             $db = DatabaseProvider::getDb();
 
-            $sql = "INSERT INTO osc_payment_webhook_log
-                    (OXID, OXEVENTID, OXEVENTTYPE, OXPROVIDER, OXPAYLOAD, OXSTATUS, OXCREATED)
+            $sql = "INSERT INTO osc_payment_webhooklogs
+                    (OXID, OXEVENTID, OXEVENTTYPE, OXPROVIDER, OXPAYLOAD, OXSTATUS, OXRECEIVEDAT)
                     VALUES (?, ?, ?, 'stripe', ?, 'received', NOW())
                     ON DUPLICATE KEY UPDATE
-                    OXSTATUS = 'duplicate',
-                    OXUPDATED = NOW()";
+                    OXSTATUS = 'duplicate'";
 
             $db->execute($sql, [
                 UtilsObject::getInstance()->generateUId(),
@@ -641,9 +640,8 @@ class WebhookProcessingService
         try {
             $db = DatabaseProvider::getDb();
 
-            $sql = "UPDATE osc_payment_webhook_log
-                    SET OXSTATUS = ?,
-                        OXUPDATED = NOW()
+            $sql = "UPDATE osc_payment_webhooklogs
+                    SET OXSTATUS = ?
                     WHERE OXEVENTID = ?";
 
             $db->execute($sql, [$status, $eventId]);

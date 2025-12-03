@@ -422,7 +422,7 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
     private function cleanupTestData(): void
     {
         $this->connection->executeStatement(
-            "DELETE FROM osc_payment_webhook_log WHERE OXEVENTID LIKE ?",
+            "DELETE FROM osc_payment_webhooklogs WHERE OXEVENTID LIKE ?",
             ['evt_test_%']
         );
         $this->connection->executeStatement(
