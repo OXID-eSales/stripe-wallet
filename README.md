@@ -22,7 +22,19 @@ then do
 make up
 ```
 
+## Activation
+
+OXID 7.x Module Commands:
+
+| Action     | Command                                               |
+  |------------|-------------------------------------------------------|
+| Install    | bin/oe-console oe:module:install extensions/stripe    |
+| Uninstall  | bin/oe-console oe:module:uninstall osc_stripe_wallet  |
+| Activate   | bin/oe-console oe:module:activate osc_stripe_wallet   |
+| Deactivate | bin/oe-console oe:module:deactivate osc_stripe_wallet |
+
 ## Running Tests
+
 
 ### Pre-Commit Checks
 
