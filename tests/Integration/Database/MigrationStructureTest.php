@@ -57,11 +57,13 @@ class MigrationStructureTest extends TestCase
         );
     }
 
-    public function testOrderStateTableExists(): void
+    public function testOrderStateTableDropped(): void
     {
-        $this->assertTrue(
+        // Sprint 8: osc_payment_order_state table was DROPPED
+        // Capture/refund tracking now handled by osc_payment_contract fields
+        $this->assertFalse(
             $this->tableExists('osc_payment_order_state'),
-            'Table osc_payment_order_state should exist'
+            'Table osc_payment_order_state should NOT exist (dropped in Sprint 8)'
         );
     }
 
@@ -214,40 +216,25 @@ class MigrationStructureTest extends TestCase
         $this->assertTrue($hasSelfFK, 'Transaction table should have self-referencing FK for parent transactions');
     }
 
-    // ==================== ORDER STATE TABLE STRUCTURE ====================
+    // ==================== SPRINT 8: CONTRACT CAPTURE/REFUND COLUMNS ====================
 
-    public function testOrderStateTableHasRequiredColumns(): void
+    public function testContractTableHasCaptureRefundColumns(): void
     {
-        $columns = $this->getTableColumns('osc_payment_order_state');
+        // Sprint 8: osc_payment_order_state table DROPPED
+        // Capture/refund tracking now in osc_payment_contract
+        $columns = $this->getTableColumns('osc_payment_contract');
 
-        $expectedColumns = [
-            'OXID', 'OXORDERID', 'OXCONTRACTID', 'OXPAYMENTSTATE',
-            'OXPROVIDERORDERID', 'OXWEBHOOKWAITSINCE', 'OXWEBHOOKTIMEOUT',
-            'OXLASTPAYMENTATTEMPT', 'OXPAYMENTATTEMPTCOUNT', 'OXCREATED', 'OXUPDATED'
+        $captureRefundColumns = [
+            'OXCAPTUREDAMOUNT', 'OXREFUNDEDAMOUNT', 'OXCAPTUREDAT', 'OXREFUNDEDAT'
         ];
 
-        foreach ($expectedColumns as $column) {
+        foreach ($captureRefundColumns as $column) {
             $this->assertContains(
                 $column,
                 $columns,
-                "OrderState table should have column {$column}"
+                "Contract table should have capture/refund column {$column} (Sprint 8)"
             );
         }
-    }
-
-    public function testOrderStateTableHasUniqueIndexOnOrderId(): void
-    {
-        $indexes = $this->getTableIndexes('osc_payment_order_state');
-
-        $hasUniqueOrderIndex = false;
-        foreach ($indexes as $indexName => $indexData) {
-            if (in_array('OXORDERID', $indexData['columns']) && $indexData['unique']) {
-                $hasUniqueOrderIndex = true;
-                break;
-            }
-        }
-
-        $this->assertTrue($hasUniqueOrderIndex, 'OrderState table should have unique index on OXORDERID');
     }
 
     // ==================== CUSTOMER TABLE STRUCTURE ====================

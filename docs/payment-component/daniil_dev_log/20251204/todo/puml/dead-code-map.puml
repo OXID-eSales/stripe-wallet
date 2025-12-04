@@ -1,0 +1,93 @@
+@startuml dead-code-map
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title Dead Code Identification Map\n(Sprint 8 Cleanup Targets)
+
+package "Files to DELETE" #FFB6C1 {
+    class "PaymentOrderStateRepository.php" as posr <<DEAD>> {
+        Location: src/Stripe/Repository/
+        --
+        Reason: Never instantiated
+        Commented in services.yaml
+        No code references
+    }
+}
+
+package "Methods to REMOVE" #FFCCCB {
+    class "WebhookProcessingService" as wps {
+        --
+        <color:red>- updateOrderPaymentState()</color>
+        <color:red>- updateOrderCaptureState()</color>
+        <color:red>- updateOrderRefundState()</color>
+        --
+        Lines: 660-725
+        Update legacy order_state table
+    }
+
+    class "WebhookController" as wc {
+        --
+        <color:red>- processEventBasic()</color>
+        --
+        Lines: 132-162
+        Fallback never needed
+    }
+}
+
+package "Call Sites to REMOVE" #FFE4B5 {
+    note as calls
+        WebhookProcessingService.php:
+        - Line 285: updateOrderPaymentState('paid')
+        - Line 350: updateOrderPaymentState('failed')
+        - Line 372: updateOrderPaymentState('canceled')
+        - Line 427: updateOrderCaptureState()
+        - Line 488: updateOrderRefundState()
+        - Line 583: updateOrderPaymentState('paid')
+    end note
+}
+
+package "Tables to DROP" #FF6B6B {
+    entity "osc_payment_order_state" as ost <<DROP>> {
+        **REDUNDANT TABLE**
+        --
+        OXPAYMENTSTATE: duplicates contract.OXSTATE
+        OXPROVIDERORDERID: duplicates contract
+        OXCAPTUREDAMOUNT: move to contract
+        OXREFUNDEDAMOUNT: move to contract
+    }
+}
+
+package "Code for Tests Only" #E8E8E8 {
+    class "ContractRepository.php" as cr <<TEST ONLY>> {
+        In-memory implementation
+        Used only in unit tests
+        Keep but mark clearly
+    }
+
+    class "WebhookLogRepository.php" as wlr <<TEST ONLY>> {
+        In-memory implementation
+        Used only in unit tests
+        Keep but mark clearly
+    }
+}
+
+package "services.yaml Cleanup" #FFF8DC {
+    note as yaml
+        Line 408: Remove commented entry
+        # OxidSolutionCatalysts\\Payments\\
+        #   Stripe\\Repository\\
+        #   PaymentOrderStateRepository:
+    end note
+}
+
+posr -[hidden]-> wps
+wps -[hidden]-> calls
+calls -[hidden]-> ost
+
+note bottom of ost
+    **MIGRATION REQUIRED**
+    1. Add capture/refund fields to contract
+    2. Migrate existing data
+    3. Drop table
+end note
+@enduml

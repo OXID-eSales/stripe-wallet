@@ -281,9 +281,7 @@ class WebhookProcessingService
         $order = $this->findOrderByPaymentIntentId($paymentIntent->id);
 
         if ($order) {
-            // Update order payment state
-            $this->updateOrderPaymentState($order->getId(), 'paid');
-
+            // Sprint 8: order_state table removed - only update oxorder fields
             // Update OXPAID timestamp - payment has been confirmed
             $this->updateOrderPaidTimestamp($order->getId());
 
@@ -343,12 +341,8 @@ class WebhookProcessingService
             ]);
         }
 
-        // Always update legacy order state for backward compatibility
-        $order = $this->findOrderByPaymentIntentId($paymentIntentId);
-
-        if ($order) {
-            $this->updateOrderPaymentState($order->getId(), 'failed');
-        }
+        // Sprint 8: order_state table removed - no legacy update needed
+        // Contract failure is tracked via contract.OXSTATE = 'failed'
     }
 
     /**
@@ -366,11 +360,8 @@ class WebhookProcessingService
             'payment_intent_id' => $paymentIntent->id,
         ]);
 
-        $order = $this->findOrderByPaymentIntentId($paymentIntent->id);
-
-        if ($order) {
-            $this->updateOrderPaymentState($order->getId(), 'canceled');
-        }
+        // Sprint 8: order_state table removed - no legacy update needed
+        // Cancellation is tracked via contract.OXSTATE = 'cancelled'
     }
 
     /**
@@ -401,8 +392,11 @@ class WebhookProcessingService
             return;
         }
 
+        // Sprint 8: Pass captured amount to handler for contract tracking
+        $capturedAmount = $amount / 100;
+
         // Sprint 6: Try contract-aware capture handling first
-        $contractResult = $this->contractFulfillmentHandler->handleChargeCaptured($paymentIntentId);
+        $contractResult = $this->contractFulfillmentHandler->handleChargeCaptured($paymentIntentId, $capturedAmount);
 
         if ($contractResult === true) {
             Registry::getLogger()->info('Contract fulfilled via charge.captured webhook', [
@@ -419,13 +413,10 @@ class WebhookProcessingService
             return;
         }
 
-        // Legacy fallback
+        // Sprint 8: Legacy fallback - only update oxorder fields, no order_state
         $order = $this->findOrderByPaymentIntentId($paymentIntentId);
-        $capturedAmount = $amount / 100;
 
         if ($order) {
-            $this->updateOrderCaptureState($order->getId(), $capturedAmount);
-
             // Update OXPAID timestamp - payment has been captured
             $this->updateOrderPaidTimestamp($order->getId());
 
@@ -481,20 +472,8 @@ class WebhookProcessingService
             ]);
         }
 
-        // Always update legacy order state for refund tracking
-        $order = $this->findOrderByPaymentIntentId($paymentIntentId);
-
-        if ($order) {
-            $this->updateOrderRefundState($order->getId(), $refundedAmount);
-
-            // Update OXPAID timestamp to refund time
-            $this->updateOrderPaidTimestamp($order->getId());
-
-            Registry::getLogger()->info('Payment refunded for order', [
-                'order_id' => $order->getId(),
-                'refunded_amount' => $refundedAmount,
-            ]);
-        }
+        // Sprint 8: Refund tracking now handled by contract.OXREFUNDEDAMOUNT
+        // No legacy order_state update needed
     }
 
     /**
@@ -575,13 +554,10 @@ class WebhookProcessingService
             return;
         }
 
-        // Legacy fallback for orders without contracts
+        // Sprint 8: Legacy fallback - only update oxorder fields, no order_state
         $order = $this->findOrderByPaymentIntentId($paymentIntentId);
 
         if ($order) {
-            // Update order payment state
-            $this->updateOrderPaymentState($order->getId(), 'paid');
-
             // Update OXPAID timestamp - payment has been confirmed
             $this->updateOrderPaidTimestamp($order->getId());
 
@@ -650,68 +626,9 @@ class WebhookProcessingService
         return $order;
     }
 
-    /**
-     * Update order payment state
-     *
-     * @param string $orderId
-     * @param string $state
-     * @return void
-     */
-    private function updateOrderPaymentState(string $orderId, string $state): void
-    {
-        $db = DatabaseProvider::getDb();
-
-        $sql = "UPDATE osc_payment_order_state
-                SET OXPAYMENTSTATE = ?,
-                    OXUPDATED = NOW()
-                WHERE OXORDERID = ?";
-
-        $db->execute($sql, [$state, $orderId]);
-    }
-
-    /**
-     * Update order capture state
-     *
-     * @param string $orderId
-     * @param float $capturedAmount
-     * @return void
-     */
-    private function updateOrderCaptureState(string $orderId, float $capturedAmount): void
-    {
-        $db = DatabaseProvider::getDb();
-
-        $sql = "UPDATE osc_payment_order_state
-                SET OXCAPTURED = 1,
-                    OXCAPTUREDAMOUNT = ?,
-                    OXCAPTUREDAT = NOW(),
-                    OXPAYMENTSTATE = 'paid',
-                    OXUPDATED = NOW()
-                WHERE OXORDERID = ?";
-
-        $db->execute($sql, [$capturedAmount, $orderId]);
-    }
-
-    /**
-     * Update order refund state
-     *
-     * @param string $orderId
-     * @param float $refundedAmount
-     * @return void
-     */
-    private function updateOrderRefundState(string $orderId, float $refundedAmount): void
-    {
-        $db = DatabaseProvider::getDb();
-
-        $sql = "UPDATE osc_payment_order_state
-                SET OXREFUNDED = 1,
-                    OXREFUNDEDAMOUNT = COALESCE(OXREFUNDEDAMOUNT, 0) + ?,
-                    OXREFUNDEDAT = NOW(),
-                    OXPAYMENTSTATE = 'refunded',
-                    OXUPDATED = NOW()
-                WHERE OXORDERID = ?";
-
-        $db->execute($sql, [$refundedAmount, $orderId]);
-    }
+    // Sprint 8: Removed updateOrderPaymentState(), updateOrderCaptureState(), updateOrderRefundState()
+    // These methods updated the now-dropped osc_payment_order_state table.
+    // Capture/refund tracking is now handled by osc_payment_contract fields.
 
     /**
      * Update order OXPAID timestamp

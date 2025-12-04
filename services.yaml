@@ -402,11 +402,10 @@ services:
     public: true
 
   # Payment Order State Repository - DEPRECATED (No longer used)
-  # Payment state is now tracked via Component-level TransactionRepository
-  # which provides provider-agnostic transaction persistence.
-  # Keeping this definition for backwards compatibility but it's no longer injected.
-  # OxidSolutionCatalysts\Payments\Stripe\Repository\PaymentOrderStateRepository:
-  #   public: false
+  # Sprint 8: PaymentOrderStateRepository DELETED
+  # Payment state now tracked via osc_payment_contract with capture/refund fields.
+  # osc_payment_order_state table has been dropped.
+
   # ==========================================
   # Twig Extensions
   # ==========================================

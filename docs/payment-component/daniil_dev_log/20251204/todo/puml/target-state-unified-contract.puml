@@ -1,0 +1,105 @@
+@startuml target-state-unified-contract
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam class {
+    BackgroundColor #E3F2FD
+    BorderColor #1976D2
+    ArrowColor #1976D2
+}
+
+title Target State: Unified Contract-Based Architecture\n(Sprint 8 Goal)
+
+package "Database Tables" {
+    entity "oxorder" as order {
+        OXID : char(32)
+        --
+        OXTRANSID : pi_xxx (kept for legacy)
+        OXTRANSSTATUS : OK/NOT_FINISHED
+        **OXPAID** : datetime
+        OXPAYMENTTYPE : osc_stripe_wallet
+    }
+
+    entity "osc_payment_contract" as contract #90EE90 {
+        OXID : char(32)
+        --
+        **OXPROVIDERORDERID** : pi_xxx
+        **OXSTATE** : pending/committed/fulfilled/failed/refunded
+        OXORDERID : FK → oxorder
+        OXUSERID : FK → oxuser
+        OXBASKETDATA : JSON
+        OXCONDITIONS : JSON
+        --
+        **NEW FIELDS (from order_state):**
+        OXCAPTUREDAMOUNT : float
+        OXREFUNDEDAMOUNT : float
+        OXCAPTUREDAT : datetime
+        OXREFUNDEDAT : datetime
+    }
+
+    entity "osc_payment_webhooklogs" as webhooks {
+        OXID : char(32)
+        --
+        OXEVENTID : evt_xxx
+        OXEVENTTYPE : payment_intent.succeeded
+        OXSTATUS : processed
+        OXCONTRACTID : FK → contract
+    }
+
+    together {
+        entity "osc_payment_order_state" as order_state #FF6B6B {
+            **DROPPED**
+        }
+    }
+}
+
+package "Services" {
+    class "WebhookProcessingService" as wps {
+        + processEvent()
+        --
+        Updates **ONLY**:
+        - contract (via handler)
+        - oxorder.OXPAID (for OXID compatibility)
+    }
+
+    class "WebhookContractFulfillmentHandler" as wcfh #90EE90 {
+        + handlePaymentSucceeded()
+        + handleChargeCaptured()
+        + handleChargeRefunded()
+        + handlePaymentFailed()
+        --
+        **ENHANCED:**
+        Handles capture/refund amounts
+    }
+}
+
+contract "1" -- "0..1" order : OXORDERID
+webhooks "0..*" -- "0..1" contract : OXCONTRACTID
+
+wps --> wcfh : "unified flow"
+wcfh --> contract : "state + amounts"
+wcfh --> order : "OXPAID only"
+
+note right of contract
+    **SINGLE SOURCE OF TRUTH**
+    All payment state in one place:
+    - State machine (OXSTATE)
+    - Provider ID (OXPROVIDERORDERID)
+    - Amounts (captured/refunded)
+    - Timestamps
+end note
+
+note right of order_state
+    **REMOVED**
+    - Migration moves data to contract
+    - Table dropped
+    - All references removed
+end note
+
+note bottom of wps
+    **CLEAN ARCHITECTURE**
+    - Single update path
+    - Contract is authoritative
+    - oxorder.OXPAID for OXID compat
+    - No dual tracking
+end note
+@enduml

@@ -1,0 +1,112 @@
+@startuml current-state-competing-entities
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam class {
+    BackgroundColor #E3F2FD
+    BorderColor #1976D2
+    ArrowColor #1976D2
+}
+
+title Current State: Competing Payment State Entities\n(Technical Debt)
+
+package "Database Tables" {
+    entity "oxorder" as order {
+        OXID : char(32)
+        --
+        **OXTRANSID** : pi_xxx
+        **OXTRANSSTATUS** : OK/NOT_FINISHED
+        **OXPAID** : datetime
+        OXPAYMENTTYPE : osc_stripe_wallet
+    }
+
+    entity "osc_payment_contract" as contract #90EE90 {
+        OXID : char(32)
+        --
+        **OXPROVIDERORDERID** : pi_xxx
+        **OXSTATE** : committed/fulfilled
+        OXORDERID : FK → oxorder
+        OXUSERID : FK → oxuser
+        OXBASKETDATA : JSON
+        OXCONDITIONS : JSON
+    }
+
+    entity "osc_payment_order_state" as order_state #FFB6C1 {
+        OXID : char(32)
+        --
+        **OXPROVIDERORDERID** : pi_xxx
+        **OXPAYMENTSTATE** : paid/failed/refunded
+        OXORDERID : FK → oxorder
+        OXCONTRACTID : FK → contract
+        OXCAPTUREDAMOUNT : float
+        OXREFUNDEDAMOUNT : float
+    }
+
+    entity "osc_payment_webhooklogs" as webhooks {
+        OXID : char(32)
+        --
+        OXEVENTID : evt_xxx
+        OXEVENTTYPE : payment_intent.succeeded
+        OXSTATUS : processed
+        **OXCONTRACTID** : FK → contract
+    }
+}
+
+package "Services" {
+    class "WebhookProcessingService" as wps {
+        + processEvent()
+        --
+        Updates **BOTH**:
+        - contract (via handler)
+        - order_state (direct SQL)
+        - oxorder (OXPAID, etc.)
+    }
+
+    class "PaymentOrderStateRepository" as posr #FFB6C1 {
+        + updateOrderState()
+        + findByOrderId()
+        --
+        **DEAD CODE**
+        Never instantiated!
+    }
+
+    class "WebhookContractFulfillmentHandler" as wcfh #90EE90 {
+        + handlePaymentSucceeded()
+        + handleChargeCaptured()
+        + handleChargeRefunded()
+    }
+}
+
+order_state "1" -- "1" order : OXORDERID
+contract "1" -- "0..1" order : OXORDERID
+order_state "0..1" -- "1" contract : OXCONTRACTID
+webhooks "0..*" -- "0..1" contract : OXCONTRACTID
+
+wps --> order_state : "direct SQL (legacy)"
+wps --> wcfh : "contract flow"
+wcfh --> contract : "state transitions"
+
+note right of order_state
+    **REDUNDANT TABLE**
+    - Duplicates contract state tracking
+    - OXPAYMENTSTATE overlaps OXSTATE
+    - OXPROVIDERORDERID duplicated
+    - Should be DROPPED
+end note
+
+note right of posr
+    **DEAD CODE**
+    - Class exists but never used
+    - Commented out in services.yaml
+    - Should be DELETED
+end note
+
+note bottom of wps
+    **DUAL TRACKING BUG**
+    Same webhook updates:
+    1. contract.OXSTATE → fulfilled
+    2. order_state.OXPAYMENTSTATE → paid
+    3. order.OXPAID → timestamp
+
+    This is redundant and confusing!
+end note
+@enduml

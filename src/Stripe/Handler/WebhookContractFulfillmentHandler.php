@@ -43,9 +43,42 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
     /**
      * @inheritDoc
      */
-    public function handleChargeCaptured(string $providerOrderId): ?bool
+    public function handleChargeCaptured(string $providerOrderId, float $capturedAmount = 0.0): ?bool
     {
-        return $this->fulfillContractByProviderOrderId($providerOrderId);
+        $contract = $this->findContractByProviderOrderId($providerOrderId);
+
+        if ($contract === null) {
+            return null;
+        }
+
+        // Sprint 8: Record captured amount on contract
+        if ($capturedAmount > 0.0 && $contract instanceof PaymentContract) {
+            $contract->setCapturedAmount($capturedAmount);
+            $contract->setCapturedAt(new \DateTimeImmutable());
+        }
+
+        // Idempotency check - already fulfilled
+        if ($contract->getState()->isFulfilled()) {
+            // Still save the captured amount if it changed
+            if ($capturedAmount > 0.0) {
+                $this->contractRepository->save($contract);
+            }
+            return false;
+        }
+
+        // Validation - must be COMMITTED to fulfill
+        if (!$contract->getState()->isCommitted()) {
+            return false;
+        }
+
+        // Transition contract to FULFILLED
+        $contract->fulfill();
+        $this->contractRepository->save($contract);
+
+        // Dispatch ContractFulfilledEvent
+        $this->dispatchContractFulfilledEvent($contract);
+
+        return true;
     }
 
     /**
@@ -64,8 +97,13 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
             return false;
         }
 
-        // For now, just acknowledge refund processing
-        // Refund tracking is handled via the transaction table
+        // Sprint 8: Record refund amount on contract (accumulates for partial refunds)
+        if ($refundAmount > 0.0 && $contract instanceof PaymentContract) {
+            $contract->addRefundedAmount($refundAmount);
+            $contract->setRefundedAt(new \DateTimeImmutable());
+            $this->contractRepository->save($contract);
+        }
+
         return true;
     }
 

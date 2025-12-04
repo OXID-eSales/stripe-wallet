@@ -31,10 +31,13 @@ interface WebhookContractFulfillmentHandlerInterface
     /**
      * Handle charge.captured webhook event.
      *
+     * Sprint 8: Now accepts captured amount for contract tracking.
+     *
      * @param string $providerOrderId Stripe PaymentIntent ID
+     * @param float $capturedAmount Amount captured in currency units (default 0.0 for backwards compat)
      * @return bool|null true if fulfilled, false if skipped, null if not found
      */
-    public function handleChargeCaptured(string $providerOrderId): ?bool;
+    public function handleChargeCaptured(string $providerOrderId, float $capturedAmount = 0.0): ?bool;
 
     /**
      * Handle charge.refunded webhook event.

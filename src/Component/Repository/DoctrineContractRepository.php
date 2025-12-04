@@ -207,6 +207,10 @@ class DoctrineContractRepository implements ContractRepositoryInterface
             'OXCOMMITTEDAT' => isset($contractArray['committedAt']) ? $this->formatDateTime($contractArray['committedAt']) : null,
             'OXFULFILLEDAT' => isset($contractArray['fulfilledAt']) ? $this->formatDateTime($contractArray['fulfilledAt']) : null,
             'OXEXPIRESAT' => isset($contractArray['expiresAt']) ? $this->formatDateTime($contractArray['expiresAt']) : null,
+            'OXCAPTUREDAMOUNT' => $contractArray['capturedAmount'] ?? null,
+            'OXREFUNDEDAMOUNT' => $contractArray['refundedAmount'] ?? null,
+            'OXCAPTUREDAT' => isset($contractArray['capturedAt']) ? $this->formatDateTime($contractArray['capturedAt']) : null,
+            'OXREFUNDEDAT' => isset($contractArray['refundedAt']) ? $this->formatDateTime($contractArray['refundedAt']) : null,
         ];
     }
 
@@ -306,6 +310,12 @@ class DoctrineContractRepository implements ContractRepositoryInterface
         // Restore metadata from database
         $metadata = $this->hydrateContractMetadata($data);
         $this->setPrivateProperty($reflection, $contract, 'metadata', $metadata);
+
+        // Sprint 8: Capture/Refund tracking fields
+        $this->setPrivateProperty($reflection, $contract, 'capturedAmount', $this->parseOptionalFloat($data['OXCAPTUREDAMOUNT'] ?? null));
+        $this->setPrivateProperty($reflection, $contract, 'refundedAmount', $this->parseOptionalFloat($data['OXREFUNDEDAMOUNT'] ?? null));
+        $this->setPrivateProperty($reflection, $contract, 'capturedAt', $this->parseDateTime($data['OXCAPTUREDAT'] ?? null));
+        $this->setPrivateProperty($reflection, $contract, 'refundedAt', $this->parseDateTime($data['OXREFUNDEDAT'] ?? null));
     }
 
     /**
@@ -368,5 +378,22 @@ class DoctrineContractRepository implements ContractRepositoryInterface
         /** @phpstan-ignore-next-line */
         $stringValue = is_string($value) ? $value : (string) $value;
         return new DateTime($stringValue);
+    }
+
+    /**
+     * Parse an optional float from database value
+     */
+    private function parseOptionalFloat(mixed $value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (is_float($value)) {
+            return $value;
+        }
+        if (is_int($value) || is_numeric($value)) {
+            return (float) $value;
+        }
+        return null;
     }
 }

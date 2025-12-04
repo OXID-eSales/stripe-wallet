@@ -72,4 +72,46 @@ interface PaymentContractInterface extends ModelInterface
      * @return array<string, mixed>
      */
     public function getAllMetadata(): array;
+
+    // Sprint 8: Capture/Refund tracking (consolidated from order_state)
+
+    /**
+     * Get the captured payment amount.
+     */
+    public function getCapturedAmount(): ?float;
+
+    /**
+     * Set the captured payment amount.
+     */
+    public function setCapturedAmount(float $amount): void;
+
+    /**
+     * Get the total refunded amount.
+     */
+    public function getRefundedAmount(): ?float;
+
+    /**
+     * Add to the refunded amount (accumulates multiple refunds).
+     */
+    public function addRefundedAmount(float $amount): void;
+
+    /**
+     * Get the timestamp when payment was captured.
+     */
+    public function getCapturedAt(): ?DateTimeInterface;
+
+    /**
+     * Set the timestamp when payment was captured.
+     */
+    public function setCapturedAt(DateTimeInterface $date): void;
+
+    /**
+     * Get the timestamp of last refund.
+     */
+    public function getRefundedAt(): ?DateTimeInterface;
+
+    /**
+     * Set the timestamp of last refund.
+     */
+    public function setRefundedAt(DateTimeInterface $date): void;
 }
