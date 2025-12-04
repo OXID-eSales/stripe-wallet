@@ -349,11 +349,13 @@ services:
     alias: OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface
 
   # WebhookProcessingService - Now requires WebhookContractFulfillmentHandler
+  # Sprint 7: Added ContractRepository for linking webhook logs to contracts
   OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService:
     arguments:
       $contractFulfillmentHandler: '@OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface'
       $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
       $webhookLogRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface'
+      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
     public: true
 
   # ==========================================

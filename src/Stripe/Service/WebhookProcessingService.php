@@ -20,6 +20,7 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\WebhookRe
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentCapturedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentRefundedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentFailedEvent;
+use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookLog;
 use OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface;
@@ -61,16 +62,19 @@ class WebhookProcessingService
 {
     private ?EventDispatcherInterface $eventDispatcher;
     private ?WebhookLogRepositoryInterface $webhookLogRepository;
+    private ?ContractRepositoryInterface $contractRepository;
     private WebhookContractFulfillmentHandlerInterface $contractFulfillmentHandler;
 
     public function __construct(
         WebhookContractFulfillmentHandlerInterface $contractFulfillmentHandler,
         ?EventDispatcherInterface $eventDispatcher = null,
-        ?WebhookLogRepositoryInterface $webhookLogRepository = null
+        ?WebhookLogRepositoryInterface $webhookLogRepository = null,
+        ?ContractRepositoryInterface $contractRepository = null
     ) {
         $this->contractFulfillmentHandler = $contractFulfillmentHandler;
         $this->eventDispatcher = $eventDispatcher;
         $this->webhookLogRepository = $webhookLogRepository;
+        $this->contractRepository = $contractRepository;
     }
 
     /**
@@ -137,8 +141,68 @@ class WebhookProcessingService
                 ]);
         }
 
-        // Update webhook log status
-        $this->updateWebhookStatus($event->id, 'processed');
+        // Look up contract ID for linking webhook log to contract
+        $contractId = $this->findContractIdFromEvent($event);
+
+        // Update webhook log status with contract ID if found
+        $this->updateWebhookStatus($event->id, 'processed', $contractId);
+    }
+
+    /**
+     * Extract provider order ID (payment intent ID) from Stripe event.
+     *
+     * @param \Stripe\Event $event
+     * @return string|null Payment intent ID or null if not found
+     */
+    private function extractProviderOrderIdFromEvent(\Stripe\Event $event): ?string
+    {
+        $object = $event->data->object;
+
+        // Direct payment intent events
+        if (str_starts_with($event->type, 'payment_intent.')) {
+            return $object->id ?? null;
+        }
+
+        // Charge events - payment intent is a property
+        if (str_starts_with($event->type, 'charge.')) {
+            return $object->payment_intent ?? null;
+        }
+
+        // Checkout session events
+        if ($event->type === 'checkout.session.completed') {
+            return $object->payment_intent ?? null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Find contract ID from event by looking up via provider order ID.
+     *
+     * @param \Stripe\Event $event
+     * @return string|null Contract ID or null if not found
+     */
+    private function findContractIdFromEvent(\Stripe\Event $event): ?string
+    {
+        if ($this->contractRepository === null) {
+            return null;
+        }
+
+        $providerOrderId = $this->extractProviderOrderIdFromEvent($event);
+        if ($providerOrderId === null) {
+            return null;
+        }
+
+        try {
+            $contract = $this->contractRepository->findByProviderOrderId($providerOrderId);
+            return $contract?->getId();
+        } catch (\Exception $e) {
+            Registry::getLogger()->debug('Could not look up contract for webhook', [
+                'provider_order_id' => $providerOrderId,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
     }
 
     /**
@@ -799,14 +863,15 @@ class WebhookProcessingService
      *
      * @param string $eventId
      * @param string $status
+     * @param string|null $contractId Optional contract ID to link the webhook to
      * @return void
      */
-    private function updateWebhookStatus(string $eventId, string $status): void
+    private function updateWebhookStatus(string $eventId, string $status, ?string $contractId = null): void
     {
         // Sprint 7 Phase 4: Use repository if available
         if ($this->webhookLogRepository !== null) {
             try {
-                $this->webhookLogRepository->updateStatus($eventId, $status);
+                $this->webhookLogRepository->updateStatus($eventId, $status, null, $contractId);
                 return;
             } catch (\Exception $e) {
                 Registry::getLogger()->error('Failed to update webhook status via repository', [
@@ -819,11 +884,17 @@ class WebhookProcessingService
         try {
             $db = DatabaseProvider::getDb();
 
-            $sql = "UPDATE osc_payment_webhooklogs
-                    SET OXSTATUS = ?, OXPROCESSEDAT = NOW()
-                    WHERE OXEVENTID = ?";
-
-            $db->execute($sql, [$status, $eventId]);
+            if ($contractId !== null) {
+                $sql = "UPDATE osc_payment_webhooklogs
+                        SET OXSTATUS = ?, OXPROCESSEDAT = NOW(), OXCONTRACTID = ?
+                        WHERE OXEVENTID = ?";
+                $db->execute($sql, [$status, $contractId, $eventId]);
+            } else {
+                $sql = "UPDATE osc_payment_webhooklogs
+                        SET OXSTATUS = ?, OXPROCESSEDAT = NOW()
+                        WHERE OXEVENTID = ?";
+                $db->execute($sql, [$status, $eventId]);
+            }
         } catch (\Exception $e) {
             Registry::getLogger()->error('Failed to update webhook status', [
                 'error' => $e->getMessage(),
