@@ -1,0 +1,91 @@
+@startuml Sprint 7 - Provider Order ID Fixed
+!theme plain
+title <font size=24 color="#2E7D32"><b>Sprint 7: Provider Order ID Fixed Flow</b></font>\n<font size=14 color="#388E3C">OXPAID correctly updated via contract state machine</font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+
+skinparam sequence {
+    ArrowColor #333333
+    LifeLineBorderColor #666666
+    ParticipantBackgroundColor #E3F2FD
+    ParticipantBorderColor #1565C0
+}
+
+actor Customer as C
+participant "Stripe\nCheckout" as SC #BBDEFB
+participant "StripeCheckout\nSessionHandler" as SCSH #C8E6C9
+participant "Contract\nRepository" as CR #FFF9C4
+participant "StripeCheckout\nReturnHandler" as SCRH #C8E6C9
+participant "PaymentAuthorized\nEventHandler" as PAEH #C8E6C9
+participant "Webhook\nController" as WC #C8E6C9
+participant "WebhookContract\nFulfillmentHandler" as WCFH #C8E6C9
+database "oxorder" as DB #E1BEE7
+
+== Checkout Flow ==
+
+C -> SC : Pay
+SC -> SCSH : Create session
+SCSH -> CR : Save contract\n(providerOrderId = cs_test_...)
+note right #FFF9C4
+  Initial: Checkout Session ID
+  (will be updated on return)
+end note
+
+SC --> C : Payment success
+C -> SCRH : Return to shop
+
+== Return Handler (FIXED!) ==
+
+SCRH -> SCRH : Get paymentIntentId (pi_...)
+SCRH -> SCRH : Get sessionId (cs_test_...)
+
+SCRH -> PAEH : <font color="#2E7D32"><b>PaymentAuthorizedEvent(\n  providerOrderId = paymentIntentId  // FIXED!\n)</b></font>
+note right #C8E6C9
+  <font color="#2E7D32"><b>FIX:</b></font>
+  Now passes paymentIntentId
+  instead of sessionId
+end note
+
+PAEH -> CR : <font color="#2E7D32">contract.setProvider("stripe", <b>pi_...</b>)</font>
+note right #C8E6C9
+  Contract UPDATED to
+  PaymentIntent ID (pi_...)
+end note
+
+== Webhook Arrives (WORKS!) ==
+
+WC -> WCFH : handlePaymentSucceeded(<font color="#1565C0"><b>pi_...</b></font>)
+WCFH -> CR : findByProviderOrderId(<font color="#1565C0"><b>pi_...</b></font>)
+CR --> WCFH : <font color="#2E7D32"><b>Contract found!</b></font>
+note right #C8E6C9
+  Lookup SUCCEEDS because:
+  Contract has: pi_...
+  Webhook has: pi_...
+  <font color="#2E7D32"><b>MATCH!</b></font>
+end note
+
+WCFH -> WCFH : contract.fulfill()
+WCFH -> CR : save(contract)
+WCFH -> WCFH : dispatch(ContractFulfilledEvent)
+
+WCFH --> WC : <font color="#2E7D32">true (fulfilled)</font>
+
+WC -> DB : <font color="#2E7D32">UPDATE oxorder\nSET OXPAID = NOW()</font>
+WC -> DB : <font color="#2E7D32">UPDATE oxorder\nSET OXTRANSSTATUS = 'OK'</font>
+
+note right #C8E6C9
+  <font color="#2E7D32"><b>RESULT:</b></font>
+  - Contract → FULFILLED
+  - OXPAID = real timestamp
+  - E2E tests pass!
+end note
+
+legend bottom
+  |= Component |= ID Type |= Value |
+  | Contract (stored) | PaymentIntent | <font color="#2E7D32">pi_...</font> |
+  | Webhook (received) | PaymentIntent | <font color="#2E7D32">pi_...</font> |
+  | <font color="#2E7D32"><b>MATCH!</b></font> | | |
+endlegend
+
+@enduml

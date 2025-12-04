@@ -1,0 +1,84 @@
+@startuml Sprint 7 - Provider Order ID Bug
+!theme plain
+title <font size=24 color="#C62828"><b>Sprint 7: Provider Order ID Mismatch Bug</b></font>\n<font size=14 color="#E53935">Why OXPAID is never updated</font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+
+skinparam sequence {
+    ArrowColor #333333
+    LifeLineBorderColor #666666
+    ParticipantBackgroundColor #E3F2FD
+    ParticipantBorderColor #1565C0
+}
+
+actor Customer as C
+participant "Stripe\nCheckout" as SC #BBDEFB
+participant "StripeCheckout\nSessionHandler" as SCSH #C8E6C9
+participant "Contract\nRepository" as CR #FFF9C4
+participant "StripeCheckout\nReturnHandler" as SCRH #C8E6C9
+participant "PaymentAuthorized\nEventHandler" as PAEH #C8E6C9
+participant "Webhook\nController" as WC #FFCDD2
+participant "WebhookContract\nFulfillmentHandler" as WCFH #FFCDD2
+
+== Checkout Flow ==
+
+C -> SC : Pay
+SC -> SCSH : Create session
+SCSH -> CR : <font color="#2E7D32">Save contract with\n<b>providerOrderId = cs_test_...</b></font>
+note right #C8E6C9
+  Contract stores
+  Checkout Session ID
+end note
+
+SC --> C : Payment success
+C -> SCRH : Return to shop
+
+== Return Handler (BUG HERE!) ==
+
+SCRH -> SCRH : Get paymentIntentId (pi_...)
+SCRH -> SCRH : Get sessionId (cs_test_...)
+
+SCRH -> PAEH : <font color="#C62828"><b>PaymentAuthorizedEvent(\n  providerOrderId = sessionId  // BUG!\n)</b></font>
+note right #FFCDD2
+  <font color="#C62828"><b>BUG:</b></font>
+  Should pass paymentIntentId
+  but passes sessionId instead!
+end note
+
+PAEH -> CR : <font color="#C62828">contract.setProvider("stripe", cs_test_...)</font>
+note right #FFCDD2
+  Contract KEEPS
+  cs_test_... as providerOrderId
+  instead of pi_...
+end note
+
+== Webhook Arrives (FAILS!) ==
+
+WC -> WCFH : handlePaymentSucceeded(<font color="#1565C0"><b>pi_...</b></font>)
+WCFH -> CR : findByProviderOrderId(<font color="#1565C0"><b>pi_...</b></font>)
+CR --> WCFH : <font color="#C62828"><b>null</b></font> (not found!)
+note right #FFCDD2
+  Lookup FAILS because:
+  Contract has: cs_test_...
+  Webhook has: pi_...
+end note
+
+WCFH --> WC : <font color="#C62828">null (contract not found)</font>
+WC -> WC : Fall back to legacy path
+WC -> WC : <font color="#C62828">Legacy also fails...</font>
+note right #FFCDD2
+  <font color="#C62828"><b>RESULT:</b></font>
+  - Contract stays COMMITTED
+  - OXPAID = 0000-00-00 00:00:00
+  - E2E tests fail!
+end note
+
+legend bottom
+  |= Component |= ID Type |= Value |
+  | Contract (stored) | Checkout Session | <font color="#C62828">cs_test_...</font> |
+  | Webhook (received) | PaymentIntent | <font color="#1565C0">pi_...</font> |
+  | <font color="#C62828"><b>MISMATCH!</b></font> | | |
+endlegend
+
+@enduml

@@ -157,4 +157,30 @@ class DoctrineWebhookLogRepository implements WebhookLogRepositoryInterface
         /** @phpstan-ignore-next-line */
         return is_string($data[$key]) ? $data[$key] : (string) $data[$key];
     }
+
+    public function updateStatus(
+        string $eventId,
+        string $status,
+        ?string $error = null,
+        ?string $contractId = null
+    ): void {
+        try {
+            $data = [
+                'OXSTATUS' => $status,
+                'OXPROCESSEDAT' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+            ];
+
+            if ($error !== null) {
+                $data['OXERROR'] = $error;
+            }
+
+            if ($contractId !== null) {
+                $data['OXCONTRACTID'] = $contractId;
+            }
+
+            $this->connection->update(self::TABLE_NAME, $data, ['OXEVENTID' => $eventId]);
+        } catch (Exception $e) {
+            throw new RuntimeException('Failed to update webhook log status: ' . $e->getMessage(), 0, $e);
+        }
+    }
 }

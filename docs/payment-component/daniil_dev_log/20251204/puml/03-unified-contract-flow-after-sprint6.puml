@@ -1,0 +1,111 @@
+@startuml Unified Contract Flow After Sprint 6
+!theme plain
+title <font size=24 color="#1565C0"><b>UNIFIED: Frontend + Webhook Flow After Sprint 6</b></font>\n<font size=14 color="#1976D2">Both paths now use the contract state machine!</font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+
+left to right direction
+
+rectangle "Frontend Flow\n<font color='#2E7D32'>(Contract-Aware)</font>" as Frontend #C8E6C9 {
+    rectangle "1. StripeContractCreationHandler" as F1 #A5D6A7
+    rectangle "2. StripeCheckoutSessionHandler" as F2 #A5D6A7
+    rectangle "3. StripeCheckoutReturnHandler" as F3 #A5D6A7
+    rectangle "4. PaymentAuthorizedEventHandler" as F4 #A5D6A7
+    rectangle "5. StripeOrderCreationHandler" as F5 #A5D6A7
+
+    F1 --> F2
+    F2 --> F3
+    F3 --> F4
+    F4 --> F5
+}
+
+rectangle "Contract State Machine" as Contract #FFF9C4 {
+    rectangle "DRAFT" as Draft #2196F3
+    rectangle "PENDING" as Pending #FF9800
+    rectangle "READY_TO_COMMIT" as Ready #4CAF50
+    rectangle "COMMITTED" as Committed #8BC34A
+    rectangle "FULFILLED" as Fulfilled #009688
+
+    Draft --> Pending : transitionToPending()
+    Pending --> Ready : fulfillCondition()
+    Ready --> Committed : commitToOrder()
+    Committed --> Fulfilled : <font color='#2E7D32'><b>fulfill()</b></font>\n<font color='#2E7D32'>(Sprint 6 FIX!)</font>
+}
+
+rectangle "Webhook Flow\n<font color='#2E7D32'>(NOW Contract-Aware!)</font>" as Webhook #C8E6C9 {
+    rectangle "WebhookController" as W1 #A5D6A7
+    rectangle "WebhookProcessingService" as W2 #A5D6A7
+    rectangle "WebhookContractFulfillmentHandler" as W3 #81C784
+
+    W1 --> W2
+    W2 --> W3
+}
+
+rectangle "Events Dispatched" as Events #E1BEE7 {
+    rectangle "ContractCreatedEvent" as E1 #CE93D8
+    rectangle "PaymentAuthorizedEvent" as E2 #CE93D8
+    rectangle "ContractCommittedEvent" as E3 #CE93D8
+    rectangle "ContractFulfilledEvent" as E4 #CE93D8
+}
+
+' Connections from Frontend to Contract
+F1 ..> Draft : Creates
+F4 ..> Pending : Transitions
+F4 ..> Ready : When authorized
+F5 ..> Committed : After order
+
+' Connection from Webhook (NOW WORKS!)
+W3 ..> Committed : Finds via\nproviderOrderId
+W3 ..> Fulfilled : <font color='#2E7D32'><b>Transitions!</b></font>
+
+' Event connections
+F1 ..> E1 : dispatches
+F4 ..> E2 : dispatches
+F5 ..> E3 : dispatches
+W3 ..> E4 : <font color='#2E7D32'><b>dispatches!</b></font>
+
+note right of Frontend
+  <font color='#2E7D32'><b>Uses:</b></font>
+  - ContractRepository
+  - EventDispatcher
+  - Contract state machine
+  - PaymentContract model
+
+  <b>State Transitions:</b>
+  DRAFT → PENDING → READY → COMMITTED
+end note
+
+note right of Webhook
+  <font color='#2E7D32'><b>NOW USES (Sprint 6):</b></font>
+  - ContractRepository
+  - EventDispatcher
+  - Contract state machine
+  - PaymentContract model
+
+  <b>State Transition:</b>
+  COMMITTED → FULFILLED
+
+  <font color='#2E7D32'><b>Via new handler:</b></font>
+  WebhookContractFulfillmentHandler
+end note
+
+note bottom of Contract
+  <font color='#2E7D32'><b>SPRINT 6 UNIFIED!</b></font>
+  Frontend creates contract: DRAFT → COMMITTED
+  Webhook completes lifecycle: COMMITTED → FULFILLED
+
+  Both flows now use the contract layer!
+  State machine integrity preserved.
+end note
+
+legend bottom
+  |= Flow |= Uses Contract? |= State Transitions |= Events |
+  | <#C8E6C9> Frontend | YES | DRAFT→PENDING→READY→COMMITTED | Created, Authorized, Committed |
+  | <#C8E6C9> Webhook | <font color='#2E7D32'><b>YES (Sprint 6)</b></font> | COMMITTED→FULFILLED | <font color='#2E7D32'><b>Fulfilled</b></font> |
+
+  <font color='#2E7D32'><b>THE "TWO PATHS" AMBIGUITY IS RESOLVED!</b></font>
+  Contract completes full lifecycle: DRAFT → PENDING → READY → COMMITTED → FULFILLED
+endlegend
+
+@enduml

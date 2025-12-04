@@ -1,0 +1,130 @@
+@startuml WebhookContractFulfillmentHandler Class Diagram
+!theme plain
+title <font size=24 color="#1565C0"><b>Sprint 6: Handler Class Architecture</b></font>\n<font size=14 color="#1976D2">WebhookContractFulfillmentHandler</font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+
+skinparam class {
+    BackgroundColor<<interface>> #E3F2FD
+    BackgroundColor<<new>> #C8E6C9
+    BackgroundColor<<existing>> #FFF9C4
+    BackgroundColor<<event>> #E1BEE7
+}
+
+package "Stripe Handler Layer (NEW)" #E8F5E9 {
+    interface WebhookContractFulfillmentHandlerInterface <<interface>> {
+        +handlePaymentSucceeded(providerOrderId: string): ?bool
+        +handleChargeCaptured(providerOrderId: string): ?bool
+        +handleChargeRefunded(providerOrderId: string, amount: float): ?bool
+        +handlePaymentFailed(providerOrderId: string, reason: string): ?bool
+    }
+
+    class WebhookContractFulfillmentHandler <<new>> {
+        -contractRepository: ContractRepositoryInterface
+        -eventDispatcher: EventDispatcherInterface
+        --
+        +__construct(repo, dispatcher)
+        +handlePaymentSucceeded(providerOrderId): ?bool
+        +handleChargeCaptured(providerOrderId): ?bool
+        +handleChargeRefunded(providerOrderId, amount): ?bool
+        +handlePaymentFailed(providerOrderId, reason): ?bool
+        --
+        -fulfillContractByProviderOrderId(id): ?bool
+        -findContractByProviderOrderId(id): ?Contract
+        -dispatchContractFulfilledEvent(contract): void
+    }
+
+    WebhookContractFulfillmentHandler .up.|> WebhookContractFulfillmentHandlerInterface
+}
+
+package "Stripe Service Layer" #FFF9C4 {
+    class WebhookProcessingService <<existing>> {
+        -contractFulfillmentHandler: HandlerInterface
+        -eventDispatcher: EventDispatcherInterface
+        -webhookLogRepository: WebhookLogRepoInterface
+        --
+        +processEvent(event): void
+        -handlePaymentIntentSucceeded(event): void
+        -handleChargeCaptured(event): void
+        -handleChargeRefunded(event): void
+        -handlePaymentIntentFailed(event): void
+        ...
+    }
+}
+
+package "Component Contract Layer" #FFF9C4 {
+    interface ContractRepositoryInterface <<interface>> {
+        +findByProviderOrderId(id: string): ?Contract
+        +findById(id: string): ?Contract
+        +save(contract: Contract): void
+    }
+
+    interface PaymentContractInterface <<interface>> {
+        +getState(): ContractState
+        +getOrderId(): ?string
+        +getProviderOrderId(): ?string
+        +fulfill(): void
+        +fail(reason: string): void
+    }
+
+    class ContractState <<existing>> {
+        +isDraft(): bool
+        +isPending(): bool
+        +isCommitted(): bool
+        +isFulfilled(): bool
+        +isFailed(): bool
+        +isTerminal(): bool
+        --
+        {static} +committed(): ContractState
+        {static} +fulfilled(): ContractState
+    }
+}
+
+package "Component Event System" #E1BEE7 {
+    interface EventDispatcherInterface <<interface>> {
+        +dispatch(event: object): void
+    }
+
+    class ContractFulfilledEvent <<event>> {
+        -contract: PaymentContractInterface
+        -context: EventContextInterface
+        -orderId: string
+        --
+        +__construct(contract, context, orderId)
+        +getContract(): PaymentContractInterface
+        +getOrderId(): string
+    }
+}
+
+' Dependencies
+WebhookProcessingService --> WebhookContractFulfillmentHandlerInterface : uses
+WebhookContractFulfillmentHandler --> ContractRepositoryInterface : uses
+WebhookContractFulfillmentHandler --> EventDispatcherInterface : uses
+WebhookContractFulfillmentHandler --> PaymentContractInterface : manages
+WebhookContractFulfillmentHandler ..> ContractFulfilledEvent : dispatches
+PaymentContractInterface --> ContractState : has
+
+note right of WebhookContractFulfillmentHandler
+  <b>Return Value Semantics:</b>
+  • true = Contract fulfilled
+  • false = Skipped (idempotent)
+  • null = Not found (use legacy)
+end note
+
+note bottom of WebhookProcessingService
+  <b>Sprint 6 Changes:</b>
+  • Constructor now REQUIRES handler
+  • Tries contract-aware path first
+  • Falls back to legacy if null
+end note
+
+legend bottom
+  |= Color |= Meaning |
+  | <#C8E6C9> | New in Sprint 6 |
+  | <#FFF9C4> | Existing (modified) |
+  | <#E1BEE7> | Event classes |
+  | <#E3F2FD> | Interfaces |
+endlegend
+
+@enduml

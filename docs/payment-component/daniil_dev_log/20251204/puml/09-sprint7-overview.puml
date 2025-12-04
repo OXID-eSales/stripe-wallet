@@ -1,0 +1,75 @@
+@startuml Sprint 7 - Overview
+!theme plain
+title <font size=24 color="#1565C0"><b>Sprint 7: OXPAID & Provider Order ID Fix - Overview</b></font>\n<font size=14 color="#1976D2">4 Phases to fix the payment date bug</font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+
+skinparam rectangle {
+    BackgroundColor<<phase1>> #C8E6C9
+    BackgroundColor<<phase2>> #BBDEFB
+    BackgroundColor<<phase3>> #FFF9C4
+    BackgroundColor<<phase4>> #E1BEE7
+    BackgroundColor<<bug>> #FFCDD2
+    BackgroundColor<<fix>> #C8E6C9
+}
+
+rectangle "THE BUG" <<bug>> #FFCDD2 {
+    rectangle "OXPAID = 0000-00-00\neven after payment" as Bug1 #EF9A9A
+    rectangle "Contract stores cs_test_...\nWebhook sends pi_..." as Bug2 #EF9A9A
+    rectangle "Lookup fails\nContract not found" as Bug3 #EF9A9A
+
+    Bug1 -down-> Bug2
+    Bug2 -down-> Bug3
+}
+
+rectangle "Phase 1: Fix the Bug" <<phase1>> {
+    rectangle "StripeCheckoutReturnHandler.php:275" as P1_File #81C784
+    rectangle "Change: providerOrderId = sessionId\nTo: providerOrderId = paymentIntentId" as P1_Change #A5D6A7
+
+    P1_File --> P1_Change
+}
+
+rectangle "Phase 2: Fix Tests" <<phase2>> {
+    rectangle "OxpaidWebhookUpdateTest" as P2_File #90CAF9
+    rectangle "Remove direct SQL\nUse ContractRepository\nTransition state machine" as P2_Change #BBDEFB
+
+    P2_File --> P2_Change
+}
+
+rectangle "Phase 3: Fix Data" <<phase3>> {
+    rectangle "Migration:\nVersion20251204_FixContractProviderOrderId" as P3_File #FFEB3B
+    rectangle "UPDATE contracts\nSET providerOrderId = pi_...\nWHERE providerOrderId LIKE 'cs_%'" as P3_Change #FFF59D
+
+    P3_File --> P3_Change
+}
+
+rectangle "Phase 4: Architecture" <<phase4>> {
+    rectangle "WebhookLogService (NEW)" as P4_A #CE93D8
+    rectangle "OrderRepository (NEW)" as P4_B #CE93D8
+    rectangle "Remove all direct SQL\nfrom Controllers/Services" as P4_Change #E1BEE7
+
+    P4_A --> P4_Change
+    P4_B --> P4_Change
+}
+
+Bug3 -right-> P1_File : <font color="#2E7D32"><b>Fix 1</b></font>
+P1_Change -right-> P2_File : <font color="#1565C0"><b>Fix 2</b></font>
+P2_Change -right-> P3_File : <font color="#F57C00"><b>Fix 3</b></font>
+P3_Change -right-> P4_A : <font color="#7B1FA2"><b>Fix 4</b></font>
+
+rectangle "SUCCESS CRITERIA" <<fix>> #C8E6C9 {
+    rectangle "Contract → FULFILLED\nOXPAID = real timestamp\nE2E tests pass\nTests use contracts" as Success #A5D6A7
+}
+
+P4_Change -down-> Success
+
+legend bottom
+  |= Phase |= Effort |= Priority |
+  | <#C8E6C9> Phase 1: Bug Fix | 1-2 hours | <font color="#C62828"><b>CRITICAL</b></font> |
+  | <#BBDEFB> Phase 2: Test Refactoring | 2-3 hours | <font color="#C62828"><b>CRITICAL</b></font> |
+  | <#FFF9C4> Phase 3: Data Migration | 1 hour | HIGH |
+  | <#E1BEE7> Phase 4: Architecture | 4-6 hours | MEDIUM |
+endlegend
+
+@enduml

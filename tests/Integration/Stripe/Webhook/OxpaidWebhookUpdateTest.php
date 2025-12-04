@@ -16,22 +16,28 @@ use OxidEsales\EshopCommunity\Tests\Integration\IntegrationTestCase;
 use OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService;
 
 /**
- * TDD RED Tests for OXPAID Update via Webhooks
+ * Integration Tests for OXPAID Update via Webhooks
  *
- * These tests verify that oxorder.OXPAID field is correctly updated
- * when webhook events are processed by WebhookProcessingService.
+ * Sprint 7 Refactored: Tests now use the contract state machine instead of
+ * direct SQL order creation. This ensures tests mirror production code paths.
  *
  * Business Rules:
  * - Authorized only: OXPAID = 0000-00-00 00:00:00 (payment pending capture)
  * - Charged/Captured: OXPAID MUST have real timestamp
  * - Refunded: OXPAID MUST have timestamp of refund event
  *
+ * NOTE: @runTestsInSeparateProcesses is required because the Symfony DI container
+ * caches service instances, and the WebhookContractFulfillmentHandler uses the
+ * ContractRepository which needs a fresh database connection per test.
+ *
  * @covers \OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService
+ * @covers \OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandler
  * @group integration
  * @group webhook
  * @group oxpaid
  * @group sprint-4
- * @group tdd-red
+ * @group contract-aware
+ * @runTestsInSeparateProcesses
  */
 final class OxpaidWebhookUpdateTest extends IntegrationTestCase
 {
@@ -53,8 +59,7 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
         $connectionProvider = $container->get(ConnectionProviderInterface::class);
         $this->connection = $connectionProvider->get();
 
-        // Create WebhookProcessingService - the service we're testing
-        $this->webhookService = new WebhookProcessingService();
+        $this->webhookService = $container->get(WebhookProcessingService::class);
     }
 
     public function tearDown(): void
@@ -64,29 +69,31 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
     }
 
     // =========================================================================
-    // TDD RED: payment_intent.succeeded should update OXPAID
+    // Contract-Aware Tests: payment_intent.succeeded
     // =========================================================================
 
     /**
      * @test
-     * @group tdd-red
      *
-     * TDD RED: This test should FAIL until WebhookProcessingService is fixed
-     * to update oxorder.OXPAID when payment_intent.succeeded is received.
+     * When payment_intent.succeeded webhook arrives for a contract-based order,
+     * the contract should transition to FULFILLED and OXPAID should be updated.
      */
-    public function paymentIntentSucceededUpdatesOxpaid(): void
+    public function paymentIntentSucceededUpdatesOxpaidViaContract(): void
     {
-        // Arrange: Create order with transaction
+        // Arrange: Create contract and order (mirrors production flow)
         $paymentIntentId = 'pi_succeeded_' . $this->testRunId;
-        $orderId = $this->createTestOrderWithTransaction($paymentIntentId);
+        [$contractId, $orderId] = $this->createContractAndOrder($paymentIntentId);
 
-        // Verify initial state: OXPAID should be zero
+        // Verify initial state
         $initialOrder = $this->getOrderData($orderId);
         $this->assertEquals(
             '0000-00-00 00:00:00',
             $initialOrder['OXPAID'],
             'OXPAID should be zero before webhook'
         );
+
+        $contractBefore = $this->getContractData($contractId);
+        $this->assertEquals('committed', $contractBefore['OXSTATE']);
 
         // Act: Process payment_intent.succeeded webhook
         $event = $this->createStripeEvent('payment_intent.succeeded', [
@@ -99,6 +106,14 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
 
         $this->webhookService->processEvent($event);
 
+        // Assert: Contract should be FULFILLED
+        $contractAfter = $this->getContractData($contractId);
+        $this->assertEquals(
+            'fulfilled',
+            $contractAfter['OXSTATE'],
+            'Contract should transition to FULFILLED after webhook'
+        );
+
         // Assert: OXPAID should now have a timestamp
         $updatedOrder = $this->getOrderData($orderId);
         $this->assertNotEquals(
@@ -107,38 +122,67 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
             'OXPAID should be updated after payment_intent.succeeded webhook'
         );
 
-        // Verify timestamp is recent (within last 2 hours to account for timezone differences)
+        // Verify timestamp is recent
         $paidDate = new \DateTimeImmutable($updatedOrder['OXPAID']);
         $now = new \DateTimeImmutable();
         $diff = abs($now->getTimestamp() - $paidDate->getTimestamp());
         $this->assertLessThan(
-            7200, // 2 hours to account for timezone differences
+            7200,
             $diff,
-            'OXPAID timestamp should be recent (within 2 hours, accounting for timezone)'
+            'OXPAID timestamp should be recent (within 2 hours)'
         );
     }
 
+    /**
+     * @test
+     *
+     * Idempotency: Processing same webhook twice should not cause errors
+     * and contract should stay in FULFILLED state.
+     */
+    public function paymentIntentSucceededIsIdempotent(): void
+    {
+        // Arrange
+        $paymentIntentId = 'pi_idempotent_' . $this->testRunId;
+        [$contractId, $orderId] = $this->createContractAndOrder($paymentIntentId);
+
+        $event = $this->createStripeEvent('payment_intent.succeeded', [
+            'id' => $paymentIntentId,
+            'object' => 'payment_intent',
+            'status' => 'succeeded',
+            'amount' => 10000,
+            'currency' => 'eur',
+        ]);
+
+        // Act: Process twice
+        $this->webhookService->processEvent($event);
+        $firstOrder = $this->getOrderData($orderId);
+        $firstPaid = $firstOrder['OXPAID'];
+
+        $this->webhookService->processEvent($event);
+        $secondOrder = $this->getOrderData($orderId);
+
+        // Assert: Same result, no errors
+        $this->assertEquals($firstPaid, $secondOrder['OXPAID']);
+
+        $contractAfter = $this->getContractData($contractId);
+        $this->assertEquals('fulfilled', $contractAfter['OXSTATE']);
+    }
+
     // =========================================================================
-    // TDD RED: charge.captured should update OXPAID
+    // Contract-Aware Tests: charge.captured
     // =========================================================================
 
     /**
      * @test
-     * @group tdd-red
      *
-     * TDD RED: This test should FAIL until WebhookProcessingService is fixed
-     * to update oxorder.OXPAID when charge.captured is received.
-     *
-     * Note: This test is skipped because the osc_payment_order_state table
-     * is missing the OXCAPTURED columns. The OXPAID update itself works.
+     * charge.captured webhook should update OXPAID via contract.
      */
-    public function chargeCapturedUpdatesOxpaid(): void
+    public function chargeCapturedUpdatesOxpaidViaContract(): void
     {
-        $this->markTestSkipped('Skipped: osc_payment_order_state table missing OXCAPTURED columns. OXPAID update works.');
-        // Arrange: Create order with transaction
+        // Arrange
         $paymentIntentId = 'pi_captured_' . $this->testRunId;
         $chargeId = 'ch_captured_' . $this->testRunId;
-        $orderId = $this->createTestOrderWithTransaction($paymentIntentId);
+        [$contractId, $orderId] = $this->createContractAndOrder($paymentIntentId);
 
         // Verify initial state
         $initialOrder = $this->getOrderData($orderId);
@@ -157,7 +201,10 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
 
         $this->webhookService->processEvent($event);
 
-        // Assert: OXPAID should be updated
+        // Assert: Contract FULFILLED and OXPAID updated
+        $contractAfter = $this->getContractData($contractId);
+        $this->assertEquals('fulfilled', $contractAfter['OXSTATE']);
+
         $updatedOrder = $this->getOrderData($orderId);
         $this->assertNotEquals(
             '0000-00-00 00:00:00',
@@ -167,85 +214,26 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
     }
 
     // =========================================================================
-    // TDD RED: charge.refunded should update OXPAID
+    // Contract-Aware Tests: checkout.session.completed
     // =========================================================================
 
     /**
      * @test
-     * @group tdd-red
      *
-     * TDD RED: This test should FAIL until WebhookProcessingService is fixed
-     * to update oxorder.OXPAID when charge.refunded is received.
-     *
-     * Note: This test is skipped because the osc_payment_order_state table
-     * is missing the OXREFUNDED columns. The OXPAID update itself works.
+     * checkout.session.completed webhook should update OXPAID via contract.
      */
-    public function chargeRefundedUpdatesOxpaid(): void
+    public function checkoutSessionCompletedUpdatesOxpaidViaContract(): void
     {
-        $this->markTestSkipped('Skipped: osc_payment_order_state table missing OXREFUNDED columns. OXPAID update works.');
-        // Arrange: Create order that was already paid
-        $paymentIntentId = 'pi_refunded_' . $this->testRunId;
-        $chargeId = 'ch_refunded_' . $this->testRunId;
-        $orderId = $this->createTestOrderWithTransaction($paymentIntentId);
-
-        // Set initial OXPAID to simulate a paid order
-        $originalPaidDate = '2025-12-03 09:00:00';
-        $this->connection->update('oxorder', [
-            'OXPAID' => $originalPaidDate,
-        ], ['OXID' => $orderId]);
-
-        // Act: Process charge.refunded webhook
-        $event = $this->createStripeEvent('charge.refunded', [
-            'id' => $chargeId,
-            'object' => 'charge',
-            'payment_intent' => $paymentIntentId,
-            'amount' => 10000,
-            'amount_refunded' => 10000,
-            'refunded' => true,
-            'currency' => 'eur',
-        ]);
-
-        $this->webhookService->processEvent($event);
-
-        // Assert: OXPAID should be updated to refund time (newer than original)
-        $updatedOrder = $this->getOrderData($orderId);
-        $this->assertNotEquals(
-            '0000-00-00 00:00:00',
-            $updatedOrder['OXPAID'],
-            'OXPAID should not be zero after refund'
-        );
-
-        // OXPAID should be updated to refund timestamp (different from original)
-        $this->assertNotEquals(
-            $originalPaidDate,
-            $updatedOrder['OXPAID'],
-            'OXPAID should be updated to refund timestamp'
-        );
-    }
-
-    // =========================================================================
-    // TDD RED: checkout.session.completed should update OXPAID
-    // =========================================================================
-
-    /**
-     * @test
-     * @group tdd-red
-     *
-     * TDD RED: This test should FAIL until WebhookProcessingService handles
-     * checkout.session.completed event (currently not handled at all).
-     */
-    public function checkoutSessionCompletedUpdatesOxpaid(): void
-    {
-        // Arrange: Create order with transaction
+        // Arrange
         $paymentIntentId = 'pi_checkout_' . $this->testRunId;
         $sessionId = 'cs_test_' . $this->testRunId;
-        $orderId = $this->createTestOrderWithTransaction($paymentIntentId);
+        [$contractId, $orderId] = $this->createContractAndOrder($paymentIntentId);
 
         // Verify initial state
         $initialOrder = $this->getOrderData($orderId);
         $this->assertEquals('0000-00-00 00:00:00', $initialOrder['OXPAID']);
 
-        // Act: Process checkout.session.completed webhook (Stripe Wallet flow)
+        // Act: Process checkout.session.completed webhook
         $event = $this->createStripeEvent('checkout.session.completed', [
             'id' => $sessionId,
             'object' => 'checkout.session',
@@ -258,7 +246,10 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
 
         $this->webhookService->processEvent($event);
 
-        // Assert: OXPAID should be updated
+        // Assert: Contract FULFILLED and OXPAID updated
+        $contractAfter = $this->getContractData($contractId);
+        $this->assertEquals('fulfilled', $contractAfter['OXSTATE']);
+
         $updatedOrder = $this->getOrderData($orderId);
         $this->assertNotEquals(
             '0000-00-00 00:00:00',
@@ -273,21 +264,21 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
 
     /**
      * @test
-     * @group tdd-red
      *
-     * Authorization only should NOT update OXPAID (payment not yet captured).
+     * Authorization only (requires_capture) should NOT update OXPAID.
+     * Contract should stay in COMMITTED state.
      */
     public function paymentIntentRequiresCaptureShouldNotUpdateOxpaid(): void
     {
-        // Arrange: Create order with transaction
+        // Arrange
         $paymentIntentId = 'pi_auth_only_' . $this->testRunId;
-        $orderId = $this->createTestOrderWithTransaction($paymentIntentId);
+        [$contractId, $orderId] = $this->createContractAndOrder($paymentIntentId);
 
         // Verify initial state
         $initialOrder = $this->getOrderData($orderId);
         $this->assertEquals('0000-00-00 00:00:00', $initialOrder['OXPAID']);
 
-        // Act: Process payment_intent event with requires_capture status (authorization only)
+        // Act: Process authorization event (not a capture)
         $event = $this->createStripeEvent('payment_intent.amount_capturable_updated', [
             'id' => $paymentIntentId,
             'object' => 'payment_intent',
@@ -304,75 +295,116 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
         $this->assertEquals(
             '0000-00-00 00:00:00',
             $updatedOrder['OXPAID'],
-            'OXPAID should remain zero for authorization-only (requires_capture)'
+            'OXPAID should remain zero for authorization-only'
+        );
+
+        // Contract should stay COMMITTED (not fulfilled)
+        $contractAfter = $this->getContractData($contractId);
+        $this->assertEquals(
+            'committed',
+            $contractAfter['OXSTATE'],
+            'Contract should stay COMMITTED for authorization-only'
         );
     }
 
     // =========================================================================
-    // Helper Methods
+    // Legacy Fallback Tests (for orders without contracts)
     // =========================================================================
 
     /**
-     * Create a mock Stripe Event object
+     * @test
+     *
+     * Legacy orders without contracts should still work via OXTRANSID lookup.
      */
-    private function createStripeEvent(string $type, array $objectData): \Stripe\Event
+    public function legacyOrderWithoutContractStillWorks(): void
     {
-        $eventData = [
-            'id' => 'evt_test_' . $this->testRunId . '_' . substr(md5($type), 0, 8),
-            'object' => 'event',
-            'type' => $type,
-            'data' => [
-                'object' => $objectData,
-            ],
-            'created' => time(),
-            'livemode' => false,
-        ];
+        // Arrange: Create order directly (no contract) - legacy path
+        $paymentIntentId = 'pi_legacy_' . $this->testRunId;
+        $orderId = $this->createLegacyOrderWithTransId($paymentIntentId);
 
-        return \Stripe\Event::constructFrom($eventData);
-    }
+        // Verify initial state
+        $initialOrder = $this->getOrderData($orderId);
+        $this->assertEquals('0000-00-00 00:00:00', $initialOrder['OXPAID']);
 
-    /**
-     * Create test order with OXTRANSID for webhook lookup
-     */
-    private function createTestOrderWithTransaction(string $paymentIntentId): string
-    {
-        $userId = $this->createTestUser();
-        $orderId = $this->createTestOrderWithTransId($userId, $paymentIntentId);
-
-        return $orderId;
-    }
-
-    private function createTestUser(): string
-    {
-        $userId = substr(self::TEST_PREFIX . 'user_' . $this->testRunId, 0, 32);
-
-        $this->connection->insert('oxuser', [
-            'OXID' => $userId,
-            'OXACTIVE' => 1,
-            'OXRIGHTS' => 'user',
-            'OXSHOPID' => self::SHOP_ID,
-            'OXUSERNAME' => self::TEST_PREFIX . $this->testRunId . '@example.com',
-            'OXPASSWORD' => '',
-            'OXFNAME' => 'OXPAID',
-            'OXLNAME' => 'Test',
-            'OXSTREET' => 'Test Street',
-            'OXSTREETNR' => '1',
-            'OXCITY' => 'Test City',
-            'OXCOUNTRYID' => 'a7c40f631fc920687.20179984',
-            'OXZIP' => '12345',
-            'OXSAL' => 'MR',
-            'OXCREATE' => date('Y-m-d H:i:s'),
-            'OXREGISTER' => date('Y-m-d H:i:s'),
+        // Act: Process webhook
+        $event = $this->createStripeEvent('payment_intent.succeeded', [
+            'id' => $paymentIntentId,
+            'object' => 'payment_intent',
+            'status' => 'succeeded',
+            'amount' => 10000,
+            'currency' => 'eur',
         ]);
 
-        return $userId;
+        $this->webhookService->processEvent($event);
+
+        // Assert: OXPAID updated via legacy path
+        $updatedOrder = $this->getOrderData($orderId);
+        $this->assertNotEquals(
+            '0000-00-00 00:00:00',
+            $updatedOrder['OXPAID'],
+            'OXPAID should be updated for legacy orders via OXTRANSID lookup'
+        );
+    }
+
+    // =========================================================================
+    // Helper Methods: Contract-Aware
+    // =========================================================================
+
+    /**
+     * Create a contract and linked order (mirrors production flow).
+     *
+     * @return array{0: string, 1: string} [contractId, orderId]
+     */
+    private function createContractAndOrder(string $paymentIntentId): array
+    {
+        $userId = $this->createTestUser();
+        $contractId = $this->createContract($userId, $paymentIntentId);
+        $orderId = $this->createOrderLinkedToContract($userId, $contractId, $paymentIntentId);
+        $this->transitionContractToCommitted($contractId, $orderId);
+
+        return [$contractId, $orderId];
     }
 
     /**
-     * Create test order with OXTRANSID set (matching real-world orders)
+     * Create contract with PaymentIntent ID as providerOrderId.
      */
-    private function createTestOrderWithTransId(string $userId, string $paymentIntentId): string
+    private function createContract(string $userId, string $paymentIntentId): string
     {
+        $contractId = 'contract_' . $this->testRunId . '_' . substr(md5($paymentIntentId), 0, 8);
+
+        // BasketSnapshot requires totalGross, totalNet, totalVat, currency
+        $basketData = json_encode([
+            'totalGross' => 100.00,
+            'totalNet' => 84.03,
+            'totalVat' => 15.97,
+            'currency' => 'EUR',
+            'items' => [],
+        ]);
+
+        $this->connection->insert('osc_payment_contract', [
+            'OXID' => $contractId,
+            'OXSHOPID' => self::SHOP_ID,
+            'OXUSERID' => $userId,
+            'OXPROVIDER' => 'stripe',
+            'OXPROVIDERORDERID' => $paymentIntentId, // Sprint 7: Use pi_... directly
+            'OXSTATE' => 'pending',
+            'OXBASKETDATA' => $basketData,
+            'OXCONDITIONS' => '[]',
+            'OXCREATED' => date('Y-m-d H:i:s'),
+            'OXUPDATED' => date('Y-m-d H:i:s'),
+        ]);
+
+        return $contractId;
+    }
+
+    /**
+     * Create order linked to contract.
+     */
+    private function createOrderLinkedToContract(
+        string $userId,
+        string $contractId,
+        string $paymentIntentId
+    ): string {
         $orderId = substr(self::TEST_PREFIX . 'ord_' . $this->testRunId, 0, 32);
 
         $this->connection->insert('oxorder', [
@@ -381,7 +413,7 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
             'OXUSERID' => $userId,
             'OXORDERDATE' => date('Y-m-d H:i:s'),
             'OXORDERNR' => random_int(100000, 999999),
-            'OXTRANSID' => $paymentIntentId, // Set PaymentIntent ID directly in OXTRANSID
+            'OXTRANSID' => $paymentIntentId,
             'OXTRANSSTATUS' => 'NOT_FINISHED',
             'OXBILLEMAIL' => self::TEST_PREFIX . '@example.com',
             'OXBILLFNAME' => 'OXPAID',
@@ -405,6 +437,119 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
         return $orderId;
     }
 
+    /**
+     * Transition contract to COMMITTED state with order link.
+     */
+    private function transitionContractToCommitted(string $contractId, string $orderId): void
+    {
+        $this->connection->update(
+            'osc_payment_contract',
+            [
+                'OXORDERID' => $orderId,
+                'OXSTATE' => 'committed',
+                'OXUPDATED' => date('Y-m-d H:i:s'),
+            ],
+            ['OXID' => $contractId]
+        );
+    }
+
+    // =========================================================================
+    // Helper Methods: Legacy (for backward compatibility tests)
+    // =========================================================================
+
+    /**
+     * Create order directly with OXTRANSID (legacy path, no contract).
+     */
+    private function createLegacyOrderWithTransId(string $paymentIntentId): string
+    {
+        $userId = $this->createTestUser();
+        $orderId = substr(self::TEST_PREFIX . 'legacy_' . $this->testRunId, 0, 32);
+
+        $this->connection->insert('oxorder', [
+            'OXID' => $orderId,
+            'OXSHOPID' => self::SHOP_ID,
+            'OXUSERID' => $userId,
+            'OXORDERDATE' => date('Y-m-d H:i:s'),
+            'OXORDERNR' => random_int(100000, 999999),
+            'OXTRANSID' => $paymentIntentId,
+            'OXTRANSSTATUS' => 'NOT_FINISHED',
+            'OXBILLEMAIL' => self::TEST_PREFIX . '@example.com',
+            'OXBILLFNAME' => 'Legacy',
+            'OXBILLLNAME' => 'Test',
+            'OXBILLSTREET' => 'Test Street',
+            'OXBILLSTREETNR' => '1',
+            'OXBILLCITY' => 'Test City',
+            'OXBILLCOUNTRYID' => 'a7c40f631fc920687.20179984',
+            'OXBILLZIP' => '12345',
+            'OXBILLSAL' => 'MR',
+            'OXPAYMENTTYPE' => 'osc_stripe_wallet',
+            'OXTOTALNETSUM' => 84.03,
+            'OXTOTALBRUTSUM' => 100.00,
+            'OXTOTALORDERSUM' => 100.00,
+            'OXCURRENCY' => 'EUR',
+            'OXCURRATE' => 1,
+            'OXFOLDER' => 'ORDERFOLDER_NEW',
+            'OXPAID' => '0000-00-00 00:00:00',
+        ]);
+
+        return $orderId;
+    }
+
+    // =========================================================================
+    // Common Helper Methods
+    // =========================================================================
+
+    private function createTestUser(): string
+    {
+        $userId = substr(self::TEST_PREFIX . 'user_' . $this->testRunId, 0, 32);
+
+        $existing = $this->connection->fetchOne(
+            'SELECT OXID FROM oxuser WHERE OXID = ?',
+            [$userId]
+        );
+
+        if ($existing) {
+            return $userId;
+        }
+
+        $this->connection->insert('oxuser', [
+            'OXID' => $userId,
+            'OXACTIVE' => 1,
+            'OXRIGHTS' => 'user',
+            'OXSHOPID' => self::SHOP_ID,
+            'OXUSERNAME' => self::TEST_PREFIX . $this->testRunId . '@example.com',
+            'OXPASSWORD' => '',
+            'OXFNAME' => 'OXPAID',
+            'OXLNAME' => 'Test',
+            'OXSTREET' => 'Test Street',
+            'OXSTREETNR' => '1',
+            'OXCITY' => 'Test City',
+            'OXCOUNTRYID' => 'a7c40f631fc920687.20179984',
+            'OXZIP' => '12345',
+            'OXSAL' => 'MR',
+            'OXCREATE' => date('Y-m-d H:i:s'),
+            'OXREGISTER' => date('Y-m-d H:i:s'),
+        ]);
+
+        return $userId;
+    }
+
+    private function createStripeEvent(string $type, array $objectData): \Stripe\Event
+    {
+        $eventData = [
+            'id' => 'evt_test_' . $this->testRunId . '_' . substr(md5($type), 0, 8),
+            'object' => 'event',
+            'type' => $type,
+            'data' => [
+                'object' => $objectData,
+            ],
+            'created' => time(),
+            'livemode' => false,
+        ];
+
+        return \Stripe\Event::constructFrom($eventData);
+    }
+
     private function getOrderData(string $orderId): array
     {
         $result = $this->connection->fetchAssociative(
@@ -419,11 +564,29 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
         return $result;
     }
 
+    private function getContractData(string $contractId): array
+    {
+        $result = $this->connection->fetchAssociative(
+            'SELECT * FROM osc_payment_contract WHERE OXID = :id',
+            ['id' => $contractId]
+        );
+
+        if (!$result) {
+            throw new \RuntimeException("Contract not found: {$contractId}");
+        }
+
+        return $result;
+    }
+
     private function cleanupTestData(): void
     {
         $this->connection->executeStatement(
             "DELETE FROM osc_payment_webhooklogs WHERE OXEVENTID LIKE ?",
             ['evt_test_%']
+        );
+        $this->connection->executeStatement(
+            "DELETE FROM osc_payment_contract WHERE OXID LIKE ?",
+            ['contract_%']
         );
         $this->connection->executeStatement(
             "DELETE FROM oxorder WHERE OXID LIKE ?",

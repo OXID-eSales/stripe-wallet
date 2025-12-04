@@ -1,0 +1,116 @@
+@startuml Before/After Sprint 6 Comparison
+!theme plain
+title <font size=24 color="#1565C0"><b>Sprint 6: Before vs After Comparison</b></font>\n<font size=14 color="#1976D2">Contract-Aware Webhook Processing Fix</font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+
+left to right direction
+
+rectangle "BEFORE Sprint 6\n<font color='#C62828'>(Direct DB - Broken)</font>" as Before #FFCDD2 {
+    rectangle "WebhookProcessingService" as WPS_Old #EF9A9A {
+        rectangle "handlePaymentIntentSucceeded()" as Handle_Old #FFCDD2
+    }
+
+    rectangle "Direct SQL\n(Bypassed Contract!)" as SQL_Old #FFCCBC {
+        rectangle "UPDATE osc_payment_order_state" as U1_Old #FFAB91
+        rectangle "UPDATE oxorder.OXPAID" as U2_Old #FFAB91
+        rectangle "UPDATE oxorder.OXTRANSSTATUS" as U3_Old #FFAB91
+    }
+
+    rectangle "Contract Layer" as Contract_Old #E0E0E0 {
+        rectangle "ContractRepository" as CR_Old #BDBDBD
+        rectangle "PaymentContract" as PC_Old #BDBDBD
+        note as N_Old
+          <font color="#C62828"><b>NEVER CALLED!</b></font>
+          Contract stuck in COMMITTED
+        end note
+    }
+
+    Handle_Old --> U1_Old
+    Handle_Old --> U2_Old
+    Handle_Old --> U3_Old
+    Handle_Old ..> CR_Old : <font color="#C62828">✗ Bypassed</font>
+}
+
+rectangle "AFTER Sprint 6\n<font color='#2E7D32'>(Contract-Aware - Fixed)</font>" as After #C8E6C9 {
+    rectangle "WebhookProcessingService" as WPS_New #A5D6A7 {
+        rectangle "handlePaymentIntentSucceeded()" as Handle_New #81C784
+    }
+
+    rectangle "WebhookContractFulfillmentHandler\n<font color='#2E7D32'><b>NEW!</b></font>" as Handler_New #66BB6A {
+        rectangle "findByProviderOrderId()" as F1_New #4CAF50
+        rectangle "validate state" as F2_New #4CAF50
+        rectangle "contract.fulfill()" as F3_New #4CAF50
+        rectangle "save(contract)" as F4_New #4CAF50
+        rectangle "dispatch(Event)" as F5_New #4CAF50
+    }
+
+    rectangle "Contract Layer" as Contract_New #FFF9C4 {
+        rectangle "ContractRepository" as CR_New #FFEB3B
+        rectangle "PaymentContract" as PC_New #FFEB3B
+        note as N_New
+          <font color="#2E7D32"><b>CALLED!</b></font>
+          Contract → FULFILLED
+        end note
+    }
+
+    rectangle "Event System" as Events_New #E1BEE7 {
+        rectangle "ContractFulfilledEvent" as CFE_New #CE93D8
+    }
+
+    rectangle "Legacy Fallback\n(Backward Compat)" as Legacy_New #E0E0E0 {
+        rectangle "Direct SQL" as SQL_New #BDBDBD
+        note as N_Legacy
+          Only if contract
+          not found (null)
+        end note
+    }
+
+    Handle_New --> Handler_New : <font color="#2E7D32">✓ NEW</font>
+    Handler_New --> CR_New
+    Handler_New --> PC_New
+    Handler_New --> CFE_New
+    Handle_New ..> Legacy_New : <font color="#757575">fallback</font>
+}
+
+note bottom of Before
+  <font color="#C62828"><b>PROBLEMS:</b></font>
+  1. Contract layer bypassed
+  2. No state validation
+  3. No state transition
+  4. No events dispatched
+  5. Contract stuck in COMMITTED
+
+  <b>Code Location:</b>
+  WebhookProcessingService.php:147-182
+end note
+
+note bottom of After
+  <font color="#2E7D32"><b>FIXED:</b></font>
+  1. Contract looked up by providerOrderId
+  2. State validated (must be COMMITTED)
+  3. State transitioned (→ FULFILLED)
+  4. ContractFulfilledEvent dispatched
+  5. Contract completes lifecycle
+
+  <b>New Handler:</b>
+  WebhookContractFulfillmentHandler.php
+end note
+
+' Visual separator
+Before -[hidden]right-> After
+
+legend bottom
+  |= Aspect |= Before Sprint 6 |= After Sprint 6 |
+  | Contract Lookup | ✗ None | ✓ findByProviderOrderId() |
+  | State Validation | ✗ None | ✓ isCommitted() check |
+  | State Transition | ✗ None | ✓ COMMITTED → FULFILLED |
+  | Event Dispatch | ✗ None | ✓ ContractFulfilledEvent |
+  | Idempotency | ✗ None | ✓ isFulfilled() check |
+  | Legacy Support | N/A | ✓ Fallback for old orders |
+
+  <font color="#2E7D32"><b>Sprint 6 resolves the "two paths" ambiguity!</b></font>
+endlegend
+
+@enduml

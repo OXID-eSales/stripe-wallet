@@ -22,6 +22,7 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentRe
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentFailedEvent;
 use OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookLog;
+use OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface;
 
 /**
  * Webhook processing service
@@ -60,11 +61,14 @@ class WebhookProcessingService
 {
     private ?EventDispatcherInterface $eventDispatcher;
     private ?WebhookLogRepositoryInterface $webhookLogRepository;
+    private WebhookContractFulfillmentHandlerInterface $contractFulfillmentHandler;
 
     public function __construct(
+        WebhookContractFulfillmentHandlerInterface $contractFulfillmentHandler,
         ?EventDispatcherInterface $eventDispatcher = null,
         ?WebhookLogRepositoryInterface $webhookLogRepository = null
     ) {
+        $this->contractFulfillmentHandler = $contractFulfillmentHandler;
         $this->eventDispatcher = $eventDispatcher;
         $this->webhookLogRepository = $webhookLogRepository;
     }
@@ -141,6 +145,9 @@ class WebhookProcessingService
      * Handle payment_intent.succeeded event
      * Payment has been successfully confirmed
      *
+     * Sprint 6: Contract-Aware Webhook Processing
+     * First tries to fulfill via contract, falls back to legacy DB update.
+     *
      * @param \Stripe\Event $event
      * @return void
      */
@@ -154,7 +161,59 @@ class WebhookProcessingService
             'currency' => $paymentIntent->currency,
         ]);
 
-        // Find order by payment intent ID
+        // Sprint 6: Try contract-aware fulfillment first
+        $contractResult = $this->contractFulfillmentHandler->handlePaymentSucceeded($paymentIntent->id);
+
+        if ($contractResult === true) {
+            Registry::getLogger()->info('Contract fulfilled via webhook', [
+                'payment_intent_id' => $paymentIntent->id,
+            ]);
+            // Contract fulfilled - order update handled via ContractFulfilledEvent
+            // Still update direct order fields for backward compatibility
+            $this->updateOrderFieldsAfterContractFulfillment($paymentIntent->id);
+            return;
+        }
+
+        if ($contractResult === false) {
+            Registry::getLogger()->info('Contract already fulfilled (idempotent) or not in COMMITTED state', [
+                'payment_intent_id' => $paymentIntent->id,
+            ]);
+            // Already processed or not ready - skip
+            return;
+        }
+
+        // Contract not found (null) - use legacy fallback for orders without contracts
+        Registry::getLogger()->debug('No contract found, using legacy fallback', [
+            'payment_intent_id' => $paymentIntent->id,
+        ]);
+
+        $this->processLegacyPaymentSucceeded($paymentIntent);
+    }
+
+    /**
+     * Update order fields after contract fulfillment.
+     *
+     * Updates OXPAID, OXTRANSSTATUS, OXTRANSID for backward compatibility
+     * even when contract-aware processing is used.
+     */
+    private function updateOrderFieldsAfterContractFulfillment(string $paymentIntentId): void
+    {
+        $order = $this->findOrderByPaymentIntentId($paymentIntentId);
+
+        if ($order) {
+            $this->updateOrderPaidTimestamp($order->getId());
+            $this->updateOrderTransStatus($order->getId(), 'OK');
+            $this->updateOrderTransId($order->getId(), $paymentIntentId);
+        }
+    }
+
+    /**
+     * Legacy payment processing for orders created without contracts.
+     *
+     * @param object $paymentIntent Stripe PaymentIntent object
+     */
+    private function processLegacyPaymentSucceeded(object $paymentIntent): void
+    {
         $order = $this->findOrderByPaymentIntentId($paymentIntent->id);
 
         if ($order) {
@@ -170,7 +229,7 @@ class WebhookProcessingService
             // Update OXTRANSID with PaymentIntent ID
             $this->updateOrderTransId($order->getId(), $paymentIntent->id);
 
-            Registry::getLogger()->info('Order payment state updated', [
+            Registry::getLogger()->info('Order payment state updated (legacy path)', [
                 'order_id' => $order->getId(),
                 'order_number' => $order->getFieldData('oxordernr'),
             ]);
@@ -185,20 +244,43 @@ class WebhookProcessingService
      * Handle payment_intent.payment_failed event
      * Payment has failed
      *
+     * Sprint 6: Contract-Aware Webhook Processing
+     *
      * @param \Stripe\Event $event
      * @return void
      */
     private function handlePaymentIntentFailed(\Stripe\Event $event): void
     {
         $paymentIntent = $event->data->object;
+        /** @var string $paymentIntentId */
+        $paymentIntentId = $paymentIntent->id ?? '';
+        /** @var string $failureReason */
+        $failureReason = $paymentIntent->last_payment_error->message ?? 'Unknown error';
 
         Registry::getLogger()->warning('Payment intent failed', [
-            'payment_intent_id' => $paymentIntent->id,
-            'error' => $paymentIntent->last_payment_error->message ?? 'Unknown error',
+            'payment_intent_id' => $paymentIntentId,
+            'error' => $failureReason,
         ]);
 
-        // Find order and update state
-        $order = $this->findOrderByPaymentIntentId($paymentIntent->id);
+        if ($paymentIntentId === '') {
+            return;
+        }
+
+        // Sprint 6: Try contract-aware failure handling first
+        $contractResult = $this->contractFulfillmentHandler->handlePaymentFailed(
+            $paymentIntentId,
+            $failureReason
+        );
+
+        if ($contractResult !== null) {
+            Registry::getLogger()->info('Contract failure handled via webhook', [
+                'payment_intent_id' => $paymentIntentId,
+                'result' => $contractResult ? 'failed' : 'skipped',
+            ]);
+        }
+
+        // Always update legacy order state for backward compatibility
+        $order = $this->findOrderByPaymentIntentId($paymentIntentId);
 
         if ($order) {
             $this->updateOrderPaymentState($order->getId(), 'failed');
@@ -231,23 +313,54 @@ class WebhookProcessingService
      * Handle charge.captured event
      * Payment has been captured (for manual capture mode)
      *
+     * Sprint 6: Contract-Aware Webhook Processing
+     *
      * @param \Stripe\Event $event
      * @return void
      */
     private function handleChargeCaptured(\Stripe\Event $event): void
     {
         $charge = $event->data->object;
+        /** @var string|null $paymentIntentId */
+        $paymentIntentId = $charge->payment_intent ?? null;
+        /** @var int $amount */
+        $amount = $charge->amount ?? 0;
 
         Registry::getLogger()->info('Charge captured', [
-            'charge_id' => $charge->id,
-            'amount' => $charge->amount,
-            'payment_intent' => $charge->payment_intent,
+            'charge_id' => $charge->id ?? '',
+            'amount' => $amount,
+            'payment_intent' => $paymentIntentId,
         ]);
 
-        $order = $this->findOrderByPaymentIntentId($charge->payment_intent);
+        if ($paymentIntentId === null || $paymentIntentId === '') {
+            Registry::getLogger()->warning('No payment intent ID in charge.captured event');
+            return;
+        }
+
+        // Sprint 6: Try contract-aware capture handling first
+        $contractResult = $this->contractFulfillmentHandler->handleChargeCaptured($paymentIntentId);
+
+        if ($contractResult === true) {
+            Registry::getLogger()->info('Contract fulfilled via charge.captured webhook', [
+                'payment_intent_id' => $paymentIntentId,
+            ]);
+            $this->updateOrderFieldsAfterContractFulfillment($paymentIntentId);
+            return;
+        }
+
+        if ($contractResult === false) {
+            Registry::getLogger()->info('Contract already fulfilled (idempotent) for charge.captured', [
+                'payment_intent_id' => $paymentIntentId,
+            ]);
+            return;
+        }
+
+        // Legacy fallback
+        $order = $this->findOrderByPaymentIntentId($paymentIntentId);
+        $capturedAmount = $amount / 100;
 
         if ($order) {
-            $this->updateOrderCaptureState($order->getId(), $charge->amount / 100);
+            $this->updateOrderCaptureState($order->getId(), $capturedAmount);
 
             // Update OXPAID timestamp - payment has been captured
             $this->updateOrderPaidTimestamp($order->getId());
@@ -255,9 +368,9 @@ class WebhookProcessingService
             // Update OXTRANSSTATUS to OK
             $this->updateOrderTransStatus($order->getId(), 'OK');
 
-            Registry::getLogger()->info('Payment captured for order', [
+            Registry::getLogger()->info('Payment captured for order (legacy path)', [
                 'order_id' => $order->getId(),
-                'captured_amount' => $charge->amount / 100,
+                'captured_amount' => $capturedAmount,
             ]);
         }
     }
@@ -266,30 +379,56 @@ class WebhookProcessingService
      * Handle charge.refunded event
      * Payment has been refunded
      *
+     * Sprint 6: Contract-Aware Webhook Processing
+     *
      * @param \Stripe\Event $event
      * @return void
      */
     private function handleChargeRefunded(\Stripe\Event $event): void
     {
         $charge = $event->data->object;
+        /** @var string|null $paymentIntentId */
+        $paymentIntentId = $charge->payment_intent ?? null;
+        /** @var int $amountRefunded */
+        $amountRefunded = $charge->amount_refunded ?? 0;
+        $refundedAmount = $amountRefunded / 100;
 
         Registry::getLogger()->info('Charge refunded', [
-            'charge_id' => $charge->id,
-            'amount_refunded' => $charge->amount_refunded,
-            'payment_intent' => $charge->payment_intent,
+            'charge_id' => $charge->id ?? '',
+            'amount_refunded' => $refundedAmount,
+            'payment_intent' => $paymentIntentId,
         ]);
 
-        $order = $this->findOrderByPaymentIntentId($charge->payment_intent);
+        if ($paymentIntentId === null || $paymentIntentId === '') {
+            Registry::getLogger()->warning('No payment intent ID in charge.refunded event');
+            return;
+        }
+
+        // Sprint 6: Try contract-aware refund handling first
+        $contractResult = $this->contractFulfillmentHandler->handleChargeRefunded(
+            $paymentIntentId,
+            $refundedAmount
+        );
+
+        if ($contractResult !== null) {
+            Registry::getLogger()->info('Contract refund processed via webhook', [
+                'payment_intent_id' => $paymentIntentId,
+                'result' => $contractResult ? 'processed' : 'skipped',
+            ]);
+        }
+
+        // Always update legacy order state for refund tracking
+        $order = $this->findOrderByPaymentIntentId($paymentIntentId);
 
         if ($order) {
-            $this->updateOrderRefundState($order->getId(), $charge->amount_refunded / 100);
+            $this->updateOrderRefundState($order->getId(), $refundedAmount);
 
             // Update OXPAID timestamp to refund time
             $this->updateOrderPaidTimestamp($order->getId());
 
             Registry::getLogger()->info('Payment refunded for order', [
                 'order_id' => $order->getId(),
-                'refunded_amount' => $charge->amount_refunded / 100,
+                'refunded_amount' => $refundedAmount,
             ]);
         }
     }
@@ -320,6 +459,8 @@ class WebhookProcessingService
      * Handle checkout.session.completed event
      * Checkout session has been completed (used by Stripe Wallet)
      *
+     * Sprint 6: Contract-Aware Webhook Processing
+     *
      * @param \Stripe\Event $event
      * @return void
      */
@@ -336,7 +477,7 @@ class WebhookProcessingService
         // Only process if payment was successful
         $paymentStatus = $session->payment_status ?? '';
         if ($paymentStatus !== 'paid') {
-            Registry::getLogger()->debug('Checkout session not paid, skipping OXPAID update', [
+            Registry::getLogger()->debug('Checkout session not paid, skipping', [
                 'payment_status' => $paymentStatus,
             ]);
             return;
@@ -351,6 +492,26 @@ class WebhookProcessingService
             return;
         }
 
+        // Sprint 6: Try contract-aware fulfillment first
+        $contractResult = $this->contractFulfillmentHandler->handlePaymentSucceeded($paymentIntentId);
+
+        if ($contractResult === true) {
+            Registry::getLogger()->info('Contract fulfilled via checkout.session.completed webhook', [
+                'payment_intent_id' => $paymentIntentId,
+                'session_id' => $session->id,
+            ]);
+            $this->updateOrderFieldsAfterContractFulfillment($paymentIntentId);
+            return;
+        }
+
+        if ($contractResult === false) {
+            Registry::getLogger()->info('Contract already fulfilled (idempotent) for checkout session', [
+                'payment_intent_id' => $paymentIntentId,
+            ]);
+            return;
+        }
+
+        // Legacy fallback for orders without contracts
         $order = $this->findOrderByPaymentIntentId($paymentIntentId);
 
         if ($order) {
@@ -366,7 +527,7 @@ class WebhookProcessingService
             // Update OXTRANSID with PaymentIntent ID
             $this->updateOrderTransId($order->getId(), $paymentIntentId);
 
-            Registry::getLogger()->info('Order updated from checkout session', [
+            Registry::getLogger()->info('Order updated from checkout session (legacy path)', [
                 'order_id' => $order->getId(),
                 'order_number' => $order->getFieldData('oxordernr'),
             ]);
@@ -631,17 +792,33 @@ class WebhookProcessingService
     /**
      * Update webhook processing status
      *
+     * Sprint 7 Phase 4: Uses WebhookLogRepository for proper layering.
+     * Falls back to direct SQL if repository not available.
+     *
      * @param string $eventId
      * @param string $status
      * @return void
      */
     private function updateWebhookStatus(string $eventId, string $status): void
     {
+        // Sprint 7 Phase 4: Use repository if available
+        if ($this->webhookLogRepository !== null) {
+            try {
+                $this->webhookLogRepository->updateStatus($eventId, $status);
+                return;
+            } catch (\Exception $e) {
+                Registry::getLogger()->error('Failed to update webhook status via repository', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Fallback to direct SQL (legacy)
         try {
             $db = DatabaseProvider::getDb();
 
             $sql = "UPDATE osc_payment_webhooklogs
-                    SET OXSTATUS = ?
+                    SET OXSTATUS = ?, OXPROCESSEDAT = NOW()
                     WHERE OXEVENTID = ?";
 
             $db->execute($sql, [$status, $eventId]);

@@ -6,6 +6,7 @@ namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Service;
 
 use OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookLog;
+use OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService;
 use PHPUnit\Framework\TestCase;
 
@@ -50,7 +51,9 @@ class WebhookProcessingServiceRepositoryTest extends TestCase
     {
         $repository = $this->createMock(WebhookLogRepositoryInterface::class);
 
+        $contractHandler = $this->createMock(WebhookContractFulfillmentHandlerInterface::class);
         $service = new WebhookProcessingService(
+            contractFulfillmentHandler: $contractHandler,
             webhookLogRepository: $repository
         );
 
@@ -84,7 +87,10 @@ class WebhookProcessingServiceRepositoryTest extends TestCase
                     && $log->getStatus() === 'received';
             }));
 
+        $contractHandler = $this->createMock(WebhookContractFulfillmentHandlerInterface::class);
+        $contractHandler->method('handlePaymentSucceeded')->willReturn(null);
         $service = new WebhookProcessingService(
+            contractFulfillmentHandler: $contractHandler,
             webhookLogRepository: $repository
         );
 
@@ -120,7 +126,10 @@ class WebhookProcessingServiceRepositoryTest extends TestCase
                     && $payload['id'] === 'pi_mock_123';
             }));
 
+        $contractHandler = $this->createMock(WebhookContractFulfillmentHandlerInterface::class);
+        $contractHandler->method('handlePaymentSucceeded')->willReturn(null);
         $service = new WebhookProcessingService(
+            contractFulfillmentHandler: $contractHandler,
             webhookLogRepository: $repository
         );
 
@@ -151,7 +160,9 @@ class WebhookProcessingServiceRepositoryTest extends TestCase
             ->expects($this->never())
             ->method('save');
 
+        $contractHandler = $this->createMock(WebhookContractFulfillmentHandlerInterface::class);
         $service = new WebhookProcessingService(
+            contractFulfillmentHandler: $contractHandler,
             webhookLogRepository: $repository
         );
 
@@ -183,7 +194,10 @@ class WebhookProcessingServiceRepositoryTest extends TestCase
                 return $log->getStatus() === 'received';
             }));
 
+        $contractHandler = $this->createMock(WebhookContractFulfillmentHandlerInterface::class);
+        $contractHandler->method('handlePaymentSucceeded')->willReturn(null);
         $service = new WebhookProcessingService(
+            contractFulfillmentHandler: $contractHandler,
             webhookLogRepository: $repository
         );
 

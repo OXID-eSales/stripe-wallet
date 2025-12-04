@@ -11,6 +11,8 @@ namespace OxidSolutionCatalysts\Payments\Stripe\Controller\Webhook;
 
 use OxidEsales\Eshop\Application\Controller\FrontendController;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
+use OxidSolutionCatalysts\Payments\Component\Service\WebhookLogServiceInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService;
 use Stripe\Exception\SignatureVerificationException;
@@ -26,6 +28,7 @@ class WebhookController extends FrontendController
 {
     private ModuleConfigurationService $config;
     private ?WebhookProcessingService $webhookService = null;
+    private ?WebhookLogServiceInterface $webhookLogService = null;
 
     /**
      * Initialize services
@@ -42,6 +45,14 @@ class WebhookController extends FrontendController
         } catch (\Exception $e) {
             // Service not yet implemented, use basic processing
             Registry::getLogger()->debug('WebhookProcessingService not available, using basic processing');
+        }
+
+        // Sprint 7 Phase 4: Use WebhookLogService for proper layering
+        try {
+            $container = ContainerFactory::getInstance()->getContainer();
+            $this->webhookLogService = $container->get(WebhookLogServiceInterface::class);
+        } catch (\Exception $e) {
+            Registry::getLogger()->debug('WebhookLogService not available');
         }
     }
 
@@ -153,11 +164,27 @@ class WebhookController extends FrontendController
     /**
      * Log webhook event to database
      *
+     * Sprint 7 Phase 4: Uses WebhookLogService for proper layering.
+     * Falls back to direct SQL if service not available.
+     *
      * @param \Stripe\Event $event
      */
     private function logWebhookEvent($event): void
     {
         try {
+            // Sprint 7 Phase 4: Use service if available
+            if ($this->webhookLogService !== null) {
+                $payload = $event->data->object->toArray();
+                $this->webhookLogService->logEventReceived(
+                    $event->id,
+                    $event->type,
+                    $payload,
+                    'stripe'
+                );
+                return;
+            }
+
+            // Fallback to direct SQL (legacy)
             $db = \OxidEsales\Eshop\Core\DatabaseProvider::getDb();
 
             $sql = "INSERT INTO osc_payment_webhooklogs

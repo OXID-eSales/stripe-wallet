@@ -1,11 +1,20 @@
 <?php
 
+/**
+ * Copyright © OXID eSales AG. All rights reserved.
+ * See LICENSE file for license details.
+ */
+
 declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\Repository;
 
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookLog;
 
+/**
+ * In-memory implementation of WebhookLogRepository.
+ * Used for testing and fallback scenarios.
+ */
 class WebhookLogRepository implements WebhookLogRepositoryInterface
 {
     /**
@@ -17,6 +26,11 @@ class WebhookLogRepository implements WebhookLogRepositoryInterface
      * @var array<string, string>
      */
     private array $eventIndex = [];
+
+    /**
+     * @var array<string, array{status: string, error: ?string, contractId: ?string}>
+     */
+    private array $statusUpdates = [];
 
     public function save(WebhookLog $log): void
     {
@@ -33,5 +47,28 @@ class WebhookLogRepository implements WebhookLogRepositoryInterface
     {
         $logId = $this->eventIndex[$eventId] ?? null;
         return $logId ? $this->logs[$logId] : null;
+    }
+
+    public function updateStatus(
+        string $eventId,
+        string $status,
+        ?string $error = null,
+        ?string $contractId = null
+    ): void {
+        $this->statusUpdates[$eventId] = [
+            'status' => $status,
+            'error' => $error,
+            'contractId' => $contractId,
+        ];
+    }
+
+    /**
+     * Get status update for testing.
+     *
+     * @return array{status: string, error: ?string, contractId: ?string}|null
+     */
+    public function getStatusUpdate(string $eventId): ?array
+    {
+        return $this->statusUpdates[$eventId] ?? null;
     }
 }

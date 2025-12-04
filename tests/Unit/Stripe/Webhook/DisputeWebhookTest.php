@@ -11,6 +11,7 @@ namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Webhook;
 
 use OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookLog;
+use OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService;
 use PHPUnit\Framework\TestCase;
 use Stripe\Event;
@@ -29,13 +30,16 @@ use Stripe\Event;
 final class DisputeWebhookTest extends TestCase
 {
     private WebhookLogRepositoryInterface $webhookLogRepository;
+    private WebhookContractFulfillmentHandlerInterface $contractFulfillmentHandler;
     private WebhookProcessingService $service;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->webhookLogRepository = $this->createMock(WebhookLogRepositoryInterface::class);
+        $this->contractFulfillmentHandler = $this->createMock(WebhookContractFulfillmentHandlerInterface::class);
         $this->service = new WebhookProcessingService(
+            contractFulfillmentHandler: $this->contractFulfillmentHandler,
             webhookLogRepository: $this->webhookLogRepository
         );
     }
@@ -122,7 +126,11 @@ final class DisputeWebhookTest extends TestCase
                     return true;
                 }));
 
-            $service = new WebhookProcessingService(webhookLogRepository: $repository);
+            $contractHandler = $this->createMock(WebhookContractFulfillmentHandlerInterface::class);
+            $service = new WebhookProcessingService(
+                contractFulfillmentHandler: $contractHandler,
+                webhookLogRepository: $repository
+            );
             $service->processEvent($event);
 
             $this->assertEquals($reason, $capturedLog->getPayload()['reason'], "Reason '$reason' not captured");
@@ -309,7 +317,11 @@ final class DisputeWebhookTest extends TestCase
                     return true;
                 }));
 
-            $service = new WebhookProcessingService(webhookLogRepository: $repository);
+            $contractHandler = $this->createMock(WebhookContractFulfillmentHandlerInterface::class);
+            $service = new WebhookProcessingService(
+                contractFulfillmentHandler: $contractHandler,
+                webhookLogRepository: $repository
+            );
             $service->processEvent($event);
 
             $this->assertEquals($outcome, $capturedLog->getPayload()['status']);

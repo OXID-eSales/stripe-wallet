@@ -1,0 +1,130 @@
+@startuml Sprint 7 - WebhookLog Service Architecture
+!theme plain
+title <font size=24 color="#1565C0"><b>Sprint 7: WebhookLog Service Layer Architecture</b></font>\n<font size=14 color="#1976D2">Proper layering: Controller → Service → Repository → Database</font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+
+skinparam class {
+    BackgroundColor<<before>> #FFCDD2
+    BackgroundColor<<after>> #C8E6C9
+    BackgroundColor<<interface>> #E3F2FD
+    BackgroundColor<<repository>> #FFF9C4
+    BackgroundColor<<database>> #E1BEE7
+}
+
+package "BEFORE (Direct SQL)" #FFEBEE {
+    class WebhookController <<before>> {
+        -connection: Connection
+        --
+        +handleWebhook(): Response
+        -<font color="#C62828"><b>logWebhookEvent()</b></font>
+        --
+        <font color="#C62828">// Direct SQL INSERT!</font>
+        <font color="#C62828">INSERT INTO osc_payment_webhooklogs...</font>
+    }
+
+    class WebhookProcessingService <<before>> {
+        -connection: Connection
+        --
+        +processEvent(): void
+        -<font color="#C62828"><b>logWebhookProcessed()</b></font>
+        -<font color="#C62828"><b>updateWebhookStatus()</b></font>
+        --
+        <font color="#C62828">// Direct SQL INSERT/UPDATE!</font>
+        <font color="#C62828">INSERT INTO osc_payment_webhooklogs...</font>
+        <font color="#C62828">UPDATE osc_payment_webhooklogs...</font>
+    }
+
+    database "osc_payment_webhooklogs" as DB_Before <<database>>
+
+    WebhookController ..> DB_Before : <font color="#C62828">Direct SQL</font>
+    WebhookProcessingService ..> DB_Before : <font color="#C62828">Direct SQL</font>
+}
+
+package "AFTER (Service Layer)" #E8F5E9 {
+    class WebhookControllerNew <<after>> {
+        -webhookLogService: WebhookLogServiceInterface
+        --
+        +handleWebhook(): Response
+        --
+        <font color="#2E7D32">// Uses service!</font>
+        <font color="#2E7D32">$this->webhookLogService->logEventReceived(...)</font>
+    }
+
+    class WebhookProcessingServiceNew <<after>> {
+        -webhookLogService: WebhookLogServiceInterface
+        --
+        +processEvent(): void
+        --
+        <font color="#2E7D32">// Uses service!</font>
+        <font color="#2E7D32">$this->webhookLogService->markEventProcessed(...)</font>
+        <font color="#2E7D32">$this->webhookLogService->markEventFailed(...)</font>
+    }
+
+    interface WebhookLogServiceInterface <<interface>> {
+        +logEventReceived(eventId, type, payload): void
+        +markEventProcessed(eventId, status): void
+        +markEventFailed(eventId, errorMessage): void
+        +findByEventId(eventId): ?WebhookLog
+    }
+
+    class WebhookLogService <<after>> {
+        -repository: WebhookLogRepositoryInterface
+        --
+        +logEventReceived(eventId, type, payload): void
+        +markEventProcessed(eventId, status): void
+        +markEventFailed(eventId, errorMessage): void
+        +findByEventId(eventId): ?WebhookLog
+    }
+
+    interface WebhookLogRepositoryInterface <<interface>> {
+        +save(log: WebhookLog): void
+        +findByEventId(eventId): ?WebhookLog
+        +updateStatus(eventId, status): void
+    }
+
+    class DoctrineWebhookLogRepository <<repository>> {
+        -connection: Connection
+        --
+        +save(log: WebhookLog): void
+        +findByEventId(eventId): ?WebhookLog
+        +updateStatus(eventId, status): void
+    }
+
+    database "osc_payment_webhooklogs" as DB_After <<database>>
+
+    WebhookControllerNew --> WebhookLogServiceInterface
+    WebhookProcessingServiceNew --> WebhookLogServiceInterface
+    WebhookLogServiceInterface <|.. WebhookLogService
+    WebhookLogService --> WebhookLogRepositoryInterface
+    WebhookLogRepositoryInterface <|.. DoctrineWebhookLogRepository
+    DoctrineWebhookLogRepository --> DB_After
+}
+
+note bottom of DB_Before
+  <font color="#C62828"><b>BEFORE:</b></font>
+  Multiple places write
+  directly to database.
+  No abstraction layer.
+end note
+
+note bottom of DB_After
+  <font color="#2E7D32"><b>AFTER:</b></font>
+  Single repository
+  handles all DB access.
+  Service provides
+  business logic.
+end note
+
+legend bottom
+  |= Layer |= Responsibility |
+  | Controller | HTTP handling, delegates to service |
+  | Service | Business logic, orchestration |
+  | Repository | Data access, persistence |
+  | Database | Storage |
+
+  <font color="#2E7D32"><b>Principle:</b> Controller → Service → Repository → Database</font>
+endlegend
+
+@enduml

@@ -1,0 +1,155 @@
+@startuml Sprint 6 Implemented Flow - Contract-Aware Webhook
+!theme plain
+title <font size=24 color="#2E7D32"><b>SPRINT 6 IMPLEMENTED: Contract-Aware Webhook Flow</b></font>\n<font size=14 color="#388E3C">WebhookProcessingService now uses WebhookContractFulfillmentHandler</font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+
+skinparam participant {
+    BackgroundColor<<stripe>> #E3F2FD
+    BackgroundColor<<new>> #C8E6C9
+    BackgroundColor<<contract>> #FFF9C4
+    BackgroundColor<<event>> #E1BEE7
+    BackgroundColor<<db>> #F3E5F5
+}
+
+skinparam note {
+    BackgroundColor #C8E6C9
+    BorderColor #2E7D32
+    FontColor #000000
+}
+
+box "External" #ECEFF1
+    participant "Stripe" as Stripe <<stripe>>
+end box
+
+box "Webhook Layer" #E8F5E9
+    participant "WebhookController" as WC
+    participant "WebhookProcessingService" as WPS
+    participant "WebhookContractFulfillmentHandler" as WCFH <<new>>
+end box
+
+box "Contract Layer" #FFF9C4
+    participant "ContractRepositoryInterface" as CR <<contract>>
+    participant "PaymentContract" as PC <<contract>>
+end box
+
+box "Event System" #F3E5F5
+    participant "EventDispatcher" as ED <<event>>
+    participant "ContractFulfilledEvent" as CFE <<event>>
+end box
+
+box "Database" #F3E5F5
+    database "osc_payment_contract" as DBContract <<db>>
+    database "oxorder" as DBOrder <<db>>
+end box
+
+== Sprint 6: Contract-Aware Webhook Processing ==
+
+Stripe -> WC : POST /webhook/stripe\nEvent: payment_intent.succeeded\nPI: pi_xxx
+activate WC #90CAF9
+
+WC -> WC : Verify signature
+WC -> WPS : processEvent(event)
+activate WPS #A5D6A7
+
+note right of WPS #C8E6C9
+  **NEW: Contract-aware path first**
+  Tries handler before legacy fallback
+end note
+
+WPS -> WCFH : handlePaymentSucceeded("pi_xxx")
+activate WCFH #81C784
+
+note right of WCFH #C8E6C9
+  **Step 1: Find contract by providerOrderId**
+end note
+
+WCFH -> CR : findByProviderOrderId("pi_xxx")
+activate CR #FFF59D
+CR -> DBContract : SELECT * WHERE provider_order_id = 'pi_xxx'
+DBContract --> CR : contract_data
+CR --> WCFH : PaymentContract (state=COMMITTED)
+deactivate CR
+
+note right of WCFH #C8E6C9
+  **Step 2: Idempotency check**
+  Skip if already FULFILLED
+end note
+
+WCFH -> PC : getState()
+PC --> WCFH : ContractState::COMMITTED
+
+alt Contract already FULFILLED
+    note right of WCFH #FFF9C4
+      return false (idempotent)
+    end note
+    WCFH --> WPS : false
+else Contract is COMMITTED (expected)
+    note right of WCFH #C8E6C9
+      **Step 3: State transition**
+    end note
+
+    WCFH -> PC : fulfill()
+    activate PC #FFF59D
+    PC -> PC : setState(FULFILLED)\nsetFulfilledAt(now)
+    PC --> WCFH : void
+    deactivate PC
+
+    note right of WCFH #C8E6C9
+      **Step 4: Persist state**
+    end note
+
+    WCFH -> CR : save(contract)
+    activate CR #FFF59D
+    CR -> DBContract : UPDATE state='FULFILLED', fulfilled_at=NOW()
+    CR --> WCFH : void
+    deactivate CR
+
+    note right of WCFH #C8E6C9
+      **Step 5: Dispatch event**
+    end note
+
+    WCFH -> ED : dispatch(ContractFulfilledEvent)
+    activate ED #CE93D8
+    create CFE
+    ED -> CFE : new(contract, context, orderId)
+    ED --> WCFH : void
+    deactivate ED
+
+    WCFH --> WPS : true (fulfilled)
+end
+deactivate WCFH
+
+note right of WPS #C8E6C9
+  **Backward compatibility:**
+  Still update oxorder fields
+end note
+
+WPS -> DBOrder : UPDATE OXPAID=NOW(), OXTRANSSTATUS='OK'
+
+WPS --> WC : processed
+deactivate WPS
+
+WC --> Stripe : 200 OK
+deactivate WC
+
+legend right
+  |= Step |= Component |= Action |
+  | 1 | ContractRepository | findByProviderOrderId("pi_xxx") |
+  | 2 | PaymentContract | getState() - check idempotency |
+  | 3 | PaymentContract | fulfill() - transition state |
+  | 4 | ContractRepository | save() - persist to DB |
+  | 5 | EventDispatcher | dispatch(ContractFulfilledEvent) |
+
+  **CONTRACT STATE TRANSITION:**
+  COMMITTED → FULFILLED
+
+  <font color="#2E7D32"><b>SPRINT 6 FIX COMPLETE!</b></font>
+  Contract layer no longer bypassed.
+  State machine integrity preserved.
+endlegend
+
+footer <font color="#2E7D32"><b>Sprint 6: Contract-aware webhook processing - IMPLEMENTED 2024-12-04</b></font>
+
+@enduml

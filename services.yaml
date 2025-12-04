@@ -331,6 +331,32 @@ services:
     public: false
 
   # ==========================================
+  # Webhook Contract Fulfillment Handler (Sprint 6)
+  # ==========================================
+  # Handles contract state transitions from webhook events.
+  # Bridges Stripe webhooks to the contract state machine.
+
+  # Interface binding
+  OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface:
+    class: OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandler
+    arguments:
+      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+    public: false
+
+  # Concrete implementation alias
+  OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandler:
+    alias: OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface
+
+  # WebhookProcessingService - Now requires WebhookContractFulfillmentHandler
+  OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService:
+    arguments:
+      $contractFulfillmentHandler: '@OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface'
+      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      $webhookLogRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface'
+    public: true
+
+  # ==========================================
   # Repositories (Data Access Layer)
   # ==========================================
 
@@ -354,6 +380,22 @@ services:
   # Stripe Payment Details Repository - Stores Stripe-specific payment data
   OxidSolutionCatalysts\Payments\Stripe\Repository\StripePaymentDetailsRepository:
     public: false
+
+  # Webhook Log Repository - Logs webhook events for auditing and idempotency
+  OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface:
+    class: OxidSolutionCatalysts\Payments\Component\Repository\DoctrineWebhookLogRepository
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+    public: false
+
+  # Webhook Log Service - Sprint 7 Phase 4: Proper layering for webhook log access
+  # Architecture: Controller/Service → WebhookLogService → WebhookLogRepository → Database
+  OxidSolutionCatalysts\Payments\Component\Service\WebhookLogServiceInterface:
+    class: OxidSolutionCatalysts\Payments\Component\Service\WebhookLogService
+    arguments:
+      $repository: '@OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface'
+      $logger: '@Psr\Log\LoggerInterface'
+    public: true
 
   # Payment Order State Repository - DEPRECATED (No longer used)
   # Payment state is now tracked via Component-level TransactionRepository

@@ -1,0 +1,109 @@
+@startuml Sprint 7 - Test Refactoring
+!theme plain
+title <font size=24 color="#1565C0"><b>Sprint 7: Test Refactoring - Contract State Machine</b></font>\n<font size=14 color="#1976D2">Tests must mirror production code paths</font>
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+
+left to right direction
+
+package "BEFORE: False Green Tests" #FFEBEE {
+    rectangle "OxpaidWebhookUpdateTest\n<font color='#C62828'>(Bypasses Contract)</font>" as TestBefore #FFCDD2 {
+        rectangle "1. Direct SQL INSERT\ninto oxorder" as T1 #EF9A9A
+        rectangle "2. Set OXTRANSID = pi_...\ndirectly" as T2 #EF9A9A
+        rectangle "3. Process webhook" as T3 #EF9A9A
+        rectangle "4. Assert OXPAID" as T4 #EF9A9A
+
+        T1 --> T2
+        T2 --> T3
+        T3 --> T4
+    }
+
+    rectangle "Production Flow\n<font color='#C62828'>(Uses Contract)</font>" as ProdBefore #FFCDD2 {
+        rectangle "1. Create Contract\nwith cs_test_..." as P1 #EF9A9A
+        rectangle "2. Return updates\nproviderOrderId" as P2 #EF9A9A
+        rectangle "3. Process webhook\nlookup by pi_..." as P3 #EF9A9A
+        rectangle "4. Update OXPAID" as P4 #EF9A9A
+
+        P1 --> P2
+        P2 --> P3
+        P3 --> P4
+    }
+
+    note bottom of TestBefore
+      <font color="#C62828"><b>TEST PATH:</b></font>
+      - No contract created
+      - Direct SQL with pi_...
+      - Legacy lookup works
+      - <font color="#2E7D32">TEST PASSES!</font>
+    end note
+
+    note bottom of ProdBefore
+      <font color="#C62828"><b>PROD PATH:</b></font>
+      - Contract has cs_test_...
+      - BUG: not updated to pi_...
+      - Lookup fails
+      - <font color="#C62828">OXPAID = 0!</font>
+    end note
+}
+
+package "AFTER: True Tests" #E8F5E9 {
+    rectangle "ContractAwareOxpaidWebhookTest\n<font color='#2E7D32'>(Uses Contract State Machine)</font>" as TestAfter #C8E6C9 {
+        rectangle "1. Create Contract\nvia ContractRepository" as A1 #81C784
+        rectangle "2. Transition:\nDRAFT → PENDING → COMMITTED" as A2 #81C784
+        rectangle "3. Set providerOrderId\n= pi_... (like fix)" as A3 #81C784
+        rectangle "4. Process webhook" as A4 #81C784
+        rectangle "5. Assert:\n- Contract FULFILLED\n- OXPAID updated" as A5 #81C784
+
+        A1 --> A2
+        A2 --> A3
+        A3 --> A4
+        A4 --> A5
+    }
+
+    rectangle "Production Flow\n<font color='#2E7D32'>(Uses Contract)</font>" as ProdAfter #C8E6C9 {
+        rectangle "1. Create Contract\nvia handlers" as B1 #81C784
+        rectangle "2. Transition via\nevent handlers" as B2 #81C784
+        rectangle "3. Return handler\nsets pi_... (FIXED)" as B3 #81C784
+        rectangle "4. Process webhook" as B4 #81C784
+        rectangle "5. Contract fulfilled\nOXPAID updated" as B5 #81C784
+
+        B1 --> B2
+        B2 --> B3
+        B3 --> B4
+        B4 --> B5
+    }
+
+    note bottom of TestAfter
+      <font color="#2E7D32"><b>TEST PATH:</b></font>
+      Mirrors production!
+      Same contract flow.
+      Would catch the bug.
+    end note
+
+    note bottom of ProdAfter
+      <font color="#2E7D32"><b>PROD PATH:</b></font>
+      Same as test!
+      Both use contracts.
+      Both work correctly.
+    end note
+}
+
+rectangle "MISMATCH!" as Mismatch #FFCDD2
+TestBefore -[#C62828,bold]-> Mismatch
+ProdBefore -[#C62828,bold]-> Mismatch
+
+rectangle "ALIGNED!" as Aligned #C8E6C9
+TestAfter -[#2E7D32,bold]-> Aligned
+ProdAfter -[#2E7D32,bold]-> Aligned
+
+legend bottom
+  |= Problem |= Solution |
+  | Tests bypass contract layer | Tests must use ContractRepository |
+  | Direct SQL creates false green | Create contracts, transition states |
+  | Tests don't catch real bugs | Mirror production code paths |
+
+  <font color="#2E7D32"><b>Principle:</b> If production uses contracts, tests must use contracts</font>
+endlegend
+
+@enduml

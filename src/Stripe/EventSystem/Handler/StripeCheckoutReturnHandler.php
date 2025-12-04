@@ -269,10 +269,12 @@ class StripeCheckoutReturnHandler implements HandlerInterface
         $currency = $session->currency ?? 'EUR';
         $context->set('currency', $currency);
 
+        // Sprint 7 Fix: Use PaymentIntent ID as providerOrderId (not checkout session ID)
+        // This ensures webhook handler can find the contract when payment_intent.succeeded arrives
         $event = new PaymentAuthorizedEvent(
             context: $context,
             authorizationId: $paymentIntentId,
-            providerOrderId: $sessionId,
+            providerOrderId: $paymentIntentId,  // Fixed: was $sessionId (cs_test_...), now pi_...
             amount: $session->amount_total / 100,
             currency: $currency
         );
