@@ -192,11 +192,12 @@ services:
   # ==========================================
 
   # Contract Repository Interface - Bind to Doctrine implementation
+  # public: true required for integration tests to access directly
   OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface:
     class: OxidSolutionCatalysts\Payments\Component\Repository\DoctrineContractRepository
     arguments:
       $connection: '@doctrine.dbal.connection'
-    public: false
+    public: true
 
   # Contract Repository - Alias
   OxidSolutionCatalysts\Payments\Component\Repository\DoctrineContractRepository:
@@ -384,11 +385,12 @@ services:
     public: false
 
   # Webhook Log Repository - Logs webhook events for auditing and idempotency
+  # public: true required for integration tests to access directly
   OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface:
     class: OxidSolutionCatalysts\Payments\Component\Repository\DoctrineWebhookLogRepository
     arguments:
       $connection: '@doctrine.dbal.connection'
-    public: false
+    public: true
 
   # Webhook Log Service - Sprint 7 Phase 4: Proper layering for webhook log access
   # Architecture: Controller/Service → WebhookLogService → WebhookLogRepository → Database

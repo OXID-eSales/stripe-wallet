@@ -13,6 +13,10 @@ use Doctrine\DBAL\Connection;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionProviderInterface;
 use OxidEsales\EshopCommunity\Tests\Integration\IntegrationTestCase;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
+use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandler;
 use OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService;
 
 /**
@@ -55,7 +59,35 @@ final class ContractAwareOxpaidWebhookTest extends IntegrationTestCase
         $connectionProvider = $container->get(ConnectionProviderInterface::class);
         $this->connection = $connectionProvider->get();
 
-        $this->webhookService = $container->get(WebhookProcessingService::class);
+        // Manually instantiate WebhookProcessingService with its dependencies
+        // to avoid DI container caching issues in CI
+        $this->webhookService = $this->createWebhookProcessingService($container);
+    }
+
+    /**
+     * Create WebhookProcessingService manually with dependencies from container.
+     * This avoids issues with DI container caching in CI environments.
+     */
+    private function createWebhookProcessingService($container): WebhookProcessingService
+    {
+        // Get dependencies that are reliably available in the container
+        $contractRepository = $container->get(ContractRepositoryInterface::class);
+        $eventDispatcher = $container->get(EventDispatcherInterface::class);
+        $webhookLogRepository = $container->get(WebhookLogRepositoryInterface::class);
+
+        // Create the fulfillment handler
+        $fulfillmentHandler = new WebhookContractFulfillmentHandler(
+            $contractRepository,
+            $eventDispatcher
+        );
+
+        // Create the service
+        return new WebhookProcessingService(
+            $fulfillmentHandler,
+            $eventDispatcher,
+            $webhookLogRepository,
+            $contractRepository
+        );
     }
 
     public function tearDown(): void
