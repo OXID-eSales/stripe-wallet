@@ -174,6 +174,7 @@ class WebhookController extends FrontendController
         try {
             // Sprint 7 Phase 4: Use service if available
             if ($this->webhookLogService !== null) {
+                /** @var array<string, mixed> $payload */
                 $payload = $event->data->object->toArray();
                 $this->webhookLogService->logEventReceived(
                     $event->id,

@@ -755,7 +755,9 @@ class WebhookProcessingService
                 );
                 $log->setEventType($event->type);
                 $log->setProvider('stripe');
-                $log->setPayload($event->data->object->toArray());
+                /** @var array<string, mixed> $payload */
+                $payload = $event->data->object->toArray();
+                $log->setPayload($payload);
 
                 $this->webhookLogRepository->save($log);
             } catch (\Exception $e) {
