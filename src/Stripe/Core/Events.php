@@ -9,10 +9,17 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Core;
 
-use OxidEsales\Eshop\Core\DatabaseProvider;
+use Doctrine\DBAL\Exception;
+use OxidEsales\Eshop\Application\Model\Shop;
+use OxidEsales\Eshop\Core\Exception\DatabaseConnectionException;
+use OxidEsales\Eshop\Core\Exception\DatabaseErrorException;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\EshopCommunity\Core\Di\ContainerFacade;
+use OxidEsales\EshopCommunity\Internal\Framework\Database\QueryBuilderFactoryInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\StaticContent;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
+use Psr\Container\ContainerExceptionInterface;
+use Psr\Container\NotFoundExceptionInterface;
 
 /**
  * Activation and deactivation handler
@@ -27,7 +34,7 @@ class Events
      *
      * @var array<string>
      */
-    public static $aGroupsToAdd = [
+    public static array $aGroupsToAdd = [
         'oxidadmin',
         'oxidcustomer',
         'oxiddealer',
@@ -49,7 +56,7 @@ class Events
      *
      * @var array<string>
      */
-    public static $aRemovedPaymentMethods = [
+    public static array $aRemovedPaymentMethods = [
         'stripepaypal'
     ];
 
@@ -57,6 +64,10 @@ class Events
      * Execute action on activate event.
      *
      * @return void
+     * @throws ContainerExceptionInterface
+     * @throws DatabaseConnectionException
+     * @throws DatabaseErrorException
+     * @throws NotFoundExceptionInterface
      */
     public static function onActivate(): void
     {
@@ -86,7 +97,7 @@ class Events
      */
     protected static function regenerateViews(): void
     {
-        /** @var \OxidEsales\Eshop\Application\Model\Shop $oShop */
+        /** @var Shop $oShop */
         $oShop = oxNew('oxShop');
         $oShop->generateViews();
     }
@@ -98,20 +109,22 @@ class Events
      */
     protected static function clearTmp(): void
     {
-        shell_exec(VENDOR_PATH . 'bin/oe-console oe:cache:clear');
+        Registry::getUtils()->oxResetFileCache();
     }
 
     /**
      * Ensure all Stripe payment methods are installed using StaticContent service
      *
      * @return void
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
      */
     protected static function ensureStripePaymentMethods(): void
     {
         $container = ContainerFactory::getInstance()->getContainer();
-        /** @var \OxidEsales\EshopCommunity\Internal\Framework\Database\QueryBuilderFactoryInterface $queryBuilderFactory */
+        /** @var QueryBuilderFactoryInterface $queryBuilderFactory */
         $queryBuilderFactory = $container->get(
-            \OxidEsales\EshopCommunity\Internal\Framework\Database\QueryBuilderFactoryInterface::class
+            QueryBuilderFactoryInterface::class
         );
 
         $staticContentService = new StaticContent($queryBuilderFactory);
@@ -122,6 +135,8 @@ class Events
      * Deletes removed payment methods
      *
      * @return void
+     * @throws DatabaseConnectionException
+     * @throws DatabaseErrorException
      */
     protected static function deleteRemovedPaymentMethods(): void
     {
@@ -138,10 +153,16 @@ class Events
      */
     protected static function deletePaymentMethod(string $sPaymentId): void
     {
-        DatabaseProvider::getDb()->Execute(
-            "DELETE FROM oxpayments WHERE oxid = ?",
-            [$sPaymentId]
-        );
+        try {
+            ContainerFacade::get(QueryBuilderFactoryInterface::class)
+                ->create()
+                ->delete('oxpayments')
+                ->where('oxid = :oxid')
+                ->setParameter(':oxid', $sPaymentId)
+                ->execute();
+        } catch (Exception) {
+            // do noting
+        }
     }
 
     /**
