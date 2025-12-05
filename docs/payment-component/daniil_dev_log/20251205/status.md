@@ -32,7 +32,7 @@ Today's work focused on analyzing CI failures and documenting the checkout data 
 1. `FullDataPersistenceFlowTest.php` references dropped `osc_payment_order_state` table
 2. Tests use DI for `ContractRepositoryInterface` but module not activated in CI
 
-**Fix Strategy:** Direct repository instantiation instead of DI
+**Fix Strategy:** Direct repository and EventDispatcher instantiation instead of DI
 
 ### Sprint 10: OXPAID Data Flow Analysis (Complete)
 

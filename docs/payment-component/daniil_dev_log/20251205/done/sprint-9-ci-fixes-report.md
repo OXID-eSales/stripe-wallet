@@ -15,8 +15,8 @@ Fixed 16 CI integration test failures caused by Sprint 8's `osc_payment_order_st
 ### Category 1: Table Not Found (3 errors)
 Tests referencing dropped `osc_payment_order_state` table.
 
-### Category 2: Service Not Found (13 errors)
-Tests using `$container->get(ContractRepositoryInterface::class)` but module not activated in CI.
+### Category 2: Service Not Found (13 errors → 21 errors total)
+Tests using `$container->get(ContractRepositoryInterface::class)` and `$container->get(EventDispatcherInterface::class)` but module not activated in CI.
 
 ## Changes Made
 
@@ -65,6 +65,18 @@ $webhookLogRepository = new DoctrineWebhookLogRepository($this->connection);
 
 Same changes as ContractAwareOxpaidWebhookTest.php.
 
+### 5. EventDispatcher Direct Instantiation (Additional Fix)
+
+Both webhook test files also needed EventDispatcher to be instantiated directly:
+
+```php
+// BEFORE (CI fails - 8 additional errors)
+$eventDispatcher = $container->get(EventDispatcherInterface::class);
+
+// AFTER (works in CI)
+$eventDispatcher = new EventDispatcher(null);
+```
+
 ## Files Modified
 
 | File | Type | Changes |
@@ -82,8 +94,11 @@ Tests: 1109, Assertions: 2476
 Status: ✅ PASSING
 ```
 
-### Integration Tests (CI)
-Status: Pending push and CI verification
+### Integration Tests (Local)
+```
+Tests: 306, Assertions: 1098
+Status: ✅ PASSING (0 errors)
+```
 
 ## Key Insight
 

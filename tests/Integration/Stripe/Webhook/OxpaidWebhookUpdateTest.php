@@ -13,6 +13,7 @@ use Doctrine\DBAL\Connection;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionProviderInterface;
 use OxidEsales\EshopCommunity\Tests\Integration\IntegrationTestCase;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\DoctrineContractRepository;
@@ -80,8 +81,8 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
         $contractRepository = new DoctrineContractRepository($this->connection);
         $webhookLogRepository = new DoctrineWebhookLogRepository($this->connection);
 
-        // EventDispatcher is available via container (core OXID service)
-        $eventDispatcher = $container->get(EventDispatcherInterface::class);
+        // Direct instantiation for EventDispatcher (CI compatibility - module not activated)
+        $eventDispatcher = new EventDispatcher(null);
 
         // Create the fulfillment handler
         $fulfillmentHandler = new WebhookContractFulfillmentHandler(
