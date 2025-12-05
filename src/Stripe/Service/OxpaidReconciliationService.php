@@ -75,7 +75,7 @@ class OxpaidReconciliationService
     {
         try {
             // Get Stripe adapter
-            $adapter = $this->adapterFactory->createFromConfig();
+            $adapter = $this->adapterFactory->createDefaultAdapter();
 
             // Query Stripe for payment details
             $paymentDetails = $adapter->getPaymentDetails($paymentIntentId);
