@@ -16,6 +16,7 @@ use OxidEsales\EshopCommunity\Tests\Integration\IntegrationTestCase;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
 use OxidSolutionCatalysts\Payments\Component\Contract\BasketSnapshot;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Repository\DoctrineContractRepository;
 
 /**
  * Sprint 8: Contract Capture/Refund Tracking Tests
@@ -51,7 +52,9 @@ final class ContractCaptureRefundTest extends IntegrationTestCase
         /** @var ConnectionProviderInterface $connectionProvider */
         $connectionProvider = $container->get(ConnectionProviderInterface::class);
         $this->connection = $connectionProvider->get();
-        $this->contractRepository = $container->get(ContractRepositoryInterface::class);
+
+        // Direct instantiation to work in CI without module activation
+        $this->contractRepository = new DoctrineContractRepository($this->connection);
     }
 
     public function tearDown(): void

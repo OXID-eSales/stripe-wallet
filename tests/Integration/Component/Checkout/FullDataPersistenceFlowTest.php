@@ -27,9 +27,8 @@ use OxidSolutionCatalysts\Payments\Component\Transaction\Transaction;
  * as documented in: docs/payment-component/puml/04-02-payment-smart-contract-flow-standard.puml
  *
  * Tables tested:
- * - osc_payment_contract    : Contract state machine
+ * - osc_payment_contract    : Contract state machine (includes capture/refund tracking since Sprint 8)
  * - osc_payment_customer    : Customer payment profile
- * - osc_payment_order_state : Order ↔ Contract link
  * - osc_payment_transaction : Payment transactions (auth, capture, refund)
  * - osc_payment_sessions    : Payment session data
  * - oxorder                 : OXID order (linked via contract)
@@ -38,6 +37,9 @@ use OxidSolutionCatalysts\Payments\Component\Transaction\Transaction;
  * NOT tested (require Stripe API):
  * - osc_payment_webhooklogs
  * - osc_payment_idempotency
+ *
+ * Note: osc_payment_order_state was DROPPED in Sprint 8.
+ * Capture/refund tracking is now handled by osc_payment_contract fields.
  *
  * @group integration
  * @group e2e
@@ -353,100 +355,10 @@ final class FullDataPersistenceFlowTest extends IntegrationTestCase
     }
 
     // =========================================================================
-    // TEST: osc_payment_order_state
+    // TEST: osc_payment_contract capture/refund (Sprint 8)
     // =========================================================================
-
-    /**
-     * @group data-persistence
-     */
-    public function testOrderState_PersistsOrderContractLink(): void
-    {
-        $userId = $this->createTestUser();
-        $orderId = $this->createTestOrder($userId, 250.00, 'EUR');
-        $contractId = $this->createContractId('order_state');
-        $providerOrderId = 'pi_state_' . $this->testRunId;
-
-        // Create contract and commit to order
-        $contract = $this->createContract($contractId, $userId);
-        $contract->setProvider('stripe', $providerOrderId, null);
-        $contract->addCondition(ContractCondition::paymentAuthorized());
-        $contract->transitionToPending();
-        $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED, ['authId' => 'auth123']);
-        $contract->commitToOrder($orderId);
-        $this->contractRepository->save($contract);
-
-        // Insert order state record (simulating what OrderCreationHandler does)
-        $orderStateId = $this->createOrderStateId('link');
-        $this->connection->insert('osc_payment_order_state', [
-            'OXID' => $orderStateId,
-            'OXORDERID' => $orderId,
-            'OXCONTRACTID' => $contractId,
-            'OXPAYMENTSTATE' => 'authorized',
-            'OXPROVIDERORDERID' => $providerOrderId,
-            'OXCREATED' => date('Y-m-d H:i:s'),
-            'OXUPDATED' => date('Y-m-d H:i:s'),
-            'OXPAYMENTATTEMPTCOUNT' => 1,
-        ]);
-
-        // Verify order state record
-        $dbOrderState = $this->connection->fetchAssociative(
-            'SELECT * FROM osc_payment_order_state WHERE OXORDERID = :orderId',
-            ['orderId' => $orderId]
-        );
-
-        $this->assertNotFalse($dbOrderState, 'Order state should exist');
-        $this->assertEquals($contractId, $dbOrderState['OXCONTRACTID']);
-        $this->assertEquals($providerOrderId, $dbOrderState['OXPROVIDERORDERID']);
-        $this->assertEquals('authorized', $dbOrderState['OXPAYMENTSTATE']);
-    }
-
-    /**
-     * @group data-persistence
-     */
-    public function testOrderState_TracksPaymentStateChanges(): void
-    {
-        $userId = $this->createTestUser();
-        $orderId = $this->createTestOrder($userId, 175.00, 'EUR');
-        $contractId = $this->createContractId('state_changes');
-        $orderStateId = $this->createOrderStateId('changes');
-
-        // Create contract first (FK constraint)
-        $contract = $this->createContract($contractId, $userId);
-        $this->contractRepository->save($contract);
-
-        // Insert initial state
-        $this->connection->insert('osc_payment_order_state', [
-            'OXID' => $orderStateId,
-            'OXORDERID' => $orderId,
-            'OXCONTRACTID' => $contractId,
-            'OXPAYMENTSTATE' => 'pending',
-            'OXCREATED' => date('Y-m-d H:i:s'),
-            'OXUPDATED' => date('Y-m-d H:i:s'),
-            'OXPAYMENTATTEMPTCOUNT' => 0,
-        ]);
-
-        // Update to authorized
-        $this->connection->update('osc_payment_order_state', [
-            'OXPAYMENTSTATE' => 'authorized',
-            'OXUPDATED' => date('Y-m-d H:i:s'),
-            'OXPAYMENTATTEMPTCOUNT' => 1,
-        ], ['OXID' => $orderStateId]);
-
-        // Update to captured
-        $this->connection->update('osc_payment_order_state', [
-            'OXPAYMENTSTATE' => 'captured',
-            'OXUPDATED' => date('Y-m-d H:i:s'),
-        ], ['OXID' => $orderStateId]);
-
-        // Verify final state
-        $dbOrderState = $this->connection->fetchAssociative(
-            'SELECT * FROM osc_payment_order_state WHERE OXID = :id',
-            ['id' => $orderStateId]
-        );
-
-        $this->assertEquals('captured', $dbOrderState['OXPAYMENTSTATE']);
-        $this->assertEquals(1, (int)$dbOrderState['OXPAYMENTATTEMPTCOUNT']);
-    }
+    // Note: osc_payment_order_state was DROPPED in Sprint 8.
+    // Capture/refund tracking tests moved to ContractCaptureRefundTest.php
 
     // =========================================================================
     // TEST: osc_payment_customer
@@ -664,20 +576,8 @@ final class FullDataPersistenceFlowTest extends IntegrationTestCase
         $contract->commitToOrder($orderId);
         $this->contractRepository->save($contract);
 
-        // 8. Create order state link (osc_payment_order_state)
-        $orderStateId = $this->createOrderStateId('flow');
-        $this->connection->insert('osc_payment_order_state', [
-            'OXID' => $orderStateId,
-            'OXORDERID' => $orderId,
-            'OXCONTRACTID' => $contractId,
-            'OXPAYMENTSTATE' => 'authorized',
-            'OXPROVIDERORDERID' => $providerOrderId,
-            'OXCREATED' => date('Y-m-d H:i:s'),
-            'OXUPDATED' => date('Y-m-d H:i:s'),
-            'OXPAYMENTATTEMPTCOUNT' => 1,
-        ]);
-
-        // 9. Create authorization transaction (osc_payment_transaction)
+        // 8. Create authorization transaction (osc_payment_transaction)
+        // Note: osc_payment_order_state was DROPPED in Sprint 8
         $authTxId = $this->createTransactionId('flow_auth');
         $authTx = new Transaction(
             $authTxId,
@@ -694,11 +594,11 @@ final class FullDataPersistenceFlowTest extends IntegrationTestCase
         $authTx->setTransactionId('ch_flow_' . $flowId);
         $this->transactionRepository->save($authTx);
 
-        // 10. Simulate capture (webhook) - update order state and add capture transaction
-        $this->connection->update('osc_payment_order_state', [
-            'OXPAYMENTSTATE' => 'captured',
-            'OXUPDATED' => date('Y-m-d H:i:s'),
-        ], ['OXID' => $orderStateId]);
+        // 9. Simulate capture (webhook) - add capture transaction and update contract
+        // Sprint 8: Capture tracking now on osc_payment_contract, not osc_payment_order_state
+        $contract->setCapturedAmount(599.99);
+        $contract->setCapturedAt(new \DateTimeImmutable());
+        $this->contractRepository->save($contract);
 
         $captureTxId = $this->createTransactionId('flow_cap');
         $captureTx = new Transaction(
@@ -716,7 +616,7 @@ final class FullDataPersistenceFlowTest extends IntegrationTestCase
         $captureTx->setTransactionId('py_flow_' . $flowId);
         $this->transactionRepository->save($captureTx);
 
-        // 11. Fulfill contract
+        // 10. Fulfill contract
         $contract->fulfill();
         $this->contractRepository->save($contract);
 
@@ -758,6 +658,10 @@ final class FullDataPersistenceFlowTest extends IntegrationTestCase
         $this->assertEquals($providerOrderId, $dbContract['OXPROVIDERORDERID']);
         $this->assertNotNull($dbContract['OXFULFILLEDAT']);
 
+        // Sprint 8: Verify capture tracking on contract (replaces osc_payment_order_state)
+        $this->assertEquals(599.99, (float)$dbContract['OXCAPTUREDAMOUNT'], 'Contract should track captured amount');
+        $this->assertNotNull($dbContract['OXCAPTUREDAT'], 'Contract should have capture timestamp');
+
         // Verify oxorder
         $dbOrder = $this->connection->fetchAssociative(
             'SELECT * FROM oxorder WHERE OXID = :id',
@@ -767,14 +671,8 @@ final class FullDataPersistenceFlowTest extends IntegrationTestCase
         $this->assertEquals($userId, $dbOrder['OXUSERID']);
         $this->assertEquals(599.99, (float)$dbOrder['OXTOTALORDERSUM']);
 
-        // Verify osc_payment_order_state
-        $dbOrderState = $this->connection->fetchAssociative(
-            'SELECT * FROM osc_payment_order_state WHERE OXORDERID = :orderId',
-            ['orderId' => $orderId]
-        );
-        $this->assertNotFalse($dbOrderState, 'osc_payment_order_state record should exist');
-        $this->assertEquals($contractId, $dbOrderState['OXCONTRACTID']);
-        $this->assertEquals('captured', $dbOrderState['OXPAYMENTSTATE']);
+        // Note: osc_payment_order_state was DROPPED in Sprint 8
+        // Capture/refund tracking is now on osc_payment_contract (verified above)
 
         // Verify osc_payment_transaction (should have 2: auth + capture)
         $dbTransactions = $this->transactionRepository->findByOrderId($orderId);
@@ -805,10 +703,7 @@ final class FullDataPersistenceFlowTest extends IntegrationTestCase
         return substr(self::TEST_PREFIX . 'tx_' . $this->testRunId . '_' . $suffix, 0, 32);
     }
 
-    private function createOrderStateId(string $suffix): string
-    {
-        return substr(self::TEST_PREFIX . 'os_' . $this->testRunId . '_' . $suffix, 0, 32);
-    }
+    // Note: createOrderStateId removed in Sprint 8 (osc_payment_order_state dropped)
 
     private function createPaymentCustomerId(string $suffix): string
     {

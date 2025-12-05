@@ -15,6 +15,8 @@ use OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionProviderInte
 use OxidEsales\EshopCommunity\Tests\Integration\IntegrationTestCase;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Repository\DoctrineContractRepository;
+use OxidSolutionCatalysts\Payments\Component\Repository\DoctrineWebhookLogRepository;
 use OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandler;
 use OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService;
@@ -65,15 +67,17 @@ final class ContractAwareOxpaidWebhookTest extends IntegrationTestCase
     }
 
     /**
-     * Create WebhookProcessingService manually with dependencies from container.
-     * This avoids issues with DI container caching in CI environments.
+     * Create WebhookProcessingService manually with dependencies.
+     * Uses direct instantiation to work in CI without module activation.
      */
     private function createWebhookProcessingService($container): WebhookProcessingService
     {
-        // Get dependencies that are reliably available in the container
-        $contractRepository = $container->get(ContractRepositoryInterface::class);
+        // Direct instantiation for repositories (CI compatibility)
+        $contractRepository = new DoctrineContractRepository($this->connection);
+        $webhookLogRepository = new DoctrineWebhookLogRepository($this->connection);
+
+        // EventDispatcher is available via container (core OXID service)
         $eventDispatcher = $container->get(EventDispatcherInterface::class);
-        $webhookLogRepository = $container->get(WebhookLogRepositoryInterface::class);
 
         // Create the fulfillment handler
         $fulfillmentHandler = new WebhookContractFulfillmentHandler(

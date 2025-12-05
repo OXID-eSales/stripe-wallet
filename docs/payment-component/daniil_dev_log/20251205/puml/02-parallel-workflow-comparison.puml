@@ -1,0 +1,85 @@
+@startuml 02-parallel-workflow-comparison
+!theme plain
+title Parallel Workflow Comparison - Frontend vs Webhook
+footer Sprint 10 Analysis - 2025-12-05
+
+skinparam {
+    BackgroundColor white
+    NoteBackgroundColor #FFFACD
+}
+
+' Color scheme
+skinparam swimlane {
+    BorderColor black
+}
+
+|#90EE90| Frontend Flow |
+|#87CEEB| Webhook Flow |
+|#DDA0DD| Contract State |
+|#FFB6C1| oxorder State |
+
+|Frontend Flow|
+start
+:User returns from Stripe;
+:StripeCheckoutReturnEvent;
+:Validate session + token;
+:PaymentAuthorizedEvent;
+
+|Contract State|
+:DRAFT → PENDING;
+:Fulfill payment_authorized;
+:PENDING → READY_TO_COMMIT;
+:ContractReadyToCommitEvent;
+
+|Frontend Flow|
+:StripeOrderCreationHandler;
+:Create order via finalizeOrder();
+
+|oxorder State|
+:Order created;
+note right #FFA500
+OXPAID = '0000-00-00'
+OXTRANSSTATUS = 'OK'
+OXTRANSID = pi_xxx
+end note
+
+|Contract State|
+:READY_TO_COMMIT → COMMITTED;
+:Contract linked to order;
+
+|Frontend Flow|
+:Redirect to thankyou;
+:User sees order confirmation;
+
+|Webhook Flow|
+:payment_intent.succeeded webhook;
+note right
+May arrive 1-60 seconds
+after user returns
+end note
+
+:WebhookProcessingService;
+:Find contract by pi_xxx;
+
+|Contract State|
+if (Contract found?) then (yes)
+  :COMMITTED → FULFILLED;
+else (no)
+  :Legacy fallback;
+endif
+
+|Webhook Flow|
+:updateOrderFieldsAfterContractFulfillment();
+
+|oxorder State|
+:UPDATE OXPAID = NOW();
+note right #90EE90
+**OXPAID finally set!**
+Only happens if webhook
+arrives and succeeds
+end note
+
+|Webhook Flow|
+stop
+
+@enduml

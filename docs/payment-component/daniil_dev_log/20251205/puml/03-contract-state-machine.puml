@@ -1,0 +1,193 @@
+@startuml 03-contract-state-machine
+!theme plain
+title Contract State Machine - Event-Driven Transitions with Trigger Sources
+footer Sprint 11 Documentation - 2025-12-05
+
+skinparam {
+    BackgroundColor white
+    StateBackgroundColor #E8E8E8
+    StateBorderColor #333333
+    NoteBorderColor #333333
+}
+
+' Color Legend
+legend top left
+|= Color |= Source |
+|<#90EE90> | Frontend (StripeOrderController) |
+|<#87CEEB> | Webhook (WebhookController) |
+|<#DDA0DD> | Automatic (Handler Logic) |
+|<#FFB6C1> | Terminal State |
+endlegend
+
+' State colors by type
+skinparam state {
+    BackgroundColor<<initial>> #90EE90
+    BackgroundColor<<pending>> #90EE90
+    BackgroundColor<<ready>> #DDA0DD
+    BackgroundColor<<committed>> #90EE90
+    BackgroundColor<<fulfilled>> #87CEEB
+    BackgroundColor<<terminal>> #FFB6C1
+}
+
+state "DRAFT" as Draft <<initial>> {
+    Draft : Contract created
+    Draft : No conditions fulfilled
+    Draft : providerOrderId: null
+}
+
+state "PENDING" as Pending <<pending>> {
+    Pending : Awaiting conditions
+    Pending : payment_authorized added
+    Pending : providerOrderId: pi_xxx
+}
+
+state "READY_TO_COMMIT" as Ready <<ready>> {
+    Ready : All conditions fulfilled
+    Ready : Ready to create order
+}
+
+state "COMMITTED" as Committed <<committed>> {
+    Committed : Order created (OXPAID=0)
+    Committed : OXORDERID linked
+    Committed : Awaiting webhook
+}
+
+state "FULFILLED" as Fulfilled <<fulfilled>> {
+    Fulfilled : Payment confirmed
+    Fulfilled : OXPAID = NOW()
+    Fulfilled : Terminal state
+}
+
+state "FAILED" as Failed <<terminal>> {
+    Failed : Payment failed
+    Failed : failureReason stored
+}
+
+state "CANCELLED" as Cancelled <<terminal>> {
+    Cancelled : User cancelled
+}
+
+state "EXPIRED" as Expired <<terminal>> {
+    Expired : Timeout reached
+}
+
+' Transitions with trigger sources
+
+[*] --> Draft #Green : <color:green><b>FE</b></color>\n<color:green>StripeOrderController</color>\n<color:green>::createCheckoutSession()</color>
+
+Draft --> Pending #Green : <color:green><b>FE</b></color>\n<color:green>StripeOrderController</color>\n<color:green>::checkoutSuccess()</color>
+
+Pending --> Ready #Purple : <color:purple><b>AUTO</b></color>\n<color:purple>PaymentAuthorizedEventHandler</color>\n<color:purple>areAllConditionsFulfilled()</color>
+
+Ready --> Committed #Green : <color:green><b>FE</b></color>\n<color:green>StripeOrderCreationHandler</color>\n<color:green>::handle()</color>
+
+Committed --> Fulfilled #Blue : <color:blue><b>WEBHOOK</b></color>\n<color:blue>WebhookController::render()</color>\n<color:blue>→ handlePaymentSucceeded()</color>
+
+Committed --> Failed #Blue : <color:blue><b>WEBHOOK</b></color>\n<color:blue>WebhookController::render()</color>\n<color:blue>→ handlePaymentFailed()</color>
+
+Draft --> Cancelled : <color:gray>Not implemented</color>
+Pending --> Cancelled : <color:gray>Not implemented</color>
+Draft --> Expired : <color:gray>Not implemented</color>
+Pending --> Expired : <color:gray>Not implemented</color>
+
+Fulfilled --> [*]
+Failed --> [*]
+Cancelled --> [*]
+Expired --> [*]
+
+' Detailed notes with method chains
+
+note right of Draft #FFFACD
+<b>TRIGGER: Frontend</b>
+════════════════════════════════════════
+<b>Entry Point:</b>
+StripeOrderController::createCheckoutSession()
+
+<b>Event Chain:</b>
+1. StripeCheckoutSessionRequestEvent dispatched
+2. <b>StripeContractCreationHandler::handle()</b>
+   → Creates PaymentContract(DRAFT)
+   → Saves to osc_payment_contract
+3. StripeCheckoutSessionHandler::handle()
+   → Creates Stripe Checkout Session
+   → Sets providerOrderId on contract
+
+<b>Result:</b>
+Contract in DRAFT state
+User redirected to Stripe
+end note
+
+note right of Pending #FFFACD
+<b>TRIGGER: Frontend (Return)</b>
+════════════════════════════════════════
+<b>Entry Point:</b>
+StripeOrderController::checkoutSuccess()
+
+<b>Event Chain:</b>
+1. StripeCheckoutReturnEvent dispatched
+2. <b>StripeCheckoutReturnHandler::handle()</b>
+   → Validates session + token
+   → Retrieves Stripe session
+   → Dispatches PaymentAuthorizedEvent
+3. <b>PaymentAuthorizedEventHandler::handle()</b>
+   → contract.transitionToPending()
+   → contract.fulfillCondition('payment_authorized')
+   → contract.setProvider('stripe', pi_xxx)
+   → If all conditions met → READY_TO_COMMIT
+
+<b>Result:</b>
+Contract transitions: DRAFT → PENDING → READY_TO_COMMIT
+end note
+
+note right of Committed #FFFACD
+<b>TRIGGER: Frontend (Continuation)</b>
+════════════════════════════════════════
+<b>Entry Point:</b>
+(Same request as checkoutSuccess)
+
+<b>Event Chain:</b>
+1. ContractReadyToCommitEvent dispatched
+2. <b>StripeOrderCreationHandler::handle()</b>
+   → OxidShopOrderService.createOrder()
+   → Order::finalizeOrder()
+   → contract.commitToOrder(orderId)
+   → ContractCommittedEvent dispatched
+
+<b>Result:</b>
+Contract COMMITTED
+Order created (OXPAID = '0000-00-00')
+User sees thank you page
+end note
+
+note right of Fulfilled #E0FFFF
+<b>TRIGGER: Webhook</b>
+════════════════════════════════════════
+<b>Entry Point:</b>
+WebhookController::render()
+POST /index.php?cl=stripe_webhook
+
+<b>Event Chain:</b>
+1. Stripe sends payment_intent.succeeded
+2. WebhookProcessingService::processEvent()
+3. <b>WebhookContractFulfillmentHandler</b>
+   → findByProviderOrderId(pi_xxx)
+   → contract.fulfill()
+   → ContractFulfilledEvent dispatched
+4. updateOrderFieldsAfterContractFulfillment()
+   → UPDATE oxorder SET OXPAID = NOW()
+
+<b>Result:</b>
+Contract FULFILLED
+OXPAID set to current timestamp
+end note
+
+note bottom of Failed #FFE4E1
+<b>TRIGGER: Webhook</b>
+════════════════════════
+WebhookController::render()
+→ payment_intent.failed
+→ handlePaymentFailed()
+→ contract.fail(reason)
+end note
+
+@enduml

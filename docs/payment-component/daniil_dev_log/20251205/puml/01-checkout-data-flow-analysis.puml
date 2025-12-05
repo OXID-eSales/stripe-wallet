@@ -1,0 +1,153 @@
+@startuml 01-checkout-data-flow-analysis
+!theme plain
+title Stripe Checkout Data Flow Analysis - Where is OXPAID Set?
+footer Sprint 10 - 2025-12-05
+
+skinparam {
+    BackgroundColor white
+    ArrowColor #333333
+    NoteBackgroundColor #FFFACD
+    NoteBorderColor #DAA520
+}
+
+' Color Legend
+legend right
+|= Color |= Meaning |
+|<#90EE90> | Frontend Flow (User Return) |
+|<#87CEEB> | Webhook Flow (Stripe Server) |
+|<#FFB6C1> | OXPAID Update Location |
+|<#FFA500> | Problem Area |
+|<#DDA0DD> | Contract State Transition |
+endlegend
+
+participant "Customer\nBrowser" as Customer #LightGreen
+participant "StripeOrderController\nrender()" as OrderCtrl #90EE90
+participant "CheckoutOrchestrator\ninitiatePayment()" as Orchestrator #90EE90
+participant "StripeCheckoutReturnHandler\nhandle()" as ReturnHandler #90EE90
+participant "PaymentAuthorizedHandler\nhandle()" as AuthHandler #90EE90
+participant "StripeOrderCreationHandler\nhandle()" as CreateOrderHandler #90EE90
+participant "OxidShopOrderService\ncreateOrder()" as ShopOrderSvc #90EE90
+participant "Stripe\nWebhook" as Webhook #87CEEB
+participant "WebhookController\nrender()" as WebhookCtrl #87CEEB
+participant "WebhookProcessingService" as WebhookSvc #87CEEB
+participant "WebhookContractFulfillmentHandler" as FulfillHandler #87CEEB
+database "osc_payment_contract" as ContractDB #DDA0DD
+database "oxorder" as OrderDB #FFB6C1
+
+== FRONTEND FLOW (User Returns from Stripe) ==
+
+Customer -> OrderCtrl: Return from Stripe\n?session_id=cs_xxx&contract_token=xxx
+activate OrderCtrl #90EE90
+
+OrderCtrl -> Orchestrator: processCheckoutReturn()
+activate Orchestrator #90EE90
+
+Orchestrator -> ReturnHandler: dispatch(StripeCheckoutReturnEvent)
+activate ReturnHandler #90EE90
+
+ReturnHandler -> ReturnHandler: 1. Validate session_id
+ReturnHandler -> ReturnHandler: 2. Validate contract_token
+ReturnHandler -> ReturnHandler: 3. Retrieve Stripe Session
+ReturnHandler -> ReturnHandler: 4. Verify payment_status = 'paid'
+
+note right of ReturnHandler #FFA500
+**CRITICAL BUG FIX (Sprint 7)**
+providerOrderId must be pi_xxx
+NOT cs_xxx (checkout session ID)
+end note
+
+ReturnHandler -> AuthHandler: dispatch(PaymentAuthorizedEvent)\nproviderOrderId = **pi_xxx**
+deactivate ReturnHandler
+activate AuthHandler #90EE90
+
+AuthHandler -> ContractDB: contract.transitionToPending()
+AuthHandler -> ContractDB: contract.fulfillCondition('payment_authorized')
+AuthHandler -> ContractDB: contract.setProvider('stripe', pi_xxx)
+
+note over ContractDB #DDA0DD
+Contract State:
+DRAFT → PENDING → READY_TO_COMMIT
+end note
+
+AuthHandler -> CreateOrderHandler: dispatch(ContractReadyToCommitEvent)
+deactivate AuthHandler
+activate CreateOrderHandler #90EE90
+
+CreateOrderHandler -> ShopOrderSvc: createOrder(request)
+activate ShopOrderSvc #90EE90
+
+ShopOrderSvc -> OrderDB: Order::finalizeOrder()
+note right of OrderDB #FFB6C1
+**OXPAID = '0000-00-00 00:00:00'**
+Order created but NOT marked paid!
+end note
+
+ShopOrderSvc --> CreateOrderHandler: OrderResponse(orderId)
+deactivate ShopOrderSvc
+
+CreateOrderHandler -> ContractDB: contract.commitToOrder(orderId)
+note over ContractDB #DDA0DD
+Contract State:
+READY_TO_COMMIT → COMMITTED
+end note
+
+CreateOrderHandler --> OrderCtrl: Return to thankyou page
+deactivate CreateOrderHandler
+deactivate Orchestrator
+deactivate OrderCtrl
+
+== WEBHOOK FLOW (Stripe Server Calls) ==
+
+Webhook -> WebhookCtrl: POST /stripe/webhook\npayment_intent.succeeded\npi_xxx
+activate WebhookCtrl #87CEEB
+
+WebhookCtrl -> WebhookSvc: processEvent()
+activate WebhookSvc #87CEEB
+
+WebhookSvc -> FulfillHandler: handlePaymentSucceeded(pi_xxx)
+activate FulfillHandler #87CEEB
+
+FulfillHandler -> ContractDB: findByProviderOrderId(pi_xxx)
+
+note right of ContractDB #FFA500
+**IF CONTRACT NOT FOUND (pi_xxx)**
+Falls back to legacy processing
+end note
+
+FulfillHandler -> ContractDB: contract.fulfill()
+note over ContractDB #DDA0DD
+Contract State:
+COMMITTED → FULFILLED
+end note
+
+FulfillHandler --> WebhookSvc: true (fulfilled)
+deactivate FulfillHandler
+
+WebhookSvc -> WebhookSvc: updateOrderFieldsAfterContractFulfillment(pi_xxx)
+WebhookSvc -> OrderDB: **UPDATE oxorder SET OXPAID = NOW()**
+note right of OrderDB #FFB6C1
+**OXPAID FINALLY SET HERE!**
+Only via webhook, not frontend flow
+end note
+
+WebhookSvc --> WebhookCtrl: 200 OK
+deactivate WebhookSvc
+deactivate WebhookCtrl
+
+== TIMING ANALYSIS ==
+
+note across #FFFACD
+**RACE CONDITION POTENTIAL**
+
+Timeline:
+1. User clicks "Pay" → Contract DRAFT
+2. User completes Stripe payment
+3. User returns to shop → Contract COMMITTED, Order created (OXPAID=0)
+4. Stripe sends webhook (may be delayed 1-60 seconds)
+5. Webhook updates OXPAID
+
+**Problem:** If webhook fails/delayed, OXPAID stays '0000-00-00 00:00:00'
+**Problem:** If user refreshes before webhook, they see unpaid order
+end note
+
+@enduml
