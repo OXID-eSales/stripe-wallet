@@ -458,7 +458,6 @@ services:
       $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
       $fileLogger: '@stripe.reconciliation.file_logger'
-      $logger: '@Psr\Log\LoggerInterface'
     public: true
 
   # Console Command: stripe:reconcile-oxpaid

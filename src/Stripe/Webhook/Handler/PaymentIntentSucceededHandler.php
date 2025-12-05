@@ -134,5 +134,4 @@ final class PaymentIntentSucceededHandler implements WebhookEventHandlerInterfac
             'transid' => $paymentIntentId,
         ]);
     }
-
 }

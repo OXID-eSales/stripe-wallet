@@ -77,7 +77,6 @@ class WebhookController extends FrontendController
         $this->logRawWebhookRequest($payload, $sigHeader);
 
         try {
-
             if (empty($payload)) {
                 throw new \Exception('Empty payload');
             }
