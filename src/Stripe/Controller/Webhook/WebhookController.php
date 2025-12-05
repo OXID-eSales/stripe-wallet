@@ -26,6 +26,8 @@ use Stripe\Webhook;
  */
 class WebhookController extends FrontendController
 {
+    private const WEBHOOK_LOG_FILE = 'log/osc/stripe_webhooks.log';
+
     private ModuleConfigurationService $config;
     private ?WebhookProcessingService $webhookService = null;
     private ?WebhookLogServiceInterface $webhookLogService = null;
@@ -60,17 +62,21 @@ class WebhookController extends FrontendController
      * Handle incoming webhook
      * Verifies signature and processes event
      *
-     * @return void
+     * @return string
      */
-    public function render()
+    public function render(): string
     {
         // Set JSON header
         Registry::getUtils()->setHeader('Content-Type: application/json');
 
+        // Get raw POST body early for logging
+        $payload = file_get_contents('php://input');
+        $sigHeader = $_SERVER['HTTP_STRIPE_SIGNATURE'] ?? '';
+
+        // Log raw incoming request FIRST (before any validation)
+        $this->logRawWebhookRequest($payload, $sigHeader);
+
         try {
-            // Get raw POST body
-            $payload = file_get_contents('php://input');
-            $sigHeader = $_SERVER['HTTP_STRIPE_SIGNATURE'] ?? '';
 
             if (empty($payload)) {
                 throw new \Exception('Empty payload');
@@ -101,6 +107,7 @@ class WebhookController extends FrontendController
             }
 
             // Return success response
+            $this->logWebhookResult($payload, 'SUCCESS', 200);
             http_response_code(200);
             echo json_encode(['received' => true]);
         } catch (SignatureVerificationException $e) {
@@ -109,6 +116,7 @@ class WebhookController extends FrontendController
                 'error' => $e->getMessage(),
             ]);
 
+            $this->logWebhookResult($payload, 'SIGNATURE_FAILED: ' . $e->getMessage(), 400);
             http_response_code(400);
             echo json_encode(['error' => 'Invalid signature']);
         } catch (\Exception $e) {
@@ -117,11 +125,14 @@ class WebhookController extends FrontendController
                 'error' => $e->getMessage(),
             ]);
 
+            $this->logWebhookResult($payload, 'PROCESSING_FAILED: ' . $e->getMessage(), 500);
             http_response_code(500);
             echo json_encode(['error' => 'Processing failed']);
         }
 
         exit;
+        // @phpstan-ignore-next-line - unreachable but required for return type
+        return '';
     }
 
     /**
@@ -204,6 +215,187 @@ class WebhookController extends FrontendController
             Registry::getLogger()->error('Failed to log webhook', [
                 'error' => $e->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * Log raw incoming webhook HTTP request to file
+     *
+     * This logs EVERY incoming request to the webhook endpoint,
+     * regardless of whether it passes validation or not.
+     * Useful for debugging lost/missing webhooks.
+     *
+     * Log file: source/log/osc/stripe_webhooks.log
+     *
+     * @param string|false $payload Raw POST body
+     * @param string $sigHeader Stripe signature header
+     */
+    private function logRawWebhookRequest($payload, string $sigHeader): void
+    {
+        try {
+            $logFile = $this->getWebhookLogFilePath();
+            if ($logFile === null) {
+                return;
+            }
+
+            $eventInfo = $this->parseWebhookEventInfo($payload);
+            $logEntry = $this->formatWebhookLogEntry($eventInfo, $sigHeader, $payload);
+
+            file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
+        } catch (\Throwable $e) {
+            Registry::getLogger()->warning('Failed to write webhook log file', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Get webhook log file path, creating directory if needed.
+     */
+    private function getWebhookLogFilePath(): ?string
+    {
+        $shopDir = Registry::getConfig()->getConfigParam('sShopDir');
+        if (!is_string($shopDir)) {
+            return null;
+        }
+
+        $logFile = rtrim($shopDir, '/') . '/' . self::WEBHOOK_LOG_FILE;
+        $logDir = dirname($logFile);
+
+        if (!is_dir($logDir)) {
+            mkdir($logDir, 0755, true);
+        }
+
+        return $logFile;
+    }
+
+    /**
+     * Parse webhook payload to extract event info.
+     *
+     * @param string|false $payload
+     * @return array<string, string> Array with eventId, eventType, paymentIntentId keys
+     */
+    private function parseWebhookEventInfo($payload): array
+    {
+        $result = ['eventId' => 'unknown', 'eventType' => 'unknown', 'paymentIntentId' => 'unknown'];
+
+        if (!is_string($payload) || $payload === '') {
+            return $result;
+        }
+
+        $data = json_decode($payload, true);
+        if (!is_array($data)) {
+            return $result;
+        }
+
+        /** @var array<string, mixed> $data */
+        $result['eventId'] = $this->extractStringField($data, 'id');
+        $result['eventType'] = $this->extractStringField($data, 'type');
+        $result['paymentIntentId'] = $this->extractPaymentIntentId($data);
+
+        return $result;
+    }
+
+    /**
+     * Extract a string field from array with fallback.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function extractStringField(array $data, string $key): string
+    {
+        $value = $data[$key] ?? null;
+        return is_string($value) ? $value : 'unknown';
+    }
+
+    /**
+     * Extract payment intent ID from webhook data structure.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function extractPaymentIntentId(array $data): string
+    {
+        $dataObj = $data['data'] ?? null;
+        if (!is_array($dataObj)) {
+            return 'unknown';
+        }
+
+        $objData = $dataObj['object'] ?? null;
+        if (!is_array($objData)) {
+            return 'unknown';
+        }
+
+        $id = $objData['id'] ?? $objData['payment_intent'] ?? null;
+        return is_string($id) ? $id : 'unknown';
+    }
+
+    /**
+     * Format webhook log entry.
+     *
+     * @param array<string, string> $eventInfo Event info with eventId, eventType, paymentIntentId
+     * @param string $sigHeader
+     * @param string|false $payload
+     */
+    private function formatWebhookLogEntry(array $eventInfo, string $sigHeader, $payload): string
+    {
+        $timestamp = date('Y-m-d H:i:s.u');
+        $requestId = substr(md5(uniqid('', true)), 0, 8);
+        $remoteIp = is_string($_SERVER['REMOTE_ADDR'] ?? null) ? $_SERVER['REMOTE_ADDR'] : 'unknown';
+        $userAgent = is_string($_SERVER['HTTP_USER_AGENT'] ?? null) ? $_SERVER['HTTP_USER_AGENT'] : 'unknown';
+        $payloadSize = is_string($payload) ? strlen($payload) : 0;
+
+        return sprintf(
+            "[%s] [%s] WEBHOOK_RECEIVED\n" .
+            "  Event ID:      %s\n" .
+            "  Event Type:    %s\n" .
+            "  Payment ID:    %s\n" .
+            "  Remote IP:     %s\n" .
+            "  User Agent:    %s\n" .
+            "  Payload Size:  %d bytes\n" .
+            "  Has Signature: %s\n" .
+            "  Signature:     %s\n" .
+            "  ---\n",
+            $timestamp,
+            $requestId,
+            $eventInfo['eventId'],
+            $eventInfo['eventType'],
+            $eventInfo['paymentIntentId'],
+            $remoteIp,
+            $userAgent,
+            $payloadSize,
+            $sigHeader !== '' ? 'YES' : 'NO',
+            $sigHeader !== '' ? substr($sigHeader, 0, 50) . '...' : 'NONE'
+        );
+    }
+
+    /**
+     * Log webhook processing result to file
+     *
+     * @param string|false $payload Raw POST body
+     * @param string $result Result status (SUCCESS, SIGNATURE_FAILED, PROCESSING_FAILED)
+     * @param int $httpCode HTTP response code
+     */
+    private function logWebhookResult($payload, string $result, int $httpCode): void
+    {
+        try {
+            $logFile = $this->getWebhookLogFilePath();
+            if ($logFile === null) {
+                return;
+            }
+
+            $eventInfo = $this->parseWebhookEventInfo($payload);
+
+            $logEntry = sprintf(
+                "[%s] WEBHOOK_RESULT: %s (HTTP %d) - Event: %s [%s]\n",
+                date('Y-m-d H:i:s.u'),
+                $result,
+                $httpCode,
+                $eventInfo['eventType'],
+                $eventInfo['eventId']
+            );
+
+            file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
+        } catch (\Throwable $e) {
+            // Silent fail - don't break webhook response
         }
     }
 }

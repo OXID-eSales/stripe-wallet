@@ -9,6 +9,7 @@ services:
     exclude:
       - 'src/Stripe/Service/EncryptionService.php'
       - 'src/Stripe/Service/Result/*'
+      - 'src/Stripe/Service/ReconciliationResult.php'
     public: true
 
   # Encryption Service - Requires explicit encryption key configuration
@@ -430,4 +431,27 @@ services:
   OxidSolutionCatalysts\Payments\Stripe\Controller\StripeOrderController:
     tags:
       - { name: oxid.view_controller, controller_key: order }
+    public: true
+
+  # ==========================================
+  # OXPAID Reconciliation (Sprint 10)
+  # ==========================================
+  # Service and console command for reconciling OXPAID with Stripe API.
+  # Handles cases where webhooks were missed or delayed.
+
+  # Reconciliation Service
+  OxidSolutionCatalysts\Payments\Stripe\Service\OxpaidReconciliationService:
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+      $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $logger: '@Psr\Log\LoggerInterface'
+    public: true
+
+  # Console Command: stripe:reconcile-oxpaid
+  OxidSolutionCatalysts\Payments\Stripe\Command\ReconcileOxpaidCommand:
+    arguments:
+      $reconciliationService: '@OxidSolutionCatalysts\Payments\Stripe\Service\OxpaidReconciliationService'
+    tags:
+      - { name: 'console.command', command: 'stripe:reconcile-oxpaid' }
     public: true

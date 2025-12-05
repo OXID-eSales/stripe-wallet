@@ -1,49 +1,86 @@
 # Status - 2025-12-05
 
-**Last Updated:** 2025-12-05 (analysis complete)
+**Last Updated:** 2025-12-05 (implementation complete)
 **Branch:** b-7.4.x-auth-STRP-70
 
 ---
 
 ## Summary
 
-Today's work focused on analyzing CI failures and documenting the checkout data flow. Key findings:
+Today's work focused on fixing CI failures, implementing OXPAID reconciliation, and adding webhook logging.
 
-1. **CI Failures:** 16 errors caused by Sprint 8's table drop + service discovery issues
-2. **OXPAID Issue:** Not a bug - by design, OXPAID is set via webhook only
-3. **Architecture Documentation:** Contract state machine fully documented
+| Sprint | Status | Description |
+|--------|--------|-------------|
+| Sprint 9 | ✅ DONE | CI Integration Test Fixes |
+| Sprint 10.1 | ✅ DONE | Webhook Request Logging |
+| Sprint 10.2 | ✅ DONE | OXPAID Reconciliation Command |
+| Sprint 11 | ✅ DONE | Contract State Machine Documentation |
+| Sprint 12 | 📋 TODO | Skipped Tests Analysis |
 
 ---
 
-## Analysis Completed
+## Completed Today
 
 ### Sprint 9: CI Integration Test Fixes (COMPLETED)
 
 | Task | Status |
 |------|--------|
 | Identify root causes | ✅ Done |
-| Document fix strategy | ✅ Done |
-| Create TDD plan | ✅ Done |
-| Implementation | ✅ Done |
+| Fix FullDataPersistenceFlowTest | ✅ Done |
+| Fix ContractCaptureRefundTest | ✅ Done |
+| Fix ContractAwareOxpaidWebhookTest | ✅ Done |
+| Fix OxpaidWebhookUpdateTest | ✅ Done |
+| Fix EventDispatcher instantiation | ✅ Done |
 | Unit tests verified | ✅ 1109 passing |
-| Integration tests verified | ✅ 276 passing, 0 errors |
+| Integration tests verified | ✅ 306 tests (0 errors) |
 
-**Root Causes Identified:**
-1. `FullDataPersistenceFlowTest.php` references dropped `osc_payment_order_state` table
-2. Tests use DI for `ContractRepositoryInterface` but module not activated in CI
+**Root Causes Fixed:**
+1. Removed references to dropped `osc_payment_order_state` table
+2. Direct repository instantiation instead of DI (CI compatibility)
+3. Direct EventDispatcher instantiation instead of DI
 
-**Fix Strategy:** Direct repository and EventDispatcher instantiation instead of DI
+### Sprint 10.1: Webhook Request Logging (IMPLEMENTED)
 
-### Sprint 10: OXPAID Data Flow Analysis (Complete)
+| Component | Status |
+|-----------|--------|
+| Log file path | `source/log/osc/stripe_webhooks.log` |
+| Log on request | ✅ WEBHOOK_RECEIVED with full details |
+| Log on result | ✅ WEBHOOK_RESULT with status code |
+| Error handling | ✅ Silent fail (won't break webhook) |
 
-| Finding | Detail |
-|---------|--------|
-| Root Cause | OXPAID set via webhook only (by design) |
-| Frontend Flow | Creates order + commits contract (OXPAID=0) |
-| Webhook Flow | Fulfills contract + sets OXPAID |
-| Recommendation | Keep current design, add webhook monitoring |
+**Sample Log:**
+```
+[2025-12-05 14:30:45.123456] [a1b2c3d4] WEBHOOK_RECEIVED
+  Event ID:      evt_1234567890
+  Event Type:    payment_intent.succeeded
+  Payment ID:    pi_abcdef123456
+  Remote IP:     54.187.174.169
+  Payload Size:  2456 bytes
+  Has Signature: YES
+  ---
+[2025-12-05 14:30:45.234567] WEBHOOK_RESULT: SUCCESS (HTTP 200)
+```
 
-**Key Insight:** This is **correct behavior** - OXPAID should reflect actual capture, not just payment intent.
+### Sprint 10.2: OXPAID Reconciliation Command (IMPLEMENTED)
+
+| Component | Status |
+|-----------|--------|
+| Console command | `bin/oe-console stripe:reconcile-oxpaid` |
+| Dry run mode | `--dry-run` |
+| Max age option | `--max-age=N` (days) |
+| Log file | `source/log/osc/stripe_reconciliation.log` |
+
+**Usage:**
+```bash
+bin/oe-console stripe:reconcile-oxpaid           # Fix unpaid orders
+bin/oe-console stripe:reconcile-oxpaid --dry-run # Preview only
+bin/oe-console stripe:reconcile-oxpaid --max-age=14
+```
+
+**Cron Setup (recommended):**
+```cron
+0 * * * * cd /var/www && bin/oe-console stripe:reconcile-oxpaid --max-age=1
+```
 
 ### Sprint 11: Contract State Machine (Documented)
 
@@ -58,62 +95,78 @@ Today's work focused on analyzing CI failures and documenting the checkout data 
 
 ---
 
-## Deliverables Created
-
-### Documentation
-| File | Purpose |
-|------|---------|
-| `README.md` | Day overview, input from yesterday |
-| `status.md` | This file |
-| `todo/sprint-9-ci-fixes.md` | TDD plan for CI fixes |
-| `todo/sprint-10-oxpaid-dataflow.md` | OXPAID analysis |
-
-### Diagrams (PlantUML)
-| File | Purpose |
-|------|---------|
-| `puml/01-checkout-data-flow-analysis.puml` | Full checkout flow with OXPAID locations |
-| `puml/02-parallel-workflow-comparison.puml` | Frontend vs Webhook timing |
-| `puml/03-contract-state-machine.puml` | Contract state transitions |
-
----
-
 ## Next Steps
 
-### Immediate (Sprint 9 Implementation)
-1. [ ] Update `FullDataPersistenceFlowTest.php` - remove order_state tests
-2. [ ] Fix `ContractCaptureRefundTest.php` - direct repo instantiation
-3. [ ] Fix `ContractAwareOxpaidWebhookTest.php` - direct repo instantiation
-4. [ ] Fix `OxpaidWebhookUpdateTest.php` - direct repo instantiation
-5. [ ] Run integration tests locally
-6. [ ] Push and verify CI passes
+### Sprint 12: Skipped Tests Analysis (TODO)
 
-### Future (Enhancement Backlog)
-- [ ] Add cron job to check/fix unpaid orders with completed Stripe payments
-- [ ] Add UI indicator "Payment processing..." for brief webhook delay window
+67 skipped + 1 incomplete integration tests to investigate:
+
+| Category | Count | Reason |
+|----------|-------|--------|
+| Watch Feature | 49 | PaymentWatch API not configured |
+| Migration Structure | 11 | PaymentWatch indexes not created |
+| Module Lifecycle | 6 | Module not activated in CI |
+| Contract Repository | 1 | Transaction rollback test |
+| Stripe Adapter | 1 | Incomplete partial refund test |
+
+### Future Backlog
+- [ ] Add UI indicator "Payment processing..." for webhook delay window
 - [ ] Implement contract CANCELLED and EXPIRED state handlers
 
 ---
 
 ## Test Results
 
-### Unit Tests (Local)
+### Unit Tests
 ```
 Status: ✅ PASSING
 Tests: 1109, Assertions: 2476
 ```
 
-### Integration Tests (Local - After Fix)
+### Integration Tests
 ```
 Status: ✅ PASSING
-Tests: 276, Assertions: 1021, Errors: 0
-(was: 16 errors before Sprint 9 fix)
+Tests: 306, Assertions: 1098
+Skipped: 67, Incomplete: 1
 ```
+
+---
+
+## Files Changed Today
+
+### Production Code
+| File | Type | Description |
+|------|------|-------------|
+| `src/Stripe/Controller/Webhook/WebhookController.php` | Modified | Added webhook logging |
+| `src/Stripe/Command/ReconcileOxpaidCommand.php` | New | Console command |
+| `src/Stripe/Service/OxpaidReconciliationService.php` | New | Reconciliation logic |
+| `src/Stripe/Service/ReconciliationResult.php` | New | Result DTO |
+| `services.yaml` | Modified | Registered new services |
+
+### Test Fixes
+| File | Type | Description |
+|------|------|-------------|
+| `tests/.../FullDataPersistenceFlowTest.php` | Modified | Removed order_state tests |
+| `tests/.../ContractCaptureRefundTest.php` | Modified | Direct repo instantiation |
+| `tests/.../ContractAwareOxpaidWebhookTest.php` | Modified | Direct instantiation |
+| `tests/.../OxpaidWebhookUpdateTest.php` | Modified | Direct instantiation |
+
+### Documentation
+| File | Type | Description |
+|------|------|-------------|
+| `docs/.../20251205/README.md` | New | Day overview |
+| `docs/.../20251205/status.md` | New | This file |
+| `docs/.../20251205/done/sprint-9-ci-fixes.md` | Moved | CI fix plan |
+| `docs/.../20251205/done/sprint-9-ci-fixes-report.md` | New | CI fix report |
+| `docs/.../20251205/todo/sprint-10-oxpaid-dataflow.md` | Updated | OXPAID implementation |
+| `docs/.../20251205/todo/sprint-12-skipped-tests-analysis.md` | New | Skipped tests analysis |
+| `docs/.../20251205/puml/*.puml` | New | 3 diagrams |
 
 ---
 
 ## Key Insights
 
-### Why OXPAID Issue is Not a Bug
+### OXPAID Architecture (Correct by Design)
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -130,10 +183,12 @@ Tests: 276, Assertions: 1021, Errors: 0
 │  OXPAID should only be set at step 6, not step 4!               │
 │  This ensures OXPAID = actual money captured, not just intent.   │
 │                                                                  │
+│  MITIGATION: stripe:reconcile-oxpaid command for missed webhooks │
+│                                                                  │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-### Contract State Machine Summary
+### Contract State Machine
 
 ```
 DRAFT → PENDING → READY_TO_COMMIT → COMMITTED → FULFILLED
@@ -149,12 +204,9 @@ DRAFT → PENDING → READY_TO_COMMIT → COMMITTED → FULFILLED
 
 ---
 
-## Files Changed Today
+## Log Files Created
 
-| File | Type | Description |
-|------|------|-------------|
-| `docs/.../20251205/README.md` | New | Day overview |
-| `docs/.../20251205/status.md` | New | Work status |
-| `docs/.../20251205/todo/sprint-9-ci-fixes.md` | New | CI fix plan |
-| `docs/.../20251205/todo/sprint-10-oxpaid-dataflow.md` | New | OXPAID analysis |
-| `docs/.../20251205/puml/*.puml` | New | 3 diagrams |
+| Log File | Purpose |
+|----------|---------|
+| `log/osc/stripe_webhooks.log` | All incoming webhook HTTP requests |
+| `log/osc/stripe_reconciliation.log` | OXPAID reconciliation actions |

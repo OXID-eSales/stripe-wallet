@@ -1,7 +1,7 @@
 # Sprint 10: OXPAID Data Flow Analysis
 
 **Date:** 2025-12-05
-**Status:** Analysis Complete
+**Status:** IMPLEMENTED
 **Branch:** b-7.4.x-auth-STRP-70
 
 ---
@@ -221,6 +221,135 @@ The current architecture is correct:
 3. This ensures OXPAID reflects actual payment capture, not just payment intent
 
 **Recommendation:** Keep current design. Add monitoring/retry for webhook failures.
+
+---
+
+## Sprint 10.1: Webhook Request Logging (IMPLEMENTED)
+
+**Problem:** Webhooks from Stripe may be getting lost - need visibility into all incoming requests.
+
+**Solution Implemented:** Raw HTTP request logging added to `WebhookController`
+
+### Log File Location
+```
+source/log/osc/stripe_webhooks.log
+```
+
+### What Gets Logged
+
+**On every incoming request (WEBHOOK_RECEIVED):**
+- Timestamp with microseconds
+- Request ID (for correlation)
+- Event ID (`evt_xxx`)
+- Event Type (`payment_intent.succeeded`, etc.)
+- Payment Intent ID (`pi_xxx`)
+- Remote IP
+- User Agent
+- Payload size
+- Signature presence
+- Truncated signature
+
+**On processing complete (WEBHOOK_RESULT):**
+- SUCCESS (HTTP 200)
+- SIGNATURE_FAILED (HTTP 400)
+- PROCESSING_FAILED (HTTP 500)
+
+### Sample Log Output
+```
+[2025-12-05 14:30:45.123456] [a1b2c3d4] WEBHOOK_RECEIVED
+  Event ID:      evt_1234567890
+  Event Type:    payment_intent.succeeded
+  Payment ID:    pi_abcdef123456
+  Remote IP:     54.187.174.169
+  User Agent:    Stripe/1.0 (+https://stripe.com/docs/webhooks)
+  Payload Size:  2456 bytes
+  Has Signature: YES
+  Signature:     t=1701789045,v1=abc123def456...
+  ---
+[2025-12-05 14:30:45.234567] WEBHOOK_RESULT: SUCCESS (HTTP 200) - Event: payment_intent.succeeded [evt_1234567890]
+```
+
+### Files Changed
+- `src/Stripe/Controller/Webhook/WebhookController.php`
+  - Added `WEBHOOK_LOG_FILE` constant
+  - Added `logRawWebhookRequest()` method
+  - Added `logWebhookResult()` method
+
+---
+
+## Sprint 10.2: OXPAID Reconciliation Command (IMPLEMENTED)
+
+**Problem:** When webhooks fail or are delayed, OXPAID remains '0000-00-00 00:00:00' even though Stripe has captured the payment.
+
+**Solution Implemented:** Console command to reconcile OXPAID with Stripe API.
+
+### Usage
+
+```bash
+# Check and fix all unpaid orders from the last 7 days
+bin/oe-console stripe:reconcile-oxpaid
+
+# Dry run (show what would be done without making changes)
+bin/oe-console stripe:reconcile-oxpaid --dry-run
+
+# Check orders from the last 14 days
+bin/oe-console stripe:reconcile-oxpaid --max-age=14
+```
+
+### How It Works
+
+1. **Find unpaid orders**: Query orders where:
+   - `OXPAID = '0000-00-00 00:00:00'` (not paid)
+   - `OXTRANSID LIKE 'pi_%'` (Stripe PaymentIntent)
+   - Order created within specified days
+
+2. **Check Stripe API**: For each order, call `getPaymentDetails()` via StripeAdapter
+
+3. **Update if captured**: If Stripe shows payment is captured:
+   - Update `OXPAID` timestamp on the order
+   - Transition contract to `FULFILLED` state (if exists)
+
+### Log File
+```
+source/log/osc/stripe_reconciliation.log
+```
+
+### Sample Output
+```
+Stripe OXPAID Reconciliation
+============================
+
+Checking orders from the last 7 days...
+Found 3 unpaid order(s) to check.
+
++---------------+----------------------+---------+----------+------------------------------------------+
+| Order ID      | PaymentIntent        | Status  | Contract | Reason                                   |
++---------------+----------------------+---------+----------+------------------------------------------+
+| abc123def4... | pi_3ABC123DEF456789  | UPDATED | Yes      | OXPAID updated from Stripe payment status|
+| xyz789abc1... | pi_3XYZ789ABC123456  | SKIPPED | No       | Payment not captured. Status: requires_ca|
+| def456ghi7... | pi_3DEF456GHI789012  | ERROR   | No       | API error: No such payment_intent        |
++---------------+----------------------+---------+----------+------------------------------------------+
+
+Summary
+-------
+Orders checked: 3
+Updated: 1
+Skipped: 1
+Errors: 1
+```
+
+### Cron Setup
+
+Add to crontab to run every hour:
+```cron
+0 * * * * cd /var/www && bin/oe-console stripe:reconcile-oxpaid --max-age=1 >> /var/log/stripe-reconcile.log 2>&1
+```
+
+### Files Created
+- `src/Stripe/Command/ReconcileOxpaidCommand.php` - Console command
+- `src/Stripe/Service/OxpaidReconciliationService.php` - Business logic
+- `src/Stripe/Service/ReconciliationResult.php` - Result DTO
+- `services.yaml` - Service registration
 
 ---
 
