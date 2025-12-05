@@ -50,7 +50,7 @@ class OxpaidReconciliationService
      * - Order created within specified days (default 7)
      *
      * @param int $maxAgeDays Maximum age of orders to check (default 7 days)
-     * @return array<array{OXID: string, OXTRANSID: string, OXORDERNR: int, OXORDERDATE: string}>
+     * @return array<int, array<string, mixed>>
      */
     public function findUnpaidOrders(int $maxAgeDays = 7): array
     {
@@ -133,10 +133,13 @@ class OxpaidReconciliationService
         $results = [];
 
         foreach ($unpaidOrders as $order) {
+            $orderId = (string) $order['OXID'];
+            $transId = (string) $order['OXTRANSID'];
+
             if ($dryRun) {
                 $results[] = new ReconciliationResult(
-                    orderId: $order['OXID'],
-                    paymentIntentId: $order['OXTRANSID'],
+                    orderId: $orderId,
+                    paymentIntentId: $transId,
                     success: true,
                     action: 'dry_run',
                     reason: "Would check order #{$order['OXORDERNR']} from {$order['OXORDERDATE']}"
@@ -144,7 +147,7 @@ class OxpaidReconciliationService
                 continue;
             }
 
-            $results[] = $this->reconcileOrder($order['OXID'], $order['OXTRANSID']);
+            $results[] = $this->reconcileOrder($orderId, $transId);
         }
 
         return $results;
@@ -153,7 +156,7 @@ class OxpaidReconciliationService
     /**
      * Update OXPAID timestamp on order.
      */
-    private function updateOrderPaidTimestamp(string $orderId, ?\DateTimeImmutable $capturedAt): void
+    private function updateOrderPaidTimestamp(string $orderId, ?\DateTimeInterface $capturedAt): void
     {
         $timestamp = $capturedAt?->format('Y-m-d H:i:s') ?? date('Y-m-d H:i:s');
 
@@ -179,7 +182,7 @@ class OxpaidReconciliationService
             }
 
             // Only fulfill if in committed state
-            if ($contract->getState() !== 'committed') {
+            if (!$contract->getState()->isCommitted()) {
                 return false;
             }
 
@@ -208,6 +211,7 @@ class OxpaidReconciliationService
         ?string $error = null
     ): void {
         try {
+            /** @var string $shopDir */
             $shopDir = \OxidEsales\Eshop\Core\Registry::getConfig()->getConfigParam('sShopDir');
             $logFile = rtrim($shopDir, '/') . '/' . self::LOG_FILE;
 
