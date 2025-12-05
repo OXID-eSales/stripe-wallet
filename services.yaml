@@ -439,12 +439,25 @@ services:
   # Service and console command for reconciling OXPAID with Stripe API.
   # Handles cases where webhooks were missed or delayed.
 
+  # Reconciliation File Logger Factory - Creates logger with correct shop path
+  # Sprint 14: Factory approach for OXID compatibility (no kernel.project_dir)
+  OxidSolutionCatalysts\Payments\Stripe\Service\Factory\ReconciliationFileLoggerFactory:
+    public: false
+
+  # Reconciliation File Logger - Writes to log/osc/stripe_reconciliation.log
+  # Sprint 14: Injected logger for testability (prevents unit tests writing to production logs)
+  stripe.reconciliation.file_logger:
+    class: OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface
+    factory: ['@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\ReconciliationFileLoggerFactory', 'create']
+    public: false
+
   # Reconciliation Service
   OxidSolutionCatalysts\Payments\Stripe\Service\OxpaidReconciliationService:
     arguments:
       $connection: '@doctrine.dbal.connection'
       $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $fileLogger: '@stripe.reconciliation.file_logger'
       $logger: '@Psr\Log\LoggerInterface'
     public: true
 

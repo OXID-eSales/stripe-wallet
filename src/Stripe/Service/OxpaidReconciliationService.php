@@ -11,8 +11,8 @@ namespace OxidSolutionCatalysts\Payments\Stripe\Service;
 
 use Doctrine\DBAL\Connection;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
-use Psr\Log\LoggerInterface;
 
 /**
  * OXPAID Reconciliation Service
@@ -31,13 +31,11 @@ use Psr\Log\LoggerInterface;
  */
 class OxpaidReconciliationService
 {
-    private const LOG_FILE = 'log/osc/stripe_reconciliation.log';
-
     public function __construct(
         private readonly Connection $connection,
         private readonly StripeAdapterFactoryInterface $adapterFactory,
         private readonly ContractRepositoryInterface $contractRepository,
-        private readonly ?LoggerInterface $logger = null
+        private readonly ?FileLoggerInterface $fileLogger = null
     ) {
     }
 
@@ -67,6 +65,8 @@ class OxpaidReconciliationService
     /**
      * Reconcile a single order.
      *
+     * Sprint 15: Contract is REQUIRED - no backward compatibility.
+     *
      * @param string $orderId OXID of the order
      * @param string $paymentIntentId Stripe PaymentIntent ID
      * @return ReconciliationResult
@@ -74,10 +74,22 @@ class OxpaidReconciliationService
     public function reconcileOrder(string $orderId, string $paymentIntentId): ReconciliationResult
     {
         try {
-            // Get Stripe adapter
-            $adapter = $this->adapterFactory->createDefaultAdapter();
+            // Sprint 15: Contract is REQUIRED first - check before Stripe API
+            $contract = $this->contractRepository->findByProviderOrderId($paymentIntentId);
 
-            // Query Stripe for payment details
+            if ($contract === null) {
+                $this->logReconciliation($orderId, $paymentIntentId, 'ERROR', false, 'No contract found');
+                return new ReconciliationResult(
+                    orderId: $orderId,
+                    paymentIntentId: $paymentIntentId,
+                    success: false,
+                    action: 'no_contract',
+                    reason: "No contract found for PaymentIntent: {$paymentIntentId}"
+                );
+            }
+
+            // Only proceed with Stripe API if contract exists
+            $adapter = $this->adapterFactory->createDefaultAdapter();
             $paymentDetails = $adapter->getPaymentDetails($paymentIntentId);
 
             // Check if payment is actually captured/succeeded
@@ -94,8 +106,13 @@ class OxpaidReconciliationService
             // Payment is captured - update OXPAID
             $this->updateOrderPaidTimestamp($orderId, $paymentDetails->capturedAt);
 
-            // Find and update related contract if exists
-            $contractUpdated = $this->fulfillRelatedContract($paymentIntentId);
+            // Fulfill contract if in committed state
+            $contractUpdated = false;
+            if ($contract->getState()->isCommitted()) {
+                $contract->fulfill();
+                $this->contractRepository->save($contract);
+                $contractUpdated = true;
+            }
 
             $this->logReconciliation($orderId, $paymentIntentId, 'SUCCESS', $contractUpdated);
 
@@ -168,39 +185,6 @@ class OxpaidReconciliationService
     }
 
     /**
-     * Find and fulfill the related contract.
-     *
-     * @return bool True if contract was found and updated
-     */
-    private function fulfillRelatedContract(string $paymentIntentId): bool
-    {
-        try {
-            $contract = $this->contractRepository->findByProviderOrderId($paymentIntentId);
-
-            if ($contract === null) {
-                return false;
-            }
-
-            // Only fulfill if in committed state
-            if (!$contract->getState()->isCommitted()) {
-                return false;
-            }
-
-            // Fulfill the contract
-            $contract->fulfill();
-            $this->contractRepository->save($contract);
-
-            return true;
-        } catch (\Throwable $e) {
-            $this->logger?->warning('Failed to fulfill contract during reconciliation', [
-                'payment_intent_id' => $paymentIntentId,
-                'error' => $e->getMessage(),
-            ]);
-            return false;
-        }
-    }
-
-    /**
      * Log reconciliation action to file.
      */
     private function logReconciliation(
@@ -210,33 +194,22 @@ class OxpaidReconciliationService
         bool $contractUpdated,
         ?string $error = null
     ): void {
-        try {
-            /** @var string $shopDir */
-            $shopDir = \OxidEsales\Eshop\Core\Registry::getConfig()->getConfigParam('sShopDir');
-            $logFile = rtrim($shopDir, '/') . '/' . self::LOG_FILE;
-
-            $logDir = dirname($logFile);
-            if (!is_dir($logDir)) {
-                mkdir($logDir, 0755, true);
-            }
-
-            $timestamp = date('Y-m-d H:i:s');
-            $contractFlag = $contractUpdated ? 'CONTRACT_FULFILLED' : 'NO_CONTRACT';
-            $errorMsg = $error ? " Error: {$error}" : '';
-
-            $logEntry = sprintf(
-                "[%s] RECONCILE %s: Order=%s PaymentIntent=%s %s%s\n",
-                $timestamp,
-                $status,
-                $orderId,
-                $paymentIntentId,
-                $contractFlag,
-                $errorMsg
-            );
-
-            file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
-        } catch (\Throwable $e) {
-            // Silent fail for logging
+        if ($this->fileLogger === null) {
+            return;
         }
+
+        $contractFlag = $contractUpdated ? 'CONTRACT_FULFILLED' : 'NO_CONTRACT';
+        $errorMsg = $error !== null ? " Error: {$error}" : '';
+
+        $message = sprintf(
+            '%s: Order=%s PaymentIntent=%s %s%s',
+            $status,
+            $orderId,
+            $paymentIntentId,
+            $contractFlag,
+            $errorMsg
+        );
+
+        $this->fileLogger->log($message);
     }
 }

@@ -15,11 +15,11 @@ use OxidSolutionCatalysts\Payments\Component\Adapter\Response\PaymentDetailsResp
 use OxidSolutionCatalysts\Payments\Component\Contract\ContractState;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\OxpaidReconciliationService;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ReconciliationResult;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\LoggerInterface;
 
 /**
  * Unit tests for OxpaidReconciliationService
@@ -28,6 +28,8 @@ use Psr\Log\LoggerInterface;
  *
  * @covers \OxidSolutionCatalysts\Payments\Stripe\Service\OxpaidReconciliationService
  * @group sprint-10
+ * @group sprint-14
+ * @group sprint-15
  * @group reconciliation
  */
 class OxpaidReconciliationServiceTest extends TestCase
@@ -35,7 +37,7 @@ class OxpaidReconciliationServiceTest extends TestCase
     private Connection $connection;
     private StripeAdapterFactoryInterface $adapterFactory;
     private ContractRepositoryInterface $contractRepository;
-    private LoggerInterface $logger;
+    private FileLoggerInterface $fileLogger;  // Sprint 14: LSP - type-hint interface
     private OxpaidReconciliationService $service;
 
     protected function setUp(): void
@@ -45,13 +47,14 @@ class OxpaidReconciliationServiceTest extends TestCase
         $this->connection = $this->createMock(Connection::class);
         $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
+        // Sprint 14: Mock FileLogger - prevents tests writing to production log files
+        $this->fileLogger = $this->createMock(FileLoggerInterface::class);
 
         $this->service = new OxpaidReconciliationService(
             $this->connection,
             $this->adapterFactory,
             $this->contractRepository,
-            $this->logger
+            $this->fileLogger  // Sprint 14: Inject mock - tests isolated from filesystem
         );
     }
 
@@ -106,12 +109,72 @@ class OxpaidReconciliationServiceTest extends TestCase
 
     /**
      * @test
+     * Sprint 15: NO_CONTRACT is ERROR - contract is required for reconciliation
+     */
+    public function reconcileOrderFailsWithoutContract(): void
+    {
+        $orderId = 'test_order_no_contract';
+        $paymentIntentId = 'pi_no_contract';
+
+        // Given: No contract exists
+        $this->contractRepository
+            ->method('findByProviderOrderId')
+            ->with($paymentIntentId)
+            ->willReturn(null);
+
+        // Should NOT call Stripe API without contract
+        $this->adapterFactory
+            ->expects($this->never())
+            ->method('createDefaultAdapter');
+
+        // Should NOT update OXPAID without contract
+        $this->connection
+            ->expects($this->never())
+            ->method('update');
+
+        // Should log error
+        $this->fileLogger
+            ->expects($this->once())
+            ->method('log')
+            ->with($this->stringContains('ERROR'));
+
+        // When: Reconcile order
+        $result = $this->service->reconcileOrder($orderId, $paymentIntentId);
+
+        // Then: Error - contract required
+        $this->assertFalse($result->success);
+        $this->assertEquals('no_contract', $result->action);
+        $this->assertStringContains('No contract found', $result->reason);
+    }
+
+    /**
+     * @test
+     * Sprint 15: OXPAID is only updated when contract exists and is COMMITTED
      */
     public function reconcileOrderUpdatesOxpaidWhenPaymentIsCaptured(): void
     {
         $orderId = 'test_order_123';
         $paymentIntentId = 'pi_test_456';
         $capturedAt = new \DateTimeImmutable('2025-12-05 10:30:00');
+
+        // Given: Contract in COMMITTED state (required)
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract
+            ->method('getState')
+            ->willReturn(ContractState::committed());
+        $contract
+            ->expects($this->once())
+            ->method('fulfill');
+
+        $this->contractRepository
+            ->method('findByProviderOrderId')
+            ->with($paymentIntentId)
+            ->willReturn($contract);
+
+        $this->contractRepository
+            ->expects($this->once())
+            ->method('save')
+            ->with($contract);
 
         // Mock adapter factory to return adapter
         $adapter = $this->createMock(PaymentAdapterInterface::class);
@@ -149,26 +212,31 @@ class OxpaidReconciliationServiceTest extends TestCase
                 ['OXID' => $orderId]
             );
 
-        // No contract found
-        $this->contractRepository
-            ->method('findByProviderOrderId')
-            ->willReturn(null);
-
         $result = $this->service->reconcileOrder($orderId, $paymentIntentId);
 
         $this->assertInstanceOf(ReconciliationResult::class, $result);
         $this->assertTrue($result->success);
         $this->assertEquals('updated', $result->action);
-        $this->assertFalse($result->contractUpdated);
+        $this->assertTrue($result->contractUpdated);
     }
 
     /**
      * @test
+     * Sprint 15: Skips when payment not captured (but contract exists)
      */
     public function reconcileOrderSkipsWhenPaymentNotCaptured(): void
     {
         $orderId = 'test_order_123';
         $paymentIntentId = 'pi_test_456';
+
+        // Contract is required
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getState')->willReturn(ContractState::committed());
+
+        $this->contractRepository
+            ->method('findByProviderOrderId')
+            ->with($paymentIntentId)
+            ->willReturn($contract);
 
         $adapter = $this->createMock(PaymentAdapterInterface::class);
         $this->adapterFactory
@@ -207,11 +275,21 @@ class OxpaidReconciliationServiceTest extends TestCase
 
     /**
      * @test
+     * Sprint 15: API errors are handled (with contract)
      */
     public function reconcileOrderHandlesApiError(): void
     {
         $orderId = 'test_order_123';
         $paymentIntentId = 'pi_test_456';
+
+        // Contract is required
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getState')->willReturn(ContractState::committed());
+
+        $this->contractRepository
+            ->method('findByProviderOrderId')
+            ->with($paymentIntentId)
+            ->willReturn($contract);
 
         $adapter = $this->createMock(PaymentAdapterInterface::class);
         $this->adapterFactory
@@ -347,6 +425,7 @@ class OxpaidReconciliationServiceTest extends TestCase
 
     /**
      * @test
+     * Sprint 15: reconcileAll requires contracts for each order
      */
     public function reconcileAllProcessesAllOrders(): void
     {
@@ -358,6 +437,16 @@ class OxpaidReconciliationServiceTest extends TestCase
         $this->connection
             ->method('fetchAllAssociative')
             ->willReturn($orders);
+
+        // Both orders have contracts in COMMITTED state
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract
+            ->method('getState')
+            ->willReturn(ContractState::committed());
+
+        $this->contractRepository
+            ->method('findByProviderOrderId')
+            ->willReturn($contract);
 
         $adapter = $this->createMock(PaymentAdapterInterface::class);
         $this->adapterFactory
@@ -383,15 +472,42 @@ class OxpaidReconciliationServiceTest extends TestCase
             ->method('getPaymentDetails')
             ->willReturn($paymentDetails);
 
-        $this->contractRepository
-            ->method('findByProviderOrderId')
-            ->willReturn(null);
-
         $results = $this->service->reconcileAll(7, false);
 
         $this->assertCount(2, $results);
         $this->assertTrue($results[0]->success);
         $this->assertTrue($results[1]->success);
+    }
+
+    /**
+     * @test
+     * Sprint 15: reconcileAll skips orders without contracts
+     */
+    public function reconcileAllFailsOrdersWithoutContracts(): void
+    {
+        $orders = [
+            ['OXID' => 'order1', 'OXTRANSID' => 'pi_111', 'OXORDERNR' => 1, 'OXORDERDATE' => '2025-12-05'],
+        ];
+
+        $this->connection
+            ->method('fetchAllAssociative')
+            ->willReturn($orders);
+
+        // No contract found
+        $this->contractRepository
+            ->method('findByProviderOrderId')
+            ->willReturn(null);
+
+        // Should NOT call Stripe API
+        $this->adapterFactory
+            ->expects($this->never())
+            ->method('createDefaultAdapter');
+
+        $results = $this->service->reconcileAll(7, false);
+
+        $this->assertCount(1, $results);
+        $this->assertFalse($results[0]->success);
+        $this->assertEquals('no_contract', $results[0]->action);
     }
 
     /**
