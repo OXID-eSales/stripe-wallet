@@ -28,11 +28,13 @@ final class WebhookControllerTest extends TestCase
         $this->processor = $this->createMock(WebhookProcessorInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
-        $this->controller = new WebhookController(
+        // Use anonymous class to test abstract WebhookController
+        $this->controller = new class (
             $this->signatureVerifier,
             $this->processor,
             $this->logger
-        );
+        ) extends WebhookController {
+        };
     }
 
     public function testHandlesValidWebhookRequest(): void

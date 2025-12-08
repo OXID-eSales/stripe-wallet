@@ -8,7 +8,7 @@ use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookProcessorInterface;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookSignatureVerifierInterface;
 use Psr\Log\LoggerInterface;
 
-class WebhookController implements WebhookControllerInterface
+abstract class WebhookController implements WebhookControllerInterface
 {
     public function __construct(
         private readonly WebhookSignatureVerifierInterface $signatureVerifier,

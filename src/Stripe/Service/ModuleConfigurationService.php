@@ -9,10 +9,11 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Service;
 
-use OxidEsales\Eshop\Core\Config;
+use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Dao\ModuleConfigurationDaoInterface;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\DataObject\ModuleConfiguration;
 use OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface;
+use OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\ServiceInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Module;
 use Throwable;
@@ -45,19 +46,20 @@ use Throwable;
  */
 class ModuleConfigurationService implements ServiceInterface
 {
-    private ModuleConfiguration $config;
+    private ModuleConfiguration $moduleConfig;
 
     public function __construct(
         private ContextInterface $context,
         private ModuleConfigurationDaoInterface $moduleConfigurationDao,
+        private ?ShopAdapterInterface $shopAdapter = null,
     ) {
-        $this->config = $this->moduleConfigurationDao->get(Module::MODULE_ID, $this->context->getCurrentShopId());
+        $this->moduleConfig = $this->moduleConfigurationDao->get(Module::MODULE_ID, $this->context->getCurrentShopId());
     }
 
     public function get(string $name): mixed
     {
         try {
-            return $this->config->getModuleSetting($name)->getValue();
+            return $this->moduleConfig->getModuleSetting($name)->getValue();
         } catch (Throwable $e) {
             return '';
         }
@@ -235,11 +237,30 @@ class ModuleConfigurationService implements ServiceInterface
 
     /**
      * Get the webhook URL for Stripe configuration
+     *
+     * Uses ShopAdapterInterface if injected (LSP), falls back to Registry for backward compatibility.
      */
     public function getWebhookUrl(): string
     {
-        $shopUrl = $this->config->getShopUrl();
+        $shopUrl = $this->getShopBaseUrl();
         return rtrim($shopUrl, '/') . '/index.php?cl=osc_stripe_webhook';
+    }
+
+    /**
+     * Get shop base URL using adapter or fallback to Registry
+     *
+     * Follows Dependency Inversion Principle:
+     * - Prefers injected ShopAdapterInterface (testable, LSP-compliant)
+     * - Falls back to Registry for backward compatibility
+     */
+    private function getShopBaseUrl(): string
+    {
+        if ($this->shopAdapter !== null) {
+            return $this->shopAdapter->getShopUrl();
+        }
+
+        // Fallback for backward compatibility when adapter not injected
+        return Registry::getConfig()->getShopUrl();
     }
 
     /**

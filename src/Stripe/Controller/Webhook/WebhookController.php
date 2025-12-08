@@ -34,16 +34,23 @@ class WebhookController extends FrontendController
 
     /**
      * Initialize services
+     *
+     * Uses Symfony DI container for services with constructor dependencies.
+     * Registry::get() does NOT support dependency injection.
      */
     public function init(): void
     {
         parent::init();
 
-        $this->config = Registry::get(ModuleConfigurationService::class);
+        // Use DI container for services with constructor dependencies
+        $container = ContainerFactory::getInstance()->getContainer();
 
-        // Webhook service is optional (requires implementation)
+        // ModuleConfigurationService requires DI (ContextInterface, ModuleConfigurationDaoInterface)
+        $this->config = $container->get(ModuleConfigurationService::class);
+
+        // WebhookProcessingService requires DI (multiple dependencies)
         try {
-            $this->webhookService = Registry::get(WebhookProcessingService::class);
+            $this->webhookService = $container->get(WebhookProcessingService::class);
         } catch (\Exception $e) {
             // Service not yet implemented, use basic processing
             Registry::getLogger()->debug('WebhookProcessingService not available, using basic processing');
@@ -51,7 +58,6 @@ class WebhookController extends FrontendController
 
         // Sprint 7 Phase 4: Use WebhookLogService for proper layering
         try {
-            $container = ContainerFactory::getInstance()->getContainer();
             $this->webhookLogService = $container->get(WebhookLogServiceInterface::class);
         } catch (\Exception $e) {
             Registry::getLogger()->debug('WebhookLogService not available');

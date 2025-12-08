@@ -8,6 +8,7 @@ use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Dao\Module
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\DataObject\ModuleConfiguration;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Setting\Setting as ModuleSetting;
 use OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface;
+use OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Module;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use PHPUnit\Framework\TestCase;
@@ -23,6 +24,7 @@ class ModuleConfigurationServiceTest extends TestCase
     private ContextInterface&MockObject $context;
     private ModuleConfigurationDaoInterface&MockObject $moduleConfigDao;
     private ModuleConfiguration&MockObject $moduleConfig;
+    private ShopAdapterInterface&MockObject $shopAdapter;
 
     protected function setUp(): void
     {
@@ -42,8 +44,16 @@ class ModuleConfigurationServiceTest extends TestCase
             ->with(Module::MODULE_ID, 1)
             ->willReturn($this->moduleConfig);
 
-        // Create service under test
-        $this->service = new ModuleConfigurationService($this->context, $this->moduleConfigDao);
+        // Mock ShopAdapterInterface (LSP - use interface, not concrete class)
+        $this->shopAdapter = $this->createMock(ShopAdapterInterface::class);
+        $this->shopAdapter->method('getShopUrl')->willReturn('https://test-shop.local/');
+
+        // Create service under test (with ShopAdapter injected via DI)
+        $this->service = new ModuleConfigurationService(
+            $this->context,
+            $this->moduleConfigDao,
+            $this->shopAdapter
+        );
     }
 
     /**
@@ -685,5 +695,103 @@ class ModuleConfigurationServiceTest extends TestCase
 
         // Then: Returns null (no error)
         $this->assertNull($result);
+    }
+
+    // =========================================================================
+    // Sprint 13: Webhook URL Tests (TDD RED → GREEN)
+    // =========================================================================
+
+    /**
+     * Test 35: getWebhookUrl returns non-empty string
+     *
+     * @group webhook-url
+     * @group sprint-13
+     */
+    public function testGetWebhookUrlReturnsNonEmptyString(): void
+    {
+        // Given: Service is configured (no special settings needed)
+        $this->configureSettings([]);
+
+        // When: getWebhookUrl() called
+        $result = $this->service->getWebhookUrl();
+
+        // Then: Returns non-empty URL
+        $this->assertNotEmpty($result, 'Webhook URL should not be empty');
+        $this->assertIsString($result);
+    }
+
+    /**
+     * Test 36: getWebhookUrl contains webhook controller parameter
+     *
+     * @group webhook-url
+     * @group sprint-13
+     */
+    public function testGetWebhookUrlContainsWebhookController(): void
+    {
+        // Given: Service is configured
+        $this->configureSettings([]);
+
+        // When: getWebhookUrl() called
+        $result = $this->service->getWebhookUrl();
+
+        // Then: URL contains controller parameter for webhook
+        $this->assertStringContainsString('cl=', $result);
+        $this->assertStringContainsString('webhook', $result);
+    }
+
+    /**
+     * Test 37: getWebhookUrl starts with http scheme
+     *
+     * @group webhook-url
+     * @group sprint-13
+     */
+    public function testGetWebhookUrlStartsWithHttpScheme(): void
+    {
+        // Given: Service is configured
+        $this->configureSettings([]);
+
+        // When: getWebhookUrl() called
+        $result = $this->service->getWebhookUrl();
+
+        // Then: URL starts with http:// or https://
+        $startsWithHttp = str_starts_with($result, 'http://') || str_starts_with($result, 'https://');
+        $this->assertTrue($startsWithHttp, "URL '{$result}' must start with http:// or https://");
+    }
+
+    /**
+     * Test 38: getWebhookUrl does not have double slashes (except in scheme)
+     *
+     * @group webhook-url
+     * @group sprint-13
+     */
+    public function testGetWebhookUrlNoDoubleSlashes(): void
+    {
+        // Given: Service is configured
+        $this->configureSettings([]);
+
+        // When: getWebhookUrl() called
+        $result = $this->service->getWebhookUrl();
+
+        // Then: No double slashes except in http://
+        $urlWithoutScheme = preg_replace('#^https?://#', '', $result);
+        $this->assertStringNotContainsString('//', $urlWithoutScheme);
+    }
+
+    /**
+     * Test 39: getWebhookUrl uses stripe_webhook controller
+     *
+     * @group webhook-url
+     * @group sprint-13
+     */
+    public function testGetWebhookUrlUsesStripeWebhookController(): void
+    {
+        // Given: Service is configured
+        $this->configureSettings([]);
+
+        // When: getWebhookUrl() called
+        $result = $this->service->getWebhookUrl();
+
+        // Then: URL uses osc_stripe_webhook controller (as registered in metadata.php)
+        $this->assertStringContainsString('cl=osc_stripe_webhook', $result);
     }
 }

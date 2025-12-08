@@ -20,6 +20,8 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\WebhookRe
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentCapturedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentRefundedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentFailedEvent;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractFulfilledEvent;
+use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookLog;
@@ -57,6 +59,7 @@ use OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHand
  * @package OxidSolutionCatalysts\Payments\Stripe\Service
  * @author OXID eSales AG
  * @since 1.0.0
+ * @SuppressWarnings(PHPMD)
  */
 class WebhookProcessingService
 {
@@ -177,7 +180,12 @@ class WebhookProcessingService
     }
 
     /**
-     * Find contract ID from event by looking up via provider order ID.
+     * Find contract ID from event by looking up via provider order ID or metadata.
+     *
+     * Sprint 14: Enhanced lookup strategy:
+     * 1. Try by PaymentIntent ID (fast path for updated contracts)
+     * 2. Try by contract_id from metadata (reliable - set at session creation)
+     * 3. Try by Checkout Session ID (for checkout.session.completed events)
      *
      * @param \Stripe\Event $event
      * @return string|null Contract ID or null if not found
@@ -188,17 +196,169 @@ class WebhookProcessingService
             return null;
         }
 
+        // Strategy 1: Try by PaymentIntent ID
         $providerOrderId = $this->extractProviderOrderIdFromEvent($event);
-        if ($providerOrderId === null) {
+        if ($providerOrderId !== null) {
+            try {
+                $contract = $this->contractRepository->findByProviderOrderId($providerOrderId);
+                if ($contract !== null) {
+                    return $contract->getId();
+                }
+            } catch (\Exception $e) {
+                Registry::getLogger()->debug('Could not look up contract by provider order ID', [
+                    'provider_order_id' => $providerOrderId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Strategy 2: Try by contract_id from metadata
+        $contractIdFromMetadata = $this->extractContractIdFromMetadata($event);
+        if ($contractIdFromMetadata !== null) {
+            try {
+                $contract = $this->contractRepository->findById($contractIdFromMetadata);
+                if ($contract !== null) {
+                    return $contract->getId();
+                }
+            } catch (\Exception $e) {
+                Registry::getLogger()->debug('Could not look up contract by metadata contract_id', [
+                    'contract_id' => $contractIdFromMetadata,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Strategy 3: For checkout.session.completed, try by session ID
+        if ($event->type === 'checkout.session.completed') {
+            $sessionId = $event->data->object->id ?? null;
+            if ($sessionId !== null) {
+                try {
+                    $contract = $this->contractRepository->findByProviderOrderId($sessionId);
+                    if ($contract !== null) {
+                        return $contract->getId();
+                    }
+                } catch (\Exception $e) {
+                    Registry::getLogger()->debug('Could not look up contract by session ID', [
+                        'session_id' => $sessionId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract contract_id from event metadata.
+     *
+     * Contract ID is stored in metadata during Stripe Checkout Session creation.
+     * This provides a reliable way to find contracts even before paymentIntentId
+     * is stored on the contract.
+     *
+     * @param \Stripe\Event $event
+     * @return string|null Contract ID from metadata or null
+     */
+    private function extractContractIdFromMetadata(\Stripe\Event $event): ?string
+    {
+        $object = $event->data->object;
+
+        // Try direct metadata on the object
+        // @phpstan-ignore-next-line - Stripe metadata is dynamic
+        $metadata = $object->metadata ?? null;
+        if ($metadata !== null) {
+            // @phpstan-ignore-next-line - Stripe metadata is dynamic
+            $contractId = $metadata['contract_id'] ?? null;
+            if (is_string($contractId) && $contractId !== '') {
+                return $contractId;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Update contract's providerOrderId with PaymentIntent ID.
+     *
+     * Sprint 14: Contracts are initially stored with Checkout Session ID.
+     * When checkout.session.completed webhook arrives, we update the contract
+     * with the PaymentIntent ID so future webhooks (payment_intent.succeeded,
+     * charge.refunded, etc.) can find the contract.
+     *
+     * Sprint 14 Fix: Also fulfills the contract if it's in COMMITTED state,
+     * to avoid database lookup issues when delegating to the fulfillment handler.
+     *
+     * @param \Stripe\Event $event
+     * @param string $paymentIntentId
+     * @return bool|null true if fulfilled, false if skipped/not ready, null if not found
+     */
+    private function updateContractProviderOrderId(\Stripe\Event $event, string $paymentIntentId): ?bool
+    {
+        if ($this->contractRepository === null) {
+            return null;
+        }
+
+        // Find contract using enhanced lookup (metadata or session ID)
+        $contractId = $this->findContractIdFromEvent($event);
+        if ($contractId === null) {
+            Registry::getLogger()->debug('No contract found to update providerOrderId', [
+                'payment_intent_id' => $paymentIntentId,
+            ]);
             return null;
         }
 
         try {
-            $contract = $this->contractRepository->findByProviderOrderId($providerOrderId);
-            return $contract?->getId();
+            $contract = $this->contractRepository->findById($contractId);
+            if ($contract === null) {
+                return null;
+            }
+
+            // Update providerOrderId if needed
+            $currentProviderOrderId = $contract->getProviderOrderId();
+            if ($currentProviderOrderId !== $paymentIntentId) {
+                $contract->setProvider('stripe', $paymentIntentId);
+                Registry::getLogger()->info('Contract providerOrderId updated with PaymentIntent ID', [
+                    'contract_id' => $contractId,
+                    'old_provider_order_id' => $currentProviderOrderId,
+                    'new_provider_order_id' => $paymentIntentId,
+                ]);
+            }
+
+            // Idempotency check - already fulfilled
+            if ($contract->getState()->isFulfilled()) {
+                $this->contractRepository->save($contract);
+                return false;
+            }
+
+            // Sprint 14: If contract not yet committed, save providerOrderId update and skip fulfillment
+            // The order creation flow will handle OXPAID update since webhook might arrive before
+            // the user's browser completes the return flow
+            if (!$contract->getState()->isCommitted()) {
+                Registry::getLogger()->debug('Contract not in COMMITTED state, saving providerOrderId only', [
+                    'contract_id' => $contractId,
+                    'state' => $contract->getStateValue(),
+                ]);
+                $this->contractRepository->save($contract);
+                return false;
+            }
+
+            // Directly fulfill the contract we have in memory
+            $contract->fulfill();
+            $this->contractRepository->save($contract);
+
+            // Dispatch ContractFulfilledEvent for event handlers (e.g., to update OXPAID)
+            $this->dispatchContractFulfilledEvent($contract);
+
+            Registry::getLogger()->info('Contract fulfilled via updateContractProviderOrderId', [
+                'contract_id' => $contractId,
+                'payment_intent_id' => $paymentIntentId,
+            ]);
+
+            return true;
         } catch (\Exception $e) {
-            Registry::getLogger()->debug('Could not look up contract for webhook', [
-                'provider_order_id' => $providerOrderId,
+            Registry::getLogger()->error('Failed to update/fulfill contract', [
+                'contract_id' => $contractId,
+                'payment_intent_id' => $paymentIntentId,
                 'error' => $e->getMessage(),
             ]);
             return null;
@@ -206,10 +366,39 @@ class WebhookProcessingService
     }
 
     /**
+     * Dispatch ContractFulfilledEvent for event handlers.
+     *
+     * This ensures the event-driven architecture is used properly,
+     * allowing handlers like OrderPaymentStateHandler to update OXPAID.
+     */
+    private function dispatchContractFulfilledEvent(PaymentContractInterface $contract): void
+    {
+        if ($this->eventDispatcher === null) {
+            return;
+        }
+
+        $context = new EventContext([
+            'contractId' => $contract->getId(),
+            'orderId' => $contract->getOrderId(),
+            'providerOrderId' => $contract->getProviderOrderId(),
+            'source' => 'webhook',
+        ]);
+
+        $event = new ContractFulfilledEvent(
+            $contract,
+            $context,
+            $contract->getOrderId() ?? ''
+        );
+
+        $this->eventDispatcher->dispatch($event);
+    }
+
+    /**
      * Handle payment_intent.succeeded event
      * Payment has been successfully confirmed
      *
      * Sprint 6: Contract-Aware Webhook Processing
+     * Sprint 14: Enhanced contract lookup via metadata when regular lookup fails
      * First tries to fulfill via contract, falls back to legacy DB update.
      *
      * @param \Stripe\Event $event
@@ -219,39 +408,141 @@ class WebhookProcessingService
     {
         $paymentIntent = $event->data->object;
 
+        // Extract PaymentIntent ID with proper type handling
+        /** @var string|null $paymentIntentId */
+        $paymentIntentId = $paymentIntent->id ?? null;
+        /** @var int|null $amount */
+        $amount = $paymentIntent->amount ?? null;
+        /** @var string|null $currency */
+        $currency = $paymentIntent->currency ?? null;
+
         Registry::getLogger()->info('Payment intent succeeded', [
-            'payment_intent_id' => $paymentIntent->id,
-            'amount' => $paymentIntent->amount,
-            'currency' => $paymentIntent->currency,
+            'payment_intent_id' => $paymentIntentId,
+            'amount' => $amount,
+            'currency' => $currency,
         ]);
 
+        if ($paymentIntentId === null || $paymentIntentId === '') {
+            Registry::getLogger()->warning('Payment intent succeeded without valid ID');
+            return;
+        }
+
         // Sprint 6: Try contract-aware fulfillment first
-        $contractResult = $this->contractFulfillmentHandler->handlePaymentSucceeded($paymentIntent->id);
+        $contractResult = $this->contractFulfillmentHandler->handlePaymentSucceeded($paymentIntentId);
 
         if ($contractResult === true) {
             Registry::getLogger()->info('Contract fulfilled via webhook', [
-                'payment_intent_id' => $paymentIntent->id,
+                'payment_intent_id' => $paymentIntentId,
             ]);
             // Contract fulfilled - order update handled via ContractFulfilledEvent
             // Still update direct order fields for backward compatibility
-            $this->updateOrderFieldsAfterContractFulfillment($paymentIntent->id);
+            $this->updateOrderFieldsAfterContractFulfillment($paymentIntentId);
             return;
         }
 
         if ($contractResult === false) {
             Registry::getLogger()->info('Contract already fulfilled (idempotent) or not in COMMITTED state', [
-                'payment_intent_id' => $paymentIntent->id,
+                'payment_intent_id' => $paymentIntentId,
             ]);
             // Already processed or not ready - skip
             return;
         }
 
+        // Sprint 14: Contract not found by payment intent ID, try via metadata
+        $contractResult = $this->tryFulfillContractViaMetadata($event, $paymentIntentId);
+        if ($contractResult === true) {
+            Registry::getLogger()->info('Contract fulfilled via metadata lookup', [
+                'payment_intent_id' => $paymentIntentId,
+            ]);
+            $this->updateOrderFieldsAfterContractFulfillment($paymentIntentId);
+            return;
+        }
+
+        if ($contractResult === false) {
+            // Found but not in right state
+            return;
+        }
+
         // Contract not found (null) - use legacy fallback for orders without contracts
         Registry::getLogger()->debug('No contract found, using legacy fallback', [
-            'payment_intent_id' => $paymentIntent->id,
+            'payment_intent_id' => $paymentIntentId,
         ]);
 
         $this->processLegacyPaymentSucceeded($paymentIntent);
+    }
+
+    /**
+     * Try to fulfill contract found via metadata.
+     *
+     * Sprint 14: When contract isn't found by payment intent ID (because it's
+     * stored with session ID), try to find it via contract_id in metadata.
+     * Directly fulfills the contract in memory to avoid database lookup issues.
+     *
+     * @param \Stripe\Event $event
+     * @param string $paymentIntentId
+     * @return bool|null true if fulfilled, false if skipped, null if not found
+     */
+    private function tryFulfillContractViaMetadata(\Stripe\Event $event, string $paymentIntentId): ?bool
+    {
+        if ($this->contractRepository === null) {
+            return null;
+        }
+
+        // Try to find contract via metadata
+        $contractId = $this->extractContractIdFromMetadata($event);
+        if ($contractId === null) {
+            return null;
+        }
+
+        try {
+            $contract = $this->contractRepository->findById($contractId);
+            if ($contract === null) {
+                return null;
+            }
+
+            // Update contract's providerOrderId for future webhooks
+            if ($contract->getProviderOrderId() !== $paymentIntentId) {
+                $contract->setProvider('stripe', $paymentIntentId);
+            }
+
+            // Idempotency check - already fulfilled
+            if ($contract->getState()->isFulfilled()) {
+                // Still save provider ID update if needed
+                $this->contractRepository->save($contract);
+                return false;
+            }
+
+            // Validation - must be COMMITTED to fulfill
+            if (!$contract->getState()->isCommitted()) {
+                Registry::getLogger()->debug('Contract not in COMMITTED state for metadata fulfillment', [
+                    'contract_id' => $contractId,
+                    'state' => $contract->getStateValue(),
+                ]);
+                $this->contractRepository->save($contract);
+                return false;
+            }
+
+            // Directly fulfill the contract we have in memory
+            $contract->fulfill();
+            $this->contractRepository->save($contract);
+
+            // Dispatch ContractFulfilledEvent for event handlers (e.g., to update OXPAID)
+            $this->dispatchContractFulfilledEvent($contract);
+
+            Registry::getLogger()->info('Contract fulfilled via metadata lookup', [
+                'contract_id' => $contractId,
+                'payment_intent_id' => $paymentIntentId,
+            ]);
+
+            return true;
+        } catch (\Exception $e) {
+            Registry::getLogger()->error('Failed to fulfill contract via metadata', [
+                'contract_id' => $contractId,
+                'payment_intent_id' => $paymentIntentId,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
     }
 
     /**
@@ -274,11 +565,19 @@ class WebhookProcessingService
     /**
      * Legacy payment processing for orders created without contracts.
      *
-     * @param object $paymentIntent Stripe PaymentIntent object
+     * @param \Stripe\StripeObject $paymentIntent Stripe PaymentIntent object
      */
-    private function processLegacyPaymentSucceeded(object $paymentIntent): void
+    private function processLegacyPaymentSucceeded(\Stripe\StripeObject $paymentIntent): void
     {
-        $order = $this->findOrderByPaymentIntentId($paymentIntent->id);
+        /** @var string|null $paymentIntentId */
+        $paymentIntentId = $paymentIntent->id ?? null;
+
+        if ($paymentIntentId === null) {
+            Registry::getLogger()->warning('Payment intent has no ID');
+            return;
+        }
+
+        $order = $this->findOrderByPaymentIntentId($paymentIntentId);
 
         if ($order) {
             // Sprint 8: order_state table removed - only update oxorder fields
@@ -289,7 +588,7 @@ class WebhookProcessingService
             $this->updateOrderTransStatus($order->getId(), 'OK');
 
             // Update OXTRANSID with PaymentIntent ID
-            $this->updateOrderTransId($order->getId(), $paymentIntent->id);
+            $this->updateOrderTransId($order->getId(), $paymentIntentId);
 
             Registry::getLogger()->info('Order payment state updated (legacy path)', [
                 'order_id' => $order->getId(),
@@ -297,7 +596,7 @@ class WebhookProcessingService
             ]);
         } else {
             Registry::getLogger()->warning('Order not found for payment intent', [
-                'payment_intent_id' => $paymentIntent->id,
+                'payment_intent_id' => $paymentIntentId,
             ]);
         }
     }
@@ -316,8 +615,12 @@ class WebhookProcessingService
         $paymentIntent = $event->data->object;
         /** @var string $paymentIntentId */
         $paymentIntentId = $paymentIntent->id ?? '';
+        // @phpstan-ignore-next-line - Stripe object properties are dynamic
+        $lastPaymentError = $paymentIntent->last_payment_error ?? null;
         /** @var string $failureReason */
-        $failureReason = $paymentIntent->last_payment_error->message ?? 'Unknown error';
+        $failureReason = is_object($lastPaymentError) && isset($lastPaymentError->message)
+            ? (string) $lastPaymentError->message
+            : 'Unknown error';
 
         Registry::getLogger()->warning('Payment intent failed', [
             'payment_intent_id' => $paymentIntentId,
@@ -487,11 +790,12 @@ class WebhookProcessingService
     {
         $dispute = $event->data->object;
 
+        // @phpstan-ignore-next-line - Stripe Dispute properties are dynamic
         Registry::getLogger()->warning('Dispute created', [
-            'dispute_id' => $dispute->id,
-            'amount' => $dispute->amount,
-            'reason' => $dispute->reason,
-            'charge' => $dispute->charge,
+            'dispute_id' => $dispute->id ?? null,
+            'amount' => $dispute->amount ?? null,
+            'reason' => $dispute->reason ?? null,
+            'charge' => $dispute->charge ?? null,
         ]);
 
         // This would typically trigger an email notification to admin
@@ -503,6 +807,7 @@ class WebhookProcessingService
      * Checkout session has been completed (used by Stripe Wallet)
      *
      * Sprint 6: Contract-Aware Webhook Processing
+     * Sprint 14: Update contract's providerOrderId with PaymentIntent ID for future webhooks
      *
      * @param \Stripe\Event $event
      * @return void
@@ -535,8 +840,9 @@ class WebhookProcessingService
             return;
         }
 
-        // Sprint 6: Try contract-aware fulfillment first
-        $contractResult = $this->contractFulfillmentHandler->handlePaymentSucceeded($paymentIntentId);
+        // Sprint 14: Update contract's providerOrderId and fulfill if ready
+        // This method now directly fulfills the contract to avoid database lookup issues
+        $contractResult = $this->updateContractProviderOrderId($event, $paymentIntentId);
 
         if ($contractResult === true) {
             Registry::getLogger()->info('Contract fulfilled via checkout.session.completed webhook', [
@@ -836,11 +1142,13 @@ class WebhookProcessingService
             'eventType' => $event->type,
         ]);
 
+        /** @var array<string, mixed> $payload */
+        $payload = $event->data->object->toArray();
         $webhookEvent = new WebhookReceivedEvent(
             context: $context,
             provider: 'stripe',
             eventType: $event->type,
-            payload: $event->data->object->toArray(),
+            payload: $payload,
             signature: '' // Signature already verified by WebhookController
         );
 

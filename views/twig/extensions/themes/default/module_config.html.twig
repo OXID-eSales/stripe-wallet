@@ -71,14 +71,23 @@
             </dd>
         </dl>
     {% elseif module_var == 'sStripeWebhookEndpoint' %}
-        <dl>
-            <dt>{{ translate({ ident: "SHOP_MODULE_" ~ module_var }) }}</dt>
-            <dd>
-                <input type="text" readonly disabled id="{{ module_var }}" class="txt" style="width: 250px;" name="confstr[{{ module_var }}]" value="{{ confstrs[module_var] }}" />
-                <span style="margin-left: 1em;">{{ translate({ ident: "STRIPE_WEBHOOK_SET" }) }}</span>
-            </dd>
-        </dl>
+        {# Skip - URL is auto-generated, not needed in UI #}
     {% elseif module_var == 'sStripeWebhookEndpointSecret' %}
+        <dl>
+            <dt>
+                <input type="text" class="txt" style="width: 350px;" name="confstrs[{{ module_var }}]" value="{{ confstrs[module_var] }}" {{ readonly }} placeholder="whsec_...">
+                {% include "inputhelp.html.twig" with {'sHelpId': help_id("HELP_SHOP_MODULE_" ~ module_var), 'sHelpText': help_text("HELP_SHOP_MODULE_" ~ module_var)} %}
+            </dt>
+            <dd style="white-space: nowrap;">
+                <span style="float:left;">{{ translate({ ident: "SHOP_MODULE_" ~ module_var }) }}</span>
+                {% if confstrs[module_var] %}
+                    <span style="margin-left: 1em; color: green;">&#10003; Configured</span>
+                {% else %}
+                    <span style="margin-left: 1em; color: orange;">&#9888; Not set - copy from Stripe Dashboard</span>
+                {% endif %}
+            </dd>
+            <div class="spacer"></div>
+        </dl>
     {% elseif module_var == 'sStripeTestKey' or module_var == 'sStripeLiveKey' %}
         <dl>
             <dt>

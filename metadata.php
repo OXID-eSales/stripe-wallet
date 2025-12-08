@@ -60,10 +60,9 @@ $aModule = [
     ],
     'controllers' => [
         'osc_stripe_payment' => StripePaymentController::class,
-        'osc_stripe_webhook' => WebhookController::class,
+        'osc_stripe_webhook' => StripeWebhookController::class,
         'paymentwatch_assumption' => AssumptionController::class,
         'StripeConnect' => StripeConnect::class,
-        'stripe_webhook' => StripeWebhookController::class,
         'stripe_order_refund' => OrderRefund::class,
         'orderController' => StripeOrderController::class,
     ],

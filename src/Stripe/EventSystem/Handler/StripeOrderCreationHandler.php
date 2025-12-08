@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
 
+use Doctrine\DBAL\Connection;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreateOrderRequest;
@@ -36,7 +37,8 @@ class StripeOrderCreationHandler implements HandlerInterface
 {
     public function __construct(
         private ContractRepositoryInterface $contractRepository,
-        private ShopOrderServiceInterface $shopOrderService
+        private ShopOrderServiceInterface $shopOrderService,
+        private Connection $connection
     ) {
     }
 
@@ -80,6 +82,7 @@ class StripeOrderCreationHandler implements HandlerInterface
         try {
             // Get session basket
             $basket = Registry::getSession()->getBasket();
+            /** @phpstan-ignore-next-line booleanNot.alwaysFalse - basket could be empty in edge cases */
             if (!$basket) {
                 Registry::getLogger()->error('StripeOrderCreationHandler: No basket in session');
                 $context->set('error', 'No basket found in session');
@@ -88,11 +91,19 @@ class StripeOrderCreationHandler implements HandlerInterface
 
             // Create order request
             // Note: CreateOrderRequest gets basket from session via getBasket() method
+            $paymentIntentId = $context->get('paymentIntentId');
+            $authorizationId = $context->get('authorizationId');
+            /** @var string|null $paymentTransactionId */
+            $paymentTransactionId = is_string($paymentIntentId) ? $paymentIntentId
+                : (is_string($authorizationId) ? $authorizationId : null);
+
+            /** @phpstan-ignore-next-line nullCoalesce.expr - getPaymentId can return null in edge cases */
+            $paymentId = $basket->getPaymentId() ?? 'oxidstripe';
             $request = new CreateOrderRequest(
                 sessionId: Registry::getSession()->getId(),
                 userId: $contract->getUserId(),
-                paymentId: $basket->getPaymentId() ?? 'oxidstripe',
-                paymentTransactionId: $context->get('paymentIntentId') ?? $context->get('authorizationId'),
+                paymentId: $paymentId,
+                paymentTransactionId: $paymentTransactionId,
                 orderRemark: null,
                 metadata: [
                     'contract_id' => $contract->getId(),
@@ -118,6 +129,10 @@ class StripeOrderCreationHandler implements HandlerInterface
             $context->set('orderId', $orderId);
             $context->set('orderNumber', $orderResponse->orderNumber);
 
+            // Sprint 14: Update OXPAID immediately since payment was confirmed
+            // This is the reliable path - webhook might arrive before contract is committed
+            $this->updateOrderPaidTimestamp($orderId, $contract->getProviderOrderId());
+
             // Dispatch committed event
             $committedEvent = new ContractCommittedEvent(
                 $contract,
@@ -132,6 +147,48 @@ class StripeOrderCreationHandler implements HandlerInterface
                 'trace' => $e->getTraceAsString(),
             ]);
             $context->set('error', 'Order creation failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Update OXPAID timestamp on the order.
+     *
+     * Sprint 14: Called immediately after order creation since payment was confirmed
+     * on Stripe. This is more reliable than waiting for webhook as it might arrive
+     * before the contract transitions to COMMITTED state.
+     */
+    private function updateOrderPaidTimestamp(string $orderId, ?string $providerOrderId): void
+    {
+        try {
+            // Update OXPAID to current time using PHP date to match OXID's timezone handling
+            $currentTime = date('Y-m-d H:i:s');
+            $sql = "UPDATE oxorder SET OXPAID = :paidTime WHERE OXID = :orderId AND OXPAID = '0000-00-00 00:00:00'";
+            $affected = $this->connection->executeStatement($sql, ['orderId' => $orderId, 'paidTime' => $currentTime]);
+
+            // Also update OXTRANSSTATUS to OK
+            $sql = "UPDATE oxorder SET OXTRANSSTATUS = 'OK' WHERE OXID = :orderId";
+            $this->connection->executeStatement($sql, ['orderId' => $orderId]);
+
+            // Update OXTRANSID if not already set
+            if ($providerOrderId !== null && $providerOrderId !== '') {
+                $sql = "UPDATE oxorder SET OXTRANSID = :transId WHERE OXID = :orderId AND (OXTRANSID IS NULL OR OXTRANSID = '')";
+                $this->connection->executeStatement($sql, [
+                    'orderId' => $orderId,
+                    'transId' => $providerOrderId,
+                ]);
+            }
+
+            if ($affected > 0) {
+                Registry::getLogger()->info('OXPAID updated in order creation flow', [
+                    'order_id' => $orderId,
+                    'provider_order_id' => $providerOrderId,
+                ]);
+            }
+        } catch (\Exception $e) {
+            Registry::getLogger()->error('Failed to update OXPAID in order creation', [
+                'order_id' => $orderId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 }
