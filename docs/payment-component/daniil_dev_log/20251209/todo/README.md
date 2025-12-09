@@ -33,11 +33,11 @@
 | Sprint 18 | Extract ContractFulfillmentService | HIGH | 3h | **DONE** |
 | [Sprint 19](sprint-19-stripe-adapter-routing.md) | Route Stripe SDK calls through adapter | HIGH | 4h | PENDING |
 | [Sprint 20](sprint-20-remove-request-modification.md) | Remove $_REQUEST modification | HIGH | 2h | PENDING |
-| [Sprint 21](sprint-21-refactor-fat-handlers.md) | Refactor fat handlers (RefundService) | MEDIUM | 4h | PENDING |
+| [Sprint 21](sprint-21-refactor-fat-handlers.md) | Refactor ALL fat handlers (6 handlers → services) | MEDIUM-HIGH | 16h | PENDING |
 | [Sprint 22](sprint-22-resolve-container-factory.md) | Resolve ContainerFactory usage | MEDIUM | 3h | PENDING |
 | [Sprint 23](sprint-23-documentation-updates.md) | Update architecture documentation | MEDIUM | 2h | PENDING |
 
-**Total Estimated Effort:** 25 hours
+**Total Estimated Effort:** 37 hours
 
 ---
 
@@ -69,10 +69,10 @@ Sprint 20: $_REQUEST Removal (HIGH)
     │
     └──► Improves: Security and testability
 
-Sprint 21: Fat Handler Refactoring (MEDIUM)
+Sprint 21: ALL Fat Handlers Refactoring (MEDIUM-HIGH)
     │
-    ├── Depends on: Sprint 18, 19 (service extraction pattern)
-    └──► Creates: RefundService, RefundOrchestrator
+    ├── Depends on: Sprint 18, 19, 20 (service extraction patterns)
+    └──► Creates: 8 new services (RefundService, CheckoutReturnService, etc.)
 
 Sprint 22: ContainerFactory Resolution (MEDIUM)
     │

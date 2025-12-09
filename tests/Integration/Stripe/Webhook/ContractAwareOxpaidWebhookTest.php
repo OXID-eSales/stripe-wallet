@@ -19,8 +19,11 @@ use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterf
 use OxidSolutionCatalysts\Payments\Component\Repository\DoctrineContractRepository;
 use OxidSolutionCatalysts\Payments\Component\Repository\DoctrineWebhookLogRepository;
 use OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentService;
+use OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandler;
 use OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService;
+use Psr\Log\NullLogger;
 
 /**
  * TDD Tests: Contract-Aware OXPAID Update via Webhooks
@@ -70,6 +73,8 @@ final class ContractAwareOxpaidWebhookTest extends IntegrationTestCase
     /**
      * Create WebhookProcessingService manually with dependencies.
      * Uses direct instantiation to work in CI without module activation.
+     *
+     * Sprint 18: Updated to use ContractFulfillmentService
      */
     private function createWebhookProcessingService($container): WebhookProcessingService
     {
@@ -80,18 +85,27 @@ final class ContractAwareOxpaidWebhookTest extends IntegrationTestCase
         // Direct instantiation for EventDispatcher (CI compatibility - module not activated)
         $eventDispatcher = new EventDispatcher(null);
 
-        // Create the fulfillment handler
-        $fulfillmentHandler = new WebhookContractFulfillmentHandler(
+        // Sprint 18: Create ContractFulfillmentService (requires logger)
+        $contractFulfillmentService = new ContractFulfillmentService(
             $contractRepository,
-            $eventDispatcher
+            $eventDispatcher,
+            new NullLogger()
         );
 
-        // Create the service
+        // Create the fulfillment handler with ContractFulfillmentService (Sprint 18)
+        $fulfillmentHandler = new WebhookContractFulfillmentHandler(
+            $contractRepository,
+            $contractFulfillmentService
+        );
+
+        // Create the service with ContractFulfillmentService (Sprint 18)
         return new WebhookProcessingService(
             $fulfillmentHandler,
             $eventDispatcher,
             $webhookLogRepository,
-            $contractRepository
+            $contractRepository,
+            null, // orderPaymentStateService - not needed for these tests
+            $contractFulfillmentService
         );
     }
 
