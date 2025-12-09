@@ -9,7 +9,6 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Adapter;
 
-use OxidSolutionCatalysts\Payments\Component\Adapter\PaymentAdapterInterface;
 use OxidSolutionCatalysts\Payments\Component\Adapter\WebhookEvent;
 use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreatePaymentRequest;
 use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CapturePaymentRequest;
@@ -30,8 +29,11 @@ use OxidSolutionCatalysts\Payments\Component\Adapter\Response\AuthorizationRespo
 use OxidSolutionCatalysts\Payments\Component\Adapter\Response\PaymentMethodResponse;
 use OxidSolutionCatalysts\Payments\Component\Adapter\Response\ThreeDSecureResponse;
 use OxidSolutionCatalysts\Payments\Component\Adapter\Exception\PaymentAdapterException;
-use Stripe\StripeClient;
+use Stripe\Checkout\Session;
 use Stripe\Exception\ApiErrorException;
+use Stripe\PaymentIntent;
+use Stripe\Refund;
+use Stripe\StripeClient;
 use Stripe\Webhook;
 use DateTimeImmutable;
 
@@ -43,9 +45,11 @@ use DateTimeImmutable;
  *
  * Uses Stripe SDK v18.
  *
+ * Sprint 19: Extended with StripeAdapterInterface for Stripe-specific methods.
+ *
  * @since 1.0.0
  */
-final class StripeAdapter implements PaymentAdapterInterface
+final class StripeAdapter implements StripeAdapterInterface
 {
     /**
      * @param StripeClient $stripeClient Configured Stripe SDK client
@@ -157,10 +161,12 @@ final class StripeAdapter implements PaymentAdapterInterface
             $amountCaptured = $paymentIntent->amount_received / 100;
 
             // Get capture timestamp from latest charge, or use current time if not available
+            /** @phpstan-ignore-next-line nullsafe.neverNull */
             $capturedAtTimestamp = $paymentIntent->latest_charge?->created ?? time();
 
             return new CaptureResponse(
                 providerPaymentId: $paymentIntent->id,
+                /** @phpstan-ignore-next-line nullsafe.neverNull */
                 captureId: $paymentIntent->latest_charge?->id ?? $paymentIntent->id,
                 amountCaptured: $amountCaptured,
                 currency: strtoupper($paymentIntent->currency),
@@ -581,6 +587,86 @@ final class StripeAdapter implements PaymentAdapterInterface
                 message: 'Invalid webhook signature',
                 previous: $e
             );
+        }
+    }
+
+    // ==========================================
+    // STRIPE-SPECIFIC METHODS (Sprint 19)
+    // ==========================================
+
+    /**
+     * @inheritDoc
+     */
+    public function retrieveCheckoutSession(string $sessionId, array $expand = []): Session
+    {
+        try {
+            $options = [];
+            if (!empty($expand)) {
+                $options['expand'] = $expand;
+            }
+
+            return $this->stripeClient->checkout->sessions->retrieve($sessionId, $options);
+        } catch (ApiErrorException $e) {
+            throw $this->convertStripeException($e);
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function createCheckoutSession(array $params): Session
+    {
+        try {
+            return $this->stripeClient->checkout->sessions->create($params);
+        } catch (ApiErrorException $e) {
+            throw $this->convertStripeException($e);
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function retrievePaymentIntent(string $paymentIntentId, array $expand = []): PaymentIntent
+    {
+        try {
+            $options = [];
+            if (!empty($expand)) {
+                $options['expand'] = $expand;
+            }
+
+            return $this->stripeClient->paymentIntents->retrieve($paymentIntentId, $options);
+        } catch (ApiErrorException $e) {
+            throw $this->convertStripeException($e);
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function createRefundByCharge(
+        string $chargeId,
+        ?int $amount = null,
+        ?string $reason = null,
+        ?array $metadata = null
+    ): Refund {
+        try {
+            $params = ['charge' => $chargeId];
+
+            if ($amount !== null) {
+                $params['amount'] = $amount;
+            }
+
+            if ($reason !== null) {
+                $params['reason'] = $reason;
+            }
+
+            if ($metadata !== null) {
+                $params['metadata'] = $metadata;
+            }
+
+            return $this->stripeClient->refunds->create($params);
+        } catch (ApiErrorException $e) {
+            throw $this->convertStripeException($e);
         }
     }
 

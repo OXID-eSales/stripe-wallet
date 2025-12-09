@@ -5,16 +5,15 @@ declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
 
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterface;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentAuthorizedEvent;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\ReturnSecurityValidatorInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
+use OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutReturnServiceInterface;
+use OxidSolutionCatalysts\Payments\Stripe\Service\DeliveryAddressHashServiceInterface;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -22,14 +21,17 @@ use Psr\Log\NullLogger;
 /**
  * Handles return from Stripe Checkout page.
  *
- * This handler:
- * 1. Retrieves the Checkout Session from Stripe
- * 2. Verifies payment_status is 'paid'
- * 3. Loads the contract using contract_id from metadata
- * 4. Dispatches PaymentAuthorizedEvent to trigger condition fulfillment
+ * Sprint 21: Refactored to delegate validation to CheckoutReturnService (SRP).
+ * Sprint 22: EventDispatcher now injected via constructor (no ContainerFactory).
  *
- * NOTE: EventDispatcher is fetched lazily to avoid circular dependency
- * with EventListenerProvider during container initialization.
+ * Handler responsibilities (ONLY):
+ * 1. Extract parameters from event
+ * 2. Delegate validation to CheckoutReturnService
+ * 3. Load contract and validate security
+ * 4. Restore session state
+ * 5. Dispatch PaymentAuthorizedEvent
+ *
+ * @since 2.0.0
  */
 class StripeCheckoutReturnHandler implements HandlerInterface
 {
@@ -38,23 +40,14 @@ class StripeCheckoutReturnHandler implements HandlerInterface
     private LoggerInterface $logger;
 
     public function __construct(
-        private ContractRepositoryInterface $contractRepository,
-        private StripeAdapterFactoryInterface $adapterFactory,
-        private TokenServiceInterface $tokenService,
-        private ReturnSecurityValidatorInterface $securityValidator,
+        private readonly CheckoutReturnServiceInterface $checkoutReturnService,
+        private readonly ContractRepositoryInterface $contractRepository,
+        private readonly ReturnSecurityValidatorInterface $securityValidator,
+        private readonly DeliveryAddressHashServiceInterface $deliveryAddressHashService,
+        private readonly EventDispatcherInterface $eventDispatcher,
         ?LoggerInterface $logger = null
     ) {
         $this->logger = $logger ?? new NullLogger();
-    }
-
-    protected function getEventDispatcher(): EventDispatcherInterface
-    {
-        /** @var EventDispatcherInterface $dispatcher */
-        $dispatcher = ContainerFactory::getInstance()
-            ->getContainer()
-            ->get(EventDispatcherInterface::class);
-
-        return $dispatcher;
     }
 
     public static function getHandledEventClass(): string
@@ -70,126 +63,57 @@ class StripeCheckoutReturnHandler implements HandlerInterface
 
         $context = $event->getContext();
 
-        // Step 1: Validate URL parameters
-        $sessionId = $this->validateSessionId($event, $context);
+        // Step 1: Extract and validate parameters
+        $sessionId = $event->getCheckoutSessionId();
         if ($sessionId === null) {
+            $this->setError($context, 'Checkout session ID is missing');
             return;
         }
 
-        // Step 2: Validate contract token
-        $contractIdFromUrl = $this->validateContractToken($context, $sessionId);
-        if ($contractIdFromUrl === null) {
+        $contractId = $this->getStringFromContext($context, 'contract_id');
+        $contractToken = $this->getStringFromContext($context, 'contract_token');
+
+        if ($contractId === null || $contractToken === null) {
+            $this->setError($context, 'Contract ID or token is missing');
             return;
         }
 
-        // Step 3: Retrieve and validate Stripe session
-        $checkoutSession = $this->retrieveStripeSession($sessionId);
-        $contractId = $this->validatePaymentStatus($checkoutSession, $context, $contractIdFromUrl);
-        if ($contractId === null) {
+        // Step 2: Delegate validation to service
+        $result = $this->checkoutReturnService->validateReturn($sessionId, $contractId, $contractToken);
+        if (!$result->isSuccessful()) {
+            $this->setError($context, $result->getErrorMessage() ?? 'Validation failed', $result->getErrorCode());
             return;
         }
 
-        // Step 4: Load and validate contract
+        // Step 3: Load and validate contract
         $contract = $this->loadContract($contractId, $context);
         if ($contract === null) {
             return;
         }
 
-        // Step 5: Perform security validation
+        // Step 4: Perform security validation
         if (!$this->validateSecurity($contract, $contractId, $context)) {
             return;
         }
 
-        // Step 6: Restore session state and dispatch event
+        // Step 5: Restore session state and dispatch event
         $this->restoreDeliveryAddressHash($contract, $context);
-        $this->dispatchPaymentEvent($checkoutSession, $sessionId, $context);
+        $this->dispatchPaymentEvent($result, $context);
     }
 
-    private function validateSessionId(StripeCheckoutReturnEvent $event, EventContext $context): ?string
+    private function getStringFromContext(EventContext $context, string $key): ?string
     {
-        $sessionId = $event->getCheckoutSessionId();
-        if ($sessionId === null) {
-            $context->set('error', 'Checkout session ID is missing');
-            $context->set('redirectTarget', 'payment');
-            return null;
-        }
-        return $sessionId;
+        $value = $context->get($key);
+        return is_string($value) && $value !== '' ? $value : null;
     }
 
-    private function validateContractToken(EventContext $context, string $sessionId): ?string
+    private function setError(EventContext $context, string $message, ?string $code = null): void
     {
-        $contractToken = $context->get('contract_token');
-        $contractIdFromUrl = $context->get('contract_id');
-
-        if (!is_string($contractToken) || $contractToken === '') {
-            $context->set('error', 'Contract token is missing');
-            $context->set('redirectTarget', 'payment');
-            return null;
+        $context->set('error', $message);
+        if ($code !== null) {
+            $context->set('errorCode', $code);
         }
-
-        if (!is_string($contractIdFromUrl) || $contractIdFromUrl === '') {
-            $context->set('error', 'Contract ID is missing from URL');
-            $context->set('redirectTarget', 'payment');
-            return null;
-        }
-
-        if (!$this->tokenService->validateToken($contractToken, $contractIdFromUrl)) {
-            $this->logger->warning('Invalid contract token', [
-                'contract_id' => $contractIdFromUrl,
-                'session_id' => $sessionId,
-            ]);
-            $context->set('error', 'Invalid contract token');
-            $context->set('redirectTarget', 'payment');
-            return null;
-        }
-
-        return $contractIdFromUrl;
-    }
-
-    /**
-     * @return object Stripe\Checkout\Session object (or mock in tests)
-     */
-    private function retrieveStripeSession(string $sessionId): object
-    {
-        $stripeClient = $this->adapterFactory->getStripeClient();
-        return $stripeClient->checkout->sessions->retrieve($sessionId, [
-            'expand' => ['payment_intent'],
-        ]);
-    }
-
-    /**
-     * @param object $session Stripe\Checkout\Session object (or mock in tests)
-     */
-    private function validatePaymentStatus(
-        object $session,
-        EventContext $context,
-        string $contractIdFromUrl
-    ): ?string {
-        if ($session->payment_status !== 'paid') {
-            $context->set('error', 'Payment not completed: ' . $session->payment_status);
-            $context->set('redirectTarget', 'payment');
-            return null;
-        }
-
-        $contractId = $session->metadata->contract_id ?? null;
-
-        if ($contractId === null) {
-            $context->set('error', 'Contract ID not found in checkout session metadata');
-            $context->set('redirectTarget', 'payment');
-            return null;
-        }
-
-        if ($contractId !== $contractIdFromUrl) {
-            $this->logger->warning('Contract ID mismatch', [
-                'url_contract_id' => $contractIdFromUrl,
-                'metadata_contract_id' => $contractId,
-            ]);
-            $context->set('error', 'Contract ID mismatch');
-            $context->set('redirectTarget', 'payment');
-            return null;
-        }
-
-        return $contractId;
+        $context->set('redirectTarget', 'payment');
     }
 
     private function loadContract(string $contractId, EventContext $context): ?PaymentContractInterface
@@ -197,8 +121,7 @@ class StripeCheckoutReturnHandler implements HandlerInterface
         $contract = $this->contractRepository->findById($contractId);
 
         if ($contract === null) {
-            $context->set('error', 'Contract not found: ' . $contractId);
-            $context->set('redirectTarget', 'payment');
+            $this->setError($context, 'Contract not found: ' . $contractId);
             return null;
         }
 
@@ -230,9 +153,7 @@ class StripeCheckoutReturnHandler implements HandlerInterface
                 'score' => $securityResult->getScore(),
                 'warnings' => $securityResult->getWarnings(),
             ]);
-            $context->set('error', 'Security validation failed');
-            $context->set('errorCode', 'security_check_failed');
-            $context->set('redirectTarget', 'payment');
+            $this->setError($context, 'Security validation failed', 'security_check_failed');
             return false;
         }
 
@@ -240,8 +161,6 @@ class StripeCheckoutReturnHandler implements HandlerInterface
     }
 
     /**
-     * Build security context from current request.
-     *
      * @return array<string, mixed>
      */
     private function buildSecurityContext(): array
@@ -253,53 +172,13 @@ class StripeCheckoutReturnHandler implements HandlerInterface
         ];
     }
 
-    /**
-     * @param object $session Stripe\Checkout\Session object (or mock in tests)
-     */
-    private function dispatchPaymentEvent(
-        object $session,
-        string $sessionId,
-        EventContext $context
-    ): void {
-        $paymentIntent = $session->payment_intent;
-        $paymentIntentId = is_string($paymentIntent) ? $paymentIntent : ($paymentIntent->id ?? '');
-
-        $context->set('paymentIntentId', $paymentIntentId);
-        $context->set('amount', $session->amount_total / 100);
-        $currency = $session->currency ?? 'EUR';
-        $context->set('currency', $currency);
-
-        // Sprint 7 Fix: Use PaymentIntent ID as providerOrderId (not checkout session ID)
-        // This ensures webhook handler can find the contract when payment_intent.succeeded arrives
-        $event = new PaymentAuthorizedEvent(
-            context: $context,
-            authorizationId: $paymentIntentId,
-            providerOrderId: $paymentIntentId,  // Fixed: was $sessionId (cs_test_...), now pi_...
-            amount: $session->amount_total / 100,
-            currency: $currency
-        );
-
-        $this->getEventDispatcher()->dispatch($event);
-
-        if ($context->get('orderId') !== null) {
-            $context->set('redirectTarget', 'thankyou');
-        }
-    }
-
-    /**
-     * Restore delivery address hash from contract metadata.
-     *
-     * CRITICAL: We inject into BOTH $_REQUEST and session because:
-     * - Order::validateDeliveryAddress() reads from $_REQUEST['sDeliveryAddressMD5']
-     * - Some OXID code paths also check session variable 'sDelAddrMD5'
-     */
     private function restoreDeliveryAddressHash(PaymentContractInterface $contract, EventContext $context): void
     {
         $session = Registry::getSession();
 
         $deliveryHash = $contract->getMetadata('delivery_address_hash');
         if ($deliveryHash !== null && is_string($deliveryHash)) {
-            $_REQUEST['sDeliveryAddressMD5'] = $deliveryHash;
+            $this->deliveryAddressHashService->restoreHashForValidation($deliveryHash);
             $session->setVariable('sDelAddrMD5', $deliveryHash);
         }
 
@@ -307,6 +186,33 @@ class StripeCheckoutReturnHandler implements HandlerInterface
         if ($deliveryId !== null && is_string($deliveryId)) {
             $session->setVariable('deladrid', $deliveryId);
             $context->set('restoredDeliveryAddressId', $deliveryId);
+        }
+    }
+
+    private function dispatchPaymentEvent(
+        \OxidSolutionCatalysts\Payments\Stripe\DTO\CheckoutReturnResult $result,
+        EventContext $context
+    ): void {
+        $paymentIntentId = $result->getPaymentIntentId() ?? '';
+        $amount = $result->getAmount() ?? 0;
+        $currency = $result->getCurrency() ?? 'EUR';
+
+        $context->set('paymentIntentId', $paymentIntentId);
+        $context->set('amount', $amount);
+        $context->set('currency', $currency);
+
+        $event = new PaymentAuthorizedEvent(
+            context: $context,
+            authorizationId: $paymentIntentId,
+            providerOrderId: $paymentIntentId,
+            amount: $amount,
+            currency: $currency
+        );
+
+        $this->eventDispatcher->dispatch($event);
+
+        if ($context->get('orderId') !== null) {
+            $context->set('redirectTarget', 'thankyou');
         }
     }
 }

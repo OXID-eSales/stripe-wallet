@@ -12,6 +12,7 @@ namespace OxidSolutionCatalysts\Payments\Stripe\Service\Factory;
 use OxidSolutionCatalysts\Payments\Component\Adapter\PaymentAdapterInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory;
 use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapter;
+use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeClientFactory;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use Stripe\StripeClient;
@@ -88,9 +89,22 @@ class StripeAdapterFactory extends PaymentAdapterFactory implements StripeAdapte
     }
 
     /**
+     * Get Stripe adapter with Stripe-specific methods.
+     *
+     * Sprint 19: Use this instead of getStripeClient() to route SDK calls through adapter.
+     *
+     * @return StripeAdapterInterface
+     * @throws \RuntimeException If Stripe API key is not configured
+     */
+    public function getStripeAdapter(): StripeAdapterInterface
+    {
+        return $this->createStripeAdapter();
+    }
+
+    /**
      * Get Stripe SDK client for direct API access.
      *
-     * Useful for operations not covered by the adapter (e.g., Checkout Sessions).
+     * @deprecated Use getStripeAdapter() instead for better testability and DIP compliance.
      *
      * @return StripeClient
      * @throws \RuntimeException If Stripe API key is not configured

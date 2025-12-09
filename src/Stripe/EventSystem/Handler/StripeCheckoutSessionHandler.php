@@ -7,12 +7,14 @@ namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
+use OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutSessionServiceInterface;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use RuntimeException;
 
 /**
  * Creates Stripe Checkout Session for contract-first payment flow.
+ *
+ * Sprint 21: Refactored to delegate business logic to CheckoutSessionService.
  *
  * Key differences from Bartek's OrderController::createCheckoutSession():
  * - Uses CONTRACT ID in metadata instead of order ID
@@ -28,9 +30,9 @@ use RuntimeException;
 class StripeCheckoutSessionHandler implements HandlerInterface
 {
     public function __construct(
-        private ContractRepositoryInterface $contractRepository,
-        private StripeAdapterFactoryInterface $adapterFactory,
-        private TokenServiceInterface $tokenService
+        private readonly CheckoutSessionServiceInterface $checkoutSessionService,
+        private readonly ContractRepositoryInterface $contractRepository,
+        private readonly TokenServiceInterface $tokenService
     ) {
     }
 
@@ -57,8 +59,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
             throw new RuntimeException('Contract not found in context. ContractCreationHandler must run first.');
         }
 
-        // Build line items from CONTRACT's basket snapshot (not current basket!)
-        $lineItems = $this->buildLineItems($contract->getBasketSnapshot());
+        $contractId = $contract->getId() ?? '';
 
         // Get capture mode from context (default: automatic)
         $captureMode = $context->get('captureMode', 'automatic');
@@ -72,88 +73,40 @@ class StripeCheckoutSessionHandler implements HandlerInterface
             $shopUrl = 'https://shop.example.com/';
         }
 
-        // Get contract ID
-        $contractId = $contract->getId() ?? '';
-
         // Generate secure token for session restoration
         $contractToken = $this->tokenService->generateToken($contractId);
 
-        // Success URL includes contract_id and contract_token for session restoration
-        // The {CHECKOUT_SESSION_ID} placeholder is replaced by Stripe with actual session ID
-        $successUrl = $shopUrl . 'index.php?cl=order&fnc=checkoutSuccess'
-            . '&session_id={CHECKOUT_SESSION_ID}'
-            . '&contract_id=' . urlencode($contractId)
-            . '&contract_token=' . urlencode($contractToken);
-
-        // Cancel URL just goes back to payment page (no token needed)
+        // Build success and cancel URLs
+        $successUrl = $this->checkoutSessionService->buildSuccessUrl($shopUrl, $contractId, $contractToken);
         $cancelUrl = $shopUrl . 'index.php?cl=payment';
-
-        // Get Stripe SDK client
-        $stripeClient = $this->adapterFactory->getStripeClient();
 
         // Get shop ID
         $shopId = $context->get('shopId', '1');
         $shopIdString = is_string($shopId) ? $shopId : (string) $shopId;
 
-        // Create Checkout Session with CONTRACT reference (not order!)
-        /** @var \Stripe\Checkout\Session $checkoutSession */
-        $checkoutSession = $stripeClient->checkout->sessions->create([
-            'mode' => 'payment',
-            'line_items' => $lineItems,
-            'success_url' => $successUrl,
-            'cancel_url' => $cancelUrl,
-            'metadata' => [
-                'contract_id' => $contractId,
-                'shop_id' => $shopIdString,
-            ],
-            'payment_intent_data' => [
-                'capture_method' => $captureMode,
-                'metadata' => [
-                    'contract_id' => $contractId,
-                ],
-            ],
-        ]);
+        // Sprint 21: Delegate session creation to service
+        $result = $this->checkoutSessionService->createSession(
+            $contractId,
+            $contract->getBasketSnapshot(),
+            $successUrl,
+            $cancelUrl,
+            $shopIdString,
+            $captureMode
+        );
+
+        if (!$result->isSuccessful()) {
+            throw new RuntimeException(
+                'Failed to create checkout session: ' . ($result->getErrorMessage() ?? 'Unknown error')
+            );
+        }
 
         // Store session ID in contract via setProvider
-        $contract->setProvider('stripe', $checkoutSession->id, $successUrl);
+        $contract->setProvider('stripe', $result->getSessionId() ?? '', $successUrl);
 
         $this->contractRepository->save($contract);
 
         // Update context for controller
-        $context->set('checkoutSessionId', $checkoutSession->id);
-        // Also provide the direct URL for redirect (more reliable than redirectToCheckout)
-        $context->set('checkoutUrl', $checkoutSession->url);
-    }
-
-    /**
-     * Build Stripe line items from basket snapshot.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    private function buildLineItems(\OxidSolutionCatalysts\Payments\Component\Contract\BasketSnapshot $snapshot): array
-    {
-        $lineItems = [];
-        $currency = strtolower($snapshot->getCurrency());
-
-        foreach ($snapshot->getItems() as $item) {
-            $title = isset($item['title']) && is_string($item['title']) ? $item['title'] : 'Product';
-            $unitPrice = isset($item['unitPrice']) && (is_float($item['unitPrice']) || is_int($item['unitPrice']))
-                ? (float) $item['unitPrice']
-                : 0.0;
-            $quantity = isset($item['quantity']) && is_int($item['quantity']) ? $item['quantity'] : 1;
-
-            $lineItems[] = [
-                'price_data' => [
-                    'currency' => $currency,
-                    'unit_amount' => (int) round($unitPrice * 100),
-                    'product_data' => [
-                        'name' => $title,
-                    ],
-                ],
-                'quantity' => $quantity,
-            ];
-        }
-
-        return $lineItems;
+        $context->set('checkoutSessionId', $result->getSessionId());
+        $context->set('checkoutUrl', $result->getCheckoutUrl());
     }
 }

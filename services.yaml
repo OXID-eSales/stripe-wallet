@@ -279,25 +279,61 @@ services:
     alias: OxidSolutionCatalysts\Payments\Component\Service\ReturnSecurityValidatorInterface
 
   # ==========================================
+  # Delivery Address Hash Service (Sprint 20)
+  # ==========================================
+  # Encapsulates $_REQUEST modification for OXID's delivery address validation.
+  # OXID reads from $_REQUEST['sDeliveryAddressMD5'] which requires this anti-pattern.
+
+  OxidSolutionCatalysts\Payments\Stripe\Service\DeliveryAddressHashServiceInterface:
+    class: OxidSolutionCatalysts\Payments\Stripe\Service\DeliveryAddressHashService
+    public: false
+
+  # ==========================================
+  # Stripe Checkout Session Service (Sprint 21)
+  # ==========================================
+  # Extracted business logic from StripeCheckoutSessionHandler.
+  # SRP: Service handles checkout session creation logic.
+
+  OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutSessionServiceInterface:
+    class: OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutSessionService
+    arguments:
+      $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: false
+
+  # ==========================================
+  # Contract Metadata Service (Sprint 21)
+  # ==========================================
+  # Extracted business logic from StripeContractCreationHandler.
+  # SRP: Service handles contract metadata operations.
+
+  OxidSolutionCatalysts\Payments\Stripe\Service\ContractMetadataServiceInterface:
+    class: OxidSolutionCatalysts\Payments\Stripe\Service\ContractMetadataService
+    public: false
+
+  # ==========================================
   # Stripe Checkout Session Handlers
   # ==========================================
 
   # Stripe Contract Creation Handler - Creates contract for checkout flow
   # Priority 100: Runs BEFORE StripeCheckoutSessionHandler (priority 0)
+  # Sprint 21: Refactored to delegate metadata to ContractMetadataService
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeContractCreationHandler:
     arguments:
       $contractService: '@OxidSolutionCatalysts\Payments\Component\Service\ContractServiceInterface'
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $metadataService: '@OxidSolutionCatalysts\Payments\Stripe\Service\ContractMetadataServiceInterface'
     tags:
       - { name: payment.event_handler, priority: 100 }
     public: false
 
   # Stripe Checkout Session Handler - Creates Stripe Checkout Session
   # Priority 0 (default): Runs AFTER StripeContractCreationHandler
+  # Sprint 21: Refactored to delegate to CheckoutSessionService (SRP)
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler:
     arguments:
+      $checkoutSessionService: '@OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutSessionServiceInterface'
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
-      $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
       $tokenService: '@OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface'
     tags:
       - { name: payment.event_handler, priority: 0 }
@@ -315,6 +351,20 @@ services:
     public: false
 
   # ==========================================
+  # Stripe Checkout Return Service (Sprint 21)
+  # ==========================================
+  # Extracted business logic from StripeCheckoutReturnHandler.
+  # SRP: Service handles checkout return validation logic.
+
+  OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutReturnServiceInterface:
+    class: OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutReturnService
+    arguments:
+      $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $tokenService: '@OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: false
+
+  # ==========================================
   # Stripe Checkout Return Handlers
   # ==========================================
   # These handlers process the return flow when user comes back from Stripe.
@@ -322,14 +372,16 @@ services:
 
   # Stripe Checkout Return Handler - Handles return from Stripe Checkout page
   # Priority 100: Entry point for checkout return flow
-  # Retrieves Checkout Session, verifies payment, dispatches PaymentAuthorizedEvent
-  # NOTE: EventDispatcher is fetched lazily to avoid circular dependency
+  # Sprint 21: Refactored to delegate validation to CheckoutReturnService (SRP)
+  # Sprint 22: EventDispatcher now injected via constructor (no ContainerFactory)
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler:
     arguments:
+      $checkoutReturnService: '@OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutReturnServiceInterface'
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
-      $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
-      $tokenService: '@OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface'
       $securityValidator: '@OxidSolutionCatalysts\Payments\Component\Service\ReturnSecurityValidatorInterface'
+      $deliveryAddressHashService: '@OxidSolutionCatalysts\Payments\Stripe\Service\DeliveryAddressHashServiceInterface'
+      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      $logger: '@oxid_esales.monolog.logger'
     tags:
       - { name: payment.event_handler, priority: 100 }
     public: false
@@ -338,10 +390,11 @@ services:
   # Priority 90: Runs after StripeCheckoutReturnHandler
   # Transitions contract to PENDING, fulfills payment_authorized condition
   # Dispatches ContractReadyToCommitEvent if all conditions met
-  # NOTE: EventDispatcher is fetched lazily to avoid circular dependency
+  # Sprint 22: EventDispatcher now injected via constructor (no ContainerFactory)
   OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\PaymentAuthorizedEventHandler:
     arguments:
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
     tags:
       - { name: payment.event_handler, priority: 90 }
     public: false
@@ -349,27 +402,42 @@ services:
   # Stripe Order Creation Handler - Creates OXID order from contract
   # Priority 80: Runs after PaymentAuthorizedEventHandler
   # Uses OxidShopOrderService for proper OXID integration
-  # NOTE: EventDispatcher is fetched lazily to avoid circular dependency
   # Sprint 16: Uses OrderPaymentStateService for OXPAID updates (DRY)
+  # Sprint 22: EventDispatcher now injected via constructor (no ContainerFactory)
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeOrderCreationHandler:
     arguments:
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
       $shopOrderService: '@OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface'
       $orderPaymentStateService: '@OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface'
+      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
     tags:
       - { name: payment.event_handler, priority: 80 }
     public: false
 
   # ==========================================
-  # Stripe Refund Handler (Sprint 4)
+  # Stripe Refund Service (Sprint 21)
+  # ==========================================
+  # Extracted business logic from StripeRefundRequestHandler.
+  # SRP: Service handles all refund processing logic.
+
+  OxidSolutionCatalysts\Payments\Stripe\Service\RefundServiceInterface:
+    class: OxidSolutionCatalysts\Payments\Stripe\Service\RefundService
+    arguments:
+      $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: false
+
+  # ==========================================
+  # Stripe Refund Handler (Sprint 4, Refactored Sprint 21)
   # ==========================================
   # Handles StripeRefundRequestEvent from admin panel, webhook, or API.
-  # Processes refunds via Stripe API and updates order/contract state.
+  # Sprint 21: Delegates to RefundService for business logic (SRP).
 
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeRefundRequestHandler:
     arguments:
-      $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $refundService: '@OxidSolutionCatalysts\Payments\Stripe\Service\RefundServiceInterface'
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
     tags:
       - { name: payment.event_handler }
     public: false

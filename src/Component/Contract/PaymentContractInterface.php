@@ -39,6 +39,19 @@ interface PaymentContractInterface extends ModelInterface
 
     public function areAllConditionsFulfilled(): bool;
 
+    /**
+     * Transition contract from DRAFT to PENDING state.
+     */
+    public function transitionToPending(): void;
+
+    /**
+     * Fulfill a condition on this contract.
+     *
+     * @param string $type Condition type (e.g., 'payment_authorized')
+     * @param array<string, mixed> $data Additional data for the condition
+     */
+    public function fulfillCondition(string $type, array $data = []): void;
+
     public function commitToOrder(string $orderId): void;
 
     public function fulfill(): void;

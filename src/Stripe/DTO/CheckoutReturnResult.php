@@ -1,0 +1,159 @@
+<?php
+
+/**
+ * Copyright © OXID eSales AG. All rights reserved.
+ * See LICENSE file for license details.
+ */
+
+declare(strict_types=1);
+
+namespace OxidSolutionCatalysts\Payments\Stripe\DTO;
+
+/**
+ * Result object for checkout return validation.
+ *
+ * Sprint 21: Extract business logic from StripeCheckoutReturnHandler.
+ *
+ * Immutable DTO following the Result Object pattern:
+ * - Named constructors for success/failure states
+ * - Type-safe access to result data
+ * - Self-documenting API
+ *
+ * @since 2.0.0
+ */
+final readonly class CheckoutReturnResult
+{
+    private function __construct(
+        private bool $successful,
+        private ?string $contractId,
+        private ?string $paymentIntentId,
+        private ?int $amountCents,
+        private ?string $currency,
+        private ?string $paymentStatus,
+        private ?string $errorMessage,
+        private ?string $errorCode,
+        private ?string $redirectTarget
+    ) {
+    }
+
+    /**
+     * Create a successful checkout return result.
+     */
+    public static function success(
+        string $contractId,
+        string $paymentIntentId,
+        int $amountCents,
+        string $currency,
+        string $paymentStatus = 'paid'
+    ): self {
+        return new self(
+            successful: true,
+            contractId: $contractId,
+            paymentIntentId: $paymentIntentId,
+            amountCents: $amountCents,
+            currency: $currency,
+            paymentStatus: $paymentStatus,
+            errorMessage: null,
+            errorCode: null,
+            redirectTarget: 'thankyou'
+        );
+    }
+
+    /**
+     * Create a failed checkout return result.
+     */
+    public static function failure(
+        string $errorMessage,
+        ?string $errorCode = null,
+        string $redirectTarget = 'payment'
+    ): self {
+        return new self(
+            successful: false,
+            contractId: null,
+            paymentIntentId: null,
+            amountCents: null,
+            currency: null,
+            paymentStatus: null,
+            errorMessage: $errorMessage,
+            errorCode: $errorCode,
+            redirectTarget: $redirectTarget
+        );
+    }
+
+    /**
+     * Create a security failure result.
+     */
+    public static function securityFailure(string $errorMessage): self
+    {
+        return new self(
+            successful: false,
+            contractId: null,
+            paymentIntentId: null,
+            amountCents: null,
+            currency: null,
+            paymentStatus: null,
+            errorMessage: $errorMessage,
+            errorCode: 'security_check_failed',
+            redirectTarget: 'payment'
+        );
+    }
+
+    public function isSuccessful(): bool
+    {
+        return $this->successful;
+    }
+
+    public function getContractId(): ?string
+    {
+        return $this->contractId;
+    }
+
+    public function getPaymentIntentId(): ?string
+    {
+        return $this->paymentIntentId;
+    }
+
+    /**
+     * Get the amount in cents.
+     */
+    public function getAmountCents(): ?int
+    {
+        return $this->amountCents;
+    }
+
+    /**
+     * Get the amount in decimal (e.g., 25.50 for 2550 cents).
+     */
+    public function getAmount(): ?float
+    {
+        if ($this->amountCents === null) {
+            return null;
+        }
+        return $this->amountCents / 100;
+    }
+
+    public function getCurrency(): ?string
+    {
+        return $this->currency;
+    }
+
+    public function getPaymentStatus(): ?string
+    {
+        return $this->paymentStatus;
+    }
+
+    public function getErrorMessage(): ?string
+    {
+        return $this->errorMessage;
+    }
+
+    public function getErrorCode(): ?string
+    {
+        return $this->errorCode;
+    }
+
+    public function getRedirectTarget(): ?string
+    {
+        return $this->redirectTarget;
+    }
+}

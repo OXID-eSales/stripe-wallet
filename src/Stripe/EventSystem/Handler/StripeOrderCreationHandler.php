@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
 
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreateOrderRequest;
 use OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterface;
@@ -28,25 +27,18 @@ use OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInt
  * 3. Contract transitions to COMMITTED state
  * 4. Dispatches ContractCommittedEvent
  *
- * NOTE: EventDispatcher is fetched lazily to avoid circular dependency
- * with EventListenerProvider during container initialization.
+ * Sprint 22: EventDispatcher now injected via constructor (no ContainerFactory).
  *
  * @since 1.0.0
  */
 class StripeOrderCreationHandler implements HandlerInterface
 {
     public function __construct(
-        private ContractRepositoryInterface $contractRepository,
-        private ShopOrderServiceInterface $shopOrderService,
-        private OrderPaymentStateServiceInterface $orderPaymentStateService
+        private readonly ContractRepositoryInterface $contractRepository,
+        private readonly ShopOrderServiceInterface $shopOrderService,
+        private readonly OrderPaymentStateServiceInterface $orderPaymentStateService,
+        private readonly EventDispatcherInterface $eventDispatcher
     ) {
-    }
-
-    private function getEventDispatcher(): EventDispatcherInterface
-    {
-        return ContainerFactory::getInstance()
-            ->getContainer()
-            ->get(EventDispatcherInterface::class);
     }
 
     public static function getHandledEventClass(): string
@@ -139,7 +131,7 @@ class StripeOrderCreationHandler implements HandlerInterface
                 $context,
                 $orderId
             );
-            $this->getEventDispatcher()->dispatch($committedEvent);
+            $this->eventDispatcher->dispatch($committedEvent);
         } catch (\Throwable $e) {
             Registry::getLogger()->error('StripeOrderCreationHandler: Order creation failed', [
                 'contract_id' => $contract->getId(),

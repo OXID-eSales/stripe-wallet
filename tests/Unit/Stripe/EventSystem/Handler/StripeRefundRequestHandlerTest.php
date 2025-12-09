@@ -8,53 +8,37 @@ use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeRefundReques
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
+use OxidSolutionCatalysts\Payments\Stripe\Service\RefundServiceInterface;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Log\LoggerInterface;
-use Stripe\StripeClient;
-use Stripe\Service\PaymentIntentService;
-use Stripe\Service\RefundService;
-use Stripe\PaymentIntent;
-use Stripe\Refund;
-use Stripe\Exception\InvalidRequestException;
 
 /**
  * Unit tests for StripeRefundRequestHandler.
  *
+ * Sprint 21: Tests updated for refactored handler with RefundService injection.
+ *
  * Note: These tests focus on the handler's interface and event handling.
+ * Business logic tests are in RefundServiceTest.
  * Full integration tests with OXID Order loading are in the Integration test suite.
  */
 class StripeRefundRequestHandlerTest extends TestCase
 {
-    private StripeAdapterFactoryInterface&MockObject $adapterFactory;
+    private RefundServiceInterface&MockObject $refundService;
     private ContractRepositoryInterface&MockObject $contractRepository;
     private LoggerInterface&MockObject $logger;
-    private StripeClient&MockObject $stripeClient;
-    private PaymentIntentService&MockObject $paymentIntentService;
-    private RefundService&MockObject $refundService;
 
     protected function setUp(): void
     {
-        $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
+        $this->refundService = $this->createMock(RefundServiceInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
-        $this->stripeClient = $this->createMock(StripeClient::class);
-        $this->paymentIntentService = $this->createMock(PaymentIntentService::class);
-        $this->refundService = $this->createMock(RefundService::class);
-
-        // Set up Stripe client mock structure
-        $this->stripeClient->paymentIntents = $this->paymentIntentService;
-        $this->stripeClient->refunds = $this->refundService;
-
-        $this->adapterFactory->method('getStripeClient')->willReturn($this->stripeClient);
     }
 
     private function createHandler(): StripeRefundRequestHandler
     {
         return new StripeRefundRequestHandler(
-            $this->adapterFactory,
+            $this->refundService,
             $this->contractRepository,
             $this->logger
         );
@@ -79,8 +63,10 @@ class StripeRefundRequestHandlerTest extends TestCase
             }
         };
 
-        // Should not throw, just return early
-        $this->refundService->expects($this->never())->method('create');
+        // RefundService should never be called for non-matching events
+        $this->refundService->expects($this->never())->method('processFullRefund');
+        $this->refundService->expects($this->never())->method('processPartialRefund');
+        $this->refundService->expects($this->never())->method('processRefundByCharge');
 
         $handler->handle($otherEvent);
     }

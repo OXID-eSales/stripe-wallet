@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Stripe\Service\Factory;
 
 use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactoryInterface;
+use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapterInterface;
 use Stripe\StripeClient;
 
 /**
@@ -24,9 +25,19 @@ use Stripe\StripeClient;
 interface StripeAdapterFactoryInterface extends PaymentAdapterFactoryInterface
 {
     /**
+     * Get Stripe adapter with Stripe-specific methods.
+     *
+     * Sprint 19: Use this instead of getStripeClient() to route SDK calls through adapter.
+     *
+     * @return StripeAdapterInterface
+     * @throws \RuntimeException If Stripe API key is not configured
+     */
+    public function getStripeAdapter(): StripeAdapterInterface;
+
+    /**
      * Get Stripe SDK client for direct API access.
      *
-     * Useful for operations not covered by the adapter (e.g., Checkout Sessions).
+     * @deprecated Use getStripeAdapter() instead for better testability and DIP compliance.
      *
      * @return StripeClient
      * @throws \RuntimeException If Stripe API key is not configured

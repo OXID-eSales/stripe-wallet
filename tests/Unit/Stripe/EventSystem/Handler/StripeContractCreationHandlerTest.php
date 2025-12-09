@@ -11,261 +11,274 @@ namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\EventSystem\Handler;
 
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeContractCreationHandler;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
+use OxidSolutionCatalysts\Payments\Stripe\Service\ContractMetadataServiceInterface;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\ContractServiceInterface;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
-use OxidSolutionCatalysts\Payments\Component\Contract\BasketSnapshot;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 /**
+ * Unit tests for StripeContractCreationHandler.
+ *
+ * Sprint 21: Refactored tests for handler with ContractMetadataService delegation.
+ *
  * @covers \OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeContractCreationHandler
  */
 class StripeContractCreationHandlerTest extends TestCase
 {
-    private ContractServiceInterface $contractService;
-    private ContractRepositoryInterface $contractRepository;
-    private StripeContractCreationHandler $handler;
+    private ContractServiceInterface&MockObject $contractService;
+    private ContractRepositoryInterface&MockObject $contractRepository;
+    private ContractMetadataServiceInterface&MockObject $metadataService;
 
     protected function setUp(): void
     {
         $this->contractService = $this->createMock(ContractServiceInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
+        $this->metadataService = $this->createMock(ContractMetadataServiceInterface::class);
+    }
 
-        $this->handler = new StripeContractCreationHandler(
+    private function createHandler(): StripeContractCreationHandler
+    {
+        return new StripeContractCreationHandler(
             $this->contractService,
-            $this->contractRepository
+            $this->contractRepository,
+            $this->metadataService
         );
     }
 
-    protected function tearDown(): void
-    {
-        // Clean up global state
-        unset($_SERVER['REMOTE_ADDR']);
-        unset($_SERVER['HTTP_USER_AGENT']);
-    }
-
     // =========================================================================
-    // Security Metadata Storage Tests
+    // Handler Delegation Tests (Sprint 21)
     // =========================================================================
 
-    public function testContractStoresUserIpInMetadata(): void
+    public function testDelegatesDeliveryAddressMetadataToService(): void
     {
         // Arrange
-        $_SERVER['REMOTE_ADDR'] = '192.168.1.100';
-
         $contract = $this->createMockContract();
         $this->setupContractService($contract);
 
-        $metadataSet = [];
-        $contract->method('setMetadata')
-            ->willReturnCallback(function ($key, $value) use (&$metadataSet) {
-                $metadataSet[$key] = $value;
-            });
+        $basket = $this->createMock(\stdClass::class);
+        $context = $this->createCheckoutContext($basket);
+        $event = new StripeCheckoutSessionRequestEvent($context);
 
-        $context = $this->createCheckoutContext();
+        // Expect metadata service to be called
+        $this->metadataService
+            ->expects($this->once())
+            ->method('storeDeliveryAddressMetadata')
+            ->with($contract, $basket);
+
+        // Act
+        $handler = $this->createHandler();
+        $handler->handle($event);
+    }
+
+    public function testDelegatesSecurityMetadataToService(): void
+    {
+        // Arrange
+        $contract = $this->createMockContract();
+        $this->setupContractService($contract);
+
+        $basket = $this->createMock(\stdClass::class);
+        $context = $this->createCheckoutContext($basket);
+        $event = new StripeCheckoutSessionRequestEvent($context);
+
+        // Expect metadata service to be called with context
+        $this->metadataService
+            ->expects($this->once())
+            ->method('storeSecurityMetadata')
+            ->with($contract, $context);
+
+        // Act
+        $handler = $this->createHandler();
+        $handler->handle($event);
+    }
+
+    public function testSavesContractAfterMetadataIsStored(): void
+    {
+        // Arrange
+        $contract = $this->createMockContract();
+        $this->setupContractService($contract);
+
+        $basket = $this->createMock(\stdClass::class);
+        $context = $this->createCheckoutContext($basket);
+        $event = new StripeCheckoutSessionRequestEvent($context);
+
+        // Expect contract to be saved
+        $this->contractRepository
+            ->expects($this->once())
+            ->method('save')
+            ->with($contract);
+
+        // Act
+        $handler = $this->createHandler();
+        $handler->handle($event);
+    }
+
+    public function testSetsContractInContext(): void
+    {
+        // Arrange
+        $contract = $this->createMockContract();
+        $this->setupContractService($contract);
+
+        $basket = $this->createMock(\stdClass::class);
+        $context = $this->createCheckoutContext($basket);
         $event = new StripeCheckoutSessionRequestEvent($context);
 
         // Act
-        $this->handler->handle($event);
+        $handler = $this->createHandler();
+        $handler->handle($event);
 
         // Assert
-        $this->assertArrayHasKey('user_ip', $metadataSet);
-        $this->assertEquals('192.168.1.100', $metadataSet['user_ip']);
+        $this->assertSame($contract, $context->getContract());
     }
 
-    public function testContractStoresUserAgentInMetadata(): void
+    public function testSetsContractIdInContext(): void
     {
         // Arrange
-        $_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0 Chrome/120.0';
+        $contractId = 'contract_test_123';
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getId')->willReturn($contractId);
 
-        $contract = $this->createMockContract();
-        $this->setupContractService($contract);
+        $this->contractService
+            ->method('createContract')
+            ->willReturn($contract);
 
-        $metadataSet = [];
-        $contract->method('setMetadata')
-            ->willReturnCallback(function ($key, $value) use (&$metadataSet) {
-                $metadataSet[$key] = $value;
-            });
-
-        $context = $this->createCheckoutContext();
+        $basket = $this->createMock(\stdClass::class);
+        $context = $this->createCheckoutContext($basket);
         $event = new StripeCheckoutSessionRequestEvent($context);
 
         // Act
-        $this->handler->handle($event);
+        $handler = $this->createHandler();
+        $handler->handle($event);
 
         // Assert
-        $this->assertArrayHasKey('user_agent', $metadataSet);
-        $this->assertEquals('Mozilla/5.0 Chrome/120.0', $metadataSet['user_agent']);
+        $this->assertEquals($contractId, $context->get('contractId'));
     }
 
-    public function testContractStoresCreatedTimestamp(): void
+    public function testSkipsIfContractAlreadyExists(): void
     {
         // Arrange
-        $beforeTime = time();
+        $existingContract = $this->createMock(PaymentContractInterface::class);
 
-        $contract = $this->createMockContract();
-        $this->setupContractService($contract);
-
-        $metadataSet = [];
-        $contract->method('setMetadata')
-            ->willReturnCallback(function ($key, $value) use (&$metadataSet) {
-                $metadataSet[$key] = $value;
-            });
-
-        $context = $this->createCheckoutContext();
+        $basket = $this->createMock(\stdClass::class);
+        $context = $this->createCheckoutContext($basket);
+        $context->setContract($existingContract);
         $event = new StripeCheckoutSessionRequestEvent($context);
 
-        // Act
-        $this->handler->handle($event);
+        // Should NOT create a new contract
+        $this->contractService
+            ->expects($this->never())
+            ->method('createContract');
 
-        // Assert
-        $this->assertArrayHasKey('created_timestamp', $metadataSet);
-        $this->assertGreaterThanOrEqual($beforeTime, $metadataSet['created_timestamp']);
-        $this->assertLessThanOrEqual(time(), $metadataSet['created_timestamp']);
+        // Act
+        $handler = $this->createHandler();
+        $handler->handle($event);
     }
 
-    public function testContractStoresSessionId(): void
+    public function testThrowsExceptionWhenUserIdMissing(): void
+    {
+        // Arrange
+        $basket = $this->createMock(\stdClass::class);
+        $context = new EventContext([
+            'basket' => $basket,
+            // userId is missing
+        ]);
+        $event = new StripeCheckoutSessionRequestEvent($context);
+
+        // Expect
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('User ID is required');
+
+        // Act
+        $handler = $this->createHandler();
+        $handler->handle($event);
+    }
+
+    public function testThrowsExceptionWhenBasketMissing(): void
+    {
+        // Arrange
+        $context = new EventContext([
+            'userId' => 'user_123',
+            // basket is missing
+        ]);
+        $event = new StripeCheckoutSessionRequestEvent($context);
+
+        // Expect
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Basket is required');
+
+        // Act
+        $handler = $this->createHandler();
+        $handler->handle($event);
+    }
+
+    public function testHandlerIgnoresNonStripeCheckoutSessionRequestEvent(): void
+    {
+        // Arrange
+        $otherEvent = new class {
+            public function getContext(): EventContext
+            {
+                return new EventContext([]);
+            }
+        };
+
+        // Should NOT interact with services
+        $this->contractService->expects($this->never())->method('createContract');
+        $this->metadataService->expects($this->never())->method('storeDeliveryAddressMetadata');
+
+        // Act
+        $handler = $this->createHandler();
+        $handler->handle($otherEvent);
+    }
+
+    public function testReturnsCorrectHandledEventClass(): void
+    {
+        $this->assertEquals(
+            StripeCheckoutSessionRequestEvent::class,
+            StripeContractCreationHandler::getHandledEventClass()
+        );
+    }
+
+    public function testHasHighPriority(): void
+    {
+        $handler = $this->createHandler();
+
+        // Priority 100 ensures it runs before StripeCheckoutSessionHandler (priority 0)
+        $this->assertEquals(100, $handler->getPriority());
+    }
+
+    public function testPassesConditionTypesToContractService(): void
     {
         // Arrange
         $contract = $this->createMockContract();
-        $this->setupContractService($contract);
+        $basket = $this->createMock(\stdClass::class);
 
-        $metadataSet = [];
-        $contract->method('setMetadata')
-            ->willReturnCallback(function ($key, $value) use (&$metadataSet) {
-                $metadataSet[$key] = $value;
-            });
-
-        $context = $this->createCheckoutContext();
-        $context->set('phpSessionId', 'sess_abc123');
+        $conditionTypes = ['payment_authorized', 'fraud_check'];
+        $context = new EventContext([
+            'userId' => 'user_123',
+            'basket' => $basket,
+            'conditionTypes' => $conditionTypes,
+        ]);
         $event = new StripeCheckoutSessionRequestEvent($context);
+
+        // Expect contract service to receive condition types
+        $this->contractService
+            ->expects($this->once())
+            ->method('createContract')
+            ->with('user_123', $basket, $conditionTypes)
+            ->willReturn($contract);
 
         // Act
-        $this->handler->handle($event);
-
-        // Assert
-        $this->assertArrayHasKey('session_id', $metadataSet);
-        $this->assertEquals('sess_abc123', $metadataSet['session_id']);
-    }
-
-    public function testContractStoresUserCountryWhenProvided(): void
-    {
-        // Arrange
-        $contract = $this->createMockContract();
-        $this->setupContractService($contract);
-
-        $metadataSet = [];
-        $contract->method('setMetadata')
-            ->willReturnCallback(function ($key, $value) use (&$metadataSet) {
-                $metadataSet[$key] = $value;
-            });
-
-        $context = $this->createCheckoutContext();
-        $context->set('userCountry', 'DE');
-        $event = new StripeCheckoutSessionRequestEvent($context);
-
-        // Act
-        $this->handler->handle($event);
-
-        // Assert
-        $this->assertArrayHasKey('user_country', $metadataSet);
-        $this->assertEquals('DE', $metadataSet['user_country']);
-    }
-
-    public function testContractStoresDeliveryAddressHashWhenAvailable(): void
-    {
-        // Note: delivery_address_hash depends on OXID Registry::getSession()
-        // which cannot be mocked in unit tests. This test verifies that
-        // when session has no data and user is null, the key is NOT set
-        // (which is correct behavior - don't store empty values).
-
-        // Arrange
-        $contract = $this->createMockContract();
-        $this->setupContractService($contract);
-
-        $metadataSet = [];
-        $contract->method('setMetadata')
-            ->willReturnCallback(function ($key, $value) use (&$metadataSet) {
-                $metadataSet[$key] = $value;
-            });
-
-        $context = $this->createCheckoutContext();
-        $event = new StripeCheckoutSessionRequestEvent($context);
-
-        // Act
-        $this->handler->handle($event);
-
-        // Assert - security metadata IS set (these don't depend on session)
-        $this->assertArrayHasKey('user_ip', $metadataSet);
-        $this->assertArrayHasKey('created_timestamp', $metadataSet);
-
-        // Note: delivery_address_hash is only set when session has data
-        // This will be tested in integration tests with full OXID bootstrap
-    }
-
-    public function testContractStoresAllSecurityMetadata(): void
-    {
-        // Arrange
-        $_SERVER['REMOTE_ADDR'] = '192.168.1.100';
-        $_SERVER['HTTP_USER_AGENT'] = 'TestBrowser/1.0';
-
-        $contract = $this->createMockContract();
-        $this->setupContractService($contract);
-
-        $metadataSet = [];
-        $contract->method('setMetadata')
-            ->willReturnCallback(function ($key, $value) use (&$metadataSet) {
-                $metadataSet[$key] = $value;
-            });
-
-        $context = $this->createCheckoutContext();
-        $context->set('phpSessionId', 'sess_test');
-        $context->set('userCountry', 'DE');
-        $event = new StripeCheckoutSessionRequestEvent($context);
-
-        // Act
-        $this->handler->handle($event);
-
-        // Assert - all security metadata present
-        $this->assertArrayHasKey('user_ip', $metadataSet);
-        $this->assertArrayHasKey('user_agent', $metadataSet);
-        $this->assertArrayHasKey('created_timestamp', $metadataSet);
-        $this->assertArrayHasKey('session_id', $metadataSet);
-        $this->assertArrayHasKey('user_country', $metadataSet);
-    }
-
-    public function testHandlesEmptyServerVariables(): void
-    {
-        // Arrange - no REMOTE_ADDR or HTTP_USER_AGENT set
-        unset($_SERVER['REMOTE_ADDR']);
-        unset($_SERVER['HTTP_USER_AGENT']);
-
-        $contract = $this->createMockContract();
-        $this->setupContractService($contract);
-
-        $metadataSet = [];
-        $contract->method('setMetadata')
-            ->willReturnCallback(function ($key, $value) use (&$metadataSet) {
-                $metadataSet[$key] = $value;
-            });
-
-        $context = $this->createCheckoutContext();
-        $event = new StripeCheckoutSessionRequestEvent($context);
-
-        // Act - should not throw
-        $this->handler->handle($event);
-
-        // Assert - keys should exist with empty/default values
-        $this->assertArrayHasKey('user_ip', $metadataSet);
-        $this->assertArrayHasKey('user_agent', $metadataSet);
+        $handler = $this->createHandler();
+        $handler->handle($event);
     }
 
     // =========================================================================
     // Helper Methods
     // =========================================================================
 
-    private function createMockContract(): PaymentContractInterface
+    private function createMockContract(): PaymentContractInterface&MockObject
     {
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getId')->willReturn('contract_' . uniqid());
@@ -279,17 +292,12 @@ class StripeContractCreationHandlerTest extends TestCase
             ->willReturn($contract);
     }
 
-    private function createCheckoutContext(): EventContext
+    private function createCheckoutContext(object $basket): EventContext
     {
-        $basket = $this->createMock(\OxidEsales\Eshop\Application\Model\Basket::class);
-        $basket->method('getBasketUser')->willReturn(null);
-
-        $context = new EventContext([
+        return new EventContext([
             'userId' => 'user_123',
             'basket' => $basket,
             'conditionTypes' => [],
         ]);
-
-        return $context;
     }
 }

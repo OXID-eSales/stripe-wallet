@@ -7,83 +7,61 @@ namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\EventSystem\Handler;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
 use OxidSolutionCatalysts\Payments\Stripe\Service\Result\SecurityValidationResult;
+use OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutReturnServiceInterface;
+use OxidSolutionCatalysts\Payments\Stripe\DTO\CheckoutReturnResult;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentAuthorizedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
 use OxidSolutionCatalysts\Payments\Component\Contract\BasketSnapshot;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\ReturnSecurityValidatorInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
+use OxidSolutionCatalysts\Payments\Stripe\Service\DeliveryAddressHashServiceInterface;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
-use Stripe\StripeClient;
-use Stripe\Service\Checkout\SessionService;
 
 /**
- * Testable subclass that allows injecting the event dispatcher for testing.
+ * Sprint 22: Removed TestableStripeCheckoutReturnHandler - EventDispatcher is now
+ * injected via constructor, no longer fetched lazily via ContainerFactory.
  */
-class TestableStripeCheckoutReturnHandler extends StripeCheckoutReturnHandler
-{
-    private ?EventDispatcherInterface $testEventDispatcher = null;
 
-    public function setTestEventDispatcher(EventDispatcherInterface $dispatcher): void
-    {
-        $this->testEventDispatcher = $dispatcher;
-    }
-
-    protected function getEventDispatcher(): EventDispatcherInterface
-    {
-        if ($this->testEventDispatcher !== null) {
-            return $this->testEventDispatcher;
-        }
-        return parent::getEventDispatcher();
-    }
-
-    /**
-     * Expose request injection for testing
-     */
-    public function getInjectedRequestValues(): array
-    {
-        return [
-            'sDeliveryAddressMD5' => $_REQUEST['sDeliveryAddressMD5'] ?? null,
-        ];
-    }
-}
-
+/**
+ * Unit tests for StripeCheckoutReturnHandler.
+ *
+ * Sprint 21: Tests updated for refactored handler with CheckoutReturnService injection.
+ * Sprint 22: EventDispatcher now injected via constructor (no ContainerFactory).
+ */
 class StripeCheckoutReturnHandlerTest extends TestCase
 {
-    private ContractRepositoryInterface $contractRepository;
-    private StripeAdapterFactoryInterface $adapterFactory;
-    private TokenServiceInterface $tokenService;
-    private ReturnSecurityValidatorInterface $securityValidator;
-    private LoggerInterface $logger;
-    private EventDispatcherInterface $eventDispatcher;
-    private StripeClient $stripeClient;
-    private SessionService $sessionService;
+    private CheckoutReturnServiceInterface&MockObject $checkoutReturnService;
+    private ContractRepositoryInterface&MockObject $contractRepository;
+    private ReturnSecurityValidatorInterface&MockObject $securityValidator;
+    private DeliveryAddressHashServiceInterface&MockObject $deliveryAddressHashService;
+    private LoggerInterface&MockObject $logger;
+    private EventDispatcherInterface&MockObject $eventDispatcher;
 
     protected function setUp(): void
     {
+        $this->checkoutReturnService = $this->createMock(CheckoutReturnServiceInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
-        $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
-        $this->tokenService = $this->createMock(TokenServiceInterface::class);
         $this->securityValidator = $this->createMock(ReturnSecurityValidatorInterface::class);
+        $this->deliveryAddressHashService = $this->createMock(DeliveryAddressHashServiceInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $this->stripeClient = $this->createMock(StripeClient::class);
-        $this->sessionService = $this->createMock(SessionService::class);
-
-        // Default: token validation passes
-        $this->tokenService->method('validateToken')->willReturn(true);
-        $this->tokenService->method('extractContractId')->willReturnCallback(
-            fn($token) => str_starts_with($token, 'token_') ? str_replace('token_', '', $token) : null
-        );
 
         // Default: security validation passes
         $this->securityValidator->method('validateReturn')->willReturn(
             new SecurityValidationResult(100, [], true)
         );
+
+        // Default: delivery address hash service restores hash to $_REQUEST
+        $this->deliveryAddressHashService->method('restoreHashForValidation')
+            ->willReturnCallback(function (?string $hash): void {
+                if ($hash !== null && $hash !== '') {
+                    $_REQUEST['sDeliveryAddressMD5'] = $hash;
+                }
+            });
 
         // Clear any previous $_REQUEST state
         unset($_REQUEST['sDeliveryAddressMD5']);
@@ -95,17 +73,16 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         unset($_REQUEST['sDeliveryAddressMD5']);
     }
 
-    private function createHandler(): TestableStripeCheckoutReturnHandler
+    private function createHandler(): StripeCheckoutReturnHandler
     {
-        $handler = new TestableStripeCheckoutReturnHandler(
+        return new StripeCheckoutReturnHandler(
+            $this->checkoutReturnService,
             $this->contractRepository,
-            $this->adapterFactory,
-            $this->tokenService,
             $this->securityValidator,
+            $this->deliveryAddressHashService,
+            $this->eventDispatcher,
             $this->logger
         );
-        $handler->setTestEventDispatcher($this->eventDispatcher);
-        return $handler;
     }
 
     public function testHandlerIgnoresNonStripeCheckoutReturnEvent(): void
@@ -125,17 +102,70 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         $handler->handle($otherEvent);
     }
 
-    public function testRetrievesCheckoutSession(): void
+    public function testReturnsCorrectHandledEventClass(): void
     {
-        $checkoutSession = $this->createCheckoutSessionMock('cs_test_123', 'paid', 'pi_test_123', 'contract_xyz');
+        $this->assertEquals(
+            StripeCheckoutReturnEvent::class,
+            StripeCheckoutReturnHandler::getHandledEventClass()
+        );
+    }
 
-        $this->sessionService
+    public function testSetsErrorWhenCheckoutSessionIdMissing(): void
+    {
+        $context = new EventContext([
+            'contract_token' => 'token_123',
+            'contract_id' => 'contract_123',
+            // No checkoutSessionId
+        ]);
+        $event = new StripeCheckoutReturnEvent($context);
+
+        $handler = $this->createHandler();
+        $handler->handle($event);
+
+        $this->assertNotNull($context->get('error'));
+        $this->assertStringContainsString('session ID', $context->get('error'));
+        $this->assertEquals('payment', $context->get('redirectTarget'));
+    }
+
+    public function testSetsErrorWhenContractIdMissing(): void
+    {
+        $context = new EventContext([
+            'checkoutSessionId' => 'cs_test_123',
+            'contract_token' => 'token_123',
+            // No contract_id
+        ]);
+        $event = new StripeCheckoutReturnEvent($context);
+
+        $handler = $this->createHandler();
+        $handler->handle($event);
+
+        $this->assertNotNull($context->get('error'));
+        $this->assertEquals('payment', $context->get('redirectTarget'));
+    }
+
+    public function testSetsErrorWhenContractTokenMissing(): void
+    {
+        $context = new EventContext([
+            'checkoutSessionId' => 'cs_test_123',
+            'contract_id' => 'contract_123',
+            // No contract_token
+        ]);
+        $event = new StripeCheckoutReturnEvent($context);
+
+        $handler = $this->createHandler();
+        $handler->handle($event);
+
+        $this->assertNotNull($context->get('error'));
+        $this->assertEquals('payment', $context->get('redirectTarget'));
+    }
+
+    public function testDelegatesToCheckoutReturnService(): void
+    {
+        $this->checkoutReturnService
             ->expects($this->once())
-            ->method('retrieve')
-            ->with('cs_test_123', ['expand' => ['payment_intent']])
-            ->willReturn($checkoutSession);
-
-        $this->setupStripeClientMocks();
+            ->method('validateReturn')
+            ->with('cs_test_123', 'contract_xyz', 'token_contract_xyz')
+            ->willReturn(CheckoutReturnResult::success('contract_xyz', 'pi_test_123', 10000, 'eur'));
 
         $contract = $this->createContractMockWithMetadata('contract_xyz', [
             'delivery_address_hash' => 'hash_xyz',
@@ -156,25 +186,20 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         $handler->handle($event);
     }
 
-    public function testVerifiesPaymentStatus(): void
+    public function testDispatchesPaymentAuthorizedEventOnSuccess(): void
     {
-        $checkoutSession = $this->createCheckoutSessionMock('cs_test_paid', 'paid', 'pi_test_paid', 'contract_paid');
-
-        $this->sessionService
-            ->method('retrieve')
-            ->willReturn($checkoutSession);
-
-        $this->setupStripeClientMocks();
+        $this->checkoutReturnService
+            ->method('validateReturn')
+            ->willReturn(CheckoutReturnResult::success('contract_paid', 'pi_test_paid', 10000, 'eur'));
 
         $contract = $this->createContractMockWithMetadata('contract_paid', [
             'delivery_address_hash' => 'hash_paid',
         ]);
         $this->contractRepository
             ->method('findById')
-            ->with('contract_paid')
             ->willReturn($contract);
 
-        // When payment is 'paid', should dispatch PaymentAuthorizedEvent
+        // When validation succeeds, should dispatch PaymentAuthorizedEvent
         $this->eventDispatcher
             ->expects($this->once())
             ->method('dispatch')
@@ -191,89 +216,13 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         $handler->handle($event);
     }
 
-    public function testLoadsContractFromMetadata(): void
+    public function testSetsErrorWhenServiceValidationFails(): void
     {
-        $checkoutSession = $this->createCheckoutSessionMock('cs_test_load', 'paid', 'pi_test_load', 'contract_load_test');
+        $this->checkoutReturnService
+            ->method('validateReturn')
+            ->willReturn(CheckoutReturnResult::failure('Payment not completed: unpaid'));
 
-        $this->sessionService
-            ->method('retrieve')
-            ->willReturn($checkoutSession);
-
-        $this->setupStripeClientMocks();
-
-        $contract = $this->createContractMockWithMetadata('contract_load_test', [
-            'delivery_address_hash' => 'hash_load',
-        ]);
-
-        // Verify the correct contract ID is used
-        $this->contractRepository
-            ->expects($this->once())
-            ->method('findById')
-            ->with('contract_load_test')
-            ->willReturn($contract);
-
-        $context = new EventContext([
-            'checkoutSessionId' => 'cs_test_load',
-            'contract_token' => 'token_contract_load_test',
-            'contract_id' => 'contract_load_test',
-        ]);
-        $event = new StripeCheckoutReturnEvent($context);
-
-        $handler = $this->createHandler();
-        $handler->handle($event);
-    }
-
-    public function testDispatchesPaymentConfirmedEvent(): void
-    {
-        $checkoutSession = $this->createCheckoutSessionMock('cs_test_confirm', 'paid', 'pi_test_confirm', 'contract_confirm');
-
-        $this->sessionService
-            ->method('retrieve')
-            ->willReturn($checkoutSession);
-
-        $this->setupStripeClientMocks();
-
-        $contract = $this->createContractMockWithMetadata('contract_confirm', [
-            'delivery_address_hash' => 'hash_confirm',
-        ]);
-        $this->contractRepository
-            ->method('findById')
-            ->willReturn($contract);
-
-        $dispatchedEvent = null;
-        $this->eventDispatcher
-            ->expects($this->once())
-            ->method('dispatch')
-            ->willReturnCallback(function ($event) use (&$dispatchedEvent) {
-                $dispatchedEvent = $event;
-                return $event;
-            });
-
-        $context = new EventContext([
-            'checkoutSessionId' => 'cs_test_confirm',
-            'contract_token' => 'token_contract_confirm',
-            'contract_id' => 'contract_confirm',
-        ]);
-        $event = new StripeCheckoutReturnEvent($context);
-
-        $handler = $this->createHandler();
-        $handler->handle($event);
-
-        $this->assertInstanceOf(PaymentAuthorizedEvent::class, $dispatchedEvent);
-    }
-
-    public function testSetsErrorOnPaymentNotCompleted(): void
-    {
-        // Unpaid session
-        $checkoutSession = $this->createCheckoutSessionMock('cs_test_unpaid', 'unpaid', 'pi_test_unpaid', 'contract_unpaid');
-
-        $this->sessionService
-            ->method('retrieve')
-            ->willReturn($checkoutSession);
-
-        $this->setupStripeClientMocks();
-
-        // Should NOT dispatch PaymentConfirmedEvent
+        // Should NOT dispatch event
         $this->eventDispatcher
             ->expects($this->never())
             ->method('dispatch');
@@ -289,41 +238,15 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         $handler->handle($event);
 
         $this->assertNotNull($context->get('error'));
-        $this->assertStringContainsString('unpaid', $context->get('error'));
-    }
-
-    public function testSetsRedirectTargetToPaymentOnError(): void
-    {
-        $checkoutSession = $this->createCheckoutSessionMock('cs_test_err', 'expired', 'pi_test_err', 'contract_err');
-
-        $this->sessionService
-            ->method('retrieve')
-            ->willReturn($checkoutSession);
-
-        $this->setupStripeClientMocks();
-
-        $context = new EventContext([
-            'checkoutSessionId' => 'cs_test_err',
-            'contract_token' => 'token_contract_err',
-            'contract_id' => 'contract_err',
-        ]);
-        $event = new StripeCheckoutReturnEvent($context);
-
-        $handler = $this->createHandler();
-        $handler->handle($event);
-
+        $this->assertStringContainsString('not completed', $context->get('error'));
         $this->assertEquals('payment', $context->get('redirectTarget'));
     }
 
     public function testSetsContractInContext(): void
     {
-        $checkoutSession = $this->createCheckoutSessionMock('cs_test_ctx', 'paid', 'pi_test_ctx', 'contract_ctx');
-
-        $this->sessionService
-            ->method('retrieve')
-            ->willReturn($checkoutSession);
-
-        $this->setupStripeClientMocks();
+        $this->checkoutReturnService
+            ->method('validateReturn')
+            ->willReturn(CheckoutReturnResult::success('contract_ctx', 'pi_test_ctx', 10000, 'eur'));
 
         $contract = $this->createContractMockWithMetadata('contract_ctx', [
             'delivery_address_hash' => 'hash_ctx',
@@ -345,23 +268,11 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         $this->assertSame($contract, $context->getContract());
     }
 
-    public function testReturnsCorrectHandledEventClass(): void
-    {
-        $this->assertEquals(
-            StripeCheckoutReturnEvent::class,
-            StripeCheckoutReturnHandler::getHandledEventClass()
-        );
-    }
-
     public function testSetsPaymentIntentIdInContext(): void
     {
-        $checkoutSession = $this->createCheckoutSessionMock('cs_test_pi', 'paid', 'pi_test_xyz123', 'contract_pi');
-
-        $this->sessionService
-            ->method('retrieve')
-            ->willReturn($checkoutSession);
-
-        $this->setupStripeClientMocks();
+        $this->checkoutReturnService
+            ->method('validateReturn')
+            ->willReturn(CheckoutReturnResult::success('contract_pi', 'pi_test_xyz123', 10000, 'eur'));
 
         $contract = $this->createContractMockWithMetadata('contract_pi', [
             'delivery_address_hash' => 'hash_pi',
@@ -384,89 +295,14 @@ class StripeCheckoutReturnHandlerTest extends TestCase
     }
 
     // =========================================================================
-    // Token Validation Tests (Sprint 1 - Session Restoration)
-    // =========================================================================
-
-    public function testValidatesContractTokenFromUrl(): void
-    {
-        $checkoutSession = $this->createCheckoutSessionMock('cs_test_token', 'paid', 'pi_test_token', 'contract_token_test');
-
-        $this->sessionService->method('retrieve')->willReturn($checkoutSession);
-        $this->setupStripeClientMocks();
-
-        $contract = $this->createContractMockWithMetadata('contract_token_test', [
-            'delivery_address_hash' => 'hash_abc123',
-        ]);
-        $this->contractRepository->method('findById')->willReturn($contract);
-
-        // Token should be validated
-        $this->tokenService
-            ->expects($this->once())
-            ->method('validateToken')
-            ->with('token_contract_token_test', 'contract_token_test')
-            ->willReturn(true);
-
-        $context = new EventContext([
-            'checkoutSessionId' => 'cs_test_token',
-            'contract_token' => 'token_contract_token_test',
-            'contract_id' => 'contract_token_test',
-        ]);
-        $event = new StripeCheckoutReturnEvent($context);
-
-        $handler = $this->createHandler();
-        $handler->handle($event);
-
-        // Should proceed without error
-        $this->assertNull($context->get('error'));
-    }
-
-    public function testRejectsInvalidToken(): void
-    {
-        // Token validation fails
-        $this->tokenService = $this->createMock(TokenServiceInterface::class);
-        $this->tokenService->method('validateToken')->willReturn(false);
-        $this->tokenService->method('extractContractId')->willReturn('contract_invalid');
-
-        $context = new EventContext([
-            'checkoutSessionId' => 'cs_test_invalid',
-            'contract_token' => 'invalid_token',
-            'contract_id' => 'contract_invalid',
-        ]);
-        $event = new StripeCheckoutReturnEvent($context);
-
-        $handler = $this->createHandler();
-        $handler->handle($event);
-
-        // Should set error
-        $this->assertNotNull($context->get('error'));
-        $this->assertEquals('payment', $context->get('redirectTarget'));
-    }
-
-    public function testRejectsMissingToken(): void
-    {
-        $context = new EventContext([
-            'checkoutSessionId' => 'cs_test_no_token',
-            // No contract_token provided
-        ]);
-        $event = new StripeCheckoutReturnEvent($context);
-
-        $handler = $this->createHandler();
-        $handler->handle($event);
-
-        // Should set error for missing token
-        $this->assertNotNull($context->get('error'));
-    }
-
-    // =========================================================================
-    // Security Validation Tests (Sprint 1 - Session Restoration)
+    // Security Validation Tests
     // =========================================================================
 
     public function testPerformsSecurityValidation(): void
     {
-        $checkoutSession = $this->createCheckoutSessionMock('cs_test_sec', 'paid', 'pi_test_sec', 'contract_sec');
-
-        $this->sessionService->method('retrieve')->willReturn($checkoutSession);
-        $this->setupStripeClientMocks();
+        $this->checkoutReturnService
+            ->method('validateReturn')
+            ->willReturn(CheckoutReturnResult::success('contract_sec', 'pi_test_sec', 10000, 'eur'));
 
         $contract = $this->createContractMockWithMetadata('contract_sec', [
             'user_ip' => '192.168.1.100',
@@ -494,10 +330,9 @@ class StripeCheckoutReturnHandlerTest extends TestCase
 
     public function testLogsWarningForLowSecurityScore(): void
     {
-        $checkoutSession = $this->createCheckoutSessionMock('cs_test_warn', 'paid', 'pi_test_warn', 'contract_warn');
-
-        $this->sessionService->method('retrieve')->willReturn($checkoutSession);
-        $this->setupStripeClientMocks();
+        $this->checkoutReturnService
+            ->method('validateReturn')
+            ->willReturn(CheckoutReturnResult::success('contract_warn', 'pi_test_warn', 10000, 'eur'));
 
         $contract = $this->createContractMockWithMetadata('contract_warn', [
             'delivery_address_hash' => 'hash_warn',
@@ -532,10 +367,9 @@ class StripeCheckoutReturnHandlerTest extends TestCase
 
     public function testBlocksReturnWhenSecurityCheckFails(): void
     {
-        $checkoutSession = $this->createCheckoutSessionMock('cs_test_block', 'paid', 'pi_test_block', 'contract_block');
-
-        $this->sessionService->method('retrieve')->willReturn($checkoutSession);
-        $this->setupStripeClientMocks();
+        $this->checkoutReturnService
+            ->method('validateReturn')
+            ->willReturn(CheckoutReturnResult::success('contract_block', 'pi_test_block', 10000, 'eur'));
 
         $contract = $this->createContractMockWithMetadata('contract_block', [
             'delivery_address_hash' => 'hash_block',
@@ -567,17 +401,16 @@ class StripeCheckoutReturnHandlerTest extends TestCase
     }
 
     // =========================================================================
-    // Session Restoration Tests (Sprint 1 - CRITICAL)
+    // Session Restoration Tests
     // =========================================================================
 
     public function testInjectsDeliveryAddressHashIntoRequest(): void
     {
         $expectedHash = 'abc123hash';
 
-        $checkoutSession = $this->createCheckoutSessionMock('cs_test_inject', 'paid', 'pi_test_inject', 'contract_inject');
-
-        $this->sessionService->method('retrieve')->willReturn($checkoutSession);
-        $this->setupStripeClientMocks();
+        $this->checkoutReturnService
+            ->method('validateReturn')
+            ->willReturn(CheckoutReturnResult::success('contract_inject', 'pi_test_inject', 10000, 'eur'));
 
         $contract = $this->createContractMockWithMetadata('contract_inject', [
             'delivery_address_hash' => $expectedHash,
@@ -603,10 +436,9 @@ class StripeCheckoutReturnHandlerTest extends TestCase
 
     public function testRestoresDeliveryAddressIdToContext(): void
     {
-        $checkoutSession = $this->createCheckoutSessionMock('cs_test_addr', 'paid', 'pi_test_addr', 'contract_addr');
-
-        $this->sessionService->method('retrieve')->willReturn($checkoutSession);
-        $this->setupStripeClientMocks();
+        $this->checkoutReturnService
+            ->method('validateReturn')
+            ->willReturn(CheckoutReturnResult::success('contract_addr', 'pi_test_addr', 10000, 'eur'));
 
         $contract = $this->createContractMockWithMetadata('contract_addr', [
             'delivery_address_hash' => 'hash_addr',
@@ -630,11 +462,6 @@ class StripeCheckoutReturnHandlerTest extends TestCase
 
     // --- Helper methods ---
 
-    private function createContractMock(string $contractId): PaymentContractInterface
-    {
-        return $this->createContractMockWithMetadata($contractId, []);
-    }
-
     private function createContractMockWithMetadata(string $contractId, array $metadata): PaymentContractInterface
     {
         $contract = $this->createMock(PaymentContractInterface::class);
@@ -656,56 +483,5 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         $contract->method('getBasketSnapshot')->willReturn($snapshot);
 
         return $contract;
-    }
-
-    /**
-     * Create a checkout session mock with metadata
-     */
-    private function createCheckoutSessionMock(
-        string $sessionId,
-        string $paymentStatus,
-        string $paymentIntentId,
-        string $contractId
-    ): object {
-        return new class($sessionId, $paymentStatus, $paymentIntentId, $contractId) {
-            public string $id;
-            public string $payment_status;
-            public string $payment_intent;
-            public int $amount_total;
-            public string $currency;
-            public object $metadata;
-
-            public function __construct(
-                string $id,
-                string $paymentStatus,
-                string $paymentIntentId,
-                string $contractId
-            ) {
-                $this->id = $id;
-                $this->payment_status = $paymentStatus;
-                $this->payment_intent = $paymentIntentId;
-                $this->amount_total = 1000; // 10.00 EUR in cents
-                $this->currency = 'eur';
-                $this->metadata = new class($contractId) {
-                    public string $contract_id;
-                    public function __construct(string $contractId)
-                    {
-                        $this->contract_id = $contractId;
-                    }
-                };
-            }
-        };
-    }
-
-    private function setupStripeClientMocks(): void
-    {
-        $checkoutService = new \stdClass();
-        $checkoutService->sessions = $this->sessionService;
-
-        $this->stripeClient->checkout = $checkoutService;
-
-        $this->adapterFactory
-            ->method('getStripeClient')
-            ->willReturn($this->stripeClient);
     }
 }

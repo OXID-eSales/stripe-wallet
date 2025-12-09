@@ -13,68 +13,45 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterfac
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Contract\SecurityValidationResultInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\ReturnSecurityValidatorInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface;
+use OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutReturnServiceInterface;
+use OxidSolutionCatalysts\Payments\Stripe\DTO\CheckoutReturnResult;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler;
-use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
+use OxidSolutionCatalysts\Payments\Stripe\Service\DeliveryAddressHashServiceInterface;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Stripe\StripeClient;
-use Stripe\Service\Checkout\SessionService;
 
 /**
- * Testable subclass for address hash restoration tests.
+ * Sprint 22: Removed TestableAddressHashHandler - EventDispatcher is now
+ * injected via constructor, no longer fetched lazily via ContainerFactory.
  */
-class TestableAddressHashHandler extends StripeCheckoutReturnHandler
-{
-    private ?EventDispatcherInterface $testEventDispatcher = null;
-
-    public function setTestEventDispatcher(EventDispatcherInterface $dispatcher): void
-    {
-        $this->testEventDispatcher = $dispatcher;
-    }
-
-    protected function getEventDispatcher(): EventDispatcherInterface
-    {
-        if ($this->testEventDispatcher !== null) {
-            return $this->testEventDispatcher;
-        }
-        return parent::getEventDispatcher();
-    }
-}
 
 /**
  * Tests for address hash restoration from contract when returning from Stripe.
  *
- * TDD Test Suite - Phase 1 (Red):
+ * Sprint 21: Updated for refactored handler with CheckoutReturnServiceInterface.
+ * Sprint 22: EventDispatcher now injected via constructor (no ContainerFactory).
+ *
  * These tests verify that the delivery address hash is properly restored
  * to the session when returning from Stripe checkout.
  */
 class AddressHashRestorationTest extends TestCase
 {
-    private ContractRepositoryInterface $contractRepository;
-    private StripeAdapterFactoryInterface $adapterFactory;
-    private TokenServiceInterface $tokenService;
-    private ReturnSecurityValidatorInterface $securityValidator;
-    private EventDispatcherInterface $eventDispatcher;
-    private StripeClient $stripeClient;
-    private SessionService $sessionService;
-    private Session $session;
+    private CheckoutReturnServiceInterface&MockObject $checkoutReturnService;
+    private ContractRepositoryInterface&MockObject $contractRepository;
+    private ReturnSecurityValidatorInterface&MockObject $securityValidator;
+    private DeliveryAddressHashServiceInterface&MockObject $deliveryAddressHashService;
+    private EventDispatcherInterface&MockObject $eventDispatcher;
+    private Session&MockObject $session;
 
     protected function setUp(): void
     {
+        $this->checkoutReturnService = $this->createMock(CheckoutReturnServiceInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
-        $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
-        $this->tokenService = $this->createMock(TokenServiceInterface::class);
         $this->securityValidator = $this->createMock(ReturnSecurityValidatorInterface::class);
+        $this->deliveryAddressHashService = $this->createMock(DeliveryAddressHashServiceInterface::class);
         $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $this->stripeClient = $this->createMock(StripeClient::class);
-        $this->sessionService = $this->createMock(SessionService::class);
         $this->session = $this->createMock(Session::class);
-
-        // Default: token validation passes
-        $this->tokenService
-            ->method('validateToken')
-            ->willReturn(true);
 
         // Default: security validation passes
         $securityResult = $this->createMock(SecurityValidationResultInterface::class);
@@ -87,16 +64,15 @@ class AddressHashRestorationTest extends TestCase
             ->willReturn($securityResult);
     }
 
-    private function createHandler(): TestableAddressHashHandler
+    private function createHandler(): StripeCheckoutReturnHandler
     {
-        $handler = new TestableAddressHashHandler(
+        return new StripeCheckoutReturnHandler(
+            $this->checkoutReturnService,
             $this->contractRepository,
-            $this->adapterFactory,
-            $this->tokenService,
-            $this->securityValidator
+            $this->securityValidator,
+            $this->deliveryAddressHashService,
+            $this->eventDispatcher
         );
-        $handler->setTestEventDispatcher($this->eventDispatcher);
-        return $handler;
     }
 
     /**
@@ -124,25 +100,16 @@ class AddressHashRestorationTest extends TestCase
         );
         $contract->setMetadata('delivery_address_hash', $storedHash);
 
+        // Mock checkout return service to return success
+        $this->checkoutReturnService
+            ->method('validateReturn')
+            ->willReturn(CheckoutReturnResult::success($contractId, 'pi_test_123', 10000, 'eur'));
+
         // Mock contract repository
         $this->contractRepository
             ->method('findById')
             ->with($contractId)
             ->willReturn($contract);
-
-        // Mock Stripe checkout session
-        $checkoutSession = $this->createCheckoutSessionMock(
-            'cs_test_123',
-            'paid',
-            'pi_test_123',
-            $contractId
-        );
-
-        $this->sessionService
-            ->method('retrieve')
-            ->willReturn($checkoutSession);
-
-        $this->setupStripeClientMocks();
 
         // Expect session variable to be set
         $this->session
@@ -192,23 +159,14 @@ class AddressHashRestorationTest extends TestCase
         $contract->setMetadata('delivery_address_hash', $storedHash);
         $contract->setMetadata('delivery_address_id', $deliveryAddressId);
 
+        $this->checkoutReturnService
+            ->method('validateReturn')
+            ->willReturn(CheckoutReturnResult::success($contractId, 'pi_test_456', 10000, 'eur'));
+
         $this->contractRepository
             ->method('findById')
             ->with($contractId)
             ->willReturn($contract);
-
-        $checkoutSession = $this->createCheckoutSessionMock(
-            'cs_test_456',
-            'paid',
-            'pi_test_456',
-            $contractId
-        );
-
-        $this->sessionService
-            ->method('retrieve')
-            ->willReturn($checkoutSession);
-
-        $this->setupStripeClientMocks();
 
         // Expect both session variables to be set
         $setVariableCalls = [];
@@ -262,23 +220,14 @@ class AddressHashRestorationTest extends TestCase
         );
         // Note: No metadata set
 
+        $this->checkoutReturnService
+            ->method('validateReturn')
+            ->willReturn(CheckoutReturnResult::success($contractId, 'pi_test_no_hash', 10000, 'eur'));
+
         $this->contractRepository
             ->method('findById')
             ->with($contractId)
             ->willReturn($contract);
-
-        $checkoutSession = $this->createCheckoutSessionMock(
-            'cs_test_no_hash',
-            'paid',
-            'pi_test_no_hash',
-            $contractId
-        );
-
-        $this->sessionService
-            ->method('retrieve')
-            ->willReturn($checkoutSession);
-
-        $this->setupStripeClientMocks();
 
         // Session setVariable should NOT be called for sDelAddrMD5
         $this->session
@@ -331,22 +280,13 @@ class AddressHashRestorationTest extends TestCase
         );
         $contract->setMetadata('delivery_address_hash', $storedHash);
 
+        $this->checkoutReturnService
+            ->method('validateReturn')
+            ->willReturn(CheckoutReturnResult::success($contractId, 'pi_timing', 10000, 'eur'));
+
         $this->contractRepository
             ->method('findById')
             ->willReturn($contract);
-
-        $checkoutSession = $this->createCheckoutSessionMock(
-            'cs_timing',
-            'paid',
-            'pi_timing',
-            $contractId
-        );
-
-        $this->sessionService
-            ->method('retrieve')
-            ->willReturn($checkoutSession);
-
-        $this->setupStripeClientMocks();
 
         // Track when hash is restored vs when event is dispatched
         $this->session
@@ -393,55 +333,5 @@ class AddressHashRestorationTest extends TestCase
                 'Address hash should be restored even if dispatch is not called'
             );
         }
-    }
-
-    // --- Helper methods ---
-
-    private function createCheckoutSessionMock(
-        string $sessionId,
-        string $paymentStatus,
-        string $paymentIntentId,
-        string $contractId
-    ): object {
-        return new class($sessionId, $paymentStatus, $paymentIntentId, $contractId) {
-            public string $id;
-            public string $payment_status;
-            public string $payment_intent;
-            public int $amount_total;
-            public string $currency;
-            public object $metadata;
-
-            public function __construct(
-                string $id,
-                string $paymentStatus,
-                string $paymentIntentId,
-                string $contractId
-            ) {
-                $this->id = $id;
-                $this->payment_status = $paymentStatus;
-                $this->payment_intent = $paymentIntentId;
-                $this->amount_total = 10000;
-                $this->currency = 'eur';
-                $this->metadata = new class($contractId) {
-                    public string $contract_id;
-                    public function __construct(string $contractId)
-                    {
-                        $this->contract_id = $contractId;
-                    }
-                };
-            }
-        };
-    }
-
-    private function setupStripeClientMocks(): void
-    {
-        $checkoutService = new \stdClass();
-        $checkoutService->sessions = $this->sessionService;
-
-        $this->stripeClient->checkout = $checkoutService;
-
-        $this->adapterFactory
-            ->method('getStripeClient')
-            ->willReturn($this->stripeClient);
     }
 }

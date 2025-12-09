@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\EventSystem\Handler;
 
-use OxidEsales\Eshop\Application\Model\Basket;
-use OxidEsales\Eshop\Application\Model\User;
-use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\Eshop\Core\Session;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
 use OxidSolutionCatalysts\Payments\Component\Contract\BasketSnapshot;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
@@ -15,210 +11,141 @@ use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterf
 use OxidSolutionCatalysts\Payments\Component\Service\ContractServiceInterface;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeContractCreationHandler;
+use OxidSolutionCatalysts\Payments\Stripe\Service\ContractMetadataServiceInterface;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 /**
  * Tests for address hash storage in contract during Stripe checkout initiation.
  *
- * TDD Test Suite - Phase 1 (Red):
- * These tests verify that the delivery address hash is properly stored
- * in the contract metadata before redirecting to Stripe.
+ * Sprint 21: Updated tests for handler with ContractMetadataService delegation.
+ * The actual metadata storage logic is now tested in ContractMetadataServiceTest.
+ * These tests verify that the handler delegates correctly to the service.
  */
 class AddressHashStorageTest extends TestCase
 {
+    private ContractServiceInterface&MockObject $contractService;
+    private ContractRepositoryInterface&MockObject $contractRepository;
+    private ContractMetadataServiceInterface&MockObject $metadataService;
+
+    protected function setUp(): void
+    {
+        $this->contractService = $this->createMock(ContractServiceInterface::class);
+        $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
+        $this->metadataService = $this->createMock(ContractMetadataServiceInterface::class);
+    }
+
+    private function createHandler(): StripeContractCreationHandler
+    {
+        return new StripeContractCreationHandler(
+            $this->contractService,
+            $this->contractRepository,
+            $this->metadataService
+        );
+    }
+
     /**
-     * Test 1: Address hash is stored in contract metadata when contract is created.
+     * Test 1: Handler delegates address hash storage to metadata service.
      */
     public function testAddressHashStoredInContractOnCreation(): void
     {
         // Arrange
-        $expectedHash = 'abc123def456';
+        $contract = $this->createContract();
+        $basket = new \stdClass();
 
-        // Mock session to return the delivery address hash
-        $session = $this->createMock(Session::class);
-        $session->method('getVariable')
-            ->willReturnMap([
-                ['sDelAddrMD5', $expectedHash],
-                ['deladrid', null],
-            ]);
-        Registry::set(Session::class, $session);
+        $this->contractService->method('createContract')->willReturn($contract);
 
-        // Create mock basket with user
-        $user = $this->createMock(User::class);
-        $user->method('getId')->willReturn('user123');
-        $user->method('getEncodedDeliveryAddress')->willReturn($expectedHash);
-
-        $basket = $this->createMock(Basket::class);
-        $basket->method('getBasketUser')->willReturn($user);
-        $basket->method('getProductsCount')->willReturn(1);
-        $basket->method('getPrice')->willReturn(new class {
-            public function getBruttoPrice(): float { return 100.0; }
-            public function getNettoPrice(): float { return 84.0; }
-            public function getVatValue(): float { return 16.0; }
-        });
-        $basket->method('getBasketCurrency')->willReturn(new class {
-            public string $name = 'EUR';
-        });
-        $basket->method('getContents')->willReturn([]);
-
-        // Create a real contract to verify metadata is stored
-        $contract = new PaymentContract(
-            shopId: 1,
-            userId: 'user123',
-            basketSnapshot: BasketSnapshot::fromArray([
-                'items' => [],
-                'discounts' => [],
-                'totalGross' => 100.0,
-                'totalNet' => 84.0,
-                'totalVat' => 16.0,
-                'currency' => 'EUR',
-            ])
-        );
-
-        // Mock contract service to return our contract
-        $contractService = $this->createMock(ContractServiceInterface::class);
-        $contractService->method('createContract')
-            ->willReturn($contract);
-
-        // Create context
         $context = new EventContext([
             'userId' => 'user123',
             'basket' => $basket,
             'conditionTypes' => ['payment_authorized'],
         ]);
-
         $event = new StripeCheckoutSessionRequestEvent($context);
 
-        // Mock repository for save
-        $contractRepository = $this->createMock(ContractRepositoryInterface::class);
+        // Expect metadata service to be called to store delivery address
+        $this->metadataService
+            ->expects($this->once())
+            ->method('storeDeliveryAddressMetadata')
+            ->with($contract, $basket);
 
         // Act
-        $handler = new StripeContractCreationHandler($contractService, $contractRepository);
+        $handler = $this->createHandler();
         $handler->handle($event);
 
-        // Assert
-        $storedContract = $context->getContract();
-        $this->assertNotNull($storedContract);
-        $this->assertEquals(
-            $expectedHash,
-            $storedContract->getMetadata('delivery_address_hash'),
-            'Delivery address hash should be stored in contract metadata'
-        );
+        // Assert - contract should be set in context
+        $this->assertSame($contract, $context->getContract());
     }
 
     /**
-     * Test 2: Address hash includes delivery address ID when present.
+     * Test 2: Handler delegates delivery address ID storage to metadata service.
      */
     public function testAddressHashIncludesDeliveryAddressId(): void
     {
         // Arrange
-        $billingHash = 'billing123';
-        $deliveryHash = 'delivery456';
-        $combinedHash = $billingHash . $deliveryHash;
-        $deliveryAddressId = 'deladdr_abc';
+        $contract = $this->createContract();
+        $basket = new \stdClass();
 
-        $session = $this->createMock(Session::class);
-        $session->method('getVariable')
-            ->willReturnMap([
-                ['sDelAddrMD5', $combinedHash],
-                ['deladrid', $deliveryAddressId],
-            ]);
-        Registry::set(Session::class, $session);
-
-        $user = $this->createMock(User::class);
-        $user->method('getId')->willReturn('user123');
-        $user->method('getEncodedDeliveryAddress')->willReturn($billingHash);
-
-        $basket = $this->createMock(Basket::class);
-        $basket->method('getBasketUser')->willReturn($user);
-        $basket->method('getProductsCount')->willReturn(1);
-        $basket->method('getPrice')->willReturn(new class {
-            public function getBruttoPrice(): float { return 100.0; }
-            public function getNettoPrice(): float { return 84.0; }
-            public function getVatValue(): float { return 16.0; }
-        });
-        $basket->method('getBasketCurrency')->willReturn(new class {
-            public string $name = 'EUR';
-        });
-        $basket->method('getContents')->willReturn([]);
-
-        $contract = new PaymentContract(
-            shopId: 1,
-            userId: 'user123',
-            basketSnapshot: BasketSnapshot::fromArray([
-                'items' => [],
-                'discounts' => [],
-                'totalGross' => 100.0,
-                'totalNet' => 84.0,
-                'totalVat' => 16.0,
-                'currency' => 'EUR',
-            ])
-        );
-
-        $contractService = $this->createMock(ContractServiceInterface::class);
-        $contractService->method('createContract')->willReturn($contract);
+        $this->contractService->method('createContract')->willReturn($contract);
 
         $context = new EventContext([
             'userId' => 'user123',
             'basket' => $basket,
             'conditionTypes' => ['payment_authorized'],
         ]);
-
         $event = new StripeCheckoutSessionRequestEvent($context);
 
-        // Mock repository for save
-        $contractRepository = $this->createMock(ContractRepositoryInterface::class);
+        // Expect metadata service to be called
+        $this->metadataService
+            ->expects($this->once())
+            ->method('storeDeliveryAddressMetadata')
+            ->with($contract, $basket);
 
         // Act
-        $handler = new StripeContractCreationHandler($contractService, $contractRepository);
+        $handler = $this->createHandler();
         $handler->handle($event);
 
-        // Assert
-        $storedContract = $context->getContract();
-        $this->assertEquals(
-            $combinedHash,
-            $storedContract->getMetadata('delivery_address_hash'),
-            'Combined billing+delivery hash should be stored'
-        );
-        $this->assertEquals(
-            $deliveryAddressId,
-            $storedContract->getMetadata('delivery_address_id'),
-            'Delivery address ID should be stored'
-        );
+        // Assert - the metadata service handles the actual storage logic
+        // See ContractMetadataServiceTest for detailed hash storage tests
+        $this->assertSame($contract, $context->getContract());
     }
 
     /**
-     * Test 3: Contract stores null hash when no address hash in session.
+     * Test 3: Handler still delegates when no address hash in session.
+     *
+     * The metadata service handles empty/null cases internally.
      */
     public function testContractHandlesMissingAddressHash(): void
     {
-        // Arrange - no hash in session
-        $session = $this->createMock(Session::class);
-        $session->method('getVariable')
-            ->willReturnMap([
-                ['sDelAddrMD5', null],
-                ['deladrid', null],
-            ]);
-        Registry::set(Session::class, $session);
+        // Arrange
+        $contract = $this->createContract();
+        $basket = new \stdClass();
 
-        $user = $this->createMock(User::class);
-        $user->method('getId')->willReturn('user123');
-        $user->method('getEncodedDeliveryAddress')->willReturn('computed_hash');
+        $this->contractService->method('createContract')->willReturn($contract);
 
-        $basket = $this->createMock(Basket::class);
-        $basket->method('getBasketUser')->willReturn($user);
-        $basket->method('getProductsCount')->willReturn(1);
-        $basket->method('getPrice')->willReturn(new class {
-            public function getBruttoPrice(): float { return 100.0; }
-            public function getNettoPrice(): float { return 84.0; }
-            public function getVatValue(): float { return 16.0; }
-        });
-        $basket->method('getBasketCurrency')->willReturn(new class {
-            public string $name = 'EUR';
-        });
-        $basket->method('getContents')->willReturn([]);
+        $context = new EventContext([
+            'userId' => 'user123',
+            'basket' => $basket,
+            'conditionTypes' => ['payment_authorized'],
+        ]);
+        $event = new StripeCheckoutSessionRequestEvent($context);
 
-        $contract = new PaymentContract(
+        // Expect metadata service to be called regardless - it handles empty values
+        $this->metadataService
+            ->expects($this->once())
+            ->method('storeDeliveryAddressMetadata')
+            ->with($contract, $basket);
+
+        // Act
+        $handler = $this->createHandler();
+        $handler->handle($event);
+
+        // Assert - contract should be set and saved
+        $this->assertSame($contract, $context->getContract());
+    }
+
+    private function createContract(): PaymentContract
+    {
+        return new PaymentContract(
             shopId: 1,
             userId: 'user123',
             basketSnapshot: BasketSnapshot::fromArray([
@@ -229,32 +156,6 @@ class AddressHashStorageTest extends TestCase
                 'totalVat' => 16.0,
                 'currency' => 'EUR',
             ])
-        );
-
-        $contractService = $this->createMock(ContractServiceInterface::class);
-        $contractService->method('createContract')->willReturn($contract);
-
-        $context = new EventContext([
-            'userId' => 'user123',
-            'basket' => $basket,
-            'conditionTypes' => ['payment_authorized'],
-        ]);
-
-        $event = new StripeCheckoutSessionRequestEvent($context);
-
-        // Mock repository for save
-        $contractRepository = $this->createMock(ContractRepositoryInterface::class);
-
-        // Act
-        $handler = new StripeContractCreationHandler($contractService, $contractRepository);
-        $handler->handle($event);
-
-        // Assert - should compute hash from user
-        $storedContract = $context->getContract();
-        $this->assertEquals(
-            'computed_hash',
-            $storedContract->getMetadata('delivery_address_hash'),
-            'Should compute and store hash from user when session hash is missing'
         );
     }
 }

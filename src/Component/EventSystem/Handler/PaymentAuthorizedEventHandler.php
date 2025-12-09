@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Handler;
 
-use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidSolutionCatalysts\Payments\Component\Contract\ContractCondition;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractReadyToCommitEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentAuthorizedEvent;
@@ -22,23 +21,16 @@ use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterf
  * This is the bridge between provider-specific payment confirmation
  * (PaymentAuthorizedEvent) and the contract state machine.
  *
- * NOTE: EventDispatcher is fetched lazily to avoid circular dependency
- * with EventListenerProvider during container initialization.
+ * Sprint 22: EventDispatcher now injected via constructor (no ContainerFactory).
  *
  * @since 1.0.0
  */
 class PaymentAuthorizedEventHandler implements HandlerInterface
 {
     public function __construct(
-        private ContractRepositoryInterface $contractRepository
+        private readonly ContractRepositoryInterface $contractRepository,
+        private readonly EventDispatcherInterface $eventDispatcher
     ) {
-    }
-
-    private function getEventDispatcher(): EventDispatcherInterface
-    {
-        return ContainerFactory::getInstance()
-            ->getContainer()
-            ->get(EventDispatcherInterface::class);
     }
 
     public static function getHandledEventClass(): string
@@ -99,7 +91,7 @@ class PaymentAuthorizedEventHandler implements HandlerInterface
                 []
             );
 
-            $this->getEventDispatcher()->dispatch($readyEvent);
+            $this->eventDispatcher->dispatch($readyEvent);
         }
     }
 }
