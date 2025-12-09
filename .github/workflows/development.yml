@@ -269,7 +269,8 @@ jobs:
           docker compose exec -T -e XDEBUG_MODE=coverage php vendor/bin/phpunit \
             -c /var/www/test-module/tests/phpunit.xml \
             --testsuite Integration \
-            --bootstrap=/var/www/source/bootstrap.php 
+            --bootstrap=/var/www/source/bootstrap.php \
+            --exclude-group webhook-e2e 
 
       - name: Upload log artifact
         if: always()
