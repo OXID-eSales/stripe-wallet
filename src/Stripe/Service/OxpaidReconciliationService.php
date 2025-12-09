@@ -11,6 +11,7 @@ namespace OxidSolutionCatalysts\Payments\Stripe\Service;
 
 use Doctrine\DBAL\Connection;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 
@@ -27,6 +28,8 @@ use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryIn
  *
  * This handles cases where webhooks were missed or delayed.
  *
+ * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment.
+ *
  * @since Sprint 10
  */
 class OxpaidReconciliationService
@@ -35,6 +38,7 @@ class OxpaidReconciliationService
         private readonly Connection $connection,
         private readonly StripeAdapterFactoryInterface $adapterFactory,
         private readonly ContractRepositoryInterface $contractRepository,
+        private readonly ContractFulfillmentServiceInterface $contractFulfillmentService,
         private readonly ?FileLoggerInterface $fileLogger = null
     ) {
     }
@@ -106,13 +110,8 @@ class OxpaidReconciliationService
             // Payment is captured - update OXPAID
             $this->updateOrderPaidTimestamp($orderId, $paymentDetails->capturedAt);
 
-            // Fulfill contract if in committed state
-            $contractUpdated = false;
-            if ($contract->getState()->isCommitted()) {
-                $contract->fulfill();
-                $this->contractRepository->save($contract);
-                $contractUpdated = true;
-            }
+            // Sprint 18: Use ContractFulfillmentService for DRY fulfillment
+            $contractUpdated = $this->contractFulfillmentService->fulfill($contract);
 
             $this->logReconciliation($orderId, $paymentIntentId, 'SUCCESS', $contractUpdated);
 

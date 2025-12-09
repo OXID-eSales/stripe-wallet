@@ -305,6 +305,8 @@ class AddressHashRestorationTest extends TestCase
 
     /**
      * Test 4: Address hash restored BEFORE PaymentAuthorizedEvent is dispatched.
+     *
+     * Sprint 17: Fixed false-positive test - explicit assertions at test level
      */
     public function testAddressHashRestoredBeforePaymentEvent(): void
     {
@@ -312,6 +314,7 @@ class AddressHashRestorationTest extends TestCase
         $storedHash = 'hash_for_timing_test';
         $contractId = 'contract_timing';
         $hashRestoredBeforeDispatch = false;
+        $dispatchWasCalled = false;
 
         $contract = new PaymentContract(
             shopId: 1,
@@ -354,14 +357,13 @@ class AddressHashRestorationTest extends TestCase
                 }
             });
 
+        // Capture timing state when dispatch is called
+        $hashStateAtDispatch = null;
         $this->eventDispatcher
             ->method('dispatch')
-            ->willReturnCallback(function ($event) use (&$hashRestoredBeforeDispatch) {
-                // When dispatch is called, hash should already be restored
-                $this->assertTrue(
-                    $hashRestoredBeforeDispatch,
-                    'Address hash should be restored BEFORE PaymentAuthorizedEvent dispatch'
-                );
+            ->willReturnCallback(function ($event) use (&$hashRestoredBeforeDispatch, &$dispatchWasCalled, &$hashStateAtDispatch) {
+                $dispatchWasCalled = true;
+                $hashStateAtDispatch = $hashRestoredBeforeDispatch;
                 return $event;
             });
 
@@ -378,9 +380,19 @@ class AddressHashRestorationTest extends TestCase
         $handler = $this->createHandler();
         $handler->handle($event);
 
-        // Assert - if no dispatch occurred, test should still pass
-        // (the callback only asserts IF dispatch is called)
-        $this->assertTrue(true);
+        // Assert - explicit assertions at test level (Sprint 17)
+        if ($dispatchWasCalled) {
+            $this->assertTrue(
+                $hashStateAtDispatch,
+                'Address hash should be restored BEFORE PaymentAuthorizedEvent dispatch'
+            );
+        } else {
+            // If dispatch wasn't called, hash should still have been restored
+            $this->assertTrue(
+                $hashRestoredBeforeDispatch,
+                'Address hash should be restored even if dispatch is not called'
+            );
+        }
     }
 
     // --- Helper methods ---

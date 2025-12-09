@@ -17,13 +17,11 @@ use OxidEsales\Eshop\Application\Model\Order;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\WebhookReceivedEvent;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentCapturedEvent;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentRefundedEvent;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentFailedEvent;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractFulfilledEvent;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookLog;
 use OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface;
 
@@ -66,18 +64,24 @@ class WebhookProcessingService
     private ?EventDispatcherInterface $eventDispatcher;
     private ?WebhookLogRepositoryInterface $webhookLogRepository;
     private ?ContractRepositoryInterface $contractRepository;
+    private ?OrderPaymentStateServiceInterface $orderPaymentStateService;
+    private ?ContractFulfillmentServiceInterface $contractFulfillmentService;
     private WebhookContractFulfillmentHandlerInterface $contractFulfillmentHandler;
 
     public function __construct(
         WebhookContractFulfillmentHandlerInterface $contractFulfillmentHandler,
         ?EventDispatcherInterface $eventDispatcher = null,
         ?WebhookLogRepositoryInterface $webhookLogRepository = null,
-        ?ContractRepositoryInterface $contractRepository = null
+        ?ContractRepositoryInterface $contractRepository = null,
+        ?OrderPaymentStateServiceInterface $orderPaymentStateService = null,
+        ?ContractFulfillmentServiceInterface $contractFulfillmentService = null
     ) {
         $this->contractFulfillmentHandler = $contractFulfillmentHandler;
         $this->eventDispatcher = $eventDispatcher;
         $this->webhookLogRepository = $webhookLogRepository;
         $this->contractRepository = $contractRepository;
+        $this->orderPaymentStateService = $orderPaymentStateService;
+        $this->contractFulfillmentService = $contractFulfillmentService;
     }
 
     /**
@@ -342,14 +346,22 @@ class WebhookProcessingService
                 return false;
             }
 
-            // Directly fulfill the contract we have in memory
+            // Sprint 18: Use ContractFulfillmentService for DRY fulfillment
+            if ($this->contractFulfillmentService !== null) {
+                $result = $this->contractFulfillmentService->fulfill($contract);
+                Registry::getLogger()->info('Contract fulfilled via updateContractProviderOrderId', [
+                    'contract_id' => $contractId,
+                    'payment_intent_id' => $paymentIntentId,
+                    'fulfilled' => $result,
+                ]);
+                return $result;
+            }
+
+            // Legacy fallback - direct fulfillment if service not available
             $contract->fulfill();
             $this->contractRepository->save($contract);
 
-            // Dispatch ContractFulfilledEvent for event handlers (e.g., to update OXPAID)
-            $this->dispatchContractFulfilledEvent($contract);
-
-            Registry::getLogger()->info('Contract fulfilled via updateContractProviderOrderId', [
+            Registry::getLogger()->info('Contract fulfilled via updateContractProviderOrderId (legacy)', [
                 'contract_id' => $contractId,
                 'payment_intent_id' => $paymentIntentId,
             ]);
@@ -363,34 +375,6 @@ class WebhookProcessingService
             ]);
             return null;
         }
-    }
-
-    /**
-     * Dispatch ContractFulfilledEvent for event handlers.
-     *
-     * This ensures the event-driven architecture is used properly,
-     * allowing handlers like OrderPaymentStateHandler to update OXPAID.
-     */
-    private function dispatchContractFulfilledEvent(PaymentContractInterface $contract): void
-    {
-        if ($this->eventDispatcher === null) {
-            return;
-        }
-
-        $context = new EventContext([
-            'contractId' => $contract->getId(),
-            'orderId' => $contract->getOrderId(),
-            'providerOrderId' => $contract->getProviderOrderId(),
-            'source' => 'webhook',
-        ]);
-
-        $event = new ContractFulfilledEvent(
-            $contract,
-            $context,
-            $contract->getOrderId() ?? ''
-        );
-
-        $this->eventDispatcher->dispatch($event);
     }
 
     /**
@@ -522,14 +506,22 @@ class WebhookProcessingService
                 return false;
             }
 
-            // Directly fulfill the contract we have in memory
+            // Sprint 18: Use ContractFulfillmentService for DRY fulfillment
+            if ($this->contractFulfillmentService !== null) {
+                $result = $this->contractFulfillmentService->fulfill($contract);
+                Registry::getLogger()->info('Contract fulfilled via metadata lookup', [
+                    'contract_id' => $contractId,
+                    'payment_intent_id' => $paymentIntentId,
+                    'fulfilled' => $result,
+                ]);
+                return $result;
+            }
+
+            // Legacy fallback - direct fulfillment if service not available
             $contract->fulfill();
             $this->contractRepository->save($contract);
 
-            // Dispatch ContractFulfilledEvent for event handlers (e.g., to update OXPAID)
-            $this->dispatchContractFulfilledEvent($contract);
-
-            Registry::getLogger()->info('Contract fulfilled via metadata lookup', [
+            Registry::getLogger()->info('Contract fulfilled via metadata lookup (legacy)', [
                 'contract_id' => $contractId,
                 'payment_intent_id' => $paymentIntentId,
             ]);
@@ -550,20 +542,30 @@ class WebhookProcessingService
      *
      * Updates OXPAID, OXTRANSSTATUS, OXTRANSID for backward compatibility
      * even when contract-aware processing is used.
+     *
+     * Sprint 16: Uses OrderPaymentStateService for DRY compliance.
      */
     private function updateOrderFieldsAfterContractFulfillment(string $paymentIntentId): void
     {
         $order = $this->findOrderByPaymentIntentId($paymentIntentId);
 
-        if ($order) {
-            $this->updateOrderPaidTimestamp($order->getId());
-            $this->updateOrderTransStatus($order->getId(), 'OK');
-            $this->updateOrderTransId($order->getId(), $paymentIntentId);
+        if ($order && $this->orderPaymentStateService !== null) {
+            $this->orderPaymentStateService->markOrderAsPaid(
+                $order->getId(),
+                $paymentIntentId
+            );
+        } elseif ($order) {
+            // Legacy fallback if service not available
+            $this->updateOrderPaidTimestampLegacy($order->getId());
+            $this->updateOrderTransStatusLegacy($order->getId(), 'OK');
+            $this->updateOrderTransIdLegacy($order->getId(), $paymentIntentId);
         }
     }
 
     /**
      * Legacy payment processing for orders created without contracts.
+     *
+     * Sprint 16: Uses OrderPaymentStateService when available for DRY compliance.
      *
      * @param \Stripe\StripeObject $paymentIntent Stripe PaymentIntent object
      */
@@ -580,15 +582,18 @@ class WebhookProcessingService
         $order = $this->findOrderByPaymentIntentId($paymentIntentId);
 
         if ($order) {
-            // Sprint 8: order_state table removed - only update oxorder fields
-            // Update OXPAID timestamp - payment has been confirmed
-            $this->updateOrderPaidTimestamp($order->getId());
-
-            // Update OXTRANSSTATUS to OK
-            $this->updateOrderTransStatus($order->getId(), 'OK');
-
-            // Update OXTRANSID with PaymentIntent ID
-            $this->updateOrderTransId($order->getId(), $paymentIntentId);
+            // Sprint 16: Use OrderPaymentStateService if available (DRY)
+            if ($this->orderPaymentStateService !== null) {
+                $this->orderPaymentStateService->markOrderAsPaid(
+                    $order->getId(),
+                    $paymentIntentId
+                );
+            } else {
+                // Sprint 8: Legacy fallback - only update oxorder fields
+                $this->updateOrderPaidTimestampLegacy($order->getId());
+                $this->updateOrderTransStatusLegacy($order->getId(), 'OK');
+                $this->updateOrderTransIdLegacy($order->getId(), $paymentIntentId);
+            }
 
             Registry::getLogger()->info('Order payment state updated (legacy path)', [
                 'order_id' => $order->getId(),
@@ -720,11 +725,16 @@ class WebhookProcessingService
         $order = $this->findOrderByPaymentIntentId($paymentIntentId);
 
         if ($order) {
-            // Update OXPAID timestamp - payment has been captured
-            $this->updateOrderPaidTimestamp($order->getId());
-
-            // Update OXTRANSSTATUS to OK
-            $this->updateOrderTransStatus($order->getId(), 'OK');
+            // Sprint 16: Use OrderPaymentStateService if available (DRY)
+            if ($this->orderPaymentStateService !== null) {
+                $this->orderPaymentStateService->markOrderAsPaid(
+                    $order->getId(),
+                    $paymentIntentId
+                );
+            } else {
+                $this->updateOrderPaidTimestampLegacy($order->getId());
+                $this->updateOrderTransStatusLegacy($order->getId(), 'OK');
+            }
 
             Registry::getLogger()->info('Payment captured for order (legacy path)', [
                 'order_id' => $order->getId(),
@@ -832,8 +842,9 @@ class WebhookProcessingService
         }
 
         // Find order by payment intent ID
+        /** @var string|null $paymentIntentId */
         $paymentIntentId = $session->payment_intent ?? null;
-        if (!$paymentIntentId) {
+        if ($paymentIntentId === null || $paymentIntentId === '') {
             Registry::getLogger()->warning('No payment intent ID in checkout session', [
                 'session_id' => $session->id,
             ]);
@@ -864,14 +875,17 @@ class WebhookProcessingService
         $order = $this->findOrderByPaymentIntentId($paymentIntentId);
 
         if ($order) {
-            // Update OXPAID timestamp - payment has been confirmed
-            $this->updateOrderPaidTimestamp($order->getId());
-
-            // Update OXTRANSSTATUS to OK
-            $this->updateOrderTransStatus($order->getId(), 'OK');
-
-            // Update OXTRANSID with PaymentIntent ID
-            $this->updateOrderTransId($order->getId(), $paymentIntentId);
+            // Sprint 16: Use OrderPaymentStateService if available (DRY)
+            if ($this->orderPaymentStateService !== null) {
+                $this->orderPaymentStateService->markOrderAsPaid(
+                    $order->getId(),
+                    $paymentIntentId
+                );
+            } else {
+                $this->updateOrderPaidTimestampLegacy($order->getId());
+                $this->updateOrderTransStatusLegacy($order->getId(), 'OK');
+                $this->updateOrderTransIdLegacy($order->getId(), $paymentIntentId);
+            }
 
             Registry::getLogger()->info('Order updated from checkout session (legacy path)', [
                 'order_id' => $order->getId(),
@@ -937,15 +951,16 @@ class WebhookProcessingService
     // Capture/refund tracking is now handled by osc_payment_contract fields.
 
     /**
-     * Update order OXPAID timestamp
+     * Update order OXPAID timestamp (legacy fallback).
      *
      * Sets the OXPAID field in oxorder table to current timestamp.
      * This field stores "Time when order was paid".
      *
+     * @deprecated Use OrderPaymentStateService::updatePaidTimestamp() instead
      * @param string $orderId
      * @return void
      */
-    private function updateOrderPaidTimestamp(string $orderId): void
+    private function updateOrderPaidTimestampLegacy(string $orderId): void
     {
         try {
             $db = DatabaseProvider::getDb();
@@ -953,11 +968,11 @@ class WebhookProcessingService
             $sql = "UPDATE oxorder SET OXPAID = NOW() WHERE OXID = ?";
             $db->execute($sql, [$orderId]);
 
-            Registry::getLogger()->debug('OXPAID timestamp updated', [
+            Registry::getLogger()->debug('OXPAID timestamp updated (legacy)', [
                 'order_id' => $orderId,
             ]);
         } catch (\Exception $e) {
-            Registry::getLogger()->error('Failed to update OXPAID', [
+            Registry::getLogger()->error('Failed to update OXPAID (legacy)', [
                 'order_id' => $orderId,
                 'error' => $e->getMessage(),
             ]);
@@ -965,16 +980,17 @@ class WebhookProcessingService
     }
 
     /**
-     * Update order OXTRANSSTATUS
+     * Update order OXTRANSSTATUS (legacy fallback).
      *
      * Sets the OXTRANSSTATUS field in oxorder table.
      * Valid values: NOT_FINISHED, OK, ERROR
      *
+     * @deprecated Use OrderPaymentStateService::updateTransactionStatus() instead
      * @param string $orderId
      * @param string $status
      * @return void
      */
-    private function updateOrderTransStatus(string $orderId, string $status): void
+    private function updateOrderTransStatusLegacy(string $orderId, string $status): void
     {
         try {
             $db = DatabaseProvider::getDb();
@@ -982,12 +998,12 @@ class WebhookProcessingService
             $sql = "UPDATE oxorder SET OXTRANSSTATUS = ? WHERE OXID = ?";
             $db->execute($sql, [$status, $orderId]);
 
-            Registry::getLogger()->debug('OXTRANSSTATUS updated', [
+            Registry::getLogger()->debug('OXTRANSSTATUS updated (legacy)', [
                 'order_id' => $orderId,
                 'status' => $status,
             ]);
         } catch (\Exception $e) {
-            Registry::getLogger()->error('Failed to update OXTRANSSTATUS', [
+            Registry::getLogger()->error('Failed to update OXTRANSSTATUS (legacy)', [
                 'order_id' => $orderId,
                 'error' => $e->getMessage(),
             ]);
@@ -995,15 +1011,16 @@ class WebhookProcessingService
     }
 
     /**
-     * Update order OXTRANSID (transaction ID)
+     * Update order OXTRANSID (legacy fallback).
      *
      * Sets the OXTRANSID field in oxorder table to the PaymentIntent ID.
      *
+     * @deprecated Use OrderPaymentStateService::updateTransactionId() instead
      * @param string $orderId
      * @param string $transactionId
      * @return void
      */
-    private function updateOrderTransId(string $orderId, string $transactionId): void
+    private function updateOrderTransIdLegacy(string $orderId, string $transactionId): void
     {
         try {
             $db = DatabaseProvider::getDb();
@@ -1012,12 +1029,12 @@ class WebhookProcessingService
             $sql = "UPDATE oxorder SET OXTRANSID = ? WHERE OXID = ? AND (OXTRANSID IS NULL OR OXTRANSID = '')";
             $db->execute($sql, [$transactionId, $orderId]);
 
-            Registry::getLogger()->debug('OXTRANSID updated', [
+            Registry::getLogger()->debug('OXTRANSID updated (legacy)', [
                 'order_id' => $orderId,
                 'transaction_id' => $transactionId,
             ]);
         } catch (\Exception $e) {
-            Registry::getLogger()->error('Failed to update OXTRANSID', [
+            Registry::getLogger()->error('Failed to update OXTRANSID (legacy)', [
                 'order_id' => $orderId,
                 'error' => $e->getMessage(),
             ]);

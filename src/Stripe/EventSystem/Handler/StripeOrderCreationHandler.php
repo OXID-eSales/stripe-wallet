@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
 
-use Doctrine\DBAL\Connection;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreateOrderRequest;
@@ -14,6 +13,7 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\Contract
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractCommittedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface;
 
 /**
  * Creates OXID orders when contract is ready to commit.
@@ -38,7 +38,7 @@ class StripeOrderCreationHandler implements HandlerInterface
     public function __construct(
         private ContractRepositoryInterface $contractRepository,
         private ShopOrderServiceInterface $shopOrderService,
-        private Connection $connection
+        private OrderPaymentStateServiceInterface $orderPaymentStateService
     ) {
     }
 
@@ -156,38 +156,20 @@ class StripeOrderCreationHandler implements HandlerInterface
      * Sprint 14: Called immediately after order creation since payment was confirmed
      * on Stripe. This is more reliable than waiting for webhook as it might arrive
      * before the contract transitions to COMMITTED state.
+     *
+     * Sprint 16: Uses OrderPaymentStateService (DRY - single location for OXPAID updates)
      */
     private function updateOrderPaidTimestamp(string $orderId, ?string $providerOrderId): void
     {
-        try {
-            // Update OXPAID to current time using PHP date to match OXID's timezone handling
-            $currentTime = date('Y-m-d H:i:s');
-            $sql = "UPDATE oxorder SET OXPAID = :paidTime WHERE OXID = :orderId AND OXPAID = '0000-00-00 00:00:00'";
-            $affected = $this->connection->executeStatement($sql, ['orderId' => $orderId, 'paidTime' => $currentTime]);
+        $updated = $this->orderPaymentStateService->markOrderAsPaid(
+            $orderId,
+            $providerOrderId
+        );
 
-            // Also update OXTRANSSTATUS to OK
-            $sql = "UPDATE oxorder SET OXTRANSSTATUS = 'OK' WHERE OXID = :orderId";
-            $this->connection->executeStatement($sql, ['orderId' => $orderId]);
-
-            // Update OXTRANSID if not already set
-            if ($providerOrderId !== null && $providerOrderId !== '') {
-                $sql = "UPDATE oxorder SET OXTRANSID = :transId WHERE OXID = :orderId AND (OXTRANSID IS NULL OR OXTRANSID = '')";
-                $this->connection->executeStatement($sql, [
-                    'orderId' => $orderId,
-                    'transId' => $providerOrderId,
-                ]);
-            }
-
-            if ($affected > 0) {
-                Registry::getLogger()->info('OXPAID updated in order creation flow', [
-                    'order_id' => $orderId,
-                    'provider_order_id' => $providerOrderId,
-                ]);
-            }
-        } catch (\Exception $e) {
-            Registry::getLogger()->error('Failed to update OXPAID in order creation', [
+        if ($updated) {
+            Registry::getLogger()->info('OXPAID updated in order creation flow', [
                 'order_id' => $orderId,
-                'error' => $e->getMessage(),
+                'provider_order_id' => $providerOrderId,
             ]);
         }
     }

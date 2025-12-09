@@ -13,8 +13,8 @@ use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepository;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
 use OxidSolutionCatalysts\Payments\Component\Contract\BasketSnapshot;
 use OxidSolutionCatalysts\Payments\Component\Contract\ContractCondition;
+use OxidSolutionCatalysts\Payments\Component\Order\Order;
 use OxidSolutionCatalysts\Payments\Tests\Unit\Component\EventSystem\Handler\Support\InMemoryOrderRepository;
-use OxidSolutionCatalysts\Payments\Tests\Unit\Component\EventSystem\Handler\Support\Order;
 use PHPUnit\Framework\TestCase;
 
 class ContractFulfillmentHandlerTest extends TestCase

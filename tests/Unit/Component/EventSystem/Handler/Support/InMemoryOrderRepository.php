@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Unit\Component\EventSystem\Handler\Support;
 
+use OxidSolutionCatalysts\Payments\Component\Order\Order;
 use OxidSolutionCatalysts\Payments\Component\Repository\OrderRepositoryInterface;
 
 class InMemoryOrderRepository implements OrderRepositoryInterface

@@ -38,6 +38,35 @@ services:
     public: true
 
   # ===========================================
+  # Order Payment State Service (Sprint 16)
+  # ===========================================
+  # Consolidates all OXPAID/OXTRANSSTATUS/OXTRANSID updates
+  # DRY: Single location for payment state operations
+  # Previously duplicated in 4+ locations with inconsistent date handling
+
+  OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface:
+    class: OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateService
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+      $logger: '@oxid_esales.monolog.logger'
+    public: true
+
+  # ===========================================
+  # Contract Fulfillment Service (Sprint 18)
+  # ===========================================
+  # Consolidates all contract fulfillment operations
+  # DRY: Single location for fulfill() logic previously duplicated in 8+ locations
+  # Guards: Only COMMITTED contracts can be fulfilled
+
+  OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface:
+    class: OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentService
+    arguments:
+      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: true
+
+  # ===========================================
   # Checkout Orchestrator (Sprint 2)
   # ===========================================
 
@@ -276,9 +305,10 @@ services:
 
   # Order Payment Completed Handler - Updates OXPAID when contract is fulfilled
   # Sprint 14: Event-driven OXPAID update via ContractFulfilledEvent
+  # Sprint 16: Uses OrderPaymentStateService for OXPAID updates (DRY)
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\OrderPaymentCompletedHandler:
     arguments:
-      $connection: '@doctrine.dbal.connection'
+      $orderPaymentStateService: '@OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface'
       $logger: '@oxid_esales.monolog.logger'
     tags:
       - { name: payment.event_handler, priority: 0 }
@@ -320,11 +350,12 @@ services:
   # Priority 80: Runs after PaymentAuthorizedEventHandler
   # Uses OxidShopOrderService for proper OXID integration
   # NOTE: EventDispatcher is fetched lazily to avoid circular dependency
+  # Sprint 16: Uses OrderPaymentStateService for OXPAID updates (DRY)
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeOrderCreationHandler:
     arguments:
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
       $shopOrderService: '@OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface'
-      $connection: '@doctrine.dbal.connection'
+      $orderPaymentStateService: '@OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface'
     tags:
       - { name: payment.event_handler, priority: 80 }
     public: false
@@ -350,11 +381,12 @@ services:
   # Bridges Stripe webhooks to the contract state machine.
 
   # Interface binding
+  # Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
   OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface:
     class: OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandler
     arguments:
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
-      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      $contractFulfillmentService: '@OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface'
     public: false
 
   # Concrete implementation alias
@@ -363,12 +395,16 @@ services:
 
   # WebhookProcessingService - Now requires WebhookContractFulfillmentHandler
   # Sprint 7: Added ContractRepository for linking webhook logs to contracts
+  # Sprint 16: Added OrderPaymentStateService for DRY OXPAID updates
+  # Sprint 18: Added ContractFulfillmentService for DRY fulfillment
   OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService:
     arguments:
       $contractFulfillmentHandler: '@OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface'
       $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
       $webhookLogRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface'
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $orderPaymentStateService: '@OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface'
+      $contractFulfillmentService: '@OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface'
     public: true
 
   # ==========================================
@@ -445,6 +481,21 @@ services:
     public: true
 
   # ==========================================
+  # Webhook Handlers (Sprint 13)
+  # ==========================================
+
+  # PaymentIntentSucceededHandler - Handles payment_intent.succeeded webhooks
+  # Sprint 16: Uses OrderPaymentStateService for OXPAID updates (DRY)
+  # Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
+  OxidSolutionCatalysts\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededHandler:
+    arguments:
+      $orderPaymentStateService: '@OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface'
+      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $contractFulfillmentService: '@OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: false
+
+  # ==========================================
   # OXPAID Reconciliation (Sprint 10)
   # ==========================================
   # Service and console command for reconciling OXPAID with Stripe API.
@@ -463,11 +514,13 @@ services:
     public: false
 
   # Reconciliation Service
+  # Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
   OxidSolutionCatalysts\Payments\Stripe\Service\OxpaidReconciliationService:
     arguments:
       $connection: '@doctrine.dbal.connection'
       $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $contractFulfillmentService: '@OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface'
       $fileLogger: '@stripe.reconciliation.file_logger'
     public: true
 

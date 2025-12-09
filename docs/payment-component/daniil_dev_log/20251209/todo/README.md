@@ -25,17 +25,17 @@
 
 ## Sprint Overview
 
-| Sprint | Description | Priority | Est. Effort |
-|--------|-------------|----------|-------------|
-| [Sprint 15](sprint-15-test-class-in-production.md) | Remove test class import from production | CRITICAL | 2h |
-| [Sprint 16](sprint-16-order-payment-state-service.md) | Extract OrderPaymentStateService (OXPAID consolidation) | CRITICAL | 3h |
-| [Sprint 17](sprint-17-fix-false-positive-tests.md) | Fix false-positive tests | CRITICAL | 2h |
-| [Sprint 18](sprint-18-contract-fulfillment-service.md) | Extract ContractFulfillmentService | HIGH | 3h |
-| [Sprint 19](sprint-19-stripe-adapter-routing.md) | Route Stripe SDK calls through adapter | HIGH | 4h |
-| [Sprint 20](sprint-20-remove-request-modification.md) | Remove $_REQUEST modification | HIGH | 2h |
-| [Sprint 21](sprint-21-refactor-fat-handlers.md) | Refactor fat handlers (RefundService) | MEDIUM | 4h |
-| [Sprint 22](sprint-22-resolve-container-factory.md) | Resolve ContainerFactory usage | MEDIUM | 3h |
-| [Sprint 23](sprint-23-documentation-updates.md) | Update architecture documentation | MEDIUM | 2h |
+| Sprint | Description | Priority | Est. Effort | Status |
+|--------|-------------|----------|-------------|--------|
+| Sprint 15 | Remove test class import from production | CRITICAL | 2h | **DONE** |
+| Sprint 16 | Extract OrderPaymentStateService (OXPAID consolidation) | CRITICAL | 3h | **DONE** |
+| Sprint 17 | Fix false-positive tests | CRITICAL | 2h | **DONE** |
+| Sprint 18 | Extract ContractFulfillmentService | HIGH | 3h | **DONE** |
+| [Sprint 19](sprint-19-stripe-adapter-routing.md) | Route Stripe SDK calls through adapter | HIGH | 4h | PENDING |
+| [Sprint 20](sprint-20-remove-request-modification.md) | Remove $_REQUEST modification | HIGH | 2h | PENDING |
+| [Sprint 21](sprint-21-refactor-fat-handlers.md) | Refactor fat handlers (RefundService) | MEDIUM | 4h | PENDING |
+| [Sprint 22](sprint-22-resolve-container-factory.md) | Resolve ContainerFactory usage | MEDIUM | 3h | PENDING |
+| [Sprint 23](sprint-23-documentation-updates.md) | Update architecture documentation | MEDIUM | 2h | PENDING |
 
 **Total Estimated Effort:** 25 hours
 
@@ -137,10 +137,10 @@ cd tests/e2e/playwright && npx playwright test tests/checkout/
 
 | Sprint | Status | Started | Completed |
 |--------|--------|---------|-----------|
-| Sprint 15 | PENDING | - | - |
-| Sprint 16 | PENDING | - | - |
-| Sprint 17 | PENDING | - | - |
-| Sprint 18 | PENDING | - | - |
+| Sprint 15 | **DONE** | 2025-12-09 | 2025-12-09 |
+| Sprint 16 | **DONE** | 2025-12-09 | 2025-12-09 |
+| Sprint 17 | **DONE** | 2025-12-09 | 2025-12-09 |
+| Sprint 18 | **DONE** | 2025-12-09 | 2025-12-09 |
 | Sprint 19 | PENDING | - | - |
 | Sprint 20 | PENDING | - | - |
 | Sprint 21 | PENDING | - | - |
@@ -152,17 +152,23 @@ cd tests/e2e/playwright && npx playwright test tests/checkout/
 ## Files in This Directory
 
 ```
-20251209/todo/
-├── README.md                           # This file - sprint overview
-├── sprint-15-test-class-in-production.md
-├── sprint-16-order-payment-state-service.md
-├── sprint-17-fix-false-positive-tests.md
-├── sprint-18-contract-fulfillment-service.md
-├── sprint-19-stripe-adapter-routing.md
-├── sprint-20-remove-request-modification.md
-├── sprint-21-refactor-fat-handlers.md
-├── sprint-22-resolve-container-factory.md
-└── sprint-23-documentation-updates.md
+20251209/
+├── todo/
+│   ├── README.md                           # This file - sprint overview
+│   ├── sprint-19-stripe-adapter-routing.md
+│   ├── sprint-20-remove-request-modification.md
+│   ├── sprint-21-refactor-fat-handlers.md
+│   ├── sprint-22-resolve-container-factory.md
+│   └── sprint-23-documentation-updates.md
+└── done/
+    ├── sprint-15-test-class-in-production.md           # Plan
+    ├── sprint-15-test-class-in-production-report.md    # Report
+    ├── sprint-16-order-payment-state-service.md        # Plan
+    ├── sprint-16-order-payment-state-service-report.md # Report
+    ├── sprint-17-fix-false-positive-tests.md           # Plan
+    ├── sprint-17-fix-false-positive-tests-report.md    # Report
+    ├── sprint-18-contract-fulfillment-service.md       # Plan
+    └── sprint-18-contract-fulfillment-service-report.md # Report
 ```
 
 ---

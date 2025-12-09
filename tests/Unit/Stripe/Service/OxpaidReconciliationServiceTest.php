@@ -15,6 +15,7 @@ use OxidSolutionCatalysts\Payments\Component\Adapter\Response\PaymentDetailsResp
 use OxidSolutionCatalysts\Payments\Component\Contract\ContractState;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\OxpaidReconciliationService;
@@ -25,11 +26,13 @@ use PHPUnit\Framework\TestCase;
  * Unit tests for OxpaidReconciliationService
  *
  * Sprint 10: Tests for OXPAID reconciliation with Stripe API.
+ * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment.
  *
  * @covers \OxidSolutionCatalysts\Payments\Stripe\Service\OxpaidReconciliationService
  * @group sprint-10
  * @group sprint-14
  * @group sprint-15
+ * @group sprint-18
  * @group reconciliation
  */
 class OxpaidReconciliationServiceTest extends TestCase
@@ -37,6 +40,7 @@ class OxpaidReconciliationServiceTest extends TestCase
     private Connection $connection;
     private StripeAdapterFactoryInterface $adapterFactory;
     private ContractRepositoryInterface $contractRepository;
+    private ContractFulfillmentServiceInterface $contractFulfillmentService;
     private FileLoggerInterface $fileLogger;  // Sprint 14: LSP - type-hint interface
     private OxpaidReconciliationService $service;
 
@@ -47,6 +51,8 @@ class OxpaidReconciliationServiceTest extends TestCase
         $this->connection = $this->createMock(Connection::class);
         $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
+        // Sprint 18: Mock ContractFulfillmentService
+        $this->contractFulfillmentService = $this->createMock(ContractFulfillmentServiceInterface::class);
         // Sprint 14: Mock FileLogger - prevents tests writing to production log files
         $this->fileLogger = $this->createMock(FileLoggerInterface::class);
 
@@ -54,6 +60,7 @@ class OxpaidReconciliationServiceTest extends TestCase
             $this->connection,
             $this->adapterFactory,
             $this->contractRepository,
+            $this->contractFulfillmentService,  // Sprint 18
             $this->fileLogger  // Sprint 14: Inject mock - tests isolated from filesystem
         );
     }
@@ -150,6 +157,7 @@ class OxpaidReconciliationServiceTest extends TestCase
     /**
      * @test
      * Sprint 15: OXPAID is only updated when contract exists and is COMMITTED
+     * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
      */
     public function reconcileOrderUpdatesOxpaidWhenPaymentIsCaptured(): void
     {
@@ -162,19 +170,18 @@ class OxpaidReconciliationServiceTest extends TestCase
         $contract
             ->method('getState')
             ->willReturn(ContractState::committed());
-        $contract
-            ->expects($this->once())
-            ->method('fulfill');
 
         $this->contractRepository
             ->method('findByProviderOrderId')
             ->with($paymentIntentId)
             ->willReturn($contract);
 
-        $this->contractRepository
+        // Sprint 18: ContractFulfillmentService handles fulfillment
+        $this->contractFulfillmentService
             ->expects($this->once())
-            ->method('save')
-            ->with($contract);
+            ->method('fulfill')
+            ->with($contract)
+            ->willReturn(true);
 
         // Mock adapter factory to return adapter
         $adapter = $this->createMock(PaymentAdapterInterface::class);
@@ -310,6 +317,7 @@ class OxpaidReconciliationServiceTest extends TestCase
 
     /**
      * @test
+     * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
      */
     public function reconcileOrderFulfillsContractWhenFound(): void
     {
@@ -349,19 +357,18 @@ class OxpaidReconciliationServiceTest extends TestCase
         $contract
             ->method('getState')
             ->willReturn(ContractState::committed());
-        $contract
-            ->expects($this->once())
-            ->method('fulfill');
 
         $this->contractRepository
             ->method('findByProviderOrderId')
             ->with($paymentIntentId)
             ->willReturn($contract);
 
-        $this->contractRepository
+        // Sprint 18: ContractFulfillmentService handles fulfillment
+        $this->contractFulfillmentService
             ->expects($this->once())
-            ->method('save')
-            ->with($contract);
+            ->method('fulfill')
+            ->with($contract)
+            ->willReturn(true);
 
         $result = $this->service->reconcileOrder($orderId, $paymentIntentId);
 
@@ -371,6 +378,7 @@ class OxpaidReconciliationServiceTest extends TestCase
 
     /**
      * @test
+     * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
      */
     public function reconcileOrderDoesNotFulfillContractIfNotCommitted(): void
     {
@@ -409,13 +417,17 @@ class OxpaidReconciliationServiceTest extends TestCase
         $contract
             ->method('getState')
             ->willReturn(ContractState::fulfilled());
-        $contract
-            ->expects($this->never())
-            ->method('fulfill');
 
         $this->contractRepository
             ->method('findByProviderOrderId')
             ->willReturn($contract);
+
+        // Sprint 18: Service returns false for already fulfilled
+        $this->contractFulfillmentService
+            ->expects($this->once())
+            ->method('fulfill')
+            ->with($contract)
+            ->willReturn(false);
 
         $result = $this->service->reconcileOrder($orderId, $paymentIntentId);
 

@@ -193,17 +193,38 @@ final class WebhookEventDispatcherTest extends TestCase
 
     /**
      * @test
+     * Sprint 17: Fixed false-positive test - now verifies both handlers are checked
      */
     public function canRegisterMultipleHandlers(): void
     {
+        $event = new WebhookEvent('evt_123', 'some.event', [], 0);
+
+        // First handler doesn't support the event
         $handler1 = $this->createMock(WebhookEventHandlerInterface::class);
+        $handler1->expects($this->once())
+            ->method('supports')
+            ->with('some.event')
+            ->willReturn(false);
+        $handler1->expects($this->never())->method('handle');
+
+        // Second handler supports and handles the event
         $handler2 = $this->createMock(WebhookEventHandlerInterface::class);
+        $handler2->expects($this->once())
+            ->method('supports')
+            ->with('some.event')
+            ->willReturn(true);
+        $handler2->expects($this->once())
+            ->method('handle')
+            ->willReturn(WebhookResult::success('handled_by_second'));
 
         $this->dispatcher->registerHandler($handler1);
         $this->dispatcher->registerHandler($handler2);
 
-        // Should not throw
-        $this->assertTrue(true);
+        $result = $this->dispatcher->dispatch($event);
+
+        // Assert: Second handler was reached and handled the event
+        $this->assertTrue($result->isSuccess());
+        $this->assertSame('handled_by_second', $result->action);
     }
 
     /**

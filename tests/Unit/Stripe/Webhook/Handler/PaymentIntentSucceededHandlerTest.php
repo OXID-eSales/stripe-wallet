@@ -9,14 +9,15 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Webhook\Handler;
 
-use Doctrine\DBAL\Connection;
 use OxidSolutionCatalysts\Payments\Component\Contract\ContractState;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookEvent;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookEventHandlerInterface;
-use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookResult;
 use OxidSolutionCatalysts\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededHandler;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -24,27 +25,32 @@ use Psr\Log\LoggerInterface;
  * @covers \OxidSolutionCatalysts\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededHandler
  * @group sprint-13
  * @group sprint-15
+ * @group sprint-16
+ * @group sprint-18
  * @group webhook
  * @group handler
  */
 final class PaymentIntentSucceededHandlerTest extends TestCase
 {
-    private Connection $connection;
-    private ContractRepositoryInterface $contractRepository;
-    private LoggerInterface $logger;
+    private OrderPaymentStateServiceInterface&MockObject $orderPaymentStateService;
+    private ContractRepositoryInterface&MockObject $contractRepository;
+    private ContractFulfillmentServiceInterface&MockObject $contractFulfillmentService;
+    private LoggerInterface&MockObject $logger;
     private PaymentIntentSucceededHandler $handler;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->connection = $this->createMock(Connection::class);
+        $this->orderPaymentStateService = $this->createMock(OrderPaymentStateServiceInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
+        $this->contractFulfillmentService = $this->createMock(ContractFulfillmentServiceInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->handler = new PaymentIntentSucceededHandler(
-            $this->connection,
+            $this->orderPaymentStateService,
             $this->contractRepository,
+            $this->contractFulfillmentService,
             $this->logger
         );
     }
@@ -78,6 +84,8 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
     /**
      * @test
      * Sprint 15: OXPAID is only updated when contract exists
+     * Sprint 16: Uses OrderPaymentStateService for OXPAID updates
+     * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
      */
     public function updatesOxpaidTimestampWithContract(): void
     {
@@ -93,20 +101,25 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
         // Contract is REQUIRED
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getState')->willReturn(ContractState::committed());
-        $contract->expects($this->once())->method('fulfill');
 
         $this->contractRepository
             ->method('findByProviderOrderId')
             ->willReturn($contract);
 
-        $this->connection
+        // Sprint 18: ContractFulfillmentService handles fulfillment
+        $this->contractFulfillmentService
             ->expects($this->once())
-            ->method('executeStatement')
+            ->method('fulfill')
+            ->with($contract)
+            ->willReturn(true);
+
+        // Sprint 16: Uses OrderPaymentStateService instead of Connection
+        $this->orderPaymentStateService
+            ->expects($this->once())
+            ->method('updatePaidTimestampByTransactionId')
             ->with(
-                $this->stringContains('UPDATE oxorder'),
-                $this->callback(function ($params) {
-                    return isset($params['transid']) && $params['transid'] === 'pi_test_123';
-                })
+                'pi_test_123',
+                $this->isInstanceOf(\DateTimeImmutable::class)
             );
 
         $result = $this->handler->handle($event);
@@ -117,6 +130,7 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
     /**
      * @test
      * Sprint 15: NO_CONTRACT is ERROR - logs error but returns success (200)
+     * Sprint 16: Uses OrderPaymentStateService for OXPAID updates
      */
     public function logsErrorWhenNoContractFound(): void
     {
@@ -137,9 +151,9 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
             );
 
         // Should NOT update OXPAID without contract
-        $this->connection
+        $this->orderPaymentStateService
             ->expects($this->never())
-            ->method('executeStatement');
+            ->method('updatePaidTimestampByTransactionId');
 
         $result = $this->handler->handle($event);
 
@@ -150,6 +164,7 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
 
     /**
      * @test
+     * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
      */
     public function fulfillsContractWhenCommitted(): void
     {
@@ -157,17 +172,18 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getState')->willReturn(ContractState::committed());
-        $contract->expects($this->once())->method('fulfill');
 
         $this->contractRepository
             ->method('findByProviderOrderId')
             ->with('pi_test_456')
             ->willReturn($contract);
 
-        $this->contractRepository
+        // Sprint 18: ContractFulfillmentService handles fulfillment
+        $this->contractFulfillmentService
             ->expects($this->once())
-            ->method('save')
-            ->with($contract);
+            ->method('fulfill')
+            ->with($contract)
+            ->willReturn(true);
 
         $result = $this->handler->handle($event);
 
@@ -178,6 +194,8 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
     /**
      * @test
      * Sprint 15: Contract must be in COMMITTED state to be fulfilled
+     * Sprint 16: Uses OrderPaymentStateService for OXPAID updates
+     * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
      */
     public function doesNotFulfillContractIfNotCommitted(): void
     {
@@ -185,25 +203,27 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getState')->willReturn(ContractState::fulfilled());
-        $contract->expects($this->never())->method('fulfill');
 
         $this->contractRepository
             ->method('findByProviderOrderId')
             ->willReturn($contract);
 
-        // Should NOT update OXPAID if contract is not committed
-        $this->connection
-            ->expects($this->never())
-            ->method('executeStatement');
+        // Sprint 18: ContractFulfillmentService returns false for non-committed
+        $this->contractFulfillmentService
+            ->expects($this->once())
+            ->method('fulfill')
+            ->with($contract)
+            ->willReturn(false);
 
         $result = $this->handler->handle($event);
 
         $this->assertTrue($result->isSuccess());
-        $this->assertSame('contract_not_committed', $result->action);
+        $this->assertSame('contract_not_fulfilled', $result->action);
     }
 
     /**
      * @test
+     * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
      */
     public function logsSuccessfulHandling(): void
     {
@@ -214,6 +234,11 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
         $contract->method('getState')->willReturn(ContractState::committed());
 
         $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
+
+        // Sprint 18: Mock fulfillment service
+        $this->contractFulfillmentService
+            ->method('fulfill')
+            ->willReturn(true);
 
         $this->logger
             ->expects($this->atLeastOnce())
@@ -246,6 +271,8 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
 
     /**
      * @test
+     * Sprint 16: Uses OrderPaymentStateService for OXPAID updates
+     * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
      */
     public function extractsCapturedAtFromChargeData(): void
     {
@@ -265,16 +292,19 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
 
         $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
 
-        $this->connection
+        // Sprint 18: Mock fulfillment service
+        $this->contractFulfillmentService
+            ->method('fulfill')
+            ->willReturn(true);
+
+        // Sprint 16: Verify OrderPaymentStateService is called with correct timestamp
+        $this->orderPaymentStateService
             ->expects($this->once())
-            ->method('executeStatement')
+            ->method('updatePaidTimestampByTransactionId')
             ->with(
-                $this->anything(),
-                $this->callback(function ($params) {
-                    // Verify paid parameter exists and is a valid datetime string
-                    return isset($params['paid'])
-                        && isset($params['transid'])
-                        && preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $params['paid']);
+                'pi_charge_test',
+                $this->callback(function (\DateTimeImmutable $paidAt) use ($chargeCreatedTimestamp) {
+                    return $paidAt->getTimestamp() === $chargeCreatedTimestamp;
                 })
             );
 

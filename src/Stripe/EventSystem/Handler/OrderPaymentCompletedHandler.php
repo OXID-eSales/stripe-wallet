@@ -9,9 +9,9 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
 
-use Doctrine\DBAL\Connection;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractFulfilledEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -20,12 +20,15 @@ use Psr\Log\LoggerInterface;
  * Sprint 14: Properly implements event-driven architecture.
  * Listens for ContractFulfilledEvent and updates the order's payment timestamp.
  *
+ * Sprint 16: Uses OrderPaymentStateService for DRY compliance.
+ * All OXPAID/OXTRANSSTATUS/OXTRANSID updates consolidated in single service.
+ *
  * @since 1.0.0
  */
 class OrderPaymentCompletedHandler implements HandlerInterface
 {
     public function __construct(
-        private readonly Connection $connection,
+        private readonly OrderPaymentStateServiceInterface $orderPaymentStateService,
         private readonly LoggerInterface $logger
     ) {
     }
@@ -57,59 +60,17 @@ class OrderPaymentCompletedHandler implements HandlerInterface
             return;
         }
 
-        // Update OXPAID timestamp
-        $this->updateOrderPaidTimestamp($orderId);
+        // Sprint 16: Use OrderPaymentStateService for all payment state updates (DRY)
+        $updated = $this->orderPaymentStateService->markOrderAsPaid(
+            $orderId,
+            $providerOrderId
+        );
 
-        // Also update OXTRANSSTATUS to OK and OXTRANSID if not already set
-        $this->updateOrderTransactionFields($orderId, $providerOrderId);
-
-        $this->logger->info('Order payment completed via ContractFulfilledEvent', [
-            'order_id' => $orderId,
-            'contract_id' => $contract->getId(),
-            'provider_order_id' => $providerOrderId,
-        ]);
-    }
-
-    /**
-     * Update OXPAID timestamp on the order.
-     */
-    private function updateOrderPaidTimestamp(string $orderId): void
-    {
-        try {
-            $sql = "UPDATE oxorder SET OXPAID = NOW() WHERE OXID = :orderId AND OXPAID = '0000-00-00 00:00:00'";
-            $affected = $this->connection->executeStatement($sql, ['orderId' => $orderId]);
-
-            if ($affected > 0) {
-                $this->logger->debug('OXPAID timestamp updated', ['order_id' => $orderId]);
-            }
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to update OXPAID', [
+        if ($updated) {
+            $this->logger->info('Order payment completed via ContractFulfilledEvent', [
                 'order_id' => $orderId,
-                'error' => $e->getMessage(),
-            ]);
-        }
-    }
-
-    /**
-     * Update transaction fields on the order.
-     */
-    private function updateOrderTransactionFields(string $orderId, ?string $providerOrderId): void
-    {
-        try {
-            $sql = "UPDATE oxorder SET OXTRANSSTATUS = 'OK' WHERE OXID = :orderId";
-            $this->connection->executeStatement($sql, ['orderId' => $orderId]);
-
-            if ($providerOrderId !== null && $providerOrderId !== '') {
-                $sql = "UPDATE oxorder SET OXTRANSID = :transId WHERE OXID = :orderId AND (OXTRANSID IS NULL OR OXTRANSID = '')";
-                $this->connection->executeStatement($sql, [
-                    'orderId' => $orderId,
-                    'transId' => $providerOrderId,
-                ]);
-            }
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to update transaction fields', [
-                'order_id' => $orderId,
-                'error' => $e->getMessage(),
+                'contract_id' => $contract->getId(),
+                'provider_order_id' => $providerOrderId,
             ]);
         }
     }

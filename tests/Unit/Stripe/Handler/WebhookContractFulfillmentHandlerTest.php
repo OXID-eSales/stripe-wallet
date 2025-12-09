@@ -9,9 +9,8 @@ use OxidSolutionCatalysts\Payments\Component\Contract\ContractCondition;
 use OxidSolutionCatalysts\Payments\Component\Contract\ContractState;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractFulfilledEvent;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandler;
 use PHPUnit\Framework\TestCase;
 
@@ -19,25 +18,26 @@ use PHPUnit\Framework\TestCase;
  * TDD Tests for WebhookContractFulfillmentHandler
  *
  * Sprint 6: Contract-Aware Webhook Processing
+ * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
  *
  * This handler bridges Stripe webhooks to the contract state machine by:
  * 1. Looking up contract by providerOrderId (payment intent ID)
- * 2. Validating contract state (must be COMMITTED)
- * 3. Transitioning contract to FULFILLED
- * 4. Dispatching ContractFulfilledEvent
+ * 2. Delegating fulfillment to ContractFulfillmentService
+ * 3. Handling capture/refund amounts
  *
  * @group sprint-6
+ * @group sprint-18
  * @group contract-aware
  */
 class WebhookContractFulfillmentHandlerTest extends TestCase
 {
     private ContractRepositoryInterface $contractRepository;
-    private EventDispatcherInterface $eventDispatcher;
+    private ContractFulfillmentServiceInterface $contractFulfillmentService;
 
     protected function setUp(): void
     {
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
-        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $this->contractFulfillmentService = $this->createMock(ContractFulfillmentServiceInterface::class);
     }
 
     // =========================================================================
@@ -47,27 +47,23 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     /**
      * @test
      * @group sprint-6
+     * @group sprint-18
      * @group contract-aware
      */
     public function handlerFindsContractByProviderOrderId(): void
     {
         $providerOrderId = 'pi_test_123';
 
-        $contract = $this->createCommittedContractMock($providerOrderId, 'order123');
-
-        $this->contractRepository
+        // Sprint 18: Delegates to ContractFulfillmentService
+        $this->contractFulfillmentService
             ->expects($this->once())
-            ->method('findByProviderOrderId')
+            ->method('fulfillByProviderOrderId')
             ->with($providerOrderId)
-            ->willReturn($contract);
-
-        // Contract will be fulfilled and saved
-        $contract->expects($this->once())->method('fulfill');
-        $this->contractRepository->expects($this->once())->method('save')->with($contract);
+            ->willReturn(true);
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->eventDispatcher
+            $this->contractFulfillmentService
         );
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
@@ -82,34 +78,23 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     /**
      * @test
      * @group sprint-6
+     * @group sprint-18
      * @group contract-aware
      */
     public function handlerSkipsAlreadyFulfilledContract(): void
     {
         $providerOrderId = 'pi_already_fulfilled';
 
-        $contract = $this->createMock(PaymentContractInterface::class);
-        $contract->method('getState')->willReturn(ContractState::fulfilled());
-        $contract->method('getId')->willReturn('contract456');
-
-        $this->contractRepository
-            ->method('findByProviderOrderId')
+        // Sprint 18: Delegates to ContractFulfillmentService which returns false
+        $this->contractFulfillmentService
+            ->expects($this->once())
+            ->method('fulfillByProviderOrderId')
             ->with($providerOrderId)
-            ->willReturn($contract);
-
-        // Contract should NOT be saved (already fulfilled - idempotent)
-        $this->contractRepository
-            ->expects($this->never())
-            ->method('save');
-
-        // No event should be dispatched
-        $this->eventDispatcher
-            ->expects($this->never())
-            ->method('dispatch');
+            ->willReturn(false);
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->eventDispatcher
+            $this->contractFulfillmentService
         );
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
@@ -124,29 +109,23 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     /**
      * @test
      * @group sprint-6
+     * @group sprint-18
      * @group contract-aware
      */
     public function handlerRejectsNonCommittedContract(): void
     {
         $providerOrderId = 'pi_pending_contract';
 
-        $contract = $this->createMock(PaymentContractInterface::class);
-        $contract->method('getState')->willReturn(ContractState::pending());
-        $contract->method('getId')->willReturn('contract789');
-        $contract->method('getStateValue')->willReturn('pending');
-
-        $this->contractRepository
-            ->method('findByProviderOrderId')
-            ->willReturn($contract);
-
-        // Contract should NOT be saved
-        $this->contractRepository
-            ->expects($this->never())
-            ->method('save');
+        // Sprint 18: Delegates to ContractFulfillmentService which returns false for non-committed
+        $this->contractFulfillmentService
+            ->expects($this->once())
+            ->method('fulfillByProviderOrderId')
+            ->with($providerOrderId)
+            ->willReturn(false);
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->eventDispatcher
+            $this->contractFulfillmentService
         );
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
@@ -161,34 +140,28 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     /**
      * @test
      * @group sprint-6
+     * @group sprint-18
      * @group contract-aware
      */
     public function handlerTransitionsContractToFulfilled(): void
     {
         $providerOrderId = 'pi_to_fulfill';
 
-        $contract = $this->createCommittedContractMock($providerOrderId, 'order456');
-
-        $this->contractRepository
-            ->method('findByProviderOrderId')
-            ->willReturn($contract);
-
-        // Contract::fulfill() should be called
-        $contract->expects($this->once())
-            ->method('fulfill');
-
-        // Contract should be saved after fulfillment
-        $this->contractRepository
+        // Sprint 18: Delegates to ContractFulfillmentService
+        $this->contractFulfillmentService
             ->expects($this->once())
-            ->method('save')
-            ->with($contract);
+            ->method('fulfillByProviderOrderId')
+            ->with($providerOrderId)
+            ->willReturn(true);
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->eventDispatcher
+            $this->contractFulfillmentService
         );
 
-        $handler->handlePaymentSucceeded($providerOrderId);
+        $result = $handler->handlePaymentSucceeded($providerOrderId);
+
+        $this->assertTrue($result);
     }
 
     // =========================================================================
@@ -198,34 +171,28 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     /**
      * @test
      * @group sprint-6
+     * @group sprint-18
      * @group contract-aware
      */
-    public function handlerDispatchesContractFulfilledEvent(): void
+    public function handlerDelegatesEventDispatchToService(): void
     {
         $providerOrderId = 'pi_dispatch_event';
-        $orderId = 'order789';
 
-        $contract = $this->createCommittedContractMock($providerOrderId, $orderId);
-
-        $this->contractRepository
-            ->method('findByProviderOrderId')
-            ->willReturn($contract);
-
-        // Event dispatcher should receive ContractFulfilledEvent
-        $this->eventDispatcher
+        // Sprint 18: Event dispatch is handled by ContractFulfillmentService
+        $this->contractFulfillmentService
             ->expects($this->once())
-            ->method('dispatch')
-            ->with($this->callback(function ($event) use ($orderId) {
-                return $event instanceof ContractFulfilledEvent
-                    && $event->getOrderId() === $orderId;
-            }));
+            ->method('fulfillByProviderOrderId')
+            ->with($providerOrderId)
+            ->willReturn(true);
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->eventDispatcher
+            $this->contractFulfillmentService
         );
 
-        $handler->handlePaymentSucceeded($providerOrderId);
+        $result = $handler->handlePaymentSucceeded($providerOrderId);
+
+        $this->assertTrue($result);
     }
 
     // =========================================================================
@@ -235,22 +202,23 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     /**
      * @test
      * @group sprint-6
+     * @group sprint-18
      * @group contract-aware
      */
-    public function handlerReturnsOrderIdFromContract(): void
+    public function handlerReturnsResultFromService(): void
     {
         $providerOrderId = 'pi_get_order_id';
-        $expectedOrderId = 'order_from_contract';
 
-        $contract = $this->createCommittedContractMock($providerOrderId, $expectedOrderId);
-
-        $this->contractRepository
-            ->method('findByProviderOrderId')
-            ->willReturn($contract);
+        // Sprint 18: Return value comes from service
+        $this->contractFulfillmentService
+            ->expects($this->once())
+            ->method('fulfillByProviderOrderId')
+            ->with($providerOrderId)
+            ->willReturn(true);
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->eventDispatcher
+            $this->contractFulfillmentService
         );
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
@@ -265,25 +233,23 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     /**
      * @test
      * @group sprint-6
+     * @group sprint-18
      * @group contract-aware
      */
     public function handlerReturnsNullWhenContractNotFound(): void
     {
         $providerOrderId = 'pi_no_contract';
 
-        $this->contractRepository
-            ->method('findByProviderOrderId')
+        // Sprint 18: Service returns null when contract not found
+        $this->contractFulfillmentService
+            ->expects($this->once())
+            ->method('fulfillByProviderOrderId')
             ->with($providerOrderId)
             ->willReturn(null);
 
-        // No save should happen
-        $this->contractRepository
-            ->expects($this->never())
-            ->method('save');
-
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->eventDispatcher
+            $this->contractFulfillmentService
         );
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
@@ -298,6 +264,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     /**
      * @test
      * @group sprint-6
+     * @group sprint-18
      * @group contract-aware
      */
     public function handlerHandlesChargeCapturedEvent(): void
@@ -310,11 +277,16 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->method('findByProviderOrderId')
             ->willReturn($contract);
 
-        $contract->expects($this->once())->method('fulfill');
+        // Sprint 18: Uses fulfill() method which delegates to service
+        $this->contractFulfillmentService
+            ->expects($this->once())
+            ->method('fulfill')
+            ->with($contract)
+            ->willReturn(true);
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->eventDispatcher
+            $this->contractFulfillmentService
         );
 
         $result = $handler->handleChargeCaptured($providerOrderId);
@@ -329,6 +301,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     /**
      * @test
      * @group sprint-6
+     * @group sprint-18
      * @group contract-aware
      */
     public function handlerHandlesChargeRefundedEvent(): void
@@ -348,7 +321,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->eventDispatcher
+            $this->contractFulfillmentService
         );
 
         $result = $handler->handleChargeRefunded($providerOrderId, $refundAmount);
@@ -363,6 +336,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     /**
      * @test
      * @group sprint-6
+     * @group sprint-18
      * @group contract-aware
      */
     public function handlerHandlesPaymentFailed(): void
@@ -399,7 +373,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->eventDispatcher
+            $this->contractFulfillmentService
         );
 
         $result = $handler->handlePaymentFailed($providerOrderId, $failureReason);

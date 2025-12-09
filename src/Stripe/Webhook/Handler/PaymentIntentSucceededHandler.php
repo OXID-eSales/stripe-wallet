@@ -9,8 +9,9 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Webhook\Handler;
 
-use Doctrine\DBAL\Connection;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookEvent;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookEventHandlerInterface;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookResult;
@@ -22,6 +23,9 @@ use Psr\Log\LoggerInterface;
  * Updates OXPAID timestamp on orders and fulfills contracts
  * when payments are successfully captured.
  *
+ * Sprint 16: Uses OrderPaymentStateService for DRY compliance.
+ * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment.
+ *
  * @since Sprint 13
  */
 final class PaymentIntentSucceededHandler implements WebhookEventHandlerInterface
@@ -29,8 +33,9 @@ final class PaymentIntentSucceededHandler implements WebhookEventHandlerInterfac
     private const EVENT_TYPE = 'payment_intent.succeeded';
 
     public function __construct(
-        private readonly Connection $connection,
+        private readonly OrderPaymentStateServiceInterface $orderPaymentStateService,
         private readonly ContractRepositoryInterface $contractRepository,
+        private readonly ContractFulfillmentServiceInterface $contractFulfillmentService,
         private readonly LoggerInterface $logger
     ) {
     }
@@ -71,21 +76,20 @@ final class PaymentIntentSucceededHandler implements WebhookEventHandlerInterfac
             return WebhookResult::success('no_contract_logged');
         }
 
-        // Only proceed if contract is in committed state
-        if (!$contract->getState()->isCommitted()) {
-            $this->logger->info('Contract not in committed state, skipping fulfillment', [
-                'payment_intent_id' => $paymentIntentId,
-                'contract_state' => $contract->getState()->getValue(),
-            ]);
-            return WebhookResult::success('contract_not_committed');
-        }
-
-        // Update OXPAID and fulfill contract
+        // Update OXPAID timestamp
         $capturedAt = $this->extractCapturedAt($event);
         $this->updateOrderPaidTimestamp($paymentIntentId, $capturedAt);
 
-        $contract->fulfill();
-        $this->contractRepository->save($contract);
+        // Sprint 18: Use ContractFulfillmentService for DRY fulfillment
+        $fulfilled = $this->contractFulfillmentService->fulfill($contract);
+
+        if (!$fulfilled) {
+            $this->logger->info('Contract not fulfilled (guard failed)', [
+                'payment_intent_id' => $paymentIntentId,
+                'contract_state' => $contract->getState()->getValue(),
+            ]);
+            return WebhookResult::success('contract_not_fulfilled');
+        }
 
         $this->logger->info('payment_intent.succeeded handled successfully', [
             'payment_intent_id' => $paymentIntentId,
@@ -124,14 +128,14 @@ final class PaymentIntentSucceededHandler implements WebhookEventHandlerInterfac
 
     /**
      * Update OXPAID timestamp on the order.
+     *
+     * Sprint 16: Uses OrderPaymentStateService for DRY compliance.
      */
     private function updateOrderPaidTimestamp(string $paymentIntentId, \DateTimeImmutable $capturedAt): void
     {
-        $sql = "UPDATE oxorder SET OXPAID = :paid WHERE OXTRANSID = :transid";
-
-        $this->connection->executeStatement($sql, [
-            'paid' => $capturedAt->format('Y-m-d H:i:s'),
-            'transid' => $paymentIntentId,
-        ]);
+        $this->orderPaymentStateService->updatePaidTimestampByTransactionId(
+            $paymentIntentId,
+            $capturedAt
+        );
     }
 }

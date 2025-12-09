@@ -9,15 +9,16 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Webhook;
 
-use Doctrine\DBAL\Connection;
 use OxidSolutionCatalysts\Payments\Component\Contract\BasketSnapshot;
 use OxidSolutionCatalysts\Payments\Component\Contract\ContractCondition;
 use OxidSolutionCatalysts\Payments\Component\Contract\ContractState;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookEvent;
 use OxidSolutionCatalysts\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededHandler;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -30,14 +31,15 @@ use Psr\Log\LoggerInterface;
  * @covers \OxidSolutionCatalysts\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededHandler
  * @group sprint-14
  * @group sprint-15
+ * @group sprint-16
  * @group webhook
  * @group contract
  */
 final class WebhookContractTransitionTest extends TestCase
 {
-    private Connection $connection;
-    private ContractRepositoryInterface $contractRepository;
-    private LoggerInterface $logger;
+    private OrderPaymentStateServiceInterface&MockObject $orderPaymentStateService;
+    private ContractRepositoryInterface&MockObject $contractRepository;
+    private LoggerInterface&MockObject $logger;
     private PaymentIntentSucceededHandler $handler;
     private BasketSnapshot $basketSnapshot;
 
@@ -45,12 +47,12 @@ final class WebhookContractTransitionTest extends TestCase
     {
         parent::setUp();
 
-        $this->connection = $this->createMock(Connection::class);
+        $this->orderPaymentStateService = $this->createMock(OrderPaymentStateServiceInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->handler = new PaymentIntentSucceededHandler(
-            $this->connection,
+            $this->orderPaymentStateService,
             $this->contractRepository,
             $this->logger
         );
@@ -120,10 +122,10 @@ final class WebhookContractTransitionTest extends TestCase
             ->expects($this->never())
             ->method('save');
 
-        // OXPAID should NOT be updated
-        $this->connection
+        // Sprint 16: OXPAID should NOT be updated
+        $this->orderPaymentStateService
             ->expects($this->never())
-            ->method('executeStatement');
+            ->method('updatePaidTimestampByTransactionId');
 
         // When: payment_intent.succeeded webhook received
         $event = $this->createWebhookEvent('payment_intent.succeeded', $paymentIntentId);
@@ -155,10 +157,10 @@ final class WebhookContractTransitionTest extends TestCase
             ->expects($this->never())
             ->method('save');
 
-        // OXPAID should NOT be updated
-        $this->connection
+        // Sprint 16: OXPAID should NOT be updated
+        $this->orderPaymentStateService
             ->expects($this->never())
-            ->method('executeStatement');
+            ->method('updatePaidTimestampByTransactionId');
 
         // When: payment_intent.succeeded webhook received
         $event = $this->createWebhookEvent('payment_intent.succeeded', $paymentIntentId);
@@ -172,6 +174,7 @@ final class WebhookContractTransitionTest extends TestCase
     /**
      * @test
      * Sprint 15: NO_CONTRACT is ERROR - logs error, returns success (200)
+     * Sprint 16: Uses OrderPaymentStateService
      */
     public function paymentIntentSucceededLogsErrorWhenNoContract(): void
     {
@@ -192,10 +195,10 @@ final class WebhookContractTransitionTest extends TestCase
                 $this->callback(fn($ctx) => $ctx['payment_intent_id'] === $paymentIntentId)
             );
 
-        // OXPAID should NOT be updated without contract
-        $this->connection
+        // Sprint 16: OXPAID should NOT be updated without contract
+        $this->orderPaymentStateService
             ->expects($this->never())
-            ->method('executeStatement');
+            ->method('updatePaidTimestampByTransactionId');
 
         // When: payment_intent.succeeded webhook received
         $event = $this->createWebhookEvent('payment_intent.succeeded', $paymentIntentId);
@@ -209,6 +212,7 @@ final class WebhookContractTransitionTest extends TestCase
     /**
      * @test
      * Sprint 15: OXPAID is only updated when contract exists and is COMMITTED
+     * Sprint 16: Uses OrderPaymentStateService
      */
     public function paymentIntentSucceededUpdatesOxpaidTimestamp(): void
     {
@@ -227,16 +231,14 @@ final class WebhookContractTransitionTest extends TestCase
             ->expects($this->once())
             ->method('save');
 
-        // Expect OXPAID update
-        $this->connection
+        // Sprint 16: Expect OXPAID update via service
+        $this->orderPaymentStateService
             ->expects($this->once())
-            ->method('executeStatement')
+            ->method('updatePaidTimestampByTransactionId')
             ->with(
-                $this->stringContains('UPDATE oxorder SET OXPAID'),
-                $this->callback(function (array $params) use ($paymentIntentId) {
-                    return $params['transid'] === $paymentIntentId
-                        && isset($params['paid'])
-                        && preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $params['paid']);
+                $paymentIntentId,
+                $this->callback(function (\DateTimeImmutable $paidAt) use ($chargeTimestamp) {
+                    return $paidAt->getTimestamp() === $chargeTimestamp;
                 })
             );
 

@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Webhook;
 
+use OxidEsales\Eshop\Core\Registry;
 use OxidSolutionCatalysts\Payments\Tests\Helper\StripeWebhookTestHelper;
 use PHPUnit\Framework\TestCase;
 
@@ -25,15 +26,15 @@ use PHPUnit\Framework\TestCase;
  */
 final class WebhookEndpointE2ETest extends TestCase
 {
-    private const SHOP_URL = 'https://daniil.oxiddev.de';
-    private const WEBHOOK_PATH = '/index.php?cl=osc_stripe_webhook';
+    private const WEBHOOK_PATH = 'index.php?cl=osc_stripe_webhook';
 
     private string $webhookUrl;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->webhookUrl = self::SHOP_URL . self::WEBHOOK_PATH;
+        $shopUrl = Registry::getConfig()->getShopUrl();
+        $this->webhookUrl = rtrim($shopUrl, '/') . '/' . self::WEBHOOK_PATH;
     }
 
     /**

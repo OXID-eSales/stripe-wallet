@@ -6,21 +6,19 @@ namespace OxidSolutionCatalysts\Payments\Stripe\Handler;
 
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractFulfilledEvent;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface;
 
 /**
  * Handles webhook events with contract-awareness.
  *
  * Sprint 6: Contract-Aware Webhook Processing
+ * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
  *
  * This handler bridges Stripe webhooks to the contract state machine by:
  * 1. Looking up contract by providerOrderId (payment intent ID)
- * 2. Validating contract state (must be COMMITTED for fulfillment)
- * 3. Transitioning contract to FULFILLED
- * 4. Dispatching ContractFulfilledEvent
+ * 2. Delegating fulfillment to ContractFulfillmentService
+ * 3. Handling capture/refund amounts
  *
  * @since 1.0.0
  */
@@ -28,7 +26,7 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
 {
     public function __construct(
         private readonly ContractRepositoryInterface $contractRepository,
-        private readonly EventDispatcherInterface $eventDispatcher
+        private readonly ContractFulfillmentServiceInterface $contractFulfillmentService
     ) {
     }
 
@@ -37,7 +35,8 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
      */
     public function handlePaymentSucceeded(string $providerOrderId): ?bool
     {
-        return $this->fulfillContractByProviderOrderId($providerOrderId);
+        // Sprint 18: Delegate to ContractFulfillmentService (DRY)
+        return $this->contractFulfillmentService->fulfillByProviderOrderId($providerOrderId);
     }
 
     /**
@@ -68,17 +67,16 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
 
         // Validation - must be COMMITTED to fulfill
         if (!$contract->getState()->isCommitted()) {
+            // Save captured amount even if not ready to fulfill
+            if ($capturedAmount > 0.0) {
+                $this->contractRepository->save($contract);
+            }
             return false;
         }
 
-        // Transition contract to FULFILLED
-        $contract->fulfill();
-        $this->contractRepository->save($contract);
-
-        // Dispatch ContractFulfilledEvent
-        $this->dispatchContractFulfilledEvent($contract);
-
-        return true;
+        // Sprint 18: Use ContractFulfillmentService for DRY fulfillment
+        // Note: capturedAmount is already set on contract above
+        return $this->contractFulfillmentService->fulfill($contract);
     }
 
     /**
@@ -134,40 +132,6 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
     }
 
     /**
-     * Find contract by provider order ID and fulfill it.
-     *
-     * @param string $providerOrderId Stripe PaymentIntent ID
-     * @return bool|null true if fulfilled, false if skipped (idempotent), null if not found
-     */
-    private function fulfillContractByProviderOrderId(string $providerOrderId): ?bool
-    {
-        $contract = $this->findContractByProviderOrderId($providerOrderId);
-
-        if ($contract === null) {
-            return null;
-        }
-
-        // Idempotency check - already fulfilled
-        if ($contract->getState()->isFulfilled()) {
-            return false;
-        }
-
-        // Validation - must be COMMITTED to fulfill
-        if (!$contract->getState()->isCommitted()) {
-            return false;
-        }
-
-        // Transition contract to FULFILLED
-        $contract->fulfill();
-        $this->contractRepository->save($contract);
-
-        // Dispatch ContractFulfilledEvent
-        $this->dispatchContractFulfilledEvent($contract);
-
-        return true;
-    }
-
-    /**
      * Find contract by provider order ID.
      *
      * @param string $providerOrderId Stripe PaymentIntent ID
@@ -175,26 +139,5 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
     private function findContractByProviderOrderId(string $providerOrderId): ?PaymentContractInterface
     {
         return $this->contractRepository->findByProviderOrderId($providerOrderId);
-    }
-
-    /**
-     * Dispatch ContractFulfilledEvent for event handlers.
-     */
-    private function dispatchContractFulfilledEvent(PaymentContractInterface $contract): void
-    {
-        $context = new EventContext([
-            'contractId' => $contract->getId(),
-            'orderId' => $contract->getOrderId(),
-            'providerOrderId' => $contract->getProviderOrderId(),
-            'source' => 'webhook',
-        ]);
-
-        $event = new ContractFulfilledEvent(
-            $contract,
-            $context,
-            $contract->getOrderId() ?? ''
-        );
-
-        $this->eventDispatcher->dispatch($event);
     }
 }
