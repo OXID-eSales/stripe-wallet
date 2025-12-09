@@ -1,0 +1,60 @@
+@startuml Fat Handler Anti-Pattern
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title **HIGH: Fat Handler Anti-Pattern - StripeRefundRequestHandler**
+
+skinparam rectangle {
+    BackgroundColor<<expected>> #C8E6C9
+    BorderColor<<expected>> #43A047
+    BackgroundColor<<actual>> #FFCDD2
+    BorderColor<<actual>> #E53935
+}
+
+rectangle "Expected: Thin Handler (15-25 lines)" <<expected>> {
+    rectangle "RefundRequestHandler" as thin {
+        rectangle "handle(event)" as thin_handle
+    }
+    rectangle "RefundService" as svc {
+        rectangle "processRefund()" as svc_method
+    }
+    thin_handle --> svc_method : delegate
+}
+
+rectangle "Actual: Fat Handler (~250 lines)" <<actual>> {
+    rectangle "StripeRefundRequestHandler" as fat {
+        rectangle "handle()" as fat1
+        rectangle "loadOrder()" as fat2
+        rectangle "getPaymentIntentId()" as fat3
+        rectangle "getChargeId()" as fat4
+        rectangle "buildRefundParams()" as fat5
+        rectangle "executeStripeRefund()" as fat6
+        rectangle "updateOrderAfterRefund()" as fat7
+        rectangle "logRefundRequest()" as fat8
+    }
+}
+
+fat1 --> fat2 : Line 64
+fat2 --> fat3 : Line 70
+fat3 --> fat4 : Line 76
+fat4 --> fat5 : Line 82
+fat5 --> fat6 : Line 85
+fat6 --> fat7 : Line 91
+fat7 --> fat8 : Line 94
+
+note right of fat
+    **7 Responsibilities in 1 Handler**
+    Violates Single Responsibility Principle
+
+    Target: 15-25 lines
+    Actual: ~250 lines
+end note
+
+note bottom
+    **Should be extracted to:**
+    - RefundService (business logic)
+    - StripeRefundAdapter (API calls)
+    - RefundLogger (logging)
+end note
+
+@enduml

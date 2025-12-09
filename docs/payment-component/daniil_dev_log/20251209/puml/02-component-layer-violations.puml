@@ -1,0 +1,67 @@
+@startuml Component Layer Provider-Agnostic Violations
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title **CRITICAL: Component Layer Not 100% Provider-Agnostic**
+
+skinparam class {
+    BackgroundColor<<component>> #E8F5E9
+    BorderColor<<component>> #4CAF50
+    BackgroundColor<<violation>> #FFEBEE
+    BorderColor<<violation>> #F44336
+    BackgroundColor<<oxid>> #E3F2FD
+    BorderColor<<oxid>> #2196F3
+}
+
+package "Component Layer (Should be 100% Agnostic)" <<component>> {
+    class OrderController <<violation>> {
+        Line 176: Registry::getRequest()
+        Line 188: Registry::getSession()
+        Line 197: Registry::getUtilsView()
+        Line 216: Registry::getSession()
+    }
+
+    class ThankyouController <<violation>> {
+        Line 149: Registry::getSession()
+        Line 157: Registry::getLogger()
+        Line 165: Registry::getLogger()
+    }
+
+    class CreateOrderRequest <<violation>> {
+        Line 50: Registry::getSession()
+    }
+
+    interface ShopAdapterInterface <<component>> {
+        +translateString()
+        +getShopId()
+        +getShopUrl()
+        +getCurrentLanguage()
+    }
+}
+
+package "OXID Framework" <<oxid>> {
+    class Registry {
+        +getSession()
+        +getRequest()
+        +getLogger()
+        +getUtilsView()
+    }
+}
+
+OrderController ..> Registry : **VIOLATION**\n4 direct calls
+ThankyouController ..> Registry : **VIOLATION**\n3 direct calls
+CreateOrderRequest ..> Registry : **VIOLATION**\n1 direct call
+
+note bottom of ShopAdapterInterface
+    **Expected Pattern:**
+    Component layer should use
+    ShopAdapterInterface for all
+    platform operations
+end note
+
+note right of Registry
+    **8 Total Violations**
+    in "provider-agnostic" layer
+end note
+
+@enduml

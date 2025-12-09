@@ -1,0 +1,66 @@
+@startuml Direct Stripe SDK Calls in Handlers
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title **HIGH: Direct Stripe SDK Calls Bypass Adapter Layer**
+
+skinparam rectangle {
+    BackgroundColor<<expected>> #C8E6C9
+    BorderColor<<expected>> #43A047
+    BackgroundColor<<actual>> #FFCDD2
+    BorderColor<<actual>> #E53935
+    BackgroundColor<<adapter>> #E3F2FD
+    BorderColor<<adapter>> #2196F3
+}
+
+package "Expected Flow" <<expected>> {
+    rectangle "Handler" as exp_handler
+    rectangle "StripeAdapter" as exp_adapter
+    rectangle "Stripe SDK" as exp_sdk
+
+    exp_handler --> exp_adapter : uses
+    exp_adapter --> exp_sdk : calls
+}
+
+package "Actual Flow (Violations)" <<actual>> {
+    rectangle "StripeCheckoutReturnHandler\nLine 154-157" as handler1 {
+        note right
+            $stripeClient->checkout
+                ->sessions->retrieve()
+        end note
+    }
+
+    rectangle "StripeRefundRequestHandler\nLine 227" as handler2 {
+        note right
+            $stripeClient->refunds
+                ->create()
+        end note
+    }
+
+    rectangle "StripeAdapter" as adapter <<adapter>> {
+        note bottom: **Bypassed!**
+    }
+
+    rectangle "Stripe SDK" as sdk
+}
+
+handler1 --> sdk : **DIRECT CALL**\nBypasses adapter
+handler2 --> sdk : **DIRECT CALL**\nBypasses adapter
+
+handler1 -[dashed]-> adapter : Should use
+handler2 -[dashed]-> adapter : Should use
+
+note bottom
+    **Problems:**
+    1. Cannot mock SDK calls in handler tests
+    2. No centralized error handling
+    3. Scattered Stripe-specific logic
+    4. Violates adapter pattern
+
+    **Solution:**
+    Add methods to StripeAdapter:
+    - retrieveCheckoutSession()
+    - createRefund()
+end note
+
+@enduml

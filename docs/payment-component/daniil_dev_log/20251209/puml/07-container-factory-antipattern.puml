@@ -1,0 +1,71 @@
+@startuml ContainerFactory Anti-Pattern
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title **MEDIUM: ContainerFactory Lazy Loading Anti-Pattern**
+
+skinparam class {
+    BackgroundColor<<violation>> #FFEBEE
+    BorderColor<<violation>> #F44336
+    BackgroundColor<<correct>> #C8E6C9
+    BorderColor<<correct>> #43A047
+}
+
+package "Anti-Pattern (4 files)" {
+    class PaymentAuthorizedEventHandler <<violation>> {
+        -getEventDispatcher()
+        --
+        Lines 37-41:
+        ContainerFactory::getInstance()
+            ->getContainer()
+            ->get(EventDispatcherInterface)
+    }
+
+    class StripeOrderCreationHandler <<violation>> {
+        -getEventDispatcher()
+        --
+        Lines 45-50:
+        Same pattern
+    }
+
+    class StripeCheckoutReturnHandler <<violation>> {
+        -getEventDispatcher()
+        --
+        Lines 50-57:
+        Same pattern
+    }
+
+    class OrderCreationHandler <<violation>> {
+        Similar lazy loading
+    }
+}
+
+package "Correct Pattern" <<correct>> {
+    class ProperHandler {
+        -EventDispatcherInterface $dispatcher
+        --
+        +__construct(EventDispatcherInterface $dispatcher)
+        +handle(): void
+    }
+}
+
+note right of PaymentAuthorizedEventHandler
+    **Why this happens:**
+    Circular dependency in
+    DI container configuration
+
+    **Problems:**
+    1. Hidden dependencies
+    2. Harder to test
+    3. Violates DI principle
+    4. Container coupling
+end note
+
+note bottom of ProperHandler
+    **Solution:**
+    1. Fix circular dependency in services.yaml
+    2. Use setter injection if needed
+    3. Extract shared services
+end note
+
+@enduml

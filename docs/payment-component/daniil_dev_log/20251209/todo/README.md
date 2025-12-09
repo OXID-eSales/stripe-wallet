@@ -1,0 +1,170 @@
+# Sprint Backlog: Code Review Remediation
+
+**Date:** 2025-12-09
+**Source:** CODE_REVIEW.md analysis
+**Developer:** Daniil (Claude Code)
+
+---
+
+## Core Development Principles
+
+**All sprints MUST follow these principles:**
+
+| Principle | Description | Enforcement |
+|-----------|-------------|-------------|
+| **TDD-FIRST** | Write failing tests BEFORE implementation (RED → GREEN → REFACTOR) | Every sprint starts with test file |
+| **SOLID** | Single Responsibility, Open/Closed, Liskov, Interface Segregation, DI | Code review checklist |
+| **LSP (Liskov Substitution)** | Use interfaces as types, subtypes must be substitutable | All new classes implement interfaces |
+| **DI (Dependency Injection)** | All dependencies injected via constructor, no `new` in business logic | No ContainerFactory access |
+| **Clean Code** | 15-25 line methods, no else expressions, early returns | PHPStan level 6 |
+| **DRY** | No duplicate code, extract shared logic to services | Max 1 location for each operation |
+| **No Over-Engineering** | Minimal changes to achieve the goal | Review scope before implementation |
+| **Containerization** | All tests run in Docker, consistent environment | `docker compose exec` commands |
+
+---
+
+## Sprint Overview
+
+| Sprint | Description | Priority | Est. Effort |
+|--------|-------------|----------|-------------|
+| [Sprint 15](sprint-15-test-class-in-production.md) | Remove test class import from production | CRITICAL | 2h |
+| [Sprint 16](sprint-16-order-payment-state-service.md) | Extract OrderPaymentStateService (OXPAID consolidation) | CRITICAL | 3h |
+| [Sprint 17](sprint-17-fix-false-positive-tests.md) | Fix false-positive tests | CRITICAL | 2h |
+| [Sprint 18](sprint-18-contract-fulfillment-service.md) | Extract ContractFulfillmentService | HIGH | 3h |
+| [Sprint 19](sprint-19-stripe-adapter-routing.md) | Route Stripe SDK calls through adapter | HIGH | 4h |
+| [Sprint 20](sprint-20-remove-request-modification.md) | Remove $_REQUEST modification | HIGH | 2h |
+| [Sprint 21](sprint-21-refactor-fat-handlers.md) | Refactor fat handlers (RefundService) | MEDIUM | 4h |
+| [Sprint 22](sprint-22-resolve-container-factory.md) | Resolve ContainerFactory usage | MEDIUM | 3h |
+| [Sprint 23](sprint-23-documentation-updates.md) | Update architecture documentation | MEDIUM | 2h |
+
+**Total Estimated Effort:** 25 hours
+
+---
+
+## Dependency Graph
+
+```
+Sprint 15: Test Class Removal (CRITICAL - blocks deployment)
+    │
+    └──► Unblocks: Clean production code
+
+Sprint 16: OrderPaymentStateService (CRITICAL - data consistency)
+    │
+    └──► Consolidates: 4 OXPAID update locations
+
+Sprint 17: False-Positive Tests (CRITICAL - test reliability)
+    │
+    └──► Enables: Confident refactoring
+
+Sprint 18: ContractFulfillmentService (HIGH)
+    │
+    ├── Depends on: Sprint 16 (shared service pattern)
+    └──► Consolidates: 3 fulfillment locations
+
+Sprint 19: Stripe Adapter Routing (HIGH)
+    │
+    └──► Enables: Provider-agnostic handlers
+
+Sprint 20: $_REQUEST Removal (HIGH)
+    │
+    └──► Improves: Security and testability
+
+Sprint 21: Fat Handler Refactoring (MEDIUM)
+    │
+    ├── Depends on: Sprint 18, 19 (service extraction pattern)
+    └──► Creates: RefundService, RefundOrchestrator
+
+Sprint 22: ContainerFactory Resolution (MEDIUM)
+    │
+    ├── Depends on: Sprint 21 (DI cleanup)
+    └──► Resolves: Circular dependencies
+
+Sprint 23: Documentation Updates (MEDIUM)
+    │
+    ├── Depends on: Sprint 15-22 (code changes)
+    └──► Updates: Architecture docs
+```
+
+---
+
+## Test Commands
+
+```bash
+# Run all unit tests
+docker compose exec -T php bash -c "cd /var/www/test-module && vendor/bin/phpunit -c tests/phpunit.xml --testsuite Unit"
+
+# Run integration tests
+docker compose exec -T php vendor/bin/phpunit \
+    -c /var/www/test-module/tests/phpunit.xml \
+    --testsuite Integration \
+    --bootstrap=/var/www/source/bootstrap.php
+
+# Run single test file
+docker compose exec -T php bash -c "cd /var/www/test-module && vendor/bin/phpunit -c tests/phpunit.xml tests/Unit/Path/To/TestFile.php"
+
+# Pre-commit check
+./bin/pre-commit-check.sh
+
+# E2E tests
+cd tests/e2e/playwright && npx playwright test tests/checkout/
+```
+
+---
+
+## Quality Gates
+
+### Before Each Sprint Completion
+
+- [ ] All new tests pass (TDD)
+- [ ] All existing tests pass
+- [ ] PHPStan level 6 passes
+- [ ] PHPCS (PSR-12) passes
+- [ ] No new ContainerFactory usage
+- [ ] All dependencies injected via constructor
+- [ ] Methods ≤ 25 lines
+- [ ] No else expressions (use early returns)
+
+### Before Final Merge
+
+- [ ] All sprints complete
+- [ ] E2E checkout flow passes
+- [ ] Documentation updated
+- [ ] Code review by peer
+
+---
+
+## Progress Tracking
+
+| Sprint | Status | Started | Completed |
+|--------|--------|---------|-----------|
+| Sprint 15 | PENDING | - | - |
+| Sprint 16 | PENDING | - | - |
+| Sprint 17 | PENDING | - | - |
+| Sprint 18 | PENDING | - | - |
+| Sprint 19 | PENDING | - | - |
+| Sprint 20 | PENDING | - | - |
+| Sprint 21 | PENDING | - | - |
+| Sprint 22 | PENDING | - | - |
+| Sprint 23 | PENDING | - | - |
+
+---
+
+## Files in This Directory
+
+```
+20251209/todo/
+├── README.md                           # This file - sprint overview
+├── sprint-15-test-class-in-production.md
+├── sprint-16-order-payment-state-service.md
+├── sprint-17-fix-false-positive-tests.md
+├── sprint-18-contract-fulfillment-service.md
+├── sprint-19-stripe-adapter-routing.md
+├── sprint-20-remove-request-modification.md
+├── sprint-21-refactor-fat-handlers.md
+├── sprint-22-resolve-container-factory.md
+└── sprint-23-documentation-updates.md
+```
+
+---
+
+**Last Updated:** 2025-12-09

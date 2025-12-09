@@ -1,0 +1,56 @@
+@startuml OXPAID Update Duplication Analysis
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam defaultTextAlignment center
+
+title **CRITICAL DEVIATION: OXPAID Updated in 4 Locations**
+
+skinparam package {
+    BackgroundColor<<violation>> #FFCCCC
+    BorderColor<<violation>> #FF0000
+    BackgroundColor<<ok>> #CCFFCC
+    BorderColor<<ok>> #00AA00
+}
+
+package "Expected Architecture" <<ok>> {
+    rectangle "Single OrderPaymentStateService" as expected {
+        rectangle "updatePaidTimestamp()" as single
+    }
+}
+
+package "Actual Implementation" <<violation>> {
+    rectangle "StripeOrderCreationHandler.php\nLines 160-193" as loc1 {
+        note right: Uses PHP date()\n"Primary path"
+    }
+
+    rectangle "OrderPaymentCompletedHandler.php\nLines 76-115" as loc2 {
+        note right: Uses MySQL NOW()\n"Event-driven backup"
+    }
+
+    rectangle "PaymentIntentSucceededHandler.php\nLines 128-136" as loc3 {
+        note right: Uses Stripe timestamp\n"Webhook handler"
+    }
+
+    rectangle "WebhookProcessingService.php\nLines 948-1025" as loc4 {
+        note right: Uses DatabaseProvider\n"Legacy path"
+    }
+}
+
+database "oxorder.OXPAID" as db
+
+expected -[hidden]down-> loc1
+
+loc1 --> db : **Inconsistent**\nDate Handling
+loc2 --> db
+loc3 --> db
+loc4 --> db
+
+note bottom of db
+    **Problems:**
+    1. Four different date sources (PHP, MySQL NOW(), Stripe)
+    2. Race conditions between handlers
+    3. Different lookup strategies (OXID vs OXTRANSID)
+    4. Different DB access methods
+end note
+
+@enduml

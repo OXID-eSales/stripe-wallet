@@ -1,0 +1,101 @@
+@startuml Refactoring Roadmap
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title **Recommended Refactoring Roadmap**
+
+skinparam rectangle {
+    BackgroundColor<<critical>> #FFCDD2
+    BorderColor<<critical>> #E53935
+    BackgroundColor<<high>> #FFE0B2
+    BorderColor<<high>> #FB8C00
+    BackgroundColor<<medium>> #FFF9C4
+    BorderColor<<medium>> #FBC02D
+    BackgroundColor<<new>> #C8E6C9
+    BorderColor<<new>> #43A047
+}
+
+package "Priority 1: CRITICAL" <<critical>> {
+    rectangle "Remove Test Class\nfrom Production" as p1_1
+    rectangle "Fix False-Positive\nTests" as p1_2
+}
+
+note right of p1_1
+    OrderCreationHandler.php:13
+    Create OrderInterface
+end note
+
+note right of p1_2
+    3 tests with assertTrue(true)
+    Replace or delete
+end note
+
+package "Priority 2: HIGH" <<high>> {
+    rectangle "Create\nOrderPaymentStateService" as p2_1 <<new>>
+    rectangle "Create\nContractFulfillmentService" as p2_2 <<new>>
+    rectangle "Fix Stripe SDK\nin Handlers" as p2_3
+    rectangle "Remove\n$_REQUEST Modification" as p2_4
+}
+
+note right of p2_1
+    Consolidate 4 OXPAID locations
+    Single date handling strategy
+end note
+
+note right of p2_2
+    Consolidate 3 fulfillment locations
+    Single event dispatch
+end note
+
+note right of p2_3
+    Route through StripeAdapter
+    Add: retrieveCheckoutSession()
+    Add: createRefund()
+end note
+
+note right of p2_4
+    StripeCheckoutReturnHandler:302
+    Use middleware/service
+end note
+
+package "Priority 3: MEDIUM" <<medium>> {
+    rectangle "Extract\nRefundService" as p3_1 <<new>>
+    rectangle "Fix ContainerFactory\nUsage" as p3_2
+    rectangle "Refactor Large\nTest Files" as p3_3
+}
+
+note right of p3_1
+    From StripeRefundRequestHandler
+    250 lines -> 25 lines
+end note
+
+note right of p3_2
+    4 files with lazy loading
+    Fix DI circular dependencies
+end note
+
+note right of p3_3
+    Use @dataProvider
+    Remove Registry::set()
+end note
+
+p1_1 --> p2_1
+p1_2 --> p2_1
+p2_1 --> p2_2
+p2_2 --> p2_3
+p2_3 --> p2_4
+p2_4 --> p3_1
+p3_1 --> p3_2
+p3_2 --> p3_3
+
+note as N1
+    **New Services to Create:**
+    1. OrderPaymentStateService - OXPAID updates
+    2. ContractFulfillmentService - fulfillment logic
+    3. RefundService - refund orchestration
+    4. DeliveryAddressSessionService - session state
+end note
+
+N1 .. p3_3
+
+@enduml

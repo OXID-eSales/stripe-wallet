@@ -1,0 +1,77 @@
+@startuml False-Positive Tests Analysis
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title **CRITICAL: False-Positive Tests (Always Pass)**
+
+skinparam rectangle {
+    BackgroundColor<<falsepos>> #FFCDD2
+    BorderColor<<falsepos>> #E53935
+    BackgroundColor<<weak>> #FFE0B2
+    BorderColor<<weak>> #FB8C00
+    BackgroundColor<<good>> #C8E6C9
+    BorderColor<<good>> #43A047
+}
+
+package "False-Positive Tests (Always Pass)" <<falsepos>> {
+    rectangle "WebhookEventDispatcherTest.php\nLine 206" as fp1
+    rectangle "AddressHashRestorationTest.php\nLine 383" as fp2
+    rectangle "HelloWorldTest.php\nLines 20-23" as fp3
+}
+
+note right of fp1
+    canRegisterMultipleHandlers()
+    **$this->assertTrue(true);**
+end note
+
+note right of fp2
+    testAddressHashRestoredBeforePaymentEvent()
+    **$this->assertTrue(true);**
+    Comment: "if no dispatch, still pass"
+end note
+
+note right of fp3
+    testPhpUnitWorks()
+    **$this->assertTrue(true, ...);**
+    Bootstrap test, not real test
+end note
+
+package "Weak Assertions (Hidden in Mocks)" <<weak>> {
+    rectangle "AddressHashRestorationTest.php\nLines 361-364" as weak1
+}
+
+note right of weak1
+    Assertion hidden in willReturnCallback():
+    ->willReturnCallback(function($e) ...
+        $this->assertTrue(...);
+        return $e;
+    ...);
+end note
+
+package "Good Test Pattern" <<good>> {
+    rectangle "ProperTest" as good1
+}
+
+note right of good1
+    Arrange: Setup preconditions
+    Act: Execute code under test
+    Assert: Verify outcomes
+    **$this->assertEquals(expected, actual);**
+end note
+
+note as N1
+    **Impact of False-Positive Tests:**
+    1. False sense of security
+    2. Tests pass even when code is broken
+    3. Code coverage numbers are misleading
+    4. Bugs slip into production
+
+    **Action Required:**
+    - Replace assertTrue(true) with meaningful assertions
+    - Or delete the tests entirely
+    - Move assertions out of mock callbacks
+end note
+
+N1 .. fp3
+
+@enduml

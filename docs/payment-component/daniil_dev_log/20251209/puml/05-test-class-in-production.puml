@@ -1,0 +1,65 @@
+@startuml Test Class in Production Code
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title **CRITICAL: Test Class Imported in Production Code**
+
+skinparam package {
+    BackgroundColor<<production>> #E3F2FD
+    BorderColor<<production>> #2196F3
+    BackgroundColor<<test>> #FFF3E0
+    BorderColor<<test>> #FF9800
+    BackgroundColor<<violation>> #FFEBEE
+    BorderColor<<violation>> #F44336
+}
+
+package "Production Code" <<production>> {
+    package "src/Component/EventSystem/Handler" {
+        class OrderCreationHandler <<violation>> {
+            **Line 13:**
+            use Tests\\Unit\\...\\Order
+            --
+            Lines 57-67:
+            $order = new Order(...)
+        }
+    }
+}
+
+package "Test Code" <<test>> {
+    package "tests/Unit/Component/Support" {
+        class Order {
+            +orderId
+            +orderNumber
+            +userId
+            +amounts...
+        }
+    }
+}
+
+OrderCreationHandler ..> Order : **CRITICAL VIOLATION**\nProduction imports Test class
+
+note bottom of OrderCreationHandler
+    **Problems:**
+    1. Production depends on test infrastructure
+    2. Test changes can break production
+    3. Deployment may fail without test deps
+    4. Violates testing pyramid
+end note
+
+note right of Order
+    **Solution:**
+    Create OrderInterface in
+    Component layer and implement
+    in production code
+end note
+
+rectangle "Correct Architecture" #C8E6C9 {
+    interface "OrderInterface" as oi
+    class "ProductionOrder" as po
+    class "TestOrder (mock)" as to
+
+    oi <|.. po : implements
+    oi <|.. to : implements
+}
+
+@enduml

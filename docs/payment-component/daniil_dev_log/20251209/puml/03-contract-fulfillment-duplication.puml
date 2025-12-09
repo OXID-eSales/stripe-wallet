@@ -1,0 +1,74 @@
+@startuml Contract Fulfillment Logic Duplication
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title **HIGH: Contract Fulfillment Logic Duplicated in 3 Locations**
+
+skinparam rectangle {
+    BackgroundColor<<dup1>> #FFCDD2
+    BorderColor<<dup1>> #E53935
+    BackgroundColor<<dup2>> #FFE0B2
+    BorderColor<<dup2>> #FB8C00
+    BackgroundColor<<dup3>> #FFF9C4
+    BorderColor<<dup3>> #FBC02D
+    BackgroundColor<<ideal>> #C8E6C9
+    BorderColor<<ideal>> #43A047
+}
+
+rectangle "Ideal: Single Service" <<ideal>> {
+    rectangle "ContractFulfillmentService" as ideal_svc {
+        rectangle "fulfill(contract)" as ideal_method
+    }
+}
+
+rectangle "Actual: 3 Duplicate Implementations" {
+
+    rectangle "Component Layer" <<dup1>> {
+        rectangle "ContractFulfillmentHandler\nLines 78-82" as comp {
+            note right
+                if (isFulfilled()) return
+                if (!isCommitted()) return
+                contract->fulfill()
+                repository->save()
+                dispatchEvent()
+            end note
+        }
+    }
+
+    rectangle "Stripe Handler Layer" <<dup2>> {
+        rectangle "WebhookContractFulfillmentHandler\nLines 38-82 & 142-168" as stripe_handler {
+            note right
+                **Same pattern**
+                + duplicate at lines 142-168
+            end note
+        }
+    }
+
+    rectangle "Stripe Service Layer" <<dup3>> {
+        rectangle "WebhookProcessingService\nLines 295-366 & 485-546" as stripe_svc {
+            note right
+                updateContractProviderOrderId()
+                tryFulfillContractViaMetadata()
+                **Same validation, 2x**
+            end note
+        }
+    }
+}
+
+ideal_svc -[hidden]down-> comp
+
+comp --> stripe_handler : **Duplicated**
+stripe_handler --> stripe_svc : **Duplicated**
+
+note bottom
+    **Duplicated Code Pattern (repeated 3+ times):**
+    ```
+    if ($contract->getState()->isFulfilled()) return false;
+    if (!$contract->getState()->isCommitted()) return false;
+    $contract->fulfill();
+    $this->contractRepository->save($contract);
+    $this->dispatchContractFulfilledEvent($contract);
+    ```
+end note
+
+@enduml

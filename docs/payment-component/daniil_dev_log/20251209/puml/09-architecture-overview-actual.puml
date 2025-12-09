@@ -1,0 +1,70 @@
+@startuml Actual Architecture vs Documented
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title **Architecture: Documented vs Actual Implementation**
+
+skinparam package {
+    BackgroundColor<<documented>> #E8F5E9
+    BorderColor<<documented>> #4CAF50
+    BackgroundColor<<actual>> #FFEBEE
+    BorderColor<<actual>> #F44336
+    BackgroundColor<<mixed>> #FFF3E0
+    BorderColor<<mixed>> #FF9800
+}
+
+package "DOCUMENTED ARCHITECTURE" <<documented>> {
+    rectangle "Presentation Layer\n(Thin Controllers)" as doc_ctrl
+    rectangle "Event Layer\n(PSR-14 Events)" as doc_event
+    rectangle "Event Handlers\n(Business Logic)" as doc_handler
+    rectangle "Contract Domain\n(Aggregate Root)" as doc_contract
+    rectangle "Service Layer" as doc_service
+    rectangle "SDK-Adapter Layer\n(Provider Agnostic)" as doc_adapter
+    rectangle "Data Access Layer\n(Repositories)" as doc_repo
+
+    doc_ctrl --> doc_event
+    doc_event --> doc_handler
+    doc_handler --> doc_contract
+    doc_handler --> doc_service
+    doc_service --> doc_adapter
+    doc_adapter --> doc_repo
+}
+
+package "ACTUAL IMPLEMENTATION (with issues)" <<actual>> {
+    rectangle "Controllers\n8 Registry calls\nin Component" as act_ctrl <<mixed>>
+    rectangle "Event System\n(Working)" as act_event
+    rectangle "Handlers\nFat handlers (250 LOC)\nDirect SDK calls\nContainerFactory" as act_handler <<mixed>>
+    rectangle "Contract Domain\n(Working)" as act_contract
+    rectangle "Services\n4x OXPAID duplication\n3x fulfillment duplication" as act_service <<mixed>>
+    rectangle "Adapter Layer\nBypassed by handlers" as act_adapter <<mixed>>
+    rectangle "Repositories +\nDirect SQL in handlers" as act_repo <<mixed>>
+
+    act_ctrl --> act_event
+    act_event --> act_handler
+    act_handler --> act_contract
+    act_handler --> act_service
+    act_handler --> act_adapter : sometimes
+    act_handler ..[#red].> "Stripe SDK" : **DIRECT**
+    act_handler ..[#red].> act_repo : **DIRECT SQL**
+    act_service --> act_adapter
+    act_adapter --> act_repo
+}
+
+note right of act_ctrl
+    **Deviation:** Component
+    layer uses OXID Registry
+end note
+
+note right of act_handler
+    **Deviations:**
+    - Fat handlers
+    - SDK bypassed
+    - ContainerFactory
+end note
+
+note right of act_service
+    **Deviation:**
+    Duplicated logic
+end note
+
+@enduml
