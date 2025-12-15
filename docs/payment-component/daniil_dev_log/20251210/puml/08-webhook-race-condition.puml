@@ -1,0 +1,154 @@
+@startuml 08-webhook-race-condition
+!theme plain
+title Webhook Race Condition Analysis
+
+skinparam backgroundColor #FEFEFE
+skinparam sequenceMessageAlign center
+
+actor Customer as C
+participant "Browser" as B
+participant "Stripe API" as Stripe #FFE0B2
+participant "Stripe Webhook" as WH #FFE0B2
+participant "User Return Flow" as RF
+participant "Contract" as Contract #E1F5FE
+participant "Order::finalizeOrder()" as FO
+database "oxorder" as DB
+
+== Scenario 1: User Returns BEFORE Webhook ==
+
+note over C, DB #E8F5E9
+    **HAPPY PATH** (Current Implementation)
+    User returns first, webhook is just confirmation
+end note
+
+C -> Stripe: Complete payment
+Stripe --> B: Redirect to success_url
+B -> RF: checkoutSuccess()
+
+RF -> Contract: Load by ID
+Contract --> RF: Contract (PENDING)
+
+RF -> Contract: fulfillCondition('payment_authorized')
+RF -> Contract: Transition to READY_TO_COMMIT
+RF -> FO: finalizeOrder()
+FO -> DB: INSERT oxorder
+FO --> RF: ORDER_STATE_OK
+
+RF -> Contract: commitToOrder(orderId)
+RF -> Contract: Transition to COMMITTED
+
+note right of Contract
+    Contract state: COMMITTED
+    Order exists: YES
+end note
+
+... later ...
+
+Stripe -> WH: payment_intent.succeeded
+WH -> Contract: Find by provider_order_id
+WH -> WH: Contract is COMMITTED
+WH -> WH: Order already exists
+WH --> Stripe: 200 OK (no action needed)
+
+== Scenario 2: Webhook Arrives BEFORE User Returns ==
+
+note over C, DB #FFCDD2
+    **RACE CONDITION**
+    Webhook tries to fulfill before user returns
+end note
+
+C -> Stripe: Complete payment
+
+group Webhook arrives first
+    Stripe -> WH: payment_intent.succeeded
+    WH -> Contract: Find by provider_order_id
+    Contract --> WH: Contract (PENDING)
+
+    note right of WH #FFCDD2
+        **PROBLEM:**
+        Contract is still PENDING
+        No order exists yet
+        What should webhook do?
+    end note
+
+    alt Option A: Webhook Creates Order (Risky)
+        WH -> WH: fulfillCondition()
+        WH -> WH: Transition to READY_TO_COMMIT
+        WH -> FO: finalizeOrder()
+
+        note right of FO #FFCDD2
+            **ISSUES:**
+            - No session basket
+            - No user context
+            - Must reconstruct from contract
+        end note
+
+        FO -> DB: INSERT oxorder
+        WH -> Contract: commitToOrder()
+
+        ... later ...
+
+        B -> RF: checkoutSuccess()
+        RF -> Contract: Already COMMITTED
+        RF --> B: Redirect to thankyou
+    else Option B: Webhook Waits (Current)
+        WH -> WH: Contract not ready
+        WH --> Stripe: 200 OK\n(acknowledged, wait for user)
+
+        note right of WH #E8F5E9
+            **SAFE:**
+            Let user flow complete order
+            Webhook just confirms
+        end note
+    end
+end
+
+... later ...
+
+Stripe --> B: Redirect to success_url
+B -> RF: checkoutSuccess()
+RF -> Contract: fulfillCondition()
+RF -> FO: finalizeOrder()
+FO --> RF: ORDER_STATE_OK
+
+== Scenario 3: User Never Returns ==
+
+note over C, DB #FFF3E0
+    **EDGE CASE**
+    User closes browser after payment
+end note
+
+C -> Stripe: Complete payment
+C -> C: Close browser (never returns)
+
+Stripe -> WH: payment_intent.succeeded
+WH -> Contract: Find by provider_order_id
+Contract --> WH: Contract (PENDING)
+
+note right of WH
+    **QUESTION:**
+    How long do we wait?
+    Payment is confirmed but no order.
+
+    **Options:**
+    1. Create order from webhook
+    2. Keep payment without order
+    3. Eventually refund
+end note
+
+== Proposed Solution ==
+
+note over Contract, DB #C8E6C9
+    **Contract-First Webhook Handling**
+
+    1. Webhook ALWAYS acknowledges immediately (200 OK)
+    2. Webhook updates contract with payment confirmation
+    3. Contract tracks "payment_confirmed" flag
+    4. User return flow checks flag and creates order
+    5. If no return within timeout, background job:
+       - Loads confirmed contracts without orders
+       - Creates orders from contract data
+       - Sends confirmation email
+end note
+
+@enduml

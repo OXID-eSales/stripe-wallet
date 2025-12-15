@@ -1,0 +1,97 @@
+@startuml 06-comparison-current-vs-proposed
+!theme plain
+title Comparison: Current vs Proposed Architecture
+
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle rectangle
+
+left to right direction
+
+package "CURRENT ARCHITECTURE" #FFCDD2 {
+
+    package "Entry Points" as EP1 #FFF {
+        [OXID OrderController] as OC1
+        [Stripe Handler] as SH1
+        [PayPal Module] as PP1
+        [Admin Recalc] as AR1
+    }
+
+    package "Order Creation" as OC1a #FFF {
+        [finalizeOrder()] as FO1
+        note bottom of FO1
+            Monolithic
+            Many responsibilities
+            Hard to customize
+        end note
+    }
+
+    OC1 --> FO1
+    SH1 --> FO1
+    PP1 --> FO1
+    AR1 --> FO1
+
+    package "Problems" #FFE0B2 {
+        note as P1
+            - Each caller manages its own state
+            - No central coordination
+            - Duplicated session management
+            - Hard to test in isolation
+            - Tight coupling to OXID internals
+        end note
+    }
+}
+
+package "PROPOSED ARCHITECTURE" #C8E6C9 {
+
+    package "Entry Points" as EP2 #FFF {
+        [OXID OrderController] as OC2
+        [Stripe Handler] as SH2
+        [PayPal Module] as PP2
+        [Admin Recalc] as AR2
+    }
+
+    package "Coordination Layer" #E8F5E9 {
+        [OrderCreationOrchestrator] as OCO
+
+        note bottom of OCO
+            Single coordination point
+            Manages all entry points
+            Delegates to strategies
+        end note
+    }
+
+    package "Strategy Pattern" #E3F2FD {
+        [StandardCheckoutStrategy] as SCS
+        [ContractBasedStrategy] as CBS
+        [RecalculationStrategy] as RS
+    }
+
+    package "Core Order Creation" #FFF {
+        [finalizeOrder()] as FO2
+    }
+
+    OC2 --> OCO
+    SH2 --> OCO
+    PP2 --> OCO
+    AR2 --> OCO
+
+    OCO --> SCS : standard flow
+    OCO --> CBS : payment modules
+    OCO --> RS : admin recalc
+
+    SCS --> FO2
+    CBS --> FO2 : with session state prepared
+    RS --> FO2 : with recalc flag
+
+    package "Benefits" #FFF8E1 {
+        note as B1
+            - Single coordination point
+            - Strategy per use case
+            - Testable components
+            - Clear responsibility separation
+            - Easy to add new entry points
+        end note
+    }
+}
+
+@enduml

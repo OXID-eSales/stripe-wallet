@@ -486,7 +486,16 @@ CREATE TABLE IF NOT EXISTS osc_payment_provider_data (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-### Table 8: osc_payment_order_state (ENHANCED)
+### Table 8: osc_payment_order_state (DEPRECATED)
+
+> **DEPRECATED (Sprint 8, December 2025):** This table has been removed from the implementation.
+> Payment state tracking is now consolidated in `osc_payment_contract` with the following fields:
+> - `OXCAPTUREDAMOUNT` - Amount captured
+> - `OXREFUNDEDAMOUNT` - Amount refunded
+> - `OXCAPTUREDAT` - Capture timestamp
+> - `OXREFUNDEDAT` - Refund timestamp
+>
+> The documentation below is kept for historical reference only.
 
 **Purpose:** Payment lifecycle state tracking (1:1 with oxorder)
 

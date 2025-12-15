@@ -36,37 +36,35 @@ npm run watch             # Watch mode for development
 
 ### Testing
 
-**Unit Tests (isolated, no shop bootstrap needed):**
+All tests run inside Docker from the project root (parent of extensions/stripe).
+
+**Unit Tests:**
 ```bash
-docker compose exec -T php bash -c "cd /var/www/test-module && vendor/bin/phpunit -c tests/phpunit.xml --testsuite Unit"
+docker compose exec php php vendor/bin/phpunit -c extensions/stripe/tests/phpunit.xml --testsuite Unit
 ```
 
-**Integration Tests (requires shop bootstrap):**
+**Integration Tests:**
 ```bash
-docker compose exec -T php vendor/bin/phpunit \
-  -c /var/www/test-module/tests/phpunit.xml \
-  --testsuite Integration \
-  --bootstrap=/var/www/source/bootstrap.php
+docker compose exec php php vendor/bin/phpunit -c extensions/stripe/tests/phpunit.xml --testsuite Integration
 ```
 
-**Single Unit Test File:**
+**Single Test File:**
 ```bash
-docker compose exec -T php bash -c "cd /var/www/test-module && vendor/bin/phpunit -c tests/phpunit.xml tests/Unit/Path/To/TestFile.php"
+docker compose exec php php vendor/bin/phpunit -c extensions/stripe/tests/phpunit.xml \
+  extensions/stripe/tests/Unit/Path/To/TestFile.php
 ```
 
-**Single Integration Test File:**
+**Single Test Method:**
 ```bash
-docker compose exec -T php vendor/bin/phpunit \
-  -c /var/www/test-module/tests/phpunit.xml \
-  --bootstrap=/var/www/source/bootstrap.php \
-  /var/www/test-module/tests/Integration/Path/To/TestFile.php
+docker compose exec php php vendor/bin/phpunit -c extensions/stripe/tests/phpunit.xml \
+  --filter testMethodName extensions/stripe/tests/Unit/Path/To/TestFile.php
 ```
 
 **E2E Tests (Playwright):**
 ```bash
-cd tests/e2e/playwright
-npm install
-npx playwright test
+cd tests/e2e/playwright && npm install && npx playwright test
+npx playwright test tests/checkout/stripe-checkout.spec.ts  # Single spec
+npx playwright test --headed                                 # With browser UI
 ```
 
 ### Code Quality
@@ -86,6 +84,14 @@ composer phpmd              # PHP Mess Detector
 composer style              # All style checks
 ```
 
+**Makefile shortcuts (from module root):**
+```bash
+make test-unit             # Run unit tests
+make test-integration      # Run integration tests
+make style                 # Run all style checks
+make pre-commit            # Full pre-commit validation
+```
+
 ### OXID Module Commands
 ```bash
 bin/oe-console oe:module:install extensions/stripe
@@ -98,7 +104,8 @@ bin/oe-console oe:module:uninstall osc_stripe_wallet
 
 The module implements a **contract-first payment pattern** where clicking "Place Order" creates a contract, not an order. The order is created only when the contract is fulfilled.
 
-**Contract Lifecycle:** `DRAFT → PENDING → COMMITTED → FULFILLED`
+**Contract Lifecycle:** `DRAFT → PENDING → READY_TO_COMMIT → COMMITTED → FULFILLED`
+(Alternative endings: `CANCELLED`, `EXPIRED`, `FAILED`)
 
 **Key Innovation:**
 - Traditional: User clicks "Place Order" → Order created → Payment → Order updated
@@ -215,3 +222,19 @@ Module settings in `metadata.php`:
 - `sStripeTestToken`/`sStripeLiveToken` - API secret keys
 - `sStripeTestPk`/`sStripeLivePk` - Publishable keys
 - `sStripeWebhookEndpointSecret` - Webhook signing secret
+
+## Event System
+
+The module uses PSR-14 compatible events. Key event types:
+
+**Contract Events** (in `Component/EventSystem/Event/Contract/`):
+- `ContractCreatedEvent`, `ContractTransitionedToPendingEvent`
+- `ContractReadyToCommitEvent`, `ContractCommittedEvent`, `ContractFulfilledEvent`
+- `ContractConditionFulfilledEvent`, `ContractCancelledEvent`, `ContractExpiredEvent`
+
+**Payment Events** (in `Component/EventSystem/Event/Payment/`):
+- `PaymentInitiatedEvent`, `PaymentAuthorizedEvent`, `PaymentCapturedEvent`
+- `PaymentRefundedEvent`, `PaymentFailedEvent`
+- `WebhookReceivedEvent`, `OrderCreatedEvent`, `OrderCompletedEvent`
+
+Handlers subscribe via `SubscriberInterface` and are registered in the `EventListenerProvider`.

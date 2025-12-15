@@ -1,0 +1,88 @@
+@startuml 04-solution-event-decomposition
+!theme plain
+title Proposed Solution A: Event-Based Decomposition of finalizeOrder()
+
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle rectangle
+skinparam packageStyle frame
+
+package "Current: Monolithic finalizeOrder()" #FFCDD2 {
+    [finalizeOrder()] as Mono
+    note right of Mono
+        Single method doing:
+        - Validation
+        - Order creation
+        - Payment execution
+        - Number assignment
+        - Notifications
+        **Problem: Cant customize individual steps**
+    end note
+}
+
+package "Proposed: Event-Driven Order Creation" #C8E6C9 {
+    package "Events" #E8F5E9 {
+        [OrderCreationRequestedEvent] as E1
+        [OrderValidatedEvent] as E2
+        [OrderPersistedEvent] as E3
+        [PaymentProcessedEvent] as E4
+        [OrderNumberAssignedEvent] as E5
+        [OrderCompletedEvent] as E6
+    }
+
+    package "Handlers" #F5F5F5 {
+        [OrderValidationHandler] as H1
+        [OrderPersistenceHandler] as H2
+        [PaymentExecutionHandler] as H3
+        [OrderNumberHandler] as H4
+        [NotificationHandler] as H5
+        [VoucherHandler] as H6
+    }
+
+    E1 --> H1 : validates basket/user/delivery
+    H1 --> E2 : if valid
+
+    E2 --> H2 : creates order record
+    H2 --> E3 : after save
+
+    E3 --> H3 : executes payment gateway
+    note right of H3
+        For Stripe:
+        Handler is SKIPPED or returns immediately
+        (payment already processed)
+    end note
+    H3 --> E4 : after payment
+
+    E4 --> H4 : assigns order number
+    H4 --> E5 : after number set
+
+    E5 --> H5 : sends emails
+    E5 --> H6 : marks vouchers
+    H5 --> E6 : after notifications
+    H6 --> E6 : after vouchers
+}
+
+note as Benefits
+    **Advantages of Event-Driven:**
+
+    1. Testable - Each handler tested in isolation
+    2. Extensible - Add/remove handlers without modifying core
+    3. Customizable - Stripe skips PaymentExecutionHandler
+    4. Observable - Log/monitor each step
+    5. Recoverable - Retry individual steps on failure
+end note
+
+note as Strategy
+    **For Stripe Module (without core changes):**
+
+    Create wrapper service that:
+    1. Emits custom pre-events before finalizeOrder()
+    2. Calls finalizeOrder() with overridden Order model
+    3. Emits custom post-events after finalizeOrder()
+
+    This gives us extension points without
+    breaking OXID core or other modules.
+end note
+
+Benefits -[hidden]- Strategy
+
+@enduml

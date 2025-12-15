@@ -1,0 +1,118 @@
+@startuml 03-stripe-checkout-flow-current
+!theme plain
+title Stripe Checkout Flow - Current Implementation
+
+skinparam backgroundColor #FEFEFE
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor Customer as C
+participant "Browser" as B
+participant "StripeOrderController" as SOC
+participant "EventDispatcher" as ED
+participant "StripeCheckoutSessionHandler" as SCSH
+participant "Stripe API" as Stripe #FFE0B2
+participant "StripeCheckoutReturnHandler" as SCRH
+participant "PaymentAuthorizedEventHandler" as PAEH
+participant "StripeOrderCreationHandler" as SOCH
+participant "OxidShopOrderService" as SOS
+participant "Order::finalizeOrder()" as FO
+participant "Contract" as Contract #E1F5FE
+database "oxorder" as DB
+
+== Phase 1: Checkout Session Creation ==
+
+C -> B: Click "Pay with Stripe"
+B -> SOC: createCheckoutSession()
+
+SOC -> ED: dispatch(StripeCheckoutSessionRequestEvent)
+ED -> SCSH: handle()
+
+SCSH -> Contract: Create (DRAFT)
+SCSH -> Stripe: Create Checkout Session
+Stripe --> SCSH: session_id, checkout_url
+SCSH -> Contract: Save metadata\n(delivery_hash, basket_snapshot)
+SCSH -> Contract: Transition to PENDING
+
+Contract --> SOC: session_id
+
+SOC --> B: JSON { id, url }
+B -> Stripe: Redirect to Hosted Checkout
+
+== Phase 2: Payment on Stripe (External) ==
+
+C -> Stripe: Enter payment details
+C -> Stripe: Confirm payment
+Stripe -> Stripe: Process payment
+note right of Stripe
+    PaymentIntent created
+    Payment captured
+end note
+
+Stripe --> B: Redirect to success_url\n?session_id=cs_xxx&contract_id=xxx&contract_token=xxx
+
+== Phase 3: Return Handling ==
+
+B -> SOC: checkoutSuccess()
+SOC -> ED: dispatch(StripeCheckoutReturnEvent)
+ED -> SCRH: handle()
+
+SCRH -> SCRH: Validate session_id, contract_id, token
+SCRH -> Contract: Load by ID
+SCRH -> SCRH: Restore session state\n(sDelAddrMD5, deladrid)
+SCRH -> ED: dispatch(PaymentAuthorizedEvent)
+
+ED -> PAEH: handle()
+PAEH -> Contract: fulfillCondition('payment_authorized')
+PAEH -> Contract: Transition to READY_TO_COMMIT
+PAEH -> ED: dispatch(ContractReadyToCommitEvent)
+
+== Phase 4: Order Creation ==
+
+ED -> SOCH: handle()
+SOCH -> SOCH: Validate contract state
+
+group #FFF3E0 THE CRITICAL SECTION
+    SOCH -> SOS: createOrder(request)
+    SOS -> FO: finalizeOrder($basket, $user)
+
+    note right of FO
+        **Inside finalizeOrder:**
+        1. Check order exists (sess_challenge)
+        2. Validate basket/user/delivery
+        3. Save order (NOT_FINISHED)
+        4. executePayment() -> TRUE (Stripe override)
+        5. Set order number
+        6. Set status OK
+        7. Send emails
+    end note
+
+    FO -> DB: INSERT oxorder
+    FO --> SOS: ORDER_STATE_OK
+end
+
+SOS --> SOCH: OrderResponse
+
+SOCH -> Contract: commitToOrder(orderId)
+SOCH -> Contract: Transition to COMMITTED
+SOCH -> DB: Update OXPAID timestamp
+
+SOCH --> SOC: orderId in context
+
+SOC -> B: Redirect to "thankyou"
+
+== Potential Issue: Webhook Race ==
+
+note over Stripe, SCRH
+    **RACE CONDITION**
+
+    Webhook (payment_intent.succeeded) may arrive
+    BEFORE user returns from Stripe.
+
+    If webhook handler tries to create order:
+    - Contract not yet COMMITTED
+    - Order might not exist
+    - Must handle gracefully
+end note
+
+@enduml

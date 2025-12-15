@@ -1,0 +1,125 @@
+@startuml 02-finalizeorder-internals
+!theme plain
+title Order::finalizeOrder() - Internal Steps Analysis
+
+skinparam backgroundColor #FEFEFE
+skinparam activityBackgroundColor #FFFFFF
+skinparam activityBorderColor #333333
+
+|#E8F5E9|Order::finalizeOrder()|
+
+start
+
+:1. **Idempotency Check**
+Check if order exists via sess_challenge;
+
+if (Order exists?) then (yes)
+    #FFCDD2:Return ORDER_STATE_ORDEREXISTS|
+    stop
+endif
+
+:2. **Set Order ID**
+From session sess_challenge;
+
+if (Not recalculating?) then (yes)
+    :3. **Validate Order**
+    - validatePayment()
+    - validateDelivery()
+    - validateDeliveryAddress()
+    - validateBasket();
+
+    if (Validation failed?) then (yes)
+        #FFCDD2:Return validation error state|
+        stop
+    endif
+endif
+
+:4. **Copy User Info**
+assignUserInformation();
+
+:5. **Copy Basket Info**
+loadFromBasket();
+
+:6. **Set Payment Info**
+setPayment();
+
+if (Not recalculating?) then (yes)
+    :7. **Set Order Folder**
+    setFolder() = ORDERFOLDER_NEW;
+endif
+
+:8. **Set Status**
+setOrderStatus('NOT_FINISHED');
+
+:9. **Save to Database**
+save();
+
+note right
+    **DANGER ZONE**
+    Order now exists in DB
+    but payment not executed
+end note
+
+if (Not recalculating?) then (yes)
+    |#FFF3E0|Payment Execution|
+    :10. **Execute Payment**
+    executePayment($oBasket, $oUserPayment);
+
+    note right
+        **STRIPE OVERRIDE**
+        Stripe\Model\Order::executePayment()
+        returns TRUE for osc_stripe_* payments
+        (payment already processed)
+    end note
+
+    if (Payment failed?) then (yes)
+        :Delete order from DB;
+        #FFCDD2:Return ORDER_STATE_PAYMENTERROR|
+        stop
+    endif
+endif
+
+|#E3F2FD|Post-Payment Processing|
+
+:11. **Set Order Number**
+if (!oxordernr) setNumber();
+
+:12. **Update Order Date**
+(if not recalculating);
+
+:13. **Set Status OK**
+setOrderStatus('OK');
+
+:14. **Update Basket**
+setOrderId();
+
+:15. **Update Wishlists**
+updateWishlist()
+updateNoticeList();
+
+if (Not recalculating?) then (yes)
+    :16. **Mark Vouchers**
+    markVouchers();
+
+    :17. **Send Emails**
+    sendOrderByEmail();
+endif
+
+#C8E6C9:Return ORDER_STATE_OK or MAILINGERROR|
+
+stop
+
+legend right
+    **Problem Analysis**
+
+    Steps 1-9: Order Creation
+    Step 10: Payment (bypassed for Stripe)
+    Steps 11-17: Post-processing
+
+    For external payment providers:
+    - Payment is ALREADY done
+    - Step 10 is redundant
+    - But we can't skip it without override
+endlegend
+
+@enduml

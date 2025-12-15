@@ -1,0 +1,79 @@
+@startuml 09-implementation-roadmap
+!theme plain
+title Implementation Roadmap for finalizeOrder() Problem Resolution
+
+skinparam backgroundColor #FEFEFE
+
+|#E8F5E9|Short-Term (Sprint 23-24)|
+start
+:Document current behavior
+in detail (this analysis);
+
+:Add comprehensive logging
+at all finalizeOrder() call points;
+
+:Create integration tests for
+all order creation scenarios:
+- Standard checkout
+- Stripe Checkout return
+- Stripe Payment Element
+- Webhook-first scenario;
+
+:Review and update
+Stripe\Model\Order overrides;
+
+|#E3F2FD|Medium-Term (Sprint 25-27)|
+:Create SessionStateManager service
+to centralize session management;
+
+:Create ContractOrderCreationService
+as wrapper around OxidShopOrderService;
+
+:Implement pre/post hooks
+for finalizeOrder() calls;
+
+:Add idempotency via contract ID
+instead of sess_challenge;
+
+:Improve error handling with
+specific error codes;
+
+|#FFF3E0|Medium-Term (Sprint 28-30)|
+:Handle webhook-first scenario:
+- Webhook marks contract as "payment_confirmed"
+- User return checks flag
+- Background job for abandoned returns;
+
+:Add contract state machine
+visualization to admin;
+
+:Create order recovery mechanism
+for failed finalizeOrder() calls;
+
+:Performance optimization:
+- Reduce database queries
+- Cache contract lookups;
+
+|#FCE4EC|Long-Term (Future)|
+:Evaluate OXID core contribution:
+- Event-based finalizeOrder()
+- Would benefit all modules;
+
+:Consider full contract-based
+order creation (bypass finalizeOrder());
+
+:Multi-payment support
+(partial payments, subscriptions);
+
+stop
+
+legend right
+    **Key Milestones**
+
+    Sprint 23: Documentation & Testing
+    Sprint 25: SessionStateManager
+    Sprint 28: Webhook-First Handling
+    Future: OXID Core Contribution
+endlegend
+
+@enduml

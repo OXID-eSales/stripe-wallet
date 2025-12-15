@@ -152,6 +152,9 @@ test.describe('Stripe Wallet Checkout', () => {
     console.log('Final URL:', page.url());
 
     expect(page.url()).toContain('thankyou');
+
+    let request =
+
     console.log('============================================');
     console.log('✓ CHECKOUT FLOW COMPLETED SUCCESSFULLY');
     console.log('============================================');

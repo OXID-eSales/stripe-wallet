@@ -1,0 +1,72 @@
+@startuml 01-finalizeorder-call-points
+!theme plain
+title Order::finalizeOrder() - Multiple Call Points Problem
+
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle rectangle
+skinparam packageStyle frame
+skinparam defaultTextAlignment center
+
+package "Call Point 1: Standard Checkout" #E8F5E9 {
+    [User Form Submit] as UserForm
+    [OrderController::execute()] as OxidController
+    note right of OxidController
+        POST request
+        Session: sess_challenge
+        Request: sDeliveryAddressMD5
+    end note
+}
+
+package "Call Point 2: Admin Recalculation" #E3F2FD {
+    [Admin Backend] as Admin
+    [Order::recalculateOrder()] as Recalc
+    note right of Recalc
+        $blRecalculatingOrder = true
+        Skips: payment, vouchers, email
+    end note
+}
+
+package "Call Point 3: Stripe Module" #FFF3E0 {
+    [StripeCheckoutReturnHandler] as StripeHandler
+    [StripeOrderCreationHandler] as StripeCreator
+    [OxidShopOrderService::createOrder()] as ShopOrderSvc
+    note right of ShopOrderSvc
+        Contract-based flow
+        Payment already processed
+        Must restore session state
+    end note
+}
+
+package "Call Point 4: Other Payment Modules" #FCE4EC {
+    [PayPal Module] as PayPal
+    [Other Modules] as OtherMod
+}
+
+database "OXID Core" as Core #F5F5F5 {
+    [Order::finalizeOrder()] as FinalizeOrder
+}
+
+UserForm --> OxidController
+OxidController --> FinalizeOrder
+
+Admin --> Recalc
+Recalc --> FinalizeOrder
+
+StripeHandler --> StripeCreator : PaymentAuthorizedEvent
+StripeCreator --> ShopOrderSvc
+ShopOrderSvc --> FinalizeOrder
+
+PayPal --> FinalizeOrder
+OtherMod --> FinalizeOrder
+
+note bottom of FinalizeOrder
+    **THE PROBLEM**
+
+    Single method, multiple callers
+    Each caller has different:
+    - State expectations
+    - Error handling needs
+    - Payment processing requirements
+end note
+
+@enduml

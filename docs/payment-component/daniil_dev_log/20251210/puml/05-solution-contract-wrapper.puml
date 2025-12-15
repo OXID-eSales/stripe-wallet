@@ -1,0 +1,133 @@
+@startuml 05-solution-contract-wrapper
+!theme plain
+title Proposed Solution B: Contract-Aware Order Creation Wrapper (Pragmatic)
+
+skinparam backgroundColor #FEFEFE
+skinparam sequenceMessageAlign center
+
+participant "StripeOrderCreationHandler" as Handler
+participant "ContractOrderCreationService\n(NEW)" as Service #C8E6C9
+participant "SessionStateManager\n(NEW)" as SSM #C8E6C9
+participant "OxidShopOrderService" as SOS
+participant "Stripe\\Model\\Order" as Order
+participant "Order::finalizeOrder()" as FO
+participant "Contract" as Contract
+database "Database" as DB
+
+== Current Problem ==
+
+note over Handler, FO
+    **Current Flow:**
+    Handler -> OxidShopOrderService -> finalizeOrder()
+
+    **Issues:**
+    1. Session state must be manually managed
+    2. No central coordination
+    3. Hard to test
+    4. Scattered error handling
+end note
+
+== Proposed Solution: Wrapper Service ==
+
+Handler -> Service: createOrderFromContract(contract)
+
+activate Service #C8E6C9
+
+Service -> Service: 1. Validate contract state
+
+Service -> SSM: 2. prepareSessionState(contract)
+activate SSM #C8E6C9
+
+SSM -> SSM: Restore sess_challenge
+SSM -> SSM: Restore sDelAddrMD5
+SSM -> SSM: Restore deladrid
+SSM -> SSM: Verify basket exists
+
+SSM --> Service: SessionStateDTO
+deactivate SSM
+
+Service -> Service: 3. Validate session state
+
+alt Session state invalid
+    Service --> Handler: OrderCreationResult(error)
+else Session state valid
+    Service -> SOS: 4. createOrder(request)
+
+    SOS -> Order: new Order()
+    SOS -> FO: finalizeOrder()
+
+    note right of FO
+        **Inside finalizeOrder:**
+        - Validation passes (state restored)
+        - executePayment() returns true
+        - Order created successfully
+    end note
+
+    FO --> SOS: ORDER_STATE_OK
+    SOS --> Service: OrderResponse
+
+    Service -> Service: 5. Post-processing
+
+    Service -> Contract: linkToOrder(orderId)
+    Service -> DB: Update OXPAID
+
+    Service -> SSM: 6. cleanupSessionState()
+    SSM -> SSM: Clear stripe_* variables
+
+    Service --> Handler: OrderCreationResult(success, orderId)
+end
+
+deactivate Service
+
+== Service Interface ==
+
+note over Service
+    **ContractOrderCreationService Interface:**
+
+    ```php
+    interface ContractOrderCreationServiceInterface
+    {
+        public function createOrderFromContract(
+            PaymentContractInterface $contract
+        ): OrderCreationResult;
+
+        public function canCreateOrder(
+            PaymentContractInterface $contract
+        ): ValidationResult;
+    }
+    ```
+
+    **Benefits:**
+    - Single point of order creation for contracts
+    - Encapsulates session state management
+    - Testable (mock SessionStateManager)
+    - Clear error handling
+end note
+
+== Session State Manager ==
+
+note over SSM
+    **SessionStateManager Interface:**
+
+    ```php
+    interface SessionStateManagerInterface
+    {
+        public function prepareForOrderCreation(
+            PaymentContractInterface $contract
+        ): SessionStateDTO;
+
+        public function restoreDeliveryAddressHash(
+            string $hash
+        ): void;
+
+        public function cleanup(): void;
+    }
+    ```
+
+    **Responsibilities:**
+    - Restore session variables from contract metadata
+    - Validate session state completeness
+    - Clean up after order creation
+end note
+
+@enduml

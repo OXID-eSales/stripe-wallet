@@ -109,12 +109,14 @@ final class CheckoutReturnService implements CheckoutReturnServiceInterface
             return null;
         }
 
+        $contractId = $session->metadata->contract_id ?? null;
+
         return [
             'payment_status' => $session->payment_status ?? 'unknown',
             'payment_intent_id' => $this->extractPaymentIntentId($session),
             'amount_total' => (int) ($session->amount_total ?? 0),
             'currency' => $session->currency ?? 'eur',
-            'contract_id' => $session->metadata->contract_id ?? null,
+            'contract_id' => is_string($contractId) ? $contractId : null,
         ];
     }
 
@@ -145,6 +147,7 @@ final class CheckoutReturnService implements CheckoutReturnServiceInterface
             return $paymentIntent->id;
         }
 
+        // @phpstan-ignore-next-line Stripe SDK may return array in some edge cases
         if (is_array($paymentIntent) && isset($paymentIntent['id'])) {
             return $paymentIntent['id'];
         }

@@ -1,0 +1,129 @@
+@startuml 07-session-state-dependencies
+!theme plain
+title Session State Dependencies for finalizeOrder()
+
+skinparam backgroundColor #FEFEFE
+skinparam packageStyle frame
+
+package "Session Variables Required" #E3F2FD {
+
+    package "Order Identification" #E8F5E9 {
+        [sess_challenge] as SC
+        note right of SC
+            Order ID
+            Used for idempotency check
+            Set by OrderController::render()
+        end note
+    }
+
+    package "Address Validation" #FFF3E0 {
+        [sDeliveryAddressMD5\n(Request param)] as DAM
+        note right of DAM
+            Hash of delivery address
+            Compared against current address
+            Prevents address change attacks
+        end note
+
+        [sDelAddrMD5\n(Session var)] as SAM
+        note right of SAM
+            **Stripe Fallback**
+            Used when no request param
+            Restored from contract metadata
+        end note
+
+        [deladrid] as DAI
+        note right of DAI
+            Delivery address ID
+            If user has separate delivery
+        end note
+    }
+
+    package "Basket State" #FCE4EC {
+        [Session Basket] as SB
+        note right of SB
+            Complete basket object
+            Products, prices, shipping
+            Must exist and be valid
+        end note
+
+        [Payment ID] as PI
+        note right of PI
+            Selected payment method
+            Set by PaymentController
+        end note
+
+        [Shipping ID] as SI
+        note right of SI
+            Selected shipping method
+            Set by PaymentController
+        end note
+    }
+
+    package "User State" #F3E5F5 {
+        [User Object] as UO
+        note right of UO
+            Logged-in user
+            Must exist and be valid
+        end note
+
+        [dynvalue] as DV
+        note right of DV
+            Dynamic payment data
+            e.g., bank details for SEPA
+        end note
+    }
+}
+
+package "PROBLEM: State Sources" #FFCDD2 {
+
+    package "Standard Checkout" #FFF {
+        note as N1
+            **State comes from:**
+            - Form submission (POST)
+            - Current session
+            - Fresh data
+
+            **Works because:**
+            Sequential flow, no interruption
+        end note
+    }
+
+    package "Stripe Checkout Return" #FFF {
+        note as N2
+            **State comes from:**
+            - URL parameters (limited)
+            - Contract metadata (stored)
+            - Session (may be lost/changed)
+
+            **Problem because:**
+            - User left site to Stripe
+            - Session may timeout
+            - Address hash not in POST
+        end note
+    }
+}
+
+package "SOLUTION: Contract as State Store" #C8E6C9 {
+
+    package "Contract Metadata" #E8F5E9 {
+        [contract.delivery_address_hash] as CDH
+        [contract.delivery_address_id] as CDI
+        [contract.basket_snapshot] as CBS
+        [contract.user_id] as CUI
+        [contract.session_id] as CSI
+    }
+
+    note as N3
+        **Contract stores:**
+        - All state at checkout initiation
+        - Can restore session on return
+        - Single source of truth
+
+        **On return from Stripe:**
+        1. Load contract by ID
+        2. Restore session from metadata
+        3. Call finalizeOrder() safely
+    end note
+}
+
+@enduml

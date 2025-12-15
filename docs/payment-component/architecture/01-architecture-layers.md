@@ -90,7 +90,7 @@ The payment component follows an **event-driven layered architecture with smart-
 
 ### Responsibilities
 - Define payment contract aggregate root
-- Manage contract state machine (DRAFT → PENDING → COMMITTED → FULFILLED)
+- Manage contract state machine (DRAFT → PENDING → READY_TO_COMMIT → COMMITTED → FULFILLED/CANCELLED/EXPIRED/FAILED)
 - Track fulfillment conditions (payment_authorized, fraud_check, stock_reserved)
 - Encapsulate business rules for contract lifecycle
 - Emit domain events on state transitions

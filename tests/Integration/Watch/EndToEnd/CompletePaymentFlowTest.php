@@ -206,7 +206,7 @@ class CompletePaymentFlowTest extends PaymentWatchIntegrationTestCase
     {
         $payload = [
             'assumption' => [
-                'osc_payment_contract.OXSTATE' => $expectedState,
+                'oxorder.OXORDERNR' => 40,
                 'where' => [
                     'OXID' => $contractId,
                 ],

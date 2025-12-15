@@ -29,7 +29,7 @@ User clicks "Place Order" → Contract created (state: DRAFT) → Conditions res
 
 ### Core Capabilities
 
-- **Contract Lifecycle Management**: DRAFT → PENDING → COMMITTED → FULFILLED
+- **Contract Lifecycle Management**: DRAFT → PENDING → READY_TO_COMMIT → COMMITTED → FULFILLED (or CANCELLED/EXPIRED/FAILED)
 - **Explicit Condition Tracking**: payment_authorized, fraud_check, stock_reserved
 - **Provider-Agnostic Design**: Works with Stripe, PayPal, Amazon Pay, Unzer, Adyen, Klarna, Square
 - **Event-Driven Architecture**: All operations triggered via domain events
@@ -76,7 +76,7 @@ All major providers use two-phase patterns. We extend this to order creation.
 A payment contract is a domain entity that:
 1. **Captures Intent**: User's intention to purchase (basket snapshot, terms)
 2. **Tracks Preconditions**: Payment authorization, fraud checks, stock availability
-3. **Manages Lifecycle**: DRAFT → PENDING → COMMITTED → FULFILLED
+3. **Manages Lifecycle**: DRAFT → PENDING → READY_TO_COMMIT → COMMITTED → FULFILLED (terminal: CANCELLED, EXPIRED, FAILED)
 4. **Triggers Order Creation**: Creates `oxorder` ONLY when all conditions met
 5. **Provides Audit Trail**: Complete history of fulfillment process
 
@@ -212,7 +212,7 @@ Create oxorder (state: NOT_FINISHED)
   - Contract.commitToOrder(oxorder.OXID)
   ↓
 Contract state: PENDING → COMMITTED
-Create osc_payment_order_state (FK to both contract + order)
+(Note: osc_payment_order_state table deprecated - state tracked in contract)
 ```
 
 ### Phase 4: Fulfillment
@@ -350,9 +350,9 @@ All providers implement contract-like patterns internally:
 
 **Component tables with FK references**: NO ALTER TABLE on OXID core
 
-- **osc_payment_contract**: Master contract table (NEW)
+- **osc_payment_contract**: Master contract table (includes capture/refund tracking)
 - **osc_payment_transaction**: Transaction tracking (enhanced with OXCONTRACTID)
-- **osc_payment_order_state**: Payment lifecycle state (enhanced with OXCONTRACTID)
+- ~~**osc_payment_order_state**~~: DEPRECATED - payment state consolidated into osc_payment_contract
 - **osc_payment_customer**: Customer payment data (1:1 with oxuser)
 - **osc_payment_idempotency**: Duplicate charge prevention
 - **osc_payment_saved_methods**: Vaulting/tokenization
@@ -901,7 +901,8 @@ parameters:
 ### 4. Explicit State Management
 
 **Contract state machine is separate from order state:**
-- Contract states: DRAFT, PENDING, READY_TO_COMMIT, COMMITTED, FULFILLED
+- Contract states: DRAFT, PENDING, READY_TO_COMMIT, COMMITTED, FULFILLED, CANCELLED, EXPIRED, FAILED
+- Terminal states: FULFILLED (success), CANCELLED (user/admin), EXPIRED (timeout), FAILED (payment failed)
 - Order states: NOT_FINISHED, OK (simplified - no intermediate payment states)
 - Clean separation prevents state pollution
 

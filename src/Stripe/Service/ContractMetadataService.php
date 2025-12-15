@@ -155,6 +155,7 @@ class ContractMetadataService implements ContractMetadataServiceInterface
             return null;
         }
 
+        // @phpstan-ignore-next-line Backward compatibility check for older OXID versions
         if (!method_exists($user, 'getEncodedDeliveryAddress')) {
             return null;
         }
