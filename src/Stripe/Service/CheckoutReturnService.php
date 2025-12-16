@@ -61,13 +61,20 @@ final class CheckoutReturnService implements CheckoutReturnServiceInterface
             return CheckoutReturnResult::failure('Failed to retrieve checkout session');
         }
 
-        // Step 3: Validate payment status
+        // Step 3: Extract payment details early (needed for validation)
         $paymentStatus = $session->payment_status ?? 'unknown';
-        if ($paymentStatus !== 'paid') {
+        $paymentIntentStatus = $this->extractPaymentIntentStatus($session);
+
+        // Step 4: Validate payment status
+        // Accept 'paid' (automatic capture) OR 'unpaid' with requires_capture (manual capture)
+        $isAutomaticCapture = $paymentStatus === 'paid';
+        $isManualCapture = $paymentStatus === 'unpaid' && $paymentIntentStatus === 'requires_capture';
+
+        if (!$isAutomaticCapture && !$isManualCapture) {
             return CheckoutReturnResult::failure("Payment not completed: {$paymentStatus}");
         }
 
-        // Step 4: Validate contract ID from metadata
+        // Step 5: Validate contract ID from metadata
         $metadataContractId = $session->metadata->contract_id ?? null;
         if ($metadataContractId === null) {
             return CheckoutReturnResult::failure('Contract ID not found in checkout session metadata');
@@ -81,7 +88,7 @@ final class CheckoutReturnService implements CheckoutReturnServiceInterface
             return CheckoutReturnResult::failure('Contract ID mismatch');
         }
 
-        // Step 5: Extract payment details
+        // Step 6: Extract remaining payment details
         $paymentIntentId = $this->extractPaymentIntentId($session);
         $amountTotal = (int) ($session->amount_total ?? 0);
         $currency = $session->currency ?? 'eur';
@@ -89,6 +96,7 @@ final class CheckoutReturnService implements CheckoutReturnServiceInterface
         $this->logger->info('Checkout return validated successfully', [
             'contract_id' => $contractId,
             'payment_intent_id' => $paymentIntentId,
+            'payment_intent_status' => $paymentIntentStatus,
             'amount' => $amountTotal / 100,
             'currency' => $currency,
         ]);
@@ -98,7 +106,8 @@ final class CheckoutReturnService implements CheckoutReturnServiceInterface
             $paymentIntentId,
             $amountTotal,
             $currency,
-            $paymentStatus
+            $paymentStatus,
+            $paymentIntentStatus
         );
     }
 
@@ -153,5 +162,38 @@ final class CheckoutReturnService implements CheckoutReturnServiceInterface
         }
 
         return '';
+    }
+
+    /**
+     * Extract PaymentIntent status from expanded Session.
+     *
+     * The session must be retrieved with ['payment_intent'] expansion
+     * to get the full PaymentIntent object with status.
+     *
+     * @param Session $session Checkout Session with expanded payment_intent
+     * @return string PaymentIntent status (succeeded, requires_capture, etc.)
+     */
+    private function extractPaymentIntentStatus(Session $session): string
+    {
+        $paymentIntent = $session->payment_intent;
+
+        // If expanded, payment_intent is an object with status
+        if (is_object($paymentIntent) && isset($paymentIntent->status)) {
+            // @phpstan-ignore-next-line ternary.alwaysTrue - Stripe SDK typings may not reflect runtime reality
+            return is_string($paymentIntent->status) ? $paymentIntent->status : 'unknown';
+        }
+
+        // @phpstan-ignore-next-line Stripe SDK may return array in some edge cases
+        if (is_array($paymentIntent) && isset($paymentIntent['status'])) {
+            return is_string($paymentIntent['status']) ? $paymentIntent['status'] : 'unknown';
+        }
+
+        // If not expanded (string ID only), we can't get status without another API call
+        // Default to 'succeeded' for backwards compatibility with existing flows
+        $this->logger->warning('PaymentIntent not expanded, assuming succeeded status', [
+            'session_id' => $session->id ?? 'unknown',
+        ]);
+
+        return 'succeeded';
     }
 }

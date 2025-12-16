@@ -245,6 +245,68 @@ class StripeOrderControllerTest extends TestCase
         $this->assertEquals('osc_stripe_card', $capturedContext->get('paymentId'));
     }
 
+    public function testCheckoutSessionContextContainsCaptureModeFromConfig(): void
+    {
+        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+
+        $capturedContext = null;
+        $eventDispatcher
+            ->expects($this->once())
+            ->method('dispatch')
+            ->with($this->isInstanceOf(StripeCheckoutSessionRequestEvent::class))
+            ->willReturnCallback(function ($event) use (&$capturedContext) {
+                $capturedContext = $event->getContext();
+                $capturedContext->set('checkoutSessionId', 'cs_test_123');
+                $capturedContext->set('contractId', 'contract_abc');
+                return $event;
+            });
+
+        // Test with manual capture mode
+        $controller = $this->createControllerWithMocks($eventDispatcher, [
+            'basketNotEmpty' => true,
+            'hasUser' => true,
+            'captureMode' => 'manual',
+        ]);
+
+        ob_start();
+        @$controller->createCheckoutSession();
+        ob_get_clean();
+
+        $this->assertNotNull($capturedContext);
+        $this->assertEquals('manual', $capturedContext->get('captureMode'));
+    }
+
+    public function testCheckoutSessionContextContainsAutomaticCaptureModeByDefault(): void
+    {
+        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+
+        $capturedContext = null;
+        $eventDispatcher
+            ->expects($this->once())
+            ->method('dispatch')
+            ->with($this->isInstanceOf(StripeCheckoutSessionRequestEvent::class))
+            ->willReturnCallback(function ($event) use (&$capturedContext) {
+                $capturedContext = $event->getContext();
+                $capturedContext->set('checkoutSessionId', 'cs_test_456');
+                $capturedContext->set('contractId', 'contract_def');
+                return $event;
+            });
+
+        // Test with default (automatic) capture mode
+        $controller = $this->createControllerWithMocks($eventDispatcher, [
+            'basketNotEmpty' => true,
+            'hasUser' => true,
+            // captureMode not specified, should default to 'automatic'
+        ]);
+
+        ob_start();
+        @$controller->createCheckoutSession();
+        ob_get_clean();
+
+        $this->assertNotNull($capturedContext);
+        $this->assertEquals('automatic', $capturedContext->get('captureMode'));
+    }
+
     // --- Helper methods ---
 
     /**

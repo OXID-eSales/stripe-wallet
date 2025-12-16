@@ -41,6 +41,9 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
 
     /**
      * @inheritDoc
+     *
+     * Sprint 7: Enhanced to handle AUTHORIZED state (manual capture mode).
+     * When a charge is captured, transitions AUTHORIZED -> READY_TO_COMMIT.
      */
     public function handleChargeCaptured(string $providerOrderId, float $capturedAmount = 0.0): ?bool
     {
@@ -63,6 +66,16 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
                 $this->contractRepository->save($contract);
             }
             return false;
+        }
+
+        // Sprint 7: Handle manual capture mode - AUTHORIZED -> READY_TO_COMMIT
+        if ($contract->getState()->isAuthorized() && $contract instanceof PaymentContract) {
+            $contract->captureAuthorization();
+            $this->contractRepository->save($contract);
+            // After capture, contract is READY_TO_COMMIT
+            // Continue to check if we can fulfill (need COMMITTED state)
+            // For now, just return true as capture was successful
+            return true;
         }
 
         // Validation - must be COMMITTED to fulfill

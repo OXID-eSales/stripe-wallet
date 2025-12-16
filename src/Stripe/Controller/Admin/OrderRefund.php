@@ -16,6 +16,8 @@ use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
+use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
+use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
 use OxidSolutionCatalysts\Payments\Stripe\Core\StripeDefinitions;
 use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Stripe\Charge;
@@ -98,6 +100,20 @@ class OrderRefund extends AdminDetailsController
      * @var string|null
      */
     protected ?string $stripeApiError = null;
+
+    /**
+     * Flag if a successful capture was executed
+     *
+     * @var bool|null
+     */
+    protected ?bool $_blSuccessfulCapture = null;
+
+    /**
+     * Flag if a successful cancel authorization was executed
+     *
+     * @var bool|null
+     */
+    protected ?bool $_blSuccessfulCancel = null;
 
     /**
      * Main render method
@@ -195,6 +211,296 @@ class OrderRefund extends AdminDetailsController
         // Process results from handler
         $this->processContextResults($context);
     }
+
+    // =========================================================================
+    // Capture Methods (Manual Capture Mode)
+    // =========================================================================
+
+    /**
+     * Execute capture action for authorized payment via event system.
+     *
+     * This method is THIN - it creates an event and dispatches it.
+     * All business logic is in StripeCaptureRequestHandler.
+     *
+     * @return void
+     */
+    public function capturePayment(): void
+    {
+        $oOrder = $this->getOrder();
+        if ($oOrder === null) {
+            $this->setErrorMessage(Registry::getLang()->translateString('STRIPE_CAPTURE_NO_ORDER'));
+            $this->_blSuccessfulCapture = false;
+            return;
+        }
+
+        // Get the PaymentIntent ID from order transaction ID
+        $paymentIntentId = $oOrder->oxorder__oxtransid->value ?? null;
+        if (empty($paymentIntentId)) {
+            $this->setErrorMessage(Registry::getLang()->translateString('STRIPE_CAPTURE_NO_TRANSACTION'));
+            $this->_blSuccessfulCapture = false;
+            return;
+        }
+
+        // Create event context with capture data
+        $context = new EventContext([
+            'orderId' => $oOrder->getId(),
+            'contractId' => $this->getContractIdFromOrder($oOrder),
+            'paymentIntentId' => $paymentIntentId,
+            'amount' => null, // Full capture
+            'initiator' => 'admin',
+            'reason' => $this->getCaptureReasonFromRequest(),
+        ]);
+
+        // Dispatch event - handler does all the work
+        $event = new StripeCaptureRequestEvent($context);
+        $this->getEventDispatcher()->dispatch($event);
+
+        // Store context for result processing
+        $this->_oEventContext = $context;
+
+        // Process capture results
+        $this->processCaptureResults($context);
+    }
+
+    /**
+     * Process capture results from event context.
+     */
+    protected function processCaptureResults(EventContext $context): void
+    {
+        $success = $context->get('captureSuccess');
+
+        if ($success === true) {
+            $this->_blSuccessfulCapture = true;
+            $this->_sErrorMessage = false;
+
+            // Force reload of API data
+            $this->_oStripeApiOrder = null;
+            $this->_oStripeApiCharge = null;
+
+            // Reload order to reflect updated state
+            $orderId = $context->get('orderId');
+            if (is_string($orderId)) {
+                $this->_oOrder = null; // Force reload
+                $this->getOrder();
+            }
+        } else {
+            $this->_blSuccessfulCapture = false;
+            $error = $context->get('error');
+            if (is_string($error) && $error !== '') {
+                $this->setErrorMessage($error);
+            } else {
+                $this->setErrorMessage(Registry::getLang()->translateString('STRIPE_CAPTURE_FAILED'));
+            }
+        }
+    }
+
+    /**
+     * Check if the order payment can be captured (requires_capture status).
+     *
+     * @return bool
+     */
+    public function isOrderCapturable(): bool
+    {
+        // If capture was just successful, hide capture option
+        if ($this->wasCaptureSuccessful() === true) {
+            return false;
+        }
+
+        $oApiOrder = $this->getStripeApiOrder();
+        if ($oApiOrder === null) {
+            return false;
+        }
+
+        // Check PaymentIntent status
+        $status = $oApiOrder->status ?? '';
+        return $status === 'requires_capture';
+    }
+
+    /**
+     * Get the authorized amount that can be captured.
+     *
+     * @return string Formatted amount
+     */
+    public function getCaptureableAmount(): string
+    {
+        $oApiOrder = $this->getStripeApiOrder();
+        if ($oApiOrder === null) {
+            return $this->getFormatedPrice(0);
+        }
+
+        // amount is in cents
+        $amount = (int) ($oApiOrder->amount ?? 0);
+        return $this->getFormatedPrice($amount / 100);
+    }
+
+    /**
+     * Get PaymentIntent status for display.
+     *
+     * @return string
+     */
+    public function getPaymentIntentStatus(): string
+    {
+        $oApiOrder = $this->getStripeApiOrder();
+        if ($oApiOrder === null) {
+            return 'unknown';
+        }
+        return $oApiOrder->status ?? 'unknown';
+    }
+
+    /**
+     * Returns if capture was successful.
+     *
+     * @return bool|null
+     */
+    public function wasCaptureSuccessful(): ?bool
+    {
+        return $this->_blSuccessfulCapture;
+    }
+
+    /**
+     * Get captured amount from last capture operation (if available).
+     */
+    public function getLastCapturedAmount(): ?float
+    {
+        if ($this->_oEventContext === null) {
+            return null;
+        }
+        $amount = $this->_oEventContext->get('capturedAmount');
+        return is_numeric($amount) ? (float) $amount : null;
+    }
+
+    /**
+     * Get capture reason from request.
+     */
+    protected function getCaptureReasonFromRequest(): ?string
+    {
+        $reason = Registry::getRequest()->getRequestEscapedParameter('capture_reason');
+        return !empty($reason) ? $reason : null;
+    }
+
+    // =========================================================================
+    // End Capture Methods
+    // =========================================================================
+
+    // =========================================================================
+    // Cancel Authorization Methods (Manual Capture Mode)
+    // =========================================================================
+
+    /**
+     * Execute cancel authorization action for authorized payment via event system.
+     *
+     * This method is THIN - it creates an event and dispatches it.
+     * All business logic is in StripeCancelAuthorizationRequestHandler.
+     *
+     * @return void
+     */
+    public function cancelAuthorization(): void
+    {
+        $oOrder = $this->getOrder();
+        if ($oOrder === null) {
+            $this->setErrorMessage(Registry::getLang()->translateString('STRIPE_CANCEL_NO_ORDER'));
+            $this->_blSuccessfulCancel = false;
+            return;
+        }
+
+        // Get the PaymentIntent ID from order transaction ID
+        $paymentIntentId = $oOrder->oxorder__oxtransid->value ?? null;
+        if (empty($paymentIntentId)) {
+            $this->setErrorMessage(Registry::getLang()->translateString('STRIPE_CANCEL_NO_TRANSACTION'));
+            $this->_blSuccessfulCancel = false;
+            return;
+        }
+
+        // Create event context with cancel data
+        $context = new EventContext([
+            'orderId' => $oOrder->getId(),
+            'contractId' => $this->getContractIdFromOrder($oOrder),
+            'paymentIntentId' => $paymentIntentId,
+            'cancellationReason' => $this->getCancellationReasonFromRequest(),
+            'initiator' => 'admin',
+        ]);
+
+        // Dispatch event - handler does all the work
+        $event = new StripeCancelAuthorizationRequestEvent($context);
+        $this->getEventDispatcher()->dispatch($event);
+
+        // Store context for result processing
+        $this->_oEventContext = $context;
+
+        // Process cancel results
+        $this->processCancelResults($context);
+    }
+
+    /**
+     * Process cancel authorization results from event context.
+     */
+    protected function processCancelResults(EventContext $context): void
+    {
+        $success = $context->get('cancelSuccess');
+
+        if ($success === true) {
+            $this->_blSuccessfulCancel = true;
+            $this->_sErrorMessage = false;
+
+            // Force reload of API data
+            $this->_oStripeApiOrder = null;
+            $this->_oStripeApiCharge = null;
+
+            // Reload order to reflect updated state
+            $orderId = $context->get('orderId');
+            if (is_string($orderId)) {
+                $this->_oOrder = null; // Force reload
+                $this->getOrder();
+            }
+        } else {
+            $this->_blSuccessfulCancel = false;
+            $error = $context->get('error');
+            if (is_string($error) && $error !== '') {
+                $this->setErrorMessage($error);
+            } else {
+                $this->setErrorMessage(Registry::getLang()->translateString('STRIPE_CANCEL_FAILED'));
+            }
+        }
+    }
+
+    /**
+     * Check if the order authorization can be cancelled (requires_capture status).
+     *
+     * @return bool
+     */
+    public function isOrderCancellable(): bool
+    {
+        // If cancel was just successful, hide cancel option
+        if ($this->wasCancelSuccessful() === true) {
+            return false;
+        }
+
+        // Same logic as capturable - order must have requires_capture status
+        return $this->isOrderCapturable();
+    }
+
+    /**
+     * Returns if cancel authorization was successful.
+     *
+     * @return bool|null
+     */
+    public function wasCancelSuccessful(): ?bool
+    {
+        return $this->_blSuccessfulCancel;
+    }
+
+    /**
+     * Get cancellation reason from request.
+     */
+    protected function getCancellationReasonFromRequest(): ?string
+    {
+        $reason = Registry::getRequest()->getRequestEscapedParameter('cancellation_reason');
+        return !empty($reason) ? $reason : null;
+    }
+
+    // =========================================================================
+    // End Cancel Authorization Methods
+    // =========================================================================
 
     /**
      * Process results from event context.

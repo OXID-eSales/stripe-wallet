@@ -11,6 +11,7 @@ class ContractState
     private const VALID_STATES = [
         'draft',
         'pending',
+        'authorized',
         'ready_to_commit',
         'committed',
         'fulfilled',
@@ -45,6 +46,11 @@ class ContractState
     public static function pending(): self
     {
         return new self('pending');
+    }
+
+    public static function authorized(): self
+    {
+        return new self('authorized');
     }
 
     public static function readyToCommit(): self
@@ -90,6 +96,11 @@ class ContractState
     public function isPending(): bool
     {
         return $this->value === 'pending';
+    }
+
+    public function isAuthorized(): bool
+    {
+        return $this->value === 'authorized';
     }
 
     public function isReadyToCommit(): bool

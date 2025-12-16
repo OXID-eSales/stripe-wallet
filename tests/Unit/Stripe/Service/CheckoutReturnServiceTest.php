@@ -210,7 +210,10 @@ class CheckoutReturnServiceTest extends TestCase
         $session = Session::constructFrom([
             'id' => 'cs_mismatch',
             'payment_status' => 'paid',
-            'payment_intent' => 'pi_mismatch',
+            'payment_intent' => [
+                'id' => 'pi_mismatch',
+                'status' => 'succeeded',
+            ],
             'amount_total' => 5000,
             'currency' => 'eur',
             'metadata' => ['contract_id' => 'different_contract'],

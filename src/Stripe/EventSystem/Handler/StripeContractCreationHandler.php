@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\ContractServiceInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ContractMetadataServiceInterface;
 
@@ -26,7 +27,8 @@ class StripeContractCreationHandler implements HandlerInterface
     public function __construct(
         private readonly ContractServiceInterface $contractService,
         private readonly ContractRepositoryInterface $contractRepository,
-        private readonly ContractMetadataServiceInterface $metadataService
+        private readonly ContractMetadataServiceInterface $metadataService,
+        private readonly ?FileLoggerInterface $eventLogger = null
     ) {
     }
 
@@ -42,7 +44,10 @@ class StripeContractCreationHandler implements HandlerInterface
 
     public function handle(object $event): void
     {
+        $this->logEvent('StripeContractCreationHandler::handle() START');
+
         if (!$event instanceof StripeCheckoutSessionRequestEvent) {
+            $this->logEvent('StripeContractCreationHandler: Wrong event type, skipping');
             return;
         }
 
@@ -50,16 +55,19 @@ class StripeContractCreationHandler implements HandlerInterface
 
         // Skip if contract already exists
         if ($context->getContract() !== null) {
+            $this->logEvent('StripeContractCreationHandler: Contract already exists, skipping');
             return;
         }
 
         $userId = $context->get('userId');
         if (!is_string($userId) || $userId === '') {
+            $this->logEvent('StripeContractCreationHandler: ERROR - User ID is required');
             throw new InvalidArgumentException('User ID is required');
         }
 
         $basket = $context->get('basket');
         if (!is_object($basket)) {
+            $this->logEvent('StripeContractCreationHandler: ERROR - Basket is required');
             throw new InvalidArgumentException('Basket is required');
         }
 
@@ -71,11 +79,20 @@ class StripeContractCreationHandler implements HandlerInterface
         /** @var array<int, string> $validatedConditionTypes */
         $validatedConditionTypes = array_values(array_filter($conditionTypes, 'is_string'));
 
+        $this->logEvent('StripeContractCreationHandler: Creating contract', [
+            'userId' => $userId,
+            'conditionTypes' => $validatedConditionTypes,
+        ]);
+
         $contract = $this->contractService->createContract(
             $userId,
             $basket,
             $validatedConditionTypes
         );
+
+        $this->logEvent('StripeContractCreationHandler: Contract created', [
+            'contractId' => $contract->getId(),
+        ]);
 
         // Sprint 21: Delegate metadata operations to service
         $this->metadataService->storeDeliveryAddressMetadata($contract, $basket);
@@ -86,5 +103,22 @@ class StripeContractCreationHandler implements HandlerInterface
 
         $context->setContract($contract);
         $context->set('contractId', $contract->getId());
+
+        $this->logEvent('StripeContractCreationHandler::handle() END', [
+            'contractId' => $contract->getId(),
+        ]);
+    }
+
+    /**
+     * Log event to file logger for debugging.
+     *
+     * @param string $message
+     * @param array<string, mixed> $context
+     */
+    private function logEvent(string $message, array $context = []): void
+    {
+        if ($this->eventLogger !== null) {
+            $this->eventLogger->log($message, $context);
+        }
     }
 }

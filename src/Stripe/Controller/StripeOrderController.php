@@ -333,10 +333,26 @@ class StripeOrderController extends OrderController
         return Registry::getConfig()->getShopUrl();
     }
 
+    /**
+     * Get capture mode from module configuration.
+     *
+     * Uses ModuleConfigurationService to determine if automatic or manual capture
+     * should be used. Request parameter can override for testing purposes.
+     */
     protected function getCaptureMode(): string
     {
-        $value = Registry::getRequest()->getRequestParameter('capture');
-        return ($value === 'manual') ? 'manual' : 'automatic';
+        // Allow override from request (for testing)
+        $override = Registry::getRequest()->getRequestParameter('capture_mode_override');
+        if (is_string($override) && in_array($override, ['automatic', 'manual'], true)) {
+            return $override;
+        }
+
+        // Get from module configuration
+        $config = $this->getServiceFromContainer(
+            \OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService::class
+        );
+
+        return $config->getStripeCaptureMethod();
     }
 
     public function getUser()

@@ -70,11 +70,11 @@ test.describe('Stripe Wallet Checkout', () => {
 
     // Step 4: Go to cart and start checkout
     console.log('STEP 4: Going to cart...');
-    await page.goto(`${shopUrl}/warenkorb/`);
+    await page.goto(`${shopUrl}/index.php?cl=basket&lang=0`);
     await page.waitForLoadState('networkidle');
 
-    // Click checkout button
-    const checkoutBtn = page.locator('a:has-text("Zur Kasse"), a:has-text("Checkout"), button:has-text("Zur Kasse")').first();
+    // Click checkout button (handle both German and English)
+    const checkoutBtn = page.locator('button:has-text("Zur Kasse"), button:has-text("Checkout"), a:has-text("Zur Kasse"), a:has-text("Checkout")').first();
     await checkoutBtn.waitFor({ state: 'visible', timeout: 10000 });
     await checkoutBtn.click();
     await page.waitForLoadState('networkidle');
@@ -152,8 +152,6 @@ test.describe('Stripe Wallet Checkout', () => {
     console.log('Final URL:', page.url());
 
     expect(page.url()).toContain('thankyou');
-
-    let request =
 
     console.log('============================================');
     console.log('✓ CHECKOUT FLOW COMPLETED SUCCESSFULLY');

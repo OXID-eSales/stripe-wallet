@@ -123,11 +123,18 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
     /**
      * @inheritDoc
      */
-    public function buildSuccessUrl(string $shopUrl, string $contractId, string $contractToken): string
+    public function buildSuccessUrl(string $shopUrl, string $contractId, string $contractToken, string $sessionId = ''): string
     {
-        return $shopUrl . 'index.php?cl=order&fnc=checkoutSuccess'
+        $url = $shopUrl . 'index.php?cl=order&fnc=checkoutSuccess'
             . '&session_id={CHECKOUT_SESSION_ID}'
             . '&contract_id=' . urlencode($contractId)
             . '&contract_token=' . urlencode($contractToken);
+
+        // Include OXID session ID to preserve session across external redirect
+        if ($sessionId !== '') {
+            $url .= '&force_sid=' . urlencode($sessionId);
+        }
+
+        return $url;
     }
 }

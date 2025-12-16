@@ -1,0 +1,92 @@
+@startuml contract-state-machine-v2
+
+title Payment Contract State Machine (v2 - with AUTHORIZED state)
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+  BackgroundColor<<terminal>> #90EE90
+  BackgroundColor<<error>> #FFB6C1
+  BackgroundColor<<new>> #87CEEB
+}
+
+[*] --> DRAFT : Contract created
+
+state DRAFT {
+  DRAFT : Initial state
+  DRAFT : Basket snapshot stored
+  DRAFT : No payment initiated yet
+}
+
+DRAFT --> PENDING : Payment initiated
+
+state PENDING {
+  PENDING : Waiting for payment
+  PENDING : Customer on payment provider
+}
+
+PENDING --> AUTHORIZED <<new>> : Payment authorized\n(manual capture mode)
+PENDING --> READY_TO_COMMIT : Payment captured\n(automatic capture mode)
+PENDING --> FAILED <<error>> : Payment failed
+
+state AUTHORIZED <<new>> {
+  AUTHORIZED : Funds reserved
+  AUTHORIZED : Awaiting capture
+  AUTHORIZED : Expires in 7 days
+}
+
+AUTHORIZED --> READY_TO_COMMIT : Manual capture executed
+AUTHORIZED --> EXPIRED <<terminal>> : Authorization timeout
+AUTHORIZED --> CANCELLED <<terminal>> : Admin void/cancel
+
+state READY_TO_COMMIT {
+  READY_TO_COMMIT : Payment confirmed
+  READY_TO_COMMIT : Ready to create order
+}
+
+READY_TO_COMMIT --> COMMITTED : Order created
+
+state COMMITTED {
+  COMMITTED : Order exists in oxorder
+  COMMITTED : Payment linked to order
+}
+
+COMMITTED --> FULFILLED <<terminal>> : Order completed
+
+state FULFILLED <<terminal>> {
+  FULFILLED : Contract lifecycle complete
+  FULFILLED : All conditions met
+}
+
+state CANCELLED <<terminal>> {
+  CANCELLED : Manually cancelled
+  CANCELLED : Refund may be issued
+}
+
+state EXPIRED <<terminal>> {
+  EXPIRED : Authorization timed out
+  EXPIRED : Funds released to customer
+}
+
+state FAILED <<terminal>> {
+  FAILED : Payment failed
+  FAILED : Customer notified
+}
+
+note right of AUTHORIZED
+  **NEW STATE**
+  Only used when:
+  sStripeCaptureMode = 'manual'
+
+  PaymentIntent status:
+  'requires_capture'
+end note
+
+note right of READY_TO_COMMIT
+  For **automatic** capture:
+  Direct path from PENDING
+
+  For **manual** capture:
+  Via AUTHORIZED state
+end note
+
+@enduml

@@ -302,4 +302,175 @@ class PaymentContractTest extends TestCase
         $this->assertEquals($contract->getStateValue(), $restored->getStateValue());
         $this->assertCount(1, $restored->getConditions());
     }
+
+    // ==========================================
+    // AUTHORIZED STATE TESTS (Sprint 1)
+    // ==========================================
+
+    public function testAuthorizeTransitionsFromPendingToAuthorized(): void
+    {
+        $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
+        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToPending();
+
+        $contract->authorize();
+
+        $this->assertTrue($contract->getState()->isAuthorized());
+        $this->assertEquals('authorized', $contract->getStateValue());
+    }
+
+    public function testAuthorizeThrowsExceptionForDraftContract(): void
+    {
+        $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Can only transition to AUTHORIZED from PENDING state');
+
+        $contract->authorize();
+    }
+
+    public function testAuthorizeThrowsExceptionForReadyToCommitContract(): void
+    {
+        $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
+        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToPending();
+        $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Can only transition to AUTHORIZED from PENDING state');
+
+        $contract->authorize();
+    }
+
+    public function testCaptureAuthorizationTransitionsToReadyToCommit(): void
+    {
+        $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
+        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToPending();
+        $contract->authorize();
+
+        $contract->captureAuthorization();
+
+        $this->assertTrue($contract->getState()->isReadyToCommit());
+        $this->assertEquals('ready_to_commit', $contract->getStateValue());
+    }
+
+    public function testCaptureAuthorizationThrowsExceptionForNonAuthorizedContract(): void
+    {
+        $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
+        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToPending();
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Can only capture authorization from AUTHORIZED state');
+
+        $contract->captureAuthorization();
+    }
+
+    public function testCaptureAuthorizationThrowsExceptionForDraftContract(): void
+    {
+        $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Can only capture authorization from AUTHORIZED state');
+
+        $contract->captureAuthorization();
+    }
+
+    public function testFullManualCaptureFlow(): void
+    {
+        // Test the complete flow: DRAFT -> PENDING -> AUTHORIZED -> READY_TO_COMMIT -> COMMITTED -> FULFILLED
+        $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
+        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+
+        // DRAFT -> PENDING
+        $contract->transitionToPending();
+        $this->assertTrue($contract->getState()->isPending());
+
+        // Mark payment condition as fulfilled (provider authorized the payment)
+        // Note: In manual capture mode, we fulfill the condition but then call authorize()
+        // to indicate we're waiting for capture instead of auto-transitioning to READY_TO_COMMIT
+        $conditions = $contract->getConditions();
+        $conditions[0]->fulfill(['authId' => 'pi_123']);
+
+        // PENDING -> AUTHORIZED (manual capture mode)
+        $contract->authorize();
+        $this->assertTrue($contract->getState()->isAuthorized());
+        $this->assertTrue($contract->areAllConditionsFulfilled());
+
+        // AUTHORIZED -> READY_TO_COMMIT (capture executed)
+        $contract->captureAuthorization();
+        $this->assertTrue($contract->getState()->isReadyToCommit());
+
+        // READY_TO_COMMIT -> COMMITTED
+        $contract->commitToOrder('order123');
+        $this->assertTrue($contract->getState()->isCommitted());
+
+        // COMMITTED -> FULFILLED
+        $contract->fulfill();
+        $this->assertTrue($contract->getState()->isFulfilled());
+    }
+
+    public function testCancelFromAuthorizedState(): void
+    {
+        $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
+        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToPending();
+        $contract->authorize();
+
+        $contract->cancel('Admin cancelled authorization');
+
+        $this->assertEquals('cancelled', $contract->getStateValue());
+    }
+
+    public function testExpireFromAuthorizedState(): void
+    {
+        $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
+        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToPending();
+        $contract->authorize();
+
+        $contract->expire();
+
+        $this->assertEquals('expired', $contract->getStateValue());
+    }
+
+    public function testToArrayIncludesAuthorizedState(): void
+    {
+        $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot(), 'test_id');
+        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToPending();
+        $contract->authorize();
+
+        $array = $contract->toArray();
+
+        $this->assertEquals('authorized', $array['state']);
+    }
+
+    public function testFromArrayRestoresAuthorizedState(): void
+    {
+        $data = [
+            'id' => 'test_id',
+            'shopId' => 1,
+            'userId' => 'user123',
+            'orderId' => null,
+            'state' => 'authorized',
+            'basketSnapshot' => [
+                'items' => [],
+                'discounts' => [],
+                'totalGross' => 100.0,
+                'totalNet' => 84.03,
+                'totalVat' => 15.97,
+                'currency' => 'EUR',
+                'capturedAt' => date('Y-m-d H:i:s'),
+            ],
+            'conditions' => [],
+            'metadata' => [],
+        ];
+
+        $contract = PaymentContract::fromArray($data);
+
+        $this->assertTrue($contract->getState()->isAuthorized());
+        $this->assertEquals('authorized', $contract->getStateValue());
+    }
 }

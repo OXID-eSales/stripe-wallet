@@ -10,7 +10,7 @@ use OxidSolutionCatalysts\Payments\Component\Model\ModelInterface;
 /**
  * Payment contract capturing purchase intent before order creation.
  *
- * States: DRAFT → PENDING → READY_TO_COMMIT → COMMITTED → FULFILLED
+ * States: DRAFT → PENDING → AUTHORIZED → READY_TO_COMMIT → COMMITTED → FULFILLED
  * Or: CANCELLED | EXPIRED | FAILED
  */
 interface PaymentContractInterface extends ModelInterface
@@ -43,6 +43,20 @@ interface PaymentContractInterface extends ModelInterface
      * Transition contract from DRAFT to PENDING state.
      */
     public function transitionToPending(): void;
+
+    /**
+     * Transition contract from PENDING to AUTHORIZED state.
+     *
+     * Used when payment is authorized but not yet captured (manual capture mode).
+     */
+    public function authorize(): void;
+
+    /**
+     * Transition contract from AUTHORIZED to READY_TO_COMMIT state.
+     *
+     * Used when an authorized payment is captured (manual capture mode).
+     */
+    public function captureAuthorization(): void;
 
     /**
      * Fulfill a condition on this contract.

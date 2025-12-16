@@ -29,6 +29,32 @@ export default defineConfig({
   },
 
   projects: [
+    // Setup project - runs first to authenticate admin
+    {
+      name: 'admin-setup',
+      testMatch: /auth\.setup\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+
+    // Admin tests - depend on setup, use saved auth state
+    {
+      name: 'admin-tests',
+      testMatch: /tests\/admin\/.*.spec.ts/,
+      dependencies: ['admin-setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'reports/admin-auth.json',
+      },
+    },
+
+    // Checkout tests - no auth needed, run independently
+    {
+      name: 'checkout-tests',
+      testMatch: /tests\/checkout\/.*.spec.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+
+    // Default project for running all tests
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },

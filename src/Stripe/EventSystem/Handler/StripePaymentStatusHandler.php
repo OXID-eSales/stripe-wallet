@@ -9,6 +9,7 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterfac
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentAuthorizedEvent;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\Stripe3DSRequiredEvent;
@@ -33,7 +34,8 @@ class StripePaymentStatusHandler implements HandlerInterface
     public function __construct(
         private ContractRepositoryInterface $contractRepository,
         private StripeAdapterFactoryInterface $adapterFactory,
-        private EventDispatcherInterface $eventDispatcher
+        private EventDispatcherInterface $eventDispatcher,
+        private ?FileLoggerInterface $eventLogger = null
     ) {
     }
 
@@ -44,14 +46,22 @@ class StripePaymentStatusHandler implements HandlerInterface
 
     public function handle(object $event): void
     {
+        $this->logEvent('StripePaymentStatusHandler::handle() START');
+
         if (!$event instanceof StripePaymentExecuteEvent) {
+            $this->logEvent('StripePaymentStatusHandler: Wrong event type, skipping');
             return;
         }
 
         $context = $event->getContext();
         $paymentIntentId = $event->getPaymentIntentId();
 
+        $this->logEvent('StripePaymentStatusHandler: Processing', [
+            'paymentIntentId' => $paymentIntentId,
+        ]);
+
         if ($paymentIntentId === null) {
+            $this->logEvent('StripePaymentStatusHandler: ERROR - PaymentIntent ID is missing');
             $context->set('error', 'PaymentIntent ID is missing');
             $context->set('redirectTarget', 'payment');
             return;
@@ -63,12 +73,20 @@ class StripePaymentStatusHandler implements HandlerInterface
             $contract = $this->contractRepository->findById($contractId);
             if ($contract !== null) {
                 $context->setContract($contract);
+                $this->logEvent('StripePaymentStatusHandler: Contract loaded', [
+                    'contractId' => $contractId,
+                ]);
             }
         }
 
         // Get payment status via adapter
         $adapter = $this->adapterFactory->createDefaultAdapter();
         $paymentDetails = $adapter->getPaymentDetails($paymentIntentId);
+
+        $this->logEvent('StripePaymentStatusHandler: Payment details retrieved', [
+            'status' => $paymentDetails->status,
+            'amount' => $paymentDetails->amount,
+        ]);
 
         // Store payment details in context
         $context->set('paymentDetails', $paymentDetails);
@@ -88,6 +106,10 @@ class StripePaymentStatusHandler implements HandlerInterface
             default =>
                 $this->handleFailure($context, $paymentDetails),
         };
+
+        $this->logEvent('StripePaymentStatusHandler::handle() END', [
+            'redirectTarget' => $context->get('redirectTarget'),
+        ]);
     }
 
     private function handleSuccess(
@@ -141,7 +163,23 @@ class StripePaymentStatusHandler implements HandlerInterface
         EventContext $context,
         \OxidSolutionCatalysts\Payments\Component\Adapter\Response\PaymentDetailsResponse $paymentDetails
     ): void {
+        $this->logEvent('StripePaymentStatusHandler: handleFailure', [
+            'status' => $paymentDetails->status,
+        ]);
         $context->set('error', 'Payment failed: ' . $paymentDetails->status);
         $context->set('redirectTarget', 'payment');
+    }
+
+    /**
+     * Log event to file logger for debugging.
+     *
+     * @param string $message
+     * @param array<string, mixed> $context
+     */
+    private function logEvent(string $message, array $context = []): void
+    {
+        if ($this->eventLogger !== null) {
+            $this->eventLogger->log($message, $context);
+        }
     }
 }

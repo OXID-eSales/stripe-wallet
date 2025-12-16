@@ -15,6 +15,9 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterfac
  * Manages event listeners and provides them to EventDispatcher.
  * Integrates with Symfony DI via tagged services.
  *
+ * Sprint 11: Uses lazy initialization to prevent circular dependency.
+ * Handlers are not instantiated until getListenersForEvent() is called.
+ *
  * @since 1.0.0
  */
 class EventListenerProvider implements EventListenerProviderInterface
@@ -22,18 +25,25 @@ class EventListenerProvider implements EventListenerProviderInterface
     /** @var array<string, array<array{listener: callable, priority: int}>> */
     private array $listeners = [];
 
+    /** @var iterable<HandlerInterface> */
+    private iterable $handlers;
+
+    private bool $initialized = false;
+
     /**
      * @param iterable<HandlerInterface> $handlers Handlers injected via DI (tagged services)
      */
     public function __construct(iterable $handlers = [])
     {
-        foreach ($handlers as $handler) {
-            $this->registerHandler($handler);
-        }
+        // Store handlers without iterating - lazy initialization
+        $this->handlers = $handlers;
     }
 
     public function getListenersForEvent(string $eventClass): array
     {
+        // Lazy initialize handlers on first access
+        $this->initialize();
+
         if (!isset($this->listeners[$eventClass])) {
             return [];
         }
@@ -54,6 +64,23 @@ class EventListenerProvider implements EventListenerProviderInterface
             'listener' => $listener,
             'priority' => $priority,
         ];
+    }
+
+    /**
+     * Lazy initialization of handlers.
+     * Called on first access to prevent circular dependency during container build.
+     */
+    private function initialize(): void
+    {
+        if ($this->initialized) {
+            return;
+        }
+
+        $this->initialized = true;
+
+        foreach ($this->handlers as $handler) {
+            $this->registerHandler($handler);
+        }
     }
 
     /**

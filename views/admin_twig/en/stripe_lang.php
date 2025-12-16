@@ -56,6 +56,12 @@ $aLang = array(
     'HELP_SHOP_MODULE_sStripeCronSecureKey'             => 'This option is only needed if you have to call the cronjob via URL instead of the php cli. Configure your secure key here, which you have to add to the cronjob call as the GET parameter "secureKey". Example: https://YOUR-SHOP-URL-HERE/modules/fc/stripe/cron.php?secureKey=YOUR-SECURE-KEY',
     'HELP_SHOP_MODULE_blStripeProvideCustomerEmailAddress' => 'If this option is activated, the customer email address will also be passed on for a Stripe order. This overwrites the standard email settings in the Stripe account for this order. This means that notifications for this order are sent to the customer email address instead of to the Stripe account email address.',
 
+    // Capture Mode Settings
+    'SHOP_MODULE_sStripeCaptureMode'                    => 'Capture Mode',
+    'SHOP_MODULE_sStripeCaptureMode_automatic'          => 'Automatic (capture immediately)',
+    'SHOP_MODULE_sStripeCaptureMode_manual'             => 'Manual (authorize only, capture later)',
+    'HELP_SHOP_MODULE_sStripeCaptureMode'               => 'Choose when to capture payments. Automatic mode captures funds immediately when the customer completes checkout. Manual mode only authorizes the payment - you must capture it manually from the order admin page within 7 days.',
+
     'STRIPE_YES'                                        => 'Yes',
     'STRIPE_NO'                                         => 'No',
     'STRIPE_DAY'                                        => 'day',
@@ -129,4 +135,32 @@ $aLang = array(
     'STRIPE_REFUND_CUSTOMER'                            => 'Requested by customer',
     'STRIPE_REFUND_FRAUD'                               => 'Fraud',
     'STRIPE_IS_NOT_STRIPE_ORDER'                        => 'This is not a Stripe order',
+
+    // Capture (Manual Capture Mode)
+    'STRIPE_CAPTURE_PAYMENT'                            => 'Capture Payment',
+    'STRIPE_CAPTURE_REQUIRED'                           => 'Payment Capture Required',
+    'STRIPE_CAPTURE_REQUIRED_TEXT'                      => 'This payment has been authorized but not yet captured. You must capture the payment to complete the transaction.',
+    'STRIPE_CAPTURE_AMOUNT_TEXT'                        => 'Authorized amount to capture',
+    'STRIPE_CAPTURE_REASON'                             => 'Capture note (optional)',
+    'STRIPE_CAPTURE_REASON_PLACEHOLDER'                 => 'e.g., Order ready to ship',
+    'STRIPE_CAPTURE_SUBMIT'                             => 'Capture Payment',
+    'STRIPE_CAPTURE_SUCCESSFUL'                         => 'Payment capture was successful.',
+    'STRIPE_CAPTURE_FAILED'                             => 'Payment capture failed.',
+    'STRIPE_CAPTURE_NO_ORDER'                           => 'Order not found.',
+    'STRIPE_CAPTURE_NO_TRANSACTION'                     => 'No transaction ID found for this order.',
+
+    // Cancel Authorization (Manual Capture Mode)
+    'STRIPE_CANCEL_AUTHORIZATION'                       => 'Cancel Authorization',
+    'STRIPE_CANCEL_AUTHORIZATION_TEXT'                  => 'Cancel this authorization to release the funds held on the customer\'s card. This action cannot be undone.',
+    'STRIPE_CANCEL_REASON'                              => 'Cancellation reason (optional)',
+    'STRIPE_CANCEL_DUPLICATE'                           => 'Duplicate',
+    'STRIPE_CANCEL_CUSTOMER'                            => 'Requested by customer',
+    'STRIPE_CANCEL_FRAUD'                               => 'Fraudulent',
+    'STRIPE_CANCEL_ABANDONED'                           => 'Abandoned',
+    'STRIPE_CANCEL_SUBMIT'                              => 'Cancel Authorization',
+    'STRIPE_CANCEL_CONFIRM'                             => 'Are you sure you want to cancel this authorization? This action cannot be undone.',
+    'STRIPE_CANCEL_SUCCESSFUL'                          => 'Authorization was cancelled successfully.',
+    'STRIPE_CANCEL_FAILED'                              => 'Authorization cancellation failed.',
+    'STRIPE_CANCEL_NO_ORDER'                            => 'Order not found.',
+    'STRIPE_CANCEL_NO_TRANSACTION'                      => 'No transaction ID found for this order.',
 );

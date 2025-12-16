@@ -56,6 +56,12 @@ $aLang = array(
     'HELP_SHOP_MODULE_sStripeCronSecureKey'             => 'Diese Option benötigen Sie nur, wenn Sie den Cronjob per URL aufrufen müssen anstelle von dem Aufruf über die php cli. Konfigurieren Sie hier einen Sicherheitsschlüssel, den Sie über den GET-Parameter "secureKey" an den Aufruf des Cronjobs anfügen. Bsp.: https://YOUR-SHOP-URL-HERE/modules/fc/stripe/cron.php?secureKey=YOUR-SECURE-KEY',
     'HELP_SHOP_MODULE_blStripeProvideCustomerEmailAddress' => 'Ist diese Option aktiviert so, wird bei einer Stripe-Bestellung die Kunden-EMailadresse ebenfalls übergeben. Das überschreibt die Standard-E-Mail-Einstellungen im Stripe-Account für diese Bestellung. Somit werden die Benachrichtigungen zu dieser Bestellung an die Kunden-EMail-Adresse gesendet, statt an die Stripe-Account-EMail-Adresse.',
 
+    // Erfassungsmodus-Einstellungen
+    'SHOP_MODULE_sStripeCaptureMode'                    => 'Erfassungsmodus',
+    'SHOP_MODULE_sStripeCaptureMode_automatic'          => 'Automatisch (sofort erfassen)',
+    'SHOP_MODULE_sStripeCaptureMode_manual'             => 'Manuell (nur autorisieren, später erfassen)',
+    'HELP_SHOP_MODULE_sStripeCaptureMode'               => 'Wählen Sie, wann Zahlungen erfasst werden sollen. Im automatischen Modus werden die Gelder sofort erfasst, wenn der Kunde den Checkout abschließt. Im manuellen Modus wird die Zahlung nur autorisiert - Sie müssen sie innerhalb von 7 Tagen manuell auf der Bestelladmin-Seite erfassen.',
+
     'STRIPE_YES'                                        => 'Ja',
     'STRIPE_NO'                                         => 'Nein',
     'STRIPE_DAY'                                        => 'Tag',
@@ -129,4 +135,32 @@ $aLang = array(
     'STRIPE_REFUND_CUSTOMER'                            => 'Vom Kunden angefordert',
     'STRIPE_REFUND_FRAUD'                               => 'Betrug',
     'STRIPE_IS_NOT_STRIPE_ORDER'                        => 'Dies ist keine Stripe Bestellung',
+
+    // Erfassung (Manueller Erfassungsmodus)
+    'STRIPE_CAPTURE_PAYMENT'                            => 'Zahlung erfassen',
+    'STRIPE_CAPTURE_REQUIRED'                           => 'Zahlungserfassung erforderlich',
+    'STRIPE_CAPTURE_REQUIRED_TEXT'                      => 'Diese Zahlung wurde autorisiert, aber noch nicht erfasst. Sie müssen die Zahlung erfassen, um die Transaktion abzuschließen.',
+    'STRIPE_CAPTURE_AMOUNT_TEXT'                        => 'Autorisierter Betrag zur Erfassung',
+    'STRIPE_CAPTURE_REASON'                             => 'Erfassungshinweis (optional)',
+    'STRIPE_CAPTURE_REASON_PLACEHOLDER'                 => 'z.B. Bestellung versandbereit',
+    'STRIPE_CAPTURE_SUBMIT'                             => 'Zahlung erfassen',
+    'STRIPE_CAPTURE_SUCCESSFUL'                         => 'Zahlungserfassung war erfolgreich.',
+    'STRIPE_CAPTURE_FAILED'                             => 'Zahlungserfassung fehlgeschlagen.',
+    'STRIPE_CAPTURE_NO_ORDER'                           => 'Bestellung nicht gefunden.',
+    'STRIPE_CAPTURE_NO_TRANSACTION'                     => 'Keine Transaktions-ID für diese Bestellung gefunden.',
+
+    // Autorisierung stornieren (Manueller Erfassungsmodus)
+    'STRIPE_CANCEL_AUTHORIZATION'                       => 'Autorisierung stornieren',
+    'STRIPE_CANCEL_AUTHORIZATION_TEXT'                  => 'Stornieren Sie diese Autorisierung, um die auf der Kundenkarte reservierten Gelder freizugeben. Diese Aktion kann nicht rückgängig gemacht werden.',
+    'STRIPE_CANCEL_REASON'                              => 'Stornierungsgrund (optional)',
+    'STRIPE_CANCEL_DUPLICATE'                           => 'Duplikat',
+    'STRIPE_CANCEL_CUSTOMER'                            => 'Vom Kunden angefordert',
+    'STRIPE_CANCEL_FRAUD'                               => 'Betrugsverdacht',
+    'STRIPE_CANCEL_ABANDONED'                           => 'Abgebrochen',
+    'STRIPE_CANCEL_SUBMIT'                              => 'Autorisierung stornieren',
+    'STRIPE_CANCEL_CONFIRM'                             => 'Sind Sie sicher, dass Sie diese Autorisierung stornieren möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
+    'STRIPE_CANCEL_SUCCESSFUL'                          => 'Autorisierung wurde erfolgreich storniert.',
+    'STRIPE_CANCEL_FAILED'                              => 'Stornierung der Autorisierung fehlgeschlagen.',
+    'STRIPE_CANCEL_NO_ORDER'                            => 'Bestellung nicht gefunden.',
+    'STRIPE_CANCEL_NO_TRANSACTION'                      => 'Keine Transaktions-ID für diese Bestellung gefunden.',
 );

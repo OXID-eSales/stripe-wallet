@@ -6,10 +6,9 @@ namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
 
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterface;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
-use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
-use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeStatusMapper;
 
 /**
  * Handles return from Stripe after Payment Element confirmation.
@@ -25,8 +24,8 @@ use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeStatusMapper;
 class StripePaymentReturnHandler implements HandlerInterface
 {
     public function __construct(
-        private ContractRepositoryInterface $contractRepository,
-        private EventDispatcherInterface $eventDispatcher
+        private EventDispatcherInterface $eventDispatcher,
+        private ?FileLoggerInterface $eventLogger = null
     ) {
     }
 
@@ -37,14 +36,23 @@ class StripePaymentReturnHandler implements HandlerInterface
 
     public function handle(object $event): void
     {
+        $this->logEvent('StripePaymentReturnHandler::handle() START');
+
         if (!$event instanceof StripePaymentReturnEvent) {
+            $this->logEvent('StripePaymentReturnHandler: Wrong event type, skipping');
             return;
         }
 
         $context = $event->getContext();
         $paymentIntentId = $event->getPaymentIntentId();
 
+        $this->logEvent('StripePaymentReturnHandler: Processing return', [
+            'paymentIntentId' => $paymentIntentId,
+            'redirectStatus' => $event->getRedirectStatus(),
+        ]);
+
         if ($paymentIntentId === null) {
+            $this->logEvent('StripePaymentReturnHandler: ERROR - Payment information missing');
             $context->set('error', 'Payment information missing');
             $context->set('redirectTarget', 'payment');
             return;
@@ -54,13 +62,32 @@ class StripePaymentReturnHandler implements HandlerInterface
 
         // Handle immediate failure based on redirect_status
         if ($redirectStatus === 'failed') {
+            $this->logEvent('StripePaymentReturnHandler: Payment failed');
             $context->set('error', 'Payment failed. Please try again.');
             $context->set('redirectTarget', 'payment');
             return;
         }
 
         // For succeeded or other statuses, dispatch execute event to verify
+        $this->logEvent('StripePaymentReturnHandler: Dispatching StripePaymentExecuteEvent');
         $executeEvent = new StripePaymentExecuteEvent($context);
         $this->eventDispatcher->dispatch($executeEvent);
+
+        $this->logEvent('StripePaymentReturnHandler::handle() END', [
+            'redirectTarget' => $context->get('redirectTarget'),
+        ]);
+    }
+
+    /**
+     * Log event to file logger for debugging.
+     *
+     * @param string $message
+     * @param array<string, mixed> $context
+     */
+    private function logEvent(string $message, array $context = []): void
+    {
+        if ($this->eventLogger !== null) {
+            $this->eventLogger->log($message, $context);
+        }
     }
 }

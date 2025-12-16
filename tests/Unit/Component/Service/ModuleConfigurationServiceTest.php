@@ -494,13 +494,13 @@ class ModuleConfigurationServiceTest extends TestCase
     }
 
     /**
-     * Test 24: Get capture mode returns default 'automatic'
+     * Test 24: Get capture mode returns 'manual' when configured
      */
-    public function testGetsCaptureMode(): void
+    public function testGetsCaptureModeManual(): void
     {
-        // Given: Capture mode configured
+        // Given: Capture mode configured as manual
         $this->configureSettings([
-            'sStripeCapture' => 'manual',
+            'sStripeCaptureMode' => 'manual',
         ]);
 
         // When: getCaptureMode() called
@@ -517,7 +517,143 @@ class ModuleConfigurationServiceTest extends TestCase
     {
         // Given: No capture mode configured
         $this->configureSettings([
-            'sStripeCapture' => '',
+            'sStripeCaptureMode' => '',
+        ]);
+
+        // When: getCaptureMode() called
+        $result = $this->service->getCaptureMode();
+
+        // Then: Returns 'automatic' as default
+        $this->assertEquals('automatic', $result);
+    }
+
+    /**
+     * Test 25a: Get capture mode returns 'automatic' when configured
+     */
+    public function testGetsCaptureModeAutomatic(): void
+    {
+        // Given: Capture mode configured as automatic
+        $this->configureSettings([
+            'sStripeCaptureMode' => 'automatic',
+        ]);
+
+        // When: getCaptureMode() called
+        $result = $this->service->getCaptureMode();
+
+        // Then: Returns 'automatic'
+        $this->assertEquals('automatic', $result);
+    }
+
+    /**
+     * Test 25b: isAutomaticCapture returns true when automatic mode
+     */
+    public function testIsAutomaticCaptureReturnsTrue(): void
+    {
+        // Given: Capture mode configured as automatic
+        $this->configureSettings([
+            'sStripeCaptureMode' => 'automatic',
+        ]);
+
+        // When: isAutomaticCapture() called
+        $result = $this->service->isAutomaticCapture();
+
+        // Then: Returns true
+        $this->assertTrue($result);
+    }
+
+    /**
+     * Test 25c: isAutomaticCapture returns false when manual mode
+     */
+    public function testIsAutomaticCaptureReturnsFalse(): void
+    {
+        // Given: Capture mode configured as manual
+        $this->configureSettings([
+            'sStripeCaptureMode' => 'manual',
+        ]);
+
+        // When: isAutomaticCapture() called
+        $result = $this->service->isAutomaticCapture();
+
+        // Then: Returns false
+        $this->assertFalse($result);
+    }
+
+    /**
+     * Test 25d: isManualCapture returns true when manual mode
+     */
+    public function testIsManualCaptureReturnsTrue(): void
+    {
+        // Given: Capture mode configured as manual
+        $this->configureSettings([
+            'sStripeCaptureMode' => 'manual',
+        ]);
+
+        // When: isManualCapture() called
+        $result = $this->service->isManualCapture();
+
+        // Then: Returns true
+        $this->assertTrue($result);
+    }
+
+    /**
+     * Test 25e: isManualCapture returns false when automatic mode
+     */
+    public function testIsManualCaptureReturnsFalse(): void
+    {
+        // Given: Capture mode configured as automatic
+        $this->configureSettings([
+            'sStripeCaptureMode' => 'automatic',
+        ]);
+
+        // When: isManualCapture() called
+        $result = $this->service->isManualCapture();
+
+        // Then: Returns false
+        $this->assertFalse($result);
+    }
+
+    /**
+     * Test 25f: getStripeCaptureMethod returns correct value for Stripe API
+     */
+    public function testGetStripeCaptureMethodReturnsManual(): void
+    {
+        // Given: Capture mode configured as manual
+        $this->configureSettings([
+            'sStripeCaptureMode' => 'manual',
+        ]);
+
+        // When: getStripeCaptureMethod() called
+        $result = $this->service->getStripeCaptureMethod();
+
+        // Then: Returns 'manual' as expected by Stripe API
+        $this->assertEquals('manual', $result);
+    }
+
+    /**
+     * Test 25g: getStripeCaptureMethod returns automatic by default
+     */
+    public function testGetStripeCaptureMethodReturnsAutomatic(): void
+    {
+        // Given: Capture mode configured as automatic
+        $this->configureSettings([
+            'sStripeCaptureMode' => 'automatic',
+        ]);
+
+        // When: getStripeCaptureMethod() called
+        $result = $this->service->getStripeCaptureMethod();
+
+        // Then: Returns 'automatic' as expected by Stripe API
+        $this->assertEquals('automatic', $result);
+    }
+
+    /**
+     * Test 25h: getCaptureMode defaults to automatic for invalid value
+     */
+    public function testGetsCaptureModeDefaultsForInvalidValue(): void
+    {
+        // Given: Invalid capture mode value
+        $this->configureSettings([
+            'sStripeCaptureMode' => 'invalid_value',
         ]);
 
         // When: getCaptureMode() called

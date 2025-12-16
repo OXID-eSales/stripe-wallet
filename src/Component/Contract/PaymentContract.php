@@ -86,6 +86,41 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
     }
 
     /**
+     * Transition contract to AUTHORIZED state (for manual capture mode).
+     *
+     * This indicates the payment has been authorized by the provider
+     * but funds have not yet been captured/transferred.
+     *
+     * @throws DomainException if not in PENDING state
+     */
+    public function authorize(): void
+    {
+        if (!$this->state->isPending()) {
+            throw new DomainException('Can only transition to AUTHORIZED from PENDING state');
+        }
+
+        $this->state = ContractState::authorized();
+        $this->touch();
+    }
+
+    /**
+     * Capture an authorized payment, transitioning to READY_TO_COMMIT.
+     *
+     * This is called when a manual capture is executed on an authorized payment.
+     *
+     * @throws DomainException if not in AUTHORIZED state
+     */
+    public function captureAuthorization(): void
+    {
+        if (!$this->state->isAuthorized()) {
+            throw new DomainException('Can only capture authorization from AUTHORIZED state');
+        }
+
+        $this->state = ContractState::readyToCommit();
+        $this->touch();
+    }
+
+    /**
      * @param array<string, mixed> $data
      */
     public function fulfillCondition(string $type, array $data = []): void

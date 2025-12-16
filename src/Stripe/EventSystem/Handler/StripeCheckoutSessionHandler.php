@@ -6,6 +6,7 @@ namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
 
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutSessionServiceInterface;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
@@ -32,7 +33,8 @@ class StripeCheckoutSessionHandler implements HandlerInterface
     public function __construct(
         private readonly CheckoutSessionServiceInterface $checkoutSessionService,
         private readonly ContractRepositoryInterface $contractRepository,
-        private readonly TokenServiceInterface $tokenService
+        private readonly TokenServiceInterface $tokenService,
+        private readonly ?FileLoggerInterface $eventLogger = null
     ) {
     }
 
@@ -48,7 +50,10 @@ class StripeCheckoutSessionHandler implements HandlerInterface
 
     public function handle(object $event): void
     {
+        $this->logEvent('StripeCheckoutSessionHandler::handle() START');
+
         if (!$event instanceof StripeCheckoutSessionRequestEvent) {
+            $this->logEvent('StripeCheckoutSessionHandler: Wrong event type, skipping');
             return;
         }
 
@@ -56,8 +61,13 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         $contract = $context->getContract();
 
         if ($contract === null) {
+            $this->logEvent('StripeCheckoutSessionHandler: ERROR - Contract not found in context');
             throw new RuntimeException('Contract not found in context. ContractCreationHandler must run first.');
         }
+
+        $this->logEvent('StripeCheckoutSessionHandler: Contract found', [
+            'contractId' => $contract->getId(),
+        ]);
 
         $contractId = $contract->getId() ?? '';
 
@@ -76,8 +86,14 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         // Generate secure token for session restoration
         $contractToken = $this->tokenService->generateToken($contractId);
 
+        // Get OXID session ID to preserve session across Stripe redirect
+        $sessionId = $context->get('sessionId', '');
+        if (!is_string($sessionId)) {
+            $sessionId = '';
+        }
+
         // Build success and cancel URLs
-        $successUrl = $this->checkoutSessionService->buildSuccessUrl($shopUrl, $contractId, $contractToken);
+        $successUrl = $this->checkoutSessionService->buildSuccessUrl($shopUrl, $contractId, $contractToken, $sessionId);
         $cancelUrl = $shopUrl . 'index.php?cl=payment';
 
         // Get shop ID
@@ -85,6 +101,11 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         $shopIdString = is_string($shopId) ? $shopId : (string) $shopId;
 
         // Sprint 21: Delegate session creation to service
+        $this->logEvent('StripeCheckoutSessionHandler: Creating checkout session', [
+            'contractId' => $contractId,
+            'captureMode' => $captureMode,
+        ]);
+
         $result = $this->checkoutSessionService->createSession(
             $contractId,
             $contract->getBasketSnapshot(),
@@ -95,10 +116,17 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         );
 
         if (!$result->isSuccessful()) {
+            $this->logEvent('StripeCheckoutSessionHandler: ERROR - Session creation failed', [
+                'error' => $result->getErrorMessage(),
+            ]);
             throw new RuntimeException(
                 'Failed to create checkout session: ' . ($result->getErrorMessage() ?? 'Unknown error')
             );
         }
+
+        $this->logEvent('StripeCheckoutSessionHandler: Session created', [
+            'sessionId' => $result->getSessionId(),
+        ]);
 
         // Store session ID in contract via setProvider
         $contract->setProvider('stripe', $result->getSessionId() ?? '', $successUrl);
@@ -108,5 +136,22 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         // Update context for controller
         $context->set('checkoutSessionId', $result->getSessionId());
         $context->set('checkoutUrl', $result->getCheckoutUrl());
+
+        $this->logEvent('StripeCheckoutSessionHandler::handle() END', [
+            'checkoutSessionId' => $result->getSessionId(),
+        ]);
+    }
+
+    /**
+     * Log event to file logger for debugging.
+     *
+     * @param string $message
+     * @param array<string, mixed> $context
+     */
+    private function logEvent(string $message, array $context = []): void
+    {
+        if ($this->eventLogger !== null) {
+            $this->eventLogger->log($message, $context);
+        }
     }
 }

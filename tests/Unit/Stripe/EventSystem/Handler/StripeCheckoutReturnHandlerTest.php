@@ -460,12 +460,179 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         $this->assertEquals('addr_456', $context->get('restoredDeliveryAddressId'));
     }
 
+    // =========================================================================
+    // Manual Capture (requires_capture) Tests
+    // =========================================================================
+
+    public function testHandleRequiresCaptureTransitionsContractToAuthorized(): void
+    {
+        // Result with requires_capture status
+        $result = CheckoutReturnResult::success(
+            'contract_rc',
+            'pi_requires_capture',
+            10000,
+            'eur',
+            'paid',
+            'requires_capture'
+        );
+
+        $this->checkoutReturnService
+            ->method('validateReturn')
+            ->willReturn($result);
+
+        $contract = $this->createContractMockForCapture('contract_rc', [
+            'delivery_address_hash' => 'hash_rc',
+        ]);
+
+        // Contract should be saved after transition
+        $this->contractRepository
+            ->expects($this->once())
+            ->method('save')
+            ->with($contract);
+
+        $this->contractRepository->method('findById')->willReturn($contract);
+
+        // Sprint 25: Should dispatch PaymentAuthorizedEvent for requires_capture
+        // to trigger order creation (thankyou page needs order ID)
+        $this->eventDispatcher
+            ->expects($this->once())
+            ->method('dispatch')
+            ->with($this->callback(function ($event) {
+                return $event instanceof \OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentAuthorizedEvent;
+            }));
+
+        $context = new EventContext([
+            'checkoutSessionId' => 'cs_test_rc',
+            'contract_token' => 'token_contract_rc',
+            'contract_id' => 'contract_rc',
+        ]);
+        $event = new StripeCheckoutReturnEvent($context);
+
+        $handler = $this->createHandler();
+        $handler->handle($event);
+
+        // Should set requiresCapture flag
+        $this->assertTrue($context->get('requiresCapture'));
+        $this->assertEquals('authorized', $context->get('paymentStatus'));
+    }
+
+    public function testHandleRequiresCaptureStoresPaymentIntentId(): void
+    {
+        $result = CheckoutReturnResult::success(
+            'contract_pi_store',
+            'pi_to_store_123',
+            10000,
+            'eur',
+            'paid',
+            'requires_capture'
+        );
+
+        $this->checkoutReturnService
+            ->method('validateReturn')
+            ->willReturn($result);
+
+        $contract = $this->createContractMockForCapture('contract_pi_store', [
+            'delivery_address_hash' => 'hash_store',
+        ]);
+
+        // Should set metadata with payment intent ID
+        $contract->expects($this->once())
+            ->method('setMetadata')
+            ->with('payment_intent_id', 'pi_to_store_123');
+
+        $this->contractRepository->method('findById')->willReturn($contract);
+
+        $context = new EventContext([
+            'checkoutSessionId' => 'cs_test_store',
+            'contract_token' => 'token_contract_store',
+            'contract_id' => 'contract_pi_store',
+        ]);
+        $event = new StripeCheckoutReturnEvent($context);
+
+        $handler = $this->createHandler();
+        $handler->handle($event);
+
+        $this->assertEquals('pi_to_store_123', $context->get('paymentIntentId'));
+    }
+
+    public function testHandleSucceededDispatchesEventNormally(): void
+    {
+        // Result with succeeded status (auto-capture)
+        $result = CheckoutReturnResult::success(
+            'contract_auto',
+            'pi_succeeded',
+            10000,
+            'eur',
+            'paid',
+            'succeeded'
+        );
+
+        $this->checkoutReturnService
+            ->method('validateReturn')
+            ->willReturn($result);
+
+        $contract = $this->createContractMockWithMetadata('contract_auto', [
+            'delivery_address_hash' => 'hash_auto',
+        ]);
+        $this->contractRepository->method('findById')->willReturn($contract);
+
+        // Should dispatch PaymentAuthorizedEvent for succeeded status
+        $this->eventDispatcher
+            ->expects($this->once())
+            ->method('dispatch')
+            ->with($this->isInstanceOf(PaymentAuthorizedEvent::class));
+
+        $context = new EventContext([
+            'checkoutSessionId' => 'cs_test_auto',
+            'contract_token' => 'token_contract_auto',
+            'contract_id' => 'contract_auto',
+        ]);
+        $event = new StripeCheckoutReturnEvent($context);
+
+        $handler = $this->createHandler();
+        $handler->handle($event);
+
+        // Should NOT set requiresCapture flag
+        $this->assertNull($context->get('requiresCapture'));
+    }
+
     // --- Helper methods ---
 
     private function createContractMockWithMetadata(string $contractId, array $metadata): PaymentContractInterface
     {
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getId')->willReturn($contractId);
+
+        $contract->method('getMetadata')->willReturnCallback(
+            fn(string $key) => $metadata[$key] ?? null
+        );
+        $contract->method('getAllMetadata')->willReturn($metadata);
+
+        $snapshot = BasketSnapshot::fromArray([
+            'items' => [['title' => 'Test', 'unitPrice' => 10.00, 'quantity' => 1]],
+            'discounts' => [],
+            'totalGross' => 10.00,
+            'totalNet' => 8.40,
+            'totalVat' => 1.60,
+            'currency' => 'EUR',
+        ]);
+        $contract->method('getBasketSnapshot')->willReturn($snapshot);
+
+        return $contract;
+    }
+
+    /**
+     * Create a contract mock that supports capture-related method expectations.
+     *
+     * @param string $contractId
+     * @param array<string, mixed> $metadata
+     * @return PaymentContractInterface&MockObject
+     */
+    private function createContractMockForCapture(string $contractId, array $metadata): PaymentContractInterface&MockObject
+    {
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getId')->willReturn($contractId);
+        $contract->method('getProviderOrderId')->willReturn(null);
 
         $contract->method('getMetadata')->willReturnCallback(
             fn(string $key) => $metadata[$key] ?? null

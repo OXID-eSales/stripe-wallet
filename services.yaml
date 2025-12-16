@@ -24,11 +24,12 @@ services:
   # ===========================================
 
   # Event Listener Provider - Collects all tagged handlers
+  # Sprint 11: public: true for debugging/verification purposes
   OxidSolutionCatalysts\Payments\Component\EventSystem\EventListenerProviderInterface:
     class: OxidSolutionCatalysts\Payments\Component\EventSystem\EventListenerProvider
     arguments:
       - !tagged_iterator payment.event_handler
-    public: false
+    public: true
 
   # Event Dispatcher - Uses provider for listener lookup
   OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface:
@@ -168,6 +169,12 @@ services:
   OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactory:
     alias: OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactoryInterface
     public: true
+
+  # Stripe Adapter Interface - Created via factory
+  # Used by handlers that need direct adapter access (capture, cancel authorization)
+  OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapterInterface:
+    factory: ['@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface', 'getStripeAdapter']
+    public: false
 
   # ==========================================
   # Shop Adapter Layer (Platform-Agnostic)
@@ -318,11 +325,13 @@ services:
   # Stripe Contract Creation Handler - Creates contract for checkout flow
   # Priority 100: Runs BEFORE StripeCheckoutSessionHandler (priority 0)
   # Sprint 21: Refactored to delegate metadata to ContractMetadataService
+  # Sprint 25: Added event logger for debugging
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeContractCreationHandler:
     arguments:
       $contractService: '@OxidSolutionCatalysts\Payments\Component\Service\ContractServiceInterface'
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
       $metadataService: '@OxidSolutionCatalysts\Payments\Stripe\Service\ContractMetadataServiceInterface'
+      $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler, priority: 100 }
     public: false
@@ -330,11 +339,13 @@ services:
   # Stripe Checkout Session Handler - Creates Stripe Checkout Session
   # Priority 0 (default): Runs AFTER StripeContractCreationHandler
   # Sprint 21: Refactored to delegate to CheckoutSessionService (SRP)
+  # Sprint 25: Added event logger for debugging
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler:
     arguments:
       $checkoutSessionService: '@OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutSessionServiceInterface'
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
       $tokenService: '@OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface'
+      $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler, priority: 0 }
     public: false
@@ -342,10 +353,12 @@ services:
   # Order Payment Completed Handler - Updates OXPAID when contract is fulfilled
   # Sprint 14: Event-driven OXPAID update via ContractFulfilledEvent
   # Sprint 16: Uses OrderPaymentStateService for OXPAID updates (DRY)
+  # Sprint 25: Added event logger for debugging
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\OrderPaymentCompletedHandler:
     arguments:
       $orderPaymentStateService: '@OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface'
       $logger: '@oxid_esales.monolog.logger'
+      $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler, priority: 0 }
     public: false
@@ -382,6 +395,7 @@ services:
       $deliveryAddressHashService: '@OxidSolutionCatalysts\Payments\Stripe\Service\DeliveryAddressHashServiceInterface'
       $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
       $logger: '@oxid_esales.monolog.logger'
+      $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler, priority: 100 }
     public: false
@@ -395,6 +409,7 @@ services:
     arguments:
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
       $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler, priority: 90 }
     public: false
@@ -410,8 +425,54 @@ services:
       $shopOrderService: '@OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface'
       $orderPaymentStateService: '@OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface'
       $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler, priority: 80 }
+    public: false
+
+  # Stripe Capture Request Handler - Handles manual capture requests
+  # Sprint 25: Added event logger for debugging
+  OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCaptureRequestHandler:
+    arguments:
+      $stripeAdapter: '@OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapterInterface'
+      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+      $eventLogger: '@stripe.events.file_logger'
+    tags:
+      - { name: payment.event_handler }
+    public: false
+
+  # Stripe Cancel Authorization Request Handler - Handles cancel authorization for manual capture
+  # Sprint 25: STRP-75 - Cancel authorization feature
+  OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCancelAuthorizationRequestHandler:
+    arguments:
+      $stripeAdapter: '@OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapterInterface'
+      $logger: '@oxid_esales.monolog.logger'
+      $eventLogger: '@stripe.events.file_logger'
+    tags:
+      - { name: payment.event_handler }
+    public: false
+
+  # Stripe Payment Return Handler - Handles return from Payment Element flow
+  # Sprint 25: Added event logger for debugging
+  OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripePaymentReturnHandler:
+    arguments:
+      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      $eventLogger: '@stripe.events.file_logger'
+    tags:
+      - { name: payment.event_handler }
+    public: false
+
+  # Stripe Payment Status Handler - Verifies payment status for Payment Element flow
+  # Sprint 25: Added event logger for debugging
+  OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripePaymentStatusHandler:
+    arguments:
+      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      $eventLogger: '@stripe.events.file_logger'
+    tags:
+      - { name: payment.event_handler }
     public: false
 
   # ==========================================
@@ -432,12 +493,14 @@ services:
   # ==========================================
   # Handles StripeRefundRequestEvent from admin panel, webhook, or API.
   # Sprint 21: Delegates to RefundService for business logic (SRP).
+  # Sprint 25: Added event logger for debugging
 
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeRefundRequestHandler:
     arguments:
       $refundService: '@OxidSolutionCatalysts\Payments\Stripe\Service\RefundServiceInterface'
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
+      $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler }
     public: false
@@ -568,6 +631,18 @@ services:
   # ==========================================
   # Service and console command for reconciling OXPAID with Stripe API.
   # Handles cases where webhooks were missed or delayed.
+
+  # Event File Logger Factory - Creates logger with correct shop path
+  # Sprint 25: Logging for event system debugging
+  OxidSolutionCatalysts\Payments\Stripe\Service\Factory\EventFileLoggerFactory:
+    public: false
+
+  # Event File Logger - Writes to log/osc/stripe_events.log
+  # Sprint 25: Debug logging for event handlers
+  stripe.events.file_logger:
+    class: OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface
+    factory: ['@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\EventFileLoggerFactory', 'create']
+    public: false
 
   # Reconciliation File Logger Factory - Creates logger with correct shop path
   # Sprint 14: Factory approach for OXID compatibility (no kernel.project_dir)

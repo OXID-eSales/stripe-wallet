@@ -30,6 +30,7 @@ final readonly class CheckoutReturnResult
         private ?int $amountCents,
         private ?string $currency,
         private ?string $paymentStatus,
+        private ?string $paymentIntentStatus,
         private ?string $errorMessage,
         private ?string $errorCode,
         private ?string $redirectTarget
@@ -38,13 +39,16 @@ final readonly class CheckoutReturnResult
 
     /**
      * Create a successful checkout return result.
+     *
+     * @param string $paymentIntentStatus PaymentIntent status (succeeded, requires_capture, etc.)
      */
     public static function success(
         string $contractId,
         string $paymentIntentId,
         int $amountCents,
         string $currency,
-        string $paymentStatus = 'paid'
+        string $paymentStatus = 'paid',
+        string $paymentIntentStatus = 'succeeded'
     ): self {
         return new self(
             successful: true,
@@ -53,6 +57,7 @@ final readonly class CheckoutReturnResult
             amountCents: $amountCents,
             currency: $currency,
             paymentStatus: $paymentStatus,
+            paymentIntentStatus: $paymentIntentStatus,
             errorMessage: null,
             errorCode: null,
             redirectTarget: 'thankyou'
@@ -74,6 +79,7 @@ final readonly class CheckoutReturnResult
             amountCents: null,
             currency: null,
             paymentStatus: null,
+            paymentIntentStatus: null,
             errorMessage: $errorMessage,
             errorCode: $errorCode,
             redirectTarget: $redirectTarget
@@ -92,6 +98,7 @@ final readonly class CheckoutReturnResult
             amountCents: null,
             currency: null,
             paymentStatus: null,
+            paymentIntentStatus: null,
             errorMessage: $errorMessage,
             errorCode: 'security_check_failed',
             redirectTarget: 'payment'
@@ -140,6 +147,35 @@ final readonly class CheckoutReturnResult
     public function getPaymentStatus(): ?string
     {
         return $this->paymentStatus;
+    }
+
+    /**
+     * Get the Stripe PaymentIntent status.
+     *
+     * @return string|null Status like 'succeeded', 'requires_capture', 'requires_action', etc.
+     */
+    public function getPaymentIntentStatus(): ?string
+    {
+        return $this->paymentIntentStatus;
+    }
+
+    /**
+     * Check if the PaymentIntent requires manual capture.
+     *
+     * This indicates the payment is authorized but not yet captured
+     * (manual capture mode is enabled).
+     */
+    public function isRequiresCapture(): bool
+    {
+        return $this->paymentIntentStatus === 'requires_capture';
+    }
+
+    /**
+     * Check if the PaymentIntent is fully captured.
+     */
+    public function isCaptured(): bool
+    {
+        return $this->paymentIntentStatus === 'succeeded';
     }
 
     public function getErrorMessage(): ?string

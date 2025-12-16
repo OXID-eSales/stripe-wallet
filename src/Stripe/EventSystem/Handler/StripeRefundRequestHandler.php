@@ -9,6 +9,7 @@ use OxidEsales\Eshop\Core\Field;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterface;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
 use OxidSolutionCatalysts\Payments\Stripe\DTO\RefundResult;
 use OxidSolutionCatalysts\Payments\Stripe\Service\RefundServiceInterface;
@@ -37,7 +38,8 @@ class StripeRefundRequestHandler implements HandlerInterface
     public function __construct(
         private readonly RefundServiceInterface $refundService,
         private readonly ContractRepositoryInterface $contractRepository,
-        ?LoggerInterface $logger = null
+        ?LoggerInterface $logger = null,
+        private readonly ?FileLoggerInterface $eventLogger = null
     ) {
         $this->logger = $logger ?? new NullLogger();
     }
@@ -49,15 +51,27 @@ class StripeRefundRequestHandler implements HandlerInterface
 
     public function handle(object $event): void
     {
+        $this->logEvent('StripeRefundRequestHandler::handle() START');
+
         if (!$event instanceof StripeRefundRequestEvent) {
+            $this->logEvent('StripeRefundRequestHandler: Wrong event type, skipping');
             return;
         }
 
         $context = $event->getContext();
 
         try {
+            $this->logEvent('StripeRefundRequestHandler: Processing refund', [
+                'orderId' => $event->getOrderId(),
+                'amount' => $event->getAmount(),
+                'isFullRefund' => $event->isFullRefund(),
+            ]);
             $this->processRefund($event, $context);
+            $this->logEvent('StripeRefundRequestHandler::handle() END - SUCCESS');
         } catch (\Throwable $e) {
+            $this->logEvent('StripeRefundRequestHandler: EXCEPTION', [
+                'error' => $e->getMessage(),
+            ]);
             $this->handleException($e, $context, $event);
         }
     }
@@ -314,6 +328,19 @@ class StripeRefundRequestHandler implements HandlerInterface
             );
         } catch (\Throwable $logError) {
             $this->logger->warning('Failed to log refund error', ['error' => $logError->getMessage()]);
+        }
+    }
+
+    /**
+     * Log event to file logger for debugging.
+     *
+     * @param string $message
+     * @param array<string, mixed> $context
+     */
+    private function logEvent(string $message, array $context = []): void
+    {
+        if ($this->eventLogger !== null) {
+            $this->eventLogger->log($message, $context);
         }
     }
 }

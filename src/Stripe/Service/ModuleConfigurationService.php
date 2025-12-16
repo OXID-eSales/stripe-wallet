@@ -274,11 +274,43 @@ class ModuleConfigurationService implements ServiceInterface
 
     /**
      * Get capture mode (automatic or manual)
+     *
+     * Automatic: Payment is captured immediately upon authorization
+     * Manual: Payment is only authorized, capture happens later (e.g., when shipping)
      */
     public function getCaptureMode(): string
     {
-        $mode = $this->get('sStripeCapture');
-        return is_string($mode) && !empty($mode) ? $mode : 'automatic';
+        $mode = $this->get('sStripeCaptureMode');
+        if (is_string($mode) && in_array($mode, ['automatic', 'manual'], true)) {
+            return $mode;
+        }
+        return 'automatic';
+    }
+
+    /**
+     * Check if automatic capture mode is enabled (default)
+     */
+    public function isAutomaticCapture(): bool
+    {
+        return $this->getCaptureMode() === 'automatic';
+    }
+
+    /**
+     * Check if manual capture mode is enabled
+     */
+    public function isManualCapture(): bool
+    {
+        return $this->getCaptureMode() === 'manual';
+    }
+
+    /**
+     * Get Stripe capture_method value for API calls
+     *
+     * Returns 'automatic' or 'manual' as expected by Stripe API
+     */
+    public function getStripeCaptureMethod(): string
+    {
+        return $this->getCaptureMode();
     }
 
     /**

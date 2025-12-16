@@ -59,6 +59,7 @@ interface CheckoutSessionServiceInterface
      * @param string $shopUrl Base shop URL
      * @param string $contractId Contract ID
      * @param string $contractToken Security token
+     * @param string $sessionId OXID session ID to preserve session across external redirect
      */
-    public function buildSuccessUrl(string $shopUrl, string $contractId, string $contractToken): string;
+    public function buildSuccessUrl(string $shopUrl, string $contractId, string $contractToken, string $sessionId = ''): string;
 }

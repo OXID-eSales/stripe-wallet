@@ -670,6 +670,24 @@ final class StripeAdapter implements StripeAdapterInterface
         }
     }
 
+    /**
+     * @inheritDoc
+     */
+    public function cancelPaymentIntent(string $paymentIntentId, ?string $cancellationReason = null): PaymentIntent
+    {
+        try {
+            $params = [];
+
+            if ($cancellationReason !== null) {
+                $params['cancellation_reason'] = $this->mapCancellationReason($cancellationReason);
+            }
+
+            return $this->stripeClient->paymentIntents->cancel($paymentIntentId, $params);
+        } catch (ApiErrorException $e) {
+            throw $this->convertStripeException($e);
+        }
+    }
+
     // ==========================================
     // PRIVATE HELPER METHODS
     // ==========================================
@@ -698,6 +716,17 @@ final class StripeAdapter implements StripeAdapterInterface
             'requested_by_customer' => 'requested_by_customer',
             'fraudulent' => 'fraudulent',
             'duplicate' => 'duplicate',
+            default => 'requested_by_customer',
+        };
+    }
+
+    private function mapCancellationReason(string $reason): string
+    {
+        return match ($reason) {
+            'requested_by_customer' => 'requested_by_customer',
+            'fraudulent' => 'fraudulent',
+            'duplicate' => 'duplicate',
+            'abandoned' => 'abandoned',
             default => 'requested_by_customer',
         };
     }

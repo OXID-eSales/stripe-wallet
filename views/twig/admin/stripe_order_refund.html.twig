@@ -33,7 +33,9 @@
     FIELDSET.fullRefund SPAN{
         margin-left: 2px;
     }
-    FIELDSET .refundSubmit {
+    FIELDSET .refundSubmit,
+    FIELDSET .captureSubmit,
+    FIELDSET .cancelSubmit {
         margin-top: 15px;
     }
     .typeSelect {
@@ -48,9 +50,14 @@
         background-color: #ffeeb5;
         border: 3px solid #FFE385;
     }
-    FIELDSET.refundSuccess {
+    FIELDSET.refundSuccess,
+    FIELDSET.captureSuccess {
         background-color: #7aff9e;
         border: 3px solid #00b02f;
+    }
+    FIELDSET.captureNotice {
+        background-color: #b5d4ff;
+        border: 3px solid #4a90d9;
     }
     FIELDSET.message STRONG {
         display: block;
@@ -65,7 +72,21 @@
 </form>
 
 {% if oView.isStripeOrder() == true %}
-    {# Success Message #}
+    {# Capture Success Message #}
+    {% if oView.wasCaptureSuccessful() == true %}
+        <fieldset class="captureSuccess message">
+            {{ translate({ ident: "STRIPE_CAPTURE_SUCCESSFUL" }) }}
+        </fieldset>
+    {% endif %}
+
+    {# Cancel Authorization Success Message #}
+    {% if oView.wasCancelSuccessful() == true %}
+        <fieldset class="captureSuccess message">
+            {{ translate({ ident: "STRIPE_CANCEL_SUCCESSFUL" }) }}
+        </fieldset>
+    {% endif %}
+
+    {# Refund Success Message #}
     {% if oView.wasRefundSuccessful() == true %}
         <fieldset class="refundSuccess message">
             {{ translate({ ident: "STRIPE_REFUND_SUCCESSFUL" }) }}
@@ -139,6 +160,59 @@
             {% endif %}
         </table>
     </fieldset>
+
+    {# Capture Section - only show if payment requires capture (manual capture mode) #}
+    {% set blIsOrderCapturable = oView.isOrderCapturable() %}
+    {% if blIsOrderCapturable == true %}
+        <fieldset class="captureNotice message">
+            <strong>{{ translate({ ident: "STRIPE_CAPTURE_REQUIRED" }) }}</strong>
+            {{ translate({ ident: "STRIPE_CAPTURE_REQUIRED_TEXT" }) }}
+        </fieldset>
+
+        <fieldset class="capturePayment">
+            <legend>{{ translate({ ident: "STRIPE_CAPTURE_PAYMENT" }) }}</legend>
+            <form name="captureForm" id="captureForm" action="{{ oViewConf.getSelfLink() }}" method="post">
+                {{ oViewConf.getHiddenSid()|raw }}
+                <input type="hidden" name="cl" value="stripe_order_refund">
+                <input type="hidden" name="oxid" value="{{ oxid }}">
+                <input type="hidden" name="fnc" value="capturePayment">
+
+                <span>{{ translate({ ident: "STRIPE_CAPTURE_AMOUNT_TEXT" }) }}: {{ oView.getCaptureableAmount() }} <small>{{ edit.getFieldData('oxcurrency') }}</small></span><br><br>
+
+                <span><label for="capture_reason">{{ translate({ ident: "STRIPE_CAPTURE_REASON" }) }}:</label></span>
+                <input type="text" id="capture_reason" name="capture_reason" value="" placeholder="{{ translate({ ident: "STRIPE_CAPTURE_REASON_PLACEHOLDER" }) }}" maxlength="140" size="60"><br>
+
+                <input type="submit" value="{{ translate({ ident: "STRIPE_CAPTURE_SUBMIT" }) }}" class="captureSubmit">
+            </form>
+        </fieldset>
+
+        {# Cancel Authorization Section - option to cancel instead of capture #}
+        {% set blIsOrderCancellable = oView.isOrderCancellable() %}
+        {% if blIsOrderCancellable == true %}
+            <fieldset class="cancelAuthorization">
+                <legend>{{ translate({ ident: "STRIPE_CANCEL_AUTHORIZATION" }) }}</legend>
+                <form name="cancelForm" id="cancelForm" action="{{ oViewConf.getSelfLink() }}" method="post">
+                    {{ oViewConf.getHiddenSid()|raw }}
+                    <input type="hidden" name="cl" value="stripe_order_refund">
+                    <input type="hidden" name="oxid" value="{{ oxid }}">
+                    <input type="hidden" name="fnc" value="cancelAuthorization">
+
+                    <span>{{ translate({ ident: "STRIPE_CANCEL_AUTHORIZATION_TEXT" }) }}</span><br><br>
+
+                    <span><label for="cancellation_reason">{{ translate({ ident: "STRIPE_CANCEL_REASON" }) }}:</label></span>
+                    <select id="cancellation_reason" name="cancellation_reason">
+                        <option value="">{{ translate({ ident: "STRIPE_PLEASE_SELECT" }) }}</option>
+                        <option value="duplicate">{{ translate({ ident: "STRIPE_CANCEL_DUPLICATE" }) }}</option>
+                        <option value="requested_by_customer">{{ translate({ ident: "STRIPE_CANCEL_CUSTOMER" }) }}</option>
+                        <option value="fraudulent">{{ translate({ ident: "STRIPE_CANCEL_FRAUD" }) }}</option>
+                        <option value="abandoned">{{ translate({ ident: "STRIPE_CANCEL_ABANDONED" }) }}</option>
+                    </select><br/>
+
+                    <input type="submit" value="{{ translate({ ident: "STRIPE_CANCEL_SUBMIT" }) }}" class="cancelSubmit" onclick="return confirm('{{ translate({ ident: "STRIPE_CANCEL_CONFIRM" }) }}');">
+                </form>
+            </fieldset>
+        {% endif %}
+    {% endif %}
 
     {# Full Refund Section - only show if order is refundable #}
     {% if blIsOrderRefundable == true %}

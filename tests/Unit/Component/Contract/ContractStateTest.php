@@ -120,7 +120,54 @@ class ContractStateTest extends TestCase
 
         $this->assertFalse(ContractState::draft()->isTerminal());
         $this->assertFalse(ContractState::pending()->isTerminal());
+        $this->assertFalse(ContractState::authorized()->isTerminal());
         $this->assertFalse(ContractState::readyToCommit()->isTerminal());
         $this->assertFalse(ContractState::committed()->isTerminal());
+    }
+
+    // ==========================================
+    // AUTHORIZED STATE TESTS (Sprint 1)
+    // ==========================================
+
+    public function testAuthorizedFactory(): void
+    {
+        $state = ContractState::authorized();
+
+        $this->assertTrue($state->isAuthorized());
+        $this->assertFalse($state->isPending());
+        $this->assertFalse($state->isReadyToCommit());
+        $this->assertEquals('authorized', $state->getValue());
+    }
+
+    public function testAuthorizedStateIsNotTerminal(): void
+    {
+        $state = ContractState::authorized();
+
+        $this->assertFalse($state->isTerminal());
+    }
+
+    public function testAuthorizedStateEquality(): void
+    {
+        $state1 = ContractState::authorized();
+        $state2 = ContractState::authorized();
+        $state3 = ContractState::pending();
+
+        $this->assertTrue($state1->equals($state2));
+        $this->assertFalse($state1->equals($state3));
+    }
+
+    public function testAuthorizedFromValue(): void
+    {
+        $state = ContractState::fromValue('authorized');
+
+        $this->assertTrue($state->isAuthorized());
+        $this->assertEquals('authorized', $state->getValue());
+    }
+
+    public function testAuthorizedToString(): void
+    {
+        $state = ContractState::authorized();
+
+        $this->assertEquals('authorized', (string) $state);
     }
 }

@@ -9,25 +9,21 @@ use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripePaymentReturnE
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
-use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeStatusMapper;
 use PHPUnit\Framework\TestCase;
 
 class StripePaymentReturnHandlerTest extends TestCase
 {
-    private ContractRepositoryInterface $contractRepository;
     private EventDispatcherInterface $eventDispatcher;
 
     protected function setUp(): void
     {
-        $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
     }
 
     public function testHandlerIgnoresNonStripePaymentReturnEvent(): void
     {
         $handler = new StripePaymentReturnHandler(
-            $this->contractRepository,
             $this->eventDispatcher
         );
 
@@ -61,7 +57,6 @@ class StripePaymentReturnHandlerTest extends TestCase
             ->willReturnCallback(fn($e) => $e);
 
         $handler = new StripePaymentReturnHandler(
-            $this->contractRepository,
             $this->eventDispatcher
         );
 
@@ -83,7 +78,6 @@ class StripePaymentReturnHandlerTest extends TestCase
             ->willReturnCallback(fn($e) => $e);
 
         $handler = new StripePaymentReturnHandler(
-            $this->contractRepository,
             $this->eventDispatcher
         );
 
@@ -104,7 +98,6 @@ class StripePaymentReturnHandlerTest extends TestCase
             ->willReturnCallback(fn($e) => $e);
 
         $handler = new StripePaymentReturnHandler(
-            $this->contractRepository,
             $this->eventDispatcher
         );
 
@@ -128,7 +121,6 @@ class StripePaymentReturnHandlerTest extends TestCase
             ->method('dispatch');
 
         $handler = new StripePaymentReturnHandler(
-            $this->contractRepository,
             $this->eventDispatcher
         );
 
@@ -150,7 +142,6 @@ class StripePaymentReturnHandlerTest extends TestCase
             ->method('dispatch');
 
         $handler = new StripePaymentReturnHandler(
-            $this->contractRepository,
             $this->eventDispatcher
         );
 
@@ -187,7 +178,6 @@ class StripePaymentReturnHandlerTest extends TestCase
             ->willReturnCallback(fn($e) => $e);
 
         $handler = new StripePaymentReturnHandler(
-            $this->contractRepository,
             $this->eventDispatcher
         );
 

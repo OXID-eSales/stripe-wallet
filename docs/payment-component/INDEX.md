@@ -49,6 +49,7 @@ The Payment Component is a **universal, provider-agnostic, event-driven payment 
 | **06** | [06-onepage-checkout.md](06-onepage-checkout.md) | [06-onepage-headless-checkout.puml](puml/06-onepage-headless-checkout.puml) | One-page checkout & headless API | 20 min |
 | **06.01** | [06-01-onepage-checkout-implementation.md](06-01-onepage-checkout-implementation.md) | - | Complete TDD implementation plan (NEW) | 45 min |
 | **07** | [07-capture-refund-operations.md](07-capture-refund-operations.md) | [07-0-capture-refund-operations.puml](puml/07-0-capture-refund-operations.puml), [07-1-capture-refund-flow-pattern.puml](puml/07-1-capture-refund-flow-pattern.puml) | Capture/refund workflows | 20 min |
+| **07.01** | [07-01-delayed-capture.md](07-01-delayed-capture.md) | - | Delayed/manual capture feature (NEW) | 15 min |
 | **08** | [08-security-and-fraud.md](08-security-and-fraud.md) | - | Security patterns and fraud prevention | 20 min |
 | **08.01** | [08-01-fraud-prevention-details.md](08-01-fraud-prevention-details.md) | - | Detailed fraud detection algorithms | 25 min |
 

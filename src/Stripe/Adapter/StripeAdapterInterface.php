@@ -77,4 +77,16 @@ interface StripeAdapterInterface extends PaymentAdapterInterface
         ?string $reason = null,
         ?array $metadata = null
     ): Refund;
+
+    /**
+     * Cancel a PaymentIntent authorization.
+     *
+     * Used by StripeCancelAuthorizationRequestHandler to release an authorized
+     * payment without capturing it.
+     *
+     * @param string $paymentIntentId Stripe PaymentIntent ID (pi_xxx)
+     * @param string|null $cancellationReason Reason (requested_by_customer, duplicate, fraudulent, abandoned)
+     * @return PaymentIntent Cancelled PaymentIntent object
+     */
+    public function cancelPaymentIntent(string $paymentIntentId, ?string $cancellationReason = null): PaymentIntent;
 }

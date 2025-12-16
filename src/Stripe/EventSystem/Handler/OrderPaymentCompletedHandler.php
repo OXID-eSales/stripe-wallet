@@ -11,6 +11,7 @@ namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
 
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractFulfilledEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface;
 use Psr\Log\LoggerInterface;
 
@@ -29,7 +30,8 @@ class OrderPaymentCompletedHandler implements HandlerInterface
 {
     public function __construct(
         private readonly OrderPaymentStateServiceInterface $orderPaymentStateService,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly ?FileLoggerInterface $eventLogger = null
     ) {
     }
 
@@ -45,7 +47,10 @@ class OrderPaymentCompletedHandler implements HandlerInterface
 
     public function handle(object $event): void
     {
+        $this->logEvent('OrderPaymentCompletedHandler::handle() START');
+
         if (!$event instanceof ContractFulfilledEvent) {
+            $this->logEvent('OrderPaymentCompletedHandler: Wrong event type, skipping');
             return;
         }
 
@@ -53,7 +58,13 @@ class OrderPaymentCompletedHandler implements HandlerInterface
         $orderId = $contract->getOrderId();
         $providerOrderId = $contract->getProviderOrderId();
 
+        $this->logEvent('OrderPaymentCompletedHandler: Processing', [
+            'contractId' => $contract->getId(),
+            'orderId' => $orderId,
+        ]);
+
         if ($orderId === null || $orderId === '') {
+            $this->logEvent('OrderPaymentCompletedHandler: WARNING - No order ID');
             $this->logger->warning('ContractFulfilledEvent received without order ID', [
                 'contract_id' => $contract->getId(),
             ]);
@@ -67,11 +78,27 @@ class OrderPaymentCompletedHandler implements HandlerInterface
         );
 
         if ($updated) {
+            $this->logEvent('OrderPaymentCompletedHandler: OXPAID updated');
             $this->logger->info('Order payment completed via ContractFulfilledEvent', [
                 'order_id' => $orderId,
                 'contract_id' => $contract->getId(),
                 'provider_order_id' => $providerOrderId,
             ]);
+        }
+
+        $this->logEvent('OrderPaymentCompletedHandler::handle() END');
+    }
+
+    /**
+     * Log event to file logger for debugging.
+     *
+     * @param string $message
+     * @param array<string, mixed> $context
+     */
+    private function logEvent(string $message, array $context = []): void
+    {
+        if ($this->eventLogger !== null) {
+            $this->eventLogger->log($message, $context);
         }
     }
 }
