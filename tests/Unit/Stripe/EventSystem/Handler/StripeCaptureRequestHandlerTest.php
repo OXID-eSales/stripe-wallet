@@ -73,6 +73,53 @@ class StripeCaptureRequestHandlerTest extends TestCase
         $this->assertEquals('PaymentIntent ID is missing', $context->get('error'));
     }
 
+    /**
+     * Test that empty string PaymentIntent ID also triggers error.
+     * This test catches mutations that change === '' to !== ''
+     */
+    public function testHandleSetsErrorWhenPaymentIntentIdIsEmptyString(): void
+    {
+        $context = new EventContext([
+            'paymentIntentId' => '',  // Empty string, not null
+        ]);
+        $event = new StripeCaptureRequestEvent($context);
+
+        $this->handler->handle($event);
+
+        $this->assertFalse($context->get('captureSuccess'));
+        $this->assertEquals('PaymentIntent ID is missing', $context->get('error'));
+    }
+
+    /**
+     * Test that valid PaymentIntent ID in direct mode does NOT set error.
+     * This catches mutations that flip the validation logic.
+     */
+    public function testHandleDoesNotSetErrorWithValidPaymentIntentIdInDirectMode(): void
+    {
+        $context = new EventContext([
+            'paymentIntentId' => 'pi_valid_123',
+        ]);
+        $event = new StripeCaptureRequestEvent($context);
+
+        // Mock the adapter to return success
+        $this->stripeAdapter
+            ->method('capturePayment')
+            ->willReturn(new CaptureResponse(
+                providerPaymentId: 'pi_valid_123',
+                captureId: 'ch_capture_123',
+                amountCaptured: 100.0,
+                currency: 'EUR',
+                status: 'captured',
+                capturedAt: new \DateTimeImmutable(),
+                providerData: []
+            ));
+
+        $this->handler->handle($event);
+
+        $this->assertTrue($context->get('captureSuccess'));
+        $this->assertNull($context->get('error'));
+    }
+
     public function testHandleSetsErrorWhenContractNotFound(): void
     {
         $context = new EventContext([
@@ -88,7 +135,11 @@ class StripeCaptureRequestHandlerTest extends TestCase
         $this->handler->handle($event);
 
         $this->assertFalse($context->get('captureSuccess'));
-        $this->assertStringContainsString('Contract not found', $context->get('error'));
+        $error = $context->get('error');
+        // Verify error message contains both the prefix and the contract ID
+        // This catches mutations that remove the contract ID from the message
+        $this->assertStringContainsString('Contract not found', $error);
+        $this->assertStringContainsString('nonexistent_contract', $error);
     }
 
     public function testHandleSetsErrorWhenContractNotInAuthorizedState(): void
@@ -271,6 +322,392 @@ class StripeCaptureRequestHandlerTest extends TestCase
 
         $this->assertFalse($context->get('captureSuccess'));
         $this->assertStringContainsString('Stripe API error', $context->get('error'));
+    }
+
+    /**
+     * Test that contract is set in context after successful lookup.
+     * This catches mutation #13 that removes $context->set('contract', $contract).
+     */
+    public function testHandleSetsContractInContext(): void
+    {
+        $context = new EventContext([
+            'contractId' => 'contract_context_test',
+            'initiator' => 'admin',
+        ]);
+        $event = new StripeCaptureRequestEvent($context);
+
+        $contract = $this->createAuthorizedContractWithPaymentIntent('pi_context');
+
+        $this->contractRepository
+            ->method('findById')
+            ->willReturn($contract);
+
+        $captureResponse = new CaptureResponse(
+            providerPaymentId: 'pi_context',
+            captureId: 'ch_context',
+            amountCaptured: 50.00,
+            currency: 'EUR',
+            status: 'succeeded',
+            capturedAt: new DateTimeImmutable()
+        );
+
+        $this->stripeAdapter
+            ->method('capturePayment')
+            ->willReturn($captureResponse);
+
+        $this->handler->handle($event);
+
+        // Verify contract is set in context (catches mutation #13)
+        $this->assertSame($contract, $context->get('contract'));
+    }
+
+    /**
+     * Test that captureAuthorization is called on contract.
+     * This catches mutation #24 that removes $contract->captureAuthorization().
+     */
+    public function testHandleCallsCaptureAuthorizationOnContract(): void
+    {
+        $context = new EventContext([
+            'contractId' => 'contract_auth_test',
+            'initiator' => 'admin',
+        ]);
+        $event = new StripeCaptureRequestEvent($context);
+
+        $contract = $this->createMock(PaymentContract::class);
+        $contract->method('getState')->willReturn(ContractState::authorized());
+        $contract->method('getProviderOrderId')->willReturn('pi_auth_test');
+
+        // CRITICAL: Verify captureAuthorization is called
+        $contract->expects($this->once())->method('captureAuthorization');
+
+        $this->contractRepository
+            ->method('findById')
+            ->willReturn($contract);
+
+        $captureResponse = new CaptureResponse(
+            providerPaymentId: 'pi_auth_test',
+            captureId: 'ch_auth',
+            amountCaptured: 100.00,
+            currency: 'EUR',
+            status: 'succeeded',
+            capturedAt: new DateTimeImmutable()
+        );
+
+        $this->stripeAdapter
+            ->method('capturePayment')
+            ->willReturn($captureResponse);
+
+        $this->handler->handle($event);
+    }
+
+    /**
+     * Test that capturedAt is set in context on successful capture.
+     * This catches mutation #32 that removes $context->set('capturedAt', ...).
+     */
+    public function testHandleSetsCapturedAtInContext(): void
+    {
+        $context = new EventContext([
+            'contractId' => 'contract_time_test',
+            'initiator' => 'admin',
+        ]);
+        $event = new StripeCaptureRequestEvent($context);
+
+        $contract = $this->createAuthorizedContractWithPaymentIntent('pi_time');
+
+        $this->contractRepository
+            ->method('findById')
+            ->willReturn($contract);
+
+        $capturedTime = new DateTimeImmutable('2025-01-15 10:30:00');
+        $captureResponse = new CaptureResponse(
+            providerPaymentId: 'pi_time',
+            captureId: 'ch_time',
+            amountCaptured: 75.00,
+            currency: 'EUR',
+            status: 'succeeded',
+            capturedAt: $capturedTime
+        );
+
+        $this->stripeAdapter
+            ->method('capturePayment')
+            ->willReturn($captureResponse);
+
+        $this->handler->handle($event);
+
+        // Verify capturedAt is set in context (catches mutation #32)
+        $this->assertEquals('2025-01-15 10:30:00', $context->get('capturedAt'));
+    }
+
+    /**
+     * Test that reason is included in metadata when provided.
+     * This catches mutations #23, #40 that flip $reason !== null to === null.
+     */
+    public function testHandlePassesReasonInMetadataWhenProvided(): void
+    {
+        $context = new EventContext([
+            'contractId' => 'contract_reason',
+            'reason' => 'manual_capture_by_admin',
+            'initiator' => 'admin',
+        ]);
+        $event = new StripeCaptureRequestEvent($context);
+
+        $contract = $this->createAuthorizedContractWithPaymentIntent('pi_reason');
+
+        $this->contractRepository
+            ->method('findById')
+            ->willReturn($contract);
+
+        $captureResponse = new CaptureResponse(
+            providerPaymentId: 'pi_reason',
+            captureId: 'ch_reason',
+            amountCaptured: 100.00,
+            currency: 'EUR',
+            status: 'succeeded',
+            capturedAt: new DateTimeImmutable()
+        );
+
+        // Verify that reason is included in the capture request metadata
+        $this->stripeAdapter
+            ->expects($this->once())
+            ->method('capturePayment')
+            ->with($this->callback(function ($request) {
+                // Verify reason is in metadata
+                return isset($request->metadata['reason'])
+                    && $request->metadata['reason'] === 'manual_capture_by_admin';
+            }))
+            ->willReturn($captureResponse);
+
+        $this->handler->handle($event);
+    }
+
+    /**
+     * Test that reason is NOT included in metadata when null.
+     * This catches mutations that incorrectly add reason when it should not be added.
+     */
+    public function testHandleDoesNotIncludeReasonWhenNull(): void
+    {
+        $context = new EventContext([
+            'contractId' => 'contract_no_reason',
+            'initiator' => 'admin',
+        ]);
+        $event = new StripeCaptureRequestEvent($context);
+
+        $contract = $this->createAuthorizedContractWithPaymentIntent('pi_no_reason');
+
+        $this->contractRepository
+            ->method('findById')
+            ->willReturn($contract);
+
+        $captureResponse = new CaptureResponse(
+            providerPaymentId: 'pi_no_reason',
+            captureId: 'ch_no_reason',
+            amountCaptured: 100.00,
+            currency: 'EUR',
+            status: 'succeeded',
+            capturedAt: new DateTimeImmutable()
+        );
+
+        // Verify that reason is NOT in metadata when not provided
+        $this->stripeAdapter
+            ->expects($this->once())
+            ->method('capturePayment')
+            ->with($this->callback(function ($request) {
+                // Verify reason is NOT in metadata
+                return !isset($request->metadata['reason']);
+            }))
+            ->willReturn($captureResponse);
+
+        $this->handler->handle($event);
+    }
+
+    /**
+     * Test direct capture also sets capturedAt in context.
+     * This catches mutation #50 that removes context.set('capturedAt') in direct capture.
+     */
+    public function testDirectCaptureSetsCapturedAtInContext(): void
+    {
+        $context = new EventContext([
+            'paymentIntentId' => 'pi_direct_time',
+            'orderId' => 'order_123',
+            'initiator' => 'admin',
+        ]);
+        $event = new StripeCaptureRequestEvent($context);
+
+        $capturedTime = new DateTimeImmutable('2025-01-15 11:00:00');
+        $captureResponse = new CaptureResponse(
+            providerPaymentId: 'pi_direct_time',
+            captureId: 'ch_direct_time',
+            amountCaptured: 50.00,
+            currency: 'EUR',
+            status: 'succeeded',
+            capturedAt: $capturedTime
+        );
+
+        $this->stripeAdapter
+            ->method('capturePayment')
+            ->willReturn($captureResponse);
+
+        $this->handler->handle($event);
+
+        // Verify capturedAt is set in direct capture mode too
+        $this->assertEquals('2025-01-15 11:00:00', $context->get('capturedAt'));
+    }
+
+    /**
+     * Test direct capture sets captureId in context.
+     * This catches mutation #47 that removes context.set('captureId').
+     */
+    public function testDirectCaptureSetsAllContextValues(): void
+    {
+        $context = new EventContext([
+            'paymentIntentId' => 'pi_direct_full',
+            'orderId' => 'order_456',
+            'initiator' => 'webhook',
+        ]);
+        $event = new StripeCaptureRequestEvent($context);
+
+        $captureResponse = new CaptureResponse(
+            providerPaymentId: 'pi_direct_full',
+            captureId: 'ch_direct_full_123',
+            amountCaptured: 199.99,
+            currency: 'USD',
+            status: 'succeeded',
+            capturedAt: new DateTimeImmutable()
+        );
+
+        $this->stripeAdapter
+            ->method('capturePayment')
+            ->willReturn($captureResponse);
+
+        $this->handler->handle($event);
+
+        // Verify all context values are set (catches mutations #47-50)
+        $this->assertTrue($context->get('captureSuccess'));
+        $this->assertEquals('ch_direct_full_123', $context->get('captureId'));
+        $this->assertEquals(199.99, $context->get('capturedAmount'));
+        $this->assertEquals('USD', $context->get('captureCurrency'));
+        $this->assertNotNull($context->get('capturedAt'));
+    }
+
+    /**
+     * Test that PaymentIntent ID from contract metadata is used when providerOrderId is empty.
+     * This catches mutations #14-15 that flip the empty string check.
+     */
+    public function testHandleUsesPaymentIntentFromMetadataWhenProviderOrderIdEmpty(): void
+    {
+        $context = new EventContext([
+            'contractId' => 'contract_metadata',
+            'initiator' => 'admin',
+        ]);
+        $event = new StripeCaptureRequestEvent($context);
+
+        // Contract with empty providerOrderId but PaymentIntent in metadata
+        $contract = $this->createMock(PaymentContract::class);
+        $contract->method('getState')->willReturn(ContractState::authorized());
+        $contract->method('getProviderOrderId')->willReturn('');  // Empty string
+        $contract->method('getMetadata')->willReturnCallback(function (string $key) {
+            if ($key === 'payment_intent_id') {
+                return 'pi_from_metadata_123';
+            }
+            return null;
+        });
+
+        $this->contractRepository
+            ->method('findById')
+            ->willReturn($contract);
+
+        $captureResponse = new CaptureResponse(
+            providerPaymentId: 'pi_from_metadata_123',
+            captureId: 'ch_meta',
+            amountCaptured: 100.00,
+            currency: 'EUR',
+            status: 'succeeded',
+            capturedAt: new DateTimeImmutable()
+        );
+
+        // Verify correct PaymentIntent ID is used from metadata
+        $this->stripeAdapter
+            ->expects($this->once())
+            ->method('capturePayment')
+            ->with($this->callback(function ($request) {
+                return $request->providerPaymentId === 'pi_from_metadata_123';
+            }))
+            ->willReturn($captureResponse);
+
+        $this->handler->handle($event);
+
+        $this->assertTrue($context->get('captureSuccess'));
+    }
+
+    /**
+     * Test that empty string PaymentIntent in metadata triggers error.
+     * This catches mutations that flip the !== '' check to === ''.
+     */
+    public function testHandleSetsErrorWhenMetadataPaymentIntentIsEmptyString(): void
+    {
+        $context = new EventContext([
+            'contractId' => 'contract_empty_meta',
+            'initiator' => 'admin',
+        ]);
+        $event = new StripeCaptureRequestEvent($context);
+
+        // Contract with no providerOrderId and empty metadata payment_intent_id
+        $contract = $this->createMock(PaymentContract::class);
+        $contract->method('getState')->willReturn(ContractState::authorized());
+        $contract->method('getProviderOrderId')->willReturn(null);
+        $contract->method('getMetadata')->willReturnCallback(function (string $key) {
+            if ($key === 'payment_intent_id') {
+                return '';  // Empty string - should fail validation
+            }
+            return null;
+        });
+
+        $this->contractRepository
+            ->method('findById')
+            ->willReturn($contract);
+
+        $this->stripeAdapter->expects($this->never())->method('capturePayment');
+
+        $this->handler->handle($event);
+
+        $this->assertFalse($context->get('captureSuccess'));
+        $this->assertStringContainsString('No PaymentIntent ID found', $context->get('error'));
+    }
+
+    /**
+     * Test direct capture with reason in metadata.
+     * This catches mutation #40 for direct capture path.
+     */
+    public function testDirectCapturePassesReasonInMetadata(): void
+    {
+        $context = new EventContext([
+            'paymentIntentId' => 'pi_direct_reason',
+            'orderId' => 'order_789',
+            'reason' => 'ship_order',
+            'initiator' => 'admin',
+        ]);
+        $event = new StripeCaptureRequestEvent($context);
+
+        $captureResponse = new CaptureResponse(
+            providerPaymentId: 'pi_direct_reason',
+            captureId: 'ch_direct_reason',
+            amountCaptured: 100.00,
+            currency: 'EUR',
+            status: 'succeeded',
+            capturedAt: new DateTimeImmutable()
+        );
+
+        // Verify reason is included in direct capture metadata
+        $this->stripeAdapter
+            ->expects($this->once())
+            ->method('capturePayment')
+            ->with($this->callback(function ($request) {
+                return isset($request->metadata['reason'])
+                    && $request->metadata['reason'] === 'ship_order';
+            }))
+            ->willReturn($captureResponse);
+
+        $this->handler->handle($event);
     }
 
     // --- Helper methods ---

@@ -66,7 +66,32 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
         $handler->handle($event);
 
         $this->assertFalse($context->get('cancelSuccess'));
-        $this->assertNotNull($context->get('error'));
+        // Verify exact error message to catch mutations
+        $this->assertEquals('PaymentIntent ID is missing', $context->get('error'));
+    }
+
+    /**
+     * Test that empty string PaymentIntent ID also triggers error.
+     * This catches mutations that change === '' to !== ''
+     */
+    public function testHandlerRejectsEmptyStringPaymentIntentId(): void
+    {
+        $context = new EventContext([
+            'paymentIntentId' => '',  // Empty string, not null
+            'cancellationReason' => 'requested_by_customer',
+        ]);
+        $event = new StripeCancelAuthorizationRequestEvent($context);
+
+        $handler = new StripeCancelAuthorizationRequestHandler(
+            $this->stripeAdapter
+        );
+
+        $this->stripeAdapter->expects($this->never())->method('cancelPaymentIntent');
+
+        $handler->handle($event);
+
+        $this->assertFalse($context->get('cancelSuccess'));
+        $this->assertEquals('PaymentIntent ID is missing', $context->get('error'));
     }
 
     public function testHandlerCancelsPaymentIntentViaStripeApi(): void

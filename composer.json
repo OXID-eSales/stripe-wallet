@@ -35,7 +35,8 @@
     "oxid-esales/oxideshop-ce": "dev-b-7.4.x",
     "phpunit/phpunit": "^11.4",
     "mikey179/vfsstream": "~1.6.8",
-    "oxid-esales/developer-tools": "dev-b-7.4.x"
+    "oxid-esales/developer-tools": "dev-b-7.4.x",
+    "infection/infection": "^0.31.9"
   },
   "autoload": {
     "psr-4": {
@@ -84,7 +85,8 @@
   "config": {
     "allow-plugins": {
       "oxid-esales/oxideshop-composer-plugin": true,
-      "oxid-esales/oxideshop-unified-namespace-generator": true
+      "oxid-esales/oxideshop-unified-namespace-generator": true,
+      "infection/extension-installer": true
     }
   }
 }
