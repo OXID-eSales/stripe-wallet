@@ -25,7 +25,6 @@ use OxidSolutionCatalysts\Payments\Stripe\Core\ViewConfig as StripeViewConfig;
 use OxidSolutionCatalysts\Payments\Stripe\Model\Order as StripeOrderModel;
 use OxidSolutionCatalysts\Payments\Stripe\Model\Payment as StripePaymentModel;
 use OxidSolutionCatalysts\Payments\Stripe\Module;
-use OxidSolutionCatalysts\Payments\Watch\Controller\AssumptionController;
 
 /**
  * Metadata version
@@ -61,8 +60,7 @@ $aModule = [
     'controllers' => [
         'osc_stripe_payment' => StripePaymentController::class,
         'osc_stripe_webhook' => StripeWebhookController::class,
-        'paymentwatch_assumption' => AssumptionController::class,
-        'StripeConnect' => StripeConnect::class,
+                'StripeConnect' => StripeConnect::class,
         'stripe_order_refund' => OrderRefund::class,
         'orderController' => StripeOrderController::class,
     ],
@@ -99,9 +97,5 @@ $aModule = [
         ['group' => 'STRIPE_CRONJOBS',          'name' => 'sStripeCronSecureKey',               'type' => 'str',        'value' => '',          'position' => 120],
         ['group' => 'STRIPE_WEBHOOKS',          'name' => 'sStripeWebhookEndpoint',             'type' => 'str',        'value' => '',          'position' => 130],
         ['group' => 'STRIPE_WEBHOOKS',          'name' => 'sStripeWebhookEndpointSecret',       'type' => 'str',        'value' => '',          'position' => 140],
-        ['group' => 'PAYMENTWATCH',             'name' => 'paywatchEnabled',                    'type' => 'bool',       'value' => '0',         'position' => 200],
-        ['group' => 'PAYMENTWATCH',             'name' => 'paywatchAllowedHosts',               'type' => 'arr',        'value' => '[]',        'position' => 210],
-        ['group' => 'PAYMENTWATCH',             'name' => 'paywatchRateLimitEnabled',           'type' => 'bool',       'value' => '0',         'position' => 220],
-        ['group' => 'PAYMENTWATCH',             'name' => 'paywatchRateLimitPerMinute',         'type' => 'str',        'value' => '100',       'position' => 230],
     ]
 ];
