@@ -45,6 +45,8 @@ final class StripeStatusMapper
 
     /**
      * Map from Stripe status to normalized status.
+     *
+     * @var array<string, string>
      */
     private const STRIPE_TO_NORMALIZED = [
         self::STRIPE_REQUIRES_PAYMENT_METHOD => self::STATUS_PENDING,

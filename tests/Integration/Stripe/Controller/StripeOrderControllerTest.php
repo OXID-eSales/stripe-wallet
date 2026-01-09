@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Controller;
+namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Controller;
 
 use OxidSolutionCatalysts\Payments\Stripe\Controller\StripeOrderController;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;

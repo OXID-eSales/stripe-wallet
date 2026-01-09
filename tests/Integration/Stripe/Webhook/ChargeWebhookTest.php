@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Webhook;
+namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Webhook;
 
 use OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookLog;

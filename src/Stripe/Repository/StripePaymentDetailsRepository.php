@@ -26,15 +26,25 @@ class StripePaymentDetailsRepository
      * Store Stripe-specific payment details
      *
      * @param string $transactionId Transaction ID to link to
-     * @param array $charge Stripe charge data
+     * @param array<string, mixed> $charge Stripe charge data
      * @return void
      */
     public function storePaymentDetails(string $transactionId, array $charge): void
     {
         $db = DatabaseProvider::getDb();
 
-        $card = $charge['payment_method_details']['card'] ?? null;
-        $threeDSecure = $card['three_d_secure'] ?? null;
+        $paymentMethodDetails = is_array($charge['payment_method_details'] ?? null)
+            ? $charge['payment_method_details']
+            : [];
+        $card = is_array($paymentMethodDetails['card'] ?? null)
+            ? $paymentMethodDetails['card']
+            : [];
+        $threeDSecure = is_array($card['three_d_secure'] ?? null)
+            ? $card['three_d_secure']
+            : null;
+        $outcome = is_array($charge['outcome'] ?? null)
+            ? $charge['outcome']
+            : [];
 
         $sql = "INSERT INTO osc_stripe_payment_details
                 (OXID, OXTRANSACTIONID, OXCARDLAST4, OXCARDBRAND, OXCARDEXPMONTH, OXCARDEXPYEAR,
@@ -54,24 +64,8 @@ class StripePaymentDetailsRepository
             $threeDSecure ? 1 : 0,
             $threeDSecure['version'] ?? null,
             $threeDSecure['authenticated'] ?? null,
-            $charge['outcome']['risk_score'] ?? null,
-            $charge['outcome']['risk_level'] ?? null,
+            $outcome['risk_score'] ?? null,
+            $outcome['risk_level'] ?? null,
         ]);
-    }
-
-    /**
-     * Find payment details by transaction ID
-     *
-     * @param string $transactionId
-     * @return array|null
-     */
-    public function findByTransactionId(string $transactionId): ?array
-    {
-        $db = DatabaseProvider::getDb();
-
-        $sql = "SELECT * FROM osc_stripe_payment_details WHERE OXTRANSACTIONID = ?";
-        $result = $db->getRow($sql, [$transactionId]);
-
-        return $result ?: null;
     }
 }

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Controller\Admin;
+namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Controller\Admin;
 
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\OrderRefund;

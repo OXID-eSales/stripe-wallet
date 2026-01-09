@@ -18,25 +18,25 @@ namespace OxidSolutionCatalysts\Payments\Stripe\Service;
 class ErrorResponseFactory
 {
     // Error codes for frontend to handle specifically
-    public const CODE_VALIDATION_ERROR = 'VALIDATION_ERROR';
-    public const CODE_PAYMENT_DECLINED = 'PAYMENT_DECLINED';
-    public const CODE_INSUFFICIENT_FUNDS = 'INSUFFICIENT_FUNDS';
-    public const CODE_INVALID_CARD = 'INVALID_CARD';
-    public const CODE_EXPIRED_CARD = 'EXPIRED_CARD';
-    public const CODE_INCORRECT_CVC = 'INCORRECT_CVC';
-    public const CODE_PROCESSING_ERROR = 'PROCESSING_ERROR';
-    public const CODE_RATE_LIMIT = 'RATE_LIMIT';
-    public const CODE_3DS_FAILED = '3DS_FAILED';
-    public const CODE_SERVER_ERROR = 'SERVER_ERROR';
-    public const CODE_NOT_FOUND = 'NOT_FOUND';
-    public const CODE_UNAUTHORIZED = 'UNAUTHORIZED';
+    public const string CODE_VALIDATION_ERROR = 'VALIDATION_ERROR';
+    public const string CODE_PAYMENT_DECLINED = 'PAYMENT_DECLINED';
+    public const string CODE_INSUFFICIENT_FUNDS = 'INSUFFICIENT_FUNDS';
+    public const string CODE_INVALID_CARD = 'INVALID_CARD';
+    public const string CODE_EXPIRED_CARD = 'EXPIRED_CARD';
+    public const string CODE_INCORRECT_CVC = 'INCORRECT_CVC';
+    public const string CODE_PROCESSING_ERROR = 'PROCESSING_ERROR';
+    public const string CODE_RATE_LIMIT = 'RATE_LIMIT';
+    public const string CODE_3DS_FAILED = '3DS_FAILED';
+    public const string CODE_SERVER_ERROR = 'SERVER_ERROR';
+    public const string CODE_NOT_FOUND = 'NOT_FOUND';
+    public const string CODE_UNAUTHORIZED = 'UNAUTHORIZED';
 
     /**
      * Create validation error response
      *
-     * @param array $validationErrors Array of ['field' => 'fieldName', 'message' => 'error message']
+     * @param array<int, array{field: string, message: string}> $validationErrors Validation errors
      * @param string $message Overall error message
-     * @return array
+     * @return array<string, mixed>
      */
     public static function validationError(array $validationErrors, string $message = 'Validation failed'): array
     {
@@ -54,8 +54,8 @@ class ErrorResponseFactory
      *
      * @param string $errorCode Stripe or payment provider error code
      * @param string $message User-friendly error message
-     * @param array $details Additional error details
-     * @return array
+     * @param array<string, mixed> $details Additional error details
+     * @return array<string, mixed>
      */
     public static function paymentError(string $errorCode, string $message, array $details = []): array
     {
@@ -76,7 +76,7 @@ class ErrorResponseFactory
      *
      * @param string $message Error message
      * @param \Exception|null $exception Exception object (for logging)
-     * @return array
+     * @return array<string, mixed>
      */
     public static function systemError(string $message = 'An error occurred', ?\Exception $exception = null): array
     {
@@ -99,7 +99,7 @@ class ErrorResponseFactory
      * Create not found error response
      *
      * @param string $resource Resource that was not found
-     * @return array
+     * @return array<string, mixed>
      */
     public static function notFoundError(string $resource = 'Resource'): array
     {
@@ -115,7 +115,7 @@ class ErrorResponseFactory
      * Create unauthorized error response
      *
      * @param string $message Error message
-     * @return array
+     * @return array<string, mixed>
      */
     public static function unauthorizedError(string $message = 'Unauthorized access'): array
     {
@@ -131,7 +131,7 @@ class ErrorResponseFactory
      * Create rate limit error response
      *
      * @param int $retryAfter Seconds until retry is allowed
-     * @return array
+     * @return array<string, mixed>
      */
     public static function rateLimitError(int $retryAfter = 60): array
     {
@@ -215,7 +215,7 @@ class ErrorResponseFactory
      * Wrap GraphQL mutation response with error handling
      *
      * @param callable $callback Function that returns mutation result
-     * @return array Standardized response
+     * @return array<string, mixed> Standardized response
      */
     public static function wrapMutation(callable $callback): array
     {
