@@ -1,0 +1,494 @@
+@startuml Contract-Order State Machine v2 - Early Order Creation
+!theme vibrant
+skinparam backgroundColor #FEFEFE
+skinparam roundcorner 15
+skinparam state {
+  BackgroundColor<<Initial>> #E8F5E9
+  BackgroundColor<<Processing>> #FFF3E0
+  BackgroundColor<<Waiting>> #E3F2FD
+  BackgroundColor<<Success>> #C8E6C9
+  BackgroundColor<<Error>> #FFCDD2
+  BackgroundColor<<Contract>> #F3E5F5
+  BackgroundColor<<Order>> #E1F5FE
+  BorderColor #455A64
+  FontSize 12
+}
+
+title Contract-Order State Machine v2\n(Early Order Creation Pattern)
+
+note as N_LEGEND
+  **Key Change from v1:**
+
+  Order is now created EARLY in the flow,
+  right after CONTRACT_DRAFT completes.
+
+  **New Flow:**
+  CONTRACT_DRAFT -> NOT_FINISHED -> CONTRACT_PENDING
+
+  **Benefits:**
+  - Order number assigned early
+  - Order visible in admin immediately
+  - Customer has order reference during payment
+end note
+
+[*] --> BASKET_ACTIVE : User adds items
+
+state BASKET_ACTIVE <<Initial>>
+note right of BASKET_ACTIVE
+  **Shopping Phase:**
+  - User browsing, adding items
+  - No contract yet
+  - No order yet
+  - Basket in session
+end note
+
+BASKET_ACTIVE --> CONTRACT_DRAFT : **Event:** CheckoutInitiatedEvent\n(User clicks "Place Order")
+
+note as N_PHASE1
+  **PHASE 1: CONTRACT DRAFT**
+  Contract created, basket snapshotted
+end note
+
+state CONTRACT_DRAFT <<Contract>> {
+  state "CONTRACT: DRAFT\n(Intent captured,\nconditions defined)" as CD
+
+  note right of CD
+    **Contract Created:**
+
+    Contract record in database:
+    - OXSTATE = 'draft'
+    - OXORDERID = NULL (no order yet)
+    - OXBASKETDATA = {snapshot}
+    - OXCONDITIONS = [
+        {type: 'payment_authorized', status: 'pending'},
+        {type: 'fraud_check', status: 'pending'},
+        {type: 'stock_reserved', status: 'pending'}
+      ]
+
+    **What happens:**
+    1. Basket snapshot captured (immutable)
+    2. Conditions defined
+    3. Contract saved to osc_payment_contract
+  end note
+}
+
+CONTRACT_DRAFT --> NOT_FINISHED : **Event:** ContractDraftCompletedEvent\n(Draft complete, create order)
+
+note on link
+  **NEW: Early Order Creation**
+
+  Order is created immediately after
+  contract draft is complete.
+
+  This ensures:
+  - Order number is assigned early
+  - Order is visible in admin
+  - Customer has reference number
+end note
+
+note as N_PHASE2
+  **PHASE 2: ORDER CREATED (NOT_FINISHED)**
+  Order exists but payment not yet processed
+end note
+
+state NOT_FINISHED <<Order>> {
+  state "ORDER: NOT_FINISHED\n(Order created,\nawaiting payment processing)" as NF
+
+  note right of NF
+    **Order Created Early:**
+
+    Database state:
+    - oxorder.OXID exists
+    - oxorder.oxordernr assigned
+    - oxorder.oxtransstatus = 'NOT_FINISHED'
+    - Contract.OXORDERID = order.OXID
+    - Contract.OXSTATE = 'not_finished'
+
+    **Order is now:**
+    - Visible in admin
+    - Has order number
+    - Linked to contract
+
+    **Payment conditions:**
+    Still being resolved in parallel
+  end note
+}
+
+NF : **Contract-Order Link Established**
+NF : Contract.OXORDERID -> Order.OXID
+
+NOT_FINISHED --> CONTRACT_PENDING : **Event:** OrderCreatedEvent\n(Proceed to payment processing)
+
+note as N_PHASE3
+  **PHASE 3: CONTRACT PENDING**
+  Payment conditions being resolved
+end note
+
+state CONTRACT_PENDING <<Contract>> {
+  state "CONTRACT: PENDING\n(Conditions being resolved)" as CP
+
+  note right of CP
+    **Parallel Condition Resolution:**
+
+    Multiple handlers work in parallel:
+
+    +-- PaymentAuthorizationHandler
+    |   -> Calls provider API
+    |   -> Fulfills 'payment_authorized'
+    |
+    +-- FraudCheckHandler
+    |   -> Runs fraud detection
+    |   -> Fulfills 'fraud_check'
+    |
+    +-- StockReservationHandler
+        -> Reserves inventory
+        -> Fulfills 'stock_reserved'
+
+    Contract monitors:
+    Are ALL conditions fulfilled?
+  end note
+}
+
+CP : **State in DB:**
+CP : Contract.OXSTATE = 'pending'
+CP : Contract.OXORDERID = order.OXID
+CP : OXCONDITIONS = [conditions being resolved...]
+
+CONTRACT_PENDING --> CONTRACT_READY : **Event:** ContractConditionsFulfilledEvent\n(All conditions met)
+
+note on link
+  **Critical Transition:**
+
+  Contract detected all conditions
+  are now fulfilled.
+
+  Contract automatically transitions
+  to READY_TO_COMMIT state.
+end note
+
+CONTRACT_PENDING --> CONTRACT_FAILED : **Event:** ContractFailedEvent\n(Condition failed)
+
+note on link
+  **Failure Scenarios:**
+  - Payment declined
+  - Fraud detected
+  - Stock unavailable
+
+  Order marked as cancelled
+  Contract state = 'failed'
+end note
+
+state CONTRACT_READY <<Contract>> {
+  state "CONTRACT: READY_TO_COMMIT\n(All conditions met,\nready for commitment)" as CR
+
+  note right of CR
+    **Ready for Commitment:**
+
+    All conditions fulfilled:
+    v Payment authorized
+    v Fraud check passed
+    v Stock reserved
+
+    Contract state:
+    - OXSTATE = 'ready_to_commit'
+    - OXORDERID = order.OXID
+    - OXCONDITIONS = [all fulfilled]
+
+    **Next:** Commit contract
+  end note
+}
+
+CR : **Optimal Commitment Point**
+CR : All risks mitigated
+
+note as N_PHASE4
+  **PHASE 4: CONTRACT COMMITTED**
+  Contract committed, payment can be captured
+end note
+
+CONTRACT_READY --> CONTRACT_COMMITTED : **Event:** ContractReadyToCommitEvent\n(Auto-commit or manual)
+
+state CONTRACT_COMMITTED <<Contract>> {
+  state "CONTRACT: COMMITTED\n(Payment authorized,\nready for capture)" as CC
+
+  note right of CC
+    **Contract Committed:**
+
+    Database state:
+    - Contract.OXSTATE = 'committed'
+    - Contract.OXORDERID = order.OXID
+    - Order.oxtransstatus = 'NOT_FINISHED'
+
+    **Payment authorized, capture pending!**
+
+    **From here, external events:**
+    - PaymentInitiatedEvent (redirect to provider)
+    - OrderCancelledEvent (user/admin cancellation)
+  end note
+}
+
+CC : **External Events Can Occur**
+CC : (Beyond this ticket's scope)
+
+CONTRACT_COMMITTED --> IN_PROGRESS : **Event:** PaymentInitiatedEvent\n(Redirect to provider)
+
+CONTRACT_COMMITTED --> CONTRACT_CANCELLED : **Event:** OrderCancelledEvent\n(External cancellation)
+
+note on link
+  **External Events:**
+
+  Beyond this ticket's scope.
+  Either PaymentInitiatedEvent or
+  OrderCancelledEvent can be emitted
+  by external systems.
+end note
+
+state IN_PROGRESS <<Processing>> {
+  state "IN_PROGRESS\n(500-800)\nPayment Processing\nat Provider" as IP
+
+  state IP {
+    state "500\nExternal Payment" as EP
+    state "700\nCard Payment" as CardPay
+    state "750\nCard Authorized" as CA
+    state "800\nNeed Finalization" as NF2
+
+    [*] --> EP : Redirect payment
+    [*] --> CardPay : Card payment
+    CardPay --> CA : Authorized
+    CA --> NF2 : Finalize
+  }
+
+  note right of IP
+    **Order Processing States:**
+
+    500 - External (iDEAL, EPS, etc.)
+    700 - Card processing (3DS)
+    750 - Card authorized
+    800 - Need finalization
+
+    **Contract state:**
+    Still COMMITTED (waiting for capture)
+  end note
+}
+
+IN_PROGRESS --> AWAITING_WEBHOOK : **Event:** PaymentApprovedEvent\n(Customer return)
+
+state AWAITING_WEBHOOK <<Waiting>> {
+  state "AWAITING_WEBHOOK\n(600)\nWaiting for Provider\nWebhook Confirmation" as AW
+
+  note right of AW
+    **Webhook Pending:**
+
+    Customer completed payment at provider,
+    now awaiting async webhook confirmation.
+
+    **Contract state:**
+    Still COMMITTED (capture pending)
+
+    **Order state:**
+    AWAITING_WEBHOOK (600)
+
+    Timeout: 60 minutes
+  end note
+}
+
+AWAITING_WEBHOOK --> CONTRACT_FULFILLED : **Event:** PaymentCapturedEvent\n(Webhook received)
+
+note on link
+  **Webhook Processing:**
+
+  WebhookHandler:
+  1. Finds contract by provider order ID
+  2. Verifies contract state = COMMITTED
+  3. Calls contract.fulfill()
+  4. Updates order to OK
+  5. Emits ContractFulfilledEvent
+end note
+
+IN_PROGRESS --> CONTRACT_FULFILLED : **Event:** PaymentCapturedEvent\n(Direct capture)
+
+note on link
+  Some payment flows
+  capture directly without
+  webhook waiting period
+end note
+
+state CONTRACT_FULFILLED <<Success>> {
+  state "CONTRACT: FULFILLED\n(Payment captured,\ncontract complete)" as CF
+
+  note right of CF
+    **Contract Fulfilled:**
+
+    Database state:
+    - Contract.OXSTATE = 'fulfilled'
+    - Contract.OXFULFILLEDAT = NOW()
+    - Order.oxpaid = NOW()
+    - Order.oxtransstatus = 'OK'
+
+    **Contract lifecycle complete!**
+
+    Side effects triggered:
+    - Email confirmation
+    - Inventory update
+    - Invoice generation
+    - Analytics tracking
+  end note
+}
+
+CF : **Terminal Success State**
+
+CONTRACT_FULFILLED --> COMPLETED : Order finalized
+
+state COMPLETED <<Success>> {
+  state "ORDER: COMPLETED\n(OK)\nOrder Ready for\nFulfillment/Shipping" as SUCCESS
+
+  note right of SUCCESS
+    **Order Completed:**
+
+    Final state:
+    - Order.oxtransstatus = 'OK'
+    - Order.oxpaid = timestamp
+    - Contract.OXSTATE = 'fulfilled'
+
+    **Ready for:**
+    - Shipment processing
+    - Invoice generation
+    - Customer service
+  end note
+}
+
+COMPLETED --> [*]
+
+note as N_PHASE5
+  **PHASE 5: ERROR & CANCELLATION PATHS**
+  Handling failures and cancellations
+end note
+
+CONTRACT_FAILED --> CONTRACT_CANCELLED : Contract cancelled
+
+state CONTRACT_FAILED <<Error>> {
+  state "CONTRACT: FAILED\n(Condition failed)" as CFail
+
+  note right of CFail
+    **Contract Failed:**
+
+    Reasons:
+    - Payment declined
+    - Fraud detected (high risk)
+    - Stock unavailable
+    - Address validation failed
+
+    Contract state:
+    - OXSTATE = 'failed'
+    - OXSTATEREASON = "reason"
+    - OXORDERID = order.OXID (order exists!)
+
+    **Order marked as cancelled**
+  end note
+}
+
+state CONTRACT_CANCELLED <<Error>> {
+  state "CANCELLED\n(Contract/Order cancelled)" as CANCEL
+
+  note right of CANCEL
+    **Cancellation:**
+
+    Order and contract both cancelled:
+    - Contract.OXSTATE = 'cancelled'
+    - Order.OXSTORNO = 1
+
+    Clean cancellation with full audit trail
+  end note
+}
+
+NOT_FINISHED --> CONTRACT_CANCELLED : **Event:** OrderCancelledEvent
+IN_PROGRESS --> CONTRACT_CANCELLED : **Event:** PaymentFailedEvent
+AWAITING_WEBHOOK --> CONTRACT_CANCELLED : **Event:** PaymentFailedEvent
+
+AWAITING_WEBHOOK --> TIMEOUT : 60 min timeout
+
+state TIMEOUT <<Processing>> {
+  state "TIMEOUT\n(900)\nWebhook Timeout\n(Fallback)" as TO
+
+  note right of TO
+    **Webhook Timeout:**
+
+    No webhook received within 60 minutes.
+
+    Fallback actions:
+    1. Poll provider API
+    2. Check payment status
+    3. Either fulfill or cancel
+  end note
+}
+
+TIMEOUT --> CONTRACT_FULFILLED : **Event:** PaymentCapturedEvent\n(Polling confirmed)
+TIMEOUT --> CONTRACT_CANCELLED : **Event:** OrderCancelledEvent\n(Polling failed)
+
+CONTRACT_CANCELLED --> [*]
+
+note bottom
+  **Contract-Order State Machine v2 - Key Changes:**
+
+  **Early Order Creation:**
+  Order created after CONTRACT_DRAFT, before CONTRACT_PENDING
+  -> Order number assigned immediately
+  -> Order visible in admin from start
+  -> Customer has reference during payment
+
+  **New State Sequence:**
+  BASKET_ACTIVE -> CONTRACT_DRAFT -> NOT_FINISHED -> CONTRACT_PENDING ->
+  CONTRACT_READY -> CONTRACT_COMMITTED -> (IN_PROGRESS) -> CONTRACT_FULFILLED
+
+  **After CONTRACT_COMMITTED:**
+  External events can trigger:
+  - PaymentInitiatedEvent (proceed to payment)
+  - OrderCancelledEvent (external cancellation)
+  (Beyond this ticket's scope)
+
+  **State Storage:**
+  - Contract state: osc_payment_contract.OXSTATE
+  - Order state: oxorder.oxtransstatus + osc_payment_order_state.OXPAYMENTSTATE
+  - Link: Contract.OXORDERID -> oxorder.OXID (established at NOT_FINISHED)
+end note
+
+note as N_FLOW
+  **Complete Flow Example (v2):**
+
+  1. User clicks "Place Order"
+     -> Contract DRAFT created
+
+  2. Contract draft complete
+     -> ORDER CREATED (NOT_FINISHED)
+     -> Contract.OXORDERID = order.OXID
+     -> Order number assigned
+
+  3. Contract transitions to PENDING
+     -> PaymentAuthorizationHandler: Authorize payment
+     -> FraudCheckHandler: Check fraud
+     -> StockReservationHandler: Reserve stock
+
+  4. All conditions fulfilled
+     -> Contract transitions to READY_TO_COMMIT
+
+  5. Contract committed
+     -> Contract.OXSTATE = 'committed'
+
+  6. External: PaymentInitiatedEvent
+     -> Customer redirected to provider
+     -> Order state: IN_PROGRESS (500-800)
+
+  7. Customer completes payment
+     -> Order state: AWAITING_WEBHOOK (600)
+
+  8. Webhook received
+     -> Contract transitions to FULFILLED
+     -> Order state: OK
+
+  **Alternative path at step 6:**
+  External: OrderCancelledEvent
+     -> Contract cancelled
+     -> Order cancelled
+end note
+
+@enduml

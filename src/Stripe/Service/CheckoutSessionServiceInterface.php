@@ -36,6 +36,8 @@ interface CheckoutSessionServiceInterface
      * @param string $cancelUrl URL to redirect on cancel
      * @param string $shopId Shop ID for metadata
      * @param string $captureMode Payment capture mode (automatic/manual)
+     * @param string|null $orderId Order ID (OXID) for metadata - STRP-75
+     * @param string|null $orderNumber Order number (OXORDERNR) for metadata - STRP-75
      */
     public function createSession(
         string $contractId,
@@ -43,7 +45,9 @@ interface CheckoutSessionServiceInterface
         string $successUrl,
         string $cancelUrl,
         string $shopId = '1',
-        string $captureMode = 'automatic'
+        string $captureMode = 'automatic',
+        ?string $orderId = null,
+        ?string $orderNumber = null
     ): CheckoutSessionResult;
 
     /**

@@ -63,6 +63,7 @@ class PaymentContractTest extends TestCase
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $condition = new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED);
         $contract->addCondition($condition);
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
 
         $this->expectException(\DomainException::class);
@@ -71,12 +72,13 @@ class PaymentContractTest extends TestCase
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_FRAUD_CHECK));
     }
 
-    public function testTransitionToPendingRequiresConditions(): void
+    public function testTransitionToPendingRequiresNotFinishedState(): void
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
+        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
 
         $this->expectException(\DomainException::class);
-        $this->expectExceptionMessage('Cannot transition to PENDING without conditions');
+        $this->expectExceptionMessage('Can only transition to PENDING from NOT_FINISHED state');
 
         $contract->transitionToPending();
     }
@@ -85,20 +87,22 @@ class PaymentContractTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
 
         $contract->transitionToPending();
 
         $this->assertTrue($contract->getState()->isPending());
     }
 
-    public function testTransitionToPendingOnlyFromDraft(): void
+    public function testTransitionToPendingOnlyFromNotFinished(): void
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
 
         $this->expectException(\DomainException::class);
-        $this->expectExceptionMessage('Can only transition to PENDING from DRAFT state');
+        $this->expectExceptionMessage('Can only transition to PENDING from NOT_FINISHED state');
 
         $contract->transitionToPending();
     }
@@ -107,6 +111,7 @@ class PaymentContractTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
 
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED, ['authId' => '123']);
@@ -119,6 +124,7 @@ class PaymentContractTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
 
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED);
@@ -137,6 +143,7 @@ class PaymentContractTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
 
         $this->assertFalse($contract->areAllConditionsFulfilled());
@@ -146,6 +153,7 @@ class PaymentContractTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED);
 
@@ -156,6 +164,7 @@ class PaymentContractTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
 
         $contract->failCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED, 'Payment declined');
@@ -167,6 +176,7 @@ class PaymentContractTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
 
         $this->expectException(\DomainException::class);
@@ -179,12 +189,13 @@ class PaymentContractTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED);
 
-        $contract->commitToOrder('order123');
+        $contract->commitToOrder('order_123');
 
-        $this->assertEquals('order123', $contract->getOrderId());
+        $this->assertEquals('order_123', $contract->getOrderId());
         $this->assertTrue($contract->getState()->isCommitted());
     }
 
@@ -202,9 +213,10 @@ class PaymentContractTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED);
-        $contract->commitToOrder('order123');
+        $contract->commitToOrder('order_123');
 
         $contract->fulfill();
 
@@ -225,9 +237,10 @@ class PaymentContractTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED);
-        $contract->commitToOrder('order123');
+        $contract->commitToOrder('order_123');
         $contract->fulfill();
 
         $this->expectException(\DomainException::class);
@@ -258,9 +271,10 @@ class PaymentContractTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED);
-        $contract->commitToOrder('order123');
+        $contract->commitToOrder('order_123');
         $contract->fulfill();
 
         $this->assertFalse($contract->isExpired());
@@ -311,6 +325,7 @@ class PaymentContractTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
 
         $contract->authorize();
@@ -333,6 +348,7 @@ class PaymentContractTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED);
 
@@ -346,6 +362,7 @@ class PaymentContractTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $contract->authorize();
 
@@ -359,6 +376,7 @@ class PaymentContractTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
 
         $this->expectException(\DomainException::class);
@@ -379,11 +397,16 @@ class PaymentContractTest extends TestCase
 
     public function testFullManualCaptureFlow(): void
     {
-        // Test the complete flow: DRAFT -> PENDING -> AUTHORIZED -> READY_TO_COMMIT -> COMMITTED -> FULFILLED
+        // Test the complete flow: DRAFT -> NOT_FINISHED -> PENDING -> AUTHORIZED -> READY_TO_COMMIT -> COMMITTED -> FULFILLED
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
 
-        // DRAFT -> PENDING
+        // DRAFT -> NOT_FINISHED (order created)
+        $contract->transitionToNotFinished('order_123');
+        $this->assertTrue($contract->getState()->isNotFinished());
+        $this->assertEquals('order_123', $contract->getOrderId());
+
+        // NOT_FINISHED -> PENDING
         $contract->transitionToPending();
         $this->assertTrue($contract->getState()->isPending());
 
@@ -403,7 +426,7 @@ class PaymentContractTest extends TestCase
         $this->assertTrue($contract->getState()->isReadyToCommit());
 
         // READY_TO_COMMIT -> COMMITTED
-        $contract->commitToOrder('order123');
+        $contract->commitToOrder('order_123');
         $this->assertTrue($contract->getState()->isCommitted());
 
         // COMMITTED -> FULFILLED
@@ -415,6 +438,7 @@ class PaymentContractTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $contract->authorize();
 
@@ -427,6 +451,7 @@ class PaymentContractTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot());
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $contract->authorize();
 
@@ -439,6 +464,7 @@ class PaymentContractTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user123', $this->createBasketSnapshot(), 'test_id');
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $contract->authorize();
 

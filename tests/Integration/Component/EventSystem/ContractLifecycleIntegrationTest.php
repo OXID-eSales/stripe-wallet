@@ -7,6 +7,7 @@ namespace OxidSolutionCatalysts\Payments\Tests\Integration\Component\EventSystem
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractCreationHandler;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractConditionResolverHandler;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\EarlyOrderCreationHandler;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\PaymentAuthorizationHandler;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\OrderCreationHandler;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractFulfillmentHandler;
@@ -14,6 +15,7 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractCleanup
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentInitiatedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\WebhookReceivedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractCreatedEvent;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractDraftCompletedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractTransitionedToPendingEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractReadyToCommitEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractCommittedEvent;
@@ -25,6 +27,7 @@ use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepository;
 use OxidSolutionCatalysts\Payments\Component\Service\ContractService;
 use OxidSolutionCatalysts\Payments\Component\Contract\BasketSnapshot;
 use OxidSolutionCatalysts\Payments\Tests\Unit\Component\EventSystem\Handler\Support\InMemoryOrderRepository;
+use OxidSolutionCatalysts\Payments\Tests\Unit\Component\EventSystem\Handler\Support\InMemoryShopOrderService;
 use PHPUnit\Framework\TestCase;
 
 class ContractLifecycleIntegrationTest extends TestCase
@@ -32,6 +35,7 @@ class ContractLifecycleIntegrationTest extends TestCase
     private EventDispatcher $dispatcher;
     private ContractRepository $contractRepository;
     private InMemoryOrderRepository $orderRepository;
+    private InMemoryShopOrderService $shopOrderService;
     private ContractService $contractService;
 
     protected function setUp(): void
@@ -39,6 +43,7 @@ class ContractLifecycleIntegrationTest extends TestCase
         $this->dispatcher = new EventDispatcher();
         $this->contractRepository = new ContractRepository();
         $this->orderRepository = new InMemoryOrderRepository();
+        $this->shopOrderService = new InMemoryShopOrderService();
         $this->contractService = new ContractService($this->contractRepository);
 
         $this->registerHandlers();
@@ -53,6 +58,13 @@ class ContractLifecycleIntegrationTest extends TestCase
 
         $contractConditionResolverHandler = new ContractConditionResolverHandler(
             $this->contractRepository,
+            $this->dispatcher
+        );
+
+        // STRP-74: EarlyOrderCreationHandler for new flow DRAFT → NOT_FINISHED → PENDING
+        $earlyOrderCreationHandler = new EarlyOrderCreationHandler(
+            $this->contractRepository,
+            $this->shopOrderService,
             $this->dispatcher
         );
 
@@ -85,6 +97,12 @@ class ContractLifecycleIntegrationTest extends TestCase
         $this->dispatcher->addListener(
             ContractCreatedEvent::class,
             [$contractConditionResolverHandler, 'handle']
+        );
+
+        // STRP-74: Register EarlyOrderCreationHandler for ContractDraftCompletedEvent
+        $this->dispatcher->addListener(
+            ContractDraftCompletedEvent::class,
+            [$earlyOrderCreationHandler, 'handle']
         );
 
         $this->dispatcher->addListener(

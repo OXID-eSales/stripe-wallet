@@ -283,13 +283,15 @@ final class EndToEndCheckoutFlowTest extends IntegrationTestCase
     public function testContractStateMachine_PersistsStateTransitions(): void
     {
         $contract = $this->createContractDirectly($this->generateTestContractId('state_machine'));
+        $orderId = $this->generateTestOrderId('sm');
 
         // Save DRAFT state
         $this->contractRepository->save($contract);
         $this->assertDatabaseState($contract->getId(), 'draft');
 
-        // Transition to PENDING
+        // Transition to NOT_FINISHED then PENDING
         $contract->addCondition(ContractCondition::paymentAuthorized());
+        $contract->transitionToNotFinished($orderId);
         $contract->transitionToPending();
         $this->contractRepository->save($contract);
         $this->assertDatabaseState($contract->getId(), 'pending');
@@ -302,7 +304,6 @@ final class EndToEndCheckoutFlowTest extends IntegrationTestCase
         $this->assertDatabaseState($contract->getId(), 'ready_to_commit');
 
         // Commit to order -> COMMITTED
-        $orderId = $this->generateTestOrderId('sm');
         $contract->commitToOrder($orderId);
         $this->contractRepository->save($contract);
         $this->assertDatabaseState($contract->getId(), 'committed');
@@ -326,6 +327,7 @@ final class EndToEndCheckoutFlowTest extends IntegrationTestCase
 
         $contract->addCondition(ContractCondition::paymentAuthorized());
         $contract->addCondition(ContractCondition::fraudCheck());
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $this->contractRepository->save($contract);
 
@@ -368,6 +370,7 @@ final class EndToEndCheckoutFlowTest extends IntegrationTestCase
     {
         $contract = $this->createContractDirectly($this->generateTestContractId('payment_auth'));
         $contract->addCondition(ContractCondition::paymentAuthorized());
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
 
         $authData = [
@@ -403,6 +406,7 @@ final class EndToEndCheckoutFlowTest extends IntegrationTestCase
     {
         $contract = $this->createContractDirectly($this->generateTestContractId('failed_condition'));
         $contract->addCondition(ContractCondition::fraudCheck());
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
 
         $contract->failCondition(ContractCondition::TYPE_FRAUD_CHECK, 'High risk score detected');
@@ -505,7 +509,9 @@ final class EndToEndCheckoutFlowTest extends IntegrationTestCase
         $this->assertNotNull($contract, 'Step 2: Contract should exist');
         $this->assertCount(2, $contract->getConditions(), 'Step 2: Should have 2 conditions');
 
-        // STEP 3: Simulate condition fulfillment
+        // STEP 3: Create order and simulate condition fulfillment
+        $orderId = $this->generateTestOrderId('flow');
+        $contract->transitionToNotFinished($orderId);
         $contract->transitionToPending();
         $this->contractRepository->save($contract);
         $this->assertDatabaseState($contractId, 'pending');
@@ -525,8 +531,7 @@ final class EndToEndCheckoutFlowTest extends IntegrationTestCase
         $this->assertTrue($contract->getState()->isReadyToCommit(), 'Step 3: Ready to commit');
         $this->assertDatabaseState($contractId, 'ready_to_commit');
 
-        // STEP 4: Order creation
-        $orderId = $this->generateTestOrderId('flow');
+        // STEP 4: Commit to order
         $contract->commitToOrder($orderId);
         $this->contractRepository->save($contract);
 
@@ -573,6 +578,7 @@ final class EndToEndCheckoutFlowTest extends IntegrationTestCase
         $this->assertNotNull($contract);
 
         $contract->addCondition(ContractCondition::paymentAuthorized());
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $this->contractRepository->save($contract);
 

@@ -193,6 +193,74 @@ class CheckoutSessionServiceTest extends TestCase
         $this->assertEquals('contract_xyz', $capturedParams['payment_intent_data']['metadata']['contract_id']);
     }
 
+    public function testCreateSessionIncludesOrderNumberInMetadata(): void
+    {
+        // Arrange
+        $basketSnapshot = $this->createBasketSnapshot();
+        $session = Session::constructFrom([
+            'id' => 'cs_order_num',
+            'url' => 'https://checkout.stripe.com/pay/cs_order_num',
+        ]);
+
+        $capturedParams = null;
+        $this->stripeAdapter
+            ->method('createCheckoutSession')
+            ->willReturnCallback(function ($params) use ($session, &$capturedParams) {
+                $capturedParams = $params;
+                return $session;
+            });
+
+        // Act
+        $service = $this->createService();
+        $service->createSession(
+            'contract_123',
+            $basketSnapshot,
+            'https://shop.example.com/success',
+            'https://shop.example.com/cancel',
+            '1',
+            'automatic',
+            'order_abc',
+            '1001'
+        );
+
+        // Assert - order_id and order_number should be in metadata
+        $this->assertEquals('order_abc', $capturedParams['metadata']['order_id']);
+        $this->assertEquals('1001', $capturedParams['metadata']['order_number']);
+        $this->assertEquals('order_abc', $capturedParams['payment_intent_data']['metadata']['order_id']);
+        $this->assertEquals('1001', $capturedParams['payment_intent_data']['metadata']['order_number']);
+    }
+
+    public function testCreateSessionWithoutOrderNumberOmitsFromMetadata(): void
+    {
+        // Arrange
+        $basketSnapshot = $this->createBasketSnapshot();
+        $session = Session::constructFrom([
+            'id' => 'cs_no_order',
+            'url' => 'https://checkout.stripe.com/pay/cs_no_order',
+        ]);
+
+        $capturedParams = null;
+        $this->stripeAdapter
+            ->method('createCheckoutSession')
+            ->willReturnCallback(function ($params) use ($session, &$capturedParams) {
+                $capturedParams = $params;
+                return $session;
+            });
+
+        // Act
+        $service = $this->createService();
+        $service->createSession(
+            'contract_456',
+            $basketSnapshot,
+            'https://shop.example.com/success',
+            'https://shop.example.com/cancel'
+        );
+
+        // Assert - order_id and order_number should not be present when not provided
+        $this->assertArrayNotHasKey('order_id', $capturedParams['metadata']);
+        $this->assertArrayNotHasKey('order_number', $capturedParams['metadata']);
+    }
+
     public function testCreateSessionHandlesStripeError(): void
     {
         // Arrange

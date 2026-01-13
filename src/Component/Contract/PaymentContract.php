@@ -71,10 +71,38 @@ class PaymentContract extends AbstractModel implements PaymentContractInterface
         $this->touch();
     }
 
-    public function transitionToPending(): void
+    /**
+     * Transition contract from DRAFT to NOT_FINISHED state.
+     *
+     * This is the early order creation step where the order is created
+     * and linked to the contract before payment processing begins.
+     *
+     * @param string $orderId The ID of the created order
+     * @throws DomainException if not in DRAFT state or orderId is empty
+     */
+    public function transitionToNotFinished(string $orderId): void
     {
         if (!$this->state->isDraft()) {
-            throw new DomainException('Can only transition to PENDING from DRAFT state');
+            throw new DomainException('Can only transition to NOT_FINISHED from DRAFT state');
+        }
+
+        if ($orderId === '') {
+            throw new DomainException('Order ID is required for NOT_FINISHED transition');
+        }
+
+        if (empty($this->conditions)) {
+            throw new DomainException('Cannot transition to NOT_FINISHED without conditions');
+        }
+
+        $this->orderId = $orderId;
+        $this->state = ContractState::notFinished();
+        $this->touch();
+    }
+
+    public function transitionToPending(): void
+    {
+        if (!$this->state->isNotFinished()) {
+            throw new DomainException('Can only transition to PENDING from NOT_FINISHED state');
         }
 
         if (empty($this->conditions)) {

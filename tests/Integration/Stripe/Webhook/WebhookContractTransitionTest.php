@@ -315,10 +315,13 @@ final class WebhookContractTransitionTest extends TestCase
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
 
         if ($state === 'pending') {
+            $contract->transitionToNotFinished('order_123');
             $contract->transitionToPending();
             return $contract;
         }
 
+        $orderId = 'order_test_' . uniqid();
+        $contract->transitionToNotFinished($orderId);
         $contract->transitionToPending();
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED);
 
@@ -326,7 +329,7 @@ final class WebhookContractTransitionTest extends TestCase
             return $contract;
         }
 
-        $contract->commitToOrder('order_test_' . uniqid());
+        $contract->commitToOrder($orderId);
 
         if ($state === 'committed') {
             return $contract;

@@ -22,10 +22,10 @@ use PHPUnit\Framework\TestCase;
  * Tests all valid state transitions and verifies invalid transitions
  * throw DomainException.
  *
- * State Machine Flow:
- * DRAFT → PENDING → READY_TO_COMMIT → COMMITTED → FULFILLED
- *          ↓              ↓               ↓
- *       FAILED         CANCELLED       EXPIRED
+ * State Machine Flow (STRP-74 updated):
+ * DRAFT → NOT_FINISHED → PENDING → READY_TO_COMMIT → COMMITTED → FULFILLED
+ *              ↓              ↓              ↓               ↓
+ *           FAILED         FAILED       CANCELLED       EXPIRED
  *
  * @covers \OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract
  * @covers \OxidSolutionCatalysts\Payments\Component\Contract\ContractState
@@ -64,8 +64,9 @@ final class ContractStateMachineTest extends TestCase
         $contract = new PaymentContract(1, 'user123', $this->basketSnapshot);
         $this->assertTrue($contract->getState()->isDraft());
 
-        // When: Add condition and transition to PENDING
+        // When: Add condition and transition to NOT_FINISHED then PENDING
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_abc123');
         $contract->transitionToPending();
         $this->assertTrue($contract->getState()->isPending());
 
@@ -90,26 +91,43 @@ final class ContractStateMachineTest extends TestCase
 
     /**
      * @test
+     * STRP-74: Updated for new flow - transitionToNotFinished checks for conditions
      */
-    public function transitionToPendingRequiresConditions(): void
+    public function transitionToNotFinishedRequiresConditions(): void
     {
         $contract = new PaymentContract(1, 'user123', $this->basketSnapshot);
 
         $this->expectException(DomainException::class);
-        $this->expectExceptionMessage('Cannot transition to PENDING without conditions');
+        $this->expectExceptionMessage('Cannot transition to NOT_FINISHED without conditions');
+
+        $contract->transitionToNotFinished('order_123');
+    }
+
+    /**
+     * @test
+     * STRP-74: transitionToPending now requires NOT_FINISHED state, not DRAFT
+     */
+    public function transitionToPendingRequiresNotFinishedState(): void
+    {
+        $contract = new PaymentContract(1, 'user123', $this->basketSnapshot);
+        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('Can only transition to PENDING from NOT_FINISHED state');
 
         $contract->transitionToPending();
     }
 
     /**
      * @test
+     * STRP-74: Updated for new flow - transitionToPending only from NOT_FINISHED
      */
-    public function transitionToPendingOnlyFromDraft(): void
+    public function transitionToPendingOnlyFromNotFinished(): void
     {
         $contract = $this->createContractInState('pending');
 
         $this->expectException(DomainException::class);
-        $this->expectExceptionMessage('Can only transition to PENDING from DRAFT state');
+        $this->expectExceptionMessage('Can only transition to PENDING from NOT_FINISHED state');
 
         $contract->transitionToPending();
     }
@@ -122,6 +140,7 @@ final class ContractStateMachineTest extends TestCase
         $contract = new PaymentContract(1, 'user123', $this->basketSnapshot);
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_FRAUD_CHECK));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
 
         // Fulfill first condition - still PENDING
@@ -247,6 +266,7 @@ final class ContractStateMachineTest extends TestCase
         $contract = new PaymentContract(1, 'user123', $this->basketSnapshot);
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_FRAUD_CHECK));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
 
         // Only fulfill one condition
@@ -345,10 +365,13 @@ final class ContractStateMachineTest extends TestCase
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
 
         if ($state === 'pending') {
+            $contract->transitionToNotFinished('order_123');
             $contract->transitionToPending();
             return $contract;
         }
 
+        $orderId = 'order_test_' . uniqid();
+        $contract->transitionToNotFinished($orderId);
         $contract->transitionToPending();
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED);
 
@@ -356,7 +379,7 @@ final class ContractStateMachineTest extends TestCase
             return $contract;
         }
 
-        $contract->commitToOrder('order_test_' . uniqid());
+        $contract->commitToOrder($orderId);
 
         if ($state === 'committed') {
             return $contract;

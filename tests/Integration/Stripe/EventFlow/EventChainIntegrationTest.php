@@ -8,15 +8,18 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractCreationHandler;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractConditionResolverHandler;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\EarlyOrderCreationHandler;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\PaymentAuthorizationHandler;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\OrderCreationHandler;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractCreatedEvent;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractDraftCompletedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractReadyToCommitEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractTransitionedToPendingEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentInitiatedEvent;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepository;
 use OxidSolutionCatalysts\Payments\Component\Service\ContractService;
 use OxidSolutionCatalysts\Payments\Tests\Unit\Component\EventSystem\Handler\Support\InMemoryOrderRepository;
+use OxidSolutionCatalysts\Payments\Tests\Unit\Component\EventSystem\Handler\Support\InMemoryShopOrderService;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -24,15 +27,19 @@ use PHPUnit\Framework\TestCase;
  *
  * This test verifies that the event-driven architecture works correctly:
  * 1. PaymentInitiatedEvent → ContractCreationHandler (creates contract)
- * 2. ContractCreatedEvent → ContractConditionResolverHandler (transitions to pending)
- * 3. ContractTransitionedToPendingEvent → PaymentAuthorizationHandler (fulfills condition)
- * 4. ContractReadyToCommitEvent → OrderCreationHandler (creates order)
+ * 2. ContractCreatedEvent → ContractConditionResolverHandler (dispatches ContractDraftCompletedEvent)
+ * 3. ContractDraftCompletedEvent → EarlyOrderCreationHandler (creates order, NOT_FINISHED → PENDING)
+ * 4. ContractTransitionedToPendingEvent → PaymentAuthorizationHandler (fulfills condition)
+ * 5. ContractReadyToCommitEvent → OrderCreationHandler (commits order)
+ *
+ * STRP-74: Updated flow with early order creation
  */
 class EventChainIntegrationTest extends TestCase
 {
     private EventDispatcher $dispatcher;
     private ContractRepository $contractRepository;
     private InMemoryOrderRepository $orderRepository;
+    private InMemoryShopOrderService $shopOrderService;
     private ContractService $contractService;
     /** @var array<string> */
     private array $handledEvents = [];
@@ -42,6 +49,7 @@ class EventChainIntegrationTest extends TestCase
         $this->dispatcher = new EventDispatcher();
         $this->contractRepository = new ContractRepository();
         $this->orderRepository = new InMemoryOrderRepository();
+        $this->shopOrderService = new InMemoryShopOrderService();
         $this->contractService = new ContractService($this->contractRepository);
         $this->handledEvents = [];
 
@@ -58,6 +66,13 @@ class EventChainIntegrationTest extends TestCase
 
         $contractConditionResolverHandler = new ContractConditionResolverHandler(
             $this->contractRepository,
+            $this->dispatcher
+        );
+
+        // STRP-74: EarlyOrderCreationHandler for new flow DRAFT → NOT_FINISHED → PENDING
+        $earlyOrderCreationHandler = new EarlyOrderCreationHandler(
+            $this->contractRepository,
+            $this->shopOrderService,
             $this->dispatcher
         );
 
@@ -86,6 +101,15 @@ class EventChainIntegrationTest extends TestCase
             function ($event) use ($contractConditionResolverHandler) {
                 $this->handledEvents[] = 'ContractConditionResolver';
                 $contractConditionResolverHandler->handle($event);
+            }
+        );
+
+        // STRP-74: Register EarlyOrderCreationHandler for ContractDraftCompletedEvent
+        $this->dispatcher->addListener(
+            ContractDraftCompletedEvent::class,
+            function ($event) use ($earlyOrderCreationHandler) {
+                $this->handledEvents[] = 'EarlyOrderCreation';
+                $earlyOrderCreationHandler->handle($event);
             }
         );
 
@@ -224,13 +248,17 @@ class EventChainIntegrationTest extends TestCase
         );
         $this->dispatcher->dispatch($event);
 
+        // STRP-74: Updated handler order with EarlyOrderCreation
         // Verify handler execution order
         $contractCreationIndex = array_search('ContractCreation', $this->handledEvents);
         $conditionResolverIndex = array_search('ContractConditionResolver', $this->handledEvents);
+        $earlyOrderCreationIndex = array_search('EarlyOrderCreation', $this->handledEvents);
 
         $this->assertNotFalse($contractCreationIndex);
         $this->assertNotFalse($conditionResolverIndex);
+        $this->assertNotFalse($earlyOrderCreationIndex);
         $this->assertLessThan($conditionResolverIndex, $contractCreationIndex);
+        $this->assertLessThan($earlyOrderCreationIndex, $conditionResolverIndex);
     }
 
     private function createTestBasket(): object

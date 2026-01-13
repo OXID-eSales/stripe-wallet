@@ -69,6 +69,17 @@ class StripeOrderCreationHandler implements HandlerInterface
             return;
         }
 
+        // STRP-74: Check if order was already created by EarlyOrderCreationHandler
+        $existingOrderId = $contract->getOrderId();
+        if ($existingOrderId !== null) {
+            $this->logEvent('StripeOrderCreationHandler: Order already exists (early creation), skipping new order', [
+                'existingOrderId' => $existingOrderId,
+            ]);
+            $this->handleExistingOrder($contract, $context, $existingOrderId);
+            $this->logEvent('StripeOrderCreationHandler::handle() END - SUCCESS (used existing order)');
+            return;
+        }
+
         try {
             $basket = $this->validateAndGetBasket($context);
             if ($basket === null) {
@@ -181,6 +192,54 @@ class StripeOrderCreationHandler implements HandlerInterface
         $context->set('orderNumber', $orderResponse->orderNumber);
 
         return $orderResponse->orderId;
+    }
+
+    /**
+     * Handle existing order from early creation (STRP-74).
+     *
+     * When EarlyOrderCreationHandler has already created the order, we:
+     * 1. Set context variables for downstream handlers
+     * 2. Commit the contract to the existing order
+     * 3. Update OXPAID on the existing order
+     * 4. Dispatch ContractCommittedEvent
+     */
+    private function handleExistingOrder(
+        \OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface $contract,
+        \OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContextInterface $context,
+        string $orderId
+    ): void {
+        // Load order to get order number
+        /** @var \OxidEsales\Eshop\Application\Model\Order $order */
+        $order = \oxNew(\OxidEsales\Eshop\Application\Model\Order::class);
+        $orderNumber = null;
+        if ($order->load($orderId)) {
+            $orderNumber = $order->getFieldData('oxordernr');
+        }
+
+        $this->logEvent('StripeOrderCreationHandler: Using existing order', [
+            'orderId' => $orderId,
+            'orderNumber' => $orderNumber,
+        ]);
+
+        // Set context for downstream handlers (like thankyou page)
+        $context->set('orderId', $orderId);
+        $context->set('orderNumber', $orderNumber);
+
+        // Commit contract to existing order
+        $contract->commitToOrder($orderId);
+        $this->contractRepository->save($contract);
+
+        // Update OXPAID only if payment was captured (not for manual capture)
+        $requiresCapture = $context->get('requiresCapture') === true;
+        if (!$requiresCapture) {
+            $this->logEvent('StripeOrderCreationHandler: Updating OXPAID on existing order (automatic capture)');
+            $this->updateOrderPaidTimestamp($orderId, $contract->getProviderOrderId());
+        } else {
+            $this->logEvent('StripeOrderCreationHandler: Skipping OXPAID (manual capture mode)');
+        }
+
+        $committedEvent = new ContractCommittedEvent($contract, $context, $orderId);
+        $this->eventDispatcher->dispatch($committedEvent);
     }
 
     private function handlePostOrderCreation(

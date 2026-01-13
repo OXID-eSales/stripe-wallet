@@ -41,6 +41,7 @@ class ContractCleanupHandlerTest extends TestCase
 
         $contract = new PaymentContract(1, 'user123', $snapshot);
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
 
         return $contract;
@@ -108,7 +109,7 @@ class ContractCleanupHandlerTest extends TestCase
     {
         $contract = $this->createPendingContract();
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED, []);
-        $contract->commitToOrder('123');
+        $contract->commitToOrder('order_123');
         $contract->fulfill();
         $this->repository->save($contract);
 

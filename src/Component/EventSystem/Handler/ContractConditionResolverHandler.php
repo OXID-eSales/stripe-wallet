@@ -4,14 +4,20 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Component\EventSystem\Handler;
 
+use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractCreatedEvent;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractTransitionedToPendingEvent;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractDraftCompletedEvent;
 
 /**
- * Handles contract creation and initiates condition resolution.
+ * Handles contract creation and dispatches draft completed event.
  *
- * When a contract is created, this handler transitions it to PENDING state
- * and dispatches an event to trigger condition fulfillment by other handlers.
+ * When a contract is created, this handler validates conditions are set
+ * and dispatches ContractDraftCompletedEvent to trigger the order creation
+ * flow: DRAFT -> NOT_FINISHED -> PENDING.
+ *
+ * STRP-74: Updated to dispatch ContractDraftCompletedEvent instead of
+ * transitioning directly to PENDING. The EarlyOrderCreationHandler
+ * will handle order creation and state transitions.
  *
  * @since 1.0.0
  */
@@ -27,18 +33,28 @@ class ContractConditionResolverHandler extends AbstractHandler
         if (!$event instanceof ContractCreatedEvent) {
             return;
         }
+
         $contract = $event->getContract();
 
-        $contract->transitionToPending();
+        if (!$contract instanceof PaymentContract) {
+            return;
+        }
 
-        $this->contractRepository->save($contract);
+        if (empty($contract->getConditions())) {
+            throw new \DomainException('Cannot transition to PENDING without conditions');
+        }
 
-        $pendingEvent = new ContractTransitionedToPendingEvent(
+        if ($this->eventDispatcher === null) {
+            return;
+        }
+
+        // Dispatch event to trigger EarlyOrderCreationHandler
+        // which will create order and transition DRAFT -> NOT_FINISHED -> PENDING
+        $draftCompletedEvent = new ContractDraftCompletedEvent(
             $contract,
-            $event->getContext(),
-            $contract->getConditions()
+            $event->getContext()
         );
 
-        $this->eventDispatcher->dispatch($pendingEvent);
+        $this->eventDispatcher->dispatch($draftCompletedEvent);
     }
 }

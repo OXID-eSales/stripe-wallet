@@ -134,6 +134,7 @@ class DoctrineContractRepositoryTest extends IntegrationTestCase
 
         // When - transition to pending
         $contract->addCondition(ContractCondition::paymentAuthorized());
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $this->repository->save($contract);
 
@@ -204,10 +205,12 @@ class DoctrineContractRepositoryTest extends IntegrationTestCase
         // Given
         $activeContract = $this->createTestContract('test_contract_active');
         $activeContract->addCondition(ContractCondition::paymentAuthorized());
+        $activeContract->transitionToNotFinished('order_active');
         $activeContract->transitionToPending();
 
         $fulfilledContract = $this->createTestContract('test_contract_fulfilled');
         $fulfilledContract->addCondition(ContractCondition::paymentAuthorized());
+        $fulfilledContract->transitionToNotFinished('test_order_123');
         $fulfilledContract->transitionToPending();
         $fulfilledContract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED);
         $fulfilledContract->commitToOrder('test_order_123');
@@ -231,6 +234,7 @@ class DoctrineContractRepositoryTest extends IntegrationTestCase
         // Given
         $fulfilledContract = $this->createTestContract('test_contract_fulfilled');
         $fulfilledContract->addCondition(ContractCondition::paymentAuthorized());
+        $fulfilledContract->transitionToNotFinished('test_order_123');
         $fulfilledContract->transitionToPending();
         $fulfilledContract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED);
         $fulfilledContract->commitToOrder('test_order_123');

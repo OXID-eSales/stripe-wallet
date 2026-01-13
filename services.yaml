@@ -123,6 +123,23 @@ services:
   #     - { name: payment.event_handler }
   #   public: false
 
+  # ==========================================
+  # Early Order Creation Handler (Sprint STRP-74)
+  # ==========================================
+  # Handles ContractDraftCompletedEvent to create order early in the flow.
+  # New flow: DRAFT -> NOT_FINISHED (order created here) -> PENDING
+  # Priority 100: Runs early to ensure order is created before other handlers.
+
+  OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\EarlyOrderCreationHandler:
+    arguments:
+      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $shopOrderService: '@OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface'
+      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      $eventLogger: '@stripe.events.file_logger'
+    tags:
+      - { name: payment.event_handler, priority: 100 }
+    public: false
+
   # ===========================================
   # Payment Adapter Layer (Provider-Agnostic)
   # ===========================================
@@ -331,6 +348,7 @@ services:
       $contractService: '@OxidSolutionCatalysts\Payments\Component\Service\ContractServiceInterface'
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
       $metadataService: '@OxidSolutionCatalysts\Payments\Stripe\Service\ContractMetadataServiceInterface'
+      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
       $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler, priority: 100 }
@@ -409,6 +427,7 @@ services:
     arguments:
       $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
       $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      $orderPaymentStateService: '@OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface'
       $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler, priority: 90 }

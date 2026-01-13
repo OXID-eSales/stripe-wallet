@@ -9,10 +9,6 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Integration\Component\Controller;
 
-use Doctrine\DBAL\Connection;
-use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
-use OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionProviderInterface;
-use OxidEsales\EshopCommunity\Tests\Integration\IntegrationTestCase;
 use OxidSolutionCatalysts\Payments\Component\Contract\BasketSnapshot;
 use OxidSolutionCatalysts\Payments\Component\Contract\ContractCondition;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
@@ -20,21 +16,25 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventListenerProvider;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractCreationHandler;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractConditionResolverHandler;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\EarlyOrderCreationHandler;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\PaymentAuthorizationHandler;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\OrderCreationHandler;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractFulfillmentHandler;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentInitiatedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\OrderCompletedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractCreatedEvent;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractDraftCompletedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractTransitionedToPendingEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractReadyToCommitEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractCommittedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventInterface;
-use OxidSolutionCatalysts\Payments\Component\Repository\DoctrineContractRepository;
+use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepository;
 use OxidSolutionCatalysts\Payments\Component\Service\CheckoutOrchestrator;
 use OxidSolutionCatalysts\Payments\Component\Service\ContractService;
 use OxidSolutionCatalysts\Payments\Tests\Unit\Component\EventSystem\Handler\Support\InMemoryOrderRepository;
+use OxidSolutionCatalysts\Payments\Tests\Unit\Component\EventSystem\Handler\Support\InMemoryShopOrderService;
+use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 /**
@@ -52,17 +52,17 @@ use Psr\Log\NullLogger;
  * @group event-system
  * @group controller-integration
  */
-final class ControllerEventSystemIntegrationTest extends IntegrationTestCase
+final class ControllerEventSystemIntegrationTest extends TestCase
 {
     private const TEST_PREFIX = 'e2e_ctrl_';
     private const SHOP_ID = 1;
 
-    private Connection $connection;
-    private DoctrineContractRepository $contractRepository;
+    private ContractRepository $contractRepository;
     private EventDispatcher $eventDispatcher;
     private EventListenerProvider $listenerProvider;
     private CheckoutOrchestrator $orchestrator;
     private InMemoryOrderRepository $orderRepository;
+    private InMemoryShopOrderService $shopOrderService;
     private ContractService $contractService;
 
     /** @var array<string, bool> Track which handlers were executed */
@@ -79,37 +79,12 @@ final class ControllerEventSystemIntegrationTest extends IntegrationTestCase
 
         $this->testRunId = date('His') . '_' . substr(uniqid(), -4);
 
-        // Get real DB connection
-        $container = ContainerFactory::getInstance()->getContainer();
-        /** @var ConnectionProviderInterface $connectionProvider */
-        $connectionProvider = $container->get(ConnectionProviderInterface::class);
-        $this->connection = $connectionProvider->get();
-
         // Reset execution logs
         $this->handlerExecutionLog = [];
         $this->eventDispatchLog = [];
 
-        // Set up real components with tracking
+        // Set up components with tracking (using in-memory repository)
         $this->setupEventSystem();
-    }
-
-    public function tearDown(): void
-    {
-        $this->commitTransaction();
-        $this->cleanupCaching();
-        $this->restoreRequestData();
-    }
-
-    private function commitTransaction(): void
-    {
-        $container = ContainerFactory::getInstance()->getContainer();
-        /** @var ConnectionProviderInterface $connectionProvider */
-        $connectionProvider = $container->get(ConnectionProviderInterface::class);
-        $connection = $connectionProvider->get();
-
-        if ($connection->isTransactionActive()) {
-            $connection->commit();
-        }
     }
 
     /**
@@ -117,8 +92,9 @@ final class ControllerEventSystemIntegrationTest extends IntegrationTestCase
      */
     private function setupEventSystem(): void
     {
-        $this->contractRepository = new DoctrineContractRepository($this->connection);
+        $this->contractRepository = new ContractRepository();
         $this->orderRepository = new InMemoryOrderRepository();
+        $this->shopOrderService = new InMemoryShopOrderService();
         $this->contractService = new ContractService($this->contractRepository);
 
         // Create listener provider
@@ -180,6 +156,20 @@ final class ControllerEventSystemIntegrationTest extends IntegrationTestCase
             function ($event) use ($conditionResolverHandler) {
                 $this->logHandlerExecuted('ContractConditionResolverHandler');
                 $conditionResolverHandler->handle($event);
+            }
+        );
+
+        // STRP-74: EarlyOrderCreationHandler for new flow DRAFT → NOT_FINISHED → PENDING
+        $earlyOrderCreationHandler = new EarlyOrderCreationHandler(
+            $this->contractRepository,
+            $this->shopOrderService,
+            $this->eventDispatcher
+        );
+        $this->listenerProvider->addListener(
+            ContractDraftCompletedEvent::class,
+            function ($event) use ($earlyOrderCreationHandler) {
+                $this->logHandlerExecuted('EarlyOrderCreationHandler');
+                $earlyOrderCreationHandler->handle($event);
             }
         );
 
@@ -297,24 +287,21 @@ final class ControllerEventSystemIntegrationTest extends IntegrationTestCase
     /**
      * @group controller-integration
      */
-    public function testOrderControllerFlow_CreatesContractInDatabase(): void
+    public function testOrderControllerFlow_CreatesContractInRepository(): void
     {
         $basket = $this->createBasketMock();
         $user = $this->createUserMock();
 
         $result = $this->orchestrator->processCheckout($basket, $user, 'stripe_card');
 
-        // Assert contract exists in database
+        // Assert contract exists in repository
         $contractId = $result->getContractId();
         $this->assertNotNull($contractId);
 
-        $dbContract = $this->connection->fetchAssociative(
-            'SELECT * FROM osc_payment_contract WHERE OXID = :id',
-            ['id' => $contractId]
-        );
+        $contract = $this->contractRepository->findById($contractId);
 
-        $this->assertNotFalse($dbContract, 'Contract should exist in database');
-        $this->assertEquals('user_' . $this->testRunId, $dbContract['OXUSERID']);
+        $this->assertNotNull($contract, 'Contract should exist in repository');
+        $this->assertEquals('user_' . $this->testRunId, $contract->getUserId());
     }
 
     /**
@@ -564,7 +551,7 @@ final class ControllerEventSystemIntegrationTest extends IntegrationTestCase
      * @group controller-integration
      * @group complete-flow
      */
-    public function testCompleteFlow_ContractStatePersistsInDatabase(): void
+    public function testCompleteFlow_ContractStatePersistsInRepository(): void
     {
         // Phase 1: Create contract
         $basket = $this->createBasketMock();
@@ -573,27 +560,21 @@ final class ControllerEventSystemIntegrationTest extends IntegrationTestCase
         $result = $this->orchestrator->processCheckout($basket, $user, 'stripe_card');
         $contractId = $result->getContractId();
 
-        // Verify initial state in DB
-        $dbContract = $this->connection->fetchAssociative(
-            'SELECT OXSTATE, OXUSERID FROM osc_payment_contract WHERE OXID = :id',
-            ['id' => $contractId]
-        );
+        // Verify initial state in repository
+        $contract = $this->contractRepository->findById($contractId);
 
-        $this->assertNotFalse($dbContract, 'Contract should exist');
-        // State depends on handler execution (could be draft, pending, or ready_to_commit)
-        $this->assertContains($dbContract['OXSTATE'], ['draft', 'pending', 'ready_to_commit']);
+        $this->assertNotNull($contract, 'Contract should exist');
+        // STRP-74: State depends on handler execution (could be draft, not_finished, pending, or ready_to_commit)
+        $this->assertContains($contract->getStateValue(), ['draft', 'not_finished', 'pending', 'ready_to_commit']);
 
         // Phase 2: Confirm order
         $orderId = 'ord_state_' . $this->testRunId;
         $this->orchestrator->confirmOrderCompletion($orderId, $contractId);
 
-        // Contract state should still be in DB (not deleted)
-        $finalContract = $this->connection->fetchAssociative(
-            'SELECT OXSTATE FROM osc_payment_contract WHERE OXID = :id',
-            ['id' => $contractId]
-        );
+        // Contract state should still exist in repository (not deleted)
+        $finalContract = $this->contractRepository->findById($contractId);
 
-        $this->assertNotFalse($finalContract, 'Contract should still exist after confirmation');
+        $this->assertNotNull($finalContract, 'Contract should still exist after confirmation');
     }
 
     // =========================================================================

@@ -13,6 +13,7 @@ use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeContractCrea
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ContractMetadataServiceInterface;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\ContractServiceInterface;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
@@ -31,12 +32,14 @@ class StripeContractCreationHandlerTest extends TestCase
     private ContractServiceInterface&MockObject $contractService;
     private ContractRepositoryInterface&MockObject $contractRepository;
     private ContractMetadataServiceInterface&MockObject $metadataService;
+    private EventDispatcherInterface&MockObject $eventDispatcher;
 
     protected function setUp(): void
     {
         $this->contractService = $this->createMock(ContractServiceInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->metadataService = $this->createMock(ContractMetadataServiceInterface::class);
+        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
     }
 
     private function createHandler(): StripeContractCreationHandler
@@ -44,7 +47,8 @@ class StripeContractCreationHandlerTest extends TestCase
         return new StripeContractCreationHandler(
             $this->contractService,
             $this->contractRepository,
-            $this->metadataService
+            $this->metadataService,
+            $this->eventDispatcher
         );
     }
 

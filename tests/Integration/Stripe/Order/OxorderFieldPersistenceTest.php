@@ -451,16 +451,19 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         $paymentIntentId = 'pi_contract_' . $this->testRunId;
         $contractId = $this->createContractId('commit');
 
+        // Act: Create order first (required for NOT_FINISHED transition)
+        $orderId = $this->createTestOrder($userId, 100.00, 'EUR', $paymentIntentId);
+
         // Create contract with provider info
         $contract = $this->createContract($contractId, $userId);
         $contract->setProvider('stripe', $paymentIntentId, null);
         $contract->addCondition(ContractCondition::paymentAuthorized());
+        $contract->transitionToNotFinished($orderId);
         $contract->transitionToPending();
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED, []);
         $this->contractRepository->save($contract);
 
-        // Act: Create order and commit contract
-        $orderId = $this->createTestOrder($userId, 100.00, 'EUR', $paymentIntentId);
+        // Commit contract to order
         $contract->commitToOrder($orderId);
         $this->contractRepository->save($contract);
 

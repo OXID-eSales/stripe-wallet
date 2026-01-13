@@ -10,6 +10,7 @@ class ContractState
 {
     private const VALID_STATES = [
         'draft',
+        'not_finished',
         'pending',
         'authorized',
         'ready_to_commit',
@@ -41,6 +42,11 @@ class ContractState
     public static function draft(): self
     {
         return new self('draft');
+    }
+
+    public static function notFinished(): self
+    {
+        return new self('not_finished');
     }
 
     public static function pending(): self
@@ -91,6 +97,11 @@ class ContractState
     public function isDraft(): bool
     {
         return $this->value === 'draft';
+    }
+
+    public function isNotFinished(): bool
+    {
+        return $this->value === 'not_finished';
     }
 
     public function isPending(): bool

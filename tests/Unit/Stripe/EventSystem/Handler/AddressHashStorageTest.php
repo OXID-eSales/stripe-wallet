@@ -7,6 +7,7 @@ namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\EventSystem\Handler;
 use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
 use OxidSolutionCatalysts\Payments\Component\Contract\BasketSnapshot;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\ContractServiceInterface;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
@@ -27,12 +28,14 @@ class AddressHashStorageTest extends TestCase
     private ContractServiceInterface&MockObject $contractService;
     private ContractRepositoryInterface&MockObject $contractRepository;
     private ContractMetadataServiceInterface&MockObject $metadataService;
+    private EventDispatcherInterface&MockObject $eventDispatcher;
 
     protected function setUp(): void
     {
         $this->contractService = $this->createMock(ContractServiceInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->metadataService = $this->createMock(ContractMetadataServiceInterface::class);
+        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
     }
 
     private function createHandler(): StripeContractCreationHandler
@@ -40,7 +43,8 @@ class AddressHashStorageTest extends TestCase
         return new StripeContractCreationHandler(
             $this->contractService,
             $this->contractRepository,
-            $this->metadataService
+            $this->metadataService,
+            $this->eventDispatcher
         );
     }
 

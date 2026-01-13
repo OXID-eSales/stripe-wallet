@@ -401,6 +401,7 @@ final class DelayedCaptureIntegrationTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user_' . uniqid(), $this->basketSnapshot);
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $contract->setProvider('stripe', $paymentIntentId);
         $contract->authorize();
@@ -412,6 +413,7 @@ final class DelayedCaptureIntegrationTest extends TestCase
     {
         $contract = new PaymentContract(1, 'user_' . uniqid(), $this->basketSnapshot);
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $contract->setProvider('stripe', $paymentIntentId);
 
@@ -420,12 +422,14 @@ final class DelayedCaptureIntegrationTest extends TestCase
 
     private function createCommittedContract(string $paymentIntentId): PaymentContract
     {
+        $orderId = 'order_' . uniqid();
         $contract = new PaymentContract(1, 'user_' . uniqid(), $this->basketSnapshot);
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished($orderId);
         $contract->transitionToPending();
         $contract->setProvider('stripe', $paymentIntentId);
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED, ['authId' => 'auth_' . uniqid()]);
-        $contract->commitToOrder('order_' . uniqid());
+        $contract->commitToOrder($orderId);
 
         return $contract;
     }

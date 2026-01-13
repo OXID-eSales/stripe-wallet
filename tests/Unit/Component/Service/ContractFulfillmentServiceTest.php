@@ -399,16 +399,19 @@ class ContractFulfillmentServiceTest extends TestCase
         switch ($state) {
             case 'pending':
                 $contract->setProvider('stripe', 'pi_test');
+                $contract->transitionToNotFinished('order-123');
                 $contract->transitionToPending();
                 break;
             case 'committed':
                 $contract->setProvider('stripe', 'pi_test');
+                $contract->transitionToNotFinished('order-123');
                 $contract->transitionToPending();
                 $contract->fulfillCondition(\OxidSolutionCatalysts\Payments\Component\Contract\ContractCondition::TYPE_PAYMENT_AUTHORIZED);
                 $contract->commitToOrder('order-123');
                 break;
             case 'fulfilled':
                 $contract->setProvider('stripe', 'pi_test');
+                $contract->transitionToNotFinished('order-123');
                 $contract->transitionToPending();
                 $contract->fulfillCondition(\OxidSolutionCatalysts\Payments\Component\Contract\ContractCondition::TYPE_PAYMENT_AUTHORIZED);
                 $contract->commitToOrder('order-123');

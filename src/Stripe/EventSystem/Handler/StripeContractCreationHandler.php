@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
 
 use InvalidArgumentException;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractDraftCompletedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\ContractServiceInterface;
@@ -28,6 +30,7 @@ class StripeContractCreationHandler implements HandlerInterface
         private readonly ContractServiceInterface $contractService,
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ContractMetadataServiceInterface $metadataService,
+        private readonly EventDispatcherInterface $eventDispatcher,
         private readonly ?FileLoggerInterface $eventLogger = null
     ) {
     }
@@ -104,8 +107,15 @@ class StripeContractCreationHandler implements HandlerInterface
         $context->setContract($contract);
         $context->set('contractId', $contract->getId());
 
+        // STRP-74: Dispatch ContractDraftCompletedEvent to trigger EarlyOrderCreationHandler
+        // This creates the order early and transitions DRAFT → NOT_FINISHED → PENDING
+        $this->logEvent('StripeContractCreationHandler: Dispatching ContractDraftCompletedEvent');
+        $draftCompletedEvent = new ContractDraftCompletedEvent($contract, $context);
+        $this->eventDispatcher->dispatch($draftCompletedEvent);
+
         $this->logEvent('StripeContractCreationHandler::handle() END', [
             'contractId' => $contract->getId(),
+            'state' => $contract->getStateValue(),
         ]);
     }
 

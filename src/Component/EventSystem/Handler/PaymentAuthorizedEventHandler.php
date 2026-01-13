@@ -10,6 +10,7 @@ use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentAu
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface;
+use OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface;
 
 /**
  * Handles PaymentAuthorizedEvent from payment providers.
@@ -32,6 +33,7 @@ class PaymentAuthorizedEventHandler implements HandlerInterface
     public function __construct(
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly OrderPaymentStateServiceInterface $orderPaymentStateService,
         private readonly ?FileLoggerInterface $eventLogger = null
     ) {
     }
@@ -91,6 +93,17 @@ class PaymentAuthorizedEventHandler implements HandlerInterface
             // Set provider info
             $providerName = $context->get('providerName') ?? 'stripe';
             $contract->setProvider($providerName, $event->getProviderOrderId());
+
+            // STRP-74: Update order's OXTRANSID if order was created early
+            // This links the Payment Intent ID to the existing order so webhooks can find it
+            $orderId = $contract->getOrderId();
+            if ($orderId !== null) {
+                $this->logEvent('PaymentAuthorizedEventHandler: Updating order OXTRANSID', [
+                    'orderId' => $orderId,
+                    'transactionId' => $event->getProviderOrderId(),
+                ]);
+                $this->orderPaymentStateService->updateTransactionId($orderId, $event->getProviderOrderId());
+            }
         }
 
         // Save contract state

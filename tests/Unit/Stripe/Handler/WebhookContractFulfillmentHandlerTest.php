@@ -323,6 +323,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $contract = new PaymentContract(1, 'user123', $snapshot);
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $contract->setProvider('stripe', $providerOrderId);
         // Transition to AUTHORIZED state (simulating manual capture mode)
@@ -402,6 +403,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $contract = new PaymentContract(1, 'user123', $snapshot);
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $contract->setProvider('stripe', $providerOrderId);
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED, ['authId' => 'auth_123']);
@@ -456,6 +458,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $contract = new PaymentContract(1, 'user123', $snapshot);
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $contract->setProvider('stripe', $providerOrderId);
         // Contract stays in PENDING - not AUTHORIZED, not COMMITTED
@@ -547,6 +550,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $contract = new PaymentContract(1, 'user123', $snapshot);
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_failed');
         $contract->transitionToPending();
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED, ['authorizationId' => 'auth_123']);
         $contract->setProvider('stripe', $providerOrderId);

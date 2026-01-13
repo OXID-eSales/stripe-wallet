@@ -45,6 +45,7 @@ class PaymentAuthorizationHandlerTest extends TestCase
 
         $contract = new PaymentContract(1, 'user123', $snapshot);
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
 
         return $contract;
@@ -153,6 +154,7 @@ class PaymentAuthorizationHandlerTest extends TestCase
         $contract = new PaymentContract(1, 'user123', $snapshot);
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_FRAUD_CHECK));
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $this->repository->save($contract);
 

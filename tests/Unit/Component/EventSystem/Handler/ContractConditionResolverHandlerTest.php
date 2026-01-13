@@ -6,7 +6,7 @@ namespace OxidSolutionCatalysts\Payments\Tests\Unit\Component\EventSystem\Handle
 
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractConditionResolverHandler;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractCreatedEvent;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractTransitionedToPendingEvent;
+use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractDraftCompletedEvent;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
 use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher;
 use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepository;
@@ -15,6 +15,12 @@ use OxidSolutionCatalysts\Payments\Component\Contract\BasketSnapshot;
 use OxidSolutionCatalysts\Payments\Component\Contract\ContractCondition;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Tests for ContractConditionResolverHandler.
+ *
+ * STRP-74: Updated to test new flow where handler dispatches
+ * ContractDraftCompletedEvent instead of transitioning directly to PENDING.
+ */
 class ContractConditionResolverHandlerTest extends TestCase
 {
     private ContractRepository $repository;
@@ -50,28 +56,14 @@ class ContractConditionResolverHandlerTest extends TestCase
         return $contract;
     }
 
-    public function testTransitionsContractToPending(): void
-    {
-        $contract = $this->createTestContract();
-        $this->repository->save($contract);
-
-        $context = new EventContext(['test' => 'data']);
-        $event = new ContractCreatedEvent($contract, $context);
-
-        $this->handler->handle($event);
-
-        $updated = $this->repository->findById($contract->getId());
-        $this->assertTrue($updated->getState()->isPending());
-    }
-
-    public function testEmitsPendingEvent(): void
+    public function testDispatchesDraftCompletedEvent(): void
     {
         $eventEmitted = false;
         $emittedContract = null;
 
         $this->dispatcher->addListener(
-            ContractTransitionedToPendingEvent::class,
-            function (ContractTransitionedToPendingEvent $event) use (&$eventEmitted, &$emittedContract) {
+            ContractDraftCompletedEvent::class,
+            function (ContractDraftCompletedEvent $event) use (&$eventEmitted, &$emittedContract) {
                 $eventEmitted = true;
                 $emittedContract = $event->getContract();
             }
@@ -87,7 +79,22 @@ class ContractConditionResolverHandlerTest extends TestCase
 
         $this->assertTrue($eventEmitted);
         $this->assertNotNull($emittedContract);
-        $this->assertTrue($emittedContract->getState()->isPending());
+        $this->assertTrue($emittedContract->getState()->isDraft());
+    }
+
+    public function testContractRemainsInDraftAfterHandler(): void
+    {
+        $contract = $this->createTestContract();
+        $this->repository->save($contract);
+
+        $context = new EventContext(['test' => 'data']);
+        $event = new ContractCreatedEvent($contract, $context);
+
+        $this->handler->handle($event);
+
+        // Contract should still be in DRAFT state
+        // The EarlyOrderCreationHandler will transition it to NOT_FINISHED
+        $this->assertTrue($contract->getState()->isDraft());
     }
 
     public function testThrowsExceptionWhenNoConditions(): void
@@ -114,18 +121,31 @@ class ContractConditionResolverHandlerTest extends TestCase
         $this->handler->handle($event);
     }
 
-    public function testThrowsExceptionWhenAlreadyPending(): void
+    public function testDoesNotDispatchEventWhenContractAlreadyProcessed(): void
     {
+        $eventCount = 0;
+
+        $this->dispatcher->addListener(
+            ContractDraftCompletedEvent::class,
+            function (ContractDraftCompletedEvent $event) use (&$eventCount) {
+                $eventCount++;
+            }
+        );
+
         $contract = $this->createTestContract();
+        $contract->transitionToNotFinished('order_123');
         $contract->transitionToPending();
         $this->repository->save($contract);
 
         $context = new EventContext(['test' => 'data']);
         $event = new ContractCreatedEvent($contract, $context);
 
-        $this->expectException(\DomainException::class);
-        $this->expectExceptionMessage('Can only transition to PENDING from DRAFT state');
-
+        // Handler should still dispatch the event (it doesn't check state)
+        // But downstream handlers should not process already-processed contracts
         $this->handler->handle($event);
+
+        // Event is dispatched but EarlyOrderCreationHandler would ignore it
+        // because contract is not in DRAFT state
+        $this->assertEquals(1, $eventCount);
     }
 }

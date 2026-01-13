@@ -137,14 +137,16 @@ final class FullDataPersistenceFlowTest extends IntegrationTestCase
         $contractId = $this->createContractId('contract_order');
         $contract = $this->createContract($contractId, $userId);
         $contract->addCondition(ContractCondition::paymentAuthorized());
+
+        // 3. Create real order in oxorder
+        $orderId = $this->createTestOrder($userId, 499.99, 'EUR');
+
+        $contract->transitionToNotFinished($orderId);
         $contract->transitionToPending();
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED, [
             'authorizationId' => 'auth_' . $this->testRunId
         ]);
         $this->contractRepository->save($contract);
-
-        // 3. Create real order in oxorder
-        $orderId = $this->createTestOrder($userId, 499.99, 'EUR');
 
         // 4. Commit contract to order
         $contract->commitToOrder($orderId);
@@ -549,17 +551,21 @@ final class FullDataPersistenceFlowTest extends IntegrationTestCase
             'OXEXPIRES' => date('Y-m-d H:i:s', strtotime('+30 minutes')),
         ]);
 
-        // 4. Create contract (osc_payment_contract)
+        // 4. Create order (oxorder) - must be created before contract transitions to NOT_FINISHED
+        $orderId = $this->createTestOrder($userId, 599.99, 'EUR');
+
+        // 5. Create contract (osc_payment_contract)
         $contractId = $this->createContractId('flow');
         $providerOrderId = 'pi_flow_' . $flowId;
         $contract = $this->createContract($contractId, $userId);
         $contract->setProvider('stripe', $providerOrderId, 'https://checkout.stripe.com/xxx');
         $contract->addCondition(ContractCondition::paymentAuthorized());
         $contract->addCondition(ContractCondition::fraudCheck());
+        $contract->transitionToNotFinished($orderId);
         $contract->transitionToPending();
         $this->contractRepository->save($contract);
 
-        // 5. Fulfill conditions (updates osc_payment_contract)
+        // 6. Fulfill conditions (updates osc_payment_contract)
         $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED, [
             'authorizationId' => 'auth_flow_' . $flowId,
         ]);
@@ -568,9 +574,6 @@ final class FullDataPersistenceFlowTest extends IntegrationTestCase
             'risk' => 'low',
         ]);
         $this->contractRepository->save($contract);
-
-        // 6. Create order (oxorder)
-        $orderId = $this->createTestOrder($userId, 599.99, 'EUR');
 
         // 7. Commit contract to order
         $contract->commitToOrder($orderId);

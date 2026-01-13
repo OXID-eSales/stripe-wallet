@@ -100,10 +100,17 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         $shopId = $context->get('shopId', '1');
         $shopIdString = is_string($shopId) ? $shopId : (string) $shopId;
 
+        // STRP-75: Get order ID and order number from contract
+        $orderId = $contract->getOrderId();
+        $orderNumber = $contract->getMetadata('order_number');
+        $orderNumberString = is_string($orderNumber) || is_int($orderNumber) ? (string) $orderNumber : null;
+
         // Sprint 21: Delegate session creation to service
         $this->logEvent('StripeCheckoutSessionHandler: Creating checkout session', [
             'contractId' => $contractId,
             'captureMode' => $captureMode,
+            'orderId' => $orderId,
+            'orderNumber' => $orderNumberString,
         ]);
 
         $result = $this->checkoutSessionService->createSession(
@@ -112,7 +119,9 @@ class StripeCheckoutSessionHandler implements HandlerInterface
             $successUrl,
             $cancelUrl,
             $shopIdString,
-            $captureMode
+            $captureMode,
+            $orderId,
+            $orderNumberString
         );
 
         if (!$result->isSuccessful()) {

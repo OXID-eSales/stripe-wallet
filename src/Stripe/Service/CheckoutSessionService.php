@@ -49,25 +49,42 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
         string $successUrl,
         string $cancelUrl,
         string $shopId = '1',
-        string $captureMode = 'automatic'
+        string $captureMode = 'automatic',
+        ?string $orderId = null,
+        ?string $orderNumber = null
     ): CheckoutSessionResult {
         try {
             $lineItems = $this->buildLineItems($basketSnapshot);
+
+            $sessionMetadata = [
+                'contract_id' => $contractId,
+                'shop_id' => $shopId,
+            ];
+
+            $paymentIntentMetadata = [
+                'contract_id' => $contractId,
+            ];
+
+            // STRP-75: Include order info in metadata when available
+            if ($orderId !== null) {
+                $sessionMetadata['order_id'] = $orderId;
+                $paymentIntentMetadata['order_id'] = $orderId;
+            }
+
+            if ($orderNumber !== null) {
+                $sessionMetadata['order_number'] = $orderNumber;
+                $paymentIntentMetadata['order_number'] = $orderNumber;
+            }
 
             $params = [
                 'mode' => 'payment',
                 'line_items' => $lineItems,
                 'success_url' => $successUrl,
                 'cancel_url' => $cancelUrl,
-                'metadata' => [
-                    'contract_id' => $contractId,
-                    'shop_id' => $shopId,
-                ],
+                'metadata' => $sessionMetadata,
                 'payment_intent_data' => [
                     'capture_method' => $captureMode,
-                    'metadata' => [
-                        'contract_id' => $contractId,
-                    ],
+                    'metadata' => $paymentIntentMetadata,
                 ],
             ];
 
@@ -76,6 +93,7 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
             $this->logger->info('Checkout session created', [
                 'session_id' => $session->id,
                 'contract_id' => $contractId,
+                'order_number' => $orderNumber,
             ]);
 
             return CheckoutSessionResult::success($session->id, $session->url);
