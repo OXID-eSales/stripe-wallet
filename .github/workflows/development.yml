@@ -250,7 +250,7 @@ jobs:
 
       - name: Install module dependencies
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GH_TOKEN }}
         run: |
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
             php bash -c "cd /var/www/test-module && composer update --no-interaction"
