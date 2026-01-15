@@ -10,7 +10,7 @@ declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Stripe\Application\Controller\Admin;
 
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\PaymentComponent\Traits\ServiceContainer;
+use OxidSolutionCatalysts\Payments\Stripe\Traits\ServiceContainer;
 use OxidSolutionCatalysts\Payments\Stripe\Module;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 

@@ -18,8 +18,8 @@ use OxidEsales\PaymentComponent\EventSystem\Event\Contract\ContractTransitionedT
 use OxidEsales\PaymentComponent\EventSystem\Event\Payment\PaymentInitiatedEvent;
 use OxidEsales\PaymentComponent\Repository\ContractRepository;
 use OxidEsales\PaymentComponent\Service\ContractService;
-use OxidSolutionCatalysts\Payments\Tests\Unit\Component\EventSystem\Handler\Support\InMemoryOrderRepository;
-use OxidSolutionCatalysts\Payments\Tests\Unit\Component\EventSystem\Handler\Support\InMemoryShopOrderService;
+use OxidEsales\PaymentComponent\Tests\Unit\EventSystem\Handler\Support\InMemoryOrderRepository;
+use OxidEsales\PaymentComponent\Tests\Unit\EventSystem\Handler\Support\InMemoryShopOrderService;
 use PHPUnit\Framework\TestCase;
 
 /**

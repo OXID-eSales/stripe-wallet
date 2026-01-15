@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Stripe\Core;
 
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\PaymentComponent\Traits\ServiceContainer;
+use OxidSolutionCatalysts\Payments\Stripe\Traits\ServiceContainer;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use Throwable;
 

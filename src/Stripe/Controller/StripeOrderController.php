@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Controller;
 
+use OxidEsales\Eshop\Application\Controller\OrderController;
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\PaymentComponent\Controller\Core\OrderController;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
-use OxidEsales\PaymentComponent\Traits\ServiceContainer;
+use OxidSolutionCatalysts\Payments\Stripe\Traits\ServiceContainer;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
