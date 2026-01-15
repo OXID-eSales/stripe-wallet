@@ -190,7 +190,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || secrets.GH_TOKEN }}
         run: |
-          # Replace path repository with VCS repository for CI
+          # Remove all repositories and add only VCS for CI
+          composer config repositories --unset
           composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component
           # Configure GitHub authentication for private repo
           composer config github-oauth.github.com $GH_TOKEN
@@ -244,6 +245,8 @@ jobs:
           # Use GH_PAT secret for cross-repository access (GITHUB_TOKEN only has access to current repo)
           GH_TOKEN: ${{ secrets.GH_PAT || secrets.GH_TOKEN }}
         run: |
+          # Remove all repositories and add only VCS for CI
+          docker compose exec -T php bash -c "cd /var/www/test-module && composer config repositories --unset"
           docker compose exec -T php bash -c "cd /var/www/test-module && composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component"
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
             php bash -c "cd /var/www/test-module && composer config github-oauth.github.com '${GH_TOKEN}'"
@@ -287,6 +290,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || secrets.GH_TOKEN }}
         run: |
+          # Remove all repositories and add only VCS for CI in module's composer.json
+          docker compose exec -T php bash -c "cd /var/www/test-module && composer config repositories --unset"
+          docker compose exec -T php bash -c "cd /var/www/test-module && composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component"
+          # Also add to shop's composer.json for resolution
           docker compose exec -T php composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
             php composer config github-oauth.github.com "${GH_TOKEN}"
