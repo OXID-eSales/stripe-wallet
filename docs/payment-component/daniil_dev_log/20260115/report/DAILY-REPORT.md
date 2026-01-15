@@ -95,9 +95,11 @@ Created provider-agnostic migration files in payment-component:
 - Added repository configuration step to `install_shop_with_module` job
 - Added repository configuration step to `styles` job (changed `composer install` → `composer update`)
 - Added repository configuration step to `isolated_unit_tests` job (changed `composer install` → `composer update`)
-- Uses `GITHUB_TOKEN` for authentication to private `https://github.com/OXID-eSales/payment-component` repo
+- Uses `GH_PAT || GITHUB_TOKEN` fallback for authentication (GH_PAT required for cross-repo access)
 - Fixed GitHub token authentication for Docker containers using `COMPOSER_AUTH` environment variable
 - Removed obsolete `OxidSolutionCatalysts\Payments\Component\` autoload entry from `composer.json`
+
+**Important:** A `GH_PAT` repository secret with `repo` scope must be configured in the stripe module's GitHub repository settings for CI/CD to access the private payment-component repository.
 
 ---
 
@@ -181,16 +183,20 @@ Added missing methods to `PaymentContractInterface` following Liskov Substitutio
 
 ## Next Steps
 
-1. Run full unit test suite once database is configured
-2. Verify GitHub Actions CI/CD passes for both repositories
-3. Continue with Stripe-specific module cleanup
-4. Add integration tests for new interface methods
+1. **Configure GH_PAT secret** in stripe repository settings:
+   - Go to GitHub → Repository Settings → Secrets and variables → Actions
+   - Create new repository secret named `GH_PAT`
+   - Value: Personal Access Token with `repo` scope for OXID-eSales organization
+2. Run full unit test suite once database is configured
+3. Verify GitHub Actions CI/CD passes for both repositories
+4. Continue with Stripe-specific module cleanup
+5. Add integration tests for new interface methods
 
 ---
 
 ## Blockers
 
-None
+**GH_PAT Secret Required:** The stripe module CI/CD cannot access the private payment-component repository until a `GH_PAT` secret with `repo` scope is configured. The workflow code is ready and uses `secrets.GH_PAT || secrets.GITHUB_TOKEN` fallback pattern.
 
 ---
 
