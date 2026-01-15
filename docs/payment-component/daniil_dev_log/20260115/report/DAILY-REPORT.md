@@ -142,7 +142,7 @@ Status: COMMITABLE
 - `tests/PhpStan/phpstan-baseline.neon` - NEW
 - `tests/PhpStan/phpstan-bootstrap.php` - NEW
 - `tests/PhpMd/phpmd.baseline.xml` - NEW
-- `composer.json` - Added dev dependencies and scripts
+- `composer.json` - Added dev dependencies and scripts, fixed `psr/log` compatibility (`^1.0 || ^2.0 || ^3.0`)
 - `.github/workflows/unit-tests.yml` - MODIFIED
 - `bin/pre-commit-check.sh` - MODIFIED
 
