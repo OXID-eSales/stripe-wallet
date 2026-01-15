@@ -188,7 +188,7 @@ jobs:
       - name: Configure private payment-component repository
         working-directory: source/test-module
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GH_TOKEN }}
         run: |
           # Replace path repository with VCS repository for CI
           composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component
@@ -242,7 +242,7 @@ jobs:
       - name: Configure private payment-component repository
         env:
           # Use GH_PAT secret for cross-repository access (GITHUB_TOKEN only has access to current repo)
-          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GH_TOKEN }}
         run: |
           docker compose exec -T php bash -c "cd /var/www/test-module && composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component"
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
