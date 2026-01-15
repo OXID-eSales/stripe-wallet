@@ -199,7 +199,7 @@ jobs:
         id: dependencies
         working-directory: source/test-module
         env:
-          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}"}}'
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.GH_PAT || secrets.GH_TOKEN }}"}}'
         run: composer update --no-interaction
 
       - name: Run style check
@@ -283,9 +283,20 @@ jobs:
           make up
           sleep 2
 
-      - name: Install testing dependencies
+      - name: Configure private payment-component repository
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GH_TOKEN }}
         run: |
-          docker compose exec -T php composer update --no-interaction
+          docker compose exec -T php composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component
+          docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
+            php composer config github-oauth.github.com "${GH_TOKEN}"
+
+      - name: Install testing dependencies
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GH_TOKEN }}
+        run: |
+          docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
+            php composer update --no-interaction
 
       - name: Install module
         run: |
