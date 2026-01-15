@@ -49,6 +49,7 @@ Updated payment intent initialization to include order info in Stripe metadata:
 |--------|---------|-------------|--------|
 | 1 | STRP-74 | State Machine Update (early order creation) | DONE |
 | 2 | STRP-75 | Order Number in Payment Intent Metadata | DONE |
+| 3 | STRP-77 | Extract Payment Component to Separate Package | TODO |
 
 ---
 
@@ -57,6 +58,7 @@ Updated payment intent initialization to include order info in Stripe metadata:
 | File | Description |
 |------|-------------|
 | [done/sprint-1-state-machine-update.md](done/sprint-1-state-machine-update.md) | Sprint 1 plan |
+| [todo/sprint-3-extract-payment-component.md](todo/sprint-3-extract-payment-component.md) | Sprint 3 plan (TODO) |
 | [done/sprint-2-order-number-in-payment-intent.md](done/sprint-2-order-number-in-payment-intent.md) | Sprint 2 plan |
 | [report/sprint-1-report.md](report/sprint-1-report.md) | Sprint 1 report |
 | [report/sprint-2-report.md](report/sprint-2-report.md) | Sprint 2 report |
