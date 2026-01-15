@@ -194,7 +194,7 @@ jobs:
       - name: Install module dependencies
         id: dependencies
         working-directory: source/test-module
-        run: composer install --no-interaction
+        run: composer update --no-interaction
 
       - name: Run style check
         run: |
@@ -242,7 +242,7 @@ jobs:
 
       - name: Install module dependencies
         run: |
-          docker compose exec -T php bash -c "cd /var/www/test-module && composer install --no-interaction"
+          docker compose exec -T php bash -c "cd /var/www/test-module && composer update --no-interaction"
 
       - name: Run isolated unit tests
         run: |
