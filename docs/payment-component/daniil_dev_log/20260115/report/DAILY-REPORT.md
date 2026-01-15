@@ -43,8 +43,16 @@ Created provider-agnostic migration files in payment-component:
 
 ### 4. CI/CD Configuration
 
+**payment-component:**
 - Updated `.github/workflows/unit-tests.yml` to use `bin/pre-commit-check.sh`
 - Updated `bin/pre-commit-check.sh` to gracefully skip PHPMD if not installed
+
+**stripe module:**
+- Updated `.github/workflows/development.yml` to configure private payment-component repository
+- Added repository configuration step to `install_shop_with_module` job
+- Added repository configuration step to `styles` job
+- Added repository configuration step to `isolated_unit_tests` job
+- Uses `GITHUB_TOKEN` for authentication to private `https://github.com/OXID-eSales/payment-component` repo
 
 ---
 
@@ -77,6 +85,8 @@ Status: COMMITABLE
 
 ### stripe:
 - `src/Component/` - DELETED (moved to payment-component)
+- `.github/workflows/development.yml` - MODIFIED (added private repo configuration for payment-component)
+- `composer.json` - MODIFIED (removed obsolete `OxidSolutionCatalysts\\Payments\\Component\\` autoload entry)
 
 ---
 

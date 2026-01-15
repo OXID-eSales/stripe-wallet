@@ -83,6 +83,15 @@ jobs:
         with:
           path: source/test-module
 
+      - name: Configure private payment-component repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          docker compose exec -T \
+            php composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component
+          docker compose exec -T \
+            php composer config github-oauth.github.com $GITHUB_TOKEN
+
       - name: Install module
         run: |
           docker compose exec -T \
@@ -172,6 +181,16 @@ jobs:
           coverage: xdebug
           extensions: gd, zip
 
+      - name: Configure private payment-component repository
+        working-directory: source/test-module
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Replace path repository with VCS repository for CI
+          composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component
+          # Configure GitHub authentication for private repo
+          composer config github-oauth.github.com $GITHUB_TOKEN
+
       - name: Install module dependencies
         id: dependencies
         working-directory: source/test-module
@@ -213,6 +232,13 @@ jobs:
         run: |
           make up
           sleep 2
+
+      - name: Configure private payment-component repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          docker compose exec -T php bash -c "cd /var/www/test-module && composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component"
+          docker compose exec -T php bash -c "cd /var/www/test-module && composer config github-oauth.github.com $GITHUB_TOKEN"
 
       - name: Install module dependencies
         run: |
