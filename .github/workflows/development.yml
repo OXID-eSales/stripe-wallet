@@ -68,7 +68,7 @@ jobs:
                  -e 's/<dbName>/example/'\
                  -e 's/<dbPwd>/root/'\
                  -e 's/<dbPort>/3306/'\
-                 -e 's/<sShopURL>/https:\/\/${{ secrets.NGROK_CUSTOM_DOMAIN }}\//'\
+                 -e 's/<sShopURL>/https:\/\/oxideshop.local\//'\
                  -e 's/<sShopDir>/\/var\/www\/source\//'\
                  -e 's/<sCompileDir>/\/var\/www\/source\/tmp\//'\
               source/source/config.inc.php
@@ -112,7 +112,7 @@ jobs:
 
       - name: Install dependencies, reset shop, activate theme
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GH_TOKEN }}
         run: |
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
             php composer update --no-interaction
