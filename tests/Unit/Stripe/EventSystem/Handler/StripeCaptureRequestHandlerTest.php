@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\EventSystem\Handler;
 
 use DateTimeImmutable;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Response\CaptureResponse;
-use OxidSolutionCatalysts\Payments\Component\Contract\BasketSnapshot;
-use OxidSolutionCatalysts\Payments\Component\Contract\ContractState;
-use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
-use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
+use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
+use OxidEsales\PaymentComponent\Contract\ContractState;
+use OxidEsales\PaymentComponent\Contract\PaymentContract;
+use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
+use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCaptureRequestHandler;

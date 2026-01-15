@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Service;
 
-use OxidSolutionCatalysts\Payments\Component\Repository\PaymentCustomerRepositoryInterface;
+use OxidEsales\PaymentComponent\Repository\PaymentCustomerRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\StripeCustomerService;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use PHPUnit\Framework\TestCase;

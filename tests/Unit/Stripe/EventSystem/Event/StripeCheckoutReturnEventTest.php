@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\EventSystem\Event;
 
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
+use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use PHPUnit\Framework\TestCase;
 
 class StripeCheckoutReturnEventTest extends TestCase

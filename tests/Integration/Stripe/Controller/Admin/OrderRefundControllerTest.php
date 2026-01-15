@@ -7,8 +7,8 @@ namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Controller\Adm
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\OrderRefund;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
+use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
+use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 

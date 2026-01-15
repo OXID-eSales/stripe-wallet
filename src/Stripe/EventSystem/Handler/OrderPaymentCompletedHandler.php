@@ -9,10 +9,10 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
 
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractFulfilledEvent;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface;
+use OxidEsales\PaymentComponent\EventSystem\Event\Contract\ContractFulfilledEvent;
+use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
+use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
+use OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface;
 use Psr\Log\LoggerInterface;
 
 /**

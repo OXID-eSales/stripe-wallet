@@ -9,13 +9,13 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Adapter;
 
-use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreatePaymentRequest;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CapturePaymentRequest;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Request\RefundPaymentRequest;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Request\VoidPaymentRequest;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Request\AuthorizePaymentRequest;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CaptureAuthorizationRequest;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Request\VoidAuthorizationRequest;
+use OxidEsales\PaymentComponent\Adapter\Request\CreatePaymentRequest;
+use OxidEsales\PaymentComponent\Adapter\Request\CapturePaymentRequest;
+use OxidEsales\PaymentComponent\Adapter\Request\RefundPaymentRequest;
+use OxidEsales\PaymentComponent\Adapter\Request\VoidPaymentRequest;
+use OxidEsales\PaymentComponent\Adapter\Request\AuthorizePaymentRequest;
+use OxidEsales\PaymentComponent\Adapter\Request\CaptureAuthorizationRequest;
+use OxidEsales\PaymentComponent\Adapter\Request\VoidAuthorizationRequest;
 use OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\StripeIntegrationTestCase;
 
 /**
@@ -171,7 +171,7 @@ final class StripeAdapterIntegrationTest extends StripeIntegrationTestCase
         );
 
         // Act & Assert
-        $this->expectException(\OxidSolutionCatalysts\Payments\Component\Adapter\Exception\PaymentAdapterException::class);
+        $this->expectException(\OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException::class);
         $this->expectExceptionMessage('return_url');
 
         $this->adapter->createPayment($requestWithoutReturnUrl);

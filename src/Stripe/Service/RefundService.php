@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Service;
 
-use OxidSolutionCatalysts\Payments\Component\Adapter\Exception\PaymentAdapterException;
+use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
 use OxidSolutionCatalysts\Payments\Stripe\DTO\RefundResult;
 use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;

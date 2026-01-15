@@ -16,7 +16,7 @@ use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Eshop\Application\Model\User;
 use OxidEsales\Eshop\Core\DatabaseProvider;
 use OxidEsales\Eshop\Core\UtilsObject;
-use OxidSolutionCatalysts\Payments\Component\Repository\PaymentCustomerRepositoryInterface;
+use OxidEsales\PaymentComponent\Repository\PaymentCustomerRepositoryInterface;
 
 /**
  * Stripe customer management service

@@ -29,10 +29,10 @@ class ModuleStructureTest extends TestCase
         $data = json_decode(file_get_contents($composerJson), true);
 
         $this->assertEquals('osc/stripe-wallet', $data['name']);
-        $this->assertArrayHasKey('OxidSolutionCatalysts\\Payments\\Component\\', $data['autoload']['psr-4']);
         $this->assertArrayHasKey('OxidSolutionCatalysts\\Payments\\Stripe\\', $data['autoload']['psr-4']);
-        $this->assertEquals('./src/Component', $data['autoload']['psr-4']['OxidSolutionCatalysts\\Payments\\Component\\']);
         $this->assertEquals('./src/Stripe', $data['autoload']['psr-4']['OxidSolutionCatalysts\\Payments\\Stripe\\']);
+        // Payment component is now a separate dependency
+        $this->assertArrayHasKey('oxid-esales/payment-component', $data['require']);
     }
 
     /** @test */
@@ -47,28 +47,6 @@ class ModuleStructureTest extends TestCase
 
         $this->assertEquals(Module::MODULE_ID, $aModule['id']);
         $this->assertEquals('2.1', $GLOBALS['sMetadataVersion'] ?? $sMetadataVersion);
-    }
-
-    /** @test */
-    public function component_directories_exist(): void
-    {
-        $requiredDirs = [
-            'src/Component/Contract',
-            'src/Component/EventSystem/Event',
-            'src/Component/EventSystem/Event/Contract',
-            'src/Component/EventSystem/Event/Payment',
-            'src/Component/Model',
-            'src/Component/Repository',
-            'src/Component/Service',
-            'src/Component/Controller/Webhook',
-        ];
-
-        foreach ($requiredDirs as $dir) {
-            $this->assertDirectoryExists(
-                $this->moduleRoot . '/' . $dir,
-                "Missing directory: $dir"
-            );
-        }
     }
 
     /** @test */
@@ -94,9 +72,7 @@ class ModuleStructureTest extends TestCase
     public function test_directories_exist(): void
     {
         $requiredDirs = [
-            'tests/Unit/Component',
             'tests/Unit/Stripe',
-            'tests/Integration/Component',
             'tests/Integration/Stripe',
             'tests/Integration/Infrastructure',
             'tests/Support',

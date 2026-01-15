@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Controller\GraphQL;
 
-use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentInitiatedEvent;
+use OxidEsales\PaymentComponent\EventSystem\EventDispatcher;
+use OxidEsales\PaymentComponent\EventSystem\Event\Payment\PaymentInitiatedEvent;
 use OxidSolutionCatalysts\Payments\Stripe\Service\EncryptionService;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ErrorResponseFactory;
 use Psr\Log\LoggerInterface;

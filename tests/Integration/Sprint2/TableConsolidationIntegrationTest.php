@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Integration\Sprint2;
 
-use OxidSolutionCatalysts\Payments\Component\Repository\DoctrinePaymentCustomerRepository;
-use OxidSolutionCatalysts\Payments\Component\Repository\DoctrineWebhookLogRepository;
-use OxidSolutionCatalysts\Payments\Component\Repository\PaymentCustomerRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookLog;
+use OxidEsales\PaymentComponent\Repository\DoctrinePaymentCustomerRepository;
+use OxidEsales\PaymentComponent\Repository\DoctrineWebhookLogRepository;
+use OxidEsales\PaymentComponent\Repository\PaymentCustomerRepositoryInterface;
+use OxidEsales\PaymentComponent\Repository\WebhookLogRepositoryInterface;
+use OxidEsales\PaymentComponent\Webhook\WebhookLog;
 use PHPUnit\Framework\TestCase;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;

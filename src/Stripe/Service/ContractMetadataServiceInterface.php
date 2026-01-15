@@ -9,8 +9,8 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Service;
 
-use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
+use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
+use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 
 /**
  * Service interface for managing contract metadata.

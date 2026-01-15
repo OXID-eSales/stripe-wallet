@@ -9,12 +9,12 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Webhook\Handler;
 
-use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface;
-use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookEvent;
-use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookEventHandlerInterface;
-use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookResult;
+use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
+use OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface;
+use OxidEsales\PaymentComponent\Webhook\WebhookEvent;
+use OxidEsales\PaymentComponent\Webhook\WebhookEventHandlerInterface;
+use OxidEsales\PaymentComponent\Webhook\WebhookResult;
 use Psr\Log\LoggerInterface;
 
 /**

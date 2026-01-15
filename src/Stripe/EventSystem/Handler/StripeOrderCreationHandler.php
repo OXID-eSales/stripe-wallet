@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
 
 use OxidEsales\Eshop\Core\Registry;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreateOrderRequest;
-use OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterface;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractReadyToCommitEvent;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Contract\ContractCommittedEvent;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
-use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface;
+use OxidEsales\PaymentComponent\Adapter\Request\CreateOrderRequest;
+use OxidEsales\PaymentComponent\Adapter\ShopOrderServiceInterface;
+use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
+use OxidEsales\PaymentComponent\EventSystem\Event\Contract\ContractReadyToCommitEvent;
+use OxidEsales\PaymentComponent\EventSystem\Event\Contract\ContractCommittedEvent;
+use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
+use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface;
+use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 
 /**
  * Creates OXID orders when contract is ready to commit.
@@ -94,7 +94,7 @@ class StripeOrderCreationHandler implements HandlerInterface
         }
     }
 
-    private function validateContractState(\OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface $contract): bool
+    private function validateContractState(\OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract): bool
     {
         if (!$contract->getState()->isReadyToCommit()) {
             $this->logEvent('StripeOrderCreationHandler: ERROR - Contract not ready to commit');
@@ -117,7 +117,7 @@ class StripeOrderCreationHandler implements HandlerInterface
     }
 
     private function validateAndGetBasket(
-        \OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContextInterface $context
+        \OxidEsales\PaymentComponent\EventSystem\Event\EventContextInterface $context
     ): ?\OxidEsales\Eshop\Application\Model\Basket {
         $basket = Registry::getSession()->getBasket();
         $basketProductsCount = $basket !== null ? $basket->getProductsCount() : 0;
@@ -146,8 +146,8 @@ class StripeOrderCreationHandler implements HandlerInterface
     }
 
     private function createOrder(
-        \OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface $contract,
-        \OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContextInterface $context,
+        \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract,
+        \OxidEsales\PaymentComponent\EventSystem\Event\EventContextInterface $context,
         \OxidEsales\Eshop\Application\Model\Basket $basket
     ): string {
         $paymentIntentId = $context->get('paymentIntentId');
@@ -204,8 +204,8 @@ class StripeOrderCreationHandler implements HandlerInterface
      * 4. Dispatch ContractCommittedEvent
      */
     private function handleExistingOrder(
-        \OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface $contract,
-        \OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContextInterface $context,
+        \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract,
+        \OxidEsales\PaymentComponent\EventSystem\Event\EventContextInterface $context,
         string $orderId
     ): void {
         // Load order to get order number
@@ -243,8 +243,8 @@ class StripeOrderCreationHandler implements HandlerInterface
     }
 
     private function handlePostOrderCreation(
-        \OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface $contract,
-        \OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContextInterface $context,
+        \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract,
+        \OxidEsales\PaymentComponent\EventSystem\Event\EventContextInterface $context,
         string $orderId
     ): void {
         $contract->commitToOrder($orderId);
@@ -264,8 +264,8 @@ class StripeOrderCreationHandler implements HandlerInterface
     }
 
     private function handleOrderCreationException(
-        \OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface $contract,
-        \OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContextInterface $context,
+        \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract,
+        \OxidEsales\PaymentComponent\EventSystem\Event\EventContextInterface $context,
         \Throwable $e
     ): void {
         $this->logEvent('StripeOrderCreationHandler: EXCEPTION', [

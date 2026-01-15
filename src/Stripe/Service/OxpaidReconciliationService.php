@@ -10,9 +10,9 @@ declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Stripe\Service;
 
 use Doctrine\DBAL\Connection;
-use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface;
+use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
+use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 
 /**

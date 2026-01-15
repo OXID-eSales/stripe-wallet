@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
 
-use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CapturePaymentRequest;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Response\CaptureResponse;
-use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterface;
-use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface;
+use OxidEsales\PaymentComponent\Adapter\Request\CapturePaymentRequest;
+use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
+use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
+use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
+use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
+use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
 use OxidSolutionCatalysts\Stripe\Application\Model\RequestLog;

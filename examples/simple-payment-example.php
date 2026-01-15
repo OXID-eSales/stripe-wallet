@@ -30,8 +30,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
-use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreatePaymentRequest;
+use OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactory;
+use OxidEsales\PaymentComponent\Adapter\Request\CreatePaymentRequest;
 use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeClientFactory;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 
@@ -114,7 +114,7 @@ function example2_twoStepAuthorization(): void
     $adapter = $factory->createAdapter('stripe');
 
     // Step 1: Authorize payment (hold funds)
-    use OxidSolutionCatalysts\Payments\Component\Adapter\Request\AuthorizePaymentRequest;
+    use OxidEsales\PaymentComponent\Adapter\Request\AuthorizePaymentRequest;
 
     $authorizeRequest = new AuthorizePaymentRequest(
         amount: 50.00,
@@ -138,7 +138,7 @@ function example2_twoStepAuthorization(): void
         echo "Expires At: {$authResponse->expiresAt->format('Y-m-d H:i:s')}\n\n";
 
         // Step 2: Later, capture the authorized payment
-        use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CaptureAuthorizationRequest;
+        use OxidEsales\PaymentComponent\Adapter\Request\CaptureAuthorizationRequest;
 
         echo "💡 Later, after verifying stock/etc, capture the payment:\n\n";
 
@@ -190,7 +190,7 @@ function example3_refundPayment(): void
         echo "✅ Payment created: {$paymentResponse->providerPaymentId}\n\n";
 
         // Refund the payment (full or partial)
-        use OxidSolutionCatalysts\Payments\Component\Adapter\Request\RefundPaymentRequest;
+        use OxidEsales\PaymentComponent\Adapter\Request\RefundPaymentRequest;
 
         $refundRequest = new RefundPaymentRequest(
             providerPaymentId: $paymentResponse->providerPaymentId,

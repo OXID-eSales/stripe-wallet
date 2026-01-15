@@ -6,8 +6,8 @@ namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\EventSystem\Handler;
 
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeRefundRequestHandler;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
-use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
+use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\RefundServiceInterface;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;

@@ -9,11 +9,11 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Adapter;
 
-use OxidSolutionCatalysts\Payments\Component\Adapter\Request\AuthorizePaymentRequest;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CaptureAuthorizationRequest;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Request\VoidAuthorizationRequest;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Request\ReauthorizePaymentRequest;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Exception\PaymentAdapterException;
+use OxidEsales\PaymentComponent\Adapter\Request\AuthorizePaymentRequest;
+use OxidEsales\PaymentComponent\Adapter\Request\CaptureAuthorizationRequest;
+use OxidEsales\PaymentComponent\Adapter\Request\VoidAuthorizationRequest;
+use OxidEsales\PaymentComponent\Adapter\Request\ReauthorizePaymentRequest;
+use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
 use OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\StripeIntegrationTestCase;
 
 /**

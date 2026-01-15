@@ -10,8 +10,8 @@ declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Webhook;
 
 use DateTimeImmutable;
-use OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookLog;
+use OxidEsales\PaymentComponent\Repository\WebhookLogRepositoryInterface;
+use OxidEsales\PaymentComponent\Webhook\WebhookLog;
 use OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService;
 use PHPUnit\Framework\TestCase;

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Handler;
 
-use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
-use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
-use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface;
+use OxidEsales\PaymentComponent\Contract\PaymentContract;
+use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
+use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
 
 /**
  * Handles webhook events with contract-awareness.

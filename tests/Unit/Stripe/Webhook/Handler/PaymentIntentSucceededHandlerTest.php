@@ -9,13 +9,13 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Webhook\Handler;
 
-use OxidSolutionCatalysts\Payments\Component\Contract\ContractState;
-use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
-use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface;
-use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookEvent;
-use OxidSolutionCatalysts\Payments\Component\Webhook\WebhookEventHandlerInterface;
+use OxidEsales\PaymentComponent\Contract\ContractState;
+use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
+use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
+use OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface;
+use OxidEsales\PaymentComponent\Webhook\WebhookEvent;
+use OxidEsales\PaymentComponent\Webhook\WebhookEventHandlerInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededHandler;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;

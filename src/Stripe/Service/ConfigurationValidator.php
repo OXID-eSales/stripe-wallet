@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Service;
 
-use OxidSolutionCatalysts\Payments\Component\Service\ServiceInterface;
+use OxidEsales\PaymentComponent\Service\ServiceInterface;
 use Stripe\StripeClient;
 
 /**

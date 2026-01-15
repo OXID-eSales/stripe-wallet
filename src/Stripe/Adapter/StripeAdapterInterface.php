@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Adapter;
 
-use OxidSolutionCatalysts\Payments\Component\Adapter\PaymentAdapterInterface;
+use OxidEsales\PaymentComponent\Adapter\PaymentAdapterInterface;
 use Stripe\Checkout\Session;
 use Stripe\PaymentIntent;
 use Stripe\Refund;

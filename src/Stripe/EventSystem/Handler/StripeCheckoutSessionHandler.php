@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
 
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\HandlerInterface;
-use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface;
+use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
+use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
+use OxidEsales\PaymentComponent\Service\TokenServiceInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutSessionServiceInterface;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use RuntimeException;

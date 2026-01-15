@@ -12,7 +12,7 @@ namespace OxidSolutionCatalysts\Payments\Stripe\Controller\Webhook;
 use OxidEsales\Eshop\Application\Controller\FrontendController;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
-use OxidSolutionCatalysts\Payments\Component\Service\WebhookLogServiceInterface;
+use OxidEsales\PaymentComponent\Service\WebhookLogServiceInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService;
 use Stripe\Exception\SignatureVerificationException;

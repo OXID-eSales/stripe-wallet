@@ -25,17 +25,17 @@ services:
 
   # Event Listener Provider - Collects all tagged handlers
   # Sprint 11: public: true for debugging/verification purposes
-  OxidSolutionCatalysts\Payments\Component\EventSystem\EventListenerProviderInterface:
-    class: OxidSolutionCatalysts\Payments\Component\EventSystem\EventListenerProvider
+  OxidEsales\PaymentComponent\EventSystem\EventListenerProviderInterface:
+    class: OxidEsales\PaymentComponent\EventSystem\EventListenerProvider
     arguments:
       - !tagged_iterator payment.event_handler
     public: true
 
   # Event Dispatcher - Uses provider for listener lookup
-  OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface:
-    class: OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher
+  OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface:
+    class: OxidEsales\PaymentComponent\EventSystem\EventDispatcher
     arguments:
-      - '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventListenerProviderInterface'
+      - '@OxidEsales\PaymentComponent\EventSystem\EventListenerProviderInterface'
     public: true
 
   # ===========================================
@@ -45,8 +45,8 @@ services:
   # DRY: Single location for payment state operations
   # Previously duplicated in 4+ locations with inconsistent date handling
 
-  OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface:
-    class: OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateService
+  OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface:
+    class: OxidEsales\PaymentComponent\Service\OrderPaymentStateService
     arguments:
       $connection: '@doctrine.dbal.connection'
       $logger: '@oxid_esales.monolog.logger'
@@ -59,11 +59,11 @@ services:
   # DRY: Single location for fulfill() logic previously duplicated in 8+ locations
   # Guards: Only COMMITTED contracts can be fulfilled
 
-  OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface:
-    class: OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentService
+  OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface:
+    class: OxidEsales\PaymentComponent\Service\ContractFulfillmentService
     arguments:
-      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
-      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
       $logger: '@oxid_esales.monolog.logger'
     public: true
 
@@ -73,10 +73,10 @@ services:
 
   # Checkout Orchestrator - Coordinates checkout accounting
   # Note: Does NOT call Stripe API - only backend accounting
-  OxidSolutionCatalysts\Payments\Component\Service\CheckoutOrchestratorInterface:
-    class: OxidSolutionCatalysts\Payments\Component\Service\CheckoutOrchestrator
+  OxidEsales\PaymentComponent\Service\CheckoutOrchestratorInterface:
+    class: OxidEsales\PaymentComponent\Service\CheckoutOrchestrator
     arguments:
-      - '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      - '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
       - null  # Logger - optional, can be injected if available
     public: true
 
@@ -88,37 +88,37 @@ services:
   # They will be enabled in Sprint 2 when the orchestrator and services are ready.
 
   # # Contract Creation Handler - Creates payment contracts on PaymentInitiatedEvent
-  # OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractCreationHandler:
+  # OxidEsales\PaymentComponent\EventSystem\Handler\ContractCreationHandler:
   #   tags:
   #     - { name: payment.event_handler }
   #   public: false
 
   # # Contract Condition Resolver Handler - Transitions contracts to PENDING state
-  # OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractConditionResolverHandler:
+  # OxidEsales\PaymentComponent\EventSystem\Handler\ContractConditionResolverHandler:
   #   tags:
   #     - { name: payment.event_handler }
   #   public: false
 
   # # Contract Fulfillment Handler - Handles webhook-triggered fulfillment
-  # OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractFulfillmentHandler:
+  # OxidEsales\PaymentComponent\EventSystem\Handler\ContractFulfillmentHandler:
   #   tags:
   #     - { name: payment.event_handler }
   #   public: false
 
   # # Contract Cleanup Handler - Cleans up terminated contracts
-  # OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\ContractCleanupHandler:
+  # OxidEsales\PaymentComponent\EventSystem\Handler\ContractCleanupHandler:
   #   tags:
   #     - { name: payment.event_handler }
   #   public: false
 
   # # Order Creation Handler - Creates orders from committed contracts
-  # OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\OrderCreationHandler:
+  # OxidEsales\PaymentComponent\EventSystem\Handler\OrderCreationHandler:
   #   tags:
   #     - { name: payment.event_handler }
   #   public: false
 
   # # Payment Authorization Handler - Handles payment authorization
-  # OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\PaymentAuthorizationHandler:
+  # OxidEsales\PaymentComponent\EventSystem\Handler\PaymentAuthorizationHandler:
   #   tags:
   #     - { name: payment.event_handler }
   #   public: false
@@ -130,11 +130,11 @@ services:
   # New flow: DRAFT -> NOT_FINISHED (order created here) -> PENDING
   # Priority 100: Runs early to ensure order is created before other handlers.
 
-  OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\EarlyOrderCreationHandler:
+  OxidEsales\PaymentComponent\EventSystem\Handler\EarlyOrderCreationHandler:
     arguments:
-      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
-      $shopOrderService: '@OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface'
-      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $shopOrderService: '@OxidEsales\PaymentComponent\Adapter\ShopOrderServiceInterface'
+      $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
       $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler, priority: 100 }
@@ -173,18 +173,18 @@ services:
   # Payment Adapter Factory Interface - Bind to Stripe implementation
   # This is the main entry point for getting payment adapters
   # Gets API credentials from ModuleConfigurationService
-  OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactoryInterface:
+  OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactoryInterface:
     class: OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactory
     public: true
 
   # Stripe Adapter Factory Interface - Stripe-specific factory
   OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface:
-    alias: OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactoryInterface
+    alias: OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactoryInterface
     public: true
 
   # Stripe Adapter Factory - Concrete implementation
   OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactory:
-    alias: OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactoryInterface
+    alias: OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactoryInterface
     public: true
 
   # Stripe Adapter Interface - Created via factory
@@ -210,13 +210,13 @@ services:
   #
 
   # Shop Adapter Interface - Bind to OXID implementation
-  OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface:
+  OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface:
     class: OxidSolutionCatalysts\Payments\Stripe\Adapter\OxidShopAdapter
     public: false
 
   # OXID Shop Adapter - OXID eShop specific implementation
   OxidSolutionCatalysts\Payments\Stripe\Adapter\OxidShopAdapter:
-    alias: OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface
+    alias: OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface
 
   # ==========================================
   # Shop Order Service (Order Operations)
@@ -233,13 +233,13 @@ services:
   #
 
   # Shop Order Service Interface - Bind to OXID implementation
-  OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface:
+  OxidEsales\PaymentComponent\Adapter\ShopOrderServiceInterface:
     class: OxidSolutionCatalysts\Payments\Stripe\Adapter\OxidShopOrderService
     public: true
 
   # OXID Shop Order Service - OXID eShop specific implementation
   OxidSolutionCatalysts\Payments\Stripe\Adapter\OxidShopOrderService:
-    alias: OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface
+    alias: OxidEsales\PaymentComponent\Adapter\ShopOrderServiceInterface
 
   # ==========================================
   # Contract Repository (Data Access Layer)
@@ -247,25 +247,25 @@ services:
 
   # Contract Repository Interface - Bind to Doctrine implementation
   # public: true required for integration tests to access directly
-  OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface:
-    class: OxidSolutionCatalysts\Payments\Component\Repository\DoctrineContractRepository
+  OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface:
+    class: OxidEsales\PaymentComponent\Repository\DoctrineContractRepository
     arguments:
       $connection: '@doctrine.dbal.connection'
     public: true
 
   # Contract Repository - Alias
-  OxidSolutionCatalysts\Payments\Component\Repository\DoctrineContractRepository:
-    alias: OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface
+  OxidEsales\PaymentComponent\Repository\DoctrineContractRepository:
+    alias: OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface
 
   # ==========================================
   # Contract Service
   # ==========================================
 
   # Contract Service Interface - Bind to implementation
-  OxidSolutionCatalysts\Payments\Component\Service\ContractServiceInterface:
-    class: OxidSolutionCatalysts\Payments\Component\Service\ContractService
+  OxidEsales\PaymentComponent\Service\ContractServiceInterface:
+    class: OxidEsales\PaymentComponent\Service\ContractService
     arguments:
-      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
     public: true
 
   # ==========================================
@@ -278,13 +278,13 @@ services:
 
   # Token Service Interface - Bind to implementation
   # Derives secret from ModuleConfigurationService (no extra env var needed)
-  OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface:
+  OxidEsales\PaymentComponent\Service\TokenServiceInterface:
     class: OxidSolutionCatalysts\Payments\Stripe\Service\ContractTokenService
     public: false
 
   # Stripe Contract Token Service
   OxidSolutionCatalysts\Payments\Stripe\Service\ContractTokenService:
-    alias: OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface
+    alias: OxidEsales\PaymentComponent\Service\TokenServiceInterface
 
   # ==========================================
   # Security Validator (Fraud Prevention)
@@ -294,13 +294,13 @@ services:
   #
 
   # Security Validator Interface - Bind to implementation
-  OxidSolutionCatalysts\Payments\Component\Service\ReturnSecurityValidatorInterface:
+  OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface:
     class: OxidSolutionCatalysts\Payments\Stripe\Service\ReturnSessionSecurityService
     public: false
 
   # Stripe Return Security Service
   OxidSolutionCatalysts\Payments\Stripe\Service\ReturnSessionSecurityService:
-    alias: OxidSolutionCatalysts\Payments\Component\Service\ReturnSecurityValidatorInterface
+    alias: OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface
 
   # ==========================================
   # Delivery Address Hash Service (Sprint 20)
@@ -345,10 +345,10 @@ services:
   # Sprint 25: Added event logger for debugging
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeContractCreationHandler:
     arguments:
-      $contractService: '@OxidSolutionCatalysts\Payments\Component\Service\ContractServiceInterface'
-      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $contractService: '@OxidEsales\PaymentComponent\Service\ContractServiceInterface'
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
       $metadataService: '@OxidSolutionCatalysts\Payments\Stripe\Service\ContractMetadataServiceInterface'
-      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
       $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler, priority: 100 }
@@ -361,8 +361,8 @@ services:
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler:
     arguments:
       $checkoutSessionService: '@OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutSessionServiceInterface'
-      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
-      $tokenService: '@OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface'
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $tokenService: '@OxidEsales\PaymentComponent\Service\TokenServiceInterface'
       $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler, priority: 0 }
@@ -374,7 +374,7 @@ services:
   # Sprint 25: Added event logger for debugging
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\OrderPaymentCompletedHandler:
     arguments:
-      $orderPaymentStateService: '@OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface'
+      $orderPaymentStateService: '@OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
     tags:
@@ -391,7 +391,7 @@ services:
     class: OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutReturnService
     arguments:
       $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
-      $tokenService: '@OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface'
+      $tokenService: '@OxidEsales\PaymentComponent\Service\TokenServiceInterface'
       $logger: '@oxid_esales.monolog.logger'
     public: false
 
@@ -408,10 +408,10 @@ services:
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler:
     arguments:
       $checkoutReturnService: '@OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutReturnServiceInterface'
-      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
-      $securityValidator: '@OxidSolutionCatalysts\Payments\Component\Service\ReturnSecurityValidatorInterface'
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $securityValidator: '@OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface'
       $deliveryAddressHashService: '@OxidSolutionCatalysts\Payments\Stripe\Service\DeliveryAddressHashServiceInterface'
-      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
     tags:
@@ -423,11 +423,11 @@ services:
   # Transitions contract to PENDING, fulfills payment_authorized condition
   # Dispatches ContractReadyToCommitEvent if all conditions met
   # Sprint 22: EventDispatcher now injected via constructor (no ContainerFactory)
-  OxidSolutionCatalysts\Payments\Component\EventSystem\Handler\PaymentAuthorizedEventHandler:
+  OxidEsales\PaymentComponent\EventSystem\Handler\PaymentAuthorizedEventHandler:
     arguments:
-      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
-      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
-      $orderPaymentStateService: '@OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface'
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
+      $orderPaymentStateService: '@OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface'
       $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler, priority: 90 }
@@ -440,10 +440,10 @@ services:
   # Sprint 22: EventDispatcher now injected via constructor (no ContainerFactory)
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeOrderCreationHandler:
     arguments:
-      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
-      $shopOrderService: '@OxidSolutionCatalysts\Payments\Component\Adapter\ShopOrderServiceInterface'
-      $orderPaymentStateService: '@OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface'
-      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $shopOrderService: '@OxidEsales\PaymentComponent\Adapter\ShopOrderServiceInterface'
+      $orderPaymentStateService: '@OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface'
+      $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
       $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler, priority: 80 }
@@ -454,7 +454,7 @@ services:
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCaptureRequestHandler:
     arguments:
       $stripeAdapter: '@OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapterInterface'
-      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
     tags:
@@ -476,7 +476,7 @@ services:
   # Sprint 25: Added event logger for debugging
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripePaymentReturnHandler:
     arguments:
-      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
       $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler }
@@ -486,9 +486,9 @@ services:
   # Sprint 25: Added event logger for debugging
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripePaymentStatusHandler:
     arguments:
-      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
       $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
-      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
+      $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
       $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler }
@@ -517,7 +517,7 @@ services:
   OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeRefundRequestHandler:
     arguments:
       $refundService: '@OxidSolutionCatalysts\Payments\Stripe\Service\RefundServiceInterface'
-      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
     tags:
@@ -535,8 +535,8 @@ services:
   OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface:
     class: OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandler
     arguments:
-      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
-      $contractFulfillmentService: '@OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface'
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $contractFulfillmentService: '@OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface'
     public: false
 
   # Concrete implementation alias
@@ -550,11 +550,11 @@ services:
   OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService:
     arguments:
       $contractFulfillmentHandler: '@OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface'
-      $eventDispatcher: '@OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface'
-      $webhookLogRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface'
-      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
-      $orderPaymentStateService: '@OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface'
-      $contractFulfillmentService: '@OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface'
+      $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
+      $webhookLogRepository: '@OxidEsales\PaymentComponent\Repository\WebhookLogRepositoryInterface'
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $orderPaymentStateService: '@OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface'
+      $contractFulfillmentService: '@OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface'
     public: true
 
   # ==========================================
@@ -568,15 +568,15 @@ services:
     public: false
 
   # Transaction Repository - Stores payment transactions
-  OxidSolutionCatalysts\Payments\Component\Repository\TransactionRepositoryInterface:
-    class: OxidSolutionCatalysts\Payments\Component\Repository\DoctrineTransactionRepository
+  OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface:
+    class: OxidEsales\PaymentComponent\Repository\DoctrineTransactionRepository
     arguments:
       $connection: '@doctrine.dbal.connection'
     public: false
 
   # Alias for easier reference
-  OxidSolutionCatalysts\Payments\Component\Repository\DoctrineTransactionRepository:
-    alias: OxidSolutionCatalysts\Payments\Component\Repository\TransactionRepositoryInterface
+  OxidEsales\PaymentComponent\Repository\DoctrineTransactionRepository:
+    alias: OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface
 
   # Stripe Payment Details Repository - Stores Stripe-specific payment data
   OxidSolutionCatalysts\Payments\Stripe\Repository\StripePaymentDetailsRepository:
@@ -584,18 +584,18 @@ services:
 
   # Webhook Log Repository - Logs webhook events for auditing and idempotency
   # public: true required for integration tests to access directly
-  OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface:
-    class: OxidSolutionCatalysts\Payments\Component\Repository\DoctrineWebhookLogRepository
+  OxidEsales\PaymentComponent\Repository\WebhookLogRepositoryInterface:
+    class: OxidEsales\PaymentComponent\Repository\DoctrineWebhookLogRepository
     arguments:
       $connection: '@doctrine.dbal.connection'
     public: true
 
   # Webhook Log Service - Sprint 7 Phase 4: Proper layering for webhook log access
   # Architecture: Controller/Service → WebhookLogService → WebhookLogRepository → Database
-  OxidSolutionCatalysts\Payments\Component\Service\WebhookLogServiceInterface:
-    class: OxidSolutionCatalysts\Payments\Component\Service\WebhookLogService
+  OxidEsales\PaymentComponent\Service\WebhookLogServiceInterface:
+    class: OxidEsales\PaymentComponent\Service\WebhookLogService
     arguments:
-      $repository: '@OxidSolutionCatalysts\Payments\Component\Repository\WebhookLogRepositoryInterface'
+      $repository: '@OxidEsales\PaymentComponent\Repository\WebhookLogRepositoryInterface'
       $logger: '@Psr\Log\LoggerInterface'
     public: true
 
@@ -639,9 +639,9 @@ services:
   # Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
   OxidSolutionCatalysts\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededHandler:
     arguments:
-      $orderPaymentStateService: '@OxidSolutionCatalysts\Payments\Component\Service\OrderPaymentStateServiceInterface'
-      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
-      $contractFulfillmentService: '@OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface'
+      $orderPaymentStateService: '@OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface'
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $contractFulfillmentService: '@OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface'
       $logger: '@oxid_esales.monolog.logger'
     public: false
 
@@ -659,7 +659,7 @@ services:
   # Event File Logger - Writes to log/osc/stripe_events.log
   # Sprint 25: Debug logging for event handlers
   stripe.events.file_logger:
-    class: OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface
+    class: OxidEsales\PaymentComponent\Service\FileLoggerInterface
     factory: ['@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\EventFileLoggerFactory', 'create']
     public: false
 
@@ -671,7 +671,7 @@ services:
   # Reconciliation File Logger - Writes to log/osc/stripe_reconciliation.log
   # Sprint 14: Injected logger for testability (prevents unit tests writing to production logs)
   stripe.reconciliation.file_logger:
-    class: OxidSolutionCatalysts\Payments\Component\Service\FileLoggerInterface
+    class: OxidEsales\PaymentComponent\Service\FileLoggerInterface
     factory: ['@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\ReconciliationFileLoggerFactory', 'create']
     public: false
 
@@ -681,8 +681,8 @@ services:
     arguments:
       $connection: '@doctrine.dbal.connection'
       $adapterFactory: '@OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
-      $contractRepository: '@OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface'
-      $contractFulfillmentService: '@OxidSolutionCatalysts\Payments\Component\Service\ContractFulfillmentServiceInterface'
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $contractFulfillmentService: '@OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface'
       $fileLogger: '@stripe.reconciliation.file_logger'
     public: true
 

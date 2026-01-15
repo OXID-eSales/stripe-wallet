@@ -9,8 +9,8 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Service\Factory;
 
-use OxidSolutionCatalysts\Payments\Component\Adapter\PaymentAdapterInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactory;
+use OxidEsales\PaymentComponent\Adapter\PaymentAdapterInterface;
+use OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactory;
 use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapter;
 use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeClientFactory;

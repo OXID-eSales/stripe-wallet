@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Adapter;
 
-use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreatePaymentMethodRequest;
+use OxidEsales\PaymentComponent\Adapter\Request\CreatePaymentMethodRequest;
 use OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\StripeIntegrationTestCase;
 
 /**

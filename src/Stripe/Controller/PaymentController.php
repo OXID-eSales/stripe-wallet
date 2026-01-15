@@ -13,10 +13,10 @@ use OxidEsales\Eshop\Application\Controller\PaymentController as CorePaymentCont
 use OxidEsales\Eshop\Core\Registry;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
 use OxidSolutionCatalysts\Payments\Stripe\Module;
-use OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactoryInterface;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Request\CreatePaymentRequest;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Exception\PaymentAdapterException;
-use OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface;
+use OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactoryInterface;
+use OxidEsales\PaymentComponent\Adapter\Request\CreatePaymentRequest;
+use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
+use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
 
 /**
  * Extended payment controller for Stripe integration
@@ -30,8 +30,8 @@ class PaymentController extends CorePaymentController
 
     /**
      * @param \OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService $stripeConfig
-     * @param \OxidSolutionCatalysts\Payments\Component\Service\Factory\PaymentAdapterFactoryInterface $adapterFactory
-     * @param \OxidSolutionCatalysts\Payments\Component\Adapter\ShopAdapterInterface $shopAdapter
+     * @param \OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactoryInterface $adapterFactory
+     * @param \OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface $shopAdapter
      */
     public function __construct(
         ModuleConfigurationService $stripeConfig,

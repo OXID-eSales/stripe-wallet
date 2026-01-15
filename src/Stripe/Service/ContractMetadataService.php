@@ -11,8 +11,8 @@ namespace OxidSolutionCatalysts\Payments\Stripe\Service;
 
 use OxidEsales\Eshop\Application\Model\User;
 use OxidEsales\Eshop\Core\Registry;
-use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
+use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
+use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 
 /**
  * Service for managing contract metadata.

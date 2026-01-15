@@ -9,7 +9,7 @@ use OxidSolutionCatalysts\Payments\Stripe\DTO\RefundResult;
 use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\RefundService;
 use OxidSolutionCatalysts\Payments\Stripe\Service\RefundServiceInterface;
-use OxidSolutionCatalysts\Payments\Component\Adapter\Exception\PaymentAdapterException;
+use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;

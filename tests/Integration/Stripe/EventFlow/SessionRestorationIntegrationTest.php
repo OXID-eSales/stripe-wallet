@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\EventFlow;
 
-use OxidSolutionCatalysts\Payments\Component\Contract\BasketSnapshot;
-use OxidSolutionCatalysts\Payments\Component\Contract\ContractCondition;
-use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContract;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcher;
-use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepository;
+use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
+use OxidEsales\PaymentComponent\Contract\ContractCondition;
+use OxidEsales\PaymentComponent\Contract\PaymentContract;
+use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
+use OxidEsales\PaymentComponent\EventSystem\EventDispatcher;
+use OxidEsales\PaymentComponent\Repository\ContractRepository;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler;
@@ -426,7 +426,7 @@ class SessionRestorationIntegrationTest extends TestCase
 
         // Should still produce a result (with warnings for missing data)
         $this->assertInstanceOf(
-            \OxidSolutionCatalysts\Payments\Component\Contract\SecurityValidationResultInterface::class,
+            \OxidEsales\PaymentComponent\Contract\SecurityValidationResultInterface::class,
             $result
         );
     }

@@ -10,7 +10,7 @@ declare(strict_types=1);
 namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Adapter;
 
 use OxidEsales\Eshop\Application\Model\Order;
-use OxidSolutionCatalysts\Payments\Component\Repository\TransactionRepositoryInterface;
+use OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Adapter\OxidShopOrderService;
 use OxidSolutionCatalysts\Payments\Stripe\Repository\StripePaymentDetailsRepository;
 use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;

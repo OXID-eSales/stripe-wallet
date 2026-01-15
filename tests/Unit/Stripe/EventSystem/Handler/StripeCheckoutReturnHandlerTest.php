@@ -9,13 +9,13 @@ use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutReturn
 use OxidSolutionCatalysts\Payments\Stripe\Service\Result\SecurityValidationResult;
 use OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutReturnServiceInterface;
 use OxidSolutionCatalysts\Payments\Stripe\DTO\CheckoutReturnResult;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\EventContext;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentAuthorizedEvent;
-use OxidSolutionCatalysts\Payments\Component\EventSystem\EventDispatcherInterface;
-use OxidSolutionCatalysts\Payments\Component\Contract\PaymentContractInterface;
-use OxidSolutionCatalysts\Payments\Component\Contract\BasketSnapshot;
-use OxidSolutionCatalysts\Payments\Component\Repository\ContractRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Component\Service\ReturnSecurityValidatorInterface;
+use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
+use OxidEsales\PaymentComponent\EventSystem\Event\Payment\PaymentAuthorizedEvent;
+use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
+use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
+use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
+use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface;
 use OxidSolutionCatalysts\Payments\Stripe\Service\DeliveryAddressHashServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -498,7 +498,7 @@ class StripeCheckoutReturnHandlerTest extends TestCase
             ->expects($this->once())
             ->method('dispatch')
             ->with($this->callback(function ($event) {
-                return $event instanceof \OxidSolutionCatalysts\Payments\Component\EventSystem\Event\Payment\PaymentAuthorizedEvent;
+                return $event instanceof \OxidEsales\PaymentComponent\EventSystem\Event\Payment\PaymentAuthorizedEvent;
             }));
 
         $context = new EventContext([

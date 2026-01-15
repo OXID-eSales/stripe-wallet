@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Service\Result;
 
-use OxidSolutionCatalysts\Payments\Component\Contract\SecurityValidationResultInterface;
+use OxidEsales\PaymentComponent\Contract\SecurityValidationResultInterface;
 
 /**
  * Value object representing the result of a security validation check

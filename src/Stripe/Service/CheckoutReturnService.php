@@ -9,8 +9,8 @@ declare(strict_types=1);
 
 namespace OxidSolutionCatalysts\Payments\Stripe\Service;
 
-use OxidSolutionCatalysts\Payments\Component\Adapter\Exception\PaymentAdapterException;
-use OxidSolutionCatalysts\Payments\Component\Service\TokenServiceInterface;
+use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
+use OxidEsales\PaymentComponent\Service\TokenServiceInterface;
 use OxidSolutionCatalysts\Payments\Stripe\DTO\CheckoutReturnResult;
 use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
