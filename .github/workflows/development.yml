@@ -89,8 +89,8 @@ jobs:
         run: |
           docker compose exec -T \
             php composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component
-          docker compose exec -T \
-            php composer config github-oauth.github.com $GITHUB_TOKEN
+          docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GITHUB_TOKEN}\"}}" \
+            php composer config github-oauth.github.com "${GITHUB_TOKEN}"
 
       - name: Install module
         run: |
@@ -110,8 +110,11 @@ jobs:
 
 
       - name: Install dependencies, reset shop, activate theme
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          docker compose exec -T php composer update --no-interaction
+          docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GITHUB_TOKEN}\"}}" \
+            php composer update --no-interaction
 
       - name: Drop FK constraints
         run: |
@@ -194,6 +197,8 @@ jobs:
       - name: Install module dependencies
         id: dependencies
         working-directory: source/test-module
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.GITHUB_TOKEN }}"}}'
         run: composer update --no-interaction
 
       - name: Run style check
@@ -238,11 +243,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           docker compose exec -T php bash -c "cd /var/www/test-module && composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component"
-          docker compose exec -T php bash -c "cd /var/www/test-module && composer config github-oauth.github.com $GITHUB_TOKEN"
+          docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GITHUB_TOKEN}\"}}" \
+            php bash -c "cd /var/www/test-module && composer config github-oauth.github.com '${GITHUB_TOKEN}'"
 
       - name: Install module dependencies
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          docker compose exec -T php bash -c "cd /var/www/test-module && composer update --no-interaction"
+          docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GITHUB_TOKEN}\"}}" \
+            php bash -c "cd /var/www/test-module && composer update --no-interaction"
 
       - name: Run isolated unit tests
         run: |
