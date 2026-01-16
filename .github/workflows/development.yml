@@ -126,10 +126,6 @@ jobs:
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
             php composer update --no-interaction
 
-      - name: Drop FK constraints
-        run: |
-          docker compose exec -T php bash -c "cd ./test-module/migration/scripts && ./setup-helper.sh drop-fk"
-
       - name: Install demodata
         run: |
           docker compose exec -T php bin/oe-console oe:database:reset \
