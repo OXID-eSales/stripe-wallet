@@ -132,10 +132,6 @@ jobs:
             --db-host=mysql --db-port=3306 --db-name=example --db-user=root --db-password=root --force
           docker compose exec -T php bash -c "bin/oe-console oe:setup:demodata"
 
-      - name: Re-add FK constraints
-        run: |
-          docker compose exec -T php bash -c "cd ./test-module/migration/scripts && ./setup-helper.sh add-fk"
-
       - name: Activate theme
         run: |
           docker compose exec -T php bin/oe-console oe:theme:activate apex
