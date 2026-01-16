@@ -258,6 +258,28 @@ jobs:
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
             php bash -c "cd /var/www/test-module && composer update --no-interaction"
 
+      - name: Run payment-component database migrations
+        run: |
+          # Run payment-component migrations using OXID's database connection
+          docker compose exec -T php bash -c '
+            cat > /tmp/migrations-db.php << "DBCONFIG"
+          <?php
+          require_once "/var/www/source/bootstrap.php";
+          $config = \OxidEsales\Eshop\Core\Registry::getConfig();
+          return [
+              "dbname" => $config->getConfigParam("dbName"),
+              "user" => $config->getConfigParam("dbUser"),
+              "password" => $config->getConfigParam("dbPwd"),
+              "host" => $config->getConfigParam("dbHost"),
+              "driver" => "pdo_mysql",
+          ];
+          DBCONFIG
+            php vendor/bin/doctrine-migrations migrate \
+              --configuration=/var/www/vendor/oxid-esales/payment-component/migration/migrations.yml \
+              --db-configuration=/tmp/migrations-db.php \
+              --no-interaction --allow-no-migration
+          '
+
       - name: Run isolated unit tests
         run: |
           docker compose exec -T php bash -c "cd /var/www/test-module && vendor/bin/phpunit -c tests/phpunit.xml --testsuite Unit"
@@ -315,9 +337,27 @@ jobs:
         run: |
           docker compose exec -T php bin/oe-console oe:module:install ./test-module
 
-      - name: Run database migrations
+      - name: Run payment-component database migrations
         run: |
-          docker compose exec -T php vendor/bin/oe-eshop-db_migrate migrations:migrate STRIPE --no-interaction
+          # Run payment-component migrations using OXID's database connection
+          docker compose exec -T php bash -c '
+            cat > /tmp/migrations-db.php << "DBCONFIG"
+          <?php
+          require_once "/var/www/source/bootstrap.php";
+          $config = \OxidEsales\Eshop\Core\Registry::getConfig();
+          return [
+              "dbname" => $config->getConfigParam("dbName"),
+              "user" => $config->getConfigParam("dbUser"),
+              "password" => $config->getConfigParam("dbPwd"),
+              "host" => $config->getConfigParam("dbHost"),
+              "driver" => "pdo_mysql",
+          ];
+          DBCONFIG
+            php vendor/bin/doctrine-migrations migrate \
+              --configuration=/var/www/vendor/oxid-esales/payment-component/migration/migrations.yml \
+              --db-configuration=/tmp/migrations-db.php \
+              --no-interaction --allow-no-migration
+          '
 
       - name: Create .env
         run: |          
