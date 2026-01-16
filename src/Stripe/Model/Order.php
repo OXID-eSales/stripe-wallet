@@ -79,7 +79,7 @@ class Order extends Order_parent
         // Check if this is a Stripe payment
         $paymentId = $oBasket->getPaymentId();
 
-        if (strpos($paymentId, 'osc_stripe_') === 0) {
+        if (strpos($paymentId, 'oe_payments_stripe_') === 0) {
             // Stripe payment - skip standard OXID payment execution
             // Payment is handled separately via Stripe SDK in OrderController
             Registry::getLogger()->debug('Stripe payment detected, skipping standard payment execution', [
@@ -116,7 +116,7 @@ class Order extends Order_parent
         }
 
         // Check if this is a Stripe payment
-        if (strpos($paymentId, 'osc_stripe_') === 0) {
+        if (strpos($paymentId, 'oe_payments_stripe_') === 0) {
             // Get hash from request first (standard OXID behavior)
             $sDelAddressMD5 = Registry::getRequest()->getRequestEscapedParameter('sDeliveryAddressMD5');
 

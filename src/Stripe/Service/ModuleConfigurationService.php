@@ -46,18 +46,27 @@ use Throwable;
  */
 class ModuleConfigurationService implements ServiceInterface
 {
-    private ModuleConfiguration $moduleConfig;
+    private ?ModuleConfiguration $moduleConfig = null;
 
     public function __construct(
         private ContextInterface $context,
         private ModuleConfigurationDaoInterface $moduleConfigurationDao,
         private ?ShopAdapterInterface $shopAdapter = null,
     ) {
-        $this->moduleConfig = $this->moduleConfigurationDao->get(Module::MODULE_ID, $this->context->getCurrentShopId());
+        try {
+            $this->moduleConfig = $this->moduleConfigurationDao->get(Module::MODULE_ID, $this->context->getCurrentShopId());
+        } catch (Throwable $e) {
+            // Module not yet activated - configuration will be null
+            $this->moduleConfig = null;
+        }
     }
 
     public function get(string $name): mixed
     {
+        if ($this->moduleConfig === null) {
+            return '';
+        }
+
         try {
             return $this->moduleConfig->getModuleSetting($name)->getValue();
         } catch (Throwable $e) {

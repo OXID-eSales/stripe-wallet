@@ -342,6 +342,7 @@ class PaymentController extends CorePaymentController
     private function isStripeSelected(): bool
     {
         $selectedPayment = Registry::getSession()->getBasket()->getPaymentId();
-        return $selectedPayment === 'osc_stripe_card';
+        // Check for any Stripe payment method (oe_payments_stripe_* prefix)
+        return str_starts_with($selectedPayment, 'oe_payments_stripe_');
     }
 }

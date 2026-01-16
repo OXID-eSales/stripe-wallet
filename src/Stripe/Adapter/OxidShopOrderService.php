@@ -52,9 +52,9 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
     public function createOrder(CreateOrderRequest $request): OrderResponse
     {
         try {
-            // 1. Get basket and user from request
+            // 1. Get basket from session (CreateOrderRequest is a DTO, basket is in session)
             /** @var Basket|null $basket */
-            $basket = $request->getBasket(); // @phpstan-ignore method.notFound
+            $basket = Registry::getSession()->getBasket();
             /** @var User|null $user */
             $user = $basket?->getBasketUser();
 

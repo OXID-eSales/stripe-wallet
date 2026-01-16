@@ -12,7 +12,7 @@
     {# Buy Now button - Direct to One-Page Checkout #}
     {% hasrights { ident: "TOBASKET" } %}
         {% if not oDetailsProduct.isNotBuyable() and blCanBuy %}
-            {% include "@osc_stripe_wallet/frontend/buy_now_button.html.twig" with {
+            {% include "@oe_payments_stripe_wallet/frontend/buy_now_button.html.twig" with {
                 productId: oDetailsProduct.oxarticles__oxid.value,
                 productNid: oDetailsProduct.oxarticles__oxnid.value,
                 parentId: oDetailsProduct.oxarticles__oxparentid.value ? oDetailsProduct.oxarticles__oxparentid.value : oDetailsProduct.oxarticles__oxid.value

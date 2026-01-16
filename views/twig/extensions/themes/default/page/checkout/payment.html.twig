@@ -6,7 +6,7 @@
         {% if config.isActive() %}
             <div class="payment-option">
                 <div class="payment-option-form">
-                    {% include "@osc_stripe_wallet/frontend/select_payment.html.twig" %}
+                    {% include "@oe_payments_stripe_wallet/frontend/select_payment.html.twig" %}
                     <label class="form-check-label" for="payment_{{ sPaymentID }}">{{ paymentmethod.oxpayments__oxdesc.value }}</label>
                         <div class="stripe-card-option-info{% if oView.getCheckedPaymentId() == paymentmethod.oxpayments__oxid.value %} activePayment{% endif %}">
                             {% for value in paymentmethod.getDynValues() %}
@@ -19,7 +19,7 @@
                                 </div>
                             {% endfor %}
 
-                            {% include "@osc_stripe_wallet/frontend/stripe_card.html.twig" with {sPaymentID: sPaymentID} %}
+                            {% include "@oe_payments_stripe_wallet/frontend/stripe_card.html.twig" with {sPaymentID: sPaymentID} %}
 
                             {% block checkout_payment_longdesc %}
                                 {% if paymentmethod.oxpayments__oxlongdesc.value|striptags|trim %}

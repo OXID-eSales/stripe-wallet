@@ -43,8 +43,8 @@
             <div class="card-body">
                 {% set payment_id_template = paymentId|replace({'osc_': ''}) %}
                 {% include [
-                    "@osc_stripe_wallet/frontend/" ~ payment_id_template ~ ".html.twig",
-                    "@osc_stripe_wallet/frontend/payment_method_unsupported.html.twig"]
+                    "@oe_payments_stripe_wallet/frontend/" ~ payment_id_template ~ ".html.twig",
+                    "@oe_payments_stripe_wallet/frontend/payment_method_unsupported.html.twig"]
                     with {
                     'payment': payment,
                     'oViewData': oViewData,
