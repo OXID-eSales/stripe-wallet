@@ -43,7 +43,7 @@ class OrderRefund extends AdminDetailsController
      *
      * @var string
      */
-    protected $_sThisTemplate = "@osc_stripe_wallet/admin/stripe_order_refund";
+    protected $_sThisTemplate = "@oe_payments_stripe_wallet/admin/stripe_order_refund";
 
     /**
      * Order object

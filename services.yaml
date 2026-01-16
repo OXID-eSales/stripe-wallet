@@ -532,16 +532,16 @@ services:
 
   # Interface binding
   # Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
-  OxidEsales\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface:
-    class: OxidEsales\Payments\Stripe\Handler\WebhookContractFulfillmentHandler
+  OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface:
+    class: OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler
     arguments:
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
       $contractFulfillmentService: '@OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface'
     public: false
 
   # Concrete implementation alias
-  OxidEsales\Payments\Stripe\Handler\WebhookContractFulfillmentHandler:
-    alias: OxidEsales\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface
+  OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler:
+    alias: OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface
 
   # WebhookProcessingService - Now requires WebhookContractFulfillmentHandler
   # Sprint 7: Added ContractRepository for linking webhook logs to contracts
@@ -549,7 +549,7 @@ services:
   # Sprint 18: Added ContractFulfillmentService for DRY fulfillment
   OxidEsales\Payments\Stripe\Service\WebhookProcessingService:
     arguments:
-      $contractFulfillmentHandler: '@OxidEsales\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface'
+      $contractFulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
       $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
       $webhookLogRepository: '@OxidEsales\PaymentComponent\Repository\WebhookLogRepositoryInterface'
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
@@ -638,7 +638,7 @@ services:
   # PaymentIntentSucceededHandler - Handles payment_intent.succeeded webhooks
   # Sprint 16: Uses OrderPaymentStateService for OXPAID updates (DRY)
   # Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
-  OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededHandler:
+  OxidEsales\Payments\Stripe\WebhookHandler\PaymentIntentSucceededHandler:
     arguments:
       $orderPaymentStateService: '@OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface'
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'

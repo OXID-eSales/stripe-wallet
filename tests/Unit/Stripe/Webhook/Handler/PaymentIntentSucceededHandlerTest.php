@@ -16,13 +16,13 @@ use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface;
 use OxidEsales\PaymentComponent\Webhook\WebhookEvent;
 use OxidEsales\PaymentComponent\Webhook\WebhookEventHandlerInterface;
-use OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededHandler;
+use OxidEsales\Payments\Stripe\WebhookHandler\PaymentIntentSucceededHandler;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 /**
- * @covers \OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededHandler
+ * @covers \OxidEsales\Payments\Stripe\WebhookHandler\PaymentIntentSucceededHandler
  * @group sprint-13
  * @group sprint-15
  * @group sprint-16

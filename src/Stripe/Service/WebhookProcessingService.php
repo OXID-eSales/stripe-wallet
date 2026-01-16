@@ -23,7 +23,7 @@ use OxidEsales\PaymentComponent\Repository\WebhookLogRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface;
 use OxidEsales\PaymentComponent\Webhook\WebhookLog;
-use OxidEsales\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface;
+use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface;
 
 /**
  * Webhook processing service

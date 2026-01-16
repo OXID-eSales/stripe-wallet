@@ -18,7 +18,7 @@ namespace OxidEsales\Payments\Stripe\Core;
 final class StripeDefinitions
 {
     // Payment method ID
-    public const STRIPE_WALLET_PAYMENT_ID = 'osc_stripe_wallet';
+    public const STRIPE_WALLET_PAYMENT_ID = 'oe_payments_stripe_wallet';
 
     // Payment constraints
     private const PAYMENT_CONSTRAINTS_DEFAULT = [

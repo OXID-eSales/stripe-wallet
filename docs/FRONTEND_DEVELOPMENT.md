@@ -315,7 +315,7 @@ export default class extends Controller {
 
 ```twig
 {# Load the compiled JavaScript bundle #}
-<script src="{{ oViewConf.getModuleUrl('osc_stripe_wallet', 'out/js/stripe.min.js') }}"></script>
+<script src="{{ oViewConf.getModuleUrl('oe_payments_stripe_wallet', 'out/js/stripe.min.js') }}"></script>
 
 {# Stimulus auto-connects when it finds this element #}
 <div data-controller="stripe-order"
@@ -506,7 +506,7 @@ ls -lh out/js/stripe.*.js
 **Checklist:**
 1. ✅ Is the bundle loaded in HTML?
    ```twig
-   <script src="{{ oViewConf.getModuleUrl('osc_stripe_wallet', 'out/js/stripe.min.js') }}"></script>
+   <script src="{{ oViewConf.getModuleUrl('oe_payments_stripe_wallet', 'out/js/stripe.min.js') }}"></script>
    ```
 
 2. ✅ Is `data-controller` attribute correct?

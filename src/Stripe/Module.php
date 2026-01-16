@@ -11,5 +11,5 @@ namespace OxidEsales\Payments\Stripe;
 
 class Module
 {
-    public const MODULE_ID = 'osc_stripe_wallet';
+    public const MODULE_ID = 'oe_payments_stripe_wallet';
 }

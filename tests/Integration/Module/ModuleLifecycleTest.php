@@ -28,7 +28,7 @@ use Psr\Container\ContainerInterface;
  */
 class ModuleLifecycleTest extends TestCase
 {
-    private const MODULE_ID = 'osc_stripe_wallet';
+    private const MODULE_ID = 'oe_payments_stripe_wallet';
     private const SHOP_ID = 1;
 
     private ?ContainerInterface $container = null;

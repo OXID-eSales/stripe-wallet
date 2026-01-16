@@ -21,7 +21,7 @@ use OxidEsales\PaymentComponent\Repository\DoctrineWebhookLogRepository;
 use OxidEsales\PaymentComponent\Repository\WebhookLogRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ContractFulfillmentService;
 use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
-use OxidEsales\Payments\Stripe\Handler\WebhookContractFulfillmentHandler;
+use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler;
 use OxidEsales\Payments\Stripe\Service\WebhookProcessingService;
 use Psr\Log\NullLogger;
 
@@ -41,7 +41,7 @@ use Psr\Log\NullLogger;
  * ContractRepository which needs a fresh database connection per test.
  *
  * @covers \OxidEsales\Payments\Stripe\Service\WebhookProcessingService
- * @covers \OxidEsales\Payments\Stripe\Handler\WebhookContractFulfillmentHandler
+ * @covers \OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler
  * @group integration
  * @group webhook
  * @group oxpaid
@@ -475,7 +475,7 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
             'OXBILLCOUNTRYID' => 'a7c40f631fc920687.20179984',
             'OXBILLZIP' => '12345',
             'OXBILLSAL' => 'MR',
-            'OXPAYMENTTYPE' => 'osc_stripe_wallet',
+            'OXPAYMENTTYPE' => 'oe_payments_stripe_wallet',
             'OXTOTALNETSUM' => 84.03,
             'OXTOTALBRUTSUM' => 100.00,
             'OXTOTALORDERSUM' => 100.00,
@@ -533,7 +533,7 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
             'OXBILLCOUNTRYID' => 'a7c40f631fc920687.20179984',
             'OXBILLZIP' => '12345',
             'OXBILLSAL' => 'MR',
-            'OXPAYMENTTYPE' => 'osc_stripe_wallet',
+            'OXPAYMENTTYPE' => 'oe_payments_stripe_wallet',
             'OXTOTALNETSUM' => 84.03,
             'OXTOTALBRUTSUM' => 100.00,
             'OXTOTALORDERSUM' => 100.00,

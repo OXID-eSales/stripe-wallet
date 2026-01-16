@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Stripe Payment Module for OXID eShop 7.4+ implementing a **Smart-Contract Architecture** for payment lifecycle management. Uses Stripe SDK v18+ with Stimulus.js for frontend.
 
-**Module ID:** `osc_stripe_wallet`
+**Module ID:** `oe_payments_stripe_wallet`
 **Namespace:** `OxidEsales\Payments\Stripe\`
 
 ## Core Development Principles
@@ -95,9 +95,9 @@ make pre-commit            # Full pre-commit validation
 ### OXID Module Commands
 ```bash
 bin/oe-console oe:module:install extensions/stripe
-bin/oe-console oe:module:activate osc_stripe_wallet
-bin/oe-console oe:module:deactivate osc_stripe_wallet
-bin/oe-console oe:module:uninstall osc_stripe_wallet
+bin/oe-console oe:module:activate oe_payments_stripe_wallet
+bin/oe-console oe:module:deactivate oe_payments_stripe_wallet
+bin/oe-console oe:module:uninstall oe_payments_stripe_wallet
 ```
 
 ## Smart-Contract Architecture

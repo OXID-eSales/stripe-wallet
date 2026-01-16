@@ -10,7 +10,7 @@ export class AdminModuleSettingsPage extends AdminBasePage {
   private readonly selectors = {
     extensionsLink: 'a:has-text("Extensions")',
     modulesLink: 'a:has-text("Modules")',
-    stripeModule: 'text=osc_stripe_wallet',
+    stripeModule: 'text=oe_payments_stripe_wallet',
     settingsTab: 'a:has-text("Settings")',
     captureModeSelect: 'select[name="confselects[sStripeCaptureMode]"]',
     saveButton: 'input[type="submit"], button[type="submit"]',

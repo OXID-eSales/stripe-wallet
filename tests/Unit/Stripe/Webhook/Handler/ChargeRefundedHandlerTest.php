@@ -13,12 +13,12 @@ use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Webhook\WebhookEvent;
 use OxidEsales\PaymentComponent\Webhook\WebhookEventHandlerInterface;
-use OxidEsales\Payments\Stripe\Webhook\Handler\ChargeRefundedHandler;
+use OxidEsales\Payments\Stripe\WebhookHandler\ChargeRefundedHandler;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 /**
- * @covers \OxidEsales\Payments\Stripe\Webhook\Handler\ChargeRefundedHandler
+ * @covers \OxidEsales\Payments\Stripe\WebhookHandler\ChargeRefundedHandler
  * @group sprint-13
  * @group webhook
  * @group handler

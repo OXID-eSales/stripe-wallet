@@ -12,7 +12,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Webhook;
 use DateTimeImmutable;
 use OxidEsales\PaymentComponent\Repository\WebhookLogRepositoryInterface;
 use OxidEsales\PaymentComponent\Webhook\WebhookLog;
-use OxidEsales\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface;
+use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface;
 use OxidEsales\Payments\Stripe\Service\WebhookProcessingService;
 use PHPUnit\Framework\TestCase;
 use Stripe\Event;

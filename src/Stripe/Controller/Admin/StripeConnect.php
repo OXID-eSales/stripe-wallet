@@ -19,7 +19,7 @@ use OxidEsales\Payments\Stripe\Module;
 class StripeConnect extends AdminController
 {
     /** @var string */
-    protected $_sThisTemplate = '@osc_stripe_wallet/admin/stripe_connect.html.twig';
+    protected $_sThisTemplate = '@oe_payments_stripe_wallet/admin/stripe_connect.html.twig';
 
     /** @var ModuleSettingBridge */
     private ModuleSettingBridge $moduleSettingService;

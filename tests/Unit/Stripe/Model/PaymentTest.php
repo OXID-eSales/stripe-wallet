@@ -20,7 +20,7 @@ use PHPUnit\Framework\TestCase;
  * if a payment method is Stripe-powered (digital wallet) or from another source.
  *
  * Note: Legacy payment methods (stripecreditcard, stripesepa, etc.) are deprecated.
- * Stripe now uses only digital wallet payment method (osc_stripe_wallet).
+ * Stripe now uses only digital wallet payment method (oe_payments_stripe_wallet).
  *
  * These tests use mocking to avoid OXID Registry initialization issues.
  *
@@ -108,10 +108,10 @@ final class PaymentTest extends TestCase
     /**
      * @test
      */
-    public function testIsStripePaymentMethodReturnsTrueForCustomOscStripePaymentMethod(): void
+    public function testIsStripePaymentMethodReturnsTrueForCustomStripePaymentMethod(): void
     {
-        // Arrange - Custom Stripe payment method with osc_stripe_ prefix
-        $payment = $this->createPaymentWithId('osc_stripe_custom');
+        // Arrange - Custom Stripe payment method with oe_payments_stripe_ prefix
+        $payment = $this->createPaymentWithId('oe_payments_stripe_custom');
 
         // Act
         $result = $payment->isStripePaymentMethod();
@@ -119,7 +119,7 @@ final class PaymentTest extends TestCase
         // Assert
         $this->assertTrue(
             $result,
-            'Custom payment method starting with "osc_stripe_" should be recognized'
+            'Custom payment method starting with "oe_payments_stripe_" should be recognized'
         );
     }
 
@@ -135,10 +135,10 @@ final class PaymentTest extends TestCase
         // Act
         $result = $payment->isStripePaymentMethod();
 
-        // Assert - Legacy methods (stripe* prefix without osc_) are NOT recognized
+        // Assert - Legacy methods (stripe* prefix without oe_payments_stripe_) are NOT recognized
         $this->assertFalse(
             $result,
-            "Legacy payment method '{$paymentId}' should NOT be recognized (use osc_stripe_* instead)"
+            "Legacy payment method '{$paymentId}' should NOT be recognized (use oe_payments_stripe_* instead)"
         );
     }
 
@@ -281,7 +281,7 @@ final class PaymentTest extends TestCase
     public function testGetStripePaymentMethodTypeReturnsCorrectTypeForCustomMethod(): void
     {
         // Arrange
-        $payment = $this->createPaymentWithId('osc_stripe_custom');
+        $payment = $this->createPaymentWithId('oe_payments_stripe_custom');
 
         // Act
         $type = $payment->getStripePaymentMethodType();
@@ -437,7 +437,7 @@ final class PaymentTest extends TestCase
 
     /**
      * Provides legacy Stripe payment method IDs that are no longer supported.
-     * These methods use the old 'stripe*' prefix instead of 'osc_stripe_*'.
+     * These methods use the old 'stripe*' prefix instead of 'oe_payments_stripe_*'.
      *
      * @return array<string, array<string>>
      */

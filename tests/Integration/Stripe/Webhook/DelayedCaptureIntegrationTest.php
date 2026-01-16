@@ -16,7 +16,7 @@ use OxidEsales\PaymentComponent\Contract\PaymentContract;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
-use OxidEsales\Payments\Stripe\Handler\WebhookContractFulfillmentHandler;
+use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -28,7 +28,7 @@ use PHPUnit\Framework\TestCase;
  * - charge.captured webhook handling
  * - Contract state machine integration
  *
- * @covers \OxidEsales\Payments\Stripe\Handler\WebhookContractFulfillmentHandler
+ * @covers \OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler
  * @group sprint-7
  * @group sprint-9
  * @group delayed-capture

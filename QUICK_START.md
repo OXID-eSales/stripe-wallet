@@ -46,7 +46,7 @@ Edit your theme's payment or layout template:
 ### 2. Activate & Clear Cache
 
 ```bash
-vendor/bin/oe-console oe:module:activate osc_stripe
+vendor/bin/oe-console oe:module:activate oe_payments_stripe_wallet
 rm -rf source/tmp/*
 vendor/bin/oe-console oe:cache:clear
 ```
@@ -147,7 +147,7 @@ window.stripeConfig  // Should show configuration object
 
 - [ ] Theme template includes `{{ stripeConfigScript|raw }}`
 - [ ] Theme template includes CSS: `<link rel="stylesheet" href="{{ stripeCssUrl }}">`
-- [ ] Module activated: `oe-console oe:module:activate osc_stripe`
+- [ ] Module activated: `oe-console oe:module:activate oe_payments_stripe_wallet`
 - [ ] Cache cleared: `rm -rf source/tmp/*`
 - [ ] API keys configured in admin
 - [ ] Payment method activated for countries/currencies

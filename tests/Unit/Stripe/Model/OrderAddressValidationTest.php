@@ -49,7 +49,7 @@ class OrderAddressValidationTest extends TestCase
      * When:
      * - Request parameter 'sDeliveryAddressMD5' is empty/missing
      * - Session variable 'sDelAddrMD5' contains the hash
-     * - Payment method starts with 'osc_stripe_'
+     * - Payment method starts with 'oe_payments_stripe_'
      *
      * Then:
      * - validateDeliveryAddress() should use session hash
@@ -66,14 +66,14 @@ class OrderAddressValidationTest extends TestCase
         $requestHash = null; // Not in request
 
         // Given: Stripe payment method
-        $paymentId = 'osc_stripe_wallet';
+        $paymentId = 'oe_payments_stripe_wallet';
 
         // Expected: For Stripe payments, when request param is missing,
         // the system should fall back to session variable
 
         // This is what needs to be implemented in Stripe\Model\Order::validateDeliveryAddress()
         $this->assertTrue(
-            $paymentId !== null && strpos($paymentId, 'osc_stripe_') === 0,
+            $paymentId !== null && strpos($paymentId, 'oe_payments_stripe_') === 0,
             'This is a Stripe payment'
         );
 

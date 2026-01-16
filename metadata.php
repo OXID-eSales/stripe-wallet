@@ -68,8 +68,8 @@ $aModule = [
         'onDeactivate' => StripeEvents::class . '::onDeactivate',
     ],
     'templates' => [
-        '@osc_stripe_wallet/admin/stripe_connect' => 'views/twig/admin/stripe_connect.html.twig',
-        '@osc_stripe_wallet/admin/stripe_order' => 'views/twig/admin/stripe_order_refund.html.twig',
+        '@oe_payments_stripe_wallet/admin/stripe_connect' => 'views/twig/admin/stripe_connect.html.twig',
+        '@oe_payments_stripe_wallet/admin/stripe_order' => 'views/twig/admin/stripe_order_refund.html.twig',
     ],
     'settings'      => [
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeDevMode',                     'type' => 'bool',       'value' => '0',         'position' => 5],

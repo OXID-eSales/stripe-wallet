@@ -24,7 +24,7 @@ use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
  * Example:
  * ```php
  * $payment = oxNew(\OxidEsales\Eshop\Application\Model\Payment::class);
- * $payment->load('osc_stripe_wallet');
+ * $payment->load('oe_payments_stripe_wallet');
  *
  * if ($payment->isStripePowered()) {
  *     // This is a Stripe payment method
@@ -80,9 +80,9 @@ class Payment extends CorePayment
             return true;
         }
 
-        // Fallback: Check if payment ID starts with 'stripe'
+        // Fallback: Check if payment ID starts with 'oe_payments_stripe_'
         // This catches any custom Stripe payment methods not in the list
-        return str_starts_with($paymentId, 'osc_stripe');
+        return str_starts_with($paymentId, 'oe_payments_stripe_');
     }
 
     /**
@@ -147,11 +147,11 @@ class Payment extends CorePayment
     /**
      * Get the Stripe payment method type.
      *
-     * Extracts the payment method type from the payment ID by removing the 'osc_stripe_' prefix.
+     * Extracts the payment method type from the payment ID by removing the 'oe_payments_stripe_' prefix.
      * Returns null for non-Stripe payment methods.
      *
      * Examples:
-     * - 'osc_stripe_wallet' → 'wallet'
+     * - 'oe_payments_stripe_wallet' → 'wallet'
      * - 'paypal' → null (not a Stripe method)
      *
      * @return string|null The Stripe payment method type, or null if not a Stripe method
@@ -172,9 +172,9 @@ class Payment extends CorePayment
 
         $paymentId = $this->getId();
 
-        // Remove 'osc_stripe_' prefix to get the payment method type
-        if (str_starts_with($paymentId, 'osc_stripe_')) {
-            return substr($paymentId, 11); // strlen('osc_stripe_') = 11
+        // Remove 'oe_payments_stripe_' prefix to get the payment method type
+        if (str_starts_with($paymentId, 'oe_payments_stripe_')) {
+            return substr($paymentId, 19); // strlen('oe_payments_stripe_') = 19
         }
 
         return null;

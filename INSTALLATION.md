@@ -46,10 +46,10 @@ cd /home/gaad/PhpStormProjects/OXID/Stripe/stripe-wallet/source
 rm -rf tmp/*
 
 # 2. Deactivate module
-php bin/oe-console oe:module:deactivate osc_stripe_wallet
+php bin/oe-console oe:module:deactivate oe_payments_stripe_wallet
 
 # 3. Activate module (registers new controller and template)
-php bin/oe-console oe:module:activate osc_stripe_wallet
+php bin/oe-console oe:module:activate oe_payments_stripe_wallet
 
 # 4. Clear cache again
 php bin/oe-console oe:cache:clear
@@ -67,7 +67,7 @@ After activation, verify the installation:
 php bin/oe-console oe:module:list
 ```
 
-You should see `osc_stripe_wallet` as **active**.
+You should see `oe_payments_stripe_wallet` as **active**.
 
 ### 2. Check Template
 Navigate to any product detail page. You should see:
@@ -205,18 +205,18 @@ Should show:
 
 ## Module ID
 
-The module ID is: **osc_stripe_wallet**
+The module ID is: **oe_payments_stripe_wallet**
 
 Use this for:
-- Command line operations: `oe:module:activate osc_stripe_wallet`
-- Getting module URL: `oViewConf.getModuleUrl('osc_stripe_wallet', 'out/css/buy-now.css')`
+- Command line operations: `oe:module:activate oe_payments_stripe_wallet`
+- Getting module URL: `oViewConf.getModuleUrl('oe_payments_stripe_wallet', 'out/css/buy-now.css')`
 
 ## Directory Convention
 
 OXID 7.x with Twig uses **directory-based template discovery**:
 
 ```
-Module: osc_stripe_wallet
+Module: oe_payments_stripe_wallet
 Override: page/details/inc/productmain.html.twig
 Location: views/twig/extensions/themes/default/page/details/inc/productmain.html.twig
 ```

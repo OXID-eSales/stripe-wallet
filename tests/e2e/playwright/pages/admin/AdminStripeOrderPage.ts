@@ -43,7 +43,7 @@ export class AdminStripeOrderPage extends AdminBasePage {
     const editFrame = this.getEditFrame();
     if (!editFrame) return null;
 
-    const paymentType = await editFrame.locator('text=osc_stripe_wallet').textContent().catch(() => '');
+    const paymentType = await editFrame.locator('text=oe_payments_stripe_wallet').textContent().catch(() => '');
     const transactionIdEl = await editFrame.locator('text=/pi_[a-zA-Z0-9]+/').first();
     const transactionId = await transactionIdEl.textContent().catch(() => '');
 
@@ -51,7 +51,7 @@ export class AdminStripeOrderPage extends AdminBasePage {
       .getAttribute('href').catch(() => null);
 
     return {
-      paymentType: paymentType?.trim() || 'osc_stripe_wallet',
+      paymentType: paymentType?.trim() || 'oe_payments_stripe_wallet',
       transactionId: transactionId?.trim() || '',
       dashboardLink,
     };

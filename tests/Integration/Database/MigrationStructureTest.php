@@ -9,9 +9,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Integration\Database;
 
-use Doctrine\DBAL\Configuration;
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\DriverManager;
+use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
+use OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionProviderInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -31,12 +31,10 @@ class MigrationStructureTest extends TestCase
     {
         parent::setUp();
 
-        // Load database configuration from payment-component (tables are created there)
-        $dbConfig = require __DIR__ . '/../../../../payment-component/migration/migrations-db.php';
-
-        // Create DBAL connection
-        $config = new Configuration();
-        $this->connection = DriverManager::getConnection($dbConfig, $config);
+        // Use OXID's ConnectionProvider to get the database connection
+        $container = ContainerFactory::getInstance()->getContainer();
+        $connectionProvider = $container->get(ConnectionProviderInterface::class);
+        $this->connection = $connectionProvider->get();
     }
 
     // ==================== TABLE EXISTENCE TESTS ====================

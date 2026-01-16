@@ -55,12 +55,12 @@ mkdir -p "$PROJECT_ROOT"/source/extensions || exit 1
 cp -r "$MODULE_ROOT" "$PROJECT_ROOT"/source/extensions/stripe || exit 1
 
 docker compose exec -T \
-  php composer config repositories.osc/stripe-wallet \
+  php composer config repositories.oxid-esales/stripe-wallet \
   --json '{"type":"path", "url":"./extensions/stripe", "options": {"symlink": true}}' || exit 1
 
 # Configure module in composer
 docker compose exec -T \
-  php composer require osc/stripe-wallet || exit 1
+  php composer require oxid-esales/stripe-wallet || exit 1
 
 
 mkdir -p ./source/var/configuration/environment/shops/1/modules
@@ -77,7 +77,7 @@ docker compose exec -T php bin/oe-console oe:setup:demodata
 
 docker compose exec -T php bin/oe-console oe:theme:activate apex
 docker compose exec -T php bin/oe-console oe:module:install extensions/stripe
-docker compose exec -T php bin/oe-console oe:module:activate osc_stripe_wallet
+docker compose exec -T php bin/oe-console oe:module:activate oe_payments_stripe_wallet
 
 $PROJECT_ROOT/source/extensions/stripe/recipe/parts/shared/create_admin.sh
 # Register all related project packages git repositories

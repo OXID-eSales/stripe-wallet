@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidEsales\Payments\Stripe\Webhook\Handler;
+namespace OxidEsales\Payments\Stripe\WebhookHandler;
 
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Webhook\WebhookEvent;
