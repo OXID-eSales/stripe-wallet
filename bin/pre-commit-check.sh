@@ -160,8 +160,9 @@ else
       PHPUNIT_STATUS=0
     else
         # Local: Run in Docker with shop bootstrap (use shop's vendor phpunit)
+        # Exclude webhook-e2e tests as they require actual HTTP endpoints
         docker compose exec -w /var/www/extensions/stripe -T php \
-            /var/www/vendor/bin/phpunit -c tests/phpunit.xml --bootstrap=/var/www/source/bootstrap.php $TESTSUITE_ARG
+            /var/www/vendor/bin/phpunit -c tests/phpunit.xml --bootstrap=/var/www/source/bootstrap.php --exclude-group webhook-e2e $TESTSUITE_ARG
         PHPUNIT_STATUS=$?
     fi
 

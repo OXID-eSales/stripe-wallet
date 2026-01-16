@@ -93,6 +93,15 @@ jobs:
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
             php composer config github-oauth.github.com "${GH_TOKEN}"
 
+      - name: Install payment-component at shop level
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GH_TOKEN }}
+        run: |
+          docker compose exec -T \
+            php composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component
+          docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
+            php composer require oxid-esales/payment-component:* --no-interaction --no-update
+
       - name: Install module
         run: |
           docker compose exec -T \
@@ -295,6 +304,13 @@ jobs:
           docker compose exec -T php composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
             php composer config github-oauth.github.com "${GH_TOKEN}"
+
+      - name: Install payment-component at shop level
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GH_TOKEN }}
+        run: |
+          docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
+            php composer require oxid-esales/payment-component:* --no-interaction --no-update
 
       - name: Install testing dependencies
         env:

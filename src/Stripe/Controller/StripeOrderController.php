@@ -45,7 +45,7 @@ class StripeOrderController extends OrderController
         // 1. Validate
         $basket = $this->getBasketFromSession();
         if ($basket->getProductsCount() === 0) {
-            $this->addErrorToDisplay('Basket is empty');
+            Registry::getUtilsView()->addErrorToDisplay('Basket is empty');
             return 'basket';
         }
 
@@ -53,7 +53,7 @@ class StripeOrderController extends OrderController
             ?? $this->getSessionPaymentIntentId();
 
         if ($paymentIntentId === null) {
-            $this->addErrorToDisplay('Payment information missing');
+            Registry::getUtilsView()->addErrorToDisplay('Payment information missing');
             return 'payment';
         }
 
@@ -61,7 +61,7 @@ class StripeOrderController extends OrderController
         $context = new EventContext([
             'basket' => $basket,
             'user' => $basket->getBasketUser(),
-            'userId' => $basket->getBasketUser()?->getId(),
+            'userId' => $basket->getBasketUser()->getId(),
             'sessionId' => $this->getSessionId(),
             'paymentId' => $basket->getPaymentId(),
             'paymentIntentId' => $paymentIntentId,
@@ -175,7 +175,7 @@ class StripeOrderController extends OrderController
         $sessionId = $this->getCheckoutSessionIdFromRequest();
 
         if ($sessionId === null) {
-            $this->addErrorToDisplay('Payment information missing');
+            Registry::getUtilsView()->addErrorToDisplay('Payment information missing');
             return 'payment';
         }
 
@@ -220,7 +220,7 @@ class StripeOrderController extends OrderController
             ?? $this->getSessionPaymentIntentId();
 
         if ($paymentIntentId === null) {
-            $this->addErrorToDisplay('Payment information missing');
+            Registry::getUtilsView()->addErrorToDisplay('Payment information missing');
             return 'payment';
         }
 
@@ -261,7 +261,7 @@ class StripeOrderController extends OrderController
         // Handle errors
         $error = $context->get('error');
         if (is_string($error) && $error !== '') {
-            $this->addErrorToDisplay($error);
+            Registry::getUtilsView()->addErrorToDisplay($error);
         }
 
         // Handle order success
@@ -318,6 +318,16 @@ class StripeOrderController extends OrderController
         return is_string($value) ? $value : null;
     }
 
+    /**
+     * Get basket from session.
+     *
+     * @return \OxidEsales\Eshop\Application\Model\Basket
+     */
+    protected function getBasketFromSession(): \OxidEsales\Eshop\Application\Model\Basket
+    {
+        return Registry::getSession()->getBasket();
+    }
+
     protected function getSessionId(): string
     {
         return Registry::getSession()->getId();
@@ -355,10 +365,15 @@ class StripeOrderController extends OrderController
         return $config->getStripeCaptureMethod();
     }
 
-    public function getUser()
+    /**
+     * Get the current user from the basket session.
+     *
+     * @return \OxidEsales\Eshop\Application\Model\User|null
+     */
+    public function getUser(): ?\OxidEsales\Eshop\Application\Model\User
     {
         $basket = $this->getBasketFromSession();
-        return $basket?->getBasketUser();
+        return $basket->getBasketUser();
     }
 
     protected function setSessionVariable(string $key, mixed $value): void
