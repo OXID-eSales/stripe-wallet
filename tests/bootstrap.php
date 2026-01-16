@@ -49,7 +49,12 @@ $possibleBootstraps = [
 $bootstrapLoaded = false;
 foreach ($possibleBootstraps as $shopBootstrap) {
     if (file_exists($shopBootstrap)) {
+        // Suppress deprecation warnings during bootstrap loading
+        // OXID bootstrap has deprecated code that triggers PHPUnit error handler issues
+        $previousErrorReporting = error_reporting();
+        error_reporting($previousErrorReporting & ~E_DEPRECATED);
         require_once $shopBootstrap;
+        error_reporting($previousErrorReporting);
         $bootstrapLoaded = true;
         break;
     }

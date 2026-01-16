@@ -12,7 +12,10 @@
          cacheDirectory=".phpunit.cache"
          backupStaticProperties="false"
          displayDetailsOnPhpunitDeprecations="false"
-         failOnPhpunitDeprecation="false">
+         failOnPhpunitDeprecation="false"
+         displayDetailsOnTestsThatTriggerDeprecations="false"
+         failOnDeprecation="false"
+         failOnWarning="false">
   <testsuites>
     <testsuite name="Unit">
       <directory>Unit/</directory>
