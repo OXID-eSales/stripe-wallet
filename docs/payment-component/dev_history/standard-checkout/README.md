@@ -64,9 +64,9 @@ Standard checkout is the traditional e-commerce flow where customers progress th
 │                              ▼                                   │
 │  ┌──────────────────────────────────────────────────┐          │
 │  │           Component Database Tables               │          │
-│  │  - osc_payment_transaction                        │          │
-│  │  - osc_payment_order_state                       │          │
-│  │  - osc_payment_customer                          │          │
+│  │  - oe_payments_transaction                        │          │
+│  │  - oe_payments_order_state                       │          │
+│  │  - oe_payments_customer                          │          │
 │  └──────────────────────────────────────────────────┘          │
 └─────────────────────────────────────────────────────────────────┘
                               │

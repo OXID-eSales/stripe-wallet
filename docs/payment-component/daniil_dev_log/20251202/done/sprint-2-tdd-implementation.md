@@ -30,8 +30,8 @@
 ### Current State Analysis
 
 **Tables:**
-- `osc_payment_webhooklogs` (Migration) - used by `DoctrineWebhookLogRepository`
-- `osc_payment_webhook_log` (Events.php) - used by `WebhookController`, `WebhookProcessingService`
+- `oe_payments_webhooklogs` (Migration) - used by `DoctrineWebhookLogRepository`
+- `oe_payments_webhook_log` (Events.php) - used by `WebhookController`, `WebhookProcessingService`
 
 ### Step 1.1: Verify Existing Behavior (Baseline Tests)
 
@@ -319,7 +319,7 @@ class WebhookLogRepositoryInterfaceTest extends TestCase
 ### Current State Analysis
 
 **Tables:**
-- `osc_payment_customer` (Migration) - provider-agnostic, unused
+- `oe_payments_customer` (Migration) - provider-agnostic, unused
 - `osc_stripe_customer_mapping` (Events.php) - Stripe-specific, used by `StripeCustomerService`
 
 ### Step 2.1: Baseline Test for StripeCustomerService
@@ -379,7 +379,7 @@ class StripeCustomerServiceBaselineTest extends IntegrationTestCase
 }
 ```
 
-### Step 2.2: Test Using osc_payment_customer Table
+### Step 2.2: Test Using oe_payments_customer Table
 
 **Test File:** `tests/Unit/Stripe/Service/StripeCustomerServiceProviderAgnosticTest.php`
 
@@ -481,7 +481,7 @@ class PaymentCustomerRepositoryTest extends TestCase
 {
     public function testUsesCorrectTableName(): void
     {
-        // Verify repository uses osc_payment_customer, NOT osc_stripe_customer_mapping
+        // Verify repository uses oe_payments_customer, NOT osc_stripe_customer_mapping
         $reflection = new \ReflectionClass(DoctrinePaymentCustomerRepository::class);
         $property = $reflection->getProperty('tableName');
         $property->setAccessible(true);
@@ -489,7 +489,7 @@ class PaymentCustomerRepositoryTest extends TestCase
         $connection = $this->createMock(Connection::class);
         $repository = new DoctrinePaymentCustomerRepository($connection);
 
-        $this->assertEquals('osc_payment_customer', $property->getValue($repository));
+        $this->assertEquals('oe_payments_customer', $property->getValue($repository));
     }
 
     public function testSaveUsesProviderAgnosticColumns(): void
@@ -501,7 +501,7 @@ class PaymentCustomerRepositoryTest extends TestCase
             ->expects($this->once())
             ->method('insert')
             ->with(
-                'osc_payment_customer',
+                'oe_payments_customer',
                 $this->callback(function ($data) {
                     // Should use OXPAYMENTCUSTOMERID, not OXSTRIPECUSTOMERID
                     return isset($data['OXPAYMENTCUSTOMERID'])
@@ -644,17 +644,17 @@ class TableConsolidationMigrationTest extends IntegrationTestCase
         );
 
         $expectedTables = [
-            'osc_payment_contract',
-            'osc_payment_transaction',
-            'osc_payment_order_state',
-            'osc_payment_customer',
-            'osc_payment_idempotency',
-            'osc_payment_sessions',
-            'osc_payment_webhooklogs',
+            'oe_payments_contract',
+            'oe_payments_transaction',
+            'oe_payments_order_state',
+            'oe_payments_customer',
+            'oe_payments_idempotency',
+            'oe_payments_sessions',
+            'oe_payments_webhooklogs',
         ];
 
         $unexpectedTables = [
-            'osc_payment_webhook_log',      // Should be removed
+            'oe_payments_webhook_log',      // Should be removed
             'osc_stripe_customer_mapping',  // Should be removed
             'osc_stripe_payment_details',   // Should be removed
         ];
@@ -671,7 +671,7 @@ class TableConsolidationMigrationTest extends IntegrationTestCase
     public function testWebhookLogsTableHasAllRequiredColumns(): void
     {
         $columns = $this->connection->fetchFirstColumn(
-            "SHOW COLUMNS FROM osc_payment_webhooklogs"
+            "SHOW COLUMNS FROM oe_payments_webhooklogs"
         );
 
         $requiredColumns = [
@@ -696,7 +696,7 @@ class TableConsolidationMigrationTest extends IntegrationTestCase
     public function testPaymentCustomerTableHasProviderAgnosticSchema(): void
     {
         $columns = $this->connection->fetchFirstColumn(
-            "SHOW COLUMNS FROM osc_payment_customer"
+            "SHOW COLUMNS FROM oe_payments_customer"
         );
 
         // Should have generic column
@@ -735,9 +735,9 @@ class EventsCleanupTest extends TestCase
         $source = file_get_contents($reflection->getFileName());
 
         $this->assertStringNotContainsString(
-            'osc_payment_webhook_log',
+            'oe_payments_webhook_log',
             $source,
-            'Events.php should not create osc_payment_webhook_log table'
+            'Events.php should not create oe_payments_webhook_log table'
         );
     }
 
@@ -812,7 +812,7 @@ class EventsCleanupTest extends TestCase
 | Order | Task | Tests First |
 |-------|------|-------------|
 | 3.1 | Create `Version20251202_ConsolidateTables.php` | Migration test |
-| 3.2 | Add columns to `osc_payment_webhooklogs` | Schema test |
+| 3.2 | Add columns to `oe_payments_webhooklogs` | Schema test |
 | 3.3 | Drop redundant tables | Table existence test |
 
 ### Round 4: Cleanup
@@ -848,36 +848,36 @@ final class Version20251202_ConsolidateTables extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        // 1. Add missing columns to osc_payment_webhooklogs
+        // 1. Add missing columns to oe_payments_webhooklogs
         $this->addSql("
-            ALTER TABLE osc_payment_webhooklogs
+            ALTER TABLE oe_payments_webhooklogs
             ADD COLUMN IF NOT EXISTS OXPROVIDER VARCHAR(50) NOT NULL DEFAULT 'stripe' AFTER OXCONTRACTID,
             ADD COLUMN IF NOT EXISTS OXPAYLOAD MEDIUMTEXT NULL AFTER OXPROVIDER,
             ADD COLUMN IF NOT EXISTS OXPROCESSEDAT DATETIME NULL AFTER OXRECEIVEDAT
         ");
 
-        // 2. Migrate data from osc_payment_webhook_log to osc_payment_webhooklogs (if any)
+        // 2. Migrate data from oe_payments_webhook_log to oe_payments_webhooklogs (if any)
         $this->addSql("
-            INSERT IGNORE INTO osc_payment_webhooklogs
+            INSERT IGNORE INTO oe_payments_webhooklogs
                 (OXID, OXEVENTID, OXEVENTTYPE, OXPROVIDER, OXPAYLOAD, OXSTATUS, OXRECEIVEDAT, OXERROR)
             SELECT
                 OXID, OXEVENTID, OXEVENTTYPE, OXPROVIDER, OXPAYLOAD, OXSTATUS, OXCREATED, OXERRORMESSAGE
-            FROM osc_payment_webhook_log
-            WHERE OXEVENTID NOT IN (SELECT OXEVENTID FROM osc_payment_webhooklogs)
+            FROM oe_payments_webhook_log
+            WHERE OXEVENTID NOT IN (SELECT OXEVENTID FROM oe_payments_webhooklogs)
         ");
 
-        // 3. Migrate data from osc_stripe_customer_mapping to osc_payment_customer (if any)
+        // 3. Migrate data from osc_stripe_customer_mapping to oe_payments_customer (if any)
         $this->addSql("
-            INSERT IGNORE INTO osc_payment_customer
+            INSERT IGNORE INTO oe_payments_customer
                 (OXID, OXUSERID, OXPAYMENTCUSTOMERID, OXCREATED, OXUPDATED)
             SELECT
                 OXID, OXUSERID, OXSTRIPECUSTOMERID, OXCREATED, IFNULL(OXUPDATED, OXCREATED)
             FROM osc_stripe_customer_mapping
-            WHERE OXUSERID NOT IN (SELECT OXUSERID FROM osc_payment_customer)
+            WHERE OXUSERID NOT IN (SELECT OXUSERID FROM oe_payments_customer)
         ");
 
         // 4. Drop redundant tables
-        $this->addSql("DROP TABLE IF EXISTS osc_payment_webhook_log");
+        $this->addSql("DROP TABLE IF EXISTS oe_payments_webhook_log");
         $this->addSql("DROP TABLE IF EXISTS osc_stripe_customer_mapping");
         $this->addSql("DROP TABLE IF EXISTS osc_stripe_payment_details");
     }
@@ -967,15 +967,15 @@ docker compose exec -T php vendor/bin/oe-console oe:module:migrations:status osc
 docker compose exec mysql mysql -uroot -proot example -e "SHOW TABLES LIKE 'osc_%';"
 
 # Check specific table structure
-docker compose exec mysql mysql -uroot -proot example -e "DESCRIBE osc_payment_webhooklogs;"
+docker compose exec mysql mysql -uroot -proot example -e "DESCRIBE oe_payments_webhooklogs;"
 
 # Count records in tables (verify data migration)
 docker compose exec mysql mysql -uroot -proot example -e "
-    SELECT 'osc_payment_webhooklogs' as tbl, COUNT(*) as cnt FROM osc_payment_webhooklogs
+    SELECT 'oe_payments_webhooklogs' as tbl, COUNT(*) as cnt FROM oe_payments_webhooklogs
     UNION ALL
-    SELECT 'osc_payment_webhook_log', COUNT(*) FROM osc_payment_webhook_log
+    SELECT 'oe_payments_webhook_log', COUNT(*) FROM oe_payments_webhook_log
     UNION ALL
-    SELECT 'osc_payment_customer', COUNT(*) FROM osc_payment_customer
+    SELECT 'oe_payments_customer', COUNT(*) FROM oe_payments_customer
     UNION ALL
     SELECT 'osc_stripe_customer_mapping', COUNT(*) FROM osc_stripe_customer_mapping;
 "
@@ -1006,14 +1006,14 @@ docker compose exec -T php vendor/bin/phpunit \
 public function testAcceptanceCriteria(): void
 {
     // 1. Only ONE webhook log table exists
-    $tables = $this->connection->fetchFirstColumn("SHOW TABLES LIKE 'osc_payment_webhook%'");
+    $tables = $this->connection->fetchFirstColumn("SHOW TABLES LIKE 'oe_payments_webhook%'");
     $this->assertCount(1, $tables);
-    $this->assertEquals('osc_payment_webhooklogs', $tables[0]);
+    $this->assertEquals('oe_payments_webhooklogs', $tables[0]);
 
     // 2. Only ONE customer table exists
     $tables = $this->connection->fetchFirstColumn("SHOW TABLES LIKE 'osc_%customer%'");
     $this->assertCount(1, $tables);
-    $this->assertEquals('osc_payment_customer', $tables[0]);
+    $this->assertEquals('oe_payments_customer', $tables[0]);
 
     // 3. Payment details table removed
     $tables = $this->connection->fetchFirstColumn("SHOW TABLES LIKE 'osc_stripe_payment_details'");

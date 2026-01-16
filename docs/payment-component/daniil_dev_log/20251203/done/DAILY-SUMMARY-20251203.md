@@ -21,7 +21,7 @@ All 1389 tests pass. Code is commitable.
 Orders completed via Stripe Wallet showed `OXPAID = '0000-00-00 00:00:00'` even after successful payment.
 
 ### Root Cause
-`WebhookProcessingService.php` handlers updated `osc_payment_order_state` but never updated `oxorder.OXPAID`.
+`WebhookProcessingService.php` handlers updated `oe_payments_order_state` but never updated `oxorder.OXPAID`.
 
 ### Solution
 1. Added helper methods to WebhookProcessingService:
@@ -29,7 +29,7 @@ Orders completed via Stripe Wallet showed `OXPAID = '0000-00-00 00:00:00'` even 
    - `updateOrderTransStatus()`
    - `updateOrderTransId()`
 
-2. Fixed order lookup to use `oxorder.OXTRANSID` (fallback from `osc_payment_transaction`)
+2. Fixed order lookup to use `oxorder.OXTRANSID` (fallback from `oe_payments_transaction`)
 
 3. Added `handleCheckoutSessionCompleted()` for Stripe Wallet
 
@@ -54,7 +54,7 @@ tests/e2e/playwright/tests/admin/stripe-admin-order.spec.ts
 ### Problem
 `Events.php` violated architecture rules:
 - Added STRIPE* columns to core OXID tables (oxorder, oxorderarticles, oxuser)
-- Created osc_payment_* tables on module activation
+- Created oe_payments_* tables on module activation
 - Not versioned in migration system
 
 ### Solution
@@ -227,7 +227,7 @@ done/
 
 ## Next Steps (Future Sprints)
 
-1. **Refund Tracking Migration:** Move STRIPE* column usage in StripeRefundRequestHandler and OrderRefund to use `osc_payment_transaction` instead
+1. **Refund Tracking Migration:** Move STRIPE* column usage in StripeRefundRequestHandler and OrderRefund to use `oe_payments_transaction` instead
 
 2. **Clean Installation Testing:** Verify new installations work without STRIPE* columns in oxorder
 

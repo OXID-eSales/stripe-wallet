@@ -2,21 +2,21 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\EventSystem\Handler;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripePaymentStatusHandler;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\Stripe3DSRequiredEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Handler\StripePaymentStatusHandler;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Event\Stripe3DSRequiredEvent;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\Event\Payment\PaymentAuthorizedEvent;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
+use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\PaymentComponent\Adapter\PaymentAdapterInterface;
 use OxidEsales\PaymentComponent\Adapter\Response\PaymentDetailsResponse;
-use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeStatusMapper;
+use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use PHPUnit\Framework\TestCase;
 
 class StripePaymentStatusHandlerTest extends TestCase

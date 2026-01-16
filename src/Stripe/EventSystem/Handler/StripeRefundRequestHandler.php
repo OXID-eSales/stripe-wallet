@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
+namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Core\Field;
@@ -10,10 +10,10 @@ use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
-use OxidSolutionCatalysts\Payments\Stripe\DTO\RefundResult;
-use OxidSolutionCatalysts\Payments\Stripe\Service\RefundServiceInterface;
-use OxidSolutionCatalysts\Stripe\Application\Model\RequestLog;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
+use OxidEsales\Payments\Stripe\DTO\RefundResult;
+use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
+use OxidEsales\Payments\Stripe\Application\Model\RequestLog;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 

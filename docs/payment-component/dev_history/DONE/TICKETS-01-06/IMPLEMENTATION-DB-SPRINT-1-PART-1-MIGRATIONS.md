@@ -34,7 +34,7 @@
 ### Goals for Sprint 1 Database Work
 
 **Primary Objectives:**
-1. ✅ Create **contract table** as primary entity (`osc_payment_contract`)
+1. ✅ Create **contract table** as primary entity (`oe_payments_contract`)
 2. ✅ Enhance existing tables with contract FK (`OXCONTRACTID`)
 3. ✅ Implement contract domain models (PaymentContract, ContractCondition, BasketSnapshot)
 4. ✅ Build contract-aware repository layer with full test coverage
@@ -284,11 +284,11 @@ final class Migration001CreatePaymentContractTable
     {
         $schema = $this->connection->createSchemaManager()->introspectSchema();
 
-        if ($schema->hasTable('osc_payment_contract')) {
+        if ($schema->hasTable('oe_payments_contract')) {
             return; // Already exists
         }
 
-        $table = $schema->createTable('osc_payment_contract');
+        $table = $schema->createTable('oe_payments_contract');
 
         // Primary key
         $table->addColumn('OXID', Types::STRING, [
@@ -429,7 +429,7 @@ final class Migration001CreatePaymentContractTable
     public function down(): void
     {
         $schemaManager = $this->connection->createSchemaManager();
-        $schemaManager->dropTable('osc_payment_contract');
+        $schemaManager->dropTable('oe_payments_contract');
     }
 }
 ```
@@ -463,11 +463,11 @@ final class Migration002CreatePaymentTransactionTable
     {
         $schema = $this->connection->createSchemaManager()->introspectSchema();
 
-        if ($schema->hasTable('osc_payment_transaction')) {
+        if ($schema->hasTable('oe_payments_transaction')) {
             return;
         }
 
-        $table = $schema->createTable('osc_payment_transaction');
+        $table = $schema->createTable('oe_payments_transaction');
 
         // Primary key
         $table->addColumn('OXID', Types::STRING, [
@@ -492,7 +492,7 @@ final class Migration002CreatePaymentTransactionTable
         $table->addColumn('OXCONTRACTID', Types::STRING, [
             'length' => 32,
             'notnull' => false,
-            'comment' => 'FK to osc_payment_contract.OXID (NEW!)'
+            'comment' => 'FK to oe_payments_contract.OXID (NEW!)'
         ]);
 
         // Provider identification
@@ -589,7 +589,7 @@ final class Migration002CreatePaymentTransactionTable
         );
 
         $table->addForeignKeyConstraint(
-            'osc_payment_contract',
+            'oe_payments_contract',
             ['OXCONTRACTID'],
             ['OXID'],
             ['onDelete' => 'SET NULL'],
@@ -597,7 +597,7 @@ final class Migration002CreatePaymentTransactionTable
         );
 
         $table->addForeignKeyConstraint(
-            'osc_payment_transaction',
+            'oe_payments_transaction',
             ['OXPARENTTRANSACTIONID'],
             ['OXID'],
             ['onDelete' => 'SET NULL'],
@@ -612,7 +612,7 @@ final class Migration002CreatePaymentTransactionTable
     public function down(): void
     {
         $schemaManager = $this->connection->createSchemaManager();
-        $schemaManager->dropTable('osc_payment_transaction');
+        $schemaManager->dropTable('oe_payments_transaction');
     }
 }
 ```
@@ -646,21 +646,21 @@ final class Migration003EnhanceTablesWithContractFK
         $schemaManager = $this->connection->createSchemaManager();
         $schema = $schemaManager->introspectSchema();
 
-        // Add OXCONTRACTID to osc_payment_order_state
-        if ($schema->hasTable('osc_payment_order_state')) {
-            $table = $schema->getTable('osc_payment_order_state');
+        // Add OXCONTRACTID to oe_payments_order_state
+        if ($schema->hasTable('oe_payments_order_state')) {
+            $table = $schema->getTable('oe_payments_order_state');
 
             if (!$table->hasColumn('OXCONTRACTID')) {
                 $table->addColumn('OXCONTRACTID', Types::STRING, [
                     'length' => 32,
                     'notnull' => false,
-                    'comment' => 'FK to osc_payment_contract.OXID'
+                    'comment' => 'FK to oe_payments_contract.OXID'
                 ]);
 
                 $table->addIndex(['OXCONTRACTID'], 'IDX_CONTRACT');
 
                 $table->addForeignKeyConstraint(
-                    'osc_payment_contract',
+                    'oe_payments_contract',
                     ['OXCONTRACTID'],
                     ['OXID'],
                     ['onDelete' => 'SET NULL'],
@@ -678,8 +678,8 @@ final class Migration003EnhanceTablesWithContractFK
         $schemaManager = $this->connection->createSchemaManager();
         $schema = $schemaManager->introspectSchema();
 
-        if ($schema->hasTable('osc_payment_order_state')) {
-            $table = $schema->getTable('osc_payment_order_state');
+        if ($schema->hasTable('oe_payments_order_state')) {
+            $table = $schema->getTable('oe_payments_order_state');
 
             if ($table->hasColumn('OXCONTRACTID')) {
                 $table->dropColumn('OXCONTRACTID');

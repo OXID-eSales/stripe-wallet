@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe;
 
-use OxidSolutionCatalysts\Payments\Stripe\WebhookSignatureVerifier;
+use OxidEsales\Payments\Stripe\WebhookSignatureVerifier;
 use PHPUnit\Framework\TestCase;
 use Stripe\Event;
 use Stripe\Exception\SignatureVerificationException;
@@ -12,7 +12,7 @@ use Stripe\StripeObject;
 use Stripe\Webhook;
 
 /**
- * @covers \OxidSolutionCatalysts\Payments\Stripe\WebhookSignatureVerifier
+ * @covers \OxidEsales\Payments\Stripe\WebhookSignatureVerifier
  */
 final class WebhookSignatureVerifierTest extends TestCase
 {

@@ -7,9 +7,9 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe;
+namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe;
 
-use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapter;
+use OxidEsales\Payments\Stripe\Adapter\StripeAdapter;
 use PHPUnit\Framework\TestCase;
 use Stripe\StripeClient;
 

@@ -104,7 +104,7 @@ The `findExpired()` method returns a contract with auto-generated ID (`contract_
 **Root Cause:** The test cleanup only deletes contracts with IDs starting with `test_`:
 ```php
 // Line 50 in test file:
-$this->connection->executeStatement('DELETE FROM osc_payment_contract WHERE OXID LIKE "test_%"');
+$this->connection->executeStatement('DELETE FROM oe_payments_contract WHERE OXID LIKE "test_%"');
 ```
 
 But other tests or previous runs may have created contracts with auto-generated IDs like `contract_692722b91338a4.27144636` that are also expired. These are not cleaned up and interfere with the test.
@@ -127,16 +127,16 @@ docker compose exec -T php vendor/bin/phpunit \
 **Change line 50:**
 ```php
 // Before:
-$this->connection->executeStatement('DELETE FROM osc_payment_contract WHERE OXID LIKE "test_%"');
+$this->connection->executeStatement('DELETE FROM oe_payments_contract WHERE OXID LIKE "test_%"');
 
 // After (clean ALL contracts for isolation):
-$this->connection->executeStatement('DELETE FROM osc_payment_contract');
+$this->connection->executeStatement('DELETE FROM oe_payments_contract');
 ```
 
 **Option B:** Also clean up contracts with `contract_` prefix
 ```php
 $this->connection->executeStatement(
-    'DELETE FROM osc_payment_contract WHERE OXID LIKE "test_%" OR OXID LIKE "contract_%"'
+    'DELETE FROM oe_payments_contract WHERE OXID LIKE "test_%" OR OXID LIKE "contract_%"'
 );
 ```
 

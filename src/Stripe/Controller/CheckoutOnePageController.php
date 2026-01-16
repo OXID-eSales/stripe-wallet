@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Controller;
+namespace OxidEsales\Payments\Stripe\Controller;
 
 use OxidEsales\Eshop\Application\Controller\FrontendController;
 use OxidEsales\Eshop\Core\Registry;
@@ -26,14 +26,15 @@ class CheckoutOnePageController extends FrontendController
 
     /**
      * Initialize controller
+     * @return void
      */
-    public function init()
+    public function init(): void
     {
         parent::init();
 
         // Check if basket has items
         $basket = Registry::getSession()->getBasket();
-        if (!$basket || $basket->getProductsCount() == 0) {
+        if ($basket->getProductsCount() == 0) {
             Registry::getUtils()->redirect(
                 Registry::getConfig()->getShopHomeUrl() . 'cl=basket',
                 false
@@ -42,9 +43,10 @@ class CheckoutOnePageController extends FrontendController
         }
 
         // Check if user needs to be logged in
-        if ($this->getConfig()->getConfigParam('blPerfNoBasketSaving')) {
+        $config = Registry::getConfig();
+        if ($config->getConfigParam('blPerfNoBasketSaving')) {
             $user = $this->getUser();
-            if (!$user) {
+            if ($user === null) { // @phpstan-ignore identical.alwaysFalse
                 Registry::getUtils()->redirect(
                     Registry::getConfig()->getShopHomeUrl() . 'cl=account&force_sid=' . Registry::getSession()->getId(),
                     false
@@ -102,32 +104,43 @@ class CheckoutOnePageController extends FrontendController
         $items = [];
 
         foreach ($basket->getContents() as $basketItem) {
+            /** @var \OxidEsales\Eshop\Application\Model\BasketItem $basketItem */
             $article = $basketItem->getArticle();
+            if ($article === null) { // @phpstan-ignore identical.alwaysFalse
+                continue;
+            }
+            $unitPrice = $basketItem->getUnitPrice();
             $items[] = [
                 'productId' => $article->getId(),
-                'productName' => $article->oxarticles__oxtitle->value,
+                'productName' => $article->oxarticles__oxtitle->value ?? '',
                 'quantity' => $basketItem->getAmount(),
-                'price' => $basketItem->getUnitPrice()->getBruttoPrice(),
+                'price' => $unitPrice ? $unitPrice->getBruttoPrice() : 0.0, // @phpstan-ignore ternary.alwaysTrue
             ];
         }
 
-        return json_encode($items);
+        $json = json_encode($items);
+        return $json !== false ? $json : '[]';
     }
 
     /**
      * Get delivery address list for current user
      *
-     * @return array
+     * @return array<string, mixed>
      */
     public function getUserAddressList(): array
     {
         $user = $this->getUser();
-        if (!$user) {
+        if ($user === null) { // @phpstan-ignore identical.alwaysFalse
             return [];
         }
 
         $addressList = $user->getUserAddresses();
-        return $addressList ? $addressList->getArray() : [];
+        if ($addressList === null) { // @phpstan-ignore identical.alwaysFalse
+            return [];
+        }
+        /** @var array<string, mixed> $result */
+        $result = is_array($addressList) ? $addressList : $addressList->getArray(); // @phpstan-ignore function.alreadyNarrowedType
+        return $result;
     }
 
     /**
@@ -135,8 +148,9 @@ class CheckoutOnePageController extends FrontendController
      *
      * @return \OxidEsales\Eshop\Application\Model\CountryList
      */
-    public function getCountryList()
+    public function getCountryList(): \OxidEsales\Eshop\Application\Model\CountryList
     {
+        /** @var \OxidEsales\Eshop\Application\Model\CountryList $countryList */
         $countryList = oxNew(\OxidEsales\Eshop\Application\Model\CountryList::class);
         $countryList->loadActiveCountries();
 
@@ -146,31 +160,35 @@ class CheckoutOnePageController extends FrontendController
     /**
      * Get payment method list
      *
-     * @return array
+     * @return array<string, mixed>
      */
     public function getPaymentList(): array
     {
         $basket = Registry::getSession()->getBasket();
-        $user = $this->getUser();
 
+        /** @var \OxidEsales\Eshop\Application\Model\PaymentList $paymentList */
         $paymentList = Registry::get(\OxidEsales\Eshop\Application\Model\PaymentList::class);
+        $price = $basket->getPrice();
+        // @phpstan-ignore method.notFound
         $paymentList->loadPaymentList(
             $basket->getProductsCount(),
-            $basket->getPrice()->getBruttoPrice()
+            $price ? $price->getBruttoPrice() : 0.0 // @phpstan-ignore ternary.alwaysTrue
         );
 
-        return $paymentList->getArray();
+        /** @var array<string, mixed> $result */
+        $result = $paymentList->getArray();
+        return $result;
     }
 
     /**
      * Get saved payment methods for current user
      *
-     * @return array
+     * @return array<string, mixed>
      */
     public function getSavedPaymentMethods(): array
     {
         $user = $this->getUser();
-        if (!$user) {
+        if ($user === null) { // @phpstan-ignore identical.alwaysFalse
             return [];
         }
 
@@ -209,14 +227,15 @@ class CheckoutOnePageController extends FrontendController
      */
     public function canUseSavedPaymentMethods(): bool
     {
-        return $this->getUser() !== null;
+        return $this->getUser() !== null; // @phpstan-ignore notIdentical.alwaysTrue
     }
 
     /**
      * AJAX handler - Update address
      * Fallback for non-GraphQL requests
+     * @return void
      */
-    public function updateAddress()
+    public function updateAddress(): void
     {
         if (!$this->isValidRequest()) {
             $this->outputJson(['success' => false, 'message' => 'Invalid request']);
@@ -234,8 +253,9 @@ class CheckoutOnePageController extends FrontendController
     /**
      * AJAX handler - Process payment
      * Fallback for non-GraphQL requests
+     * @return void
      */
-    public function processPayment()
+    public function processPayment(): void
     {
         if (!$this->isValidRequest()) {
             $this->outputJson(['success' => false, 'message' => 'Invalid request']);
@@ -253,8 +273,9 @@ class CheckoutOnePageController extends FrontendController
 
     /**
      * Handle return from 3D Secure
+     * @return void
      */
-    public function handleReturn()
+    public function handleReturn(): void
     {
         $paymentIntentId = Registry::getRequest()->getRequestParameter('payment_intent');
         $paymentIntentClientSecret = Registry::getRequest()->getRequestParameter('payment_intent_client_secret');
@@ -287,7 +308,7 @@ class CheckoutOnePageController extends FrontendController
         // Get product data from request
         $productId = $request->getRequestParameter('aid');
         $productNid = $request->getRequestParameter('anid');
-        $amount = (float) $request->getRequestParameter('am', 1);
+        $amount = (float) $request->getRequestParameter('am', '1');
         $selectionList = $request->getRequestParameter('sel');
         $persistentParams = $request->getRequestParameter('persparam');
 
@@ -321,7 +342,7 @@ class CheckoutOnePageController extends FrontendController
             ]);
 
             // Show error message and redirect back to product
-            Registry::getUtilsView()->addErrorToDisplay($e);
+            Registry::getUtilsView()->addErrorToDisplay($e->getMessage());
             Registry::getUtils()->redirect(
                 Registry::getConfig()->getShopUrl() . 'cl=details&anid=' . $productNid,
                 false
@@ -332,12 +353,13 @@ class CheckoutOnePageController extends FrontendController
     /**
      * Output JSON response
      *
-     * @param array $data
+     * @param array<string, mixed> $data
      */
     private function outputJson(array $data): void
     {
         Registry::getUtils()->setHeader('Content-Type: application/json');
-        Registry::getUtils()->showMessageAndExit(json_encode($data));
+        $json = json_encode($data);
+        Registry::getUtils()->showMessageAndExit($json !== false ? $json : '{}');
     }
 
     /**
@@ -356,14 +378,15 @@ class CheckoutOnePageController extends FrontendController
     /**
      * Get breadcrumb path
      *
-     * @return array
+     * @return array<int, array{title: string, link: string}>|null
      */
-    public function getBreadCrumb()
+    public function getBreadCrumb(): ?array
     {
         $paths = [];
 
+        $result = Registry::getLang()->translateString('CHECKOUT_TITLE', (int) Registry::getLang()->getBaseLanguage(), false);
         $path = [];
-        $path['title'] = Registry::getLang()->translateString('CHECKOUT_TITLE', Registry::getLang()->getBaseLanguage(), false);
+        $path['title'] = is_string($result) ? $result : 'Checkout';
         $path['link'] = $this->getLink();
         $paths[] = $path;
 

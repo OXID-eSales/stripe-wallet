@@ -109,7 +109,7 @@ public function up(Schema $schema): void
 {
     // Fix contracts with checkout session ID by using PaymentIntent ID from order
     $this->addSql("
-        UPDATE osc_payment_contract c
+        UPDATE oe_payments_contract c
         JOIN oxorder o ON c.OXORDERID = o.OXID
         SET c.OXPROVIDERORDERID = o.OXTRANSID,
             c.OXUPDATED = NOW()

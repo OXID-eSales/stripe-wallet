@@ -125,7 +125,7 @@ Visual Diagram: puml/06-database-schema.puml
 
 **Documentation (02-database-and-models.md lines 182-264):**
 ```sql
-CREATE TABLE osc_payment_contract (
+CREATE TABLE oe_payments_contract (
     OXID, OXSHOPID, OXUSERID, OXORDERID (NULL!),
     OXSTATE, OXSTATEREASON,
     OXBASKETDATA (JSON), OXTERMS (JSON), OXMETADATA (JSON),
@@ -138,7 +138,7 @@ CREATE TABLE osc_payment_contract (
 
 **PUML (01-01-database-schema.puml lines 74-110):**
 ```
-entity "osc_payment_contract" {
+entity "oe_payments_contract" {
     * OXID : CHAR(32) <<PK>>
     OXSHOPID : INT
     OXUSERID : CHAR(32) <<FK>>
@@ -162,9 +162,9 @@ entity "osc_payment_contract" {
 
 **Documentation (02-database-and-models.md line 334):**
 ```sql
-CREATE TABLE osc_payment_transaction (
+CREATE TABLE oe_payments_transaction (
     ...
-    OXCONTRACTID CHAR(32) NULL,  -- FK to osc_payment_contract.OXID (NEW!)
+    OXCONTRACTID CHAR(32) NULL,  -- FK to oe_payments_contract.OXID (NEW!)
     ...
 );
 ```
@@ -180,9 +180,9 @@ OXCONTRACTID : CHAR(32) <<FK>> <<NEW>>  ✅
 
 **Documentation (02-database-and-models.md line 499):**
 ```sql
-CREATE TABLE osc_payment_order_state (
+CREATE TABLE oe_payments_order_state (
     ...
-    OXCONTRACTID CHAR(32) NULL,  -- FK to osc_payment_contract.OXID (NEW!)
+    OXCONTRACTID CHAR(32) NULL,  -- FK to oe_payments_contract.OXID (NEW!)
     ...
 );
 ```

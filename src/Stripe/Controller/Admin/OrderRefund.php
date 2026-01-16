@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Controller\Admin;
+namespace OxidEsales\Payments\Stripe\Controller\Admin;
 
 use OxidEsales\Eshop\Application\Controller\Admin\AdminDetailsController;
 use OxidEsales\Eshop\Application\Model\Order;
@@ -15,11 +15,11 @@ use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
-use OxidSolutionCatalysts\Payments\Stripe\Core\StripeDefinitions;
-use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Stripe\Charge;
 use Stripe\PaymentIntent;
 

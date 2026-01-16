@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Stripe Payment Module for OXID eShop 7.4+ implementing a **Smart-Contract Architecture** for payment lifecycle management. Uses Stripe SDK v18+ with Stimulus.js for frontend.
 
 **Module ID:** `osc_stripe_wallet`
-**Namespace:** `OxidSolutionCatalysts\Payments\`
+**Namespace:** `OxidEsales\Payments\Stripe\`
 
 ## Core Development Principles
 
@@ -146,40 +146,45 @@ The module implements a **contract-first payment pattern** where clicking "Place
 ### Source Structure
 
 ```
-src/
-├── Component/          # Provider-agnostic payment components (100% reusable)
-│   ├── Adapter/        # PaymentAdapterInterface and DTOs
-│   ├── Contract/       # PaymentContract, ContractCondition entities
-│   ├── Controller/     # Base webhook controllers
-│   ├── EventSystem/    # EventDispatcher, EventListenerProvider
-│   ├── Repository/     # ContractRepository, TransactionRepository
-│   └── Service/        # CheckoutOrchestrator, ContractService
-├── Stripe/             # Stripe-specific implementation (~30% code)
-│   ├── Adapter/        # StripeAdapter implements PaymentAdapterInterface
-│   ├── Controller/     # Stripe webhook/payment controllers
-│   ├── Handler/        # Stripe webhook event handlers
-│   ├── Repository/     # Stripe-specific repositories
-│   └── Service/        # StripePaymentService, StripeCheckoutService
-└── Watch/              # PaymentWatch monitoring subsystem
+src/Stripe/             # Stripe-specific implementation only
+├── Adapter/            # StripeAdapter implements PaymentAdapterInterface
+├── Controller/         # Stripe webhook/payment controllers
+├── Handler/            # Stripe webhook event handlers
+└── Service/            # StripePaymentService, StripeCheckoutService
 ```
+
+**Note:** Provider-agnostic components (Contract, Repository, EventSystem, etc.) are in the separate `payment-component` package. Stripe uses them via dependency injection.
 
 ### Key Domain Models
 
-**PaymentContract (Aggregate Root):**
+**PaymentContract (Aggregate Root):** (from payment-component)
 - States: `DRAFT`, `PENDING`, `READY_TO_COMMIT`, `COMMITTED`, `FULFILLED`, `CANCELLED`, `EXPIRED`
 - Manages conditions: `payment_authorized`, `fraud_check`, `stock_reserved`
 - Links to oxorder only after commitment (OXORDERID NULL until committed)
 
-**BasketSnapshot (Value Object):**
+**BasketSnapshot (Value Object):** (from payment-component)
 - Immutable copy of basket at contract creation
-- Stored as JSON in `osc_payment_contract.OXBASKETDATA`
+- Stored as JSON in `oe_payments_contract.OXBASKETDATA`
 
 ### Database Schema
 
-Component tables with FK references to OXID core (NO ALTER TABLE on core):
-- `osc_payment_contract` - Contract lifecycle, basket snapshot, conditions
-- `osc_payment_transaction` - Transaction tracking with OXCONTRACTID FK
-- `osc_payment_order_state` - Payment state with OXCONTRACTID FK
+**Important:** All database tables are created by `payment-component`. Stripe has NO migrations.
+
+Tables (created by payment-component):
+- `oe_payments_contract` - Contract lifecycle, basket snapshot, capture/refund tracking
+- `oe_payments_transaction` - Transaction tracking with OXCONTRACTID FK
+- `oe_payments_customer` - Customer payment data (vaulting)
+- `oe_payments_idempotency` - Duplicate charge prevention
+- `oe_payments_sessions` - Session state management
+- `oe_payments_webhooklogs` - Webhook event logs
+
+Run migrations from payment-component:
+```bash
+docker compose exec php php vendor/bin/doctrine-migrations migrate \
+  --configuration=extensions/payment-component/migration/migrations.yml \
+  --db-configuration=extensions/payment-component/migration/migrations-db.php \
+  --no-interaction
+```
 
 ## Documentation
 

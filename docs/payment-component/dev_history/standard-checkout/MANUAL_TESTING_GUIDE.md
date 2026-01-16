@@ -68,14 +68,14 @@ cd /path/to/oxid/shop
 
 **Verify Database Tables Created:**
 ```sql
-SHOW TABLES LIKE 'osc_payment_%';
+SHOW TABLES LIKE 'oe_payments_%';
 ```
 
 Should show:
-- `osc_payment_transaction`
-- `osc_payment_order_state`
-- `osc_payment_customer`
-- `osc_payment_webhook_log`
+- `oe_payments_transaction`
+- `oe_payments_order_state`
+- `oe_payments_customer`
+- `oe_payments_webhook_log`
 
 ### Step 2: Configure API Keys
 
@@ -170,11 +170,11 @@ Should show:
 
 ```sql
 -- Check transaction was stored
-SELECT * FROM osc_payment_transaction
+SELECT * FROM oe_payments_transaction
 ORDER BY OXCREATED DESC LIMIT 1;
 
 -- Check order payment state
-SELECT * FROM osc_payment_order_state
+SELECT * FROM oe_payments_order_state
 ORDER BY OXCREATED DESC LIMIT 1;
 
 -- Should show:
@@ -237,7 +237,7 @@ Look for:
 
 ```sql
 -- Check 3DS was used
-SELECT OX3DSECURE FROM osc_payment_transaction
+SELECT OX3DSECURE FROM oe_payments_transaction
 ORDER BY OXCREATED DESC LIMIT 1;
 -- Should be 1
 ```
@@ -392,7 +392,7 @@ AND OXORDERNR IS NOT NULL;
 
 1. **Get Payment Intent ID**
    ```sql
-   SELECT OXPROVIDERORDERID FROM osc_payment_transaction
+   SELECT OXPROVIDERORDERID FROM oe_payments_transaction
    WHERE OXORDERID = 'your_order_oxid';
    ```
 
@@ -426,7 +426,7 @@ AND OXORDERNR IS NOT NULL;
 
 ```sql
 -- Check refund state
-SELECT OXREFUNDED, OXREFUNDEDAMOUNT FROM osc_payment_order_state
+SELECT OXREFUNDED, OXREFUNDEDAMOUNT FROM oe_payments_order_state
 WHERE OXORDERID = 'your_order_oxid';
 -- OXREFUNDED should be 1
 ```
@@ -500,7 +500,7 @@ stripe trigger payment_intent.succeeded
 ```
 
 **Expected:**
-- ✅ Webhook logged in `osc_payment_webhook_log`
+- ✅ Webhook logged in `oe_payments_webhook_log`
 - ✅ Event type: `payment_intent.succeeded`
 - ✅ Status: `processed`
 
@@ -533,7 +533,7 @@ curl -X POST http://localhost/index.php?cl=stripe_webhook \
 
 ```sql
 -- Check webhook logs
-SELECT * FROM osc_payment_webhook_log
+SELECT * FROM oe_payments_webhook_log
 ORDER BY OXCREATED DESC;
 
 -- Should show:
@@ -573,7 +573,7 @@ SELECT
     t.OXCARDLAST4,
     t.OX3DSECURE,
     t.OXCREATED
-FROM osc_payment_transaction t
+FROM oe_payments_transaction t
 ORDER BY t.OXCREATED DESC
 LIMIT 5;
 ```
@@ -588,7 +588,7 @@ SELECT
     s.OXCAPTUREDAMOUNT,
     s.OXREFUNDED,
     s.OXREFUNDEDAMOUNT
-FROM osc_payment_order_state s
+FROM oe_payments_order_state s
 ORDER BY s.OXCREATED DESC
 LIMIT 5;
 ```
@@ -600,7 +600,7 @@ SELECT
     OXUSERID,
     OXSTRIPECUSTOMERID,
     OXCREATED
-FROM osc_payment_customer
+FROM oe_payments_customer
 ORDER BY OXCREATED DESC;
 ```
 
@@ -698,7 +698,7 @@ curl -v https://your-shop.com/index.php?cl=stripe_webhook
 
 ### Issue: Order Created But No Transaction Record
 
-**Symptoms:** Order exists, but `osc_payment_transaction` is empty
+**Symptoms:** Order exists, but `oe_payments_transaction` is empty
 
 **Possible Causes:**
 1. Database error during transaction insert
@@ -760,19 +760,19 @@ grep "Order creation failed" /var/log/oxideshop.log
 **Symptoms:** Refund successful in Stripe, order state unchanged
 
 **Checks:**
-1. Webhook received? Check `osc_payment_webhook_log`
+1. Webhook received? Check `oe_payments_webhook_log`
 2. Webhook processed? Status should be 'processed'
 3. Order found? Check `OXPROVIDERORDERID` mapping
 
 **Debug:**
 ```sql
 -- Check if webhook was received
-SELECT * FROM osc_payment_webhook_log
+SELECT * FROM oe_payments_webhook_log
 WHERE OXEVENTTYPE = 'charge.refunded'
 ORDER BY OXCREATED DESC LIMIT 1;
 
 -- Check processing errors
-SELECT OXERRORMESSAGE FROM osc_payment_webhook_log
+SELECT OXERRORMESSAGE FROM oe_payments_webhook_log
 WHERE OXSTATUS = 'failed';
 ```
 

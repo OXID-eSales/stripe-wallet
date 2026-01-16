@@ -37,13 +37,13 @@ Dashboard link found: https://dashboard.stripe.com/payments/pi_3SaEndAeMx6SN5PN1
 
 ### BUG 1: Payment Date Not Set (OXPAID = 0000-00-00)
 
-**Root Cause:** `WebhookProcessingService.php` handlers updated `osc_payment_order_state` but never updated `oxorder.OXPAID`.
+**Root Cause:** `WebhookProcessingService.php` handlers updated `oe_payments_order_state` but never updated `oxorder.OXPAID`.
 
 **Solution:**
 - Added helper methods: `updateOrderPaidTimestamp()`, `updateOrderTransStatus()`, `updateOrderTransId()`
 - Updated webhook handlers to call these methods
 - Added `handleCheckoutSessionCompleted()` for Stripe Wallet
-- Fixed order lookup to use `oxorder.OXTRANSID` instead of `osc_payment_transaction`
+- Fixed order lookup to use `oxorder.OXTRANSID` instead of `oe_payments_transaction`
 
 ### BUG 2: Missing Dashboard Link on Transaction ID
 
@@ -153,7 +153,7 @@ WHERE OXTRANSSTATUS = 'OK' AND YEAR(OXPAID) = 0 AND OXTRANSID LIKE 'pi_%';
 
 1. **New orders may still get OXPAID=0000** if webhook processing fails or order is created outside normal flow. The SQL fix can be re-run periodically or the webhook handler should be verified in production.
 
-2. **Legacy osc_payment_webhook_log** references were cleaned up but the table still exists. See Sprint 5 for full DB architecture cleanup.
+2. **Legacy oe_payments_webhook_log** references were cleaned up but the table still exists. See Sprint 5 for full DB architecture cleanup.
 
 ---
 

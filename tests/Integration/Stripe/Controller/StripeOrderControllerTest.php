@@ -2,14 +2,16 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Controller;
+namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Controller;
 
-use OxidSolutionCatalysts\Payments\Stripe\Controller\StripeOrderController;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Eshop\Application\Model\Basket;
+use OxidEsales\Eshop\Application\Model\User;
+use OxidEsales\Payments\Stripe\Controller\StripeOrderController;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use PHPUnit\Framework\TestCase;
@@ -316,6 +318,16 @@ class StripeOrderControllerTest extends TestCase
         EventDispatcherInterface $eventDispatcher,
         array $options = []
     ): StripeOrderController {
+        // Create basket mock if not provided
+        if (!isset($options['basket'])) {
+            $options['basket'] = $this->createBasketMock($options);
+        }
+
+        // Create user mock if not provided (and hasUser is true)
+        if (!isset($options['user']) && ($options['hasUser'] ?? true)) {
+            $options['user'] = $this->createUserMock($options['userId'] ?? 'user_123');
+        }
+
         return new class($eventDispatcher, $options) extends StripeOrderController {
             private EventDispatcherInterface $mockDispatcher;
             /** @var array<string, mixed> */
@@ -342,41 +354,9 @@ class StripeOrderControllerTest extends TestCase
                 return $this->mockDispatcher;
             }
 
-            protected function getBasketFromSession(): object
+            protected function getBasketFromSession(): Basket
             {
-                if (!($this->options['basketNotEmpty'] ?? false)) {
-                    return new class {
-                        public function getProductsCount(): int { return 0; }
-                        public function getBasketUser(): ?object { return null; }
-                        public function getPaymentId(): ?string { return null; }
-                    };
-                }
-
-                $userId = $this->options['userId'] ?? 'user_123';
-                $paymentId = $this->options['paymentId'] ?? 'osc_stripe_card';
-
-                return new class($userId, $paymentId) {
-                    private string $userId;
-                    private string $paymentId;
-
-                    public function __construct(string $userId, string $paymentId)
-                    {
-                        $this->userId = $userId;
-                        $this->paymentId = $paymentId;
-                    }
-
-                    public function getProductsCount(): int { return 1; }
-                    public function getPaymentId(): string { return $this->paymentId; }
-                    public function getBasketUser(): ?object
-                    {
-                        $userId = $this->userId;
-                        return new class($userId) {
-                            private string $id;
-                            public function __construct(string $id) { $this->id = $id; }
-                            public function getId(): string { return $this->id; }
-                        };
-                    }
-                };
+                return $this->options['basket'];
             }
 
             protected function getPaymentIntentIdFromRequest(): ?string
@@ -424,18 +404,13 @@ class StripeOrderControllerTest extends TestCase
                 return $this->options['captureMode'] ?? 'automatic';
             }
 
-            public function getUser()
+            public function getUser(): ?User
             {
                 if (!($this->options['hasUser'] ?? true)) {
                     return null;
                 }
 
-                $userId = $this->options['userId'] ?? 'user_123';
-                return new class($userId) {
-                    private string $id;
-                    public function __construct(string $id) { $this->id = $id; }
-                    public function getId(): string { return $this->id; }
-                };
+                return $this->options['user'] ?? null;
             }
 
             protected function setSessionVariable(string $key, mixed $value): void
@@ -498,5 +473,44 @@ class StripeOrderControllerTest extends TestCase
                 throw new \RuntimeException("Unknown service: $serviceName");
             }
         };
+    }
+
+    /**
+     * Create a Basket mock with configurable behavior
+     *
+     * @param array<string, mixed> $options
+     */
+    private function createBasketMock(array $options = []): Basket
+    {
+        $basketNotEmpty = $options['basketNotEmpty'] ?? false;
+        $userId = $options['userId'] ?? 'user_123';
+        $paymentId = $options['paymentId'] ?? 'osc_stripe_card';
+
+        $basket = $this->createMock(Basket::class);
+
+        if (!$basketNotEmpty) {
+            $basket->method('getProductsCount')->willReturn(0);
+            $basket->method('getBasketUser')->willReturn(null);
+            $basket->method('getPaymentId')->willReturn(null);
+        } else {
+            $basket->method('getProductsCount')->willReturn(1);
+            $basket->method('getPaymentId')->willReturn($paymentId);
+
+            $user = $this->createMock(User::class);
+            $user->method('getId')->willReturn($userId);
+            $basket->method('getBasketUser')->willReturn($user);
+        }
+
+        return $basket;
+    }
+
+    /**
+     * Create a User mock
+     */
+    private function createUserMock(string $userId = 'user_123'): User
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn($userId);
+        return $user;
     }
 }

@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Service;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use Doctrine\DBAL\Connection;
 use OxidEsales\PaymentComponent\Adapter\PaymentAdapterInterface;
@@ -17,9 +17,9 @@ use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\OxpaidReconciliationService;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ReconciliationResult;
+use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
+use OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService;
+use OxidEsales\Payments\Stripe\Service\ReconciliationResult;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -28,7 +28,7 @@ use PHPUnit\Framework\TestCase;
  * Sprint 10: Tests for OXPAID reconciliation with Stripe API.
  * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment.
  *
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Service\OxpaidReconciliationService
+ * @covers \OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService
  * @group sprint-10
  * @group sprint-14
  * @group sprint-15

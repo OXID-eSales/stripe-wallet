@@ -7,9 +7,9 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Command;
+namespace OxidEsales\Payments\Stripe\Command;
 
-use OxidSolutionCatalysts\Payments\Stripe\Service\OxpaidReconciliationService;
+use OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -43,7 +43,7 @@ class ReconcileOxpaidCommand extends Command
     protected function configure(): void
     {
         $this
-            ->setDescription(self::$defaultDescription)
+            ->setDescription((string) self::$defaultDescription)
             ->setHelp(
                 <<<'HELP'
 This command checks orders with missing OXPAID timestamps (showing as unpaid)

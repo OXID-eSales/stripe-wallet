@@ -173,7 +173,7 @@ Frontend controllers don't execute business logic directly. They:
 ```
 User clicks "Place Order"
   ↓
-Create osc_payment_contract (state: DRAFT)
+Create oe_payments_contract (state: DRAFT)
   - Captures: Basket snapshot, user data, terms
   - Conditions: payment_authorized, fraud_check, stock_reserved
   - No oxorder yet!
@@ -212,7 +212,7 @@ Create oxorder (state: NOT_FINISHED)
   - Contract.commitToOrder(oxorder.OXID)
   ↓
 Contract state: PENDING → COMMITTED
-(Note: osc_payment_order_state table deprecated - state tracked in contract)
+(Note: oe_payments_order_state table deprecated - state tracked in contract)
 ```
 
 ### Phase 4: Fulfillment
@@ -350,13 +350,13 @@ All providers implement contract-like patterns internally:
 
 **Component tables with FK references**: NO ALTER TABLE on OXID core
 
-- **osc_payment_contract**: Master contract table (includes capture/refund tracking)
-- **osc_payment_transaction**: Transaction tracking (enhanced with OXCONTRACTID)
-- ~~**osc_payment_order_state**~~: DEPRECATED - payment state consolidated into osc_payment_contract
-- **osc_payment_customer**: Customer payment data (1:1 with oxuser)
-- **osc_payment_idempotency**: Duplicate charge prevention
-- **osc_payment_saved_methods**: Vaulting/tokenization
-- **osc_payment_sessions**: Session state management
+- **oe_payments_contract**: Master contract table (includes capture/refund tracking)
+- **oe_payments_transaction**: Transaction tracking (enhanced with OXCONTRACTID)
+- ~~**oe_payments_order_state**~~: DEPRECATED - payment state consolidated into oe_payments_contract
+- **oe_payments_customer**: Customer payment data (1:1 with oxuser)
+- **oe_payments_idempotency**: Duplicate charge prevention
+- **oe_payments_saved_methods**: Vaulting/tokenization
+- **oe_payments_sessions**: Session state management
 
 **Architecture Principle:** Minimal core dependency - NO ALTER TABLE on oxorder/oxuser/oxbasket
 
@@ -983,7 +983,7 @@ Contract captures intent → Conditions resolved → Order created → Payment c
 **Component tables reference OXID core via FK:**
 ```sql
 -- Contract table
-CREATE TABLE osc_payment_contract (
+CREATE TABLE oe_payments_contract (
     OXID CHAR(32) PRIMARY KEY,
     OXUSERID CHAR(32) NOT NULL,  -- FK to oxuser.OXID
     OXORDERID CHAR(32) NULL,  -- FK to oxorder.OXID (NULL until committed!)

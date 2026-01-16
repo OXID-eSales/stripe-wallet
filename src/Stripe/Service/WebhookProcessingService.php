@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Service;
+namespace OxidEsales\Payments\Stripe\Service;
 
 use DateTimeImmutable;
 use OxidEsales\Eshop\Core\Registry;
@@ -23,7 +23,7 @@ use OxidEsales\PaymentComponent\Repository\WebhookLogRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface;
 use OxidEsales\PaymentComponent\Webhook\WebhookLog;
-use OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface;
+use OxidEsales\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface;
 
 /**
  * Webhook processing service
@@ -54,7 +54,7 @@ use OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHand
  * - Critical for handling refunds and disputes
  * - Enables event-driven architecture via Component EventSystem
  *
- * @package OxidSolutionCatalysts\Payments\Stripe\Service
+ * @package OxidEsales\Payments\Stripe\Service
  * @author OXID eSales AG
  * @since 1.0.0
  * @SuppressWarnings(PHPMD)
@@ -903,7 +903,7 @@ class WebhookProcessingService
      * Find order by Stripe PaymentIntent ID
      *
      * Searches for order in two places:
-     * 1. osc_payment_transaction.OXPROVIDERORDERID (preferred - Component transaction records)
+     * 1. oe_payments_transaction.OXPROVIDERORDERID (preferred - Component transaction records)
      * 2. oxorder.OXTRANSID (fallback - direct OXID order field)
      *
      * @param string $paymentIntentId
@@ -913,9 +913,9 @@ class WebhookProcessingService
     {
         $db = DatabaseProvider::getDb();
 
-        // First try: Look in osc_payment_transaction table
+        // First try: Look in oe_payments_transaction table
         $orderId = $db->getOne(
-            "SELECT OXORDERID FROM osc_payment_transaction WHERE OXPROVIDERORDERID = ? LIMIT 1",
+            "SELECT OXORDERID FROM oe_payments_transaction WHERE OXPROVIDERORDERID = ? LIMIT 1",
             [$paymentIntentId]
         );
 
@@ -947,8 +947,8 @@ class WebhookProcessingService
     }
 
     // Sprint 8: Removed updateOrderPaymentState(), updateOrderCaptureState(), updateOrderRefundState()
-    // These methods updated the now-dropped osc_payment_order_state table.
-    // Capture/refund tracking is now handled by osc_payment_contract fields.
+    // These methods updated the now-dropped oe_payments_order_state table.
+    // Capture/refund tracking is now handled by oe_payments_contract fields.
 
     /**
      * Update order OXPAID timestamp (legacy fallback).
@@ -1076,7 +1076,7 @@ class WebhookProcessingService
         try {
             $db = DatabaseProvider::getDb();
 
-            $sql = "INSERT INTO osc_payment_webhooklogs
+            $sql = "INSERT INTO oe_payments_webhooklogs
                     (OXID, OXEVENTID, OXEVENTTYPE, OXPROVIDER, OXPAYLOAD, OXSTATUS, OXRECEIVEDAT)
                     VALUES (?, ?, ?, 'stripe', ?, 'received', NOW())
                     ON DUPLICATE KEY UPDATE
@@ -1125,12 +1125,12 @@ class WebhookProcessingService
             $db = DatabaseProvider::getDb();
 
             if ($contractId !== null) {
-                $sql = "UPDATE osc_payment_webhooklogs
+                $sql = "UPDATE oe_payments_webhooklogs
                         SET OXSTATUS = ?, OXPROCESSEDAT = NOW(), OXCONTRACTID = ?
                         WHERE OXEVENTID = ?";
                 $db->execute($sql, [$status, $contractId, $eventId]);
             } else {
-                $sql = "UPDATE osc_payment_webhooklogs
+                $sql = "UPDATE oe_payments_webhooklogs
                         SET OXSTATUS = ?, OXPROCESSEDAT = NOW()
                         WHERE OXEVENTID = ?";
                 $db->execute($sql, [$status, $eventId]);

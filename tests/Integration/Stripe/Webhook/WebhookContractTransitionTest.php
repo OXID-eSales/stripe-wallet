@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Webhook;
+namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Webhook;
 
 use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
 use OxidEsales\PaymentComponent\Contract\ContractCondition;
@@ -18,7 +18,7 @@ use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface;
 use OxidEsales\PaymentComponent\Webhook\WebhookEvent;
-use OxidSolutionCatalysts\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededHandler;
+use OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededHandler;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -29,7 +29,7 @@ use Psr\Log\LoggerInterface;
  * Tests that webhook handlers correctly update contract states
  * according to the state machine rules.
  *
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededHandler
+ * @covers \OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededHandler
  * @group sprint-14
  * @group sprint-15
  * @group sprint-16

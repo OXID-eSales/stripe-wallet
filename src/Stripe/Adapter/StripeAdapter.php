@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Adapter;
+namespace OxidEsales\Payments\Stripe\Adapter;
 
 use OxidEsales\PaymentComponent\Adapter\WebhookEvent;
 use OxidEsales\PaymentComponent\Adapter\Request\CreatePaymentRequest;
@@ -114,7 +114,11 @@ final class StripeAdapter implements StripeAdapterInterface
             }
 
             // Create PaymentIntent
+            /** @var array{amount: int, currency: string, capture_method: 'automatic'|'manual', metadata: array<string, string>, payment_method?: string, confirm?: true, customer?: string, return_url?: string} $params */
             $paymentIntent = $this->stripeClient->paymentIntents->create($params);
+
+            /** @var array<string, mixed> $providerData */
+            $providerData = $paymentIntent->toArray();
 
             return new PaymentResponse(
                 providerPaymentId: $paymentIntent->id,
@@ -124,7 +128,7 @@ final class StripeAdapter implements StripeAdapterInterface
                 requiresAction: StripeStatusMapper::requiresAction($paymentIntent->status),
                 clientSecret: $paymentIntent->client_secret,
                 redirectUrl: $paymentIntent->next_action->redirect_to_url->url ?? null,
-                providerData: $paymentIntent->toArray(),
+                providerData: $providerData,
                 metadata: $request->metadata
             );
         } catch (ApiErrorException $e) {
@@ -164,6 +168,9 @@ final class StripeAdapter implements StripeAdapterInterface
             /** @phpstan-ignore-next-line nullsafe.neverNull */
             $capturedAtTimestamp = $paymentIntent->latest_charge?->created ?? time();
 
+            /** @var array<string, mixed> $providerData */
+            $providerData = $paymentIntent->toArray();
+
             return new CaptureResponse(
                 providerPaymentId: $paymentIntent->id,
                 /** @phpstan-ignore-next-line nullsafe.neverNull */
@@ -172,7 +179,7 @@ final class StripeAdapter implements StripeAdapterInterface
                 currency: strtoupper($paymentIntent->currency),
                 status: StripeStatusMapper::STATUS_CAPTURED,
                 capturedAt: new DateTimeImmutable('@' . $capturedAtTimestamp),
-                providerData: $paymentIntent->toArray(),
+                providerData: $providerData,
                 metadata: $request->metadata
             );
         } catch (ApiErrorException $e) {
@@ -202,15 +209,18 @@ final class StripeAdapter implements StripeAdapterInterface
 
             $refund = $this->stripeClient->refunds->create($params);
 
+            /** @var array<string, mixed> $providerData */
+            $providerData = $refund->toArray();
+
             return new RefundResponse(
                 providerPaymentId: $request->providerPaymentId,
                 refundId: $refund->id,
                 amountRefunded: $refund->amount / 100,
                 currency: strtoupper($refund->currency),
-                status: $refund->status,
+                status: $refund->status ?? 'pending',
                 refundedAt: new DateTimeImmutable('@' . $refund->created),
                 reason: $request->reason,
-                providerData: $refund->toArray(),
+                providerData: $providerData,
                 metadata: $request->metadata
             );
         } catch (ApiErrorException $e) {
@@ -232,12 +242,15 @@ final class StripeAdapter implements StripeAdapterInterface
                 $params
             );
 
+            /** @var array<string, mixed> $providerData */
+            $providerData = $paymentIntent->toArray();
+
             return new VoidResponse(
                 providerPaymentId: $paymentIntent->id,
                 status: StripeStatusMapper::STATUS_CANCELLED,
                 voidedAt: new DateTimeImmutable(),
                 reason: $request->reason,
-                providerData: $paymentIntent->toArray(),
+                providerData: $providerData,
                 metadata: $request->metadata
             );
         } catch (ApiErrorException $e) {
@@ -268,6 +281,9 @@ final class StripeAdapter implements StripeAdapterInterface
                 $capturedAt = new DateTimeImmutable('@' . $paymentIntent->latest_charge->created);
             }
 
+            /** @var array<string, mixed> $providerData */
+            $providerData = $paymentIntent->toArray();
+
             return new PaymentDetailsResponse(
                 providerPaymentId: $paymentIntent->id,
                 status: StripeStatusMapper::toNormalized($paymentIntent->status),
@@ -280,7 +296,7 @@ final class StripeAdapter implements StripeAdapterInterface
                 isCancelled: StripeStatusMapper::isCancelled($paymentIntent->status),
                 createdAt: new DateTimeImmutable('@' . $paymentIntent->created),
                 capturedAt: $capturedAt,
-                providerData: $paymentIntent->toArray()
+                providerData: $providerData
             );
         } catch (ApiErrorException $e) {
             throw $this->convertStripeException($e);
@@ -340,6 +356,9 @@ final class StripeAdapter implements StripeAdapterInterface
             // Stripe authorizations expire after 7 days
             $expiresAt = new DateTimeImmutable('+7 days');
 
+            /** @var array<string, mixed> $providerData */
+            $providerData = $paymentIntent->toArray();
+
             return new AuthorizationResponse(
                 authorizationId: $paymentIntent->id,
                 providerPaymentId: $paymentIntent->id,
@@ -351,7 +370,7 @@ final class StripeAdapter implements StripeAdapterInterface
                 requiresAction: StripeStatusMapper::requiresAction($paymentIntent->status),
                 clientSecret: $paymentIntent->client_secret,
                 redirectUrl: $paymentIntent->next_action->redirect_to_url->url ?? null,
-                providerData: $paymentIntent->toArray(),
+                providerData: $providerData,
                 metadata: $request->metadata
             );
         } catch (ApiErrorException $e) {
@@ -427,14 +446,19 @@ final class StripeAdapter implements StripeAdapterInterface
                 );
             }
 
+            /** @var array<string, mixed> $details */
+            $details = $this->extractPaymentMethodDetails($paymentMethod);
+            /** @var array<string, mixed> $providerData */
+            $providerData = $paymentMethod->toArray();
+
             return new PaymentMethodResponse(
                 paymentMethodId: $paymentMethod->id,
                 customerId: $request->customerId,
                 type: $request->paymentMethod,
-                details: $this->extractPaymentMethodDetails($paymentMethod),
+                details: $details,
                 isDefault: false,
                 createdAt: new DateTimeImmutable('@' . $paymentMethod->created),
-                providerData: $paymentMethod->toArray(),
+                providerData: $providerData,
                 metadata: $request->metadata
             );
         } catch (ApiErrorException $e) {
@@ -452,14 +476,19 @@ final class StripeAdapter implements StripeAdapterInterface
 
             $result = [];
             foreach ($paymentMethods->data as $pm) {
+                /** @var array<string, mixed> $details */
+                $details = $this->extractPaymentMethodDetails($pm);
+                /** @var array<string, mixed> $providerData */
+                $providerData = $pm->toArray();
+
                 $result[] = new PaymentMethodResponse(
                     paymentMethodId: $pm->id,
                     customerId: $customerId,
                     type: 'card',
-                    details: $this->extractPaymentMethodDetails($pm),
+                    details: $details,
                     isDefault: false,
                     createdAt: new DateTimeImmutable('@' . $pm->created),
-                    providerData: $pm->toArray()
+                    providerData: $providerData
                 );
             }
 
@@ -499,13 +528,16 @@ final class StripeAdapter implements StripeAdapterInterface
                 StripeStatusMapper::STRIPE_REQUIRES_CAPTURE
             ], true);
 
+            /** @var array<string, mixed> $providerData */
+            $providerData = $paymentIntent->toArray();
+
             return new ThreeDSecureResponse(
                 paymentId: $paymentIntent->id,
                 authenticated: $authenticated,
                 status: $this->map3DSecureStatus($paymentIntent->status),
                 redirectUrl: $redirectUrl,
                 authenticationId: $paymentIntent->id,
-                providerData: $paymentIntent->toArray()
+                providerData: $providerData
             );
         } catch (ApiErrorException $e) {
             throw $this->convertStripeException($e);

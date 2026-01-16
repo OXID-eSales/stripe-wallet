@@ -7,9 +7,9 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Adapter;
+namespace OxidEsales\Payments\Stripe\Adapter;
 
-use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
 use Stripe\StripeClient;
 
 /**
@@ -25,8 +25,7 @@ final class StripeClientFactory
     private bool $testMode;
 
     /**
-     * @param string $secretKey Stripe secret key (test or live)
-     * @param bool $testMode Whether to use test mode
+     * @param ModuleConfigurationService $configurationService Module configuration service
      */
     public function __construct(
         private readonly ModuleConfigurationService $configurationService

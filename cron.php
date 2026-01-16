@@ -13,7 +13,7 @@ function canRunCronjob() {
     }
 
     $sSecureKey = \OxidEsales\Eshop\Core\Registry::getRequest()->getRequestEscapedParameter("secureKey");
-    if (!empty($sSecureKey) && $sSecureKey == \OxidSolutionCatalysts\Stripe\Application\Helper\Payment::getInstance()->getShopConfVar('sStripeCronSecureKey')) {
+    if (!empty($sSecureKey) && $sSecureKey == \OxidEsales\Payments\Stripe\Application\Helper\Payment::getInstance()->getShopConfVar('sStripeCronSecureKey')) {
         // is called via webserver and secureKey param is given and matches configured secure key
         return true;
     }
@@ -30,5 +30,5 @@ if (isset($argv[1]) && is_numeric($argv[1])) {
     $iShopId = $argv[1];
 }
 
-$oScheduler = oxNew(\OxidSolutionCatalysts\Stripe\Application\Model\Cronjob\Scheduler::class);
+$oScheduler = oxNew(\OxidEsales\Payments\Stripe\Application\Model\Cronjob\Scheduler::class);
 $oScheduler->start($iShopId);

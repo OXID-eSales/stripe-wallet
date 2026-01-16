@@ -7,12 +7,12 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Controller;
+namespace OxidEsales\Payments\Stripe\Controller;
 
 use OxidEsales\Eshop\Application\Controller\PaymentController as CorePaymentController;
 use OxidEsales\Eshop\Core\Registry;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
-use OxidSolutionCatalysts\Payments\Stripe\Module;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Module;
 use OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactoryInterface;
 use OxidEsales\PaymentComponent\Adapter\Request\CreatePaymentRequest;
 use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
@@ -29,7 +29,7 @@ class PaymentController extends CorePaymentController
     private ShopAdapterInterface $shopAdapter;
 
     /**
-     * @param \OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService $stripeConfig
+     * @param \OxidEsales\Payments\Stripe\Service\ModuleConfigurationService $stripeConfig
      * @param \OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactoryInterface $adapterFactory
      * @param \OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface $shopAdapter
      */
@@ -116,19 +116,20 @@ class PaymentController extends CorePaymentController
      * Replaces deprecated Registry::getLang() usage.
      *
      * @param string $clientSecret
-     * @return array
+     * @return array<string, mixed>
+     * @phpstan-ignore method.unused
      */
     private function buildStripeConfig(string $clientSecret): array
     {
-        $viewConfig = Registry::get(\OxidSolutionCatalysts\Stripe\Core\ViewConfig::class);
+        $viewConfig = Registry::get(\OxidEsales\Payments\Stripe\Core\ViewConfig::class);
 
         return [
             'publishableKey' => $this->stripeConfig->getPublishableKey(),
             'clientSecret' => $clientSecret,
-            'returnUrl' => $viewConfig->getStripeReturnUrl(),
+            'returnUrl' => $viewConfig->getStripeReturnUrl(), // @phpstan-ignore method.notFound
             'locale' => $this->shopAdapter->getCurrentLanguageAbbr(),
             'testMode' => $this->stripeConfig->isTestMode(),
-            'primaryColor' => $viewConfig->getStripePrimaryColor(),
+            'primaryColor' => $viewConfig->getStripePrimaryColor(), // @phpstan-ignore method.notFound
             'labels' => [
                 'cardPayment' => $this->shopAdapter->translateString('OSC_STRIPE_CARD_PAYMENT'),
                 'paymentDesc' => $this->shopAdapter->translateString('OSC_STRIPE_PAYMENT_DESC'),
@@ -145,8 +146,9 @@ class PaymentController extends CorePaymentController
     /**
      * Get inline script to inject Stripe configuration
      *
-     * @param array $config
+     * @param array<string, mixed> $config
      * @return string
+     * @phpstan-ignore method.unused
      */
     private function getStripeConfigScript(array $config): string
     {
@@ -169,7 +171,7 @@ class PaymentController extends CorePaymentController
     private function getStripeJsUrl(): string
     {
         $config = Registry::getConfig();
-        $moduleUrl = $config->getModuleUrl(Module::MODULE_ID, 'out/src/js/stripe_payment_element.js');
+        $moduleUrl = $config->getModuleUrl(Module::MODULE_ID, 'out/src/js/stripe_payment_element.js'); // @phpstan-ignore method.notFound
 
         return $moduleUrl;
     }
@@ -178,11 +180,12 @@ class PaymentController extends CorePaymentController
      * Get Stripe CSS file URL
      *
      * @return string
+     * @phpstan-ignore method.unused
      */
     private function getStripeCssUrl(): string
     {
         $config = Registry::getConfig();
-        $cssUrl = $config->getModuleUrl(Module::MODULE_ID, 'out/src/css/stripe_payment_element.css');
+        $cssUrl = $config->getModuleUrl(Module::MODULE_ID, 'out/src/css/stripe_payment_element.css'); // @phpstan-ignore method.notFound
 
         return $cssUrl;
     }
@@ -211,8 +214,10 @@ class PaymentController extends CorePaymentController
             $minimumAmount = $this->stripeConfig->getMinimumOrderAmount();
 
             if ($total < $minimumAmount) {
+                /** @var string $currencyName */
+                $currencyName = $basket->getBasketCurrency()->name ?? 'EUR';
                 Registry::getUtilsView()->addErrorToDisplay(
-                    sprintf('Minimum order amount is %.2f %s', $minimumAmount, $basket->getBasketCurrency()->name)
+                    sprintf('Minimum order amount is %.2f %s', $minimumAmount, $currencyName)
                 );
                 return 'payment';
             }
@@ -238,7 +243,7 @@ class PaymentController extends CorePaymentController
             $basket = Registry::getSession()->getBasket();
             $user = $basket->getBasketUser();
 
-            if (!$user || !$user->getId()) {
+            if (!$user || !$user->getId()) { // @phpstan-ignore booleanNot.alwaysFalse
                 echo json_encode([
                     'error' => 'User not logged in'
                 ]);
@@ -249,14 +254,16 @@ class PaymentController extends CorePaymentController
             $adapter = $this->adapterFactory->createDefaultAdapter();
 
             // Build provider-agnostic payment request
+            /** @var string $basketCurrency */
+            $basketCurrency = $basket->getBasketCurrency()->name ?? 'EUR';
             $createPaymentRequest = new CreatePaymentRequest(
                 amount: (float) $basket->getPrice()->getBruttoPrice(),
-                currency: $basket->getBasketCurrency()->name,
+                currency: $basketCurrency,
                 orderId: (string) $basket->getOrderId() ?: 'basket-' . time(),
                 shopId: (string) Registry::getConfig()->getShopId(),
                 paymentMethod: 'card',
                 directCapture: $this->stripeConfig->getCaptureMode() === 'automatic',
-                customerId: $user->getFieldData('stripe_customer_id') ?: null,
+                customerId: is_string($user->getFieldData('stripe_customer_id')) ? $user->getFieldData('stripe_customer_id') : null,
                 returnUrl: $this->getReturnUrl(),
                 cancelUrl: $this->getCancelUrl(),
                 metadata: [

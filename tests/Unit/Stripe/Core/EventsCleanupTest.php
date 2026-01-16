@@ -7,9 +7,9 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Core;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Core;
 
-use OxidSolutionCatalysts\Payments\Stripe\Core\Events;
+use OxidEsales\Payments\Stripe\Core\Events;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 
@@ -33,7 +33,7 @@ class EventsCleanupTest extends TestCase
 {
     /**
      * @test
-     * RED: Events.php should not create osc_payment_webhook_log table
+     * RED: Events.php should not create oe_payments_webhook_log table
      */
     public function eventsDoesNotCreateWebhookLogTable(): void
     {
@@ -41,9 +41,9 @@ class EventsCleanupTest extends TestCase
         $source = file_get_contents($reflection->getFileName());
 
         $this->assertStringNotContainsString(
-            'osc_payment_webhook_log',
+            'oe_payments_webhook_log',
             $source,
-            'Events.php should not create osc_payment_webhook_log table (use osc_payment_webhooklogs from migration)'
+            'Events.php should not create oe_payments_webhook_log table (use oe_payments_webhooklogs from migration)'
         );
     }
 
@@ -59,7 +59,7 @@ class EventsCleanupTest extends TestCase
         $this->assertStringNotContainsString(
             'osc_stripe_customer_mapping',
             $source,
-            'Events.php should not create osc_stripe_customer_mapping table (use osc_payment_customer from migration)'
+            'Events.php should not create osc_stripe_customer_mapping table (use oe_payments_stripe_customer from migration)'
         );
     }
 
@@ -171,7 +171,7 @@ class EventsCleanupTest extends TestCase
 
     /**
      * @test
-     * Sprint 5: Events.php should NOT create osc_payment_* tables (use migrations)
+     * Sprint 5: Events.php should NOT create oe_payments_* tables (use migrations)
      */
     public function eventsDoesNotCreateOscPaymentTables(): void
     {
@@ -196,7 +196,7 @@ class EventsCleanupTest extends TestCase
 
         $this->assertEmpty(
             $activeCreateTables,
-            "Sprint 5: Events.php should NOT have active CREATE TABLE for osc_payment_* tables.\n" .
+            "Sprint 5: Events.php should NOT have active CREATE TABLE for oe_payments_* tables.\n" .
             "These should be in migrations. Found:\n" . implode("\n", $activeCreateTables)
         );
     }

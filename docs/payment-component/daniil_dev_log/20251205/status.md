@@ -35,7 +35,7 @@ Today's work focused on fixing CI failures, implementing OXPAID reconciliation, 
 | Integration tests verified | ✅ 306 tests (0 errors) |
 
 **Root Causes Fixed:**
-1. Removed references to dropped `osc_payment_order_state` table
+1. Removed references to dropped `oe_payments_order_state` table
 2. Direct repository instantiation instead of DI (CI compatibility)
 3. Direct EventDispatcher instantiation instead of DI
 

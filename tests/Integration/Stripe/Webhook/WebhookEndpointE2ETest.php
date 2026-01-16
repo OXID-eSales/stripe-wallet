@@ -7,10 +7,10 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Webhook;
+namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Webhook;
 
 use OxidEsales\Eshop\Core\Registry;
-use OxidSolutionCatalysts\Payments\Tests\Helper\StripeWebhookTestHelper;
+use OxidEsales\Payments\Stripe\Tests\Helper\StripeWebhookTestHelper;
 use PHPUnit\Framework\TestCase;
 
 /**

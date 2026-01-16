@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Service;
+namespace OxidEsales\Payments\Stripe\Service;
 
 /**
  * Interface for services that support lazy initialization
@@ -21,7 +21,7 @@ namespace OxidSolutionCatalysts\Payments\Stripe\Service;
  * - API keys being loaded from database
  * - Service instantiated for dependency injection container
  *
- * @package OxidSolutionCatalysts\Payments\Stripe\Service
+ * @package OxidEsales\Payments\Stripe\Service
  * @author OXID eSales AG
  * @since 1.0.0
  */

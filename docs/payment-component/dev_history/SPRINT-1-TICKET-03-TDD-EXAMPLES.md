@@ -1071,9 +1071,9 @@ abstract class DatabaseTestCase extends TestCase
             )
         ");
 
-        // Create osc_payment_transaction table
+        // Create oe_payments_transaction table
         $this->db->exec("
-            CREATE TABLE osc_payment_transaction (
+            CREATE TABLE oe_payments_transaction (
                 OXID CHAR(32) PRIMARY KEY,
                 OXSHOPID VARCHAR(10) NOT NULL,
                 OXORDERID CHAR(32) NOT NULL,
@@ -1096,9 +1096,9 @@ abstract class DatabaseTestCase extends TestCase
             )
         ");
 
-        // Create osc_payment_order_state table
+        // Create oe_payments_order_state table
         $this->db->exec("
-            CREATE TABLE osc_payment_order_state (
+            CREATE TABLE oe_payments_order_state (
                 OXID CHAR(32) PRIMARY KEY,
                 OXORDERID CHAR(32) NOT NULL UNIQUE,
                 OXPAYMENTSTATE VARCHAR(32) NOT NULL,
@@ -1113,9 +1113,9 @@ abstract class DatabaseTestCase extends TestCase
             )
         ");
 
-        // Create osc_payment_customer table
+        // Create oe_payments_customer table
         $this->db->exec("
-            CREATE TABLE osc_payment_customer (
+            CREATE TABLE oe_payments_customer (
                 OXID CHAR(32) PRIMARY KEY,
                 OXUSERID CHAR(32) NOT NULL UNIQUE,
                 OXPAYMENTCUSTOMERID VARCHAR(128),
@@ -1304,7 +1304,7 @@ final class PaymentTransactionIntegrationTest extends DatabaseTestCase
         $this->assertNotNull($transaction->getId());
 
         // Assert - Database contains record
-        $this->assertDatabaseHas('osc_payment_transaction', [
+        $this->assertDatabaseHas('oe_payments_transaction', [
             'OXID' => $transaction->getId(),
             'OXORDERID' => $orderId,
             'OXPROVIDERORDERID' => 'pi_test_123',
@@ -1382,7 +1382,7 @@ final class PaymentTransactionIntegrationTest extends DatabaseTestCase
         $txId = $transaction->getId();
 
         // Assert - Transaction exists
-        $this->assertDatabaseHas('osc_payment_transaction', ['OXID' => $txId]);
+        $this->assertDatabaseHas('oe_payments_transaction', ['OXID' => $txId]);
 
         // Act - Delete order (CASCADE should delete transaction)
         $this->db->exec("DELETE FROM oxorder WHERE OXID = '{$orderId}'");
@@ -1391,7 +1391,7 @@ final class PaymentTransactionIntegrationTest extends DatabaseTestCase
         $this->assertEquals($txId, $transaction->getId());
 
         // Assert - Database record deleted due to CASCADE
-        $this->assertDatabaseMissing('osc_payment_transaction', ['OXID' => $txId]);
+        $this->assertDatabaseMissing('oe_payments_transaction', ['OXID' => $txId]);
     }
 
     // ==========================================
@@ -1411,7 +1411,7 @@ final class PaymentTransactionIntegrationTest extends DatabaseTestCase
         $txId = $transaction->getId();
 
         // Assert - Initial status in database
-        $this->assertDatabaseHas('osc_payment_transaction', [
+        $this->assertDatabaseHas('oe_payments_transaction', [
             'OXID' => $txId,
             'OXSTATUS' => 'pending'
         ]);
@@ -1425,13 +1425,13 @@ final class PaymentTransactionIntegrationTest extends DatabaseTestCase
         $this->assertEquals('completed', $transaction->getStatus());
 
         // Assert - Database reflects change
-        $this->assertDatabaseHas('osc_payment_transaction', [
+        $this->assertDatabaseHas('oe_payments_transaction', [
             'OXID' => $txId,
             'OXSTATUS' => 'completed'
         ]);
 
         // Assert - Old status no longer in database
-        $this->assertDatabaseMissing('osc_payment_transaction', [
+        $this->assertDatabaseMissing('oe_payments_transaction', [
             'OXID' => $txId,
             'OXSTATUS' => 'pending'
         ]);
@@ -1449,7 +1449,7 @@ final class PaymentTransactionIntegrationTest extends DatabaseTestCase
         $txId = $transaction->getId();
 
         // Get original updated timestamp
-        $stmt = $this->db->prepare("SELECT OXUPDATED FROM osc_payment_transaction WHERE OXID = :id");
+        $stmt = $this->db->prepare("SELECT OXUPDATED FROM oe_payments_transaction WHERE OXID = :id");
         $stmt->execute(['id' => $txId]);
         $originalUpdated = $stmt->fetchColumn();
 
@@ -1492,7 +1492,7 @@ final class PaymentTransactionIntegrationTest extends DatabaseTestCase
         $txId = $transaction->getId();
 
         // Act - Retrieve from database
-        $stmt = $this->db->prepare("SELECT OXPROVIDERDATA FROM osc_payment_transaction WHERE OXID = :id");
+        $stmt = $this->db->prepare("SELECT OXPROVIDERDATA FROM oe_payments_transaction WHERE OXID = :id");
         $stmt->execute(['id' => $txId]);
         $jsonData = $stmt->fetchColumn();
 
@@ -1547,28 +1547,28 @@ final class PaymentTransactionIntegrationTest extends DatabaseTestCase
         $this->repository->save($refund);
 
         // Assert - All transactions exist in database
-        $this->assertDatabaseCount('osc_payment_transaction', 3);
+        $this->assertDatabaseCount('oe_payments_transaction', 3);
 
         // Assert - All linked to same order
-        $this->assertDatabaseHas('osc_payment_transaction', [
+        $this->assertDatabaseHas('oe_payments_transaction', [
             'OXID' => $authorization->getId(),
             'OXORDERID' => $orderId
         ]);
-        $this->assertDatabaseHas('osc_payment_transaction', [
+        $this->assertDatabaseHas('oe_payments_transaction', [
             'OXID' => $capture->getId(),
             'OXORDERID' => $orderId
         ]);
-        $this->assertDatabaseHas('osc_payment_transaction', [
+        $this->assertDatabaseHas('oe_payments_transaction', [
             'OXID' => $refund->getId(),
             'OXORDERID' => $orderId
         ]);
 
         // Assert - Parent relationships persisted
-        $this->assertDatabaseHas('osc_payment_transaction', [
+        $this->assertDatabaseHas('oe_payments_transaction', [
             'OXID' => $capture->getId(),
             'OXPARENTTRANSACTIONID' => $authorization->getId()
         ]);
-        $this->assertDatabaseHas('osc_payment_transaction', [
+        $this->assertDatabaseHas('oe_payments_transaction', [
             'OXID' => $refund->getId(),
             'OXPARENTTRANSACTIONID' => $capture->getId()
         ]);
@@ -1596,7 +1596,7 @@ final class PaymentTransactionIntegrationTest extends DatabaseTestCase
         $this->assertEquals($transaction->getId(), $found->getId());
 
         // Assert - Database matches
-        $this->assertDatabaseHas('osc_payment_transaction', [
+        $this->assertDatabaseHas('oe_payments_transaction', [
             'OXID' => $found->getId(),
             'OXPROVIDERORDERID' => 'pi_unique_find_123'
         ]);
@@ -1667,7 +1667,7 @@ final class PaymentOrderStateIntegrationTest extends DatabaseTestCase
         $this->assertNotNull($orderState->getId());
 
         // Assert - Database contains record
-        $this->assertDatabaseHas('osc_payment_order_state', [
+        $this->assertDatabaseHas('oe_payments_order_state', [
             'OXID' => $orderState->getId(),
             'OXORDERID' => $orderId,
             'OXPAYMENTSTATE' => PaymentOrderStates::STATE_NOT_FINISHED,
@@ -1707,13 +1707,13 @@ final class PaymentOrderStateIntegrationTest extends DatabaseTestCase
         $stateId = $orderState->getId();
 
         // Assert - State exists
-        $this->assertDatabaseHas('osc_payment_order_state', ['OXID' => $stateId]);
+        $this->assertDatabaseHas('oe_payments_order_state', ['OXID' => $stateId]);
 
         // Act - Delete order
         $this->db->exec("DELETE FROM oxorder WHERE OXID = '{$orderId}'");
 
         // Assert - State deleted via CASCADE
-        $this->assertDatabaseMissing('osc_payment_order_state', ['OXID' => $stateId]);
+        $this->assertDatabaseMissing('oe_payments_order_state', ['OXID' => $stateId]);
     }
 
     // ==========================================
@@ -1741,7 +1741,7 @@ final class PaymentOrderStateIntegrationTest extends DatabaseTestCase
         $this->assertEquals(1, $orderState->getPaymentAttemptCount());
 
         // Assert - Database reflects change
-        $this->assertDatabaseHas('osc_payment_order_state', [
+        $this->assertDatabaseHas('oe_payments_order_state', [
             'OXID' => $stateId,
             'OXPAYMENTSTATE' => PaymentOrderStates::STATE_PAYMENT_IN_PROGRESS,
             'OXPAYMENTATTEMPTCOUNT' => 1
@@ -1750,7 +1750,7 @@ final class PaymentOrderStateIntegrationTest extends DatabaseTestCase
         // Assert - Timestamp set
         $stmt = $this->db->prepare("
             SELECT OXLASTPAYMENTATTEMPT
-            FROM osc_payment_order_state
+            FROM oe_payments_order_state
             WHERE OXID = :id
         ");
         $stmt->execute(['id' => $stateId]);
@@ -1768,7 +1768,7 @@ final class PaymentOrderStateIntegrationTest extends DatabaseTestCase
         $stateId = $orderState->getId();
 
         // Step 1: NOT_FINISHED (initial)
-        $this->assertDatabaseHas('osc_payment_order_state', [
+        $this->assertDatabaseHas('oe_payments_order_state', [
             'OXID' => $stateId,
             'OXPAYMENTSTATE' => PaymentOrderStates::STATE_NOT_FINISHED
         ]);
@@ -1776,7 +1776,7 @@ final class PaymentOrderStateIntegrationTest extends DatabaseTestCase
         // Step 2: PAYMENT_IN_PROGRESS
         $orderState->markAsPaymentInProgress();
         $this->repository->save($orderState);
-        $this->assertDatabaseHas('osc_payment_order_state', [
+        $this->assertDatabaseHas('oe_payments_order_state', [
             'OXID' => $stateId,
             'OXPAYMENTSTATE' => PaymentOrderStates::STATE_PAYMENT_IN_PROGRESS
         ]);
@@ -1784,7 +1784,7 @@ final class PaymentOrderStateIntegrationTest extends DatabaseTestCase
         // Step 3: WAITING_FOR_WEBHOOK
         $orderState->markAsWaitingForWebhook();
         $this->repository->save($orderState);
-        $this->assertDatabaseHas('osc_payment_order_state', [
+        $this->assertDatabaseHas('oe_payments_order_state', [
             'OXID' => $stateId,
             'OXPAYMENTSTATE' => PaymentOrderStates::STATE_WAITING_FOR_WEBHOOK
         ]);
@@ -1792,7 +1792,7 @@ final class PaymentOrderStateIntegrationTest extends DatabaseTestCase
         // Verify webhook wait timestamp in database
         $stmt = $this->db->prepare("
             SELECT OXWEBHOOKWAITSINCE, OXWEBHOOKTIMEOUT
-            FROM osc_payment_order_state
+            FROM oe_payments_order_state
             WHERE OXID = :id
         ");
         $stmt->execute(['id' => $stateId]);
@@ -1803,7 +1803,7 @@ final class PaymentOrderStateIntegrationTest extends DatabaseTestCase
         // Step 4: OK (completed)
         $orderState->markAsCompleted();
         $this->repository->save($orderState);
-        $this->assertDatabaseHas('osc_payment_order_state', [
+        $this->assertDatabaseHas('oe_payments_order_state', [
             'OXID' => $stateId,
             'OXPAYMENTSTATE' => PaymentOrderStates::STATE_OK
         ]);
@@ -1828,7 +1828,7 @@ final class PaymentOrderStateIntegrationTest extends DatabaseTestCase
         $stateId = $orderState->getId();
 
         // Assert - Initial count
-        $this->assertDatabaseHas('osc_payment_order_state', [
+        $this->assertDatabaseHas('oe_payments_order_state', [
             'OXID' => $stateId,
             'OXPAYMENTATTEMPTCOUNT' => 0
         ]);
@@ -1838,7 +1838,7 @@ final class PaymentOrderStateIntegrationTest extends DatabaseTestCase
         $this->repository->save($orderState);
 
         // Assert - Count incremented in database
-        $this->assertDatabaseHas('osc_payment_order_state', [
+        $this->assertDatabaseHas('oe_payments_order_state', [
             'OXID' => $stateId,
             'OXPAYMENTATTEMPTCOUNT' => 1
         ]);
@@ -1851,7 +1851,7 @@ final class PaymentOrderStateIntegrationTest extends DatabaseTestCase
         $this->repository->save($orderState);
 
         // Assert - Count incremented again
-        $this->assertDatabaseHas('osc_payment_order_state', [
+        $this->assertDatabaseHas('oe_payments_order_state', [
             'OXID' => $stateId,
             'OXPAYMENTATTEMPTCOUNT' => 2
         ]);
@@ -1878,7 +1878,7 @@ final class PaymentOrderStateIntegrationTest extends DatabaseTestCase
         $this->assertEquals('pi_stripe_12345', $orderState->getProviderOrderId());
 
         // Assert - Database reflects change
-        $this->assertDatabaseHas('osc_payment_order_state', [
+        $this->assertDatabaseHas('oe_payments_order_state', [
             'OXID' => $stateId,
             'OXPROVIDERORDERID' => 'pi_stripe_12345'
         ]);
@@ -1910,7 +1910,7 @@ final class PaymentOrderStateIntegrationTest extends DatabaseTestCase
         $this->repository->save($retrieved);
 
         // Assert - Database updated
-        $this->assertDatabaseHas('osc_payment_order_state', [
+        $this->assertDatabaseHas('oe_payments_order_state', [
             'OXID' => $stateId,
             'OXPAYMENTSTATE' => PaymentOrderStates::STATE_PAYMENT_IN_PROGRESS
         ]);

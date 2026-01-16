@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Webhook;
+namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Webhook;
 
 use Doctrine\DBAL\Connection;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
@@ -21,8 +21,8 @@ use OxidEsales\PaymentComponent\Repository\DoctrineWebhookLogRepository;
 use OxidEsales\PaymentComponent\Repository\WebhookLogRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ContractFulfillmentService;
 use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandler;
-use OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService;
+use OxidEsales\Payments\Stripe\Handler\WebhookContractFulfillmentHandler;
+use OxidEsales\Payments\Stripe\Service\WebhookProcessingService;
 use Psr\Log\NullLogger;
 
 /**
@@ -40,8 +40,8 @@ use Psr\Log\NullLogger;
  * caches service instances, and the WebhookContractFulfillmentHandler uses the
  * ContractRepository which needs a fresh database connection per test.
  *
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandler
+ * @covers \OxidEsales\Payments\Stripe\Service\WebhookProcessingService
+ * @covers \OxidEsales\Payments\Stripe\Handler\WebhookContractFulfillmentHandler
  * @group integration
  * @group webhook
  * @group oxpaid
@@ -432,7 +432,7 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
             'items' => [],
         ]);
 
-        $this->connection->insert('osc_payment_contract', [
+        $this->connection->insert('oe_payments_contract', [
             'OXID' => $contractId,
             'OXSHOPID' => self::SHOP_ID,
             'OXUSERID' => $userId,
@@ -494,7 +494,7 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
     private function transitionContractToCommitted(string $contractId, string $orderId): void
     {
         $this->connection->update(
-            'osc_payment_contract',
+            'oe_payments_contract',
             [
                 'OXORDERID' => $orderId,
                 'OXSTATE' => 'committed',
@@ -618,7 +618,7 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
     private function getContractData(string $contractId): array
     {
         $result = $this->connection->fetchAssociative(
-            'SELECT * FROM osc_payment_contract WHERE OXID = :id',
+            'SELECT * FROM oe_payments_contract WHERE OXID = :id',
             ['id' => $contractId]
         );
 
@@ -632,11 +632,11 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
     private function cleanupTestData(): void
     {
         $this->connection->executeStatement(
-            "DELETE FROM osc_payment_webhooklogs WHERE OXEVENTID LIKE ?",
+            "DELETE FROM oe_payments_webhooklogs WHERE OXEVENTID LIKE ?",
             ['evt_test_%']
         );
         $this->connection->executeStatement(
-            "DELETE FROM osc_payment_contract WHERE OXID LIKE ?",
+            "DELETE FROM oe_payments_contract WHERE OXID LIKE ?",
             ['contract_%']
         );
         $this->connection->executeStatement(

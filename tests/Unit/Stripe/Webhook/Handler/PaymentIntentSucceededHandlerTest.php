@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Webhook\Handler;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Webhook\Handler;
 
 use OxidEsales\PaymentComponent\Contract\ContractState;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
@@ -16,13 +16,13 @@ use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface;
 use OxidEsales\PaymentComponent\Webhook\WebhookEvent;
 use OxidEsales\PaymentComponent\Webhook\WebhookEventHandlerInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededHandler;
+use OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededHandler;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 /**
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededHandler
+ * @covers \OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededHandler
  * @group sprint-13
  * @group sprint-15
  * @group sprint-16

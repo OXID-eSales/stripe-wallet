@@ -15,7 +15,7 @@
 **Content (1149 lines):**
 - ✅ Executive Summary
 - ✅ Architecture Principles (Contract-First + Master-Detail)
-- ✅ **Contract Schema** (NEW - osc_payment_contract)
+- ✅ **Contract Schema** (NEW - oe_payments_contract)
 - ✅ **Master-Detail Pattern** (Transaction tables)
 - ✅ **Complete Database Tables** (All 12 tables with SQL)
 - ✅ **Domain Models** (PaymentContract, ContractCondition, etc.)
@@ -132,9 +132,9 @@ Payment captured → Contract: FULFILLED
 
 | Table | Purpose | Key Feature |
 |-------|---------|-------------|
-| **osc_payment_contract** | Payment lifecycle | OXORDERID = NULL until committed |
-| **osc_payment_transaction** | Transaction master | Links to contract via OXCONTRACTID |
-| **osc_payment_order_state** | Order payment state | Links to contract for audit trail |
+| **oe_payments_contract** | Payment lifecycle | OXORDERID = NULL until committed |
+| **oe_payments_transaction** | Transaction master | Links to contract via OXCONTRACTID |
+| **oe_payments_order_state** | Order payment state | Links to contract for audit trail |
 
 ### Performance Benefits
 

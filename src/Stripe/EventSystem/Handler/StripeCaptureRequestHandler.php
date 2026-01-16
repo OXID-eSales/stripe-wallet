@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
+namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
 use OxidEsales\PaymentComponent\Adapter\Request\CapturePaymentRequest;
 use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
@@ -11,9 +11,9 @@ use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapterInterface;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
-use OxidSolutionCatalysts\Stripe\Application\Model\RequestLog;
+use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
+use OxidEsales\Payments\Stripe\Application\Model\RequestLog;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 

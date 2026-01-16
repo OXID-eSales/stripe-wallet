@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Service\Result;
+namespace OxidEsales\Payments\Stripe\Service\Result;
 
 use OxidEsales\PaymentComponent\Contract\SecurityValidationResultInterface;
 

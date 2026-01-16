@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\EventSystem\Handler;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
 use DateTimeImmutable;
 use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
@@ -11,9 +11,9 @@ use OxidEsales\PaymentComponent\Contract\ContractState;
 use OxidEsales\PaymentComponent\Contract\PaymentContract;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapterInterface;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCaptureRequestHandler;
+use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCaptureRequestHandler;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;

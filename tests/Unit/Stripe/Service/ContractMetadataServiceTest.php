@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Service;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ContractMetadataService;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ContractMetadataServiceInterface;
+use OxidEsales\Payments\Stripe\Service\ContractMetadataService;
+use OxidEsales\Payments\Stripe\Service\ContractMetadataServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 

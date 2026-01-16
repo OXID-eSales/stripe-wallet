@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Service;
+namespace OxidEsales\Payments\Stripe\Service;
 
 use RuntimeException;
 use Stripe\StripeClient;
@@ -48,7 +48,7 @@ use OxidEsales\PaymentComponent\Repository\PaymentCustomerRepositoryInterface;
  * This service supports lazy initialization and can be constructed without API keys.
  * It will initialize automatically when first used if configuration is available.
  *
- * @package OxidSolutionCatalysts\Payments\Stripe\Service
+ * @package OxidEsales\Payments\Stripe\Service
  * @author OXID eSales AG
  * @since 1.0.0
  */
@@ -104,7 +104,7 @@ class StripeCustomerService implements InitializableServiceInterface
         // Check if customer already exists
         $stripeCustomerId = $this->getStoredStripeCustomerId($user->getId());
 
-        if ($stripeCustomerId) {
+        if ($stripeCustomerId && $this->stripe !== null) {
             // Verify customer still exists in Stripe
             try {
                 $this->stripe->customers->retrieve($stripeCustomerId);
@@ -133,16 +133,29 @@ class StripeCustomerService implements InitializableServiceInterface
     {
         $this->ensureInitialized();
 
+        if ($this->stripe === null) {
+            throw new RuntimeException('Stripe client not initialized');
+        }
+
         try {
-            $customer = $this->stripe->customers->create([
-                'email' => $user->getFieldData('oxusername'),
-                'name' => $user->getFieldData('oxfname') . ' ' . $user->getFieldData('oxlname'),
-                'phone' => $user->getFieldData('oxfon'),
+            $email = $user->getFieldData('oxusername');
+            $firstName = $user->getFieldData('oxfname');
+            $lastName = $user->getFieldData('oxlname');
+            $phone = $user->getFieldData('oxfon');
+            $customerNumber = $user->getFieldData('oxcustnr');
+
+            $params = [
+                'email' => is_string($email) ? $email : '',
+                'name' => trim((is_string($firstName) ? $firstName : '') . ' ' . (is_string($lastName) ? $lastName : '')) ?: 'Customer',
                 'metadata' => [
-                    'oxid_user_id' => $user->getId(),
-                    'oxid_customer_number' => $user->getFieldData('oxcustnr'),
+                    'oxid_user_id' => (string) $user->getId(),
+                    'oxid_customer_number' => is_string($customerNumber) ? $customerNumber : '',
                 ],
-            ]);
+            ];
+            if (is_string($phone) && $phone !== '') {
+                $params['phone'] = $phone;
+            }
+            $customer = $this->stripe->customers->create($params);
 
             // Store customer ID
             $this->storeStripeCustomerId($user->getId(), $customer->id);
@@ -235,16 +248,24 @@ class StripeCustomerService implements InitializableServiceInterface
 
         $stripeCustomerId = $this->getStoredStripeCustomerId($user->getId());
 
-        if (!$stripeCustomerId) {
+        if (!$stripeCustomerId || $this->stripe === null) {
             return false;
         }
 
         try {
-            $this->stripe->customers->update($stripeCustomerId, [
-                'email' => $user->getFieldData('oxusername'),
-                'name' => $user->getFieldData('oxfname') . ' ' . $user->getFieldData('oxlname'),
-                'phone' => $user->getFieldData('oxfon'),
-            ]);
+            $email = $user->getFieldData('oxusername');
+            $firstName = $user->getFieldData('oxfname');
+            $lastName = $user->getFieldData('oxlname');
+            $phone = $user->getFieldData('oxfon');
+
+            $params = [
+                'email' => is_string($email) ? $email : '',
+                'name' => trim((is_string($firstName) ? $firstName : '') . ' ' . (is_string($lastName) ? $lastName : '')) ?: 'Customer',
+            ];
+            if (is_string($phone) && $phone !== '') {
+                $params['phone'] = $phone;
+            }
+            $this->stripe->customers->update($stripeCustomerId, $params);
 
             return true;
         } catch (ApiErrorException $e) {

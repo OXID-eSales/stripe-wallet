@@ -7,11 +7,11 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Command;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Command;
 
-use OxidSolutionCatalysts\Payments\Stripe\Command\ReconcileOxpaidCommand;
-use OxidSolutionCatalysts\Payments\Stripe\Service\OxpaidReconciliationService;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ReconciliationResult;
+use OxidEsales\Payments\Stripe\Command\ReconcileOxpaidCommand;
+use OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService;
+use OxidEsales\Payments\Stripe\Service\ReconciliationResult;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -19,7 +19,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 /**
  * Unit tests for ReconcileOxpaidCommand
  *
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Command\ReconcileOxpaidCommand
+ * @covers \OxidEsales\Payments\Stripe\Command\ReconcileOxpaidCommand
  * @group sprint-10
  * @group reconciliation
  * @group command

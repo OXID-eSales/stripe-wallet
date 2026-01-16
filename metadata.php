@@ -13,18 +13,17 @@ use OxidEsales\Eshop\Application\Controller\PaymentController;
 use OxidEsales\Eshop\Application\Model\Order as CoreOrder;
 use OxidEsales\Eshop\Application\Model\Payment as CorePayment;
 use OxidEsales\Eshop\Core\ViewConfig;
-use OxidEsales\PaymentComponent\Controller\Webhook\WebhookController;
-use OxidSolutionCatalysts\Payments\Stripe\Application\Controller\Admin\ModuleConfiguration as StripeModuleConfiguration;
-use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\OrderRefund;
-use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\StripeConnect;
-use OxidSolutionCatalysts\Payments\Stripe\Controller\StripeOrderController as StripeOrderController;
-use OxidSolutionCatalysts\Payments\Stripe\Controller\PaymentController as StripePaymentController;
-use OxidSolutionCatalysts\Payments\Stripe\Controller\Webhook\WebhookController as StripeWebhookController;
-use OxidSolutionCatalysts\Payments\Stripe\Core\Events as StripeEvents;
-use OxidSolutionCatalysts\Payments\Stripe\Core\ViewConfig as StripeViewConfig;
-use OxidSolutionCatalysts\Payments\Stripe\Model\Order as StripeOrderModel;
-use OxidSolutionCatalysts\Payments\Stripe\Model\Payment as StripePaymentModel;
-use OxidSolutionCatalysts\Payments\Stripe\Module;
+use OxidEsales\Payments\Stripe\Application\Controller\Admin\ModuleConfiguration as StripeModuleConfiguration;
+use OxidEsales\Payments\Stripe\Controller\Admin\OrderRefund;
+use OxidEsales\Payments\Stripe\Controller\Admin\StripeConnect;
+use OxidEsales\Payments\Stripe\Controller\StripeOrderController as StripeOrderController;
+use OxidEsales\Payments\Stripe\Controller\PaymentController as StripePaymentController;
+use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookController as StripeWebhookController;
+use OxidEsales\Payments\Stripe\Core\Events as StripeEvents;
+use OxidEsales\Payments\Stripe\Core\ViewConfig as StripeViewConfig;
+use OxidEsales\Payments\Stripe\Model\Order as StripeOrderModel;
+use OxidEsales\Payments\Stripe\Model\Payment as StripePaymentModel;
+use OxidEsales\Payments\Stripe\Module;
 
 /**
  * Metadata version
@@ -60,7 +59,7 @@ $aModule = [
     'controllers' => [
         'osc_stripe_payment' => StripePaymentController::class,
         'osc_stripe_webhook' => StripeWebhookController::class,
-                'StripeConnect' => StripeConnect::class,
+        'StripeConnect' => StripeConnect::class,
         'stripe_order_refund' => OrderRefund::class,
         'orderController' => StripeOrderController::class,
     ],

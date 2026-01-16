@@ -58,8 +58,8 @@ public function __construct(
 
 #### 2. Redundant Persistence
 ❌ **Duplicate payment state tracking**: Payment state was being stored in both:
-- Component-level `osc_payment_transaction` table (via `TransactionRepository`)
-- Stripe-specific `osc_payment_order_state` table (via `PaymentOrderStateRepository`)
+- Component-level `oe_payments_transaction` table (via `TransactionRepository`)
+- Stripe-specific `oe_payments_order_state` table (via `PaymentOrderStateRepository`)
 
 The `Transaction` entity already contains all necessary payment state:
 - Order ID
@@ -387,7 +387,7 @@ This eliminates the need for separate order state tracking.
 ### Manual Testing Checklist
 
 - [ ] Create order with Stripe payment
-- [ ] Verify transaction saved to `osc_payment_transaction`
+- [ ] Verify transaction saved to `oe_payments_transaction`
 - [ ] Verify `OXPAID` field populated after capture
 - [ ] Verify order total displays correctly
 - [ ] Check OXID admin order list shows payment date
@@ -420,13 +420,13 @@ If you have custom extensions that:
    $status = $latestTransaction->getStatus();
    ```
 
-2. **Directly query `osc_payment_order_state` table** - Query `osc_payment_transaction` instead:
+2. **Directly query `oe_payments_order_state` table** - Query `oe_payments_transaction` instead:
    ```sql
    -- BEFORE
-   SELECT * FROM osc_payment_order_state WHERE OXORDERID = ?
+   SELECT * FROM oe_payments_order_state WHERE OXORDERID = ?
 
    -- AFTER
-   SELECT * FROM osc_payment_transaction WHERE OXORDERID = ? ORDER BY OXCREATED DESC LIMIT 1
+   SELECT * FROM oe_payments_transaction WHERE OXORDERID = ? ORDER BY OXCREATED DESC LIMIT 1
    ```
 
 ---

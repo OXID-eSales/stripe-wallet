@@ -83,7 +83,7 @@ Provider Webhook → Find Contract by provider ID → Validate contract state �
 
 2. **Find Contract** (Not Order!)
    ```sql
-   SELECT * FROM osc_payment_contract
+   SELECT * FROM oe_payments_contract
    WHERE OXPROVIDERORDERID = 'pi_stripe_123'
    ```
 
@@ -218,8 +218,8 @@ if ($contract->getState() !== PaymentContract::STATE_COMMITTED) {
 
 ```sql
 SELECT *
-FROM osc_payment_transaction t
-LEFT JOIN osc_payment_authorization_details a
+FROM oe_payments_transaction t
+LEFT JOIN oe_payments_authorization_details a
   ON t.OXID = a.OXTRANSACTIONID
 WHERE t.OXORDERID = 'order789'
   AND t.OXTYPE = 'authorization'
@@ -249,7 +249,7 @@ Provider-specific capture:
 #### 5. Record Capture Transaction
 
 ```sql
-INSERT INTO osc_payment_transaction (
+INSERT INTO oe_payments_transaction (
     OXORDERID,
     OXPROVIDERORDERID,
     OXTRANSACTIONID,
@@ -277,7 +277,7 @@ auth_456 (authorization)
 #### 6. Update Authorization Details
 
 ```sql
-UPDATE osc_payment_authorization_details
+UPDATE oe_payments_authorization_details
 SET OXCAPTUREDAMOUNT = OXCAPTUREDAMOUNT + 99.99,
     OXREMAININGAMOUNT = OXREMAININGAMOUNT - 99.99
 WHERE OXTRANSACTIONID = 'auth_456';
@@ -400,7 +400,7 @@ if ($contract->getState() !== PaymentContract::STATE_FULFILLED) {
 SELECT
   SUM(CASE WHEN OXTYPE = 'capture' THEN OXAMOUNT ELSE 0 END) as total_captured,
   SUM(CASE WHEN OXTYPE = 'refund' THEN OXAMOUNT ELSE 0 END) as total_refunded
-FROM osc_payment_transaction
+FROM oe_payments_transaction
 WHERE OXORDERID = 'order789';
 ```
 
@@ -427,7 +427,7 @@ $response = $this->paymentService->refundPayment(
 
 ```sql
 -- Main transaction
-INSERT INTO osc_payment_transaction (
+INSERT INTO oe_payments_transaction (
     OXORDERID,
     OXTYPE,
     OXSTATUS,
@@ -442,7 +442,7 @@ INSERT INTO osc_payment_transaction (
 );
 
 -- Refund details
-INSERT INTO osc_payment_refund_details (
+INSERT INTO oe_payments_refund_details (
     OXTRANSACTIONID,
     OXORIGINALAMOUNT,
     OXREFUNDAMOUNT,
@@ -543,13 +543,13 @@ Authorization (auth_456)
 -- Get all transactions for an order
 WITH RECURSIVE transaction_tree AS (
   -- Root: Authorization
-  SELECT * FROM osc_payment_transaction
+  SELECT * FROM oe_payments_transaction
   WHERE OXORDERID = 'order789' AND OXTYPE = 'authorization'
 
   UNION ALL
 
   -- Children: Captures and refunds
-  SELECT t.* FROM osc_payment_transaction t
+  SELECT t.* FROM oe_payments_transaction t
   INNER JOIN transaction_tree tt ON t.OXPARENTTRANSACTIONID = tt.OXID
 )
 SELECT * FROM transaction_tree ORDER BY OXCREATED;
@@ -566,7 +566,7 @@ SELECT
   OXCREATED as contract_created,
   OXCOMMITTEDAT as order_created,
   OXFULFILLEDAT as payment_captured
-FROM osc_payment_contract
+FROM oe_payments_contract
 WHERE OXID = 'contract123';
 
 -- All transactions
@@ -576,7 +576,7 @@ SELECT
   OXAMOUNT,
   OXCREATED,
   OXPARENTTRANSACTIONID
-FROM osc_payment_transaction
+FROM oe_payments_transaction
 WHERE OXORDERID = 'order789'
 ORDER BY OXCREATED;
 ```
@@ -871,11 +871,11 @@ VALUES ('order789', 'capture', 99.99);
 **Migrated Code:**
 ```sql
 -- Find parent authorization
-SELECT OXID FROM osc_payment_transaction
+SELECT OXID FROM oe_payments_transaction
 WHERE OXORDERID = 'order789' AND OXTYPE = 'authorization';
 
 -- Insert with parent link
-INSERT INTO osc_payment_transaction (
+INSERT INTO oe_payments_transaction (
     OXORDERID, OXTYPE, OXAMOUNT, OXPARENTTRANSACTIONID
 ) VALUES (
     'order789', 'capture', 99.99, 'auth_456'

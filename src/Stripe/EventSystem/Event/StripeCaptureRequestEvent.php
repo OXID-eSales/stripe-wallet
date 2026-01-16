@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event;
+namespace OxidEsales\Payments\Stripe\EventSystem\Event;
 
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventInterface;

@@ -7,16 +7,16 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Adapter;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Adapter;
 
-use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeClientFactory;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Adapter\StripeClientFactory;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Stripe\StripeClient;
 
 /**
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeClientFactory
+ * @covers \OxidEsales\Payments\Stripe\Adapter\StripeClientFactory
  */
 final class StripeClientFactoryTest extends TestCase
 {

@@ -187,9 +187,9 @@ work-analysis/
 **Type:** Entity-Relationship Diagram
 **Size:** 6.6 KB
 **Contents:**
-- osc_payment_contract table
-- osc_payment_transaction table
-- osc_payment_webhook_log table
+- oe_payments_contract table
+- oe_payments_transaction table
+- oe_payments_webhook_log table
 - Table relationships (1:N)
 - Index definitions
 - JSON column structures

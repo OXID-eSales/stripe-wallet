@@ -5,7 +5,7 @@
 Your GitHub Actions failed with this error:
 ```
 Cannot truncate a table referenced in a foreign key constraint
-(osc_payment_contract → oxorder)
+(oe_payments_contract → oxorder)
 ```
 
 This happens because our payment module adds foreign key constraints that prevent OXID's demodata installer from truncating tables.
@@ -47,18 +47,18 @@ If you prefer SQL commands:
 
 ```sql
 -- DROP before demodata
-ALTER TABLE osc_payment_contract DROP FOREIGN KEY FK_CONTRACT_ORDER;
-ALTER TABLE osc_payment_order_state DROP FOREIGN KEY FK_ORDER_STATE;
-ALTER TABLE osc_payment_transaction DROP FOREIGN KEY FK_ORDER;
+ALTER TABLE oe_payments_contract DROP FOREIGN KEY FK_CONTRACT_ORDER;
+ALTER TABLE oe_payments_order_state DROP FOREIGN KEY FK_ORDER_STATE;
+ALTER TABLE oe_payments_transaction DROP FOREIGN KEY FK_ORDER;
 
 -- Install demodata here
 
 -- ADD BACK after demodata
-ALTER TABLE osc_payment_contract ADD CONSTRAINT FK_CONTRACT_ORDER
+ALTER TABLE oe_payments_contract ADD CONSTRAINT FK_CONTRACT_ORDER
   FOREIGN KEY (OXORDERID) REFERENCES oxorder(OXID) ON DELETE SET NULL;
-ALTER TABLE osc_payment_order_state ADD CONSTRAINT FK_ORDER_STATE
+ALTER TABLE oe_payments_order_state ADD CONSTRAINT FK_ORDER_STATE
   FOREIGN KEY (OXORDERID) REFERENCES oxorder(OXID) ON DELETE CASCADE;
-ALTER TABLE osc_payment_transaction ADD CONSTRAINT FK_ORDER
+ALTER TABLE oe_payments_transaction ADD CONSTRAINT FK_ORDER
   FOREIGN KEY (OXORDERID) REFERENCES oxorder(OXID) ON DELETE CASCADE;
 ```
 

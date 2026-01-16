@@ -153,10 +153,10 @@ Tests are "false green" - they pass but don't verify the documented architecture
 ### Root Cause
 
 `WebhookProcessingService` was implemented with legacy direct-DB approach:
-- Finds order by `osc_payment_transaction` or `oxorder.OXTRANSID`
-- Updates `osc_payment_order_state` directly
+- Finds order by `oe_payments_transaction` or `oxorder.OXTRANSID`
+- Updates `oe_payments_order_state` directly
 - Updates `oxorder` via SQL
-- **NEVER touches osc_payment_contract!**
+- **NEVER touches oe_payments_contract!**
 
 ### Impact
 

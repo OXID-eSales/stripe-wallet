@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
+namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
@@ -12,9 +12,9 @@ use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\Event\Payment\PaymentAuthorizedEvent;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutReturnServiceInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\DeliveryAddressHashServiceInterface;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
+use OxidEsales\Payments\Stripe\Service\CheckoutReturnServiceInterface;
+use OxidEsales\Payments\Stripe\Service\DeliveryAddressHashServiceInterface;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -249,7 +249,7 @@ class StripeCheckoutReturnHandler implements HandlerInterface
     }
 
     private function dispatchPaymentEvent(
-        \OxidSolutionCatalysts\Payments\Stripe\DTO\CheckoutReturnResult $result,
+        \OxidEsales\Payments\Stripe\DTO\CheckoutReturnResult $result,
         EventContext $context
     ): void {
         $paymentIntentId = $result->getPaymentIntentId() ?? '';
@@ -303,7 +303,7 @@ class StripeCheckoutReturnHandler implements HandlerInterface
      */
     private function handleRequiresCaptureStatus(
         PaymentContractInterface $contract,
-        \OxidSolutionCatalysts\Payments\Stripe\DTO\CheckoutReturnResult $result,
+        \OxidEsales\Payments\Stripe\DTO\CheckoutReturnResult $result,
         EventContext $context
     ): void {
         $paymentIntentId = $result->getPaymentIntentId() ?? '';

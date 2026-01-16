@@ -36,7 +36,7 @@
 ### Goals for Sprint 1 Database Work
 
 **Primary Objectives:**
-1. ✅ Create **contract table** as primary entity (`osc_payment_contract`)
+1. ✅ Create **contract table** as primary entity (`oe_payments_contract`)
 2. ✅ Enhance existing tables with contract FK (`OXCONTRACTID`)
 3. ✅ Implement contract domain models (PaymentContract, ContractCondition, BasketSnapshot)
 4. ✅ Build contract-aware repository layer with full test coverage
@@ -171,30 +171,30 @@ class PaymentContractMigrationTest extends IntegrationTestCase
         $this->runMigration('001_create_payment_contract_table.sql');
 
         // Assert - Table exists
-        $this->assertTableExists('osc_payment_contract');
+        $this->assertTableExists('oe_payments_contract');
 
         // Assert - Core columns
-        $this->assertColumnExists('osc_payment_contract', 'OXID');
-        $this->assertColumnExists('osc_payment_contract', 'OXUSERID');
-        $this->assertColumnExists('osc_payment_contract', 'OXORDERID');
-        $this->assertColumnExists('osc_payment_contract', 'OXSTATE');
-        $this->assertColumnExists('osc_payment_contract', 'OXBASKETDATA');
-        $this->assertColumnExists('osc_payment_contract', 'OXCONDITIONS');
-        $this->assertColumnExists('osc_payment_contract', 'OXPROVIDERORDERID');
+        $this->assertColumnExists('oe_payments_contract', 'OXID');
+        $this->assertColumnExists('oe_payments_contract', 'OXUSERID');
+        $this->assertColumnExists('oe_payments_contract', 'OXORDERID');
+        $this->assertColumnExists('oe_payments_contract', 'OXSTATE');
+        $this->assertColumnExists('oe_payments_contract', 'OXBASKETDATA');
+        $this->assertColumnExists('oe_payments_contract', 'OXCONDITIONS');
+        $this->assertColumnExists('oe_payments_contract', 'OXPROVIDERORDERID');
 
         // Assert - Column types
-        $this->assertColumnType('osc_payment_contract', 'OXID', 'CHAR', 32);
-        $this->assertColumnType('osc_payment_contract', 'OXBASKETDATA', 'JSON');
-        $this->assertColumnType('osc_payment_contract', 'OXCONDITIONS', 'JSON');
+        $this->assertColumnType('oe_payments_contract', 'OXID', 'CHAR', 32);
+        $this->assertColumnType('oe_payments_contract', 'OXBASKETDATA', 'JSON');
+        $this->assertColumnType('oe_payments_contract', 'OXCONDITIONS', 'JSON');
 
         // Assert - Primary key
-        $this->assertPrimaryKeyExists('osc_payment_contract', 'OXID');
+        $this->assertPrimaryKeyExists('oe_payments_contract', 'OXID');
 
         // Assert - Indexes
-        $this->assertIndexExists('osc_payment_contract', 'IDX_STATE');
-        $this->assertIndexExists('osc_payment_contract', 'IDX_USER');
-        $this->assertIndexExists('osc_payment_contract', 'IDX_ORDER');
-        $this->assertIndexExists('osc_payment_contract', 'IDX_PROVIDER_ORDER');
+        $this->assertIndexExists('oe_payments_contract', 'IDX_STATE');
+        $this->assertIndexExists('oe_payments_contract', 'IDX_USER');
+        $this->assertIndexExists('oe_payments_contract', 'IDX_ORDER');
+        $this->assertIndexExists('oe_payments_contract', 'IDX_PROVIDER_ORDER');
     }
 
     /** @test */
@@ -204,7 +204,7 @@ class PaymentContractMigrationTest extends IntegrationTestCase
 
         // FK to oxuser
         $this->assertForeignKeyExists(
-            'osc_payment_contract',
+            'oe_payments_contract',
             'FK_CONTRACT_USER',
             'OXUSERID',
             'oxuser',
@@ -213,7 +213,7 @@ class PaymentContractMigrationTest extends IntegrationTestCase
 
         // FK to oxorder (NULL until committed!)
         $this->assertForeignKeyExists(
-            'osc_payment_contract',
+            'oe_payments_contract',
             'FK_CONTRACT_ORDER',
             'OXORDERID',
             'oxorder',
@@ -221,8 +221,8 @@ class PaymentContractMigrationTest extends IntegrationTestCase
         );
 
         // FK behavior
-        $this->assertForeignKeyOnDelete('osc_payment_contract', 'FK_CONTRACT_USER', 'CASCADE');
-        $this->assertForeignKeyOnDelete('osc_payment_contract', 'FK_CONTRACT_ORDER', 'SET NULL');
+        $this->assertForeignKeyOnDelete('oe_payments_contract', 'FK_CONTRACT_USER', 'CASCADE');
+        $this->assertForeignKeyOnDelete('oe_payments_contract', 'FK_CONTRACT_ORDER', 'SET NULL');
     }
 
     /** @test */
@@ -244,7 +244,7 @@ class PaymentContractMigrationTest extends IntegrationTestCase
         ]);
 
         // Assert contract created
-        $this->assertDatabaseHas('osc_payment_contract', [
+        $this->assertDatabaseHas('oe_payments_contract', [
             'OXID' => 'contract-123',
             'OXUSERID' => 'user-123',
             'OXORDERID' => null  // NULL!
@@ -275,7 +275,7 @@ class PaymentContractMigrationTest extends IntegrationTestCase
         ]);
 
         // Assert order linked
-        $this->assertDatabaseHas('osc_payment_contract', [
+        $this->assertDatabaseHas('oe_payments_contract', [
             'OXID' => 'contract-123',
             'OXORDERID' => 'order-123',
             'OXSTATE' => 'committed'
@@ -301,7 +301,7 @@ class PaymentContractMigrationTest extends IntegrationTestCase
         $this->deleteUser('user-123');
 
         // Contract should be cascade deleted
-        $this->assertDatabaseNotHas('osc_payment_contract', ['OXID' => 'contract-123']);
+        $this->assertDatabaseNotHas('oe_payments_contract', ['OXID' => 'contract-123']);
     }
 
     /** @test */
@@ -325,7 +325,7 @@ class PaymentContractMigrationTest extends IntegrationTestCase
         $this->deleteOrder('order-123');
 
         // Contract still exists but OXORDERID set to NULL
-        $this->assertDatabaseHas('osc_payment_contract', [
+        $this->assertDatabaseHas('oe_payments_contract', [
             'OXID' => 'contract-123',
             'OXORDERID' => null  // SET NULL!
         ]);
@@ -338,7 +338,7 @@ class PaymentContractMigrationTest extends IntegrationTestCase
 ```sql
 -- migration/001_create_payment_contract_table.sql
 
-CREATE TABLE IF NOT EXISTS osc_payment_contract (
+CREATE TABLE IF NOT EXISTS oe_payments_contract (
     -- Primary key
     OXID CHAR(32) NOT NULL PRIMARY KEY COMMENT 'Contract ID (UUID)',
 
@@ -441,7 +441,7 @@ class ContractLifecycleTest extends IntegrationTestCase
             'OXEXPIRESAT' => date('Y-m-d H:i:s', strtotime('+24 hours'))
         ]);
 
-        $this->assertDatabaseHas('osc_payment_contract', [
+        $this->assertDatabaseHas('oe_payments_contract', [
             'OXID' => 'contract-123',
             'OXSTATE' => 'draft',
             'OXORDERID' => null
@@ -455,7 +455,7 @@ class ContractLifecycleTest extends IntegrationTestCase
 
         $this->updateContract($contract['OXID'], ['OXSTATE' => 'pending']);
 
-        $this->assertDatabaseHas('osc_payment_contract', [
+        $this->assertDatabaseHas('oe_payments_contract', [
             'OXID' => $contract['OXID'],
             'OXSTATE' => 'pending'
         ]);
@@ -555,7 +555,7 @@ class ContractLifecycleTest extends IntegrationTestCase
         // All conditions met → ready_to_commit
         $this->updateContract($contract['OXID'], ['OXSTATE' => 'ready_to_commit']);
 
-        $this->assertDatabaseHas('osc_payment_contract', [
+        $this->assertDatabaseHas('oe_payments_contract', [
             'OXID' => $contract['OXID'],
             'OXSTATE' => 'ready_to_commit'
         ]);
@@ -584,7 +584,7 @@ class ContractLifecycleTest extends IntegrationTestCase
             'OXCOMMITTEDAT' => date('Y-m-d H:i:s')
         ]);
 
-        $this->assertDatabaseHas('osc_payment_contract', [
+        $this->assertDatabaseHas('oe_payments_contract', [
             'OXID' => $contract['OXID'],
             'OXSTATE' => 'committed',
             'OXORDERID' => 'order-123'
@@ -608,7 +608,7 @@ class ContractLifecycleTest extends IntegrationTestCase
             'OXFULFILLEDAT' => date('Y-m-d H:i:s')
         ]);
 
-        $this->assertDatabaseHas('osc_payment_contract', [
+        $this->assertDatabaseHas('oe_payments_contract', [
             'OXID' => $contract['OXID'],
             'OXSTATE' => 'fulfilled'
         ]);
@@ -627,7 +627,7 @@ class ContractLifecycleTest extends IntegrationTestCase
             'OXSTATEREASON' => 'Customer cancelled checkout'
         ]);
 
-        $this->assertDatabaseHas('osc_payment_contract', [
+        $this->assertDatabaseHas('oe_payments_contract', [
             'OXID' => $contract['OXID'],
             'OXSTATE' => 'cancelled'
         ]);
@@ -643,7 +643,7 @@ class ContractLifecycleTest extends IntegrationTestCase
 
         // Query expired contracts
         $expired = $this->db->query("
-            SELECT * FROM osc_payment_contract
+            SELECT * FROM oe_payments_contract
             WHERE OXSTATE IN ('draft', 'pending')
             AND OXEXPIRESAT < NOW()
         ")->fetchAll();
@@ -676,7 +676,7 @@ class ContractLifecycleTest extends IntegrationTestCase
             'OXSTATEREASON' => 'Fraud check failed'
         ]);
 
-        $this->assertDatabaseHas('osc_payment_contract', [
+        $this->assertDatabaseHas('oe_payments_contract', [
             'OXID' => $contract['OXID'],
             'OXSTATE' => 'failed',
             'OXSTATEREASON' => 'Fraud check failed'
@@ -692,7 +692,7 @@ class ContractLifecycleTest extends IntegrationTestCase
             'OXPROVIDERORDERID' => 'pi_stripe_123456'
         ]);
 
-        $this->assertDatabaseHas('osc_payment_contract', [
+        $this->assertDatabaseHas('oe_payments_contract', [
             'OXID' => $contract['OXID'],
             'OXPROVIDERORDERID' => 'pi_stripe_123456'
         ]);
@@ -736,7 +736,7 @@ class ContractLifecycleTest extends IntegrationTestCase
         $contract2 = $this->createTestContract(['OXUSERID' => $userId, 'OXSTATE' => 'pending']);
 
         $contracts = $this->db->query("
-            SELECT * FROM osc_payment_contract WHERE OXUSERID = ?
+            SELECT * FROM oe_payments_contract WHERE OXUSERID = ?
         ", [$userId])->fetchAll();
 
         $this->assertCount(2, $contracts);
@@ -887,7 +887,7 @@ class ContractConditionsTest extends IntegrationTestCase
         // Can transition to ready_to_commit even though optional condition pending
         $this->updateContract($contract['OXID'], ['OXSTATE' => 'ready_to_commit']);
 
-        $this->assertDatabaseHas('osc_payment_contract', [
+        $this->assertDatabaseHas('oe_payments_contract', [
             'OXID' => $contract['OXID'],
             'OXSTATE' => 'ready_to_commit'
         ]);
@@ -998,7 +998,7 @@ class PaymentContractRepositoryTest extends IntegrationTestCase
         $this->repository->save($contract);
 
         $this->assertNotNull($contract->getId());
-        $this->assertDatabaseHas('osc_payment_contract', [
+        $this->assertDatabaseHas('oe_payments_contract', [
             'OXID' => $contract->getId(),
             'OXUSERID' => 'user-123',
             'OXSTATE' => 'draft'
@@ -1071,7 +1071,7 @@ class PaymentContractRepositoryTest extends IntegrationTestCase
 
         $this->repository->save($found);
 
-        $this->assertDatabaseHas('osc_payment_contract', [
+        $this->assertDatabaseHas('oe_payments_contract', [
             'OXID' => $contract['OXID'],
             'OXSTATE' => 'ready_to_commit'
         ]);
@@ -1114,7 +1114,7 @@ class PaymentContractRepositoryTest extends IntegrationTestCase
 
         $this->repository->save($found);
 
-        $this->assertDatabaseHas('osc_payment_contract', [
+        $this->assertDatabaseHas('oe_payments_contract', [
             'OXID' => $contract['OXID'],
             'OXSTATE' => 'committed',
             'OXORDERID' => $orderId
@@ -1170,29 +1170,29 @@ class PaymentTransactionMigrationTest extends IntegrationTestCase
         $this->runMigration('001_create_payment_transaction_table.sql');
 
         // Assert - Table exists
-        $this->assertTableExists('osc_payment_transaction');
+        $this->assertTableExists('oe_payments_transaction');
 
         // Assert - Required columns exist
-        $this->assertColumnExists('osc_payment_transaction', 'OXID');
-        $this->assertColumnExists('osc_payment_transaction', 'OXSHOPID');
-        $this->assertColumnExists('osc_payment_transaction', 'OXORDERID');
-        $this->assertColumnExists('osc_payment_transaction', 'OXPROVIDER');
-        $this->assertColumnExists('osc_payment_transaction', 'OXTYPE');
-        $this->assertColumnExists('osc_payment_transaction', 'OXSTATUS');
-        $this->assertColumnExists('osc_payment_transaction', 'OXAMOUNT');
-        $this->assertColumnExists('osc_payment_transaction', 'OXCURRENCY');
+        $this->assertColumnExists('oe_payments_transaction', 'OXID');
+        $this->assertColumnExists('oe_payments_transaction', 'OXSHOPID');
+        $this->assertColumnExists('oe_payments_transaction', 'OXORDERID');
+        $this->assertColumnExists('oe_payments_transaction', 'OXPROVIDER');
+        $this->assertColumnExists('oe_payments_transaction', 'OXTYPE');
+        $this->assertColumnExists('oe_payments_transaction', 'OXSTATUS');
+        $this->assertColumnExists('oe_payments_transaction', 'OXAMOUNT');
+        $this->assertColumnExists('oe_payments_transaction', 'OXCURRENCY');
 
         // Assert - Column types correct
-        $this->assertColumnType('osc_payment_transaction', 'OXID', 'CHAR', 32);
-        $this->assertColumnType('osc_payment_transaction', 'OXAMOUNT', 'DECIMAL', [10, 2]);
+        $this->assertColumnType('oe_payments_transaction', 'OXID', 'CHAR', 32);
+        $this->assertColumnType('oe_payments_transaction', 'OXAMOUNT', 'DECIMAL', [10, 2]);
 
         // Assert - Primary key exists
-        $this->assertPrimaryKeyExists('osc_payment_transaction', 'OXID');
+        $this->assertPrimaryKeyExists('oe_payments_transaction', 'OXID');
 
         // Assert - Indexes exist
-        $this->assertIndexExists('osc_payment_transaction', 'IDX_ORDER');
-        $this->assertIndexExists('osc_payment_transaction', 'IDX_PROVIDER_ORDER');
-        $this->assertIndexExists('osc_payment_transaction', 'IDX_TYPE_STATUS');
+        $this->assertIndexExists('oe_payments_transaction', 'IDX_ORDER');
+        $this->assertIndexExists('oe_payments_transaction', 'IDX_PROVIDER_ORDER');
+        $this->assertIndexExists('oe_payments_transaction', 'IDX_TYPE_STATUS');
     }
 
     /** @test */
@@ -1203,7 +1203,7 @@ class PaymentTransactionMigrationTest extends IntegrationTestCase
 
         // Assert - FK exists
         $this->assertForeignKeyExists(
-            'osc_payment_transaction',
+            'oe_payments_transaction',
             'FK_ORDER',
             'OXORDERID',
             'oxorder',
@@ -1211,7 +1211,7 @@ class PaymentTransactionMigrationTest extends IntegrationTestCase
         );
 
         // Assert - FK has correct ON DELETE CASCADE
-        $this->assertForeignKeyOnDelete('osc_payment_transaction', 'FK_ORDER', 'CASCADE');
+        $this->assertForeignKeyOnDelete('oe_payments_transaction', 'FK_ORDER', 'CASCADE');
     }
 
     /** @test */
@@ -1245,7 +1245,7 @@ class PaymentTransactionMigrationTest extends IntegrationTestCase
 ```sql
 -- migration/001_create_payment_transaction_table.sql
 
-CREATE TABLE IF NOT EXISTS osc_payment_transaction (
+CREATE TABLE IF NOT EXISTS oe_payments_transaction (
     OXID CHAR(32) NOT NULL PRIMARY KEY COMMENT 'Primary key',
     OXSHOPID INT(11) NOT NULL COMMENT 'Shop ID',
     OXORDERID CHAR(32) NOT NULL COMMENT 'FK to oxorder.OXID',
@@ -1285,7 +1285,7 @@ CREATE TABLE IF NOT EXISTS osc_payment_transaction (
         ON DELETE CASCADE,
 
     FOREIGN KEY FK_PARENT_TX (OXPARENTTRANSACTIONID)
-        REFERENCES osc_payment_transaction(OXID)
+        REFERENCES oe_payments_transaction(OXID)
         ON DELETE SET NULL
 
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -1999,7 +1999,7 @@ class PaymentTransactionRepositoryTest extends IntegrationTestCase
 
         // Assert
         $this->assertNotNull($transaction->getId());
-        $this->assertDatabaseHas('osc_payment_transaction', [
+        $this->assertDatabaseHas('oe_payments_transaction', [
             'OXID' => $transaction->getId(),
             'OXORDERID' => $orderId,
             'OXPROVIDERORDERID' => 'pi_123'
@@ -2157,7 +2157,7 @@ final class PaymentTransactionRepository implements PaymentTransactionRepository
 
     public function findById(string $id): ?PaymentTransaction
     {
-        $sql = "SELECT * FROM osc_payment_transaction WHERE OXID = :id";
+        $sql = "SELECT * FROM oe_payments_transaction WHERE OXID = :id";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['id' => $id]);
@@ -2170,7 +2170,7 @@ final class PaymentTransactionRepository implements PaymentTransactionRepository
     public function findAllByOrderId(string $orderId): array
     {
         $sql = "
-            SELECT * FROM osc_payment_transaction
+            SELECT * FROM oe_payments_transaction
             WHERE OXORDERID = :orderId
             ORDER BY OXCREATED ASC
         ";
@@ -2188,7 +2188,7 @@ final class PaymentTransactionRepository implements PaymentTransactionRepository
 
     public function findByProviderOrderId(string $providerOrderId): ?PaymentTransaction
     {
-        $sql = "SELECT * FROM osc_payment_transaction WHERE OXPROVIDERORDERID = :providerOrderId";
+        $sql = "SELECT * FROM oe_payments_transaction WHERE OXPROVIDERORDERID = :providerOrderId";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['providerOrderId' => $providerOrderId]);
@@ -2204,7 +2204,7 @@ final class PaymentTransactionRepository implements PaymentTransactionRepository
         $now = new \DateTimeImmutable();
 
         $sql = "
-            INSERT INTO osc_payment_transaction (
+            INSERT INTO oe_payments_transaction (
                 OXID, OXSHOPID, OXORDERID, OXPROVIDER, OXPROVIDERORDERID,
                 OXTRANSACTIONID, OXTYPE, OXSTATUS, OXAMOUNT, OXCURRENCY,
                 OXPAYMENTMETHODID, OXPAYMENTMETHODTYPE, OXPARENTTRANSACTIONID,
@@ -2243,7 +2243,7 @@ final class PaymentTransactionRepository implements PaymentTransactionRepository
     private function update(PaymentTransaction $transaction): void
     {
         $sql = "
-            UPDATE osc_payment_transaction
+            UPDATE oe_payments_transaction
             SET
                 OXTRANSACTIONID = :transactionId,
                 OXSTATUS = :status,
@@ -2371,7 +2371,7 @@ vendor/bin/phpunit --filter it_finds_transaction_by_provider_order_id
 ```php
 public function findByProviderOrderId(string $providerOrderId): ?PaymentTransaction
 {
-    $sql = "SELECT * FROM osc_payment_transaction WHERE OXPROVIDERORDERID = :providerOrderId";
+    $sql = "SELECT * FROM oe_payments_transaction WHERE OXPROVIDERORDERID = :providerOrderId";
 
     $stmt = $this->db->prepare($sql);
     $stmt->execute(['providerOrderId' => $providerOrderId]);
@@ -2396,7 +2396,7 @@ vendor/bin/phpunit --filter it_finds_transaction_by_provider_order_id
 public function findByProviderOrderId(string $providerOrderId): ?PaymentTransaction
 {
     // Uses IDX_PROVIDER_ORDER index for fast lookup
-    $sql = "SELECT * FROM osc_payment_transaction WHERE OXPROVIDERORDERID = :providerOrderId";
+    $sql = "SELECT * FROM oe_payments_transaction WHERE OXPROVIDERORDERID = :providerOrderId";
 
     $stmt = $this->db->prepare($sql);
     $stmt->execute(['providerOrderId' => $providerOrderId]);
@@ -2426,10 +2426,10 @@ vendor/bin/phpunit
 /** @test */
 public function table_has_correct_schema(): void
 {
-    $this->assertTableExists('osc_payment_transaction');
-    $this->assertColumnExists('osc_payment_transaction', 'OXID');
-    $this->assertColumnType('osc_payment_transaction', 'OXAMOUNT', 'DECIMAL', [10, 2]);
-    $this->assertPrimaryKeyExists('osc_payment_transaction', 'OXID');
+    $this->assertTableExists('oe_payments_transaction');
+    $this->assertColumnExists('oe_payments_transaction', 'OXID');
+    $this->assertColumnType('oe_payments_transaction', 'OXAMOUNT', 'DECIMAL', [10, 2]);
+    $this->assertPrimaryKeyExists('oe_payments_transaction', 'OXID');
 }
 ```
 
@@ -2480,7 +2480,7 @@ public function concurrent_updates_use_pessimistic_locking(): void
 
 ### Phase 0: Smart Contract Tables (Week 1, Day 1) - **CRITICAL FIRST!**
 
-- [ ] **Migration 001: osc_payment_contract (PRIMARY TABLE)**
+- [ ] **Migration 001: oe_payments_contract (PRIMARY TABLE)**
   - [ ] Write contract table migration test
   - [ ] Create contract table migration SQL
   - [ ] Test FK to oxuser (CASCADE)
@@ -2526,28 +2526,28 @@ public function concurrent_updates_use_pessimistic_locking(): void
 
 ### Phase 1: Core Tables (Week 1, Day 2)
 
-- [ ] **Migration 002: osc_payment_transaction (Enhanced with OXCONTRACTID FK)**
+- [ ] **Migration 002: oe_payments_transaction (Enhanced with OXCONTRACTID FK)**
   - [ ] Write migration test
   - [ ] Create migration SQL
   - [ ] Test FK to oxorder (CASCADE)
-  - [ ] **Test FK to osc_payment_contract (NEW!)**
+  - [ ] **Test FK to oe_payments_contract (NEW!)**
   - [ ] Test indexes work correctly
   - [ ] Verify 100% test pass
 
-- [ ] **Migration 002: osc_payment_authorization_details**
+- [ ] **Migration 002: oe_payments_authorization_details**
   - [ ] Write migration test
   - [ ] Create migration SQL
-  - [ ] Test FK to osc_payment_transaction
+  - [ ] Test FK to oe_payments_transaction
   - [ ] Test computed columns (OXISEXPIRED)
   - [ ] Verify 100% test pass
 
-- [ ] **Migration 003: osc_payment_3ds_details**
+- [ ] **Migration 003: oe_payments_3ds_details**
   - [ ] Write migration test
   - [ ] Create migration SQL
   - [ ] Test 1:1 relationship with transaction
   - [ ] Verify 100% test pass
 
-- [ ] **Migration 004: osc_payment_refund_details**
+- [ ] **Migration 004: oe_payments_refund_details**
   - [ ] Write migration test
   - [ ] Create migration SQL
   - [ ] Test 1:1 relationship
@@ -2555,20 +2555,20 @@ public function concurrent_updates_use_pessimistic_locking(): void
 
 ### Phase 2: Support Tables (Week 1, Days 3-4)
 
-- [ ] **Migration 007: osc_payment_order_state**
+- [ ] **Migration 007: oe_payments_order_state**
   - [ ] Write migration test
   - [ ] Create migration SQL
   - [ ] Test 1:1 relationship with oxorder (UNIQUE on OXORDERID)
   - [ ] Test state transitions
   - [ ] Verify 100% test pass
 
-- [ ] **Migration 008: osc_payment_customer**
+- [ ] **Migration 008: oe_payments_customer**
   - [ ] Write migration test
   - [ ] Create migration SQL
   - [ ] Test 1:1 relationship with oxuser
   - [ ] Verify 100% test pass
 
-- [ ] **Migration 009: osc_payment_idempotency**
+- [ ] **Migration 009: oe_payments_idempotency**
   - [ ] Write migration test
   - [ ] Create migration SQL
   - [ ] Test UNIQUE constraint on OXKEY

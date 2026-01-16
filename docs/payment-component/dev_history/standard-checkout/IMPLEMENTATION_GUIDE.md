@@ -251,8 +251,8 @@ $aModule = [
 ### Important: Component Reuse Strategy ⚠️
 
 **Standard checkout REUSES Component tables** to avoid duplication and ensure consistency:
-- ✅ **REUSE:** `osc_payment_transaction` (Component table for all providers)
-- ❌ **SKIP:** `osc_payment_contract` (not used in standard checkout)
+- ✅ **REUSE:** `oe_payments_transaction` (Component table for all providers)
+- ❌ **SKIP:** `oe_payments_contract` (not used in standard checkout)
 - ➕ **CREATE:** Stripe-specific tables only
 
 See [COMPONENT_REUSE_STRATEGY.md](COMPONENT_REUSE_STRATEGY.md) for details.
@@ -268,7 +268,7 @@ Create file: `migrations/001_create_payment_tables.sql`
 -- Component Transaction Table (Provider-Agnostic)
 -- ✅ REUSES Component table structure
 -- ========================================
-CREATE TABLE IF NOT EXISTS `osc_payment_transaction` (
+CREATE TABLE IF NOT EXISTS `oe_payments_transaction` (
     `OXID` CHAR(32) NOT NULL COMMENT 'Transaction ID',
     `OXSHOPID` INT(11) NOT NULL DEFAULT 1 COMMENT 'Shop ID',
     `OXORDERID` CHAR(32) NOT NULL COMMENT 'Order ID (FK to oxorder)',
@@ -317,7 +317,7 @@ CREATE TABLE IF NOT EXISTS `osc_payment_transaction` (
 -- ========================================
 CREATE TABLE IF NOT EXISTS `osc_stripe_payment_details` (
     `OXID` CHAR(32) NOT NULL COMMENT 'Primary key',
-    `OXTRANSACTIONID` CHAR(32) NOT NULL COMMENT 'FK: osc_payment_transaction.OXID',
+    `OXTRANSACTIONID` CHAR(32) NOT NULL COMMENT 'FK: oe_payments_transaction.OXID',
 
     -- Card Details
     `OXCARDLAST4` VARCHAR(4) NULL COMMENT 'Last 4 digits of card',
@@ -348,14 +348,14 @@ CREATE TABLE IF NOT EXISTS `osc_stripe_payment_details` (
 
     CONSTRAINT `FK_DETAILS_TRANSACTION`
         FOREIGN KEY (`OXTRANSACTIONID`)
-        REFERENCES `osc_payment_transaction` (`OXID`)
+        REFERENCES `oe_payments_transaction` (`OXID`)
         ON DELETE CASCADE
 
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Stripe-specific payment details';
 
 -- ========================================
 -- Stripe Customer Mapping
--- ➕ RENAMED: osc_payment_customer → osc_stripe_customer_mapping
+-- ➕ RENAMED: oe_payments_customer → osc_stripe_customer_mapping
 -- ========================================
 CREATE TABLE IF NOT EXISTS `osc_stripe_customer_mapping` (
     `OXID` CHAR(32) NOT NULL COMMENT 'Primary key',
@@ -382,7 +382,7 @@ CREATE TABLE IF NOT EXISTS `osc_stripe_customer_mapping` (
 -- ========================================
 -- Payment Order State (Standard Checkout)
 -- ========================================
-CREATE TABLE IF NOT EXISTS `osc_payment_order_state` (
+CREATE TABLE IF NOT EXISTS `oe_payments_order_state` (
     `OXID` CHAR(32) NOT NULL COMMENT 'State ID',
     `OXSHOPID` INT(11) NOT NULL DEFAULT 1 COMMENT 'Shop ID',
     `OXORDERID` CHAR(32) NOT NULL COMMENT 'Order ID (FK to oxorder) - UNIQUE',
@@ -425,7 +425,7 @@ CREATE TABLE IF NOT EXISTS `osc_payment_order_state` (
 -- ========================================
 -- Webhook Log (Shared across providers)
 -- ========================================
-CREATE TABLE IF NOT EXISTS `osc_payment_webhook_log` (
+CREATE TABLE IF NOT EXISTS `oe_payments_webhook_log` (
     `OXID` CHAR(32) NOT NULL COMMENT 'Log ID',
     `OXSHOPID` INT(11) NOT NULL DEFAULT 1 COMMENT 'Shop ID',
     `OXEVENTID` VARCHAR(255) NOT NULL COMMENT 'Webhook event ID (idempotency)',
@@ -468,14 +468,14 @@ mysql -u [username] -p [database_name] < migrations/001_create_payment_tables.sq
 SHOW TABLES LIKE 'osc_%';
 
 -- Should return:
--- osc_payment_transaction (Component)
+-- oe_payments_transaction (Component)
 -- osc_stripe_payment_details (Stripe-specific)
 -- osc_stripe_customer_mapping (Stripe-specific)
--- osc_payment_order_state (Standard checkout)
--- osc_payment_webhook_log (Shared)
+-- oe_payments_order_state (Standard checkout)
+-- oe_payments_webhook_log (Shared)
 
 -- Verify Component-compatible transaction table
-DESCRIBE osc_payment_transaction;
+DESCRIBE oe_payments_transaction;
 -- Must have: OXSHOPID, OXCONTRACTID, OXPAYMENTMETHODID, OXPAYMENTMETHODTYPE, OXPARENTTRANSACTIONID
 
 -- Verify Stripe details table
@@ -492,7 +492,7 @@ DESCRIBE osc_stripe_payment_details;
 │                    Component Layer                          │
 ├────────────────────────────────────────────────────────────┤
 │                                                             │
-│  osc_payment_transaction (Component - Provider-Agnostic)   │
+│  oe_payments_transaction (Component - Provider-Agnostic)   │
 │  ├─ OXID (PK)                                              │
 │  ├─ OXORDERID → oxorder.OXID (FK)                          │
 │  ├─ OXCONTRACTID (NULL for standard checkout)              │
@@ -507,7 +507,7 @@ DESCRIBE osc_stripe_payment_details;
 ├────────────────────────────────────────────────────────────┤
 │                                                             │
 │  osc_stripe_payment_details (Stripe-specific)              │
-│  ├─ OXTRANSACTIONID → osc_payment_transaction.OXID (FK)   │
+│  ├─ OXTRANSACTIONID → oe_payments_transaction.OXID (FK)   │
 │  ├─ OXCARDLAST4                                            │
 │  ├─ OX3DSECURE                                             │
 │  └─ OXRISKSCORE                                            │
@@ -611,10 +611,10 @@ class Events
 
         // Check if tables exist
         $tables = [
-            'osc_payment_transaction',
-            'osc_payment_order_state',
-            'osc_payment_customer',
-            'osc_payment_webhook_log',
+            'oe_payments_transaction',
+            'oe_payments_order_state',
+            'oe_payments_customer',
+            'oe_payments_webhook_log',
         ];
 
         foreach ($tables as $table) {
@@ -766,7 +766,7 @@ class PaymentTransaction extends BaseModel
     public function __construct()
     {
         parent::__construct();
-        $this->init('osc_payment_transaction');
+        $this->init('oe_payments_transaction');
     }
 
     /**

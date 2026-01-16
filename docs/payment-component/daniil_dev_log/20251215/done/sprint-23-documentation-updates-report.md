@@ -10,7 +10,7 @@
 
 Sprint 23 updated architecture documentation to reflect changes from Sprints 15-22, including:
 - Complete contract lifecycle states
-- Deprecated `osc_payment_order_state` table references
+- Deprecated `oe_payments_order_state` table references
 - New service catalog document
 
 ---
@@ -33,10 +33,10 @@ Sprint 23 updated architecture documentation to reflect changes from Sprints 15-
 
 ```markdown
 # Before
-- **osc_payment_order_state**: Payment lifecycle state (enhanced with OXCONTRACTID)
+- **oe_payments_order_state**: Payment lifecycle state (enhanced with OXCONTRACTID)
 
 # After
-- ~~**osc_payment_order_state**~~: DEPRECATED - payment state consolidated into osc_payment_contract
+- ~~**oe_payments_order_state**~~: DEPRECATED - payment state consolidated into oe_payments_contract
 ```
 
 ### 2. 01-architecture-layers.md
@@ -56,10 +56,10 @@ Sprint 23 updated architecture documentation to reflect changes from Sprints 15-
 **Deprecation Notice Added:**
 
 ```markdown
-### Table 8: osc_payment_order_state (DEPRECATED)
+### Table 8: oe_payments_order_state (DEPRECATED)
 
 > **DEPRECATED (Sprint 8, December 2025):** This table has been removed from the implementation.
-> Payment state tracking is now consolidated in `osc_payment_contract` with the following fields:
+> Payment state tracking is now consolidated in `oe_payments_contract` with the following fields:
 > - `OXCAPTUREDAMOUNT` - Amount captured
 > - `OXREFUNDEDAMOUNT` - Amount refunded
 > - `OXCAPTUREDAT` - Capture timestamp
@@ -116,7 +116,7 @@ Created comprehensive service catalog documenting:
 
 ## Remaining Documentation Tasks
 
-The following documents still contain `osc_payment_order_state` references but were not updated (low priority):
+The following documents still contain `oe_payments_order_state` references but were not updated (low priority):
 
 - `03-building-payment-modules.md` (line 140, 618)
 - `09-02-tdd-data-persistence.md` (lines 30-31)
@@ -140,7 +140,7 @@ These are in historical/reference sections and can be updated in a future sprint
 
 - CODE_REVIEW.md Section 5 (Documentation Updates Required) - **ADDRESSED**
 - CODE_REVIEW.md Section 1.3 (Contract State Machine Outdated) - **ADDRESSED**
-- CODE_REVIEW.md Section 1.8 (osc_payment_order_state Status) - **ADDRESSED**
+- CODE_REVIEW.md Section 1.8 (oe_payments_order_state Status) - **ADDRESSED**
 
 ---
 

@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Order;
+namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Order;
 
 use Doctrine\DBAL\Connection;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
@@ -27,7 +27,7 @@ use OxidEsales\PaymentComponent\Repository\DoctrineContractRepository;
  * - OXPAID: Payment completion timestamp
  * - OXFOLDER: Order folder for admin (ORDERFOLDER_NEW, ORDERFOLDER_PROBLEMS)
  *
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService
+ * @covers \OxidEsales\Payments\Stripe\Service\WebhookProcessingService
  * @group integration
  * @group order-fields
  * @group oxorder
@@ -576,7 +576,7 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
     private function cleanupTestData(): void
     {
         $this->connection->executeStatement(
-            "DELETE FROM osc_payment_contract WHERE OXID LIKE ?",
+            "DELETE FROM oe_payments_contract WHERE OXID LIKE ?",
             [self::TEST_PREFIX . '%']
         );
         $this->connection->executeStatement(

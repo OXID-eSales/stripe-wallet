@@ -530,7 +530,7 @@ private function updatePaymentOrderState(string $orderId, $paymentDetails): void
 {
     $db = DatabaseProvider::getDb();
 
-    $sql = "INSERT INTO osc_payment_order_state
+    $sql = "INSERT INTO oe_payments_order_state
             (OXID, OXORDERID, OXPAYMENTSTATE, OXPAYMENTMETHOD, OXCAPTURED,
              OXCAPTUREDAMOUNT, OXCAPTUREDAT, OXCREATED)
             VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
@@ -768,10 +768,10 @@ Run migrations to ensure these tables exist:
 
 ```sql
 -- Component transaction table
-osc_payment_transaction
+oe_payments_transaction
 
 -- Component order state table
-osc_payment_order_state
+oe_payments_order_state
 
 -- Stripe-specific details table
 osc_stripe_payment_details
@@ -861,8 +861,8 @@ vendor/bin/phpunit tests/Integration/Stripe/ --testdox
 - [ ] Check session → `stripe_payment_intent_id` stored
 - [ ] Check template → Client secret passed correctly
 - [ ] Complete payment → Order created successfully
-- [ ] Check database → Transaction stored in `osc_payment_transaction`
-- [ ] Check database → Order state in `osc_payment_order_state`
+- [ ] Check database → Transaction stored in `oe_payments_transaction`
+- [ ] Check database → Order state in `oe_payments_order_state`
 - [ ] Check database → Stripe details in `osc_stripe_payment_details`
 - [ ] Check logs → No errors, proper info messages
 - [ ] Test 3DS → Redirect to Stripe works

@@ -42,7 +42,7 @@
 ```
 
 **Implementation Order:**
-1. Add 3DS tracking fields to `osc_payment_transaction`:
+1. Add 3DS tracking fields to `oe_payments_transaction`:
    - `OXREQUIRES_ACTION` (boolean)
    - `OXACTION_URL` (3DS redirect URL)
    - `OXLIABILITY_SHIFTED` (boolean)
@@ -114,7 +114,7 @@
 ```
 
 **Implementation Order:**
-1. Add refund tracking fields to `osc_payment_transaction`:
+1. Add refund tracking fields to `oe_payments_transaction`:
    - `OXREFUNDED_AMOUNT` (total refunded amount)
    - `OXREFUNDABLE_AMOUNT` (remaining refundable amount)
    - `OXMAX_REFUND_AMOUNT` (provider-specific max with compensation)

@@ -7,10 +7,10 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Model;
+namespace OxidEsales\Payments\Stripe\Model;
 
 use OxidEsales\Eshop\Application\Model\Payment as CorePayment;
-use OxidSolutionCatalysts\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 
 /**
  * Extended OXID Payment Model with Stripe-specific methods.

@@ -7,14 +7,14 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Service;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
-use OxidSolutionCatalysts\Payments\Stripe\Service\ContractTokenService;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Service\ContractTokenService;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Service\ContractTokenService
+ * @covers \OxidEsales\Payments\Stripe\Service\ContractTokenService
  */
 class ContractTokenServiceTest extends TestCase
 {

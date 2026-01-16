@@ -13,8 +13,8 @@ Sprint 2 focused on cleaning up the database architecture by consolidating dupli
 ### Phase 1: Webhook Table Consolidation (18 tests)
 
 **Problem:** Two webhook tables existed:
-- `osc_payment_webhook_log` (Events.php)
-- `osc_payment_webhooklogs` (migration)
+- `oe_payments_webhook_log` (Events.php)
+- `oe_payments_webhooklogs` (migration)
 
 **Solution:**
 - Extended `WebhookLog` entity with `provider`, `payload`, `processedAt` fields
@@ -35,11 +35,11 @@ Sprint 2 focused on cleaning up the database architecture by consolidating dupli
 
 **Problem:** Two customer mapping tables existed:
 - `osc_stripe_customer_mapping` (Events.php - Stripe-specific)
-- `osc_payment_customer` (migration - provider-agnostic)
+- `oe_payments_customer` (migration - provider-agnostic)
 
 **Solution:**
 - Created `PaymentCustomerRepositoryInterface` (Component layer)
-- Created `DoctrinePaymentCustomerRepository` using `osc_payment_customer`
+- Created `DoctrinePaymentCustomerRepository` using `oe_payments_customer`
 - Updated `StripeCustomerService` to accept optional repository (backward compatible)
 
 **Files Created:**
@@ -71,9 +71,9 @@ Sprint 2 focused on cleaning up the database architecture by consolidating dupli
 
 **Solution:**
 - Removed `osc_stripe_customer_mapping` table creation
-- Removed `osc_payment_webhook_log` table creation
+- Removed `oe_payments_webhook_log` table creation
 - Removed `osc_stripe_payment_details` table creation
-- Kept `osc_payment_transaction` and `osc_payment_order_state` (intentional)
+- Kept `oe_payments_transaction` and `oe_payments_order_state` (intentional)
 
 **Files Modified:**
 - `src/Stripe/Core/Events.php`
@@ -85,7 +85,7 @@ Sprint 2 focused on cleaning up the database architecture by consolidating dupli
 
 **Solution:**
 - Created `Version20251202_Sprint2TableConsolidation.php` migration
-- Adds `OXPROVIDER`, `OXPAYLOAD`, `OXPROCESSEDAT` columns to `osc_payment_webhooklogs`
+- Adds `OXPROVIDER`, `OXPAYLOAD`, `OXPROCESSEDAT` columns to `oe_payments_webhooklogs`
 - Migrates data from legacy tables to consolidated tables
 - Drops redundant tables after migration
 
@@ -110,8 +110,8 @@ Sprint 2 focused on cleaning up the database architecture by consolidating dupli
 
 ```
 Component Layer (Provider-Agnostic):
-├── osc_payment_customer (replaces osc_stripe_customer_mapping)
-├── osc_payment_webhooklogs (with provider field)
+├── oe_payments_customer (replaces osc_stripe_customer_mapping)
+├── oe_payments_webhooklogs (with provider field)
 ├── PaymentCustomerRepositoryInterface
 ├── DoctrinePaymentCustomerRepository
 ├── WebhookLogRepositoryInterface
@@ -132,7 +132,7 @@ All services now depend on interfaces, not concrete implementations:
 ## Migration Notes
 
 After deploying, run the migration to:
-1. Add new columns to `osc_payment_webhooklogs`
+1. Add new columns to `oe_payments_webhooklogs`
 2. Migrate existing data from legacy tables
 3. Drop redundant tables
 

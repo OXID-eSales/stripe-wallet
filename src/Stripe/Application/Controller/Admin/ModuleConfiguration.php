@@ -7,19 +7,19 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Application\Controller\Admin;
+namespace OxidEsales\Payments\Stripe\Application\Controller\Admin;
 
 use OxidEsales\Eshop\Core\Registry;
-use OxidSolutionCatalysts\Payments\Stripe\Traits\ServiceContainer;
-use OxidSolutionCatalysts\Payments\Stripe\Module;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
+use OxidEsales\Payments\Stripe\Module;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
 
 class ModuleConfiguration extends ModuleConfiguration_parent
 {
     use ServiceContainer;
 
     /**
-     * @var \OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService
+     * @var \OxidEsales\Payments\Stripe\Service\ModuleConfigurationService
      */
     private ModuleConfigurationService $moduleConfig;
 

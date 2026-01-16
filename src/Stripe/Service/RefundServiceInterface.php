@@ -7,9 +7,9 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Service;
+namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidSolutionCatalysts\Payments\Stripe\DTO\RefundResult;
+use OxidEsales\Payments\Stripe\DTO\RefundResult;
 
 /**
  * Service interface for processing Stripe refunds.

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\EventFlow;
+namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\EventFlow;
 
 use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
 use OxidEsales\PaymentComponent\Contract\ContractCondition;
@@ -10,13 +10,13 @@ use OxidEsales\PaymentComponent\Contract\PaymentContract;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcher;
 use OxidEsales\PaymentComponent\Repository\ContractRepository;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ContractTokenService;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ReturnSessionSecurityService;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler;
+use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler;
+use OxidEsales\Payments\Stripe\Service\ContractTokenService;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Service\ReturnSessionSecurityService;
 use PHPUnit\Framework\TestCase;
 
 /**

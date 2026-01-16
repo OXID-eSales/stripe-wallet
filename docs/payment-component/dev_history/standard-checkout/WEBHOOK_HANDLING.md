@@ -371,7 +371,7 @@ class WebhookProcessingService
         $db = DatabaseProvider::getDb();
 
         $orderId = $db->getOne(
-            "SELECT OXORDERID FROM osc_payment_transaction WHERE OXPROVIDERORDERID = ?",
+            "SELECT OXORDERID FROM oe_payments_transaction WHERE OXPROVIDERORDERID = ?",
             [$paymentIntentId]
         );
 
@@ -396,7 +396,7 @@ class WebhookProcessingService
         $db = DatabaseProvider::getDb();
 
         $orderId = $db->getOne(
-            "SELECT OXORDERID FROM osc_payment_transaction WHERE OXPROVIDERTRANSACTIONID = ?",
+            "SELECT OXORDERID FROM oe_payments_transaction WHERE OXPROVIDERTRANSACTIONID = ?",
             [$chargeId]
         );
 
@@ -448,7 +448,7 @@ class WebhookProcessingService
 
         $values[] = $orderId;
 
-        $sql = "UPDATE osc_payment_order_state SET " .
+        $sql = "UPDATE oe_payments_order_state SET " .
                implode(', ', $setParts) . ", OXUPDATED = NOW() WHERE OXORDERID = ?";
 
         $db->execute($sql, $values);
@@ -461,7 +461,7 @@ class WebhookProcessingService
     {
         $db = DatabaseProvider::getDb();
 
-        $sql = "INSERT INTO osc_payment_transaction
+        $sql = "INSERT INTO oe_payments_transaction
                 (OXID, OXORDERID, OXUSERID, OXPROVIDER, OXPROVIDERORDERID, OXPROVIDERTRANSACTIONID,
                  OXAMOUNT, OXCURRENCY, OXSTATUS, OXTYPE, OXCREATED)
                 VALUES (?, ?, ?, 'stripe', ?, ?, ?, ?, 'refunded', 'refund', NOW())";
@@ -485,7 +485,7 @@ class WebhookProcessingService
         $db = DatabaseProvider::getDb();
 
         $exists = $db->getOne(
-            "SELECT OXID FROM osc_payment_webhook_log WHERE OXEVENTID = ?",
+            "SELECT OXID FROM oe_payments_webhook_log WHERE OXEVENTID = ?",
             [$eventId]
         );
 
@@ -499,7 +499,7 @@ class WebhookProcessingService
     {
         $db = DatabaseProvider::getDb();
 
-        $sql = "INSERT INTO osc_payment_webhook_log
+        $sql = "INSERT INTO oe_payments_webhook_log
                 (OXID, OXEVENTID, OXEVENTTYPE, OXPROVIDER, OXPAYLOAD, OXSTATUS, OXCREATED)
                 VALUES (?, ?, ?, 'stripe', ?, ?, NOW())";
 
@@ -519,7 +519,7 @@ class WebhookProcessingService
     {
         $db = DatabaseProvider::getDb();
 
-        $sql = "UPDATE osc_payment_webhook_log
+        $sql = "UPDATE oe_payments_webhook_log
                 SET OXSTATUS = ?, OXPROCESSEDAT = NOW(), OXERROR = ?
                 WHERE OXEVENTID = ?";
 
@@ -766,7 +766,7 @@ SELECT
     OXSTATUS,
     OXCREATED,
     OXPROCESSEDAT
-FROM osc_payment_webhook_log
+FROM oe_payments_webhook_log
 ORDER BY OXCREATED DESC
 LIMIT 100;
 
@@ -776,7 +776,7 @@ SELECT
     OXEVENTTYPE,
     OXERROR,
     OXCREATED
-FROM osc_payment_webhook_log
+FROM oe_payments_webhook_log
 WHERE OXSTATUS = 'failed'
 ORDER BY OXCREATED DESC;
 ```

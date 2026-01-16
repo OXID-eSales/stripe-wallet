@@ -7,11 +7,11 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\EventSystem\Handler;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeContractCreationHandler;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ContractMetadataServiceInterface;
+use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeContractCreationHandler;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
+use OxidEsales\Payments\Stripe\Service\ContractMetadataServiceInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
@@ -25,7 +25,7 @@ use PHPUnit\Framework\TestCase;
  *
  * Sprint 21: Refactored tests for handler with ContractMetadataService delegation.
  *
- * @covers \OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeContractCreationHandler
+ * @covers \OxidEsales\Payments\Stripe\EventSystem\Handler\StripeContractCreationHandler
  */
 class StripeContractCreationHandlerTest extends TestCase
 {

@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Controller\Admin;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller\Admin;
 
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Eshop\Core\Request;
 use OxidEsales\Eshop\Core\Session;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Bridge\ModuleSettingBridgeInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\StripeConnect;
-use OxidSolutionCatalysts\Payments\Stripe\Module;
+use OxidEsales\Payments\Stripe\Controller\Admin\StripeConnect;
+use OxidEsales\Payments\Stripe\Module;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 

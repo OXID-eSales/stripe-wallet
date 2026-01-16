@@ -135,7 +135,7 @@ private function createTestContracts(): void
     ];
 
     foreach ($contracts as $contractId => $data) {
-        $this->connection->insert('osc_payment_contract', [
+        $this->connection->insert('oe_payments_contract', [
             'OXID' => $contractId,
             'OXSHOPID' => 1,
             'OXUSERID' => $data['user'],
@@ -159,7 +159,7 @@ private function createTestContracts(): void
 
 **Problem:**
 ```
-Table 'osc_payment_contract' doesn't exist
+Table 'oe_payments_contract' doesn't exist
 (caused by tearDown() dropping tables between tests)
 ```
 
@@ -171,7 +171,7 @@ Table 'osc_payment_contract' doesn't exist
 ```php
 public function tearDown(): void
 {
-    $this->connection->executeStatement("DROP TABLE IF EXISTS osc_payment_contract");
+    $this->connection->executeStatement("DROP TABLE IF EXISTS oe_payments_contract");
 }
 ```
 
@@ -200,11 +200,11 @@ public function tearDown(): void
 
 **Schema Design (Provider-Agnostic):**
 ```sql
-CREATE TABLE osc_payment_webhook_logs (
+CREATE TABLE oe_payments_webhook_logs (
     OXID CHAR(32) NOT NULL COMMENT 'Log entry ID',
     OXEVENTID VARCHAR(128) NOT NULL COMMENT 'Provider webhook event ID (unique)',
     OXEVENTTYPE VARCHAR(128) NULL COMMENT 'Event type (payment_intent.succeeded, etc.)',
-    OXCONTRACTID CHAR(32) NULL COMMENT 'FK to osc_payment_contract.OXID',
+    OXCONTRACTID CHAR(32) NULL COMMENT 'FK to oe_payments_contract.OXID',
     OXSTATUS VARCHAR(32) NOT NULL COMMENT 'received, processed, failed',
     OXRECEIVEDAT DATETIME NOT NULL COMMENT 'When webhook was received',
     OXERROR TEXT NULL COMMENT 'Error message if processing failed',
@@ -217,7 +217,7 @@ CREATE TABLE osc_payment_webhook_logs (
 
     CONSTRAINT FK_WEBHOOK_CONTRACT
         FOREIGN KEY (OXCONTRACTID)
-        REFERENCES osc_payment_contract (OXID)
+        REFERENCES oe_payments_contract (OXID)
         ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
@@ -413,17 +413,17 @@ public function setError(?string $error): void
 ### Migration Strategy (3 migrations)
 ```
 Version20251031140000 - Contract Table (PRIMARY)
-├── osc_payment_contract (core aggregate root)
+├── oe_payments_contract (core aggregate root)
 │
 Version20251031140100 - Transaction Table (MASTER)
-├── osc_payment_transaction (with FK to contracts)
+├── oe_payments_transaction (with FK to contracts)
 │
 Version20251031140200 - Support Tables
-├── osc_payment_order_state
-├── osc_payment_customer
-├── osc_payment_idempotency
-├── osc_payment_sessions
-└── osc_payment_webhook_logs (NEW)
+├── oe_payments_order_state
+├── oe_payments_customer
+├── oe_payments_idempotency
+├── oe_payments_sessions
+└── oe_payments_webhook_logs (NEW)
 ```
 
 ### Provider-Agnostic Design
@@ -446,8 +446,8 @@ docker compose exec -T php vendor/bin/oe-eshop-db_migrate migrations:migrate STR
 ```bash
 docker compose exec -T php php -r "
 require '/var/www/source/bootstrap.php';
-// Created osc_payment_contract
-// Created osc_payment_transaction with FKs
+// Created oe_payments_contract
+// Created oe_payments_transaction with FKs
 "
 ```
 **Result:** ✅ Tables created with proper constraints

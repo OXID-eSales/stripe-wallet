@@ -30,7 +30,7 @@ Architecture documents are out of sync with implementation after Sprints 15-22 r
 |----------|-------|
 | `00-overview.md` | Missing terminal states (CANCELLED, EXPIRED, FAILED) |
 | `01-architecture-layers.md` | Missing OXPAID strategy, ContainerFactory resolution |
-| `02-database-and-models.md` | References dropped `osc_payment_order_state` table |
+| `02-database-and-models.md` | References dropped `oe_payments_order_state` table |
 | `03-building-payment-modules.md` | Missing Component layer dependency clarification |
 | `05-webhooks.md` | Missing WebhookProcessingService complexity documentation |
 
@@ -149,17 +149,17 @@ Service (business logic)
 
 **Location:** `docs/payment-component/02-database-and-models.md`
 
-**Remove `osc_payment_order_state` references:**
+**Remove `oe_payments_order_state` references:**
 
 ```markdown
 <!-- REMOVE THIS SECTION -->
-~~### osc_payment_order_state Table~~
+~~### oe_payments_order_state Table~~
 
 <!-- ADD NOTE -->
-> **Note:** The `osc_payment_order_state` table was removed in Sprint 8 (December 2025).
-> All payment state tracking is now consolidated in `osc_payment_contract`.
+> **Note:** The `oe_payments_order_state` table was removed in Sprint 8 (December 2025).
+> All payment state tracking is now consolidated in `oe_payments_contract`.
 
-### Capture/Refund Fields (in osc_payment_contract)
+### Capture/Refund Fields (in oe_payments_contract)
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -318,7 +318,7 @@ Webhooks may arrive before user returns from Stripe. The service handles this by
 ## Verification Checklist
 
 - [ ] All code references in docs match actual implementation
-- [ ] No references to removed `osc_payment_order_state`
+- [ ] No references to removed `oe_payments_order_state`
 - [ ] Contract states documented correctly (including terminal states)
 - [ ] OXPAID strategy documented
 - [ ] Handler delegation pattern documented
@@ -342,7 +342,7 @@ Webhooks may arrive before user returns from Stripe. The service handles this by
 
 - CODE_REVIEW.md Section 5 (Documentation Updates Required)
 - CODE_REVIEW.md Section 1.3 (Contract State Machine Documentation Outdated)
-- CODE_REVIEW.md Section 1.8 (osc_payment_order_state Table Status)
+- CODE_REVIEW.md Section 1.8 (oe_payments_order_state Table Status)
 
 ---
 

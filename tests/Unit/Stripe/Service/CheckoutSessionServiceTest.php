@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Service;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
-use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapterInterface;
-use OxidSolutionCatalysts\Payments\Stripe\DTO\CheckoutSessionResult;
-use OxidSolutionCatalysts\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutSessionService;
-use OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutSessionServiceInterface;
+use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
+use OxidEsales\Payments\Stripe\DTO\CheckoutSessionResult;
+use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
+use OxidEsales\Payments\Stripe\Service\CheckoutSessionService;
+use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
 use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;

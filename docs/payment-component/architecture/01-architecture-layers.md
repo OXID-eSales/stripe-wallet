@@ -774,14 +774,14 @@ class StripeAdapter implements PaymentAdapterInterface
 ### Key Tables (Contract-Aware)
 
 **Primary:**
-- `osc_payment_contract` - Master contract table (NEW)
+- `oe_payments_contract` - Master contract table (NEW)
   - Stores: state, basket snapshot (JSON), conditions (JSON), provider order ID
   - FK to oxuser (OXUSERID)
   - FK to oxorder (OXORDERID) - **NULL until committed!**
 
 **Enhanced:**
-- `osc_payment_order_state` - Enhanced with OXCONTRACTID FK
-- `osc_payment_transaction` - Enhanced with OXCONTRACTID FK
+- `oe_payments_order_state` - Enhanced with OXCONTRACTID FK
+- `oe_payments_transaction` - Enhanced with OXCONTRACTID FK
 
 **See:** [02-database-and-models.md](02-database-and-models.md) for complete schema.
 
@@ -794,7 +794,7 @@ class ContractRepository
     {
         // Fast lookup for webhook processing
         $data = $this->connection->fetchAssociative(
-            "SELECT * FROM osc_payment_contract WHERE OXPROVIDERORDERID = ?",
+            "SELECT * FROM oe_payments_contract WHERE OXPROVIDERORDERID = ?",
             [$providerOrderId]
         );
 
@@ -806,7 +806,7 @@ class ContractRepository
         $before = $before ?? new \DateTime();
 
         $rows = $this->connection->fetchAllAssociative(
-            "SELECT * FROM osc_payment_contract
+            "SELECT * FROM oe_payments_contract
              WHERE OXEXPIRESAT < ?
              AND OXSTATE NOT IN (?, ?, ?)",
             [

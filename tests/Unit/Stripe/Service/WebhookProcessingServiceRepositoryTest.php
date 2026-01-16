@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Service;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use OxidEsales\PaymentComponent\Repository\WebhookLogRepositoryInterface;
 use OxidEsales\PaymentComponent\Webhook\WebhookLog;
-use OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService;
+use OxidEsales\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface;
+use OxidEsales\Payments\Stripe\Service\WebhookProcessingService;
 use PHPUnit\Framework\TestCase;
 
 /**
  * TDD Tests for WebhookProcessingService using WebhookLogRepositoryInterface
  *
  * Sprint 2 Phase 1: WebhookProcessingService must use the repository interface
- * instead of raw SQL queries to osc_payment_webhook_log table.
+ * instead of raw SQL queries to oe_payments_webhook_log table.
  *
  * LSP Compliance: Service depends on interface, not concrete implementation.
  *

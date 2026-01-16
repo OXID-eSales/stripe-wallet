@@ -231,9 +231,9 @@ declare(strict_types=1);
 ### 4.1 Database Schema ⚠️ **Good Design, Missing Migrations**
 
 **Tables Designed**:
-1. ✅ `osc_payment_contract` - Well-designed with proper indexes
-2. ✅ `osc_payment_transaction` - Good audit trail structure
-3. ✅ `osc_payment_webhook_log` - Idempotency tracking with unique constraint
+1. ✅ `oe_payments_contract` - Well-designed with proper indexes
+2. ✅ `oe_payments_transaction` - Good audit trail structure
+3. ✅ `oe_payments_webhook_log` - Idempotency tracking with unique constraint
 
 **Schema Quality**:
 - ✅ Proper indexing strategy (provider order ID, user ID, state, expires at)

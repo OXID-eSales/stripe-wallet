@@ -272,7 +272,7 @@ $payPalOrder = $this->trackPayPalOrder(
 
 2. **Database Schema:**
    ```sql
-   CREATE TABLE osc_payment_idempotency (
+   CREATE TABLE oe_payments_idempotency (
        OXID CHAR(32) NOT NULL PRIMARY KEY,
        OXKEY VARCHAR(128) NOT NULL UNIQUE,
        OXORDERID CHAR(32) NOT NULL,
@@ -396,7 +396,7 @@ if ($vault->status === "VAULTED") {
 
 2. **Database Schema:**
    ```sql
-   CREATE TABLE osc_payment_saved_methods (
+   CREATE TABLE oe_payments_saved_methods (
        OXID CHAR(32) NOT NULL PRIMARY KEY,
        OXUSERID CHAR(32) NOT NULL,
        OXPROVIDER VARCHAR(32) NOT NULL,
@@ -659,7 +659,7 @@ public function createRefund(string $orderId, float $refundAmount) {
 **Component Requirements:**
 1. **Refund Tracking:**
    ```sql
-   ALTER TABLE osc_payment_transaction ADD COLUMN:
+   ALTER TABLE oe_payments_transaction ADD COLUMN:
        OXREFUNDED_AMOUNT DECIMAL(10,2) DEFAULT 0.00,
        OXREFUNDABLE_AMOUNT DECIMAL(10,2),
        OXMAX_REFUND_AMOUNT DECIMAL(10,2)
@@ -760,7 +760,7 @@ public function getCheckoutSession(): array {
 
 2. **Database Persistence:**
    ```sql
-   CREATE TABLE osc_payment_sessions (
+   CREATE TABLE oe_payments_sessions (
        OXID CHAR(32) NOT NULL PRIMARY KEY,
        OXPROVIDER VARCHAR(32) NOT NULL,
        OXSESSIONID VARCHAR(128) NOT NULL,
@@ -896,7 +896,7 @@ interface PaymentStates
 
 ```sql
 -- Idempotency tracking
-CREATE TABLE osc_payment_idempotency (
+CREATE TABLE oe_payments_idempotency (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXKEY VARCHAR(128) NOT NULL UNIQUE,
     OXORDERID CHAR(32) NOT NULL,
@@ -908,7 +908,7 @@ CREATE TABLE osc_payment_idempotency (
 );
 
 -- Saved payment methods (vaulting)
-CREATE TABLE osc_payment_saved_methods (
+CREATE TABLE oe_payments_saved_methods (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXUSERID CHAR(32) NOT NULL,
     OXPROVIDER VARCHAR(32) NOT NULL,
@@ -923,7 +923,7 @@ CREATE TABLE osc_payment_saved_methods (
 );
 
 -- Checkout sessions
-CREATE TABLE osc_payment_sessions (
+CREATE TABLE oe_payments_sessions (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXPROVIDER VARCHAR(32) NOT NULL,
     OXSESSIONID VARCHAR(128) NOT NULL,
@@ -935,7 +935,7 @@ CREATE TABLE osc_payment_sessions (
 );
 
 -- Authorization tracking (enhance existing transaction table)
-ALTER TABLE osc_payment_transaction ADD COLUMN:
+ALTER TABLE oe_payments_transaction ADD COLUMN:
     OXAUTHORIZATION_ID VARCHAR(128),
     OXAUTHORIZATION_STATUS VARCHAR(32),
     OXAUTHORIZATION_EXPIRES DATETIME,

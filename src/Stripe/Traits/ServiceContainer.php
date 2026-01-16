@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Traits;
+namespace OxidEsales\Payments\Stripe\Traits;
 
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 

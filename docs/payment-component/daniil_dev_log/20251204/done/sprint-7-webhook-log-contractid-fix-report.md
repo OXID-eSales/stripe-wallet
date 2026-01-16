@@ -8,14 +8,14 @@
 
 ## Executive Summary
 
-Fixed a bug where `OXCONTRACTID` and `OXPROCESSEDAT` were always `NULL` in the `osc_payment_webhooklogs` table after webhook processing. The root cause was that `WebhookProcessingService::updateWebhookStatus()` did not accept or pass the `contractId` parameter to the repository.
+Fixed a bug where `OXCONTRACTID` and `OXPROCESSEDAT` were always `NULL` in the `oe_payments_webhooklogs` table after webhook processing. The root cause was that `WebhookProcessingService::updateWebhookStatus()` did not accept or pass the `contractId` parameter to the repository.
 
 ---
 
 ## Problem Statement
 
 ### Symptoms
-- `OXCONTRACTID` column always `NULL` in `osc_payment_webhooklogs`
+- `OXCONTRACTID` column always `NULL` in `oe_payments_webhooklogs`
 - `OXPROCESSEDAT` column always `NULL` (in some code paths)
 - No link between webhook events and their associated contracts
 - Difficult to trace webhook processing for debugging
@@ -66,7 +66,7 @@ private function updateWebhookStatus(
 
     // Fallback SQL also updated:
     if ($contractId !== null) {
-        $sql = "UPDATE osc_payment_webhooklogs
+        $sql = "UPDATE oe_payments_webhooklogs
                 SET OXSTATUS = ?, OXPROCESSEDAT = NOW(), OXCONTRACTID = ?
                 WHERE OXEVENTID = ?";
         $db->execute($sql, [$status, $contractId, $eventId]);
@@ -231,7 +231,7 @@ Stripe                          WebhookProcessingService
 
 **Before Fix:**
 ```sql
-SELECT OXEVENTID, OXSTATUS, OXPROCESSEDAT, OXCONTRACTID FROM osc_payment_webhooklogs;
+SELECT OXEVENTID, OXSTATUS, OXPROCESSEDAT, OXCONTRACTID FROM oe_payments_webhooklogs;
 +------------------+-----------+---------------+--------------+
 | OXEVENTID        | OXSTATUS  | OXPROCESSEDAT | OXCONTRACTID |
 +------------------+-----------+---------------+--------------+
@@ -241,7 +241,7 @@ SELECT OXEVENTID, OXSTATUS, OXPROCESSEDAT, OXCONTRACTID FROM osc_payment_webhook
 
 **After Fix:**
 ```sql
-SELECT OXEVENTID, OXSTATUS, OXPROCESSEDAT, OXCONTRACTID FROM osc_payment_webhooklogs;
+SELECT OXEVENTID, OXSTATUS, OXPROCESSEDAT, OXCONTRACTID FROM oe_payments_webhooklogs;
 +------------------+-----------+---------------------+------------------+
 | OXEVENTID        | OXSTATUS  | OXPROCESSEDAT       | OXCONTRACTID     |
 +------------------+-----------+---------------------+------------------+
@@ -267,7 +267,7 @@ docker compose exec php vendor/bin/phpunit \
 # Verify database after processing a webhook
 docker compose exec mysql mysql -uroot -proot oxideshop -e \
     "SELECT OXEVENTID, OXSTATUS, OXPROCESSEDAT, OXCONTRACTID
-     FROM osc_payment_webhooklogs
+     FROM oe_payments_webhooklogs
      ORDER BY OXRECEIVEDAT DESC LIMIT 5;"
 ```
 

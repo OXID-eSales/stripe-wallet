@@ -286,7 +286,7 @@ extensions/osc/stripe/
 -- migration/001_create_payment_transaction_table.sql
 -- Core transaction tracking (Component layer)
 
-CREATE TABLE IF NOT EXISTS osc_payment_transaction (
+CREATE TABLE IF NOT EXISTS oe_payments_transaction (
     OXID CHAR(32) NOT NULL PRIMARY KEY COMMENT 'Primary key',
     OXSHOPID INT(11) NOT NULL COMMENT 'Shop ID',
     OXORDERID CHAR(32) NOT NULL COMMENT 'FK to oxorder.OXID',
@@ -319,7 +319,7 @@ CREATE TABLE IF NOT EXISTS osc_payment_transaction (
 -- Component-level order payment state tracking (Component layer)
 -- Replaces extending oxorder table
 
-CREATE TABLE IF NOT EXISTS osc_payment_order_state (
+CREATE TABLE IF NOT EXISTS oe_payments_order_state (
     OXID CHAR(32) NOT NULL PRIMARY KEY COMMENT 'Primary key',
     OXORDERID CHAR(32) NOT NULL UNIQUE COMMENT 'FK to oxorder.OXID (1:1 relationship)',
     OXPAYMENTSTATE VARCHAR(32) NOT NULL COMMENT 'Payment state (NOT_FINISHED|500-900|OK|ERROR)',
@@ -345,7 +345,7 @@ CREATE TABLE IF NOT EXISTS osc_payment_order_state (
 -- Component-level payment customer data (Component layer)
 -- Replaces extending oxuser table
 
-CREATE TABLE IF NOT EXISTS osc_payment_customer (
+CREATE TABLE IF NOT EXISTS oe_payments_customer (
     OXID CHAR(32) NOT NULL PRIMARY KEY COMMENT 'Primary key',
     OXUSERID CHAR(32) NOT NULL UNIQUE COMMENT 'FK to oxuser.OXID (1:1 relationship)',
     OXPAYMENTCUSTOMERID VARCHAR(128) NULL COMMENT 'Payment provider customer ID (cus_xxx for Stripe)',
@@ -369,7 +369,7 @@ CREATE TABLE IF NOT EXISTS osc_payment_customer (
 -- Component-level basket snapshot for payment reconciliation (Component layer)
 -- Stores basket state at payment initiation time
 
-CREATE TABLE IF NOT EXISTS osc_payment_basket_snapshot (
+CREATE TABLE IF NOT EXISTS oe_payments_basket_snapshot (
     OXID CHAR(32) NOT NULL PRIMARY KEY COMMENT 'Primary key',
     OXORDERID CHAR(32) NOT NULL COMMENT 'FK to oxorder.OXID',
     OXUSERID CHAR(32) NULL COMMENT 'FK to oxuser.OXID',

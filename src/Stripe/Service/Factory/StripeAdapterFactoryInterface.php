@@ -7,10 +7,10 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Service\Factory;
+namespace OxidEsales\Payments\Stripe\Service\Factory;
 
 use OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactoryInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapterInterface;
+use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use Stripe\StripeClient;
 
 /**

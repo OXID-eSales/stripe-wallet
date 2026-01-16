@@ -100,7 +100,7 @@ class PaymentTransactionRepository implements PaymentTransactionRepositoryInterf
         $id = $this->generateId();
         $transaction->setId($id);
 
-        $sql = "INSERT INTO osc_payment_transaction
+        $sql = "INSERT INTO oe_payments_transaction
                 (OXID, OXSHOPID, OXORDERID, OXPROVIDERORDERID, OXSTATUS,
                  OXPAYMENTMETHODID, OXTRANSACTIONTYPE)
                 VALUES (?, ?, ?, ?, ?, ?, ?)";
@@ -118,7 +118,7 @@ class PaymentTransactionRepository implements PaymentTransactionRepositoryInterf
 
     private function update(PaymentTransaction $transaction): void
     {
-        $sql = "UPDATE osc_payment_transaction
+        $sql = "UPDATE oe_payments_transaction
                 SET OXSTATUS = ?,
                     OXTRANSACTIONID = ?,
                     OXPROVIDERDATA = ?
@@ -134,7 +134,7 @@ class PaymentTransactionRepository implements PaymentTransactionRepositoryInterf
 
     public function findByOrderAndProvider(string $orderId, string $providerOrderId): ?PaymentTransaction
     {
-        $sql = "SELECT * FROM osc_payment_transaction
+        $sql = "SELECT * FROM oe_payments_transaction
                 WHERE OXORDERID = ? AND OXPROVIDERORDERID = ?
                 LIMIT 1";
 
@@ -145,7 +145,7 @@ class PaymentTransactionRepository implements PaymentTransactionRepositoryInterf
 
     public function findAllByOrderId(string $orderId): array
     {
-        $sql = "SELECT * FROM osc_payment_transaction
+        $sql = "SELECT * FROM oe_payments_transaction
                 WHERE OXORDERID = ?
                 ORDER BY OXTIMESTAMP DESC";
 

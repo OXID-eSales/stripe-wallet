@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Service;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
-use OxidSolutionCatalysts\Payments\Stripe\Service\DeliveryAddressHashService;
-use OxidSolutionCatalysts\Payments\Stripe\Service\DeliveryAddressHashServiceInterface;
+use OxidEsales\Payments\Stripe\Service\DeliveryAddressHashService;
+use OxidEsales\Payments\Stripe\Service\DeliveryAddressHashServiceInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -13,7 +13,7 @@ use PHPUnit\Framework\TestCase;
  *
  * Sprint 20: Encapsulate $_REQUEST modification for delivery address hash.
  *
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Service\DeliveryAddressHashService
+ * @covers \OxidEsales\Payments\Stripe\Service\DeliveryAddressHashService
  * @group sprint-20
  */
 final class DeliveryAddressHashServiceTest extends TestCase

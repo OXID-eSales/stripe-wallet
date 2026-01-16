@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Adapter;
+namespace OxidEsales\Payments\Stripe\Adapter;
 
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
@@ -26,11 +26,34 @@ class OxidShopAdapter implements ShopAdapterInterface
         $lang = Registry::getLang();
 
         if ($languageAbbr !== null) {
-            $languageId = $lang->getLanguageIdByAbbr($languageAbbr);
-            return $lang->translateString($languageConstant, $languageId);
+            $languageId = $this->getLanguageIdByAbbr($languageAbbr);
+            $result = $lang->translateString($languageConstant, $languageId);
+            return is_array($result) ? (string) reset($result) : (string) $result;
         }
 
-        return $lang->translateString($languageConstant);
+        $result = $lang->translateString($languageConstant);
+        return is_array($result) ? (string) reset($result) : (string) $result;
+    }
+
+    /**
+     * Get language ID by abbreviation.
+     *
+     * @param string $abbr Language abbreviation (e.g., 'de', 'en')
+     * @return int|null Language ID or null if not found
+     */
+    private function getLanguageIdByAbbr(string $abbr): ?int
+    {
+        $languages = Registry::getLang()->getLanguageArray();
+        foreach ($languages as $language) {
+            if (!is_object($language)) {
+                continue;
+            }
+            /** @var object{abbr?: string, id?: int} $language */
+            if (isset($language->abbr) && $language->abbr === $abbr) {
+                return isset($language->id) ? (int) $language->id : null;
+            }
+        }
+        return null;
     }
 
     public function getCurrentLanguageAbbr(): string

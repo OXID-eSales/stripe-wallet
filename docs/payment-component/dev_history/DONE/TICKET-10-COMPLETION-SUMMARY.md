@@ -16,12 +16,12 @@
 - `Version20251031140200.php` - 4 support tables
 
 **Tables Created:** 6
-- `osc_payment_contract` (18 columns, 7 indexes, 2 FKs)
-- `osc_payment_transaction` (16 columns, 6 indexes, 3 FKs)
-- `osc_payment_order_state` (10 columns, 4 indexes, 2 FKs)
-- `osc_payment_customer` (9 columns, 1 index, 1 FK)
-- `osc_payment_idempotency` (8 columns, 3 indexes)
-- `osc_payment_sessions` (8 columns, 3 indexes)
+- `oe_payments_contract` (18 columns, 7 indexes, 2 FKs)
+- `oe_payments_transaction` (16 columns, 6 indexes, 3 FKs)
+- `oe_payments_order_state` (10 columns, 4 indexes, 2 FKs)
+- `oe_payments_customer` (9 columns, 1 index, 1 FK)
+- `oe_payments_idempotency` (8 columns, 3 indexes)
+- `oe_payments_sessions` (8 columns, 3 indexes)
 
 ### 2. Domain Models (TDD-First)
 
@@ -150,7 +150,7 @@ All implementations follow the documented architecture in:
 
 1. ✅ **Contract-First Pattern**
    - Transaction model includes `contractId` field
-   - FK to `osc_payment_contract` table
+   - FK to `oe_payments_contract` table
    - Supports NULL contract (for non-contract-aware legacy flows)
 
 2. ✅ **Provider-Agnostic Design**
@@ -275,10 +275,10 @@ docker compose exec php bash -c "cd /var/www/extensions/stripe && vendor/bin/php
 3. **TransactionRepository** - 12 tests ✅ (NEW)
 
 ### ❌ Not Yet Implemented
-4. **OrderStateRepository** - For `osc_payment_order_state` table
-5. **CustomerRepository** - For `osc_payment_customer` table
-6. **IdempotencyRepository** - For `osc_payment_idempotency` table
-7. **SessionRepository** - For `osc_payment_sessions` table
+4. **OrderStateRepository** - For `oe_payments_order_state` table
+5. **CustomerRepository** - For `oe_payments_customer` table
+6. **IdempotencyRepository** - For `oe_payments_idempotency` table
+7. **SessionRepository** - For `oe_payments_sessions` table
 
 **Rationale for Not Implementing:**
 - Time constraints (user said "continue" but we're running low on context)

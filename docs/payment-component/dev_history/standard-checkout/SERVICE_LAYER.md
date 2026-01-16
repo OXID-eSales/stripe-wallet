@@ -360,7 +360,7 @@ class StripeAdapter implements PaymentAdapterInterface
     {
         $db = \OxidEsales\Eshop\Core\DatabaseProvider::getDb();
 
-        $sql = "INSERT INTO osc_payment_order_state
+        $sql = "INSERT INTO oe_payments_order_state
                 (OXID, OXORDERID, OXPAYMENTSTATE, OXPAYMENTMETHOD, OXCAPTURED, OXCAPTUREDAMOUNT, OXCAPTUREDAT, OXCREATED)
                 VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
                 ON DUPLICATE KEY UPDATE
@@ -640,7 +640,7 @@ class StripeCustomerService
         $db = DatabaseProvider::getDb();
 
         $customerId = $db->getOne(
-            "SELECT OXSTRIPECUSTOMERID FROM osc_payment_customer WHERE OXUSERID = ?",
+            "SELECT OXSTRIPECUSTOMERID FROM oe_payments_customer WHERE OXUSERID = ?",
             [$userId]
         );
 
@@ -657,7 +657,7 @@ class StripeCustomerService
     {
         $db = DatabaseProvider::getDb();
 
-        $sql = "INSERT INTO osc_payment_customer
+        $sql = "INSERT INTO oe_payments_customer
                 (OXID, OXUSERID, OXSTRIPECUSTOMERID, OXCREATED)
                 VALUES (?, ?, ?, NOW())
                 ON DUPLICATE KEY UPDATE

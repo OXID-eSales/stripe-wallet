@@ -70,13 +70,13 @@ The fix is implemented but **still failing**. Need to investigate:
 
 | Table | Purpose | Location |
 |-------|---------|----------|
-| `osc_payment_contract` | Payment lifecycle management | Migration V20251031140000 |
-| `osc_payment_transaction` | Transaction records (all providers) | Migration V20251031140100 |
-| `osc_payment_order_state` | Order payment state tracking | Migration V20251031140200 |
-| `osc_payment_customer` | Customer-provider mapping | Migration V20251031140200 |
-| `osc_payment_idempotency` | Idempotency key storage | Migration V20251031140200 |
-| `osc_payment_sessions` | Payment session data | Migration V20251031140200 |
-| `osc_payment_webhooklogs` | Webhook event logging | Migration V20251031140200 |
+| `oe_payments_contract` | Payment lifecycle management | Migration V20251031140000 |
+| `oe_payments_transaction` | Transaction records (all providers) | Migration V20251031140100 |
+| `oe_payments_order_state` | Order payment state tracking | Migration V20251031140200 |
+| `oe_payments_customer` | Customer-provider mapping | Migration V20251031140200 |
+| `oe_payments_idempotency` | Idempotency key storage | Migration V20251031140200 |
+| `oe_payments_sessions` | Payment session data | Migration V20251031140200 |
+| `oe_payments_webhooklogs` | Webhook event logging | Migration V20251031140200 |
 
 ### Stripe-Specific Tables (Events.php)
 
@@ -84,7 +84,7 @@ The fix is implemented but **still failing**. Need to investigate:
 |-------|---------|----------|
 | `osc_stripe_payment_details` | Card info, 3DS, risk scores | Events.php |
 | `osc_stripe_customer_mapping` | OXID user → Stripe customer | Events.php |
-| `osc_payment_webhook_log` | Webhook logs (duplicate?) | Events.php |
+| `oe_payments_webhook_log` | Webhook logs (duplicate?) | Events.php |
 
 ### OXID Core Extensions
 
@@ -107,14 +107,14 @@ Added columns to existing tables:
 ### Question: Does Stripe layer rely on Component infrastructure?
 
 **YES** - The Stripe handlers use:
-- `DoctrineContractRepository` → reads/writes `osc_payment_contract`
+- `DoctrineContractRepository` → reads/writes `oe_payments_contract`
 - `PaymentContract` model → provider-agnostic with metadata support
 - Event system → Component's EventDispatcher
 
 ### Potential Issue: Duplicate webhook tables
 
-1. `osc_payment_webhooklogs` (Migration V20251031140200) - provider-agnostic
-2. `osc_payment_webhook_log` (Events.php) - also provider-agnostic
+1. `oe_payments_webhooklogs` (Migration V20251031140200) - provider-agnostic
+2. `oe_payments_webhook_log` (Events.php) - also provider-agnostic
 
 **Action Required:** Review and consolidate these tables.
 

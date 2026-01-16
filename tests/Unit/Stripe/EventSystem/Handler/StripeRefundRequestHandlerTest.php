@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\EventSystem\Handler;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeRefundRequestHandler;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeRefundRequestHandler;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\RefundServiceInterface;
+use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Log\LoggerInterface;

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
+namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
 
 /**
  * Handles return from Stripe after Payment Element confirmation.

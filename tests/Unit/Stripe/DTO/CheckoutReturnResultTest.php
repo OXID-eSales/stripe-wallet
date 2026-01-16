@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\DTO;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\DTO;
 
-use OxidSolutionCatalysts\Payments\Stripe\DTO\CheckoutReturnResult;
+use OxidEsales\Payments\Stripe\DTO\CheckoutReturnResult;
 use PHPUnit\Framework\TestCase;
 
 /**

@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\EventSystem\Handler;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
-use OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutSessionServiceInterface;
-use OxidSolutionCatalysts\Payments\Stripe\DTO\CheckoutSessionResult;
+use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
+use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
+use OxidEsales\Payments\Stripe\DTO\CheckoutSessionResult;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
@@ -22,7 +22,7 @@ use RuntimeException;
  *
  * Sprint 21: Refactored tests for handler with CheckoutSessionService delegation.
  *
- * @covers \OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler
+ * @covers \OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler
  */
 class StripeCheckoutSessionHandlerTest extends TestCase
 {

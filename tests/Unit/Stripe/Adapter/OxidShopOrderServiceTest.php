@@ -7,23 +7,21 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Adapter;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Adapter;
 
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Adapter\OxidShopOrderService;
-use OxidSolutionCatalysts\Payments\Stripe\Repository\StripePaymentDetailsRepository;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Adapter\OxidShopOrderService
+ * @covers \OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService
  */
 final class OxidShopOrderServiceTest extends TestCase
 {
     private OxidShopOrderService $service;
     private TransactionRepositoryInterface $transactionRepository;
-    private StripePaymentDetailsRepository $stripeDetailsRepository;
     private ModuleConfigurationService $moduleConfig;
 
     protected function setUp(): void
@@ -32,12 +30,10 @@ final class OxidShopOrderServiceTest extends TestCase
 
         // Mock dependencies
         $this->transactionRepository = $this->createMock(TransactionRepositoryInterface::class);
-        $this->stripeDetailsRepository = $this->createMock(StripePaymentDetailsRepository::class);
         $this->moduleConfig = $this->createMock(ModuleConfigurationService::class);
 
         $this->service = new OxidShopOrderService(
             $this->transactionRepository,
-            $this->stripeDetailsRepository,
             $this->moduleConfig
         );
     }

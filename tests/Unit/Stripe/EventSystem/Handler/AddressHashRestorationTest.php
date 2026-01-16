@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\EventSystem\Handler;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Eshop\Core\Session;
@@ -13,11 +13,11 @@ use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Contract\SecurityValidationResultInterface;
 use OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutReturnServiceInterface;
-use OxidSolutionCatalysts\Payments\Stripe\DTO\CheckoutReturnResult;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler;
-use OxidSolutionCatalysts\Payments\Stripe\Service\DeliveryAddressHashServiceInterface;
+use OxidEsales\Payments\Stripe\Service\CheckoutReturnServiceInterface;
+use OxidEsales\Payments\Stripe\DTO\CheckoutReturnResult;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler;
+use OxidEsales\Payments\Stripe\Service\DeliveryAddressHashServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 

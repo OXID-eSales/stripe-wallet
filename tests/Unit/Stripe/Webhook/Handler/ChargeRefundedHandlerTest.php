@@ -7,18 +7,18 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Webhook\Handler;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Webhook\Handler;
 
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Webhook\WebhookEvent;
 use OxidEsales\PaymentComponent\Webhook\WebhookEventHandlerInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Webhook\Handler\ChargeRefundedHandler;
+use OxidEsales\Payments\Stripe\Webhook\Handler\ChargeRefundedHandler;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 /**
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Webhook\Handler\ChargeRefundedHandler
+ * @covers \OxidEsales\Payments\Stripe\Webhook\Handler\ChargeRefundedHandler
  * @group sprint-13
  * @group webhook
  * @group handler

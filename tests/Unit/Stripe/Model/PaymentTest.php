@@ -7,10 +7,10 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Model;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Model;
 
-use OxidSolutionCatalysts\Payments\Stripe\Core\StripeDefinitions;
-use OxidSolutionCatalysts\Payments\Stripe\Model\Payment;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\Payments\Stripe\Model\Payment;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -28,7 +28,7 @@ use PHPUnit\Framework\TestCase;
  * @group stripe
  * @group model
  *
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Model\Payment
+ * @covers \OxidEsales\Payments\Stripe\Model\Payment
  */
 final class PaymentTest extends TestCase
 {

@@ -51,12 +51,12 @@ Skipped: 2
 **Error:**
 ```
 RuntimeException: Failed to save webhook log: An exception occurred while executing
-'INSERT INTO osc_payment_webhooklogs...'
+'INSERT INTO oe_payments_webhooklogs...'
 
 SQLSTATE[23000]: Integrity constraint violation: 1452 Cannot add or update a child row:
-a foreign key constraint fails (`example`.`osc_payment_webhooklogs`,
+a foreign key constraint fails (`example`.`oe_payments_webhooklogs`,
 CONSTRAINT `FK_WEBHOOK_CONTRACT` FOREIGN KEY (`OXCONTRACTID`)
-REFERENCES `osc_payment_contract` (`OXID`) ON DELETE SET NULL)
+REFERENCES `oe_payments_contract` (`OXID`) ON DELETE SET NULL)
 ```
 
 ## Fixes Applied
@@ -74,13 +74,13 @@ private function removeForeignKeyIfExists(): void
         WHERE CONSTRAINT_SCHEMA = DATABASE()
         AND CONSTRAINT_NAME = 'FK_CONTRACT_ORDER'
         AND CONSTRAINT_TYPE = 'FOREIGN KEY'
-        AND TABLE_NAME = 'osc_payment_contract'
+        AND TABLE_NAME = 'oe_payments_contract'
     ";
 
     $result = $this->connection->fetchOne($sql);
 
     if ($result > 0) {
-        $this->addSql('ALTER TABLE osc_payment_contract DROP FOREIGN KEY FK_CONTRACT_ORDER');
+        $this->addSql('ALTER TABLE oe_payments_contract DROP FOREIGN KEY FK_CONTRACT_ORDER');
     }
 }
 ```
@@ -192,11 +192,11 @@ private function cleanupTestData(): void
 {
     // Clean webhook logs first (has FK to contracts)
     $this->connection->executeStatement(
-        'DELETE FROM osc_payment_webhooklogs WHERE OXEVENTID LIKE "test_%"'
+        'DELETE FROM oe_payments_webhooklogs WHERE OXEVENTID LIKE "test_%"'
     );
     // Clean test contracts
     $this->connection->executeStatement(
-        'DELETE FROM osc_payment_contract WHERE OXID LIKE "contract_%"'
+        'DELETE FROM oe_payments_contract WHERE OXID LIKE "contract_%"'
     );
 }
 ```
@@ -298,11 +298,11 @@ tearDown()
 
 ### Design Pattern
 ```
-Contract Table (osc_payment_contract)
+Contract Table (oe_payments_contract)
 ├── OXORDERID: Nullable, NO FK constraint
 └── Rationale: Flexibility, testability
 
-Webhook Logs Table (osc_payment_webhooklogs)
+Webhook Logs Table (oe_payments_webhooklogs)
 ├── OXCONTRACTID: Nullable, HAS FK constraint
 └── Rationale: Data integrity, cascade cleanup
 ```

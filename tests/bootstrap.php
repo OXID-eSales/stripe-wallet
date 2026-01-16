@@ -1,68 +1,60 @@
 <?php
 
 /**
- * Copyright © OXID eSales AG. All rights reserved.
- * See LICENSE file for license details.
+ * Bootstrap file for Stripe Module Tests
+ *
+ * This bootstrap loads the OXID shop context for both unit and integration tests.
+ * It provides access to oxNew(), Registry, and other shop functions.
+ *
+ * Usage:
+ *   docker compose exec php php vendor/bin/phpunit -c extensions/stripe/tests/phpunit.xml --testsuite Unit
+ *   docker compose exec php php vendor/bin/phpunit -c extensions/stripe/tests/phpunit.xml --testsuite Integration
  */
 
 declare(strict_types=1);
 
-// Determine module root directory
-$moduleRoot = dirname(__DIR__);
-
-// CRITICAL: Load the module's vendor autoloader FIRST
-// This contains the test class mappings from autoload-dev
-$moduleAutoloader = $moduleRoot . '/vendor/autoload.php';
-if (file_exists($moduleAutoloader)) {
-    require_once $moduleAutoloader;
-} else {
-    // Fallback: Manually register test namespace if module vendor doesn't exist
-    // This happens in CI when only shop-level composer install runs
-
-    // Register PSR-4 autoloader for test classes
-    spl_autoload_register(function ($class) use ($moduleRoot) {
-        // Handle test classes: OxidSolutionCatalysts\Payments\Tests\
-        if (strpos($class, 'OxidSolutionCatalysts\\Payments\\Tests\\') === 0) {
-            $relativeClass = str_replace('OxidSolutionCatalysts\\Payments\\Tests\\', '', $class);
-            $file = $moduleRoot . '/tests/' . str_replace('\\', '/', $relativeClass) . '.php';
-            if (file_exists($file)) {
-                require_once $file;
-                return true;
-            }
-        }
-        return false;
-    }, true, true); // Prepend to autoloader stack
-}
-
-// Try to find and load OXID shop bootstrap (which loads shop's vendor)
+// Find the shop bootstrap - try multiple possible locations
 $possibleBootstraps = [
-    // Standard module location: source/modules/osc/stripe
-    $moduleRoot . '/../../../source/bootstrap.php',
-    // Alternative: extensions directory
-    $moduleRoot . '/../../source/bootstrap.php',
-    // Absolute Docker path
+    // Docker SDK environment - running from /var/www (shop source at /var/www/source/)
     '/var/www/source/bootstrap.php',
-    // GitHub Actions structure
-    dirname(dirname(dirname($moduleRoot))) . '/source/bootstrap.php',
+    // When running from shop root (source/extensions/stripe/tests/)
+    dirname(__DIR__, 4) . '/source/bootstrap.php',
+    // Alternative: shop root is parent of extensions
+    dirname(__DIR__, 3) . '/bootstrap.php',
 ];
 
-$bootstrapLoaded = false;
-foreach ($possibleBootstraps as $shopBootstrap) {
-    if (file_exists($shopBootstrap)) {
-        // Suppress deprecation warnings during bootstrap loading
-        // OXID bootstrap has deprecated code that triggers PHPUnit error handler issues
-        $previousErrorReporting = error_reporting();
-        error_reporting($previousErrorReporting & ~E_DEPRECATED);
-        require_once $shopBootstrap;
-        error_reporting($previousErrorReporting);
-        $bootstrapLoaded = true;
+$shopBootstrap = null;
+foreach ($possibleBootstraps as $path) {
+    if ($path !== null && file_exists($path)) {
+        $shopBootstrap = $path;
         break;
     }
 }
 
-if (!$bootstrapLoaded) {
-    throw new \RuntimeException(
-        'Could not find OXID shop bootstrap.php. Module root: ' . $moduleRoot .
-        '. Tried: ' . implode(', ', $possibleBootstraps)
+if ($shopBootstrap === null) {
+    throw new RuntimeException(
+        'OXID shop bootstrap not found. Tests must be run from shop context. ' .
+        'Searched paths: ' . implode(', ', array_filter($possibleBootstraps))
     );
 }
+
+// Load shop bootstrap (includes shop's autoloader and oxfunctions.php which defines oxNew())
+require_once $shopBootstrap;
+
+// Register autoloader for test classes (autoload-dev may not be loaded in some contexts)
+$testDir = __DIR__;
+spl_autoload_register(static function (string $class) use ($testDir): void {
+    $prefix = 'OxidEsales\\Payments\\Stripe\\Tests\\';
+    $prefixLength = strlen($prefix);
+
+    if (strncmp($class, $prefix, $prefixLength) !== 0) {
+        return;
+    }
+
+    $relativeClass = substr($class, $prefixLength);
+    $file = $testDir . '/' . str_replace('\\', '/', $relativeClass) . '.php';
+
+    if (file_exists($file)) {
+        require_once $file;
+    }
+});

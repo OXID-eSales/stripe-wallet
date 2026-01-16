@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Twig;
+namespace OxidEsales\Payments\Stripe\Twig;
 
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFunction;
@@ -51,7 +51,8 @@ class DumpExtension extends AbstractExtension
 
         echo '</pre>';
 
-        return ob_get_clean();
+        $result = ob_get_clean();
+        return $result !== false ? $result : '';
     }
 
     /**

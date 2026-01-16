@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-Fix 16 CI integration test failures caused by Sprint 8's `osc_payment_order_state` table removal and service discovery issues in CI environment.
+Fix 16 CI integration test failures caused by Sprint 8's `oe_payments_order_state` table removal and service discovery issues in CI environment.
 
 ---
 
@@ -18,7 +18,7 @@ Fix 16 CI integration test failures caused by Sprint 8's `osc_payment_order_stat
 ### Category 1: Table Not Found (3 errors)
 
 ```
-SQLSTATE[42S02]: Table 'example.osc_payment_order_state' doesn't exist
+SQLSTATE[42S02]: Table 'example.oe_payments_order_state' doesn't exist
 ```
 
 **Root Cause:** `FullDataPersistenceFlowTest.php` still references the dropped table.
@@ -51,7 +51,7 @@ ServiceNotFoundException: Service "ContractRepositoryInterface" not found
 
 ### Phase 1: Remove Dropped Table Tests
 
-**Action:** Delete or refactor tests that explicitly test `osc_payment_order_state`.
+**Action:** Delete or refactor tests that explicitly test `oe_payments_order_state`.
 
 **Files to Modify:**
 - `tests/Integration/Component/Checkout/FullDataPersistenceFlowTest.php`
@@ -60,8 +60,8 @@ ServiceNotFoundException: Service "ContractRepositoryInterface" not found
 1. Remove `testOrderState_PersistsOrderContractLink()` - table dropped
 2. Remove `testOrderState_TracksPaymentStateChanges()` - table dropped
 3. Update `testCompleteFlow_PopulatesAllTables()`:
-   - Remove INSERT into `osc_payment_order_state`
-   - Remove assertions on `osc_payment_order_state`
+   - Remove INSERT into `oe_payments_order_state`
+   - Remove assertions on `oe_payments_order_state`
    - Add assertions for contract capture/refund fields instead
 
 ### Phase 2: Fix Service Discovery
@@ -139,7 +139,7 @@ public function testContractRepositoryCanBeInstantiatedDirectly(): void
 // - testOrderState_TracksPaymentStateChanges()
 
 // Update testCompleteFlow_PopulatesAllTables():
-// - Remove osc_payment_order_state INSERT
+// - Remove oe_payments_order_state INSERT
 // - Add contract capture/refund field verification
 ```
 
@@ -201,7 +201,7 @@ Push changes and verify GitHub Actions passes.
 
 ## Success Criteria
 
-1. [ ] `FullDataPersistenceFlowTest` no longer references `osc_payment_order_state`
+1. [ ] `FullDataPersistenceFlowTest` no longer references `oe_payments_order_state`
 2. [ ] All tests use direct repo instantiation (no DI for repos)
 3. [ ] Local integration tests pass
 4. [ ] CI integration tests pass (0 errors)

@@ -428,7 +428,7 @@ use OxidEsales\Eshop\Core\Config;
 
 class ModuleSettings
 {
-    private const MODULE_ID = 'osc_payment_component';
+    private const MODULE_ID = 'oe_payments_component';
 
     public function __construct(
         private Config $config
@@ -547,7 +547,7 @@ Expected: ✅ **PASS**
 </div>
 
 {# Component JavaScript #}
-<script src="{{ oViewConf.getModuleUrl('osc_payment_component', 'out/js/onepage/checkout.js') }}"></script>
+<script src="{{ oViewConf.getModuleUrl('oe_payments_component', 'out/js/onepage/checkout.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const config = JSON.parse(

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Controller\Admin;
+namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Controller\Admin;
 
 use OxidEsales\Eshop\Application\Model\Order;
-use OxidSolutionCatalysts\Payments\Stripe\Controller\Admin\OrderRefund;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
+use OxidEsales\Payments\Stripe\Controller\Admin\OrderRefund;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use PHPUnit\Framework\TestCase;

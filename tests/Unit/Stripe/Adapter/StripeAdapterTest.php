@@ -7,10 +7,10 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Adapter;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Adapter;
 
-use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapter;
-use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapterInterface;
+use OxidEsales\Payments\Stripe\Adapter\StripeAdapter;
+use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Stripe\Checkout\Session;
@@ -27,7 +27,7 @@ use Stripe\StripeClient;
  *
  * Sprint 19: Route Stripe SDK calls through adapter
  *
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapter
+ * @covers \OxidEsales\Payments\Stripe\Adapter\StripeAdapter
  * @group sprint-19
  * @group adapter
  */

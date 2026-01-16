@@ -19,7 +19,7 @@
 
 | Sprint | Status | Description |
 |--------|--------|-------------|
-| Sprint 9 | DONE | CI Integration Test Fixes (removed `osc_payment_order_state` references) |
+| Sprint 9 | DONE | CI Integration Test Fixes (removed `oe_payments_order_state` references) |
 | Sprint 10.1 | DONE | Webhook Request Logging (`stripe_webhooks.log`) |
 | Sprint 10.2 | DONE | OXPAID Reconciliation Command (`stripe:reconcile-oxpaid`) |
 | Sprint 11 | DONE | Contract State Machine Documentation |
@@ -117,7 +117,7 @@ $_REQUEST['sDeliveryAddressMD5'] = $deliveryHash;
 Documentation updates required:
 - `00-overview.md` - Add terminal states (CANCELLED, EXPIRED, FAILED)
 - `01-architecture-layers.md` - Document OXPAID strategy
-- `02-database-and-models.md` - Remove `osc_payment_order_state` references
+- `02-database-and-models.md` - Remove `oe_payments_order_state` references
 - `03-building-payment-modules.md` - Document Component layer dependencies
 - `05-webhooks.md` - Document WebhookProcessingService complexity
 - New: `12-oxpaid-update-strategy.md`

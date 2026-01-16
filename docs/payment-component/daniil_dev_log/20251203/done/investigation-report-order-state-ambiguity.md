@@ -63,9 +63,9 @@ The webhook flow **bypasses** the contract system:
 WebhookController receives payment_intent.succeeded
     → WebhookProcessingService.processEvent()
         → findOrderByPaymentIntentId() [Direct SQL lookup!]
-            → First: osc_payment_transaction.OXPROVIDERORDERID
+            → First: oe_payments_transaction.OXPROVIDERORDERID
             → Fallback: oxorder.OXTRANSID
-        → updateOrderPaymentState() [Direct SQL to osc_payment_order_state]
+        → updateOrderPaymentState() [Direct SQL to oe_payments_order_state]
         → updateOrderPaidTimestamp() [Direct SQL to oxorder.OXPAID]
         → updateOrderTransStatus() [Direct SQL to oxorder.OXTRANSSTATUS]
 ```
@@ -95,9 +95,9 @@ Unit tests verify **what the code does**, not **what it should do**:
 
 | Table | Frontend Flow | Webhook Flow |
 |-------|--------------|--------------|
-| `osc_payment_contract` | Created & Updated | **NEVER TOUCHED** |
-| `osc_payment_transaction` | Queried (fallback) | Queried (primary) |
-| `osc_payment_order_state` | Not directly used | Updated directly |
+| `oe_payments_contract` | Created & Updated | **NEVER TOUCHED** |
+| `oe_payments_transaction` | Queried (fallback) | Queried (primary) |
+| `oe_payments_order_state` | Not directly used | Updated directly |
 | `oxorder` | Updated via Order model | Updated via direct SQL |
 
 ---
@@ -114,9 +114,9 @@ private function findOrderByPaymentIntentId(string $paymentIntentId): ?Order
 {
     $db = DatabaseProvider::getDb();
 
-    // First try: Look in osc_payment_transaction table
+    // First try: Look in oe_payments_transaction table
     $orderId = $db->getOne(
-        "SELECT OXORDERID FROM osc_payment_transaction WHERE OXPROVIDERORDERID = ? LIMIT 1",
+        "SELECT OXORDERID FROM oe_payments_transaction WHERE OXPROVIDERORDERID = ? LIMIT 1",
         [$paymentIntentId]
     );
 

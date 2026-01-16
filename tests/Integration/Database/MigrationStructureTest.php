@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Integration\Database;
+namespace OxidEsales\Payments\Stripe\Tests\Integration\Database;
 
 use Doctrine\DBAL\Configuration;
 use Doctrine\DBAL\Connection;
@@ -31,8 +31,8 @@ class MigrationStructureTest extends TestCase
     {
         parent::setUp();
 
-        // Load database configuration
-        $dbConfig = require __DIR__ . '/../../../migration/migrations-db.php';
+        // Load database configuration from payment-component (tables are created there)
+        $dbConfig = require __DIR__ . '/../../../../payment-component/migration/migrations-db.php';
 
         // Create DBAL connection
         $config = new Configuration();
@@ -44,60 +44,62 @@ class MigrationStructureTest extends TestCase
     public function testContractTableExists(): void
     {
         $this->assertTrue(
-            $this->tableExists('osc_payment_contract'),
-            'Table osc_payment_contract should exist'
+            $this->tableExists('oe_payments_contract'),
+            'Table oe_payments_contract should exist'
         );
     }
 
     public function testTransactionTableExists(): void
     {
         $this->assertTrue(
-            $this->tableExists('osc_payment_transaction'),
-            'Table osc_payment_transaction should exist'
+            $this->tableExists('oe_payments_transaction'),
+            'Table oe_payments_transaction should exist'
         );
     }
 
     public function testOrderStateTableDropped(): void
     {
-        // Sprint 8: osc_payment_order_state table was DROPPED
-        // Capture/refund tracking now handled by osc_payment_contract fields
+        // Sprint 8: oe_payments_stripe_order_state table was DROPPED
+        // Capture/refund tracking now handled by oe_payments_contract fields
         $this->assertFalse(
-            $this->tableExists('osc_payment_order_state'),
-            'Table osc_payment_order_state should NOT exist (dropped in Sprint 8)'
+            $this->tableExists('oe_payments_stripe_order_state'),
+            'Table oe_payments_stripe_order_state should NOT exist (dropped in Sprint 8)'
         );
     }
 
     public function testCustomerTableExists(): void
     {
+        // Customer table is provider-agnostic, in payment-component
         $this->assertTrue(
-            $this->tableExists('osc_payment_customer'),
-            'Table osc_payment_customer should exist'
+            $this->tableExists('oe_payments_customer'),
+            'Table oe_payments_customer should exist (from payment-component)'
         );
     }
 
     public function testIdempotencyTableExists(): void
     {
+        // Idempotency table is provider-agnostic, in payment-component
         $this->assertTrue(
-            $this->tableExists('osc_payment_idempotency'),
-            'Table osc_payment_idempotency should exist'
+            $this->tableExists('oe_payments_idempotency'),
+            'Table oe_payments_idempotency should exist (from payment-component)'
         );
     }
 
     public function testSessionsTableExists(): void
     {
+        // Sessions table is provider-agnostic, in payment-component
         $this->assertTrue(
-            $this->tableExists('osc_payment_sessions'),
-            'Table osc_payment_sessions should exist'
+            $this->tableExists('oe_payments_sessions'),
+            'Table oe_payments_sessions should exist (from payment-component)'
         );
     }
 
     public function testWebhookLogsTableExists(): void
     {
-        $this->markTestSkipped('Webhooklogs table migration not yet implemented - TODO: Add in future migration');
-
+        // Webhooklogs table is provider-agnostic, in payment-component
         $this->assertTrue(
-            $this->tableExists('osc_payment_webhooklogs'),
-            'Table osc_payment_webhooklogs should exist'
+            $this->tableExists('oe_payments_webhooklogs'),
+            'Table oe_payments_webhooklogs should exist (from payment-component)'
         );
     }
 
@@ -105,7 +107,7 @@ class MigrationStructureTest extends TestCase
 
     public function testContractTableHasRequiredColumns(): void
     {
-        $columns = $this->getTableColumns('osc_payment_contract');
+        $columns = $this->getTableColumns('oe_payments_contract');
 
         $expectedColumns = [
             'OXID', 'OXSHOPID', 'OXUSERID', 'OXORDERID', 'OXSTATE',
@@ -125,7 +127,7 @@ class MigrationStructureTest extends TestCase
 
     public function testContractTableHasPrimaryKey(): void
     {
-        $indexes = $this->getTableIndexes('osc_payment_contract');
+        $indexes = $this->getTableIndexes('oe_payments_contract');
 
         $this->assertArrayHasKey('PRIMARY', $indexes, 'Contract table should have PRIMARY key');
         $this->assertContains('OXID', $indexes['PRIMARY']['columns'], 'PRIMARY key should be on OXID');
@@ -133,7 +135,7 @@ class MigrationStructureTest extends TestCase
 
     public function testContractTableHasStateIndex(): void
     {
-        $indexes = $this->getTableIndexes('osc_payment_contract');
+        $indexes = $this->getTableIndexes('oe_payments_contract');
 
         $hasStateIndex = false;
         foreach ($indexes as $indexName => $indexData) {
@@ -148,7 +150,7 @@ class MigrationStructureTest extends TestCase
 
     public function testContractTableHasNoForeignKeysToOxidCoreTables(): void
     {
-        $foreignKeys = $this->getTableForeignKeys('osc_payment_contract');
+        $foreignKeys = $this->getTableForeignKeys('oe_payments_contract');
 
         // Verify NO foreign keys to OXID core tables (oxuser, oxorder)
         // This allows TRUNCATE during demodata installation
@@ -168,7 +170,7 @@ class MigrationStructureTest extends TestCase
 
     public function testTransactionTableHasRequiredColumns(): void
     {
-        $columns = $this->getTableColumns('osc_payment_transaction');
+        $columns = $this->getTableColumns('oe_payments_transaction');
 
         $expectedColumns = [
             'OXID', 'OXSHOPID', 'OXORDERID', 'OXCONTRACTID', 'OXPROVIDER',
@@ -188,26 +190,26 @@ class MigrationStructureTest extends TestCase
 
     public function testTransactionTableHasForeignKeyToContract(): void
     {
-        $foreignKeys = $this->getTableForeignKeys('osc_payment_transaction');
+        $foreignKeys = $this->getTableForeignKeys('oe_payments_transaction');
 
         $hasContractFK = false;
         foreach ($foreignKeys as $fk) {
-            if ($fk['column'] === 'OXCONTRACTID' && $fk['referenced_table'] === 'osc_payment_contract') {
+            if ($fk['column'] === 'OXCONTRACTID' && $fk['referenced_table'] === 'oe_payments_contract') {
                 $hasContractFK = true;
                 break;
             }
         }
 
-        $this->assertTrue($hasContractFK, 'Transaction table should have FK to osc_payment_contract');
+        $this->assertTrue($hasContractFK, 'Transaction table should have FK to oe_payments_contract');
     }
 
     public function testTransactionTableHasSelfReferencingFK(): void
     {
-        $foreignKeys = $this->getTableForeignKeys('osc_payment_transaction');
+        $foreignKeys = $this->getTableForeignKeys('oe_payments_transaction');
 
         $hasSelfFK = false;
         foreach ($foreignKeys as $fk) {
-            if ($fk['column'] === 'OXPARENTTRANSACTIONID' && $fk['referenced_table'] === 'osc_payment_transaction') {
+            if ($fk['column'] === 'OXPARENTTRANSACTIONID' && $fk['referenced_table'] === 'oe_payments_transaction') {
                 $hasSelfFK = true;
                 break;
             }
@@ -220,9 +222,9 @@ class MigrationStructureTest extends TestCase
 
     public function testContractTableHasCaptureRefundColumns(): void
     {
-        // Sprint 8: osc_payment_order_state table DROPPED
-        // Capture/refund tracking now in osc_payment_contract
-        $columns = $this->getTableColumns('osc_payment_contract');
+        // Sprint 8: oe_payments_stripe_order_state table DROPPED
+        // Capture/refund tracking now in oe_payments_contract
+        $columns = $this->getTableColumns('oe_payments_contract');
 
         $captureRefundColumns = [
             'OXCAPTUREDAMOUNT', 'OXREFUNDEDAMOUNT', 'OXCAPTUREDAT', 'OXREFUNDEDAT'
@@ -238,10 +240,11 @@ class MigrationStructureTest extends TestCase
     }
 
     // ==================== CUSTOMER TABLE STRUCTURE ====================
+    // Note: Customer, Idempotency, Sessions tables are provider-agnostic (from payment-component)
 
     public function testCustomerTableHasRequiredColumns(): void
     {
-        $columns = $this->getTableColumns('osc_payment_customer');
+        $columns = $this->getTableColumns('oe_payments_customer');
 
         $expectedColumns = [
             'OXID', 'OXUSERID', 'OXPAYMENTCUSTOMERID', 'OXDEFAULTPAYMENTMETHOD',
@@ -260,7 +263,7 @@ class MigrationStructureTest extends TestCase
 
     public function testCustomerTableHasUniqueIndexOnUserId(): void
     {
-        $indexes = $this->getTableIndexes('osc_payment_customer');
+        $indexes = $this->getTableIndexes('oe_payments_customer');
 
         $hasUniqueUserIndex = false;
         foreach ($indexes as $indexName => $indexData) {
@@ -277,7 +280,7 @@ class MigrationStructureTest extends TestCase
 
     public function testIdempotencyTableHasRequiredColumns(): void
     {
-        $columns = $this->getTableColumns('osc_payment_idempotency');
+        $columns = $this->getTableColumns('oe_payments_idempotency');
 
         $expectedColumns = [
             'OXID', 'OXKEY', 'OXORDERID', 'OXOPERATION',
@@ -295,7 +298,7 @@ class MigrationStructureTest extends TestCase
 
     public function testIdempotencyTableHasUniqueIndexOnKey(): void
     {
-        $indexes = $this->getTableIndexes('osc_payment_idempotency');
+        $indexes = $this->getTableIndexes('oe_payments_idempotency');
 
         $hasUniqueKeyIndex = false;
         foreach ($indexes as $indexName => $indexData) {
@@ -312,7 +315,7 @@ class MigrationStructureTest extends TestCase
 
     public function testSessionsTableHasRequiredColumns(): void
     {
-        $columns = $this->getTableColumns('osc_payment_sessions');
+        $columns = $this->getTableColumns('oe_payments_sessions');
 
         $expectedColumns = [
             'OXID', 'OXPROVIDER', 'OXSESSIONID', 'OXUSERID',
@@ -326,262 +329,6 @@ class MigrationStructureTest extends TestCase
                 "Sessions table should have column {$column}"
             );
         }
-    }
-
-    // ==================== PAYMENTWATCH INDEXES (Version20250112) ====================
-    // Note: These indexes are planned for PaymentWatch feature (future version)
-    // Tests are skipped until the migration is applied
-
-    /**
-     * @test
-     * @group watch
-     * @group future
-     */
-    public function testContractTableHasPaymentWatchStateIndex(): void
-    {
-        $this->markTestSkipped('PaymentWatch indexes not yet implemented (planned for Version20250112)');
-
-        $indexes = $this->getTableIndexes('osc_payment_contract');
-
-        $this->assertArrayHasKey(
-            'idx_pw_contract_state',
-            $indexes,
-            'Contract table should have PaymentWatch state index (idx_pw_contract_state)'
-        );
-
-        $this->assertContains(
-            'OXSTATE',
-            $indexes['idx_pw_contract_state']['columns'],
-            'idx_pw_contract_state should index OXSTATE column'
-        );
-    }
-
-    /**
-     * @test
-     * @group watch
-     * @group future
-     */
-    public function testContractTableHasPaymentWatchProviderOrderIndex(): void
-    {
-        $this->markTestSkipped('PaymentWatch indexes not yet implemented (planned for Version20250112)');
-
-        $indexes = $this->getTableIndexes('osc_payment_contract');
-
-        $this->assertArrayHasKey(
-            'idx_pw_contract_provider_order',
-            $indexes,
-            'Contract table should have PaymentWatch provider order index (idx_pw_contract_provider_order)'
-        );
-
-        $this->assertContains(
-            'OXPROVIDERORDERID',
-            $indexes['idx_pw_contract_provider_order']['columns'],
-            'idx_pw_contract_provider_order should index OXPROVIDERORDERID column'
-        );
-    }
-
-    /**
-     * @test
-     * @group watch
-     * @group future
-     */
-    public function testContractTableHasPaymentWatchOrderIndex(): void
-    {
-        $this->markTestSkipped('PaymentWatch indexes not yet implemented (planned for Version20250112)');
-
-        $indexes = $this->getTableIndexes('osc_payment_contract');
-
-        $this->assertArrayHasKey(
-            'idx_pw_contract_order',
-            $indexes,
-            'Contract table should have PaymentWatch order index (idx_pw_contract_order)'
-        );
-
-        $this->assertContains(
-            'OXORDERID',
-            $indexes['idx_pw_contract_order']['columns'],
-            'idx_pw_contract_order should index OXORDERID column'
-        );
-    }
-
-    /**
-     * @test
-     * @group watch
-     * @group future
-     */
-    public function testContractTableHasPaymentWatchUserIndex(): void
-    {
-        $this->markTestSkipped('PaymentWatch indexes not yet implemented (planned for Version20250112)');
-
-        $indexes = $this->getTableIndexes('osc_payment_contract');
-
-        $this->assertArrayHasKey(
-            'idx_pw_contract_user',
-            $indexes,
-            'Contract table should have PaymentWatch user index (idx_pw_contract_user)'
-        );
-
-        $this->assertContains(
-            'OXUSERID',
-            $indexes['idx_pw_contract_user']['columns'],
-            'idx_pw_contract_user should index OXUSERID column'
-        );
-    }
-
-    /**
-     * @test
-     * @group watch
-     * @group future
-     */
-    public function testContractTableHasPaymentWatchCompositeIndex(): void
-    {
-        $this->markTestSkipped('PaymentWatch indexes not yet implemented (planned for Version20250112)');
-
-        $indexes = $this->getTableIndexes('osc_payment_contract');
-
-        $this->assertArrayHasKey(
-            'idx_pw_contract_id_state',
-            $indexes,
-            'Contract table should have PaymentWatch composite index (idx_pw_contract_id_state)'
-        );
-
-        $this->assertContains(
-            'OXID',
-            $indexes['idx_pw_contract_id_state']['columns'],
-            'idx_pw_contract_id_state should include OXID column'
-        );
-
-        $this->assertContains(
-            'OXSTATE',
-            $indexes['idx_pw_contract_id_state']['columns'],
-            'idx_pw_contract_id_state should include OXSTATE column'
-        );
-    }
-
-    /**
-     * @test
-     * @group watch
-     * @group future
-     */
-    public function testTransactionTableHasPaymentWatchStatusIndex(): void
-    {
-        $this->markTestSkipped('PaymentWatch indexes not yet implemented (planned for Version20250112)');
-
-        $indexes = $this->getTableIndexes('osc_payment_transaction');
-
-        $this->assertArrayHasKey(
-            'idx_pw_transaction_status',
-            $indexes,
-            'Transaction table should have PaymentWatch status index (idx_pw_transaction_status)'
-        );
-
-        $this->assertContains(
-            'OXSTATUS',
-            $indexes['idx_pw_transaction_status']['columns'],
-            'idx_pw_transaction_status should index OXSTATUS column'
-        );
-    }
-
-    /**
-     * @test
-     * @group watch
-     * @group future
-     */
-    public function testTransactionTableHasPaymentWatchContractIndex(): void
-    {
-        $this->markTestSkipped('PaymentWatch indexes not yet implemented (planned for Version20250112)');
-
-        $indexes = $this->getTableIndexes('osc_payment_transaction');
-
-        $this->assertArrayHasKey(
-            'idx_pw_transaction_contract',
-            $indexes,
-            'Transaction table should have PaymentWatch contract index (idx_pw_transaction_contract)'
-        );
-
-        $this->assertContains(
-            'OXCONTRACTID',
-            $indexes['idx_pw_transaction_contract']['columns'],
-            'idx_pw_transaction_contract should index OXCONTRACTID column'
-        );
-    }
-
-    /**
-     * @test
-     * @group watch
-     * @group future
-     */
-    public function testTransactionTableHasPaymentWatchProviderOrderIndex(): void
-    {
-        $this->markTestSkipped('PaymentWatch indexes not yet implemented (planned for Version20250112)');
-
-        $indexes = $this->getTableIndexes('osc_payment_transaction');
-
-        $this->assertArrayHasKey(
-            'idx_pw_transaction_provider_order',
-            $indexes,
-            'Transaction table should have PaymentWatch provider order index (idx_pw_transaction_provider_order)'
-        );
-
-        $this->assertContains(
-            'OXPROVIDERORDERID',
-            $indexes['idx_pw_transaction_provider_order']['columns'],
-            'idx_pw_transaction_provider_order should index OXPROVIDERORDERID column'
-        );
-    }
-
-    /**
-     * @test
-     * @group watch
-     * @group future
-     */
-    public function testTransactionTableHasPaymentWatchTypeIndex(): void
-    {
-        $this->markTestSkipped('PaymentWatch indexes not yet implemented (planned for Version20250112)');
-
-        $indexes = $this->getTableIndexes('osc_payment_transaction');
-
-        $this->assertArrayHasKey(
-            'idx_pw_transaction_type',
-            $indexes,
-            'Transaction table should have PaymentWatch type index (idx_pw_transaction_type)'
-        );
-
-        $this->assertContains(
-            'OXTYPE',
-            $indexes['idx_pw_transaction_type']['columns'],
-            'idx_pw_transaction_type should index OXTYPE column'
-        );
-    }
-
-    /**
-     * @test
-     * @group watch
-     * @group future
-     */
-    public function testTransactionTableHasPaymentWatchCompositeIndex(): void
-    {
-        $this->markTestSkipped('PaymentWatch indexes not yet implemented (planned for Version20250112)');
-
-        $indexes = $this->getTableIndexes('osc_payment_transaction');
-
-        $this->assertArrayHasKey(
-            'idx_pw_transaction_contract_status',
-            $indexes,
-            'Transaction table should have PaymentWatch composite index (idx_pw_transaction_contract_status)'
-        );
-
-        $this->assertContains(
-            'OXCONTRACTID',
-            $indexes['idx_pw_transaction_contract_status']['columns'],
-            'idx_pw_transaction_contract_status should include OXCONTRACTID column'
-        );
-
-        $this->assertContains(
-            'OXSTATUS',
-            $indexes['idx_pw_transaction_contract_status']['columns'],
-            'idx_pw_transaction_contract_status should include OXSTATUS column'
-        );
     }
 
     // ==================== HELPER METHODS ====================

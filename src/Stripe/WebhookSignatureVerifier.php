@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe;
+namespace OxidEsales\Payments\Stripe;
 
 use OxidEsales\PaymentComponent\Webhook\WebhookSignatureVerifierInterface;
 use Stripe\Exception\SignatureVerificationException;

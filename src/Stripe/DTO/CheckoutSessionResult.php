@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\DTO;
+namespace OxidEsales\Payments\Stripe\DTO;
 
 /**
  * Result object for checkout session creation.

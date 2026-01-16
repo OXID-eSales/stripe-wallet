@@ -7,13 +7,13 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Service\Result;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service\Result;
 
-use OxidSolutionCatalysts\Payments\Stripe\Service\Result\SecurityValidationResult;
+use OxidEsales\Payments\Stripe\Service\Result\SecurityValidationResult;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Service\Result\SecurityValidationResult
+ * @covers \OxidEsales\Payments\Stripe\Service\Result\SecurityValidationResult
  */
 class SecurityValidationResultTest extends TestCase
 {

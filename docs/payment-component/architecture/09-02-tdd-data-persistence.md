@@ -27,8 +27,8 @@ This document continues the coverage of Block 2 from Part 1, focusing on reposit
 The component uses its own tables with foreign key references to OXID core tables, avoiding direct table extensions:
 
 ```sql
--- osc_payment_order_state (1:1 with oxorder)
-CREATE TABLE osc_payment_order_state (
+-- oe_payments_order_state (1:1 with oxorder)
+CREATE TABLE oe_payments_order_state (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXORDERID CHAR(32) NOT NULL UNIQUE,  -- FK to oxorder.OXID
     OXSTATE VARCHAR(32) NOT NULL,
@@ -38,8 +38,8 @@ CREATE TABLE osc_payment_order_state (
     FOREIGN KEY (OXORDERID) REFERENCES oxorder(OXID) ON DELETE CASCADE
 );
 
--- osc_payment_transaction (N:1 with oxorder)
-CREATE TABLE osc_payment_transaction (
+-- oe_payments_transaction (N:1 with oxorder)
+CREATE TABLE oe_payments_transaction (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXORDERID CHAR(32) NOT NULL,  -- FK to oxorder.OXID
     OXTRANSACTION_TYPE VARCHAR(32) NOT NULL,
@@ -53,8 +53,8 @@ CREATE TABLE osc_payment_transaction (
     UNIQUE KEY (OXORDERID, OXIDEMPOTENCY_KEY, OXTRANSACTION_TYPE)
 );
 
--- osc_payment_customer (1:1 with oxuser)
-CREATE TABLE osc_payment_customer (
+-- oe_payments_customer (1:1 with oxuser)
+CREATE TABLE oe_payments_customer (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXUSERID CHAR(32) NOT NULL UNIQUE,  -- FK to oxuser.OXID
     OXPROVIDER_CUSTOMER_ID VARCHAR(128),

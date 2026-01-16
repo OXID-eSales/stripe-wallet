@@ -24,7 +24,7 @@ Fixed 24 errors and 2 failures in GitHub CI/CD integration tests while maintaini
 **Symptom:**
 ```
 SQLSTATE[23000]: Integrity constraint violation: 1452 Cannot add or update a child row:
-a foreign key constraint fails (`example`.`osc_payment_contract`,
+a foreign key constraint fails (`example`.`oe_payments_contract`,
 CONSTRAINT `FK_CONTRACT_ORDER` FOREIGN KEY (`OXORDERID`) REFERENCES `oxorder` (`OXID`))
 ```
 
@@ -42,8 +42,8 @@ CONSTRAINT `FK_CONTRACT_ORDER` FOREIGN KEY (`OXORDERID`) REFERENCES `oxorder` (`
 **Problem:**
 ```php
 // OLD APPROACH - Unreliable
-if ($schema->hasTable('osc_payment_contract')) {
-    $table = $schema->getTable('osc_payment_contract');
+if ($schema->hasTable('oe_payments_contract')) {
+    $table = $schema->getTable('oe_payments_contract');
     if ($table->hasForeignKey('FK_CONTRACT_ORDER')) {
         $table->removeForeignKey('FK_CONTRACT_ORDER');
     }
@@ -84,13 +84,13 @@ private function removeForeignKeyIfExists(): void
         WHERE CONSTRAINT_SCHEMA = DATABASE()
         AND CONSTRAINT_NAME = 'FK_CONTRACT_ORDER'
         AND CONSTRAINT_TYPE = 'FOREIGN KEY'
-        AND TABLE_NAME = 'osc_payment_contract'
+        AND TABLE_NAME = 'oe_payments_contract'
     ";
 
     $result = $this->connection->fetchOne($sql);
 
     if ($result > 0) {
-        $this->addSql('ALTER TABLE osc_payment_contract DROP FOREIGN KEY FK_CONTRACT_ORDER');
+        $this->addSql('ALTER TABLE oe_payments_contract DROP FOREIGN KEY FK_CONTRACT_ORDER');
     }
 }
 ```
@@ -117,21 +117,21 @@ add_fk_constraints() {
     execute_sql "
         # FK_CONTRACT_ORDER REMOVED - other FKs still added
 
-        ALTER TABLE osc_payment_order_state
+        ALTER TABLE oe_payments_order_state
             ADD CONSTRAINT FK_ORDER_STATE
             FOREIGN KEY (OXORDERID) REFERENCES oxorder(OXID) ON DELETE CASCADE;
 
-        ALTER TABLE osc_payment_order_state
+        ALTER TABLE oe_payments_order_state
             ADD CONSTRAINT FK_ORDER_STATE_CONTRACT
-            FOREIGN KEY (OXCONTRACTID) REFERENCES osc_payment_contract(OXID) ON DELETE SET NULL;
+            FOREIGN KEY (OXCONTRACTID) REFERENCES oe_payments_contract(OXID) ON DELETE SET NULL;
 
-        ALTER TABLE osc_payment_transaction
+        ALTER TABLE oe_payments_transaction
             ADD CONSTRAINT FK_ORDER
             FOREIGN KEY (OXORDERID) REFERENCES oxorder(OXID) ON DELETE CASCADE;
 
-        ALTER TABLE osc_payment_transaction
+        ALTER TABLE oe_payments_transaction
             ADD CONSTRAINT FK_CONTRACT
-            FOREIGN KEY (OXCONTRACTID) REFERENCES osc_payment_contract(OXID) ON DELETE SET NULL;
+            FOREIGN KEY (OXCONTRACTID) REFERENCES oe_payments_contract(OXID) ON DELETE SET NULL;
     " 2>/dev/null || echo "Some constraints already exist"
 
     echo "✓ FK constraints added (FK_CONTRACT_ORDER intentionally omitted)"
@@ -188,7 +188,7 @@ The GitHub workflow `development.yml` runs these steps:
 
 This fix aligns with the original architectural decision documented in `04-database-design.md`:
 
-> **Contract Table (osc_payment_contract)**
+> **Contract Table (oe_payments_contract)**
 > - OXORDERID: Nullable FK to oxorder (without FK constraint in DB)
 > - Rationale: Allows TRUNCATE operations during testing and demodata installation
 > - Referential integrity maintained at application layer

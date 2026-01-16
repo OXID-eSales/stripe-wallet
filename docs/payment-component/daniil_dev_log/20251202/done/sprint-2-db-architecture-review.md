@@ -46,7 +46,7 @@ class WebhookService {
 │  │   ├── CustomerRepositoryInterface.php        ◄── Interface               │
 │  │   ├── DoctrineWebhookLogRepository.php       ◄── Implementation          │
 │  │   └── DoctrinePaymentCustomerRepository.php  ◄── Implementation          │
-│  └── tables: osc_payment_* (7 tables, all provider-agnostic)                │
+│  └── tables: oe_payments_* (7 tables, all provider-agnostic)                │
 │                                                                             │
 │  src/Stripe/ (PROVIDER SPECIFIC)                                            │
 │  └── NO TABLES! Stripe uses Component tables via interfaces                 │
@@ -60,7 +60,7 @@ class WebhookService {
 
 | Owner | Table Prefix | Created By | Used By |
 |-------|-------------|------------|---------|
-| Component | `osc_payment_*` | Migrations | All providers via interfaces |
+| Component | `oe_payments_*` | Migrations | All providers via interfaces |
 | Stripe | NONE | - | Uses Component tables |
 | PayPal (future) | NONE | - | Would use Component tables |
 
@@ -72,8 +72,8 @@ class WebhookService {
 
 | Issue | Table | Status | Action |
 |-------|-------|--------|--------|
-| Duplicate webhook logs | `osc_payment_webhooklogs` + `osc_payment_webhook_log` | REDUNDANT | Consolidate |
-| Duplicate customer mapping | `osc_stripe_customer_mapping` + `osc_payment_customer` | REDUNDANT | Remove Stripe-specific |
+| Duplicate webhook logs | `oe_payments_webhooklogs` + `oe_payments_webhook_log` | REDUNDANT | Consolidate |
+| Duplicate customer mapping | `osc_stripe_customer_mapping` + `oe_payments_customer` | REDUNDANT | Remove Stripe-specific |
 | Unused payment details | `osc_stripe_payment_details` | UNUSED | Analyze & possibly remove |
 
 ---
@@ -84,26 +84,26 @@ class WebhookService {
 
 | Table | Created By | Used By |
 |-------|-----------|---------|
-| `osc_payment_webhooklogs` | Migration V20251031140200 | DoctrineWebhookLogRepository |
-| `osc_payment_webhook_log` | Events.php | WebhookController, WebhookProcessingService |
+| `oe_payments_webhooklogs` | Migration V20251031140200 | DoctrineWebhookLogRepository |
+| `oe_payments_webhook_log` | Events.php | WebhookController, WebhookProcessingService |
 
 ### Problem
 
 Webhook logs are written to DIFFERENT tables depending on code path:
-- Component repository writes to `osc_payment_webhooklogs`
-- Stripe services write to `osc_payment_webhook_log`
+- Component repository writes to `oe_payments_webhooklogs`
+- Stripe services write to `oe_payments_webhook_log`
 
 ### Resolution
 
-**Keep:** `osc_payment_webhooklogs` (from migrations - provider-agnostic)
+**Keep:** `oe_payments_webhooklogs` (from migrations - provider-agnostic)
 
-**Remove:** `osc_payment_webhook_log` (from Events.php)
+**Remove:** `oe_payments_webhook_log` (from Events.php)
 
 **Migrate:**
 1. Update `WebhookController.php` to use `DoctrineWebhookLogRepository`
 2. Update `WebhookProcessingService.php` to use `DoctrineWebhookLogRepository`
 3. Remove table creation from `Events.php`
-4. Add migration to drop `osc_payment_webhook_log` if empty
+4. Add migration to drop `oe_payments_webhook_log` if empty
 
 ---
 
@@ -111,7 +111,7 @@ Webhook logs are written to DIFFERENT tables depending on code path:
 
 ### Current State
 
-**osc_payment_customer** (Migration - Provider-Agnostic):
+**oe_payments_customer** (Migration - Provider-Agnostic):
 ```sql
 OXID, OXUSERID (unique), OXPAYMENTCUSTOMERID, OXDEFAULTPAYMENTMETHOD,
 OXSAVEDPAYMENTMETHODS, OXBILLINGAGREEMENT, OXLASTPAYMENTDATE
@@ -126,17 +126,17 @@ OXID, OXSHOPID, OXUSERID (unique), OXSTRIPECUSTOMERID
 
 **Daniil's observation is correct** - these tables are redundant!
 
-The `osc_payment_customer.OXPAYMENTCUSTOMERID` field can store the Stripe customer ID.
+The `oe_payments_customer.OXPAYMENTCUSTOMERID` field can store the Stripe customer ID.
 
 ### Resolution
 
-**Keep:** `osc_payment_customer` (provider-agnostic)
+**Keep:** `oe_payments_customer` (provider-agnostic)
 
 **Remove:** `osc_stripe_customer_mapping`
 
 **Migrate:**
-1. If `osc_stripe_customer_mapping` has data, migrate to `osc_payment_customer`
-2. Update `StripeCustomerService.php` to use `osc_payment_customer` table
+1. If `osc_stripe_customer_mapping` has data, migrate to `oe_payments_customer`
+2. Update `StripeCustomerService.php` to use `oe_payments_customer` table
 3. Remove table creation from `Events.php`
 4. Add migration to drop `osc_stripe_customer_mapping`
 
@@ -149,13 +149,13 @@ The `osc_payment_customer.OXPAYMENTCUSTOMERID` field can store the Stripe custom
 "SELECT OXSTRIPECUSTOMERID FROM osc_stripe_customer_mapping WHERE OXUSERID = ?"
 
 // AFTER
-"SELECT OXPAYMENTCUSTOMERID FROM osc_payment_customer WHERE OXUSERID = ?"
+"SELECT OXPAYMENTCUSTOMERID FROM oe_payments_customer WHERE OXUSERID = ?"
 
 // BEFORE
 "INSERT INTO osc_stripe_customer_mapping (OXID, OXSHOPID, OXUSERID, OXSTRIPECUSTOMERID, OXCREATED)"
 
 // AFTER
-"INSERT INTO osc_payment_customer (OXID, OXUSERID, OXPAYMENTCUSTOMERID, OXCREATED, OXUPDATED)"
+"INSERT INTO oe_payments_customer (OXID, OXUSERID, OXPAYMENTCUSTOMERID, OXCREATED, OXUPDATED)"
 ```
 
 ---
@@ -206,8 +206,8 @@ SELECT * FROM osc_stripe_payment_details LIMIT 5;
 **Remove the table** - Stripe wallet means we don't handle card data.
 
 If we need risk scoring later, we can:
-1. Store in `osc_payment_contract.OXMETADATA` (JSON)
-2. Or in `osc_payment_transaction.OXMETADATA` (doesn't exist yet but could add)
+1. Store in `oe_payments_contract.OXMETADATA` (JSON)
+2. Or in `oe_payments_transaction.OXMETADATA` (doesn't exist yet but could add)
 
 ---
 
@@ -217,14 +217,14 @@ If we need risk scoring later, we can:
 
 - [ ] Update `WebhookController.php` to use DoctrineWebhookLogRepository
 - [ ] Update `WebhookProcessingService.php` to use DoctrineWebhookLogRepository
-- [ ] Remove `osc_payment_webhook_log` creation from Events.php
+- [ ] Remove `oe_payments_webhook_log` creation from Events.php
 - [ ] Create migration to drop old table
 - [ ] Test webhook processing
 
 ### Task 2: Consolidate Customer Tables
 
 - [ ] Check for existing data in `osc_stripe_customer_mapping`
-- [ ] Update `StripeCustomerService.php` to use `osc_payment_customer`
+- [ ] Update `StripeCustomerService.php` to use `oe_payments_customer`
 - [ ] Remove `osc_stripe_customer_mapping` creation from Events.php
 - [ ] Create migration to drop old table
 - [ ] Test customer creation/lookup
@@ -251,19 +251,19 @@ After above tasks, Events.php should only:
 
 | Table | Purpose | Owner |
 |-------|---------|-------|
-| `osc_payment_contract` | Contract lifecycle | Migrations |
-| `osc_payment_transaction` | Transaction records | Migrations |
-| `osc_payment_order_state` | Order payment state | Migrations |
-| `osc_payment_customer` | Customer-provider mapping | Migrations |
-| `osc_payment_idempotency` | Idempotency keys | Migrations |
-| `osc_payment_sessions` | Payment sessions | Migrations |
-| `osc_payment_webhooklogs` | Webhook logs | Migrations |
+| `oe_payments_contract` | Contract lifecycle | Migrations |
+| `oe_payments_transaction` | Transaction records | Migrations |
+| `oe_payments_order_state` | Order payment state | Migrations |
+| `oe_payments_customer` | Customer-provider mapping | Migrations |
+| `oe_payments_idempotency` | Idempotency keys | Migrations |
+| `oe_payments_sessions` | Payment sessions | Migrations |
+| `oe_payments_webhooklogs` | Webhook logs | Migrations |
 
 ### Tables to REMOVE
 
 | Table | Reason |
 |-------|--------|
-| `osc_payment_webhook_log` | Duplicate of webhooklogs |
+| `oe_payments_webhook_log` | Duplicate of webhooklogs |
 | `osc_stripe_customer_mapping` | Duplicate of payment_customer |
 | `osc_stripe_payment_details` | Unused, no card data needed |
 
@@ -289,8 +289,8 @@ docker compose exec mysql mysql -uroot -proot example -e "SHOW TABLES LIKE 'osc_
 
 ## Acceptance Criteria
 
-1. [ ] Only ONE webhook log table exists (`osc_payment_webhooklogs`)
-2. [ ] Only ONE customer table exists (`osc_payment_customer`)
+1. [ ] Only ONE webhook log table exists (`oe_payments_webhooklogs`)
+2. [ ] Only ONE customer table exists (`oe_payments_customer`)
 3. [ ] `osc_stripe_payment_details` table removed
 4. [ ] Events.php doesn't create tables (only adds columns)
 5. [ ] All webhook processing works

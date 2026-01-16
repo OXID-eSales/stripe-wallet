@@ -7,13 +7,13 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Adapter;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Adapter;
 
-use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeStatusMapper;
+use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeStatusMapper
+ * @covers \OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper
  */
 final class StripeStatusMapperTest extends TestCase
 {

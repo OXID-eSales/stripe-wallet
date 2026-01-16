@@ -7,15 +7,15 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Service;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
-use OxidSolutionCatalysts\Payments\Stripe\Service\ReconciliationResult;
+use OxidEsales\Payments\Stripe\Service\ReconciliationResult;
 use PHPUnit\Framework\TestCase;
 
 /**
  * Unit tests for ReconciliationResult DTO
  *
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Service\ReconciliationResult
+ * @covers \OxidEsales\Payments\Stripe\Service\ReconciliationResult
  * @group sprint-10
  * @group reconciliation
  */

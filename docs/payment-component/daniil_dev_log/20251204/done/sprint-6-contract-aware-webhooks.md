@@ -541,7 +541,7 @@ test('complete checkout flow with contract fulfillment', async ({ page }) => {
 
     // 4. Verify contract state in DB
     const contractState = await queryDatabase(
-        `SELECT OXSTATE FROM osc_payment_contract WHERE OXID = '${contractId}'`
+        `SELECT OXSTATE FROM oe_payments_contract WHERE OXID = '${contractId}'`
     );
     expect(contractState).toBe('fulfilled');
 });

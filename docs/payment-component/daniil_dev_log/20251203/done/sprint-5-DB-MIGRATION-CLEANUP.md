@@ -21,7 +21,7 @@ The `Events::onActivate()` method contains database schema modifications that sh
 public static function onActivate(): void
 {
     self::addDatabaseStructure();      // ❌ Creates columns in core tables
-    self::addStandardCheckoutTables(); // ❌ Creates osc_payment_* tables
+    self::addStandardCheckoutTables(); // ❌ Creates oe_payments_* tables
     self::ensureStripePaymentMethods();
     // ...
 }
@@ -66,7 +66,7 @@ self::addColumnIfNotExists('oxuser', 'STRIPECUSTOMERID', ...);
 - Creates coupling between core schema and payment provider
 - Makes it hard to uninstall the extension cleanly
 - Violates separation of concerns
-- All order-related data should be in `osc_payment_*` tables
+- All order-related data should be in `oe_payments_*` tables
 
 ### BUG 3: Tables Created in Events.php Instead of Migrations
 
@@ -75,11 +75,11 @@ self::addColumnIfNotExists('oxuser', 'STRIPECUSTOMERID', ...);
 ```php
 protected static function addStandardCheckoutTables()
 {
-    // Creates osc_payment_transaction table
-    self::addTableIfNotExists('osc_payment_transaction', "CREATE TABLE ...");
+    // Creates oe_payments_transaction table
+    self::addTableIfNotExists('oe_payments_transaction', "CREATE TABLE ...");
 
-    // Creates osc_payment_order_state table
-    self::addTableIfNotExists('osc_payment_order_state', "CREATE TABLE ...");
+    // Creates oe_payments_order_state table
+    self::addTableIfNotExists('oe_payments_order_state', "CREATE TABLE ...");
 }
 ```
 
@@ -87,9 +87,9 @@ protected static function addStandardCheckoutTables()
 - These should be in `migration/data/Version*.php` files
 - Not versioned, not tracked, not rollbackable
 
-### BUG 4: Legacy osc_payment_webhook_log References
+### BUG 4: Legacy oe_payments_webhook_log References
 
-Despite `Version20251202_Sprint2TableConsolidation.php` dropping the `osc_payment_webhook_log` table, code still references it:
+Despite `Version20251202_Sprint2TableConsolidation.php` dropping the `oe_payments_webhook_log` table, code still references it:
 
 **Files with references:**
 - `src/Stripe/Service/WebhookProcessingService.php`
@@ -114,17 +114,17 @@ Stripe extension MUST NOT add columns to:
 - `oxuser`
 - Any other `ox*` core table
 
-### Rule 3: Use osc_payment_* Tables Only
+### Rule 3: Use oe_payments_* Tables Only
 All Stripe-related order data MUST be stored in:
-- `osc_payment_contract` - Payment contracts (Component)
-- `osc_payment_order_state` - Payment state per order
-- `osc_payment_transaction` - Individual transactions
-- `osc_payment_stripe_*` - Stripe-specific data (if needed)
+- `oe_payments_contract` - Payment contracts (Component)
+- `oe_payments_order_state` - Payment state per order
+- `oe_payments_transaction` - Individual transactions
+- `oe_payments_stripe_*` - Stripe-specific data (if needed)
 
 ### Rule 4: Stripe-Specific Extensions
 If existing tables don't fit the data model, create new tables:
-- `osc_payment_stripe_order_refund` - For refund-related columns
-- `osc_payment_stripe_customer` - For customer mapping
+- `oe_payments_stripe_order_refund` - For refund-related columns
+- `oe_payments_stripe_customer` - For customer mapping
 
 ---
 
@@ -152,10 +152,10 @@ self::addColumnIfNotExists('oxorderarticles', 'STRIPEAMOUNTREFUNDED', ...);
 self::addColumnIfNotExists('oxuser', 'STRIPECUSTOMERID', ...);
 ```
 
-**Why?** All transaction data is already tracked in `osc_payment_transaction`:
+**Why?** All transaction data is already tracked in `oe_payments_transaction`:
 - Refund amounts → calculated from transaction history
-- Customer ID → stored in `osc_payment_customer.OXPAYMENTCUSTOMERID`
-- External trans ID → stored in `osc_payment_transaction.OXTRANSACTIONID`
+- Customer ID → stored in `oe_payments_customer.OXPAYMENTCUSTOMERID`
+- External trans ID → stored in `oe_payments_transaction.OXTRANSACTIONID`
 
 ### Task 2: Move Table Creation from Events.php to Migrations
 
@@ -164,14 +164,14 @@ self::addColumnIfNotExists('oxuser', 'STRIPECUSTOMERID', ...);
 The `addStandardCheckoutTables()` method creates tables in `onActivate()`.
 These should be in `migration/data/` files instead.
 
-**Already done:** Tables `osc_payment_transaction` and `osc_payment_order_state` are already
+**Already done:** Tables `oe_payments_transaction` and `oe_payments_order_state` are already
 defined in proper migrations. Remove duplicate creation from Events.php.
 
 ### Task 3: Update OrderRefund Service
 
 **File:** `src/Stripe/Controller/Admin/OrderRefund.php`
 
-Update to calculate refund totals from `osc_payment_transaction` instead of reading
+Update to calculate refund totals from `oe_payments_transaction` instead of reading
 STRIPE* columns from `oxorder`:
 
 ```php
@@ -180,12 +180,12 @@ STRIPE* columns from `oxorder`:
 $refundedAmount = $this->getRefundedAmountFromTransactions($orderId);
 ```
 
-### Task 4: ✅ DONE - Remove Legacy osc_payment_webhook_log References
+### Task 4: ✅ DONE - Remove Legacy oe_payments_webhook_log References
 
 Already completed:
-- [x] `src/Stripe/Service/WebhookProcessingService.php` → `osc_payment_webhooklogs`
-- [x] `src/Stripe/Controller/Webhook/WebhookController.php` → `osc_payment_webhooklogs`
-- [x] `tests/Integration/Stripe/Webhook/OxpaidWebhookUpdateTest.php` → `osc_payment_webhooklogs`
+- [x] `src/Stripe/Service/WebhookProcessingService.php` → `oe_payments_webhooklogs`
+- [x] `src/Stripe/Controller/Webhook/WebhookController.php` → `oe_payments_webhooklogs`
+- [x] `tests/Integration/Stripe/Webhook/OxpaidWebhookUpdateTest.php` → `oe_payments_webhooklogs`
 
 ---
 
@@ -231,9 +231,9 @@ oxuser
 oxorder                        (untouched core table)
 ├── OXID, OXSHOPID, OXUSERID, OXTRANSID, OXPAID, OXTRANSSTATUS...
 
-osc_payment_transaction        (existing - tracks ALL transactions)
+oe_payments_transaction        (existing - tracks ALL transactions)
 ├── OXORDERID → oxorder.OXID
-├── OXCONTRACTID → osc_payment_contract.OXID
+├── OXCONTRACTID → oe_payments_contract.OXID
 ├── OXPROVIDERORDERID          (PaymentIntent ID: pi_...)
 ├── OXTRANSACTIONID            (Charge/Refund ID: ch_..., re_...)
 ├── OXTYPE                     ('payment', 'refund', 'authorization')
@@ -242,14 +242,14 @@ osc_payment_transaction        (existing - tracks ALL transactions)
 ├── OXCURRENCY
 ├── OXCREATED, OXUPDATED
 
-osc_payment_order_state        (existing - payment state per order)
+oe_payments_order_state        (existing - payment state per order)
 ├── OXORDERID → oxorder.OXID
 ├── OXPAYMENTSTATE             ('pending', 'authorized', 'paid', 'refunded')
 ├── OXAUTHORIZEDAMOUNT
 ├── OXCAPTUREDAMOUNT
 ├── OXREFUNDEDAMOUNT           (total refunded - calculated or stored)
 
-osc_payment_customer           (existing)
+oe_payments_customer           (existing)
 ├── OXUSERID → oxuser.OXID
 ├── OXPAYMENTCUSTOMERID        (Stripe customer ID: cus_...)
 ```
@@ -307,11 +307,11 @@ calculate from the original order costs proportionally.
 - **No hypothetical features** - Implement what's needed NOW, not "might need later"
 
 ```
-✗ BAD:  Create osc_payment_stripe_order_refund table with 10 columns
-✓ GOOD: Use existing osc_payment_transaction to track refund history
+✗ BAD:  Create oe_payments_stripe_order_refund table with 10 columns
+✓ GOOD: Use existing oe_payments_transaction to track refund history
 
-✗ BAD:  Store refund amount in oxorder.STRIPEDELCOSTREFUNDED AND osc_payment_order_state
-✓ GOOD: Calculate from osc_payment_transaction (single source of truth)
+✗ BAD:  Store refund amount in oxorder.STRIPEDELCOSTREFUNDED AND oe_payments_order_state
+✓ GOOD: Calculate from oe_payments_transaction (single source of truth)
 
 ✗ BAD:  Create RefundCalculationService, RefundHistoryService, RefundSummaryService
 ✓ GOOD: Add getRefundedAmount() method to existing TransactionRepository
@@ -556,9 +556,9 @@ If issues arise:
 ## Acceptance Criteria
 
 - [ ] Events.php no longer adds STRIPE* columns to core tables
-- [ ] Events.php no longer creates osc_payment_* tables (migrations handle this)
-- [ ] OrderRefund service calculates refunds from `osc_payment_transaction`
-- [x] Legacy osc_payment_webhook_log references removed (DONE)
+- [ ] Events.php no longer creates oe_payments_* tables (migrations handle this)
+- [ ] OrderRefund service calculates refunds from `oe_payments_transaction`
+- [x] Legacy oe_payments_webhook_log references removed (DONE)
 - [ ] All tests pass
 - [ ] Refund functionality works end-to-end
 
@@ -573,6 +573,6 @@ If issues arise:
 
 **After (simple):**
 - Zero columns added to core tables
-- Transaction history in `osc_payment_transaction`
+- Transaction history in `oe_payments_transaction`
 - Calculate totals on-the-fly when needed
 - Store detailed breakdown in transaction metadata (JSON) if needed

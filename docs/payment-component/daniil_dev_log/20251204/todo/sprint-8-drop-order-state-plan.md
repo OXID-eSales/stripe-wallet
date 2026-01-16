@@ -1,4 +1,4 @@
-# Sprint 8: Drop osc_payment_order_state - Technical Plan
+# Sprint 8: Drop oe_payments_order_state - Technical Plan
 
 **Date:** 2025-12-04
 **Status:** Planning
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-Complete removal of `osc_payment_order_state` table and related code. All payment state tracking will be consolidated into `osc_payment_contract`. This eliminates redundant dual-tracking and simplifies the architecture.
+Complete removal of `oe_payments_order_state` table and related code. All payment state tracking will be consolidated into `oe_payments_contract`. This eliminates redundant dual-tracking and simplifies the architecture.
 
 ---
 
@@ -17,7 +17,7 @@ Complete removal of `osc_payment_order_state` table and related code. All paymen
 
 ### Current Issues
 
-1. **Dual State Tracking**: Both `osc_payment_contract.OXSTATE` and `osc_payment_order_state.OXPAYMENTSTATE` track payment status
+1. **Dual State Tracking**: Both `oe_payments_contract.OXSTATE` and `oe_payments_order_state.OXPAYMENTSTATE` track payment status
 2. **Redundant Data**: `OXPROVIDERORDERID` exists in both tables
 3. **Dead Code**: `PaymentOrderStateRepository` is never instantiated
 4. **Confusing Flow**: `WebhookProcessingService` updates both tables
@@ -27,9 +27,9 @@ Complete removal of `osc_payment_order_state` table and related code. All paymen
 
 | Table | Purpose | Action |
 |-------|---------|--------|
-| `osc_payment_order_state` | Legacy payment state | **DROP** |
-| `osc_payment_contract` | Contract state machine | **ENHANCE** |
-| `osc_payment_webhooklogs` | Webhook audit log | Keep |
+| `oe_payments_order_state` | Legacy payment state | **DROP** |
+| `oe_payments_contract` | Contract state machine | **ENHANCE** |
+| `oe_payments_webhooklogs` | Webhook audit log | Keep |
 | `oxorder` | OXID orders | Keep (OXPAID updated) |
 
 ---
@@ -48,7 +48,7 @@ src/Stripe/Repository/PaymentOrderStateRepository.php
 ### Methods to REMOVE from WebhookProcessingService
 
 ```php
-// These methods update osc_payment_order_state - REMOVE
+// These methods update oe_payments_order_state - REMOVE
 private function updateOrderPaymentState(string $orderId, string $state): void
 private function updateOrderCaptureState(string $orderId, float $capturedAmount): void
 private function updateOrderRefundState(string $orderId, float $refundedAmount): void
@@ -79,7 +79,7 @@ src/Stripe/Service/WebhookProcessingService.php:583  $this->updateOrderPaymentSt
 ### Migration: Add Fields to Contract
 
 ```sql
-ALTER TABLE osc_payment_contract
+ALTER TABLE oe_payments_contract
 ADD COLUMN OXCAPTUREDAMOUNT DECIMAL(10,2) DEFAULT NULL AFTER OXFULFILLEDAT,
 ADD COLUMN OXREFUNDEDAMOUNT DECIMAL(10,2) DEFAULT NULL AFTER OXCAPTUREDAMOUNT,
 ADD COLUMN OXCAPTUREDAT DATETIME DEFAULT NULL AFTER OXREFUNDEDAMOUNT,
@@ -90,8 +90,8 @@ ADD COLUMN OXREFUNDEDAT DATETIME DEFAULT NULL AFTER OXCAPTUREDAT;
 
 ```sql
 -- Migrate existing data from order_state to contract
-UPDATE osc_payment_contract c
-JOIN osc_payment_order_state os ON c.OXID = os.OXCONTRACTID
+UPDATE oe_payments_contract c
+JOIN oe_payments_order_state os ON c.OXID = os.OXCONTRACTID
 SET
     c.OXCAPTUREDAMOUNT = os.OXCAPTUREDAMOUNT,
     c.OXREFUNDEDAMOUNT = os.OXREFUNDEDAMOUNT,
@@ -103,7 +103,7 @@ WHERE os.OXCONTRACTID IS NOT NULL;
 ### Migration: Drop Table
 
 ```sql
-DROP TABLE IF EXISTS osc_payment_order_state;
+DROP TABLE IF EXISTS oe_payments_order_state;
 ```
 
 ---
@@ -153,7 +153,7 @@ class NoOrderStateTest extends IntegrationTestCase
     /** @test */
     public function webhookProcessingDoesNotTouchOrderStateTable(): void
     {
-        // Given: Empty osc_payment_order_state table
+        // Given: Empty oe_payments_order_state table
         // When: Process payment_intent.succeeded webhook
         // Then: Table still empty (no inserts/updates)
     }
@@ -249,28 +249,28 @@ public function handleChargeRefunded(string $providerOrderId, float $amount): ?b
 public function up(Schema $schema): void
 {
     // Step 1: Add columns to contract
-    $this->addSql("ALTER TABLE osc_payment_contract
+    $this->addSql("ALTER TABLE oe_payments_contract
         ADD COLUMN OXCAPTUREDAMOUNT DECIMAL(10,2) DEFAULT NULL,
         ADD COLUMN OXREFUNDEDAMOUNT DECIMAL(10,2) DEFAULT NULL,
         ADD COLUMN OXCAPTUREDAT DATETIME DEFAULT NULL,
         ADD COLUMN OXREFUNDEDAT DATETIME DEFAULT NULL");
 
     // Step 2: Migrate data
-    $this->addSql("UPDATE osc_payment_contract c
-        JOIN osc_payment_order_state os ON c.OXID = os.OXCONTRACTID
+    $this->addSql("UPDATE oe_payments_contract c
+        JOIN oe_payments_order_state os ON c.OXID = os.OXCONTRACTID
         SET c.OXCAPTUREDAMOUNT = os.OXCAPTUREDAMOUNT,
             c.OXREFUNDEDAMOUNT = os.OXREFUNDEDAMOUNT,
             c.OXUPDATED = NOW()
         WHERE os.OXCONTRACTID IS NOT NULL");
 
     // Step 3: Drop table
-    $this->addSql("DROP TABLE IF EXISTS osc_payment_order_state");
+    $this->addSql("DROP TABLE IF EXISTS oe_payments_order_state");
 }
 
 public function down(Schema $schema): void
 {
     // Recreate table for rollback
-    $this->addSql("CREATE TABLE osc_payment_order_state (...)");
+    $this->addSql("CREATE TABLE oe_payments_order_state (...)");
     // Migrate data back
 }
 ```
@@ -283,7 +283,7 @@ public function down(Schema $schema): void
 
 - [ ] All new tests pass (TDD)
 - [ ] All existing tests pass
-- [ ] No references to `osc_payment_order_state` in code
+- [ ] No references to `oe_payments_order_state` in code
 - [ ] No references to `PaymentOrderStateRepository`
 - [ ] Migration runs successfully (up and down)
 - [ ] E2E tests pass (checkout flow)
@@ -307,7 +307,7 @@ docker compose exec php vendor/bin/phpunit \
 cd tests/e2e/playwright && npx playwright test tests/checkout/
 
 # Verify no order_state usage
-grep -rn "osc_payment_order_state" src/
+grep -rn "oe_payments_order_state" src/
 # Should return: nothing
 ```
 
@@ -334,7 +334,7 @@ See PUML files:
 
 ## Success Criteria
 
-1. ✅ `osc_payment_order_state` table dropped
+1. ✅ `oe_payments_order_state` table dropped
 2. ✅ `PaymentOrderStateRepository.php` deleted
 3. ✅ All `updateOrder*State()` methods removed
 4. ✅ Contract stores capture/refund amounts

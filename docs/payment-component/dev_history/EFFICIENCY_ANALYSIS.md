@@ -465,7 +465,7 @@ class ContractRepository
 
         // Cache miss - load from DB
         $data = $this->db->fetchAssociative(
-            "SELECT * FROM osc_payment_contract WHERE OXPROVIDERORDERID = ?",
+            "SELECT * FROM oe_payments_contract WHERE OXPROVIDERORDERID = ?",
             [$providerOrderId]
         );
 

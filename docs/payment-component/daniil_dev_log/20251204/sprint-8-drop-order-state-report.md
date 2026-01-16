@@ -1,4 +1,4 @@
-# Sprint 8: Drop osc_payment_order_state - Implementation Report
+# Sprint 8: Drop oe_payments_order_state - Implementation Report
 
 **Date:** 2025-12-04
 **Status:** Completed
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-Successfully removed the redundant `osc_payment_order_state` table and consolidated all payment state tracking into `osc_payment_contract`. The implementation followed TDD principles with failing tests written first, then making them pass through code changes.
+Successfully removed the redundant `oe_payments_order_state` table and consolidated all payment state tracking into `oe_payments_contract`. The implementation followed TDD principles with failing tests written first, then making them pass through code changes.
 
 ---
 
@@ -17,7 +17,7 @@ Successfully removed the redundant `osc_payment_order_state` table and consolida
 
 ### Issues Identified
 
-1. **Dual State Tracking**: Both `osc_payment_contract.OXSTATE` and `osc_payment_order_state.OXPAYMENTSTATE` tracked payment status
+1. **Dual State Tracking**: Both `oe_payments_contract.OXSTATE` and `oe_payments_order_state.OXPAYMENTSTATE` tracked payment status
 2. **Redundant Data**: `OXPROVIDERORDERID` existed in both tables
 3. **Dead Code**: `PaymentOrderStateRepository.php` was never instantiated (commented out in services.yaml)
 4. **Confusing Flow**: `WebhookProcessingService` updated both tables via direct SQL
@@ -27,7 +27,7 @@ Successfully removed the redundant `osc_payment_order_state` table and consolida
 
 ```
 ┌─────────────────────────┐     ┌─────────────────────────────┐
-│    osc_payment_contract │     │  osc_payment_order_state    │
+│    oe_payments_contract │     │  oe_payments_order_state    │
 ├─────────────────────────┤     ├─────────────────────────────┤
 │ OXSTATE: committed/     │     │ OXPAYMENTSTATE: paid/failed │
 │          fulfilled      │     │ OXPROVIDERORDERID: pi_xxx   │ ← DUPLICATE!
@@ -47,7 +47,7 @@ Successfully removed the redundant `osc_payment_order_state` table and consolida
 
 ```
 ┌────────────────────────────────────────┐
-│        osc_payment_contract            │
+│        oe_payments_contract            │
 ├────────────────────────────────────────┤
 │ OXSTATE: committed/fulfilled/failed    │
 │ OXPROVIDERORDERID: pi_xxx              │
@@ -134,17 +134,17 @@ $this->setPrivateProperty($reflection, $contract, 'refundedAt', $this->parseDate
 
 ```sql
 -- Step 1: Add new columns to contract
-ALTER TABLE osc_payment_contract
+ALTER TABLE oe_payments_contract
 ADD COLUMN OXCAPTUREDAMOUNT DECIMAL(10,2) DEFAULT NULL,
 ADD COLUMN OXREFUNDEDAMOUNT DECIMAL(10,2) DEFAULT NULL,
 ADD COLUMN OXCAPTUREDAT DATETIME DEFAULT NULL,
 ADD COLUMN OXREFUNDEDAT DATETIME DEFAULT NULL;
 
 -- Step 2: Drop foreign key
-ALTER TABLE osc_payment_order_state DROP FOREIGN KEY FK_ORDER_STATE_CONTRACT;
+ALTER TABLE oe_payments_order_state DROP FOREIGN KEY FK_ORDER_STATE_CONTRACT;
 
 -- Step 3: Drop redundant table
-DROP TABLE IF EXISTS osc_payment_order_state;
+DROP TABLE IF EXISTS oe_payments_order_state;
 ```
 
 ### Phase 5: Webhook Handler Update
@@ -278,7 +278,7 @@ Tests: 308, Errors: 3, Failures: 1
 
 ## Database Schema Changes
 
-### osc_payment_contract (Enhanced)
+### oe_payments_contract (Enhanced)
 
 | Column | Type | Added In |
 |--------|------|----------|
@@ -287,9 +287,9 @@ Tests: 308, Errors: 3, Failures: 1
 | OXCAPTUREDAT | DATETIME NULL | Sprint 8 |
 | OXREFUNDEDAT | DATETIME NULL | Sprint 8 |
 
-### osc_payment_order_state (DROPPED)
+### oe_payments_order_state (DROPPED)
 
-Table completely removed. All functionality consolidated into `osc_payment_contract`.
+Table completely removed. All functionality consolidated into `oe_payments_contract`.
 
 ---
 
@@ -297,7 +297,7 @@ Table completely removed. All functionality consolidated into `osc_payment_contr
 
 | Criteria | Status |
 |----------|--------|
-| `osc_payment_order_state` table dropped | ✅ |
+| `oe_payments_order_state` table dropped | ✅ |
 | `PaymentOrderStateRepository.php` deleted | ✅ |
 | All `updateOrder*State()` methods removed | ✅ |
 | Contract stores capture/refund amounts | ✅ |
@@ -316,7 +316,7 @@ vendor/bin/oe-eshop-db_migrate migrations:migrate prev
 ```
 
 This will:
-1. Recreate `osc_payment_order_state` table
+1. Recreate `oe_payments_order_state` table
 2. Remove capture/refund columns from contract
 
 **Note:** Data in the new columns will be lost on rollback.

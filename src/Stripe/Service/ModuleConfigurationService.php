@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Service;
+namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Dao\ModuleConfigurationDaoInterface;
@@ -15,7 +15,7 @@ use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\DataObject
 use OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface;
 use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentComponent\Service\ServiceInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Module;
+use OxidEsales\Payments\Stripe\Module;
 use Throwable;
 
 /**
@@ -40,7 +40,7 @@ use Throwable;
  * - Makes it easy to switch between test and live mode
  * - Reduces code duplication across controllers and services
  *
- * @package OxidSolutionCatalysts\Payments\Stripe\Service
+ * @package OxidEsales\Payments\Stripe\Service
  * @author OXID eSales AG
  * @since 1.0.0
  */

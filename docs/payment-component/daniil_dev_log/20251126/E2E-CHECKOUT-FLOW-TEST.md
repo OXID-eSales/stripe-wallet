@@ -91,13 +91,13 @@ This allows:
 ### 4. Test Data Identification
 All test IDs use `e2e_` prefix for easy identification:
 ```sql
-SELECT * FROM osc_payment_contract WHERE OXID LIKE 'e2e_%';
+SELECT * FROM oe_payments_contract WHERE OXID LIKE 'e2e_%';
 ```
 
 ### 5. What's NOT Tested
 As requested, these are excluded (require Stripe API integration):
-- `osc_payment_idempotency` table
-- `osc_payment_webhook` table
+- `oe_payments_idempotency` table
+- `oe_payments_webhook` table
 - Actual Stripe API calls
 - Webhook signature verification
 
@@ -213,17 +213,17 @@ After running tests, you can inspect data:
 ```sql
 -- View all E2E test contracts
 SELECT OXID, OXSTATE, OXORDERID, OXUSERID
-FROM osc_payment_contract
+FROM oe_payments_contract
 WHERE OXID LIKE 'e2e_%' OR OXUSERID LIKE 'e2e_%'
 ORDER BY OXCREATED DESC;
 
 -- View contract conditions
 SELECT OXID, OXSTATE, OXCONDITIONS
-FROM osc_payment_contract
+FROM oe_payments_contract
 WHERE OXID LIKE 'e2e_%';
 
 -- Clean up test data (if needed)
-DELETE FROM osc_payment_contract
+DELETE FROM oe_payments_contract
 WHERE OXID LIKE 'e2e_%' OR OXUSERID LIKE 'e2e_%';
 ```
 
@@ -236,6 +236,6 @@ WHERE OXID LIKE 'e2e_%' OR OXUSERID LIKE 'e2e_%';
 
 ## Next Steps
 
-1. **Webhook Integration Tests** - Test `osc_payment_webhook` with mocked Stripe events
-2. **Idempotency Tests** - Test `osc_payment_idempotency` for duplicate request handling
+1. **Webhook Integration Tests** - Test `oe_payments_webhook` with mocked Stripe events
+2. **Idempotency Tests** - Test `oe_payments_idempotency` for duplicate request handling
 3. **Database Integration Tests** - Test with real `DoctrineContractRepository`

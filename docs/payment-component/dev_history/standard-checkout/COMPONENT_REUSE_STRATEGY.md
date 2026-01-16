@@ -5,8 +5,8 @@
 ## Overview
 
 The Component system (`/src/Component`) already provides database tables and repositories for:
-- **Transactions** (`osc_payment_transaction`)
-- **Contracts** (`osc_payment_contract`)
+- **Transactions** (`oe_payments_transaction`)
+- **Contracts** (`oe_payments_contract`)
 - **Event System** (EventDispatcher, Events, Handlers)
 
 **Standard checkout MUST reuse these Component tables** to avoid duplication and ensure consistency across all payment methods.
@@ -15,14 +15,14 @@ The Component system (`/src/Component`) already provides database tables and rep
 
 ## Existing Component Tables
 
-### 1. `osc_payment_transaction` (Component)
+### 1. `oe_payments_transaction` (Component)
 
 **Managed by:** `Component\Repository\DoctrineTransactionRepository`
 **Entity:** `Component\Transaction\Transaction`
 
 **Columns:**
 ```sql
-CREATE TABLE `osc_payment_transaction` (
+CREATE TABLE `oe_payments_transaction` (
     `OXID` CHAR(32) NOT NULL,                      -- Transaction ID
     `OXSHOPID` INT(11) NOT NULL,                    -- Shop ID
     `OXORDERID` CHAR(32) NOT NULL,                  -- Order ID (FK)
@@ -51,7 +51,7 @@ CREATE TABLE `osc_payment_transaction` (
 
 ---
 
-### 2. `osc_payment_contract` (Component)
+### 2. `oe_payments_contract` (Component)
 
 **Managed by:** `Component\Repository\DoctrineContractRepository`
 **Entity:** `Component\Contract\PaymentContract`
@@ -60,7 +60,7 @@ CREATE TABLE `osc_payment_transaction` (
 
 **Columns:**
 ```sql
-CREATE TABLE `osc_payment_contract` (
+CREATE TABLE `oe_payments_contract` (
     `OXID` CHAR(32) NOT NULL,
     `OXSHOPID` INT(11) NOT NULL,
     `OXUSERID` CHAR(32) NOT NULL,
@@ -88,8 +88,8 @@ CREATE TABLE `osc_payment_contract` (
 
 | Component Table | Standard Checkout Usage |
 |----------------|------------------------|
-| `osc_payment_transaction` | ✅ **YES** - Store all payment transactions |
-| `osc_payment_contract` | ❌ **NO** - Contracts not used in standard checkout |
+| `oe_payments_transaction` | ✅ **YES** - Store all payment transactions |
+| `oe_payments_contract` | ❌ **NO** - Contracts not used in standard checkout |
 
 ### Additional Stripe-Specific Tables ➕
 
@@ -102,7 +102,7 @@ Standard checkout needs **2 additional tables** for data not covered by Componen
 ```sql
 CREATE TABLE `osc_stripe_payment_details` (
     `OXID` CHAR(32) NOT NULL COMMENT 'Primary key',
-    `OXTRANSACTIONID` CHAR(32) NOT NULL COMMENT 'FK: osc_payment_transaction.OXID',
+    `OXTRANSACTIONID` CHAR(32) NOT NULL COMMENT 'FK: oe_payments_transaction.OXID',
 
     -- Card Details
     `OXCARDLAST4` VARCHAR(4) NULL COMMENT 'Last 4 digits of card',
@@ -133,7 +133,7 @@ CREATE TABLE `osc_stripe_payment_details` (
 
     CONSTRAINT `FK_DETAILS_TRANSACTION`
         FOREIGN KEY (`OXTRANSACTIONID`)
-        REFERENCES `osc_payment_transaction` (`OXID`)
+        REFERENCES `oe_payments_transaction` (`OXID`)
         ON DELETE CASCADE
 ) ENGINE=InnoDB COMMENT='Stripe-specific payment details';
 ```
@@ -162,12 +162,12 @@ CREATE TABLE `osc_stripe_customer_mapping` (
 ) ENGINE=InnoDB COMMENT='Stripe customer mapping';
 ```
 
-#### 3. `osc_payment_webhook_log` (NEW)
+#### 3. `oe_payments_webhook_log` (NEW)
 
 **Purpose:** Log webhook events from all providers
 
 ```sql
-CREATE TABLE `osc_payment_webhook_log` (
+CREATE TABLE `oe_payments_webhook_log` (
     `OXID` CHAR(32) NOT NULL,
     `OXSHOPID` INT(11) NOT NULL DEFAULT 1,
     `OXEVENTID` VARCHAR(255) NOT NULL COMMENT 'Webhook event ID (idempotency)',
@@ -200,7 +200,7 @@ class StripeAdapter
     private function storeTransaction(Order $order, array $paymentIntent): void
     {
         $db = DatabaseProvider::getDb();
-        $sql = "INSERT INTO osc_payment_transaction ...";
+        $sql = "INSERT INTO oe_payments_transaction ...";
         $db->execute($sql, [...]);
     }
 }
@@ -311,8 +311,8 @@ class StripeAdapter
 **Remove from `Events.php::addStandardCheckoutTables()`:**
 ```php
 // ❌ REMOVE THIS
-self::addTableIfNotExists('osc_payment_transaction', "
-    CREATE TABLE `osc_payment_transaction` (
+self::addTableIfNotExists('oe_payments_transaction', "
+    CREATE TABLE `oe_payments_transaction` (
         // ... old definition
     )
 ");
@@ -321,8 +321,8 @@ self::addTableIfNotExists('osc_payment_transaction', "
 **Replace with Component-compatible version:**
 ```php
 // ✅ ADD THIS (ensuring Component columns exist)
-self::addTableIfNotExists('osc_payment_transaction', "
-    CREATE TABLE `osc_payment_transaction` (
+self::addTableIfNotExists('oe_payments_transaction', "
+    CREATE TABLE `oe_payments_transaction` (
         `OXID` CHAR(32) NOT NULL,
         `OXSHOPID` INT(11) NOT NULL,
         `OXORDERID` CHAR(32) NOT NULL,
@@ -379,7 +379,7 @@ Replace custom transaction queries with repository methods:
 ```php
 // ❌ OLD
 $db = DatabaseProvider::getDb();
-$db->execute("INSERT INTO osc_payment_transaction ...", [...]);
+$db->execute("INSERT INTO oe_payments_transaction ...", [...]);
 
 // ✅ NEW
 $transaction = new Transaction(...);
@@ -392,11 +392,11 @@ $this->transactionRepository->save($transaction);
 
 | Table | Owner | Usage | Action |
 |-------|-------|-------|--------|
-| `osc_payment_transaction` | Component | All transactions | ✅ **REUSE** - Use Component table |
-| `osc_payment_contract` | Component | Smart contracts | ❌ **SKIP** - Not used in standard checkout |
+| `oe_payments_transaction` | Component | All transactions | ✅ **REUSE** - Use Component table |
+| `oe_payments_contract` | Component | Smart contracts | ❌ **SKIP** - Not used in standard checkout |
 | `osc_stripe_payment_details` | Standard Checkout | Card details, 3DS | ➕ **CREATE** - Stripe-specific |
 | `osc_stripe_customer_mapping` | Standard Checkout | User→Customer mapping | ➕ **CREATE** - Stripe-specific |
-| `osc_payment_webhook_log` | Shared | Webhook events | ➕ **CREATE** - Shared across providers |
+| `oe_payments_webhook_log` | Shared | Webhook events | ➕ **CREATE** - Shared across providers |
 
 ---
 

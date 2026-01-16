@@ -7,12 +7,12 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Service;
+namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Contract\SecurityValidationResultInterface;
 use OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\Result\SecurityValidationResult;
+use OxidEsales\Payments\Stripe\Service\Result\SecurityValidationResult;
 
 /**
  * Service for validating returning users from Stripe payment redirects.
@@ -28,6 +28,7 @@ use OxidSolutionCatalysts\Payments\Stripe\Service\Result\SecurityValidationResul
 final class ReturnSessionSecurityService implements ReturnSecurityValidatorInterface
 {
     // Timing thresholds (in seconds)
+    /** @phpstan-ignore classConstant.unused */
     private const QUICK_RETURN_MAX = 900;       // 15 minutes
     private const SLOW_RETURN_THRESHOLD = 1800; // 30 minutes
     private const VERY_LATE_THRESHOLD = 3600;   // 1 hour
@@ -49,6 +50,10 @@ final class ReturnSessionSecurityService implements ReturnSecurityValidatorInter
 
     /**
      * Validate a returning user against the original contract context.
+     *
+     * @param PaymentContractInterface $contract
+     * @param array<string, mixed> $currentContext
+     * @return SecurityValidationResultInterface
      */
     public function validateReturn(
         PaymentContractInterface $contract,
@@ -69,9 +74,11 @@ final class ReturnSessionSecurityService implements ReturnSecurityValidatorInter
         // Ensure score is within bounds
         $score = max(0, min(100, $score));
 
+        /** @var array<int, string> $indexedWarnings */
+        $indexedWarnings = array_values($warnings);
         return new SecurityValidationResult(
             $score,
-            $warnings,
+            $indexedWarnings,
             $score >= $this->threshold
         );
     }
@@ -79,6 +86,10 @@ final class ReturnSessionSecurityService implements ReturnSecurityValidatorInter
     /**
      * Validate IP address.
      *
+     * @param PaymentContractInterface $contract
+     * @param array<string, mixed> $currentContext
+     * @param int $score
+     * @param array<string> $warnings
      * @return array{int, array<string>}
      */
     private function validateIp(
@@ -129,6 +140,9 @@ final class ReturnSessionSecurityService implements ReturnSecurityValidatorInter
     /**
      * Validate return timing.
      *
+     * @param PaymentContractInterface $contract
+     * @param int $score
+     * @param array<string> $warnings
      * @return array{int, array<string>}
      */
     private function validateTiming(
@@ -159,6 +173,10 @@ final class ReturnSessionSecurityService implements ReturnSecurityValidatorInter
     /**
      * Validate user agent.
      *
+     * @param PaymentContractInterface $contract
+     * @param array<string, mixed> $currentContext
+     * @param int $score
+     * @param array<string> $warnings
      * @return array{int, array<string>}
      */
     private function validateUserAgent(

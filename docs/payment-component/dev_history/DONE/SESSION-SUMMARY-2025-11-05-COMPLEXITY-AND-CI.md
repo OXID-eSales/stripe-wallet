@@ -156,13 +156,13 @@ private function removeForeignKeyIfExists(): void
         WHERE CONSTRAINT_SCHEMA = DATABASE()
         AND CONSTRAINT_NAME = 'FK_CONTRACT_ORDER'
         AND CONSTRAINT_TYPE = 'FOREIGN KEY'
-        AND TABLE_NAME = 'osc_payment_contract'
+        AND TABLE_NAME = 'oe_payments_contract'
     ";
 
     $result = $this->connection->fetchOne($sql);
 
     if ($result > 0) {
-        $this->addSql('ALTER TABLE osc_payment_contract DROP FOREIGN KEY FK_CONTRACT_ORDER');
+        $this->addSql('ALTER TABLE oe_payments_contract DROP FOREIGN KEY FK_CONTRACT_ORDER');
     }
 }
 ```
@@ -313,7 +313,7 @@ Skipped: 1
 
 ### Database Design Decision
 ```
-Contract Table (osc_payment_contract)
+Contract Table (oe_payments_contract)
 ├── OXORDERID: Nullable FK to oxorder
 ├── NO DB-level FK constraint
 ├── Referential integrity: Application layer

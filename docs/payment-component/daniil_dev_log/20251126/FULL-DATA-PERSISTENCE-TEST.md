@@ -6,17 +6,17 @@
 
 ## Overview
 
-Created comprehensive integration tests that verify ALL `osc_payment_*` tables are populated during the checkout flow as documented in `docs/payment-component/puml/04-02-payment-smart-contract-flow-standard.puml`.
+Created comprehensive integration tests that verify ALL `oe_payments_*` tables are populated during the checkout flow as documented in `docs/payment-component/puml/04-02-payment-smart-contract-flow-standard.puml`.
 
 ## Tables Tested
 
 | Table | Tests | Description |
 |-------|-------|-------------|
-| `osc_payment_contract` | 2 | Contract creation, state machine, user/order links |
-| `osc_payment_customer` | 2 | Customer payment profile, Stripe customer ID, saved methods |
-| `osc_payment_order_state` | 2 | Order ↔ Contract link, payment state tracking |
-| `osc_payment_transaction` | 4 | Authorization, capture, refund, find by order |
-| `osc_payment_sessions` | 2 | Session data, expiry handling |
+| `oe_payments_contract` | 2 | Contract creation, state machine, user/order links |
+| `oe_payments_customer` | 2 | Customer payment profile, Stripe customer ID, saved methods |
+| `oe_payments_order_state` | 2 | Order ↔ Contract link, payment state tracking |
+| `oe_payments_transaction` | 4 | Authorization, capture, refund, find by order |
+| `oe_payments_sessions` | 2 | Session data, expiry handling |
 | `oxorder` | 2 | Real OXID order creation, totals, user link |
 | `oxuser` | 2 | Real OXID user creation, links |
 
@@ -49,13 +49,13 @@ The `testCompleteFlow_PopulatesAllTables()` test verifies the entire checkout fl
 
 ```
 1. oxuser           → Customer created
-2. osc_payment_customer → Payment profile with Stripe customer ID
-3. osc_payment_sessions → Payment session started
-4. osc_payment_contract → Contract created and transitions:
+2. oe_payments_customer → Payment profile with Stripe customer ID
+3. oe_payments_sessions → Payment session started
+4. oe_payments_contract → Contract created and transitions:
                           DRAFT → PENDING → READY_TO_COMMIT → COMMITTED → FULFILLED
 5. oxorder          → Real order created when committed
-6. osc_payment_order_state → Order-contract link with payment state
-7. osc_payment_transaction → Authorization and capture transactions
+6. oe_payments_order_state → Order-contract link with payment state
+7. oe_payments_transaction → Authorization and capture transactions
 ```
 
 ## Key Features
@@ -80,11 +80,11 @@ public function tearDown(): void
 ### 3. Test Data Identification
 All test IDs use `e2e_dp_` prefix (data persistence):
 ```sql
-SELECT * FROM osc_payment_contract WHERE OXID LIKE 'e2e_dp_%';
-SELECT * FROM osc_payment_transaction WHERE OXID LIKE 'e2e_dp_%';
-SELECT * FROM osc_payment_order_state WHERE OXID LIKE 'e2e_dp_%';
-SELECT * FROM osc_payment_customer WHERE OXID LIKE 'e2e_dp_%';
-SELECT * FROM osc_payment_sessions WHERE OXID LIKE 'e2e_dp_%';
+SELECT * FROM oe_payments_contract WHERE OXID LIKE 'e2e_dp_%';
+SELECT * FROM oe_payments_transaction WHERE OXID LIKE 'e2e_dp_%';
+SELECT * FROM oe_payments_order_state WHERE OXID LIKE 'e2e_dp_%';
+SELECT * FROM oe_payments_customer WHERE OXID LIKE 'e2e_dp_%';
+SELECT * FROM oe_payments_sessions WHERE OXID LIKE 'e2e_dp_%';
 SELECT * FROM oxorder WHERE OXID LIKE 'e2e_dp_%';
 SELECT * FROM oxuser WHERE OXID LIKE 'e2e_dp_%';
 ```
@@ -98,8 +98,8 @@ Tests respect database foreign key constraints:
 ## Tables NOT Tested
 
 As requested, these tables are excluded (require Stripe API integration):
-- `osc_payment_webhooklogs` - Requires real webhook events
-- `osc_payment_idempotency` - Requires real API calls
+- `oe_payments_webhooklogs` - Requires real webhook events
+- `oe_payments_idempotency` - Requires real API calls
 
 ## Pre-Commit Script Update
 
@@ -139,11 +139,11 @@ docker compose exec php php vendor/bin/phpunit -c extensions/stripe/tests/phpuni
 
 ```sql
 -- Clean up all E2E test data
-DELETE FROM osc_payment_transaction WHERE OXID LIKE 'e2e_dp_%';
-DELETE FROM osc_payment_order_state WHERE OXID LIKE 'e2e_dp_%';
-DELETE FROM osc_payment_sessions WHERE OXID LIKE 'e2e_dp_%';
-DELETE FROM osc_payment_customer WHERE OXID LIKE 'e2e_dp_%';
-DELETE FROM osc_payment_contract WHERE OXID LIKE 'e2e_dp_%';
+DELETE FROM oe_payments_transaction WHERE OXID LIKE 'e2e_dp_%';
+DELETE FROM oe_payments_order_state WHERE OXID LIKE 'e2e_dp_%';
+DELETE FROM oe_payments_sessions WHERE OXID LIKE 'e2e_dp_%';
+DELETE FROM oe_payments_customer WHERE OXID LIKE 'e2e_dp_%';
+DELETE FROM oe_payments_contract WHERE OXID LIKE 'e2e_dp_%';
 DELETE FROM oxorder WHERE OXID LIKE 'e2e_dp_%';
 DELETE FROM oxuser WHERE OXID LIKE 'e2e_dp_%';
 ```

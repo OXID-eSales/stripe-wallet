@@ -258,7 +258,7 @@ oe-console oe:cache:clear
 ## 🔗 Integration with Existing System
 
 ### Component Tables Used
-✅ **`osc_payment_transaction`** - Stores all transactions
+✅ **`oe_payments_transaction`** - Stores all transactions
 ✅ **`osc_stripe_payment_details`** - Stripe-specific data (card, 3DS, risk)
 ✅ **`osc_stripe_customer_mapping`** - User to Stripe Customer mapping
 

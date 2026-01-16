@@ -7,12 +7,12 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Webhook;
+namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Webhook;
 
 use OxidEsales\PaymentComponent\Repository\WebhookLogRepositoryInterface;
 use OxidEsales\PaymentComponent\Webhook\WebhookLog;
-use OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService;
+use OxidEsales\Payments\Stripe\Handler\WebhookContractFulfillmentHandlerInterface;
+use OxidEsales\Payments\Stripe\Service\WebhookProcessingService;
 use PHPUnit\Framework\TestCase;
 use Stripe\Event;
 
@@ -21,7 +21,7 @@ use Stripe\Event;
  *
  * Tests that WebhookProcessingService correctly handles all charge.dispute.* events.
  *
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService
+ * @covers \OxidEsales\Payments\Stripe\Service\WebhookProcessingService
  * @group webhook
  * @group dispute
  * @group tdd

@@ -134,9 +134,9 @@ $event = new PaymentAuthorizedEvent(
 
 The legacy path in `WebhookProcessingService::processLegacyPaymentSucceeded()`:
 1. Finds order by `OXTRANSID = pi_...` ✓
-2. Calls `updateOrderPaymentState()` on `osc_payment_order_state`
+2. Calls `updateOrderPaymentState()` on `oe_payments_order_state`
 3. Calls `updateOrderPaidTimestamp()` ✓
-4. BUT: `osc_payment_order_state` table may be missing for contract-based orders!
+4. BUT: `oe_payments_order_state` table may be missing for contract-based orders!
 
 ### Issue 3: Direct SQL Access (Architectural Debt)
 
@@ -144,13 +144,13 @@ The legacy path in `WebhookProcessingService::processLegacyPaymentSucceeded()`:
 
 | File | Line | Operation |
 |------|------|-----------|
-| `WebhookController.php` | 163 | INSERT osc_payment_webhooklogs |
-| `WebhookProcessingService.php` | 558 | SELECT osc_payment_transaction |
+| `WebhookController.php` | 163 | INSERT oe_payments_webhooklogs |
+| `WebhookProcessingService.php` | 558 | SELECT oe_payments_transaction |
 | `WebhookProcessingService.php` | 666 | UPDATE oxorder OXPAID |
 | `WebhookProcessingService.php` | 695 | UPDATE oxorder OXTRANSSTATUS |
 | `WebhookProcessingService.php` | 725 | UPDATE oxorder OXTRANSID |
-| `WebhookProcessingService.php` | 773 | INSERT osc_payment_webhooklogs |
-| `WebhookProcessingService.php` | 804 | UPDATE osc_payment_webhooklogs |
+| `WebhookProcessingService.php` | 773 | INSERT oe_payments_webhooklogs |
+| `WebhookProcessingService.php` | 804 | UPDATE oe_payments_webhooklogs |
 
 ### Issue 4: Unit Tests Bypass Contract State Machine (Critical Test Gap)
 
@@ -226,7 +226,7 @@ Create migration to update existing contracts that have `cs_test_...` as provide
 ```sql
 -- This is complex because we need to map checkout session → payment intent
 -- via the transaction table or order.OXTRANSID
-UPDATE osc_payment_contract c
+UPDATE oe_payments_contract c
 JOIN oxorder o ON c.OXORDERID = o.OXID
 SET c.OXPROVIDERORDERID = o.OXTRANSID
 WHERE c.OXPROVIDERORDERID LIKE 'cs_%'
@@ -235,7 +235,7 @@ WHERE c.OXPROVIDERORDERID LIKE 'cs_%'
 
 ### Fix 4: WebhookLog Access via Service → Repository (Architectural)
 
-**Problem:** Direct SQL access to `osc_payment_webhooklogs` in multiple places:
+**Problem:** Direct SQL access to `oe_payments_webhooklogs` in multiple places:
 - `WebhookController.php:163` - INSERT
 - `WebhookProcessingService.php:773` - INSERT
 - `WebhookProcessingService.php:804` - UPDATE
@@ -250,7 +250,7 @@ WebhookController / WebhookProcessingService
            ↓
     DoctrineWebhookLogRepository
            ↓
-    osc_payment_webhooklogs table
+    oe_payments_webhooklogs table
 ```
 
 **WebhookLogService responsibilities:**
@@ -343,7 +343,7 @@ Two tests:
 2. [ ] Create `WebhookLogService` implementation using `WebhookLogRepositoryInterface`
 3. [ ] Refactor `WebhookController` to use `WebhookLogService`
 4. [ ] Refactor `WebhookProcessingService` to use `WebhookLogService`
-5. [ ] Remove all direct SQL to `osc_payment_webhooklogs`
+5. [ ] Remove all direct SQL to `oe_payments_webhooklogs`
 
 **4b. Order Field Updates:**
 1. [ ] Create `OrderRepositoryInterface` for oxorder field updates (OXPAID, OXTRANSSTATUS, OXTRANSID)

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Handler;
+namespace OxidEsales\Payments\Stripe\Handler;
 
 /**
  * Interface for handling webhook events with contract-awareness.

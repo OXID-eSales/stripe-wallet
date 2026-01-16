@@ -746,7 +746,7 @@ final class WebhookEndpointTest extends IntegrationTestCase
 
         // Assert
         $log = $this->connection->fetchAssociative(
-            'SELECT * FROM osc_payment_webhook_log WHERE OXEVENTID = :eventId',
+            'SELECT * FROM oe_payments_webhook_log WHERE OXEVENTID = :eventId',
             ['eventId' => $eventId]
         );
 
@@ -769,7 +769,7 @@ final class WebhookEndpointTest extends IntegrationTestCase
 
         // Try duplicate insertion
         $this->connection->executeStatement(
-            "INSERT INTO osc_payment_webhook_log
+            "INSERT INTO oe_payments_webhook_log
              (OXID, OXEVENTID, OXEVENTTYPE, OXPROVIDER, OXSTATUS, OXCREATED)
              VALUES (?, ?, 'payment_intent.succeeded', 'stripe', 'duplicate', NOW())
              ON DUPLICATE KEY UPDATE OXSTATUS = 'duplicate', OXUPDATED = NOW()",
@@ -781,7 +781,7 @@ final class WebhookEndpointTest extends IntegrationTestCase
 
         // Assert - should have one record marked as duplicate
         $logs = $this->connection->fetchAllAssociative(
-            'SELECT * FROM osc_payment_webhook_log WHERE OXEVENTID = :eventId',
+            'SELECT * FROM oe_payments_webhook_log WHERE OXEVENTID = :eventId',
             ['eventId' => $eventId]
         );
 
@@ -833,7 +833,7 @@ final class WebhookEndpointTest extends IntegrationTestCase
 
         // Assert
         $orderState = $this->connection->fetchAssociative(
-            'SELECT * FROM osc_payment_order_state WHERE OXORDERID = :orderId',
+            'SELECT * FROM oe_payments_order_state WHERE OXORDERID = :orderId',
             ['orderId' => $orderId]
         );
 
@@ -881,7 +881,7 @@ final class WebhookEndpointTest extends IntegrationTestCase
 
         // Assert
         $orderState = $this->connection->fetchAssociative(
-            'SELECT * FROM osc_payment_order_state WHERE OXORDERID = :orderId',
+            'SELECT * FROM oe_payments_order_state WHERE OXORDERID = :orderId',
             ['orderId' => $orderId]
         );
 
@@ -896,7 +896,7 @@ final class WebhookEndpointTest extends IntegrationTestCase
 
     private function insertWebhookLog(string $eventId, string $eventType, string $paymentIntentId): void
     {
-        $this->connection->insert('osc_payment_webhook_log', [
+        $this->connection->insert('oe_payments_webhook_log', [
             'OXID' => substr(self::TEST_PREFIX . $this->testRunId, 0, 32),
             'OXEVENTID' => $eventId,
             'OXEVENTTYPE' => $eventType,
@@ -909,7 +909,7 @@ final class WebhookEndpointTest extends IntegrationTestCase
 
     private function insertOrderState(string $orderId, string $contractId, string $state, string $providerOrderId): void
     {
-        $this->connection->insert('osc_payment_order_state', [
+        $this->connection->insert('oe_payments_order_state', [
             'OXID' => substr(self::TEST_PREFIX . 'os_' . $this->testRunId, 0, 32),
             'OXORDERID' => $orderId,
             'OXCONTRACTID' => $contractId,
@@ -922,7 +922,7 @@ final class WebhookEndpointTest extends IntegrationTestCase
 
     private function updateOrderPaymentState(string $orderId, string $state): void
     {
-        $this->connection->update('osc_payment_order_state', [
+        $this->connection->update('oe_payments_order_state', [
             'OXPAYMENTSTATE' => $state,
             'OXUPDATED' => date('Y-m-d H:i:s'),
         ], ['OXORDERID' => $orderId]);
@@ -931,7 +931,7 @@ final class WebhookEndpointTest extends IntegrationTestCase
     private function updateOrderRefundState(string $orderId, float $amount): void
     {
         $this->connection->executeStatement(
-            "UPDATE osc_payment_order_state
+            "UPDATE oe_payments_order_state
              SET OXREFUNDED = 1,
                  OXREFUNDEDAMOUNT = COALESCE(OXREFUNDEDAMOUNT, 0) + ?,
                  OXREFUNDEDAT = NOW(),
@@ -1033,19 +1033,19 @@ final class WebhookEndpointTest extends IntegrationTestCase
     private function cleanupTestData(): void
     {
         $this->connection->executeStatement(
-            "DELETE FROM osc_payment_webhook_log WHERE OXID LIKE ?",
+            "DELETE FROM oe_payments_webhook_log WHERE OXID LIKE ?",
             [self::TEST_PREFIX . '%']
         );
         $this->connection->executeStatement(
-            "DELETE FROM osc_payment_order_state WHERE OXID LIKE ?",
+            "DELETE FROM oe_payments_order_state WHERE OXID LIKE ?",
             [self::TEST_PREFIX . '%']
         );
         $this->connection->executeStatement(
-            "DELETE FROM osc_payment_transaction WHERE OXID LIKE ?",
+            "DELETE FROM oe_payments_transaction WHERE OXID LIKE ?",
             [self::TEST_PREFIX . '%']
         );
         $this->connection->executeStatement(
-            "DELETE FROM osc_payment_contract WHERE OXID LIKE ?",
+            "DELETE FROM oe_payments_contract WHERE OXID LIKE ?",
             [self::TEST_PREFIX . '%']
         );
         $this->connection->executeStatement(

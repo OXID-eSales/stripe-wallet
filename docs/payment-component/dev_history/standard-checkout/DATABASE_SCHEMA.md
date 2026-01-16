@@ -27,10 +27,10 @@ OXID Core Tables (Unchanged)
          │ Foreign Keys (FK)
          ▼
 Component Tables (Payment Module)
-├── osc_payment_transaction    (payment records)
-├── osc_payment_order_state    (payment state per order)
-├── osc_payment_customer       (Stripe customer IDs)
-└── osc_payment_webhook_log    (webhook events)
+├── oe_payments_transaction    (payment records)
+├── oe_payments_order_state    (payment state per order)
+├── oe_payments_customer       (Stripe customer IDs)
+└── oe_payments_webhook_log    (webhook events)
 ```
 
 **Benefits:**
@@ -52,7 +52,7 @@ Component Tables (Payment Module)
          │ 1:1
          ▼
 ┌────────────────────────────┐
-│  osc_payment_customer      │
+│  oe_payments_customer      │
 │  - OXSTRIPECUSTOMERID      │
 └────────────────────────────┘
 
@@ -66,7 +66,7 @@ Component Tables (Payment Module)
          │                    │ 1:N
          ▼                    ▼
 ┌──────────────────────┐  ┌─────────────────────────┐
-│ osc_payment_         │  │ osc_payment_            │
+│ oe_payments_         │  │ oe_payments_            │
 │ order_state          │  │ transaction             │
 │ - OXPAYMENTSTATE     │  │ - OXPROVIDERORDERID     │
 │ - OXCAPTUREDAMOUNT   │  │ - OXAMOUNT              │
@@ -75,7 +75,7 @@ Component Tables (Payment Module)
 
 
 ┌─────────────────────────┐
-│ osc_payment_webhook_log │
+│ oe_payments_webhook_log │
 │ - OXEVENTID             │
 │ - OXORDERID (nullable)  │
 └─────────────────────────┘
@@ -85,14 +85,14 @@ Component Tables (Payment Module)
 
 ## Table Definitions
 
-### 1. osc_payment_transaction
+### 1. oe_payments_transaction
 
 **Purpose:** Store all payment transactions (payments, refunds, disputes)
 
 **Cardinality:** 1:N with oxorder (one order can have multiple transactions)
 
 ```sql
-CREATE TABLE IF NOT EXISTS `osc_payment_transaction` (
+CREATE TABLE IF NOT EXISTS `oe_payments_transaction` (
     -- Primary Key
     `OXID` CHAR(32) NOT NULL COMMENT 'Transaction unique ID',
 
@@ -182,14 +182,14 @@ COMMENT='All payment transactions from all providers';
 
 ---
 
-### 2. osc_payment_order_state
+### 2. oe_payments_order_state
 
 **Purpose:** Track payment state per order (1:1 relationship)
 
 **Cardinality:** 1:1 with oxorder (one payment state per order)
 
 ```sql
-CREATE TABLE IF NOT EXISTS `osc_payment_order_state` (
+CREATE TABLE IF NOT EXISTS `oe_payments_order_state` (
     -- Primary Key
     `OXID` CHAR(32) NOT NULL COMMENT 'State record ID',
 
@@ -247,14 +247,14 @@ COMMENT='Payment state per order (1:1 relationship)';
 
 ---
 
-### 3. osc_payment_customer
+### 3. oe_payments_customer
 
 **Purpose:** Store Stripe customer IDs for OXID users
 
 **Cardinality:** 1:1 with oxuser (one Stripe customer per user)
 
 ```sql
-CREATE TABLE IF NOT EXISTS `osc_payment_customer` (
+CREATE TABLE IF NOT EXISTS `oe_payments_customer` (
     -- Primary Key
     `OXID` CHAR(32) NOT NULL COMMENT 'Customer record ID',
 
@@ -295,14 +295,14 @@ COMMENT='Payment customer data (1:1 with user)';
 
 ---
 
-### 4. osc_payment_webhook_log
+### 4. oe_payments_webhook_log
 
 **Purpose:** Log all webhook events for debugging and idempotency
 
 **Cardinality:** Standalone (optional FK to oxorder)
 
 ```sql
-CREATE TABLE IF NOT EXISTS `osc_payment_webhook_log` (
+CREATE TABLE IF NOT EXISTS `oe_payments_webhook_log` (
     -- Primary Key
     `OXID` CHAR(32) NOT NULL COMMENT 'Log entry ID',
     `OXSHOPID` INT(11) NOT NULL DEFAULT 1,
@@ -363,8 +363,8 @@ SELECT
     t.OXSTATUS AS transaction_status,
     t.OXCREATED AS payment_date
 FROM oxorder o
-LEFT JOIN osc_payment_order_state ps ON o.OXID = ps.OXORDERID
-LEFT JOIN osc_payment_transaction t ON o.OXID = t.OXORDERID
+LEFT JOIN oe_payments_order_state ps ON o.OXID = ps.OXORDERID
+LEFT JOIN oe_payments_transaction t ON o.OXID = t.OXORDERID
 WHERE o.OXORDERNR = '123456';
 ```
 
@@ -380,7 +380,7 @@ SELECT
     OXCARDBRAND AS brand,
     OX3DSECURE AS three_d_secure,
     OXCREATED AS created
-FROM osc_payment_transaction
+FROM oe_payments_transaction
 WHERE OXORDERID = 'order_oxid_here'
 ORDER BY OXCREATED DESC;
 ```
@@ -393,7 +393,7 @@ SELECT
     c.OXSTRIPECUSTOMERID AS stripe_customer_id,
     c.OXCREATED AS customer_since
 FROM oxuser u
-LEFT JOIN osc_payment_customer c ON u.OXID = c.OXUSERID
+LEFT JOIN oe_payments_customer c ON u.OXID = c.OXUSERID
 WHERE u.OXID = 'user_oxid_here';
 ```
 
@@ -404,7 +404,7 @@ SELECT
     OXEVENTTYPE AS event_type,
     OXERROR AS error_message,
     OXCREATED AS received_at
-FROM osc_payment_webhook_log
+FROM oe_payments_webhook_log
 WHERE OXSTATUS = 'failed'
 ORDER BY OXCREATED DESC
 LIMIT 50;
@@ -421,7 +421,7 @@ SELECT
     SUM(CASE WHEN OX3DSECURE = 1 THEN 1 ELSE 0 END) AS with_3ds,
     SUM(OXAMOUNT) AS total_amount,
     OXCURRENCY AS currency
-FROM osc_payment_transaction
+FROM oe_payments_transaction
 WHERE OXTYPE = 'payment'
   AND OXCREATED >= DATE_SUB(NOW(), INTERVAL 30 DAY)
 GROUP BY DATE(OXCREATED), OXCURRENCY
@@ -465,14 +465,14 @@ IDX_CREATED (OXCREATED)
 
 ```sql
 -- Delete old webhook logs (keep 90 days)
-DELETE FROM osc_payment_webhook_log
+DELETE FROM oe_payments_webhook_log
 WHERE OXCREATED < DATE_SUB(NOW(), INTERVAL 90 DAY)
   AND OXSTATUS = 'processed';
 
 -- Archive old transactions (keep 7 years for accounting)
 -- Move to archive table instead of deleting
-INSERT INTO osc_payment_transaction_archive
-SELECT * FROM osc_payment_transaction
+INSERT INTO oe_payments_transaction_archive
+SELECT * FROM oe_payments_transaction
 WHERE OXCREATED < DATE_SUB(NOW(), INTERVAL 7 YEAR);
 ```
 
@@ -484,7 +484,7 @@ WHERE OXCREATED < DATE_SUB(NOW(), INTERVAL 7 YEAR);
 DELETE FROM oxuser WHERE OXID = 'user_to_delete';
 
 -- Anonymize transaction data (keep for accounting)
-UPDATE osc_payment_transaction
+UPDATE oe_payments_transaction
 SET OXUSERID = 'anonymous',
     OXMETADATA = NULL
 WHERE OXUSERID = 'user_to_delete';
@@ -499,10 +499,10 @@ WHERE OXUSERID = 'user_to_delete';
 ```bash
 # Backup payment tables
 mysqldump -u user -p database \
-  osc_payment_transaction \
-  osc_payment_order_state \
-  osc_payment_customer \
-  osc_payment_webhook_log \
+  oe_payments_transaction \
+  oe_payments_order_state \
+  oe_payments_customer \
+  oe_payments_webhook_log \
   > stripe_payment_backup_$(date +%Y%m%d).sql
 ```
 
@@ -520,11 +520,11 @@ mysql -u user -p database < stripe_payment_backup_20241113.sql
 
 ```sql
 -- Add new field to transaction table
-ALTER TABLE osc_payment_transaction
+ALTER TABLE oe_payments_transaction
 ADD COLUMN OXNEWFIELD VARCHAR(100) NULL AFTER OXMETADATA;
 
 -- Add index
-ALTER TABLE osc_payment_transaction
+ALTER TABLE oe_payments_transaction
 ADD KEY IDX_NEWFIELD (OXNEWFIELD);
 ```
 
@@ -532,10 +532,10 @@ ADD KEY IDX_NEWFIELD (OXNEWFIELD);
 
 ```sql
 -- Drop all tables (order matters due to FKs)
-DROP TABLE IF EXISTS osc_payment_webhook_log;
-DROP TABLE IF EXISTS osc_payment_transaction;
-DROP TABLE IF EXISTS osc_payment_order_state;
-DROP TABLE IF EXISTS osc_payment_customer;
+DROP TABLE IF EXISTS oe_payments_webhook_log;
+DROP TABLE IF EXISTS oe_payments_transaction;
+DROP TABLE IF EXISTS oe_payments_order_state;
+DROP TABLE IF EXISTS oe_payments_customer;
 ```
 
 **Note:** CASCADE will clean up related records automatically

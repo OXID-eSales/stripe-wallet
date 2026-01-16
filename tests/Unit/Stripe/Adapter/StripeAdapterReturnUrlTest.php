@@ -7,12 +7,12 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\Adapter;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Adapter;
 
 use OxidEsales\PaymentComponent\Adapter\Request\CreatePaymentRequest;
 use OxidEsales\PaymentComponent\Adapter\Request\AuthorizePaymentRequest;
 use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
-use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapter;
+use OxidEsales\Payments\Stripe\Adapter\StripeAdapter;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Stripe\StripeClient;
@@ -41,7 +41,7 @@ class TestStripeClient extends StripeClient
  * @group stripe
  * @group adapter
  *
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapter
+ * @covers \OxidEsales\Payments\Stripe\Adapter\StripeAdapter
  */
 final class StripeAdapterReturnUrlTest extends TestCase
 {

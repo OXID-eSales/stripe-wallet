@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\EventSystem\Handler;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCancelAuthorizationRequestHandler;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
-use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapterInterface;
+use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCancelAuthorizationRequestHandler;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
+use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use PHPUnit\Framework\TestCase;
 use Stripe\PaymentIntent;

@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\EventSystem\Handler;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripePaymentReturnHandler;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Handler\StripePaymentReturnHandler;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeStatusMapper;
+use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use PHPUnit\Framework\TestCase;
 
 class StripePaymentReturnHandlerTest extends TestCase

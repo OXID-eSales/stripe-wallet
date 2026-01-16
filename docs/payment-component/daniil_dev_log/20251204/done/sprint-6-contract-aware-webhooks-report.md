@@ -12,7 +12,7 @@ Implemented contract-aware webhook processing that bridges Stripe webhooks to th
 
 ```
 BEFORE: WebhookProcessingService bypassed contract layer
-- Direct SQL updates to osc_payment_order_state, oxorder
+- Direct SQL updates to oe_payments_order_state, oxorder
 - Contract stuck in COMMITTED state forever
 - No ContractFulfilledEvent dispatched
 - State machine integrity violated

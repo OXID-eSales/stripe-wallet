@@ -28,7 +28,7 @@
 |----------|-----------------|
 | `00-overview.md` | Add terminal states (CANCELLED, EXPIRED, FAILED) |
 | `01-architecture-layers.md` | Document ContainerFactory usage, OXPAID strategy |
-| `02-database-and-models.md` | Remove `osc_payment_order_state` references |
+| `02-database-and-models.md` | Remove `oe_payments_order_state` references |
 | `03-building-payment-modules.md` | Document actual Component layer dependencies |
 | `05-webhooks.md` | Document WebhookProcessingService complexity |
 
@@ -103,15 +103,15 @@ interface OrderPaymentStateServiceInterface
 
 ### 3. Update `02-database-and-models.md`
 
-**Remove all references to `osc_payment_order_state`:**
+**Remove all references to `oe_payments_order_state`:**
 
 ```markdown
-~~### osc_payment_order_state Table~~
+~~### oe_payments_order_state Table~~
 
 > **Note:** This table was removed in Sprint 8 (December 2025).
-> All payment state tracking is now consolidated in `osc_payment_contract`.
+> All payment state tracking is now consolidated in `oe_payments_contract`.
 
-**Capture/Refund Fields (in osc_payment_contract):**
+**Capture/Refund Fields (in oe_payments_contract):**
 | Field | Type | Description |
 |-------|------|-------------|
 | OXCAPTUREDAMOUNT | DECIMAL(10,2) | Amount captured |
@@ -347,7 +347,7 @@ Add new documents to the index.
 ## Verification Checklist
 
 - [ ] All code references in docs match actual implementation
-- [ ] No references to removed `osc_payment_order_state`
+- [ ] No references to removed `oe_payments_order_state`
 - [ ] Contract states documented correctly
 - [ ] OXPAID strategy documented
 - [ ] Fulfillment flow documented
@@ -368,7 +368,7 @@ Add new documents to the index.
 
 - CODE_REVIEW.md Section 5 (Documentation Updates Required)
 - CODE_REVIEW.md Section 1.3 (Contract State Machine Documentation Outdated)
-- CODE_REVIEW.md Section 1.8 (osc_payment_order_state Table Status)
+- CODE_REVIEW.md Section 1.8 (oe_payments_order_state Table Status)
 
 ---
 

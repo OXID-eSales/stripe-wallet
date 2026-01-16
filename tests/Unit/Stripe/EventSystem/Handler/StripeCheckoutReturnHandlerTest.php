@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\EventSystem\Handler;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
-use OxidSolutionCatalysts\Payments\Stripe\Service\Result\SecurityValidationResult;
-use OxidSolutionCatalysts\Payments\Stripe\Service\CheckoutReturnServiceInterface;
-use OxidSolutionCatalysts\Payments\Stripe\DTO\CheckoutReturnResult;
+use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
+use OxidEsales\Payments\Stripe\Service\Result\SecurityValidationResult;
+use OxidEsales\Payments\Stripe\Service\CheckoutReturnServiceInterface;
+use OxidEsales\Payments\Stripe\DTO\CheckoutReturnResult;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\Event\Payment\PaymentAuthorizedEvent;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
@@ -16,7 +16,7 @@ use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\DeliveryAddressHashServiceInterface;
+use OxidEsales\Payments\Stripe\Service\DeliveryAddressHashServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;

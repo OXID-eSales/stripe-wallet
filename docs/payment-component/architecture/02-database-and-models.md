@@ -44,7 +44,7 @@ The payment component uses a **normalized master-detail pattern enhanced with sm
 
 ### Key Innovation: Smart-Contract Schema
 
-**Contract Table (`osc_payment_contract`):**
+**Contract Table (`oe_payments_contract`):**
 - Stores: Payment intent, basket snapshot, conditions, provider contract ID
 - Links: FK to oxuser (immediate), FK to oxorder (**NULL until committed**)
 - Pattern: Mirrors how Stripe PaymentIntent, PayPal Order, Amazon ChargePermission work
@@ -58,7 +58,7 @@ The payment component uses a **normalized master-detail pattern enhanced with sm
 **NEW Pattern (Contract-Aware):**
 ```sql
 -- Contract table (created FIRST, before order!)
-CREATE TABLE osc_payment_contract (
+CREATE TABLE oe_payments_contract (
     OXID CHAR(32) PRIMARY KEY,
     OXUSERID CHAR(32) NOT NULL,  -- FK to oxuser.OXID
     OXORDERID CHAR(32) NULL,  -- FK to oxorder.OXID (NULL until committed!)
@@ -93,13 +93,13 @@ ALTER TABLE oxorder ADD COLUMN OXPAYMENTSTATE VARCHAR(32);
 **NEW Approach (OXID 7.4+):**
 ```sql
 -- ✅ Separate component table with FK
-CREATE TABLE osc_payment_order_state (
+CREATE TABLE oe_payments_order_state (
     OXID CHAR(32) PRIMARY KEY,
     OXORDERID CHAR(32) NOT NULL UNIQUE,  -- FK to oxorder.OXID
-    OXCONTRACTID CHAR(32) NULL,  -- FK to osc_payment_contract.OXID (NEW!)
+    OXCONTRACTID CHAR(32) NULL,  -- FK to oe_payments_contract.OXID (NEW!)
     OXPAYMENTSTATE VARCHAR(32),
     FOREIGN KEY (OXORDERID) REFERENCES oxorder(OXID) ON DELETE CASCADE,
-    FOREIGN KEY (OXCONTRACTID) REFERENCES osc_payment_contract(OXID) ON DELETE SET NULL
+    FOREIGN KEY (OXCONTRACTID) REFERENCES oe_payments_contract(OXID) ON DELETE SET NULL
 );
 ```
 
@@ -116,12 +116,12 @@ CREATE TABLE osc_payment_order_state (
 **Solution:** One master table + multiple detail tables
 
 ```
-osc_payment_transaction (MASTER - 16 columns including OXCONTRACTID)
-├── 1:1 → osc_payment_authorization_details
-├── 1:1 → osc_payment_3ds_details
-├── 1:1 → osc_payment_refund_details
-├── 1:N → osc_payment_delivery_tracking
-└── 1:N → osc_payment_provider_data
+oe_payments_transaction (MASTER - 16 columns including OXCONTRACTID)
+├── 1:1 → oe_payments_authorization_details
+├── 1:1 → oe_payments_3ds_details
+├── 1:1 → oe_payments_refund_details
+├── 1:N → oe_payments_delivery_tracking
+└── 1:N → oe_payments_provider_data
 ```
 
 **Why This Works:**
@@ -145,7 +145,7 @@ osc_payment_transaction (MASTER - 16 columns including OXCONTRACTID)
        │ creates
        │ n
 ┌──────▼────────────────────────────────────────────────┐
-│  osc_payment_contract (NEW - PRIMARY TABLE)            │
+│  oe_payments_contract (NEW - PRIMARY TABLE)            │
 │  ──────────────────────────────────────────────────── │
 │  OXID (PK)                                             │
 │  OXUSERID (FK → oxuser.OXID)                          │
@@ -166,7 +166,7 @@ osc_payment_transaction (MASTER - 16 columns including OXCONTRACTID)
        │ has              │ 1
        │ 1                │
 ┌──────▼─────────────────────┐      ┌──▼──────────────────────┐
-│ osc_payment_order_state     │      │ osc_payment_transaction │
+│ oe_payments_order_state     │      │ oe_payments_transaction │
 │ ──────────────────────────  │      │ ─────────────────────── │
 │ OXORDERID (FK)              │      │ OXORDERID (FK)          │
 │ OXCONTRACTID (FK) ← NEW!    │      │ OXCONTRACTID (FK) ← NEW!│
@@ -174,12 +174,12 @@ osc_payment_transaction (MASTER - 16 columns including OXCONTRACTID)
 └─────────────────────────────┘      └─────────────────────────┘
 ```
 
-### Table 1: osc_payment_contract (PRIMARY - NEW)
+### Table 1: oe_payments_contract (PRIMARY - NEW)
 
 **Purpose:** Payment contract lifecycle management - tracks intent → commitment → fulfillment
 
 ```sql
-CREATE TABLE IF NOT EXISTS osc_payment_contract (
+CREATE TABLE IF NOT EXISTS oe_payments_contract (
     -- Primary key
     OXID CHAR(32) NOT NULL PRIMARY KEY COMMENT 'Contract ID (UUID)',
 
@@ -265,18 +265,18 @@ COMMENT='Payment contract lifecycle - NEW in v4.0';
 
 ## Master-Detail Pattern (Transaction Tables)
 
-### Table 2: osc_payment_transaction (MASTER - ENHANCED)
+### Table 2: oe_payments_transaction (MASTER - ENHANCED)
 
 **Purpose:** Core transaction data - present for ALL transactions
 
 **Enhancement:** Added `OXCONTRACTID` FK to link transactions to contracts
 
 ```sql
-CREATE TABLE IF NOT EXISTS osc_payment_transaction (
+CREATE TABLE IF NOT EXISTS oe_payments_transaction (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXSHOPID INT NOT NULL,
     OXORDERID CHAR(32) NOT NULL,  -- FK to oxorder.OXID
-    OXCONTRACTID CHAR(32) NULL,  -- FK to osc_payment_contract.OXID (NEW!)
+    OXCONTRACTID CHAR(32) NULL,  -- FK to oe_payments_contract.OXID (NEW!)
 
     -- Provider identification
     OXPROVIDER VARCHAR(32) NOT NULL,  -- stripe, paypal, unzer, amazon
@@ -310,9 +310,9 @@ CREATE TABLE IF NOT EXISTS osc_payment_transaction (
 
     -- Foreign keys
     FOREIGN KEY FK_ORDER (OXORDERID) REFERENCES oxorder(OXID) ON DELETE CASCADE,
-    FOREIGN KEY FK_CONTRACT (OXCONTRACTID) REFERENCES osc_payment_contract(OXID) ON DELETE SET NULL,
+    FOREIGN KEY FK_CONTRACT (OXCONTRACTID) REFERENCES oe_payments_contract(OXID) ON DELETE SET NULL,
     FOREIGN KEY FK_PARENT_TX (OXPARENTTRANSACTIONID)
-        REFERENCES osc_payment_transaction(OXID) ON DELETE SET NULL
+        REFERENCES oe_payments_transaction(OXID) ON DELETE SET NULL
 
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
@@ -329,12 +329,12 @@ CREATE TABLE IF NOT EXISTS osc_payment_transaction (
 
 ## Complete Database Tables
 
-### Table 3: osc_payment_authorization_details (DETAIL)
+### Table 3: oe_payments_authorization_details (DETAIL)
 
 **Purpose:** Authorization-specific fields (expiration, capture strategy, reauthorization)
 
 ```sql
-CREATE TABLE IF NOT EXISTS osc_payment_authorization_details (
+CREATE TABLE IF NOT EXISTS oe_payments_authorization_details (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXTRANSACTIONID CHAR(32) NOT NULL UNIQUE,  -- FK to transaction (1:1)
 
@@ -361,17 +361,17 @@ CREATE TABLE IF NOT EXISTS osc_payment_authorization_details (
     INDEX IDX_AUTHORIZATION_ID (OXAUTHORIZATIONID),
     INDEX IDX_EXPIRES (OXEXPIRESAT),
     FOREIGN KEY FK_TRANSACTION (OXTRANSACTIONID)
-        REFERENCES osc_payment_transaction(OXID) ON DELETE CASCADE
+        REFERENCES oe_payments_transaction(OXID) ON DELETE CASCADE
 
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-### Table 4: osc_payment_3ds_details (DETAIL)
+### Table 4: oe_payments_3ds_details (DETAIL)
 
 **Purpose:** 3D Secure / Strong Customer Authentication fields
 
 ```sql
-CREATE TABLE IF NOT EXISTS osc_payment_3ds_details (
+CREATE TABLE IF NOT EXISTS oe_payments_3ds_details (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXTRANSACTIONID CHAR(32) NOT NULL UNIQUE,
 
@@ -393,17 +393,17 @@ CREATE TABLE IF NOT EXISTS osc_payment_3ds_details (
     OXCOMPLETEDAT DATETIME,
 
     FOREIGN KEY FK_TRANSACTION (OXTRANSACTIONID)
-        REFERENCES osc_payment_transaction(OXID) ON DELETE CASCADE
+        REFERENCES oe_payments_transaction(OXID) ON DELETE CASCADE
 
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-### Table 5: osc_payment_refund_details (DETAIL)
+### Table 5: oe_payments_refund_details (DETAIL)
 
 **Purpose:** Refund calculation and tracking
 
 ```sql
-CREATE TABLE IF NOT EXISTS osc_payment_refund_details (
+CREATE TABLE IF NOT EXISTS oe_payments_refund_details (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXTRANSACTIONID CHAR(32) NOT NULL UNIQUE,
 
@@ -423,17 +423,17 @@ CREATE TABLE IF NOT EXISTS osc_payment_refund_details (
     OXPROCESSEDAT DATETIME,
 
     FOREIGN KEY FK_TRANSACTION (OXTRANSACTIONID)
-        REFERENCES osc_payment_transaction(OXID) ON DELETE CASCADE
+        REFERENCES oe_payments_transaction(OXID) ON DELETE CASCADE
 
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-### Table 6: osc_payment_delivery_tracking (DETAIL)
+### Table 6: oe_payments_delivery_tracking (DETAIL)
 
 **Purpose:** Shipment tracking (required for Amazon Pay)
 
 ```sql
-CREATE TABLE IF NOT EXISTS osc_payment_delivery_tracking (
+CREATE TABLE IF NOT EXISTS oe_payments_delivery_tracking (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXTRANSACTIONID CHAR(32) NOT NULL,  -- 1:N relationship
 
@@ -458,17 +458,17 @@ CREATE TABLE IF NOT EXISTS osc_payment_delivery_tracking (
     INDEX IDX_TRANSACTION (OXTRANSACTIONID),
     INDEX IDX_TRACKING_CODE (OXTRACKINGCODE),
     FOREIGN KEY FK_TRANSACTION (OXTRANSACTIONID)
-        REFERENCES osc_payment_transaction(OXID) ON DELETE CASCADE
+        REFERENCES oe_payments_transaction(OXID) ON DELETE CASCADE
 
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-### Table 7: osc_payment_provider_data (DETAIL)
+### Table 7: oe_payments_provider_data (DETAIL)
 
 **Purpose:** Flexible key-value storage for provider-specific metadata
 
 ```sql
-CREATE TABLE IF NOT EXISTS osc_payment_provider_data (
+CREATE TABLE IF NOT EXISTS oe_payments_provider_data (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXTRANSACTIONID CHAR(32) NOT NULL,
 
@@ -481,15 +481,15 @@ CREATE TABLE IF NOT EXISTS osc_payment_provider_data (
 
     UNIQUE KEY UK_TX_KEY (OXTRANSACTIONID, OXKEY),
     FOREIGN KEY FK_TRANSACTION (OXTRANSACTIONID)
-        REFERENCES osc_payment_transaction(OXID) ON DELETE CASCADE
+        REFERENCES oe_payments_transaction(OXID) ON DELETE CASCADE
 
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-### Table 8: osc_payment_order_state (DEPRECATED)
+### Table 8: oe_payments_order_state (DEPRECATED)
 
 > **DEPRECATED (Sprint 8, December 2025):** This table has been removed from the implementation.
-> Payment state tracking is now consolidated in `osc_payment_contract` with the following fields:
+> Payment state tracking is now consolidated in `oe_payments_contract` with the following fields:
 > - `OXCAPTUREDAMOUNT` - Amount captured
 > - `OXREFUNDEDAMOUNT` - Amount refunded
 > - `OXCAPTUREDAT` - Capture timestamp
@@ -502,10 +502,10 @@ CREATE TABLE IF NOT EXISTS osc_payment_provider_data (
 **Enhancement:** Added `OXCONTRACTID` FK to link order state to contract
 
 ```sql
-CREATE TABLE IF NOT EXISTS osc_payment_order_state (
+CREATE TABLE IF NOT EXISTS oe_payments_order_state (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXORDERID CHAR(32) NOT NULL UNIQUE,  -- FK to oxorder.OXID (1:1)
-    OXCONTRACTID CHAR(32) NULL,  -- FK to osc_payment_contract.OXID (NEW!)
+    OXCONTRACTID CHAR(32) NULL,  -- FK to oe_payments_contract.OXID (NEW!)
 
     OXPAYMENTSTATE VARCHAR(32) NOT NULL,
     OXPROVIDERORDERID VARCHAR(128) NULL,
@@ -521,7 +521,7 @@ CREATE TABLE IF NOT EXISTS osc_payment_order_state (
     INDEX IDX_PROVIDER_ORDER (OXPROVIDERORDERID),
     INDEX IDX_CONTRACT (OXCONTRACTID),
     FOREIGN KEY FK_ORDER_STATE (OXORDERID) REFERENCES oxorder(OXID) ON DELETE CASCADE,
-    FOREIGN KEY FK_ORDER_STATE_CONTRACT (OXCONTRACTID) REFERENCES osc_payment_contract(OXID) ON DELETE SET NULL
+    FOREIGN KEY FK_ORDER_STATE_CONTRACT (OXCONTRACTID) REFERENCES oe_payments_contract(OXID) ON DELETE SET NULL
 
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
@@ -533,12 +533,12 @@ CREATE TABLE IF NOT EXISTS osc_payment_order_state (
 - `OK` - Payment completed
 - `ERROR` - Payment failed
 
-### Table 9: osc_payment_customer
+### Table 9: oe_payments_customer
 
 **Purpose:** Customer payment data (vaulting/tokenization)
 
 ```sql
-CREATE TABLE IF NOT EXISTS osc_payment_customer (
+CREATE TABLE IF NOT EXISTS oe_payments_customer (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXUSERID CHAR(32) NOT NULL UNIQUE,  -- FK to oxuser.OXID (1:1)
 
@@ -556,12 +556,12 @@ CREATE TABLE IF NOT EXISTS osc_payment_customer (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-### Table 10: osc_payment_idempotency (CRITICAL)
+### Table 10: oe_payments_idempotency (CRITICAL)
 
 **Purpose:** Prevent duplicate charges (P0 feature)
 
 ```sql
-CREATE TABLE IF NOT EXISTS osc_payment_idempotency (
+CREATE TABLE IF NOT EXISTS oe_payments_idempotency (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXKEY VARCHAR(128) NOT NULL UNIQUE,
     OXORDERID CHAR(32) NOT NULL,
@@ -578,12 +578,12 @@ CREATE TABLE IF NOT EXISTS osc_payment_idempotency (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-### Table 11: osc_payment_saved_methods
+### Table 11: oe_payments_saved_methods
 
 **Purpose:** Vaulting/tokenization for saved payment methods
 
 ```sql
-CREATE TABLE IF NOT EXISTS osc_payment_saved_methods (
+CREATE TABLE IF NOT EXISTS oe_payments_saved_methods (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXUSERID CHAR(32) NOT NULL,
 
@@ -607,12 +607,12 @@ CREATE TABLE IF NOT EXISTS osc_payment_saved_methods (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-### Table 12: osc_payment_sessions
+### Table 12: oe_payments_sessions
 
 **Purpose:** Session state management (Amazon Pay, PayPal)
 
 ```sql
-CREATE TABLE IF NOT EXISTS osc_payment_sessions (
+CREATE TABLE IF NOT EXISTS oe_payments_sessions (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXPROVIDER VARCHAR(32) NOT NULL,
     OXSESSIONID VARCHAR(128) NOT NULL,
@@ -827,7 +827,7 @@ class ContractRepository
     public function findByProviderOrderId(string $providerOrderId): ?PaymentContract
     {
         $data = $this->connection->fetchAssociative(
-            "SELECT * FROM osc_payment_contract WHERE OXPROVIDERORDERID = ?",
+            "SELECT * FROM oe_payments_contract WHERE OXPROVIDERORDERID = ?",
             [$providerOrderId]
         );
 
@@ -840,7 +840,7 @@ class ContractRepository
     public function findByOrderId(string $orderId): ?PaymentContract
     {
         $data = $this->connection->fetchAssociative(
-            "SELECT * FROM osc_payment_contract WHERE OXORDERID = ?",
+            "SELECT * FROM oe_payments_contract WHERE OXORDERID = ?",
             [$orderId]
         );
 
@@ -855,7 +855,7 @@ class ContractRepository
         $before = $before ?? new \DateTime();
 
         $rows = $this->connection->fetchAllAssociative(
-            "SELECT * FROM osc_payment_contract
+            "SELECT * FROM oe_payments_contract
              WHERE OXEXPIRESAT < ?
              AND OXSTATE NOT IN (?, ?, ?)",
             [
@@ -887,7 +887,7 @@ class PaymentTransactionRepository
     public function findByContractId(string $contractId): array
     {
         $sql = "
-            SELECT * FROM osc_payment_transaction
+            SELECT * FROM oe_payments_transaction
             WHERE OXCONTRACTID = :contractId
             ORDER BY OXCREATED ASC
         ";
@@ -902,8 +902,8 @@ class PaymentTransactionRepository
     {
         $sql = "
             SELECT t.*, c.OXSTATE as CONTRACT_STATE
-            FROM osc_payment_transaction t
-            LEFT JOIN osc_payment_contract c ON t.OXCONTRACTID = c.OXID
+            FROM oe_payments_transaction t
+            LEFT JOIN oe_payments_contract c ON t.OXCONTRACTID = c.OXID
             WHERE t.OXORDERID = :orderId
             ORDER BY t.OXCREATED ASC
         ";
@@ -915,80 +915,59 @@ class PaymentTransactionRepository
 
 ---
 
-## Migration Scripts
+## Migration Architecture
 
-### migration/001_create_contract_table.sql
+> **Important:** All database migrations are managed by the `payment-component` package.
+> Provider modules (Stripe, PayPal, etc.) do NOT have their own migrations.
 
-```sql
-CREATE TABLE IF NOT EXISTS osc_payment_contract (
-    -- See full schema above
-);
+### Migration Location
+
+All migrations are in `payment-component/migration/data/`:
+
+| Migration | Description |
+|-----------|-------------|
+| `Version20251031140000.php` | Creates `oe_payments_contract` table with capture/refund tracking |
+| `Version20251031140100.php` | Creates `oe_payments_transaction` table with FK constraints |
+| `Version20251031140200.php` | Creates support tables (customer, idempotency, sessions, webhooklogs) |
+
+### Provider Module Architecture
+
+**Stripe module has NO migrations.** It relies entirely on payment-component:
+
+```
+payment-component/
+├── migration/
+│   ├── data/
+│   │   ├── Version20251031140000.php  # Contract table
+│   │   ├── Version20251031140100.php  # Transaction table
+│   │   └── Version20251031140200.php  # Support tables
+│   ├── migrations.yml
+│   └── migrations-db.php
+
+stripe/
+├── src/Stripe/           # Stripe-specific adapters and handlers
+└── (NO migration/)       # Uses payment-component tables via DI
 ```
 
-### migration/002_enhance_existing_tables.sql
+### Tables Created by payment-component
 
-```sql
--- Add contract FK to order state
-ALTER TABLE osc_payment_order_state
-    ADD COLUMN IF NOT EXISTS OXCONTRACTID CHAR(32) NULL COMMENT 'FK to osc_payment_contract.OXID',
-    ADD INDEX IDX_CONTRACT (OXCONTRACTID),
-    ADD FOREIGN KEY FK_ORDER_STATE_CONTRACT (OXCONTRACTID)
-        REFERENCES osc_payment_contract(OXID) ON DELETE SET NULL;
+| Table | Purpose |
+|-------|---------|
+| `oe_payments_contract` | Contract lifecycle, basket snapshot, capture/refund tracking |
+| `oe_payments_transaction` | Transaction tracking with contract FK |
+| `oe_payments_customer` | Customer payment data (vaulting) |
+| `oe_payments_idempotency` | Duplicate charge prevention |
+| `oe_payments_sessions` | Session state management |
+| `oe_payments_webhooklogs` | Webhook event logs |
 
--- Add contract FK to transactions
-ALTER TABLE osc_payment_transaction
-    ADD COLUMN IF NOT EXISTS OXCONTRACTID CHAR(32) NULL COMMENT 'FK to osc_payment_contract.OXID',
-    ADD INDEX IDX_CONTRACT (OXCONTRACTID),
-    ADD FOREIGN KEY FK_CONTRACT (OXCONTRACTID)
-        REFERENCES osc_payment_contract(OXID) ON DELETE SET NULL;
-```
+### Running Migrations
 
-### migration/003_create_transaction_tables.sql
-
-```sql
-CREATE TABLE IF NOT EXISTS osc_payment_transaction (
-    -- See full schema above
-);
-
-CREATE TABLE IF NOT EXISTS osc_payment_authorization_details (
-    -- See full schema above
-);
-
-CREATE TABLE IF NOT EXISTS osc_payment_3ds_details (
-    -- See full schema above
-);
-
-CREATE TABLE IF NOT EXISTS osc_payment_refund_details (
-    -- See full schema above
-);
-
-CREATE TABLE IF NOT EXISTS osc_payment_delivery_tracking (
-    -- See full schema above
-);
-
-CREATE TABLE IF NOT EXISTS osc_payment_provider_data (
-    -- See full schema above
-);
-```
-
-### migration/004_create_support_tables.sql
-
-```sql
-CREATE TABLE IF NOT EXISTS osc_payment_customer (
-    -- See full schema above
-);
-
-CREATE TABLE IF NOT EXISTS osc_payment_idempotency (
-    -- See full schema above
-);
-
-CREATE TABLE IF NOT EXISTS osc_payment_saved_methods (
-    -- See full schema above
-);
-
-CREATE TABLE IF NOT EXISTS osc_payment_sessions (
-    -- See full schema above
-);
+```bash
+# From shop root
+docker compose exec php php vendor/bin/doctrine-migrations migrate \
+  --configuration=extensions/payment-component/migration/migrations.yml \
+  --db-configuration=extensions/payment-component/migration/migrations-db.php \
+  --no-interaction
 ```
 
 ---
@@ -1009,9 +988,9 @@ SELECT
     t.OXSTATUS as TRANSACTION_STATUS,
     t.OXAMOUNT,
     t.OXCREATED as TRANSACTION_CREATED
-FROM osc_payment_contract c
+FROM oe_payments_contract c
 LEFT JOIN oxorder o ON c.OXORDERID = o.OXID
-LEFT JOIN osc_payment_transaction t ON c.OXID = t.OXCONTRACTID
+LEFT JOIN oe_payments_transaction t ON c.OXID = t.OXCONTRACTID
 WHERE c.OXUSERID = :userId
 ORDER BY c.OXCREATED DESC;
 ```
@@ -1021,7 +1000,7 @@ ORDER BY c.OXCREATED DESC;
 ### Example 2: Find Contract by Provider Order ID (Webhook)
 
 ```sql
-SELECT * FROM osc_payment_contract
+SELECT * FROM oe_payments_contract
 WHERE OXPROVIDERORDERID = 'pi_stripe_123abc';
 ```
 
@@ -1037,7 +1016,7 @@ SELECT
     c.OXEXPIRESAT,
     c.OXCONDITIONS,
     TIMESTAMPDIFF(MINUTE, NOW(), c.OXEXPIRESAT) as MINUTES_UNTIL_EXPIRY
-FROM osc_payment_contract c
+FROM oe_payments_contract c
 WHERE c.OXSTATE IN ('pending', 'ready_to_commit', 'committed')
 AND c.OXEXPIRESAT > NOW()
 ORDER BY c.OXEXPIRESAT ASC;
@@ -1056,7 +1035,7 @@ SELECT
     TIMESTAMPDIFF(SECOND, c.OXCREATED, c.OXCOMMITTEDAT) as SECONDS_TO_ORDER,
     TIMESTAMPDIFF(SECOND, c.OXCOMMITTEDAT, c.OXFULFILLEDAT) as SECONDS_TO_PAYMENT,
     TIMESTAMPDIFF(SECOND, c.OXCREATED, c.OXFULFILLEDAT) as TOTAL_SECONDS
-FROM osc_payment_contract c
+FROM oe_payments_contract c
 WHERE c.OXSTATE = 'fulfilled'
 AND c.OXCREATED > DATE_SUB(NOW(), INTERVAL 7 DAY);
 ```
@@ -1069,36 +1048,36 @@ AND c.OXCREATED > DATE_SUB(NOW(), INTERVAL 7 DAY);
 
 **Contract Mapping:**
 - Provider Contract: `PaymentIntent` (ID: `pi_abc123`)
-- Stored in: `osc_payment_contract.OXPROVIDERORDERID`
+- Stored in: `oe_payments_contract.OXPROVIDERORDERID`
 - State Mapping:
   - `requires_confirmation` → Contract `pending`
   - `requires_capture` → Contract `ready_to_commit`
   - `succeeded` → Contract `fulfilled`
 
 **Tables Used:**
-- Contract: `osc_payment_contract`
-- Transactions: `osc_payment_transaction`, `osc_payment_authorization_details`
-- Optional: `osc_payment_3ds_details` (if SCA required)
+- Contract: `oe_payments_contract`
+- Transactions: `oe_payments_transaction`, `oe_payments_authorization_details`
+- Optional: `oe_payments_3ds_details` (if SCA required)
 
 ### PayPal (Order Pattern)
 
 **Contract Mapping:**
 - Provider Contract: `Order` (ID: `ORDER-123ABC`)
-- Stored in: `osc_payment_contract.OXPROVIDERORDERID`
+- Stored in: `oe_payments_contract.OXPROVIDERORDERID`
 - State Mapping:
   - `CREATED` → Contract `pending`
   - `APPROVED` → Contract `ready_to_commit`
   - `COMPLETED` → Contract `fulfilled`
 
 **Tables Used:**
-- Contract: `osc_payment_contract`
-- Transactions: `osc_payment_transaction`, `osc_payment_authorization_details`, `osc_payment_refund_details`
+- Contract: `oe_payments_contract`
+- Transactions: `oe_payments_transaction`, `oe_payments_authorization_details`, `oe_payments_refund_details`
 
 ### Amazon Pay (ChargePermission Pattern)
 
 **Contract Mapping:**
 - Provider Contract: `ChargePermission` (ID: `S01-123-456`)
-- Stored in: `osc_payment_contract.OXPROVIDERORDERID`
+- Stored in: `oe_payments_contract.OXPROVIDERORDERID`
 - Two-tier: ChargePermission → Charge
 - State Mapping:
   - `Chargeable` → Contract `pending`
@@ -1107,12 +1086,12 @@ AND c.OXCREATED > DATE_SUB(NOW(), INTERVAL 7 DAY);
 
 **Special Requirements:**
 - Must add delivery tracking for capture confirmation
-- Use: `osc_payment_delivery_tracking`
+- Use: `oe_payments_delivery_tracking`
 
 **Tables Used:**
-- Contract: `osc_payment_contract`
-- Transactions: `osc_payment_transaction`, `osc_payment_authorization_details`, `osc_payment_refund_details`
-- Required: `osc_payment_delivery_tracking`
+- Contract: `oe_payments_contract`
+- Transactions: `oe_payments_transaction`, `oe_payments_authorization_details`, `oe_payments_refund_details`
+- Required: `oe_payments_delivery_tracking`
 
 ---
 

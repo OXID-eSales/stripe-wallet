@@ -136,10 +136,10 @@ With the payment component, you get all of the above **for free**. You only need
 │  ✅ Event System                        │
 │  ✅ Request Caching                     │
 │  ✅ Component Tables (FK References)    │
-│     - osc_payment_transaction           │
-│     - osc_payment_order_state           │
-│     - osc_payment_customer              │
-│     - osc_payment_basket_snapshot       │
+│     - oe_payments_transaction           │
+│     - oe_payments_order_state           │
+│     - oe_payments_customer              │
+│     - oe_payments_basket_snapshot       │
 │  ✅ Component Models (NO Extensions)    │
 │     - PaymentTransaction                │
 │     - PaymentOrderState                 │
@@ -606,7 +606,7 @@ CREATE TABLE adyen_transaction (...);
 **With Component (OXID 7.4+):**
 ```sql
 -- Component tables with FK references (NOT ALTER TABLE)
-CREATE TABLE IF NOT EXISTS osc_payment_transaction (
+CREATE TABLE IF NOT EXISTS oe_payments_transaction (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXORDERID CHAR(32) NOT NULL,  -- FK to oxorder.OXID
     OXPROVIDERORDERID VARCHAR(128),
@@ -615,7 +615,7 @@ CREATE TABLE IF NOT EXISTS osc_payment_transaction (
     FOREIGN KEY FK_ORDER_TX (OXORDERID) REFERENCES oxorder(OXID) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS osc_payment_order_state (
+CREATE TABLE IF NOT EXISTS oe_payments_order_state (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXORDERID CHAR(32) NOT NULL UNIQUE,  -- FK to oxorder.OXID (1:1)
     OXPAYMENTSTATE VARCHAR(32),

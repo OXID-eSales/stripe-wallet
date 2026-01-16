@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Helper;
+namespace OxidEsales\Payments\Stripe\Tests\Helper;
 
 /**
  * Helper for testing Stripe webhooks.

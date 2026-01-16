@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Integration\Module;
+namespace OxidEsales\Payments\Stripe\Tests\Integration\Module;
 
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Setup\Service\ModuleActivationServiceInterface;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\State\ModuleStateServiceInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Module;
+use OxidEsales\Payments\Stripe\Module;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 
@@ -24,7 +24,7 @@ use Psr\Container\ContainerInterface;
  * @group module
  * @group lifecycle
  *
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Core\ModuleEvents
+ * @covers \OxidEsales\Payments\Stripe\Core\ModuleEvents
  */
 class ModuleLifecycleTest extends TestCase
 {
@@ -170,7 +170,7 @@ class ModuleLifecycleTest extends TestCase
 
         // When/Then: Key services should be available
         $this->assertTrue(
-            $container->has('OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService'),
+            $container->has('OxidEsales\Payments\Stripe\Service\ModuleConfigurationService'),
             'ModuleConfigurationService should be available after module activation'
         );
 

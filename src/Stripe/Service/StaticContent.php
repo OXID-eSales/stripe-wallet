@@ -7,13 +7,13 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Service;
+namespace OxidEsales\Payments\Stripe\Service;
 
 use PDO;
 use Doctrine\DBAL\Query\QueryBuilder;
 use OxidEsales\Eshop\Core\Registry as EshopRegistry;
 use OxidEsales\Eshop\Core\Field;
-use OxidSolutionCatalysts\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Eshop\Application\Model\Payment as EshopModelPayment;
 use OxidEsales\Eshop\Core\Model\BaseModel as EshopBaseModel;
 use OxidEsales\EshopCommunity\Internal\Framework\Database\QueryBuilderFactoryInterface;
@@ -82,6 +82,7 @@ class StaticContent
      */
     protected function assignPaymentToDelivery(string $paymentId, string $deliverySetId): void
     {
+        /** @var EshopBaseModel $object2Payment */
         $object2Payment = oxNew(EshopBaseModel::class);
         $object2Payment->init('oxobject2payment');
         $object2Payment->assign(
@@ -107,30 +108,37 @@ class StaticContent
         $paymentModel = oxNew(EshopModelPayment::class);
         $paymentModel->setId($paymentId);
 
+        /** @var array<int|string, int> $iso2LanguageId */
         $iso2LanguageId = array_flip($this->getLanguageIds());
+
+        // Extract constraints
+        /** @var array{oxfromamount?: float, oxtoamount?: float, oxaddsumtype?: string} $constraints */
+        $constraints = is_array($definitions['constraints'] ?? null) ? $definitions['constraints'] : [];
 
         // Assign base payment data
         $paymentModel->assign(
             [
-               'oxactive' => (bool) $definitions['defaulton'],
-               'oxfromamount' => (float) $definitions['constraints']['oxfromamount'],
-               'oxtoamount' => (float) $definitions['constraints']['oxtoamount'],
-               'oxaddsumtype' => (string) $definitions['constraints']['oxaddsumtype']
+               'oxactive' => (bool) ($definitions['defaulton'] ?? false),
+               'oxfromamount' => (float) ($constraints['oxfromamount'] ?? 0),
+               'oxtoamount' => (float) ($constraints['oxtoamount'] ?? 1000000),
+               'oxaddsumtype' => (string) ($constraints['oxaddsumtype'] ?? 'abs')
             ]
         );
         $paymentModel->save();
 
         // Assign multilingual descriptions
-        foreach ($definitions['descriptions'] as $langAbbr => $data) {
-            if (!isset($iso2LanguageId[$langAbbr])) {
+        /** @var array<string, array{desc?: string, longdesc?: string}> $descriptions */
+        $descriptions = is_array($definitions['descriptions'] ?? null) ? $definitions['descriptions'] : [];
+        foreach ($descriptions as $langAbbr => $data) {
+            if (!is_string($langAbbr) || !isset($iso2LanguageId[$langAbbr])) { // @phpstan-ignore function.alreadyNarrowedType
                 continue;
             }
 
             $paymentModel->loadInLang($iso2LanguageId[$langAbbr], $paymentModel->getId());
             $paymentModel->assign(
                 [
-                    'oxdesc' => $data['desc'],
-                    'oxlongdesc' => $data['longdesc']
+                    'oxdesc' => $data['desc'] ?? '',
+                    'oxlongdesc' => $data['longdesc'] ?? ''
                 ]
             );
             $paymentModel->save();
@@ -146,16 +154,19 @@ class StaticContent
     {
         /** @var QueryBuilder $queryBuilder */
         $queryBuilder = $this->queryBuilderFactory->create();
-        $fromDb = $queryBuilder
+        $statement = $queryBuilder
             ->select('oxid')
             ->from('oxdeliveryset')
             ->where('oxactive = 1')
-            ->execute()
-            ->fetchAll(PDO::FETCH_ASSOC);
+            ->execute();
+
+        /** @var array<int, array{oxid: string}> $fromDb */
+        $fromDb = is_object($statement) ? $statement->fetchAll(PDO::FETCH_ASSOC) : [];
 
         $result = [];
         foreach ($fromDb as $row) {
-            $result[$row['oxid']] = $row['oxid'];
+            $oxid = $row['oxid'];
+            $result[$oxid] = $oxid;
         }
 
         return $result;
@@ -168,6 +179,8 @@ class StaticContent
      */
     protected function getLanguageIds(): array
     {
-        return EshopRegistry::getLang()->getLanguageIds();
+        /** @var array<int, string> $ids */
+        $ids = EshopRegistry::getLang()->getLanguageIds();
+        return $ids;
     }
 }

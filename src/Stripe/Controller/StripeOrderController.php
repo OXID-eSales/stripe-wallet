@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Controller;
+namespace OxidEsales\Payments\Stripe\Controller;
 
 use OxidEsales\Eshop\Application\Controller\OrderController;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Traits\ServiceContainer;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
+use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
 
 /**
  * Thin Stripe Order Controller.
@@ -89,7 +89,7 @@ class StripeOrderController extends OrderController
 
         try {
             // 0. Validate API key configuration
-            $config = $this->getServiceFromContainer(\OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService::class);
+            $config = $this->getServiceFromContainer(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::class);
             $keyValidationError = $config->getKeyValidationError();
             if ($keyValidationError !== null) {
                 throw new \RuntimeException('Stripe configuration error: ' . $keyValidationError);
@@ -359,7 +359,7 @@ class StripeOrderController extends OrderController
 
         // Get from module configuration
         $config = $this->getServiceFromContainer(
-            \OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService::class
+            \OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::class
         );
 
         return $config->getStripeCaptureMethod();

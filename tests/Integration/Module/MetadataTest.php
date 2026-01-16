@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Integration\Module;
+namespace OxidEsales\Payments\Stripe\Tests\Integration\Module;
 
 use PHPUnit\Framework\TestCase;
-use OxidSolutionCatalysts\Payments\Stripe\Module;
+use OxidEsales\Payments\Stripe\Module;
 
 /**
  * Integration tests for module metadata

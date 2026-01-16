@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Webhook;
+namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Webhook;
 
 use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
 use OxidEsales\PaymentComponent\Contract\ContractCondition;
@@ -16,7 +16,7 @@ use OxidEsales\PaymentComponent\Contract\PaymentContract;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandler;
+use OxidEsales\Payments\Stripe\Handler\WebhookContractFulfillmentHandler;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -28,7 +28,7 @@ use PHPUnit\Framework\TestCase;
  * - charge.captured webhook handling
  * - Contract state machine integration
  *
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Handler\WebhookContractFulfillmentHandler
+ * @covers \OxidEsales\Payments\Stripe\Handler\WebhookContractFulfillmentHandler
  * @group sprint-7
  * @group sprint-9
  * @group delayed-capture

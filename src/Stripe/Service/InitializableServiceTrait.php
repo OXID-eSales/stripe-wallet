@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Service;
+namespace OxidEsales\Payments\Stripe\Service;
 
 /**
  * Trait for implementing lazy initialization in services
@@ -41,7 +41,7 @@ namespace OxidSolutionCatalysts\Payments\Stripe\Service;
  * }
  * ```
  *
- * @package OxidSolutionCatalysts\Payments\Stripe\Service
+ * @package OxidEsales\Payments\Stripe\Service
  * @author OXID eSales AG
  * @since 1.0.0
  */

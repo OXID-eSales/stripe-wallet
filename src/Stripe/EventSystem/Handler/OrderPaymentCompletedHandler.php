@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\EventSystem\Handler;
+namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
 use OxidEsales\PaymentComponent\EventSystem\Event\Contract\ContractFulfilledEvent;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;

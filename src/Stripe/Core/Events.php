@@ -7,16 +7,16 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Core;
+namespace OxidEsales\Payments\Stripe\Core;
 
-use Doctrine\DBAL\Exception;
+use Exception;
 use OxidEsales\Eshop\Application\Model\Shop;
 use OxidEsales\Eshop\Core\Exception\DatabaseConnectionException;
 use OxidEsales\Eshop\Core\Exception\DatabaseErrorException;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Core\Di\ContainerFacade;
 use OxidEsales\EshopCommunity\Internal\Framework\Database\QueryBuilderFactoryInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\StaticContent;
+use OxidEsales\Payments\Stripe\Service\StaticContent;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -154,14 +154,14 @@ class Events
     protected static function deletePaymentMethod(string $sPaymentId): void
     {
         try {
-            ContainerFacade::get(QueryBuilderFactoryInterface::class)
-                ->create()
-                ->delete('oxpayments')
-                ->where('oxid = :oxid')
-                ->setParameter(':oxid', $sPaymentId)
-                ->execute();
+            // Use OXID's DatabaseProvider for database operations
+            $db = \OxidEsales\Eshop\Core\DatabaseProvider::getDb();
+            $db->execute(
+                'DELETE FROM oxpayments WHERE oxid = ?',
+                [$sPaymentId]
+            );
         } catch (Exception) {
-            // do noting
+            // do nothing
         }
     }
 

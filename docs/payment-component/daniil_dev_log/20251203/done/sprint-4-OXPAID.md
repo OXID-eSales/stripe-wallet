@@ -53,7 +53,7 @@
 ✗ BAD:  Create PaymentTimestampUpdater, OrderStatusUpdater, TransactionIdUpdater classes
 ✓ GOOD: Add updateOrderPaidTimestamp(), updateOrderTransStatus() methods
 
-✗ BAD:  Store OXPAID in both oxorder AND osc_payment_order_state
+✗ BAD:  Store OXPAID in both oxorder AND oe_payments_order_state
 ✓ GOOD: Update oxorder.OXPAID only (single source of truth)
 ```
 
@@ -122,8 +122,8 @@ Passed:
 - paymentIntentRequiresCaptureShouldNotUpdateOxpaid
 
 Skipped (separate DB schema issue):
-- chargeCapturedUpdatesOxpaid (missing OXCAPTURED column in osc_payment_order_state)
-- chargeRefundedUpdatesOxpaid (missing OXREFUNDED column in osc_payment_order_state)
+- chargeCapturedUpdatesOxpaid (missing OXCAPTURED column in oe_payments_order_state)
+- chargeRefundedUpdatesOxpaid (missing OXREFUNDED column in oe_payments_order_state)
 ```
 
 ### Files Modified
@@ -178,15 +178,15 @@ if ($paymentDetails->isCaptured && $paymentDetails->capturedAt) {
 **The webhook handlers NEVER update `oxorder.OXPAID`:**
 
 1. **`handlePaymentIntentSucceeded()`** (line 143-169):
-   - Only updates `osc_payment_order_state.OXPAYMENTSTATE`
+   - Only updates `oe_payments_order_state.OXPAYMENTSTATE`
    - **MISSING:** `oxorder.OXPAID` update
 
 2. **`handleChargeCaptured()`** (line 224-246):
-   - Only updates `osc_payment_order_state.OXCAPTURED*`
+   - Only updates `oe_payments_order_state.OXCAPTURED*`
    - **MISSING:** `oxorder.OXPAID` update
 
 3. **`handleChargeRefunded()`** (line 255-276):
-   - Only updates `osc_payment_order_state.OXREFUNDED*`
+   - Only updates `oe_payments_order_state.OXREFUNDED*`
    - **MISSING:** `oxorder.OXPAID` update
 
 4. **`checkout.session.completed` is NOT HANDLED!**
@@ -412,7 +412,7 @@ All implementation tasks are complete:
 2. ✅ Order lookup fixed to use oxorder.OXTRANSID
 3. ✅ Integration tests created and passing
 4. ✅ Playwright E2E tests created and detecting bugs
-5. ✅ Legacy osc_payment_webhook_log references cleaned up
+5. ✅ Legacy oe_payments_webhook_log references cleaned up
 
 ---
 

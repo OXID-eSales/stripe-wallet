@@ -7,13 +7,13 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Helper;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Helper;
 
-use OxidSolutionCatalysts\Payments\Tests\Helper\StripeWebhookTestHelper;
+use OxidEsales\Payments\Stripe\Tests\Helper\StripeWebhookTestHelper;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @covers \OxidSolutionCatalysts\Payments\Tests\Helper\StripeWebhookTestHelper
+ * @covers \OxidEsales\Payments\Stripe\Tests\Helper\StripeWebhookTestHelper
  * @group sprint-13
  * @group webhook
  * @group helper

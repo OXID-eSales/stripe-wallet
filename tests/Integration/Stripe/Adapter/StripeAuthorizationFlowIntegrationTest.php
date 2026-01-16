@@ -7,14 +7,14 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\Adapter;
+namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Adapter;
 
 use OxidEsales\PaymentComponent\Adapter\Request\AuthorizePaymentRequest;
 use OxidEsales\PaymentComponent\Adapter\Request\CaptureAuthorizationRequest;
 use OxidEsales\PaymentComponent\Adapter\Request\VoidAuthorizationRequest;
 use OxidEsales\PaymentComponent\Adapter\Request\ReauthorizePaymentRequest;
 use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
-use OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\StripeIntegrationTestCase;
+use OxidEsales\Payments\Stripe\Tests\Integration\Stripe\StripeIntegrationTestCase;
 
 /**
  * Integration tests for StripeAdapter authorization flow with real Stripe API.
@@ -28,7 +28,7 @@ use OxidSolutionCatalysts\Payments\Tests\Integration\Stripe\StripeIntegrationTes
  * @group api
  * @group authorization
  *
- * @covers \OxidSolutionCatalysts\Payments\Stripe\Adapter\StripeAdapter
+ * @covers \OxidEsales\Payments\Stripe\Adapter\StripeAdapter
  */
 final class StripeAuthorizationFlowIntegrationTest extends StripeIntegrationTestCase
 {

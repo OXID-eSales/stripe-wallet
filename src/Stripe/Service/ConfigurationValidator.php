@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Service;
+namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentComponent\Service\ServiceInterface;
 use Stripe\StripeClient;
@@ -29,7 +29,7 @@ use Stripe\StripeClient;
  * Called during module configuration in admin panel and before payment initialization
  * to prevent configuration errors that would cause runtime failures.
  *
- * @package OxidSolutionCatalysts\Payments\Stripe\Service
+ * @package OxidEsales\Payments\Stripe\Service
  * @author OXID eSales AG
  * @since 1.0.0
  */

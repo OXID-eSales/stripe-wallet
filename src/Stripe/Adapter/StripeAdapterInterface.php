@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Adapter;
+namespace OxidEsales\Payments\Stripe\Adapter;
 
 use OxidEsales\PaymentComponent\Adapter\PaymentAdapterInterface;
 use Stripe\Checkout\Session;

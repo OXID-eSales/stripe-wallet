@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Service;
+namespace OxidEsales\Payments\Stripe\Service;
 
 use Psr\Log\LoggerInterface;
 
@@ -49,13 +49,17 @@ class EncryptionService
             // Expected format: iv + authTag + ciphertext (JSON encoded)
             $payload = json_decode($decoded, true);
 
-            if (!isset($payload['iv'], $payload['authTag'], $payload['ciphertext'])) {
+            if (!is_array($payload) || !isset($payload['iv'], $payload['authTag'], $payload['ciphertext'])) {
                 throw new \RuntimeException('Invalid encrypted payload structure');
             }
 
-            $iv = base64_decode($payload['iv'], true);
-            $authTag = base64_decode($payload['authTag'], true);
-            $ciphertext = base64_decode($payload['ciphertext'], true);
+            $iv = base64_decode((string) $payload['iv'], true);
+            $authTag = base64_decode((string) $payload['authTag'], true);
+            $ciphertext = base64_decode((string) $payload['ciphertext'], true);
+
+            if ($iv === false || $authTag === false || $ciphertext === false) {
+                throw new \RuntimeException('Failed to decode encrypted payload components');
+            }
 
             // Decrypt using AES-256-GCM
             $decrypted = openssl_decrypt(
@@ -93,16 +97,30 @@ class EncryptionService
     /**
      * Encrypt data (for testing or client-side key generation)
      *
-     * @param array $data Data to encrypt
+     * @param array<string, mixed> $data Data to encrypt
      * @return string Encrypted data with prefix
      */
     public function encrypt(array $data): string
     {
-        $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length(self::CIPHER_METHOD));
+        $ivLength = openssl_cipher_iv_length(self::CIPHER_METHOD);
+        if ($ivLength === false) { // @phpstan-ignore identical.alwaysFalse
+            throw new \RuntimeException('Failed to get cipher IV length');
+        }
+
+        $iv = openssl_random_pseudo_bytes($ivLength);
+        if ($iv === false) { // @phpstan-ignore identical.alwaysFalse
+            throw new \RuntimeException('Failed to generate IV');
+        }
+
         $authTag = '';
 
+        $jsonData = json_encode($data);
+        if ($jsonData === false) {
+            throw new \RuntimeException('Failed to encode data to JSON');
+        }
+
         $ciphertext = openssl_encrypt(
-            json_encode($data),
+            $jsonData,
             self::CIPHER_METHOD,
             $this->encryptionKey,
             OPENSSL_RAW_DATA,
@@ -110,22 +128,35 @@ class EncryptionService
             $authTag
         );
 
+        if ($ciphertext === false) {
+            throw new \RuntimeException('Encryption failed');
+        }
+
         $payload = json_encode([
             'iv' => base64_encode($iv),
             'authTag' => base64_encode($authTag),
             'ciphertext' => base64_encode($ciphertext),
         ]);
 
+        if ($payload === false) {
+            throw new \RuntimeException('Failed to encode payload to JSON');
+        }
+
         return self::ENCRYPTION_PREFIX . base64_encode($payload);
     }
 
     /**
      * Validate that data contains required payment fields
+     *
+     * @param array<string, mixed> $data Data to validate
+     * @return bool
      */
     public function validatePaymentData(array $data): bool
     {
         // Check for required fields (card or payment method)
-        $hasCard = isset($data['card']['number'], $data['card']['exp_month'], $data['card']['exp_year'], $data['card']['cvc']);
+        $card = $data['card'] ?? null;
+        $hasCard = is_array($card)
+            && isset($card['number'], $card['exp_month'], $card['exp_year'], $card['cvc']);
         $hasPaymentMethod = isset($data['paymentMethod']);
 
         return $hasCard || $hasPaymentMethod;

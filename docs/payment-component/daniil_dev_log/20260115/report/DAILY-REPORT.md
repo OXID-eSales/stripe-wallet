@@ -79,8 +79,8 @@ Successfully configured the payment-component as a standalone repository with pr
 ### 4. Migration Files
 
 Created provider-agnostic migration files in payment-component:
-- `Version20251031140000.php` - osc_payment_contract table
-- `Version20251031140100.php` - osc_payment_transaction table
+- `Version20251031140000.php` - oe_payments_contract table
+- `Version20251031140100.php` - oe_payments_transaction table
 - `Version20251031140200.php` - Support tables (order_state, customer, idempotency, sessions, webhooklogs)
 
 ### 5. CI/CD Configuration

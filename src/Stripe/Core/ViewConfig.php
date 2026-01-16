@@ -2,17 +2,18 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Core;
+namespace OxidEsales\Payments\Stripe\Core;
 
 use OxidEsales\Eshop\Core\Registry;
-use OxidSolutionCatalysts\Payments\Stripe\Traits\ServiceContainer;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
 use Throwable;
 
 /**
  * ViewConfig extension for Stripe module
  *
  * Provides helper methods for templates
+ * @phpstan-ignore class.notFound
  */
 class ViewConfig extends ViewConfig_parent
 {
@@ -71,6 +72,9 @@ class ViewConfig extends ViewConfig_parent
 
         // Check if we're on localhost/development domain
         $serverName = $_SERVER['SERVER_NAME'] ?? '';
+        if (!is_string($serverName)) {
+            $serverName = '';
+        }
         $devDomains = ['localhost', '.local', '.dev', '.test', 'oxiddev.de'];
         foreach ($devDomains as $domain) {
             if (strpos($serverName, $domain) !== false) {

@@ -8,12 +8,12 @@
 
 ## Summary
 
-Fixed 16 CI integration test failures caused by Sprint 8's `osc_payment_order_state` table removal and service discovery issues.
+Fixed 16 CI integration test failures caused by Sprint 8's `oe_payments_order_state` table removal and service discovery issues.
 
 ## Root Causes Identified
 
 ### Category 1: Table Not Found (3 errors)
-Tests referencing dropped `osc_payment_order_state` table.
+Tests referencing dropped `oe_payments_order_state` table.
 
 ### Category 2: Service Not Found (13 errors → 21 errors total)
 Tests using `$container->get(ContractRepositoryInterface::class)` and `$container->get(EventDispatcherInterface::class)` but module not activated in CI.
@@ -29,7 +29,7 @@ Tests using `$container->get(ContractRepositoryInterface::class)` and `$containe
 
 **Updated:**
 - `testCompleteFlow_PopulatesAllTables()`:
-  - Removed `osc_payment_order_state` INSERT
+  - Removed `oe_payments_order_state` INSERT
   - Added contract capture/refund field verification
   - Updated step numbers (8→8, 9→9, 10→10)
 

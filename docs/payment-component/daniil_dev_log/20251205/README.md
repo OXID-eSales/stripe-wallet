@@ -10,11 +10,11 @@
 ### Completed Sprints
 1. **Sprint 6** - Contract-Aware Webhooks (completed)
 2. **Sprint 7** - OXPAID & Provider Order ID Fix (completed)
-3. **Sprint 8** - Drop `osc_payment_order_state` table (completed)
+3. **Sprint 8** - Drop `oe_payments_order_state` table (completed)
 
 ### Key Changes Made
-- `osc_payment_order_state` table **DROPPED**
-- Capture/refund tracking moved to `osc_payment_contract`:
+- `oe_payments_order_state` table **DROPPED**
+- Capture/refund tracking moved to `oe_payments_contract`:
   - `OXCAPTUREDAMOUNT`, `OXREFUNDEDAMOUNT`
   - `OXCAPTUREDAT`, `OXREFUNDEDAT`
 - `PaymentOrderStateRepository.php` **DELETED**
@@ -43,16 +43,16 @@ No Reinventing	Check if solution already exists before creating
 ### Sprint 9: CI Integration Test Fixes
 
 **Problem:** 16 CI integration test failures:
-- 3 errors: `Table 'example.osc_payment_order_state' doesn't exist`
+- 3 errors: `Table 'example.oe_payments_order_state' doesn't exist`
 - 13 errors: `Service "ContractRepositoryInterface" not found`
 
 **Root Causes:**
-1. `FullDataPersistenceFlowTest.php` still references dropped `osc_payment_order_state` table
+1. `FullDataPersistenceFlowTest.php` still references dropped `oe_payments_order_state` table
 2. CI doesn't run module migrations before integration tests (cache from install job)
 3. Tests requesting `ContractRepositoryInterface` but service not available in CI context
 
 **Fix Strategy:**
-1. Remove/update tests that reference `osc_payment_order_state`
+1. Remove/update tests that reference `oe_payments_order_state`
 2. Update `FullDataPersistenceFlowTest` to use contract capture/refund fields
 3. Ensure integration tests handle missing services gracefully
 
@@ -104,7 +104,7 @@ No Reinventing	Check if solution already exists before creating
 
 ### Type 1: Table Not Found (3 errors)
 ```
-SQLSTATE[42S02]: Table 'example.osc_payment_order_state' doesn't exist
+SQLSTATE[42S02]: Table 'example.oe_payments_order_state' doesn't exist
 ```
 **Files affected:**
 - `FullDataPersistenceFlowTest.php:380` - `testOrderState_PersistsOrderContractLink`

@@ -1,4 +1,4 @@
-osc_payment_s# SPRINT-2 TICKET-10: Database Layer Implementation ✅ COMPLETED
+oe_payments_s# SPRINT-2 TICKET-10: Database Layer Implementation ✅ COMPLETED
 
 **Priority:** 🔴 HIGH
 **Estimated Effort:** 8-10 hours → **Actual: 6 hours**
@@ -24,7 +24,7 @@ Replace in-memory repositories with real database-backed implementations using D
 ## ✅ COMPLETED: Implementation Summary
 
 ### What Was Built:
-1. ✅ Provider-agnostic database schema (osc_payment_* prefix)
+1. ✅ Provider-agnostic database schema (oe_payments_* prefix)
 2. ✅ 3 Doctrine migrations creating 6 tables
 3. ✅ Doctrine DBAL repositories (DoctrineContractRepository, DoctrineWebhookLogRepository)
 4. ✅ Contract-first architecture with JSON storage for conditions
@@ -32,12 +32,12 @@ Replace in-memory repositories with real database-backed implementations using D
 6. ✅ Code style checks passing
 
 ### Tables Created (Provider-Agnostic):
-- `osc_payment_contract` (18 columns, 7 indexes, 2 FKs) - PRIMARY
-- `osc_payment_transaction` (16 columns, 6 indexes, 3 FKs) - MASTER
-- `osc_payment_order_state` (10 columns, 4 indexes, 2 FKs)
-- `osc_payment_customer` (9 columns, 1 unique index, 1 FK)
-- `osc_payment_idempotency` (8 columns, 3 indexes)
-- `osc_payment_sessions` (8 columns, 3 indexes)
+- `oe_payments_contract` (18 columns, 7 indexes, 2 FKs) - PRIMARY
+- `oe_payments_transaction` (16 columns, 6 indexes, 3 FKs) - MASTER
+- `oe_payments_order_state` (10 columns, 4 indexes, 2 FKs)
+- `oe_payments_customer` (9 columns, 1 unique index, 1 FK)
+- `oe_payments_idempotency` (8 columns, 3 indexes)
+- `oe_payments_sessions` (8 columns, 3 indexes)
 
 ---
 
@@ -64,11 +64,11 @@ Replace in-memory repositories with real database-backed implementations using D
 
 ### ✅ ACTUAL Database Schema (Implemented)
 
-**Note:** Provider-agnostic design using `osc_payment_*` (singular) prefix, following architecture v4.0
+**Note:** Provider-agnostic design using `oe_payments_*` (singular) prefix, following architecture v4.0
 
 ```sql
 -- PRIMARY: Payment Contracts Table (Contract-First Pattern)
-CREATE TABLE osc_payment_contract (
+CREATE TABLE oe_payments_contract (
     OXID CHAR(32) COLLATE latin1_general_ci PRIMARY KEY,
     OXSHOPID INT NOT NULL,
     OXUSERID CHAR(32) COLLATE latin1_general_ci NOT NULL,
@@ -101,7 +101,7 @@ CREATE TABLE osc_payment_contract (
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_general_ci;
 
 -- MASTER: Transaction Table (Master-Detail Pattern for Performance)
-CREATE TABLE osc_payment_transaction (
+CREATE TABLE oe_payments_transaction (
     OXID CHAR(32) COLLATE latin1_general_ci PRIMARY KEY,
     OXSHOPID INT NOT NULL,
     OXORDERID CHAR(32) COLLATE latin1_general_ci NOT NULL,
@@ -127,12 +127,12 @@ CREATE TABLE osc_payment_transaction (
     INDEX IDX_PARENT (OXPARENTTRANSACTIONID),
 
     FOREIGN KEY FK_ORDER (OXORDERID) REFERENCES oxorder(OXID) ON DELETE CASCADE,
-    FOREIGN KEY FK_CONTRACT (OXCONTRACTID) REFERENCES osc_payment_contract(OXID) ON DELETE SET NULL,
-    FOREIGN KEY FK_PARENT_TX (OXPARENTTRANSACTIONID) REFERENCES osc_payment_transaction(OXID) ON DELETE SET NULL
+    FOREIGN KEY FK_CONTRACT (OXCONTRACTID) REFERENCES oe_payments_contract(OXID) ON DELETE SET NULL,
+    FOREIGN KEY FK_PARENT_TX (OXPARENTTRANSACTIONID) REFERENCES oe_payments_transaction(OXID) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_general_ci;
 
--- Additional tables: osc_payment_order_state, osc_payment_customer,
--- osc_payment_idempotency, osc_payment_sessions (see migration files)
+-- Additional tables: oe_payments_order_state, oe_payments_customer,
+-- oe_payments_idempotency, oe_payments_sessions (see migration files)
 ```
 
 **Key Design Decisions:**
@@ -761,7 +761,7 @@ vendor/bin/phpunit --testsuite unit
 ## 📋 Definition of Done
 
 - [x] Migration files created and tested (3 migrations: Version20251031140000, Version20251031140100, Version20251031140200)
-- [x] All 6 tables created with correct schema (provider-agnostic: osc_payment_*)
+- [x] All 6 tables created with correct schema (provider-agnostic: oe_payments_*)
 - [x] Doctrine DBAL repositories implemented (using Connection, not ORM EntityManager)
 - [x] DoctrineContractRepository implemented (/home/dtkachev/osc/strpwt7-oct21/source/extensions/stripe/src/Component/Repository/DoctrineContractRepository.php)
 - [x] DoctrineWebhookLogRepository implemented (/home/dtkachev/osc/strpwt7-oct21/source/extensions/stripe/src/Component/Repository/DoctrineWebhookLogRepository.php)
@@ -776,7 +776,7 @@ vendor/bin/phpunit --testsuite unit
 ## 🎯 Success Metrics
 
 **Database:**
-- ✅ 6 tables created successfully (osc_payment_contract, osc_payment_transaction, osc_payment_order_state, osc_payment_customer, osc_payment_idempotency, osc_payment_sessions)
+- ✅ 6 tables created successfully (oe_payments_contract, oe_payments_transaction, oe_payments_order_state, oe_payments_customer, oe_payments_idempotency, oe_payments_sessions)
 - ✅ 21+ indexes for query performance (7 on contract, 6 on transaction, 8+ on support tables)
 - ✅ Foreign key constraints enforced (8 FKs total across all tables)
 - ✅ Provider-agnostic design supports multiple payment providers

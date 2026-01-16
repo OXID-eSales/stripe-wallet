@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Core;
+namespace OxidEsales\Payments\Stripe\Core;
 
 /**
  * Stripe Payment Method Definitions

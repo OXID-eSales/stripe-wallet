@@ -65,7 +65,7 @@
 - **Status:** ✅ COMPLETE
 
 **TICKET-10: Database Layer (Complete)**
-- Provider-agnostic database schema (6 tables: osc_payment_*)
+- Provider-agnostic database schema (6 tables: oe_payments_*)
 - 3 Doctrine migrations (Version20251031140000, Version20251031140100, Version20251031140200)
 - DoctrineContractRepository implementation (Doctrine DBAL)
 - DoctrineWebhookLogRepository implementation (Doctrine DBAL)

@@ -7,14 +7,14 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Controller\Webhook;
+namespace OxidEsales\Payments\Stripe\Controller\Webhook;
 
 use OxidEsales\Eshop\Application\Controller\FrontendController;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\PaymentComponent\Service\WebhookLogServiceInterface;
-use OxidSolutionCatalysts\Payments\Stripe\Service\ModuleConfigurationService;
-use OxidSolutionCatalysts\Payments\Stripe\Service\WebhookProcessingService;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Service\WebhookProcessingService;
 use Stripe\Exception\SignatureVerificationException;
 use Stripe\Webhook;
 
@@ -204,7 +204,7 @@ class WebhookController extends FrontendController
             // Fallback to direct SQL (legacy)
             $db = \OxidEsales\Eshop\Core\DatabaseProvider::getDb();
 
-            $sql = "INSERT INTO osc_payment_webhooklogs
+            $sql = "INSERT INTO oe_payments_webhooklogs
                     (OXID, OXEVENTID, OXEVENTTYPE, OXPROVIDER, OXPAYLOAD, OXSTATUS, OXRECEIVEDAT)
                     VALUES (?, ?, ?, 'stripe', ?, 'received', NOW())
                     ON DUPLICATE KEY UPDATE

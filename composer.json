@@ -1,5 +1,5 @@
 {
-  "name": "osc/stripe-wallet",
+  "name": "oxid-esales/stripe-wallet",
   "description": "Stripe Payment Module for Oxid 7",
   "type": "oxideshop-module",
   "repositories": [
@@ -32,10 +32,9 @@
   "prefer-stable": true,
   "require": {
     "php": "^8.2",
-    "oxid-esales/payment-component": "*",
+    "oxid-esales/payment-component": "dev-b-7.4.x",
     "stripe/stripe-php": "^18.0",
-    "doctrine/dbal": "^2.13",
-    "doctrine/migrations": "^3.0"
+    "doctrine/dbal": "^2.13"
   },
   "require-dev": {
     "symfony/filesystem": "^6.4",
@@ -50,9 +49,8 @@
   },
   "autoload": {
     "psr-4": {
-      "OxidSolutionCatalysts\\Payments\\Stripe\\": "./src/Stripe",
-      "OxidSolutionCatalysts\\Payments\\Migrations\\": "./migration/data",
-      "OxidSolutionCatalysts\\Payments\\Tests\\": "./tests"
+      "OxidEsales\\Payments\\Stripe\\": "./src/Stripe",
+      "OxidEsales\\Payments\\Stripe\\Tests\\": "./tests"
     }
   },
   "autoload-dev": {

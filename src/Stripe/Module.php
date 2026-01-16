@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe;
+namespace OxidEsales\Payments\Stripe;
 
 class Module
 {

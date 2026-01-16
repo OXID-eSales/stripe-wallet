@@ -25,7 +25,7 @@ AFTER:  Column additions disabled (code commented out with documentation)
 
 ### Rule 2: NO CREATE TABLE in Events.php
 ```
-BEFORE: Events.php created osc_payment_transaction, osc_payment_order_state
+BEFORE: Events.php created oe_payments_transaction, oe_payments_order_state
 AFTER:  Table creation disabled (handled by Doctrine migrations)
 ```
 
@@ -124,7 +124,7 @@ Sprint 5 Tests:
 ### New Installations
 - Tables created by Doctrine migrations (Version20251031140200.php)
 - STRIPE* columns NOT created (may cause issues if refund tracking code runs)
-- TODO: Migrate refund tracking to use osc_payment_transaction instead
+- TODO: Migrate refund tracking to use oe_payments_transaction instead
 
 ---
 
@@ -138,7 +138,7 @@ The following files still use STRIPE* columns for refund tracking:
 **Current approach:** These columns already exist in production databases, so the code works.
 
 **Future approach:**
-- Store refund details in `osc_payment_transaction` with type='refund'
+- Store refund details in `oe_payments_transaction` with type='refund'
 - Calculate refunded amounts from transaction history
 - Remove dependency on STRIPE* columns in oxorder/oxorderarticles
 
@@ -193,7 +193,7 @@ docker compose exec -T php vendor/bin/phpunit \
 
 ## Next Steps
 
-1. **Sprint 6 (Future):** Migrate refund tracking to use `osc_payment_transaction`
+1. **Sprint 6 (Future):** Migrate refund tracking to use `oe_payments_transaction`
    - Update StripeRefundRequestHandler to store refund details in transaction
    - Update OrderRefund controller to calculate from transaction history
    - Remove STRIPE* column usage

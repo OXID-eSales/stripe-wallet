@@ -149,14 +149,14 @@ The service handles:
 
 ---
 
-### 1.8 MEDIUM: osc_payment_order_state Table Status
+### 1.8 MEDIUM: oe_payments_order_state Table Status
 
-**Documentation mentions:** `osc_payment_order_state` table
+**Documentation mentions:** `oe_payments_order_state` table
 **Reality:** Table was dropped in Sprint 8 (December 2025)
 
 **Impact:** Documentation references non-existent database table.
 
-**Recommendation:** Remove references to `osc_payment_order_state` from architecture docs.
+**Recommendation:** Remove references to `oe_payments_order_state` from architecture docs.
 
 ---
 
@@ -487,7 +487,7 @@ Both handlers directly access session:
 |----------|-----------------|
 | `00-overview.md` | Add terminal states (CANCELLED, EXPIRED, FAILED) |
 | `01-architecture-layers.md` | Document ContainerFactory usage, OXPAID strategy |
-| `02-database-and-models.md` | Remove `osc_payment_order_state` references |
+| `02-database-and-models.md` | Remove `oe_payments_order_state` references |
 | `03-building-payment-modules.md` | Document actual Component layer dependencies |
 | `05-webhooks.md` | Document WebhookProcessingService complexity |
 

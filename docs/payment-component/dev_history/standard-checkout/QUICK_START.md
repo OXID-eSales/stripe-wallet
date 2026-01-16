@@ -71,10 +71,10 @@ SHOW TABLES LIKE 'osc_payment%';
 ```
 
 You should see 4 tables:
-- osc_payment_transaction
-- osc_payment_order_state
-- osc_payment_customer
-- osc_payment_webhook_log
+- oe_payments_transaction
+- oe_payments_order_state
+- oe_payments_customer
+- oe_payments_webhook_log
 
 ---
 

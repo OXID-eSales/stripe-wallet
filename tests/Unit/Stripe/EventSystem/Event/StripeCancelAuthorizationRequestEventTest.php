@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Tests\Unit\Stripe\EventSystem\Event;
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Event;
 
-use OxidSolutionCatalysts\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use PHPUnit\Framework\TestCase;
 

@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidSolutionCatalysts\Payments\Stripe\Adapter;
+namespace OxidEsales\Payments\Stripe\Adapter;
 
 use OxidEsales\PaymentComponent\Adapter\WebhookEvent;
 use Stripe\Event;
@@ -83,6 +83,9 @@ final class StripeWebhookEvent implements WebhookEvent
         return null;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getData(): array
     {
         $object = $this->stripeEvent->data->object ?? null;
@@ -92,7 +95,9 @@ final class StripeWebhookEvent implements WebhookEvent
         }
 
         // Convert Stripe object to array
-        return $object->toArray();
+        /** @var array<string, mixed> $data */
+        $data = $object->toArray();
+        return $data;
     }
 
     public function getCreatedAt(): \DateTimeInterface

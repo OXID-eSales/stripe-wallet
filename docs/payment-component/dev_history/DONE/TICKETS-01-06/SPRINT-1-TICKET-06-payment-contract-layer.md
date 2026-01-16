@@ -914,7 +914,7 @@ class ContractRepository
     {
         // TODO: Implement persistence
         // - Serialize contract to JSON for OXCONTRACTDATA column
-        // - Save to osc_payment_contract table
+        // - Save to oe_payments_contract table
     }
 
     public function findById(string $id): ?PaymentContract

@@ -281,7 +281,7 @@ extensions/osc/stripe/
 -- migration/001_create_payment_transaction_table.sql
 -- Core transaction tracking (Component layer)
 
-CREATE TABLE IF NOT EXISTS osc_payment_transaction (
+CREATE TABLE IF NOT EXISTS oe_payments_transaction (
     OXID CHAR(32) NOT NULL PRIMARY KEY COMMENT 'Primary key',
     OXSHOPID INT(11) NOT NULL COMMENT 'Shop ID',
     OXORDERID CHAR(32) NOT NULL COMMENT 'FK to oxorder.OXID',
@@ -314,7 +314,7 @@ CREATE TABLE IF NOT EXISTS osc_payment_transaction (
 -- Component-level order payment state tracking (Component layer)
 -- Replaces extending oxorder table
 
-CREATE TABLE IF NOT EXISTS osc_payment_order_state (
+CREATE TABLE IF NOT EXISTS oe_payments_order_state (
     OXID CHAR(32) NOT NULL PRIMARY KEY COMMENT 'Primary key',
     OXORDERID CHAR(32) NOT NULL UNIQUE COMMENT 'FK to oxorder.OXID (1:1 relationship)',
     OXPAYMENTSTATE VARCHAR(32) NOT NULL COMMENT 'Payment state (NOT_FINISHED|500-900|OK|ERROR)',
@@ -340,7 +340,7 @@ CREATE TABLE IF NOT EXISTS osc_payment_order_state (
 -- Component-level payment customer data (Component layer)
 -- Replaces extending oxuser table
 
-CREATE TABLE IF NOT EXISTS osc_payment_customer (
+CREATE TABLE IF NOT EXISTS oe_payments_customer (
     OXID CHAR(32) NOT NULL PRIMARY KEY COMMENT 'Primary key',
     OXUSERID CHAR(32) NOT NULL UNIQUE COMMENT 'FK to oxuser.OXID (1:1 relationship)',
     OXPAYMENTCUSTOMERID VARCHAR(128) NULL COMMENT 'Payment provider customer ID (cus_xxx for Stripe)',
@@ -364,7 +364,7 @@ CREATE TABLE IF NOT EXISTS osc_payment_customer (
 -- Component-level basket snapshot for payment reconciliation (Component layer)
 -- Stores basket state at payment initiation time
 
-CREATE TABLE IF NOT EXISTS osc_payment_basket_snapshot (
+CREATE TABLE IF NOT EXISTS oe_payments_basket_snapshot (
     OXID CHAR(32) NOT NULL PRIMARY KEY COMMENT 'Primary key',
     OXORDERID CHAR(32) NOT NULL COMMENT 'FK to oxorder.OXID',
     OXUSERID CHAR(32) NULL COMMENT 'FK to oxuser.OXID',
@@ -1757,7 +1757,7 @@ class PaymentTransactionRepository implements PaymentTransactionRepositoryInterf
         $id = $this->generateId();
         $transaction->setId($id);
 
-        $sql = "INSERT INTO osc_payment_transaction
+        $sql = "INSERT INTO oe_payments_transaction
                 (OXID, OXSHOPID, OXORDERID, OXPROVIDERORDERID, OXSTATUS,
                  OXPAYMENTMETHODID, OXTRANSACTIONTYPE)
                 VALUES (?, ?, ?, ?, ?, ?, ?)";
@@ -1775,7 +1775,7 @@ class PaymentTransactionRepository implements PaymentTransactionRepositoryInterf
 
     private function update(PaymentTransaction $transaction): void
     {
-        $sql = "UPDATE osc_payment_transaction
+        $sql = "UPDATE oe_payments_transaction
                 SET OXSTATUS = ?,
                     OXTRANSACTIONID = ?,
                     OXPROVIDERDATA = ?
@@ -1791,7 +1791,7 @@ class PaymentTransactionRepository implements PaymentTransactionRepositoryInterf
 
     public function findByOrderAndProvider(string $orderId, string $providerOrderId): ?PaymentTransaction
     {
-        $sql = "SELECT * FROM osc_payment_transaction
+        $sql = "SELECT * FROM oe_payments_transaction
                 WHERE OXORDERID = ? AND OXPROVIDERORDERID = ?
                 LIMIT 1";
 
@@ -1802,7 +1802,7 @@ class PaymentTransactionRepository implements PaymentTransactionRepositoryInterf
 
     public function findAllByOrderId(string $orderId): array
     {
-        $sql = "SELECT * FROM osc_payment_transaction
+        $sql = "SELECT * FROM oe_payments_transaction
                 WHERE OXORDERID = ?
                 ORDER BY OXTIMESTAMP DESC";
 
@@ -3028,7 +3028,7 @@ Implement two-step authorization flow where payment is authorized first, then ca
 ### Step 1: Database Migration
 ```sql
 -- migration/20250116_authorization_tracking.sql
-ALTER TABLE osc_payment_transaction ADD COLUMN (
+ALTER TABLE oe_payments_transaction ADD COLUMN (
     OXAUTHORIZATION_ID VARCHAR(128),
     OXAUTHORIZATION_STATUS VARCHAR(32),
     OXAUTHORIZATION_EXPIRES DATETIME,
@@ -3349,7 +3349,7 @@ Implement idempotency key management to prevent duplicate charges on network ret
 - [ ] Automatic key expiration
 
 ### 2. Database Table
-- [ ] `osc_payment_idempotency` table
+- [ ] `oe_payments_idempotency` table
 - [ ] Unique constraint on `OXKEY`
 - [ ] TTL-based cleanup
 
@@ -3384,7 +3384,7 @@ Implement idempotency key management to prevent duplicate charges on network ret
 
 ### Step 1: Database Migration
 ```sql
-CREATE TABLE IF NOT EXISTS osc_payment_idempotency (
+CREATE TABLE IF NOT EXISTS oe_payments_idempotency (
     OXID CHAR(32) NOT NULL PRIMARY KEY,
     OXKEY VARCHAR(128) NOT NULL UNIQUE,
     OXORDERID CHAR(32) NOT NULL,
@@ -3475,7 +3475,7 @@ public function initiatePayment(Order $order, string $paymentMethod): PaymentRes
 ## Deliverables
 
 - [ ] `IdempotencyService` class
-- [ ] `osc_payment_idempotency` table migration
+- [ ] `oe_payments_idempotency` table migration
 - [ ] Integration with `PaymentService`
 - [ ] Component tests (9+ tests)
 - [ ] Documentation

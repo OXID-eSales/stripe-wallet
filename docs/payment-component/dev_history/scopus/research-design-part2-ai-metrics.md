@@ -33,7 +33,7 @@
 ```sql
 -- Database Schema with Idempotency Enforcement
 
-CREATE TABLE osc_payment_transaction (
+CREATE TABLE oe_payments_transaction (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     order_id VARCHAR(64) NOT NULL,
     idempotency_key VARCHAR(128) NOT NULL,
@@ -67,7 +67,7 @@ CREATE TABLE osc_idempotency_violation (
     user_agent TEXT,
     request_payload JSON,
     existing_transaction_id BIGINT,
-    FOREIGN KEY (existing_transaction_id) REFERENCES osc_payment_transaction(id)
+    FOREIGN KEY (existing_transaction_id) REFERENCES oe_payments_transaction(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 

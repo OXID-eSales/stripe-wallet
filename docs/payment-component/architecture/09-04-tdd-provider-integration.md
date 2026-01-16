@@ -166,7 +166,7 @@ class PaymentServiceWithAdapterTest extends TestCase
 ```
 
 **Implementation Order:**
-1. Add authorization tracking fields to `osc_payment_transaction`:
+1. Add authorization tracking fields to `oe_payments_transaction`:
    - `OXAUTHORIZATION_ID` (provider authorization ID)
    - `OXAUTHORIZATION_STATUS` (authorized, captured, voided, expired)
    - `OXAUTHORIZATION_EXPIRES` (expiration timestamp)
@@ -243,9 +243,9 @@ class PaymentServiceWithAdapterTest extends TestCase
 ```
 
 **Implementation Order:**
-1. Create `osc_payment_idempotency` table:
+1. Create `oe_payments_idempotency` table:
    ```sql
-   CREATE TABLE osc_payment_idempotency (
+   CREATE TABLE oe_payments_idempotency (
        OXID CHAR(32) NOT NULL PRIMARY KEY,
        OXKEY VARCHAR(128) NOT NULL UNIQUE,
        OXORDERID CHAR(32) NOT NULL,
@@ -328,9 +328,9 @@ class PaymentServiceWithAdapterTest extends TestCase
 ```
 
 **Implementation Order:**
-1. Create `osc_payment_saved_methods` table:
+1. Create `oe_payments_saved_methods` table:
    ```sql
-   CREATE TABLE osc_payment_saved_methods (
+   CREATE TABLE oe_payments_saved_methods (
        OXID CHAR(32) NOT NULL PRIMARY KEY,
        OXUSERID CHAR(32) NOT NULL,
        OXPROVIDER VARCHAR(32) NOT NULL,
