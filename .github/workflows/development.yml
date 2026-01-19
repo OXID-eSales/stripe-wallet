@@ -260,25 +260,7 @@ jobs:
 
       - name: Run payment-component database migrations
         run: |
-          # Run payment-component migrations using OXID's database connection
-          docker compose exec -T php bash -c '
-            cat > /tmp/migrations-db.php << "DBCONFIG"
-          <?php
-          require_once "/var/www/source/bootstrap.php";
-          $config = \OxidEsales\Eshop\Core\Registry::getConfig();
-          return [
-              "dbname" => $config->getConfigParam("dbName"),
-              "user" => $config->getConfigParam("dbUser"),
-              "password" => $config->getConfigParam("dbPwd"),
-              "host" => $config->getConfigParam("dbHost"),
-              "driver" => "pdo_mysql",
-          ];
-          DBCONFIG
-            php vendor/bin/doctrine-migrations migrate \
-              --configuration=/var/www/vendor/oxid-esales/payment-component/migration/migrations.yml \
-              --db-configuration=/tmp/migrations-db.php \
-              --no-interaction --allow-no-migration
-          '
+          docker compose exec -T php php vendor/bin/doctrine-migrations migrate --configuration=vendor/oxid-esales/payment-component/migration/migrations.yml --db-configuration=vendor/oxid-esales/oxideshop-doctrine-migration-wrapper/src/migrations-db.php --no-interaction --allow-no-migration
 
       - name: Run isolated unit tests
         run: |
@@ -339,25 +321,7 @@ jobs:
 
       - name: Run payment-component database migrations
         run: |
-          # Run payment-component migrations using OXID's database connection
-          docker compose exec -T php bash -c '
-            cat > /tmp/migrations-db.php << "DBCONFIG"
-          <?php
-          require_once "/var/www/source/bootstrap.php";
-          $config = \OxidEsales\Eshop\Core\Registry::getConfig();
-          return [
-              "dbname" => $config->getConfigParam("dbName"),
-              "user" => $config->getConfigParam("dbUser"),
-              "password" => $config->getConfigParam("dbPwd"),
-              "host" => $config->getConfigParam("dbHost"),
-              "driver" => "pdo_mysql",
-          ];
-          DBCONFIG
-            php vendor/bin/doctrine-migrations migrate \
-              --configuration=/var/www/vendor/oxid-esales/payment-component/migration/migrations.yml \
-              --db-configuration=/tmp/migrations-db.php \
-              --no-interaction --allow-no-migration
-          '
+          docker compose exec -T php php vendor/bin/doctrine-migrations migrate --configuration=vendor/oxid-esales/payment-component/migration/migrations.yml --db-configuration=vendor/oxid-esales/oxideshop-doctrine-migration-wrapper/src/migrations-db.php --no-interaction --allow-no-migration
 
       - name: Create .env
         run: |          

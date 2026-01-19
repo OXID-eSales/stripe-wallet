@@ -72,10 +72,18 @@ The E2E tests use real database connections and leave data for inspection:
 # Run data persistence tests
 docker compose exec php php vendor/bin/phpunit -c extensions/stripe/tests/phpunit.xml \
     extensions/stripe/tests/Integration/Component/Checkout/FullDataPersistenceFlowTest.php
+```
+ 
+Test data uses `e2e_` prefix for easy identification and cleanup.
 
-# Query test data after running
-docker compose exec mysql mysql -uroot -proot example -e \
-    "SELECT * FROM osc_payment_contract WHERE OXID LIKE 'e2e_%';"
+## Migrations
+
+To run migrations the package oxid-esales/oxideshop-doctrine-migration-wrapper should be installed. 
+
+```bash
+ composer require oxid-esales/oxideshop-doctrine-migration-wrapper
 ```
 
-Test data uses `e2e_` prefix for easy identification and cleanup.
+```bash
+vendor/bin/doctrine-migrations migrate --configuration=vendor/oxid-esales/payment-component/migration/migrations.yml --db-configuration=vendor/oxid-esales/oxideshop-doctrine-migration-wrapper/src/migrations-db.php --no-interaction   
+```
