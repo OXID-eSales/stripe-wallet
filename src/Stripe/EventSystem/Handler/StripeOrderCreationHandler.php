@@ -199,9 +199,10 @@ class StripeOrderCreationHandler implements HandlerInterface
      *
      * When EarlyOrderCreationHandler has already created the order, we:
      * 1. Set context variables for downstream handlers
-     * 2. Commit the contract to the existing order
-     * 3. Update OXPAID on the existing order
-     * 4. Dispatch ContractCommittedEvent
+     * 2. Update the order's transaction ID (OXTRANSID) with the PaymentIntent ID
+     * 3. Commit the contract to the existing order
+     * 4. Update OXPAID on the existing order
+     * 5. Dispatch ContractCommittedEvent
      */
     private function handleExistingOrder(
         \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract,
@@ -224,6 +225,26 @@ class StripeOrderCreationHandler implements HandlerInterface
         // Set context for downstream handlers (like thankyou page)
         $context->set('orderId', $orderId);
         $context->set('orderNumber', $orderNumber);
+
+        // STRP-71: Update order's transaction ID (OXTRANSID) with PaymentIntent ID
+        // This is needed because early order creation sets paymentTransactionId: null
+        $paymentIntentId = $context->get('paymentIntentId');
+        $authorizationId = $context->get('authorizationId');
+        /** @var string|null $paymentTransactionId */
+        $paymentTransactionId = is_string($paymentIntentId) ? $paymentIntentId
+            : (is_string($authorizationId) ? $authorizationId : null);
+
+        if ($paymentTransactionId !== null && $order->getId() !== null) { // @phpstan-ignore notIdentical.alwaysTrue
+            $order->oxorder__oxtransid = new \OxidEsales\Eshop\Core\Field(
+                $paymentTransactionId,
+                \OxidEsales\Eshop\Core\Field::T_RAW
+            );
+            $order->save();
+            $this->logEvent('StripeOrderCreationHandler: Updated order transaction ID', [
+                'orderId' => $orderId,
+                'transactionId' => $paymentTransactionId,
+            ]);
+        }
 
         // Commit contract to existing order
         $contract->commitToOrder($orderId);

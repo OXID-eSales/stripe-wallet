@@ -24,31 +24,33 @@ use PHPUnit\Framework\TestCase;
  * Unit tests for StripeContractCreationHandler.
  *
  * Sprint 21: Refactored tests for handler with ContractMetadataService delegation.
+ * Sprint 1 (2026): Updated for Template Method pattern - handler now extends ContractCreationHandler.
  *
  * @covers \OxidEsales\Payments\Stripe\EventSystem\Handler\StripeContractCreationHandler
  */
 class StripeContractCreationHandlerTest extends TestCase
 {
     private ContractServiceInterface&MockObject $contractService;
+    private EventDispatcherInterface&MockObject $eventDispatcher;
     private ContractRepositoryInterface&MockObject $contractRepository;
     private ContractMetadataServiceInterface&MockObject $metadataService;
-    private EventDispatcherInterface&MockObject $eventDispatcher;
 
     protected function setUp(): void
     {
         $this->contractService = $this->createMock(ContractServiceInterface::class);
+        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->metadataService = $this->createMock(ContractMetadataServiceInterface::class);
-        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
     }
 
     private function createHandler(): StripeContractCreationHandler
     {
+        // Constructor order matches parent class (ContractCreationHandler) + Stripe-specific deps
         return new StripeContractCreationHandler(
             $this->contractService,
+            $this->eventDispatcher,
             $this->contractRepository,
-            $this->metadataService,
-            $this->eventDispatcher
+            $this->metadataService
         );
     }
 

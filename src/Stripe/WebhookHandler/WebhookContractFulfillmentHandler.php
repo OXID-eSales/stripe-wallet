@@ -145,6 +145,61 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
     }
 
     /**
+     * @inheritDoc
+     *
+     * Sprint 1 Bug Fix: Handle payment_intent.canceled webhook event.
+     * Previously, this was only logged but contract state was never updated.
+     */
+    public function handlePaymentCanceled(string $providerOrderId, string $cancellationReason): ?bool
+    {
+        $contract = $this->findContractByProviderOrderId($providerOrderId);
+
+        if ($contract === null) {
+            return null;
+        }
+
+        // Can only cancel non-terminal contracts
+        if ($contract->getState()->isTerminal()) {
+            return false;
+        }
+
+        // Mark contract as cancelled using the concrete method
+        if ($contract instanceof PaymentContract) {
+            $contract->cancel($cancellationReason);
+            $this->contractRepository->save($contract);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @inheritDoc
+     *
+     * Sprint 1 Bug Fix: Handle checkout.session.expired webhook event.
+     * Previously, expired sessions didn't update contract state.
+     * Uses EXPIRED state (distinct from CANCELLED) for semantic clarity.
+     */
+    public function handleSessionExpired(string $contractId): ?bool
+    {
+        $contract = $this->contractRepository->findById($contractId);
+
+        if ($contract === null) {
+            return null;
+        }
+
+        // Can only expire non-terminal contracts
+        if ($contract->getState()->isTerminal()) {
+            return false;
+        }
+
+        // Mark contract as expired
+        $contract->expire();
+        $this->contractRepository->save($contract);
+        return true;
+    }
+
+    /**
      * Find contract by provider order ID.
      *
      * @param string $providerOrderId Stripe PaymentIntent ID

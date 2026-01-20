@@ -78,9 +78,10 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         }
 
         // Build URLs with contract ID and secure token
-        $shopUrl = $context->get('shopUrl', 'https://shop.example.com/');
+        $defaultShopUrl = \OxidEsales\EshopCommunity\Core\Registry::getConfig()->getShopUrl();
+        $shopUrl = $context->get('shopUrl', $defaultShopUrl);
         if (!is_string($shopUrl)) {
-            $shopUrl = 'https://shop.example.com/';
+            $shopUrl = $defaultShopUrl;
         }
 
         // Generate secure token for session restoration

@@ -142,6 +142,10 @@ class WebhookProcessingService
                 $this->handleCheckoutSessionCompleted($event);
                 break;
 
+            case 'checkout.session.expired':
+                $this->handleCheckoutSessionExpired($event);
+                break;
+
             default:
                 Registry::getLogger()->debug('Unhandled webhook event type', [
                     'event_type' => $event->type,
@@ -657,16 +661,40 @@ class WebhookProcessingService
      * Handle payment_intent.canceled event
      * Payment has been canceled
      *
+     * Sprint 1 Bug Fix: Previously only logged - now updates contract state.
+     *
      * @param \Stripe\Event $event
      * @return void
      */
     private function handlePaymentIntentCanceled(\Stripe\Event $event): void
     {
         $paymentIntent = $event->data->object;
+        /** @var string $paymentIntentId */
+        $paymentIntentId = $paymentIntent->id ?? '';
+        // @phpstan-ignore-next-line - Stripe object properties are dynamic
+        $cancellationReason = $paymentIntent->cancellation_reason ?? 'user_requested';
 
         Registry::getLogger()->info('Payment intent canceled', [
-            'payment_intent_id' => $paymentIntent->id,
+            'payment_intent_id' => $paymentIntentId,
+            'cancellation_reason' => $cancellationReason,
         ]);
+
+        if ($paymentIntentId === '') {
+            return;
+        }
+
+        // Sprint 1: Contract-aware cancellation handling
+        $contractResult = $this->contractFulfillmentHandler->handlePaymentCanceled(
+            $paymentIntentId,
+            (string) $cancellationReason
+        );
+
+        if ($contractResult !== null) {
+            Registry::getLogger()->info('Contract cancellation handled via webhook', [
+                'payment_intent_id' => $paymentIntentId,
+                'result' => $contractResult ? 'cancelled' : 'skipped',
+            ]);
+        }
 
         // Sprint 8: order_state table removed - no legacy update needed
         // Cancellation is tracked via contract.OXSTATE = 'cancelled'
@@ -895,6 +923,43 @@ class WebhookProcessingService
             Registry::getLogger()->warning('Order not found for checkout session payment intent', [
                 'payment_intent_id' => $paymentIntentId,
                 'session_id' => $session->id,
+            ]);
+        }
+    }
+
+    /**
+     * Handle checkout.session.expired event
+     * Checkout session has expired without completing payment
+     *
+     * Sprint 1 Bug Fix: Expired sessions were not updating contract state.
+     *
+     * @param \Stripe\Event $event
+     * @return void
+     */
+    private function handleCheckoutSessionExpired(\Stripe\Event $event): void
+    {
+        $session = $event->data->object;
+
+        Registry::getLogger()->info('Checkout session expired', [
+            'session_id' => $session->id,
+        ]);
+
+        // Find contract by session metadata or lookup
+        $contractId = $this->extractContractIdFromMetadata($event);
+        if ($contractId === null) {
+            Registry::getLogger()->debug('No contract ID in expired session metadata', [
+                'session_id' => $session->id,
+            ]);
+            return;
+        }
+
+        // Sprint 1: Contract-aware expiration handling
+        $contractResult = $this->contractFulfillmentHandler->handleSessionExpired($contractId);
+
+        if ($contractResult !== null) {
+            Registry::getLogger()->info('Contract expiration handled via webhook', [
+                'contract_id' => $contractId,
+                'result' => $contractResult ? 'expired' : 'skipped',
             ]);
         }
     }

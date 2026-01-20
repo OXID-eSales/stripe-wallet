@@ -578,6 +578,254 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     }
 
     // =========================================================================
+    // Test 11: Handler handles payment_intent.canceled event
+    // Sprint 1: Bug fix - contract cancellation was not being handled
+    // =========================================================================
+
+    /**
+     * @test
+     * @group sprint-1
+     * @group contract-aware
+     * @group bug-fix
+     */
+    public function handlerHandlesPaymentCanceled(): void
+    {
+        $providerOrderId = 'pi_canceled';
+        $cancellationReason = 'user_requested';
+
+        // Use concrete PaymentContract since cancel() is not on interface
+        $snapshot = BasketSnapshot::fromArray([
+            'items' => [],
+            'discounts' => [],
+            'totalGross' => 100.0,
+            'totalNet' => 84.03,
+            'totalVat' => 15.97,
+            'currency' => 'EUR',
+            'capturedAt' => date('Y-m-d H:i:s'),
+        ]);
+
+        $contract = new PaymentContract(1, 'user123', $snapshot);
+        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_canceled');
+        $contract->transitionToPending();
+        $contract->setProvider('stripe', $providerOrderId);
+
+        $this->contractRepository
+            ->method('findByProviderOrderId')
+            ->with($providerOrderId)
+            ->willReturn($contract);
+
+        $this->contractRepository
+            ->expects($this->once())
+            ->method('save');
+
+        $handler = new WebhookContractFulfillmentHandler(
+            $this->contractRepository,
+            $this->contractFulfillmentService
+        );
+
+        $result = $handler->handlePaymentCanceled($providerOrderId, $cancellationReason);
+
+        $this->assertTrue($result);
+        // Contract should be in CANCELLED state after processing
+        $this->assertTrue($contract->getState()->isCancelled());
+    }
+
+    /**
+     * @test
+     * @group sprint-1
+     * @group contract-aware
+     * @group bug-fix
+     */
+    public function handlerReturnsNullWhenContractNotFoundOnCancel(): void
+    {
+        $providerOrderId = 'pi_no_contract_cancel';
+
+        $this->contractRepository
+            ->method('findByProviderOrderId')
+            ->with($providerOrderId)
+            ->willReturn(null);
+
+        $handler = new WebhookContractFulfillmentHandler(
+            $this->contractRepository,
+            $this->contractFulfillmentService
+        );
+
+        $result = $handler->handlePaymentCanceled($providerOrderId, 'user_requested');
+
+        $this->assertNull($result);
+    }
+
+    /**
+     * @test
+     * @group sprint-1
+     * @group contract-aware
+     * @group bug-fix
+     */
+    public function handlerReturnsFalseForAlreadyTerminalContractOnCancel(): void
+    {
+        $providerOrderId = 'pi_already_failed';
+        $cancellationReason = 'user_requested';
+
+        // Create already failed contract (terminal state)
+        $snapshot = BasketSnapshot::fromArray([
+            'items' => [],
+            'discounts' => [],
+            'totalGross' => 100.0,
+            'totalNet' => 84.03,
+            'totalVat' => 15.97,
+            'currency' => 'EUR',
+            'capturedAt' => date('Y-m-d H:i:s'),
+        ]);
+
+        $contract = new PaymentContract(1, 'user123', $snapshot);
+        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_failed');
+        $contract->transitionToPending();
+        $contract->setProvider('stripe', $providerOrderId);
+        $contract->fail('previous_failure');
+
+        $this->contractRepository
+            ->method('findByProviderOrderId')
+            ->with($providerOrderId)
+            ->willReturn($contract);
+
+        $handler = new WebhookContractFulfillmentHandler(
+            $this->contractRepository,
+            $this->contractFulfillmentService
+        );
+
+        $result = $handler->handlePaymentCanceled($providerOrderId, $cancellationReason);
+
+        // Should return false (already in terminal state - idempotent)
+        $this->assertFalse($result);
+    }
+
+    // =========================================================================
+    // Test 12: Handler handles checkout.session.expired event
+    // Sprint 1: Bug fix - expired sessions were not updating contract state
+    // =========================================================================
+
+    /**
+     * @test
+     * @group sprint-1
+     * @group contract-aware
+     * @group bug-fix
+     */
+    public function handlerHandlesSessionExpired(): void
+    {
+        $contractId = 'contract_expired_123';
+
+        // Use concrete PaymentContract since expire() is not on all interfaces
+        $snapshot = BasketSnapshot::fromArray([
+            'items' => [],
+            'discounts' => [],
+            'totalGross' => 100.0,
+            'totalNet' => 84.03,
+            'totalVat' => 15.97,
+            'currency' => 'EUR',
+            'capturedAt' => date('Y-m-d H:i:s'),
+        ]);
+
+        $contract = new PaymentContract(1, 'user123', $snapshot);
+        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_expired');
+        $contract->transitionToPending();
+        $contract->setProvider('stripe', 'pi_expired_test');
+
+        $this->contractRepository
+            ->method('findById')
+            ->with($contractId)
+            ->willReturn($contract);
+
+        $this->contractRepository
+            ->expects($this->once())
+            ->method('save');
+
+        $handler = new WebhookContractFulfillmentHandler(
+            $this->contractRepository,
+            $this->contractFulfillmentService
+        );
+
+        $result = $handler->handleSessionExpired($contractId);
+
+        $this->assertTrue($result);
+        // Contract should be in EXPIRED state after processing
+        $this->assertTrue($contract->getState()->isExpired());
+    }
+
+    /**
+     * @test
+     * @group sprint-1
+     * @group contract-aware
+     * @group bug-fix
+     */
+    public function handlerReturnsNullWhenContractNotFoundOnExpired(): void
+    {
+        $contractId = 'contract_not_found';
+
+        $this->contractRepository
+            ->method('findById')
+            ->with($contractId)
+            ->willReturn(null);
+
+        $handler = new WebhookContractFulfillmentHandler(
+            $this->contractRepository,
+            $this->contractFulfillmentService
+        );
+
+        $result = $handler->handleSessionExpired($contractId);
+
+        $this->assertNull($result);
+    }
+
+    /**
+     * @test
+     * @group sprint-1
+     * @group contract-aware
+     * @group bug-fix
+     */
+    public function handlerReturnsFalseForAlreadyTerminalContractOnExpired(): void
+    {
+        $contractId = 'contract_already_fulfilled';
+
+        // Create already fulfilled contract (terminal state)
+        $snapshot = BasketSnapshot::fromArray([
+            'items' => [],
+            'discounts' => [],
+            'totalGross' => 100.0,
+            'totalNet' => 84.03,
+            'totalVat' => 15.97,
+            'currency' => 'EUR',
+            'capturedAt' => date('Y-m-d H:i:s'),
+        ]);
+
+        $contract = new PaymentContract(1, 'user123', $snapshot);
+        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_fulfilled');
+        $contract->transitionToPending();
+        $contract->setProvider('stripe', 'pi_fulfilled_test');
+        $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED, ['authId' => 'auth_123']);
+        $contract->commitToOrder('order_fulfilled');
+        $contract->fulfill();
+
+        $this->contractRepository
+            ->method('findById')
+            ->with($contractId)
+            ->willReturn($contract);
+
+        $handler = new WebhookContractFulfillmentHandler(
+            $this->contractRepository,
+            $this->contractFulfillmentService
+        );
+
+        $result = $handler->handleSessionExpired($contractId);
+
+        // Should return false (already in terminal state - idempotent)
+        $this->assertFalse($result);
+    }
+
+    // =========================================================================
     // Helper Methods
     // =========================================================================
 

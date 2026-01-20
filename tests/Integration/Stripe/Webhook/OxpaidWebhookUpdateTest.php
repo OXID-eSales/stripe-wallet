@@ -47,7 +47,6 @@ use Psr\Log\NullLogger;
  * @group oxpaid
  * @group sprint-4
  * @group contract-aware
- * @runTestsInSeparateProcesses
  */
 final class OxpaidWebhookUpdateTest extends IntegrationTestCase
 {

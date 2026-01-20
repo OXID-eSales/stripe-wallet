@@ -20,31 +20,33 @@ use PHPUnit\Framework\TestCase;
  * Tests for address hash storage in contract during Stripe checkout initiation.
  *
  * Sprint 21: Updated tests for handler with ContractMetadataService delegation.
+ * Sprint 1 (2026): Updated for Template Method pattern - handler now extends ContractCreationHandler.
  * The actual metadata storage logic is now tested in ContractMetadataServiceTest.
  * These tests verify that the handler delegates correctly to the service.
  */
 class AddressHashStorageTest extends TestCase
 {
     private ContractServiceInterface&MockObject $contractService;
+    private EventDispatcherInterface&MockObject $eventDispatcher;
     private ContractRepositoryInterface&MockObject $contractRepository;
     private ContractMetadataServiceInterface&MockObject $metadataService;
-    private EventDispatcherInterface&MockObject $eventDispatcher;
 
     protected function setUp(): void
     {
         $this->contractService = $this->createMock(ContractServiceInterface::class);
+        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->metadataService = $this->createMock(ContractMetadataServiceInterface::class);
-        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
     }
 
     private function createHandler(): StripeContractCreationHandler
     {
+        // Constructor order matches parent class (ContractCreationHandler) + Stripe-specific deps
         return new StripeContractCreationHandler(
             $this->contractService,
+            $this->eventDispatcher,
             $this->contractRepository,
-            $this->metadataService,
-            $this->eventDispatcher
+            $this->metadataService
         );
     }
 

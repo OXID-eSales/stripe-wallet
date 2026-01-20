@@ -89,4 +89,15 @@ interface StripeAdapterInterface extends PaymentAdapterInterface
      * @return PaymentIntent Cancelled PaymentIntent object
      */
     public function cancelPaymentIntent(string $paymentIntentId, ?string $cancellationReason = null): PaymentIntent;
+
+    /**
+     * Get the Stripe Radar risk score for a PaymentIntent.
+     *
+     * Sprint 2: Used by StripeRadarFraudCheckService to check fraud risk.
+     * Returns the risk_score from the PaymentIntent's latest charge.
+     *
+     * @param string $paymentIntentId Stripe PaymentIntent ID (pi_xxx)
+     * @return float|null Risk score (0.0-1.0) or null if not available
+     */
+    public function getPaymentIntentRiskScore(string $paymentIntentId): ?float;
 }

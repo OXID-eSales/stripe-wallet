@@ -720,6 +720,41 @@ final class StripeAdapter implements StripeAdapterInterface
         }
     }
 
+    /**
+     * @inheritDoc
+     */
+    public function getPaymentIntentRiskScore(string $paymentIntentId): ?float
+    {
+        try {
+            // Retrieve PaymentIntent with expanded latest_charge to get risk data
+            $paymentIntent = $this->stripeClient->paymentIntents->retrieve(
+                $paymentIntentId,
+                ['expand' => ['latest_charge']]
+            );
+
+            // Risk score is in the latest_charge's outcome
+            // Stripe Radar returns risk_score (0-100) and risk_level (normal, elevated, highest)
+            if ($paymentIntent->latest_charge === null) {
+                return null;
+            }
+
+            $outcome = $paymentIntent->latest_charge->outcome ?? null;
+            if ($outcome === null) {
+                return null;
+            }
+
+            // Stripe Radar risk_score is 0-100, normalize to 0.0-1.0
+            $riskScore = $outcome->risk_score ?? null;
+            if ($riskScore === null) {
+                return null;
+            }
+
+            return $riskScore / 100.0;
+        } catch (ApiErrorException $e) {
+            throw $this->convertStripeException($e);
+        }
+    }
+
     // ==========================================
     // PRIVATE HELPER METHODS
     // ==========================================

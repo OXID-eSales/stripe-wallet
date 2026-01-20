@@ -10,7 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
-use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
+use OxidEsales\PaymentComponent\EventSystem\Event\EventContextInterface;
 
 /**
  * Service interface for managing contract metadata.
@@ -46,9 +46,9 @@ interface ContractMetadataServiceInterface
      * that the returning user is the same person who initiated payment.
      *
      * @param PaymentContractInterface $contract The contract to store metadata on
-     * @param EventContext $context The event context with session data
+     * @param EventContextInterface $context The event context with session data
      */
-    public function storeSecurityMetadata(PaymentContractInterface $contract, EventContext $context): void;
+    public function storeSecurityMetadata(PaymentContractInterface $contract, EventContextInterface $context): void;
 
     /**
      * Get delivery address hash from contract metadata.

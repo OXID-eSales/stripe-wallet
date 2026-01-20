@@ -16,7 +16,6 @@ use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Eshop\Application\Model\User;
 use OxidEsales\Eshop\Core\DatabaseProvider;
 use OxidEsales\Eshop\Core\UtilsObject;
-use OxidEsales\PaymentComponent\Repository\PaymentCustomerRepositoryInterface;
 
 /**
  * Stripe customer management service
@@ -58,14 +57,11 @@ class StripeCustomerService implements InitializableServiceInterface
 
     private ?StripeClient $stripe = null;
     private ModuleConfigurationService $config;
-    private ?PaymentCustomerRepositoryInterface $customerRepository;
 
     public function __construct(
-        ModuleConfigurationService $config,
-        ?PaymentCustomerRepositoryInterface $customerRepository = null
+        ModuleConfigurationService $config
     ) {
         $this->config = $config;
-        $this->customerRepository = $customerRepository;
     }
 
     /**
@@ -188,12 +184,6 @@ class StripeCustomerService implements InitializableServiceInterface
      */
     private function getStoredStripeCustomerId(string $userId): ?string
     {
-        // Use repository if available (preferred - LSP compliant)
-        if ($this->customerRepository !== null) {
-            return $this->customerRepository->findPaymentCustomerId($userId);
-        }
-
-        // Fallback to raw SQL (legacy - for backward compatibility)
         $db = DatabaseProvider::getDb();
 
         $customerId = $db->getOne(
@@ -212,13 +202,6 @@ class StripeCustomerService implements InitializableServiceInterface
      */
     private function storeStripeCustomerId(string $userId, string $stripeCustomerId): void
     {
-        // Use repository if available (preferred - LSP compliant)
-        if ($this->customerRepository !== null) {
-            $this->customerRepository->savePaymentCustomerId($userId, $stripeCustomerId);
-            return;
-        }
-
-        // Fallback to raw SQL (legacy - for backward compatibility)
         $db = DatabaseProvider::getDb();
 
         $sql = "INSERT INTO osc_stripe_customer_mapping

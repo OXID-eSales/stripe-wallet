@@ -12,7 +12,7 @@ namespace OxidEsales\Payments\Stripe\Service;
 use OxidEsales\Eshop\Application\Model\User;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
-use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
+use OxidEsales\PaymentComponent\EventSystem\Event\EventContextInterface;
 
 /**
  * Service for managing contract metadata.
@@ -56,7 +56,7 @@ class ContractMetadataService implements ContractMetadataServiceInterface
     /**
      * @inheritDoc
      */
-    public function storeSecurityMetadata(PaymentContractInterface $contract, EventContext $context): void
+    public function storeSecurityMetadata(PaymentContractInterface $contract, EventContextInterface $context): void
     {
         // Store user IP address
         $userIp = $_SERVER['REMOTE_ADDR'] ?? '';

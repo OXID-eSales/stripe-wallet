@@ -58,4 +58,27 @@ interface WebhookContractFulfillmentHandlerInterface
      * @return bool|null true if processed, false if skipped, null if not found
      */
     public function handlePaymentFailed(string $providerOrderId, string $failureReason): ?bool;
+
+    /**
+     * Handle payment_intent.canceled webhook event.
+     *
+     * Sprint 1 Bug Fix: Contract cancellation was not being handled.
+     * Transitions contract to CANCELLED state.
+     *
+     * @param string $providerOrderId Stripe PaymentIntent ID
+     * @param string $cancellationReason Reason for cancellation
+     * @return bool|null true if processed, false if skipped (already terminal), null if not found
+     */
+    public function handlePaymentCanceled(string $providerOrderId, string $cancellationReason): ?bool;
+
+    /**
+     * Handle checkout.session.expired webhook event.
+     *
+     * Sprint 1 Bug Fix: Expired checkout sessions were not updating contract state.
+     * Transitions contract to EXPIRED state (distinct from CANCELLED).
+     *
+     * @param string $contractId Contract ID from session metadata
+     * @return bool|null true if processed, false if skipped (already terminal), null if not found
+     */
+    public function handleSessionExpired(string $contractId): ?bool;
 }

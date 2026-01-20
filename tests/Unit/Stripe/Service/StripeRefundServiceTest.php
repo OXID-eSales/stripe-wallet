@@ -1,0 +1,288 @@
+<?php
+
+declare(strict_types=1);
+
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
+
+use DateTimeImmutable;
+use OxidEsales\PaymentComponent\Adapter\Response\RefundResponse;
+use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
+use OxidEsales\PaymentComponent\Contract\ContractState;
+use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
+use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface;
+use OxidEsales\PaymentComponent\Service\Exception\RefundFailedException;
+use OxidEsales\PaymentComponent\Service\Result\RefundResult;
+use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
+use OxidEsales\Payments\Stripe\Service\StripeRefundService;
+use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
+
+/**
+ * @covers \OxidEsales\Payments\Stripe\Service\StripeRefundService
+ */
+class StripeRefundServiceTest extends TestCase
+{
+    private ContractRepositoryInterface&MockObject $contractRepository;
+    private TransactionRepositoryInterface&MockObject $transactionRepository;
+    private StripeAdapterInterface&MockObject $stripeAdapter;
+    private LoggerInterface&MockObject $logger;
+    private StripeRefundService $service;
+
+    protected function setUp(): void
+    {
+        $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
+        $this->transactionRepository = $this->createMock(TransactionRepositoryInterface::class);
+        $this->stripeAdapter = $this->createMock(StripeAdapterInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
+
+        $this->service = new StripeRefundService(
+            $this->contractRepository,
+            $this->transactionRepository,
+            $this->stripeAdapter,
+            $this->logger
+        );
+    }
+
+    // 1. Process full refund for fulfilled contract
+    public function testProcessesFullRefund(): void
+    {
+        $contractId = 'contract123';
+        $providerOrderId = 'pi_stripe_123';
+        $capturedAmount = 100.00;
+
+        $contract = $this->createMockContract($contractId, $providerOrderId, $capturedAmount, ContractState::fulfilled());
+
+        $this->contractRepository->method('findById')->willReturn($contract);
+        $this->transactionRepository->method('getTotalRefundedForContract')->willReturn(0.00);
+
+        $refundResponse = $this->createRefundResponse('re_123', $capturedAmount);
+        $this->stripeAdapter->method('refundPayment')->willReturn($refundResponse);
+
+        $result = $this->service->refund($contractId);
+
+        $this->assertInstanceOf(RefundResult::class, $result);
+        $this->assertEquals('re_123', $result->refundId);
+        $this->assertEquals($capturedAmount, $result->amountRefunded);
+    }
+
+    // 2. Process partial refund
+    public function testProcessesPartialRefund(): void
+    {
+        $contractId = 'contract123';
+        $providerOrderId = 'pi_stripe_123';
+        $capturedAmount = 100.00;
+        $partialAmount = 30.00;
+
+        $contract = $this->createMockContract($contractId, $providerOrderId, $capturedAmount, ContractState::fulfilled());
+
+        $this->contractRepository->method('findById')->willReturn($contract);
+        $this->transactionRepository->method('getTotalRefundedForContract')->willReturn(0.00);
+
+        $refundResponse = $this->createRefundResponse('re_456', $partialAmount);
+        $this->stripeAdapter->method('refundPayment')->willReturn($refundResponse);
+
+        $result = $this->service->refund($contractId, $partialAmount);
+
+        $this->assertInstanceOf(RefundResult::class, $result);
+        $this->assertEquals($partialAmount, $result->amountRefunded);
+        $this->assertEquals(70.00, $result->availableForRefund);
+    }
+
+    // 3. Cannot refund uncommitted contract
+    public function testCannotRefundUncommittedContract(): void
+    {
+        $contractId = 'contract123';
+
+        $contract = $this->createMockContract($contractId, 'pi_123', 99.99, ContractState::committed());
+
+        $this->contractRepository->method('findById')->willReturn($contract);
+
+        $this->expectException(RefundFailedException::class);
+        $this->expectExceptionMessage('Can only refund fulfilled (captured) payments');
+
+        $this->service->refund($contractId);
+    }
+
+    // 4. Cannot refund more than captured amount
+    public function testCannotRefundMoreThanCaptured(): void
+    {
+        $contractId = 'contract123';
+        $capturedAmount = 100.00;
+        $requestedAmount = 150.00;
+
+        $contract = $this->createMockContract($contractId, 'pi_123', $capturedAmount, ContractState::fulfilled());
+
+        $this->contractRepository->method('findById')->willReturn($contract);
+        $this->transactionRepository->method('getTotalRefundedForContract')->willReturn(0.00);
+
+        $this->expectException(RefundFailedException::class);
+        $this->expectExceptionMessage('Cannot refund 150.00. Available: 100.00');
+
+        $this->service->refund($contractId, $requestedAmount);
+    }
+
+    // 5. Logs refund to transaction repository
+    public function testLogsRefundToTransactionRepository(): void
+    {
+        $contractId = 'contract123';
+        $providerOrderId = 'pi_stripe_123';
+        $capturedAmount = 100.00;
+        $reason = 'requested_by_customer';
+
+        $contract = $this->createMockContract($contractId, $providerOrderId, $capturedAmount, ContractState::fulfilled());
+
+        $this->contractRepository->method('findById')->willReturn($contract);
+        $this->transactionRepository->method('getTotalRefundedForContract')->willReturn(0.00);
+
+        $refundResponse = $this->createRefundResponse('re_123', $capturedAmount);
+        $this->stripeAdapter->method('refundPayment')->willReturn($refundResponse);
+
+        $this->transactionRepository
+            ->expects($this->once())
+            ->method('logRefund')
+            ->with($contractId, $capturedAmount, 're_123', $reason);
+
+        $this->service->refund($contractId, null, $reason);
+    }
+
+    // 6. Handle contract not found
+    public function testHandlesContractNotFound(): void
+    {
+        $contractId = 'nonexistent';
+
+        $this->contractRepository->method('findById')->willReturn(null);
+
+        $this->expectException(RefundFailedException::class);
+        $this->expectExceptionMessage('Contract not found');
+
+        $this->service->refund($contractId);
+    }
+
+    // 7. Handle provider API error
+    public function testHandlesProviderApiError(): void
+    {
+        $contractId = 'contract123';
+
+        $contract = $this->createMockContract($contractId, 'pi_123', 99.99, ContractState::fulfilled());
+
+        $this->contractRepository->method('findById')->willReturn($contract);
+        $this->transactionRepository->method('getTotalRefundedForContract')->willReturn(0.00);
+
+        $this->stripeAdapter
+            ->method('refundPayment')
+            ->willThrowException(new \Exception('Stripe error: charge_already_refunded'));
+
+        $this->expectException(RefundFailedException::class);
+        $this->expectExceptionMessage('Stripe error: charge_already_refunded');
+
+        $this->service->refund($contractId);
+    }
+
+    // 8. Passes reason to Stripe adapter
+    public function testPassesReasonToStripeAdapter(): void
+    {
+        $contractId = 'contract123';
+        $providerOrderId = 'pi_stripe_123';
+        $capturedAmount = 100.00;
+        $reason = 'fraudulent';
+
+        $contract = $this->createMockContract($contractId, $providerOrderId, $capturedAmount, ContractState::fulfilled());
+
+        $this->contractRepository->method('findById')->willReturn($contract);
+        $this->transactionRepository->method('getTotalRefundedForContract')->willReturn(0.00);
+
+        $refundResponse = $this->createRefundResponse('re_123', $capturedAmount);
+
+        $this->stripeAdapter
+            ->expects($this->once())
+            ->method('refundPayment')
+            ->with($this->callback(function ($request) use ($reason) {
+                return $request->reason === $reason;
+            }))
+            ->willReturn($refundResponse);
+
+        $this->service->refund($contractId, null, $reason);
+    }
+
+    // 9. Cannot refund without provider order ID
+    public function testCannotRefundWithoutProviderOrderId(): void
+    {
+        $contractId = 'contract123';
+
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getId')->willReturn($contractId);
+        $contract->method('getState')->willReturn(ContractState::fulfilled());
+        $contract->method('getProviderOrderId')->willReturn(null);
+
+        $this->contractRepository->method('findById')->willReturn($contract);
+
+        $this->expectException(RefundFailedException::class);
+        $this->expectExceptionMessage('Cannot refund: Contract has no provider order ID');
+
+        $this->service->refund($contractId);
+    }
+
+    // 10. Logs successful refund
+    public function testLogsSuccessfulRefund(): void
+    {
+        $contractId = 'contract123';
+        $amount = 50.00;
+
+        $contract = $this->createMockContract($contractId, 'pi_123', 100.00, ContractState::fulfilled());
+
+        $this->contractRepository->method('findById')->willReturn($contract);
+        $this->transactionRepository->method('getTotalRefundedForContract')->willReturn(0.00);
+
+        $refundResponse = $this->createRefundResponse('re_123', $amount);
+        $this->stripeAdapter->method('refundPayment')->willReturn($refundResponse);
+
+        $this->logger
+            ->expects($this->once())
+            ->method('info')
+            ->with(
+                'Payment refunded successfully',
+                $this->callback(function ($context) use ($contractId) {
+                    return $context['contractId'] === $contractId;
+                })
+            );
+
+        $this->service->refund($contractId, $amount);
+    }
+
+    // Helper methods
+
+    private function createMockContract(
+        string $id,
+        string $providerOrderId,
+        float $amount,
+        ContractState $state
+    ): PaymentContractInterface&MockObject {
+        $contract = $this->createMock(PaymentContractInterface::class);
+
+        $contract->method('getId')->willReturn($id);
+        $contract->method('getProviderOrderId')->willReturn($providerOrderId);
+        $contract->method('getState')->willReturn($state);
+
+        $basketSnapshot = $this->createMock(BasketSnapshot::class);
+        $basketSnapshot->method('getTotalGross')->willReturn($amount);
+        $basketSnapshot->method('getCurrency')->willReturn('EUR');
+
+        $contract->method('getBasketSnapshot')->willReturn($basketSnapshot);
+
+        return $contract;
+    }
+
+    private function createRefundResponse(string $refundId, float $amount): RefundResponse
+    {
+        return new RefundResponse(
+            providerPaymentId: 'pi_test',
+            refundId: $refundId,
+            amountRefunded: $amount,
+            currency: 'EUR',
+            status: 'succeeded',
+            refundedAt: new DateTimeImmutable()
+        );
+    }
+}

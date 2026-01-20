@@ -68,19 +68,6 @@ services:
     public: true
 
   # ===========================================
-  # Checkout Orchestrator (Sprint 2)
-  # ===========================================
-
-  # Checkout Orchestrator - Coordinates checkout accounting
-  # Note: Does NOT call Stripe API - only backend accounting
-  OxidEsales\PaymentComponent\Service\CheckoutOrchestratorInterface:
-    class: OxidEsales\PaymentComponent\Service\CheckoutOrchestrator
-    arguments:
-      - '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
-      - null  # Logger - optional, can be injected if available
-    public: true
-
-  # ===========================================
   # Event Handlers (Tagged for auto-registration)
   # ===========================================
   # Note: Handlers are commented out until their dependencies
@@ -508,6 +495,35 @@ services:
     public: false
 
   # ==========================================
+  # Contract-Based Capture/Refund Services (Sprint 3)
+  # ==========================================
+  # These services extend AbstractPaymentCaptureService and AbstractPaymentRefundService
+  # from payment-component, providing Stripe-specific behavior via Template Method pattern.
+  #
+  # StripeCaptureService:
+  # - Validates AUTHORIZED state (not COMMITTED)
+  # - Calls captureAuthorization() after capture
+  #
+  # StripeRefundService:
+  # - Uses contract-based refund approach (per Q&A decision Q6)
+  # - Validates FULFILLED state before refund
+
+  OxidEsales\Payments\Stripe\Service\StripeCaptureService:
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $paymentAdapter: '@OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: true
+
+  OxidEsales\Payments\Stripe\Service\StripeRefundService:
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $transactionRepository: '@OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface'
+      $paymentAdapter: '@OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: true
+
+  # ==========================================
   # Stripe Refund Handler (Sprint 4, Refactored Sprint 21)
   # ==========================================
   # Handles StripeRefundRequestEvent from admin panel, webhook, or API.
@@ -543,10 +559,9 @@ services:
   OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler:
     alias: OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface
 
-  # WebhookProcessingService - Now requires WebhookContractFulfillmentHandler
-  # Sprint 7: Added ContractRepository for linking webhook logs to contracts
-  # Sprint 16: Added OrderPaymentStateService for DRY OXPAID updates
-  # Sprint 18: Added ContractFulfillmentService for DRY fulfillment
+  # WebhookProcessingService - DEPRECATED (Sprint 5)
+  # Kept for backwards compatibility. Use StripeWebhookProcessor instead.
+  # TODO: Remove in next major version
   OxidEsales\Payments\Stripe\Service\WebhookProcessingService:
     arguments:
       $contractFulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
@@ -555,6 +570,26 @@ services:
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
       $orderPaymentStateService: '@OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface'
       $contractFulfillmentService: '@OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface'
+    public: true
+    deprecated:
+      package: 'oxid-esales/stripe-payment'
+      version: '1.0.0'
+      message: 'The "%service_id%" service is deprecated. Use StripeWebhookProcessor instead.'
+
+  # ==========================================
+  # Stripe Webhook Processor (Sprint 5)
+  # ==========================================
+  # New webhook processor using Template Method pattern from payment-component.
+  # Consolidates: signature verification, idempotency, logging, event routing.
+  # Replaces WebhookProcessingService.
+
+  OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor:
+    arguments:
+      $logRepository: '@OxidEsales\PaymentComponent\Repository\WebhookLogRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationService'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
     public: true
 
   # ==========================================
@@ -694,3 +729,87 @@ services:
     tags:
       - { name: 'console.command', command: 'stripe:reconcile-oxpaid' }
     public: true
+
+  # ==========================================
+  # Sprint 2: Condition Handlers (Stock & Fraud)
+  # ==========================================
+  # These handlers manage stock reservation/release and fraud checking
+  # as contract conditions. Can be disabled via admin configuration.
+  #
+  # Stock Reservation:
+  # - ON: Reserves stock on contract creation (DRAFT), releases on terminal states
+  # - OFF: No stock manipulation, OXID handles stock normally on order creation
+  #
+  # Fraud Check:
+  # - ON: Checks Stripe Radar score after payment authorization
+  # - OFF: Fraud check condition immediately fulfilled
+
+  # Stock Service - OXID implementation for direct OXSTOCK manipulation
+  # Uses DBAL to decrement/increment oxarticles.OXSTOCK directly
+  OxidEsales\PaymentComponent\Service\StockServiceInterface:
+    class: OxidEsales\PaymentComponent\Service\OxidStockService
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+    public: false
+
+  # Stock Reservation Handler - Reserves stock on contract creation (DRAFT)
+  # Priority 90: Runs early to reserve stock before other handlers
+  # Can fail contract creation if insufficient stock
+  OxidEsales\PaymentComponent\EventSystem\Handler\StockReservationHandler:
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $stockService: '@OxidEsales\PaymentComponent\Service\StockServiceInterface'
+      $enabled: '%payment.stock_reservation.enabled%'
+    tags:
+      - { name: payment.event_handler, priority: 90 }
+    public: false
+
+  # Stock Release Handler - Releases stock on terminal states (CANCELLED, EXPIRED, FAILED)
+  # Does NOT release on FULFILLED (order completed, stock stays reserved)
+  # Throws StockReleaseException on failure (strict consistency)
+  OxidEsales\PaymentComponent\EventSystem\Handler\StockReleaseHandler:
+    arguments:
+      $stockService: '@OxidEsales\PaymentComponent\Service\StockServiceInterface'
+      $enabled: '%payment.stock_reservation.enabled%'
+    tags:
+      - { name: payment.event_handler }
+    public: false
+
+  # Fraud Check Handler - Checks fraud score on payment authorization
+  # Priority 85: Runs after stock reservation, before order creation
+  # Binary pass/fail only - no manual review
+  # On failure: contract is failed (will trigger stock release)
+  OxidEsales\PaymentComponent\EventSystem\Handler\FraudCheckHandler:
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $fraudCheckService: '@OxidEsales\PaymentComponent\Service\FraudCheckServiceInterface'
+      $enabled: '%payment.fraud_check.enabled%'
+    tags:
+      - { name: payment.event_handler, priority: 85 }
+    public: false
+
+  # Stripe Radar Fraud Check Service - Checks Stripe Radar score
+  # Default threshold: 0.7 (score >= 0.7 fails)
+  # Implementation in Stripe module, interface in payment-component
+  OxidEsales\PaymentComponent\Service\FraudCheckServiceInterface:
+    class: OxidEsales\Payments\Stripe\Service\StripeRadarFraudCheckService
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $threshold: '%payment.fraud_check.threshold%'
+    public: false
+
+# ==========================================
+# Parameters for Sprint 2 Condition Handlers
+# ==========================================
+# These can be overridden in shop configuration or environment
+
+parameters:
+  # Stock reservation toggle (default: enabled)
+  payment.stock_reservation.enabled: true
+
+  # Fraud check toggle (default: enabled)
+  payment.fraud_check.enabled: true
+
+  # Fraud check threshold (default: 0.7 = 70% risk score)
+  # Scores >= threshold fail the fraud check
+  payment.fraud_check.threshold: 0.7

@@ -9,6 +9,7 @@ env:
   PHP_VERSION: '8.3'
   MYSQL_VERSION: '5.7'
   TEMPLATE_ENGINE: 'twig'
+  PAYMENT_COMPONENT_BRANCH: 'dev-b-7.4.x-order-model-STRP-71'
 
 jobs:
   install_shop_with_module:
@@ -100,7 +101,7 @@ jobs:
           docker compose exec -T \
             php composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
-            php composer require oxid-esales/payment-component:* --no-interaction --no-update
+            php composer require oxid-esales/payment-component:${{ env.PAYMENT_COMPONENT_BRANCH }} --no-interaction --no-update
 
       - name: Install module
         run: |
@@ -306,7 +307,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_PAT || secrets.GH_TOKEN }}
         run: |
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
-            php composer require oxid-esales/payment-component:* --no-interaction --no-update
+            php composer require oxid-esales/payment-component:${{ env.PAYMENT_COMPONENT_BRANCH }} --no-interaction --no-update
 
       - name: Install testing dependencies
         env:
