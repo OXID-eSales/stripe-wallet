@@ -9,7 +9,7 @@ env:
   PHP_VERSION: '8.3'
   MYSQL_VERSION: '5.7'
   TEMPLATE_ENGINE: 'twig'
-  PAYMENT_COMPONENT_BRANCH: 'dev-b-7.4.x-order-model-STRP-71'
+  PAYMENT_COMPONENT_BRANCH: 'dev-b-7.4.x'
 
 jobs:
   install_shop_with_module:
