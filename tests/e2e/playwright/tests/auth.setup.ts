@@ -1,5 +1,5 @@
 import { test as setup } from '@playwright/test';
-import { AdminLoginPage } from './pages/admin/AdminLoginPage';
+import { AdminLoginPage } from '../pages/admin/AdminLoginPage';
 
 /**
  * Admin Authentication Setup

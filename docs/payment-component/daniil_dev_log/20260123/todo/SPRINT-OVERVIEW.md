@@ -74,7 +74,8 @@ SPRINT-12: OrderCreationHandler Cleanup (LOW) ── No dependencies
 | **10** | RefundHandler Refactor | MEDIUM | 2-3h | Sprint 8 | **COMPLETED ✓** |
 | **11** | CancelAuthorizationService | MEDIUM | 1-2h | Sprint 8 | **COMPLETED ✓** |
 | **12** | OrderCreationHandler Cleanup | LOW | 1h | - | **COMPLETED ✓** |
-| | **TOTAL** | | **9-13h** | | **5/5 DONE** |
+| **13** | Fix Playwright Admin Auth | HIGH | 30min | - | **COMPLETED ✓** |
+| | **TOTAL** | | **9-14h** | | **6/6 DONE** |
 
 ---
 
