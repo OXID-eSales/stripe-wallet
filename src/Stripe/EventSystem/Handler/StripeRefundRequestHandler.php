@@ -5,28 +5,29 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
 use OxidEsales\Eshop\Application\Model\Order;
-use OxidEsales\Eshop\Core\Field;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
 use OxidEsales\Payments\Stripe\DTO\RefundResult;
+use OxidEsales\Payments\Stripe\Service\OrderRefundUpdateServiceInterface;
 use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
-use OxidEsales\Payments\Stripe\Application\Model\RequestLog;
+use OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
 /**
  * Handles refund requests via Stripe API.
  *
+ * Sprint 10: Refactored to use OrderRefundUpdateService (SRP).
  * Sprint 21: Refactored to delegate to RefundService (SRP).
  *
  * Handler responsibilities (ONLY):
  * 1. Receive event and extract parameters
  * 2. Delegate to RefundService
- * 3. Update order state on success
- * 4. Log request/response
+ * 3. Delegate order updates to OrderRefundUpdateService
+ * 4. Delegate logging to RequestLogService
  * 5. Set results in context
  *
  * @since 2.0.0
@@ -38,6 +39,8 @@ class StripeRefundRequestHandler implements HandlerInterface
     public function __construct(
         private readonly RefundServiceInterface $refundService,
         private readonly ContractRepositoryInterface $contractRepository,
+        private readonly OrderRefundUpdateServiceInterface $orderRefundUpdateService,
+        private readonly RequestLogServiceInterface $requestLogService,
         ?LoggerInterface $logger = null,
         private readonly ?FileLoggerInterface $eventLogger = null
     ) {
@@ -218,26 +221,18 @@ class StripeRefundRequestHandler implements HandlerInterface
         $this->setSuccessResults($context, $result, $order);
     }
 
+    /**
+     * Update order after refund.
+     *
+     * Sprint 10: Delegates to OrderRefundUpdateService for full refunds.
+     */
     private function updateOrderAfterRefund(Order $order, StripeRefundRequestEvent $event): void
     {
         if (!$event->isFullRefund()) {
             return;
         }
 
-        $order->oxorder__stripedelcostrefunded = new Field($order->oxorder__oxdelcost->value);
-        $order->oxorder__stripepaycostrefunded = new Field($order->oxorder__oxpaycost->value);
-        $order->oxorder__stripewrapcostrefunded = new Field($order->oxorder__oxwrapcost->value);
-        $order->oxorder__stripegiftcardrefunded = new Field($order->oxorder__oxgiftcardcost->value);
-        $order->oxorder__stripevoucherdiscountrefunded = new Field($order->oxorder__oxvoucherdiscount->value);
-        $order->oxorder__stripediscountrefunded = new Field($order->oxorder__oxdiscount->value);
-        $order->save();
-
-        foreach ($order->getOrderArticles() as $orderArticle) {
-            $orderArticle->oxorderarticles__stripeamountrefunded = new Field(
-                $orderArticle->oxorderarticles__oxbrutprice->value
-            );
-            $orderArticle->save();
-        }
+        $this->orderRefundUpdateService->updateOrderAfterFullRefund($order);
     }
 
     private function updateContractState(StripeRefundRequestEvent $event): void
@@ -256,25 +251,24 @@ class StripeRefundRequestHandler implements HandlerInterface
         $this->contractRepository->save($contract);
     }
 
+    /**
+     * Log refund request to request log.
+     *
+     * Sprint 8: Now delegates to RequestLogService (Facade pattern).
+     */
     private function logRefundRequest(RefundResult $result, Order $order): void
     {
-        try {
-            // @phpstan-ignore-next-line - RequestLog is from legacy Stripe module
-            $requestLog = oxNew(RequestLog::class);
-            // @phpstan-ignore-next-line - RequestLog is from legacy Stripe module
-            $requestLog->logRequest(
-                ['refund_id' => $result->getRefundId()],
-                [
-                    'status' => $result->getStatus(),
-                    'amount' => $result->getRefundedAmountCents(),
-                    'currency' => $result->getCurrency(),
-                ],
-                $order->getId(),
-                (int) \OxidEsales\Eshop\Core\Registry::getConfig()->getShopId()
-            );
-        } catch (\Throwable $e) {
-            $this->logger->warning('Failed to log refund request', ['error' => $e->getMessage()]);
-        }
+        $this->requestLogService->logRequest(
+            action: 'refund',
+            request: ['refund_id' => $result->getRefundId()],
+            response: [
+                'status' => $result->getStatus(),
+                'amount' => $result->getRefundedAmountCents(),
+                'currency' => $result->getCurrency(),
+            ],
+            referenceId: (string) $order->getId(),
+            shopId: (int) \OxidEsales\Eshop\Core\Registry::getConfig()->getShopId()
+        );
     }
 
     private function setSuccessResults(EventContext $context, RefundResult $result, Order $order): void
@@ -308,27 +302,24 @@ class StripeRefundRequestHandler implements HandlerInterface
         $this->logExceptionToRequestLog($e, $event);
     }
 
+    /**
+     * Log exception to request log.
+     *
+     * Sprint 8: Now delegates to RequestLogService (Facade pattern).
+     */
     private function logExceptionToRequestLog(\Throwable $e, StripeRefundRequestEvent $event): void
     {
-        try {
-            $orderId = $event->getOrderId();
-            if ($orderId === null) {
-                return;
-            }
-
-            // @phpstan-ignore-next-line - RequestLog is from legacy Stripe module
-            $requestLog = oxNew(RequestLog::class);
-            // @phpstan-ignore-next-line - RequestLog is from legacy Stripe module
-            $requestLog->logExceptionResponse(
-                ['order_id' => $orderId],
-                (int) ($e->getCode() ?: 500),
-                $e->getMessage(),
-                'refund',
-                $orderId
-            );
-        } catch (\Throwable $logError) {
-            $this->logger->warning('Failed to log refund error', ['error' => $logError->getMessage()]);
+        $orderId = $event->getOrderId();
+        if ($orderId === null) {
+            return;
         }
+
+        $this->requestLogService->logException(
+            action: 'refund',
+            exception: $e,
+            referenceId: $orderId,
+            shopId: (int) \OxidEsales\Eshop\Core\Registry::getConfig()->getShopId()
+        );
     }
 
     /**

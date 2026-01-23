@@ -4,16 +4,15 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
-use OxidEsales\PaymentComponent\Adapter\Request\CapturePaymentRequest;
-use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
-use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
+use OxidEsales\Payments\Stripe\DTO\CaptureResult;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
-use OxidEsales\Payments\Stripe\Application\Model\RequestLog;
+use OxidEsales\Payments\Stripe\Service\CaptureServiceInterface;
+use OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
@@ -38,8 +37,9 @@ class StripeCaptureRequestHandler implements HandlerInterface
     private LoggerInterface $logger;
 
     public function __construct(
-        private readonly StripeAdapterInterface $stripeAdapter,
+        private readonly CaptureServiceInterface $captureService,
         private readonly ContractRepositoryInterface $contractRepository,
+        private readonly RequestLogServiceInterface $requestLogService,
         ?LoggerInterface $logger = null,
         private readonly ?FileLoggerInterface $eventLogger = null
     ) {
@@ -171,12 +171,9 @@ class StripeCaptureRequestHandler implements HandlerInterface
     }
 
     /**
-     * Execute the capture via Stripe API.
+     * Execute the capture via CaptureService.
      *
-     * @param StripeCaptureRequestEvent $event
-     * @param PaymentContractInterface $contract
-     * @param string $paymentIntentId
-     * @param EventContext $context
+     * Sprint 9: Delegates to CaptureService for capture execution and contract state transition.
      */
     private function executeCapture(
         StripeCaptureRequestEvent $event,
@@ -184,154 +181,142 @@ class StripeCaptureRequestHandler implements HandlerInterface
         string $paymentIntentId,
         EventContext $context
     ): void {
-        $amount = $event->getAmount();
-
         $this->logger->info('Executing Stripe capture', [
             'contract_id' => $event->getContractId(),
             'payment_intent_id' => $paymentIntentId,
-            'amount' => $amount,
+            'amount' => $event->getAmount(),
             'initiator' => $event->getInitiator(),
         ]);
 
-        try {
-            // Build capture request
-            $metadata = [
-                'contract_id' => $event->getContractId(),
-                'initiator' => $event->getInitiator(),
-            ];
+        $metadata = $this->buildMetadata($event);
+        $result = $this->captureService->processCapture($contract, $event->getAmount(), $metadata);
 
-            $reason = $event->getReason();
-            if ($reason !== null) {
-                $metadata['reason'] = $reason;
-            }
-
-            $request = new CapturePaymentRequest(
-                providerPaymentId: $paymentIntentId,
-                amount: $amount,
-                metadata: $metadata
-            );
-
-            // Execute capture via adapter
-            $response = $this->stripeAdapter->capturePayment($request);
-
-            // Transition contract from AUTHORIZED to READY_TO_COMMIT
-            $contract->captureAuthorization();
-            $this->contractRepository->save($contract);
-
-            // Log success
-            $this->logger->info('Stripe capture successful', [
-                'contract_id' => $event->getContractId(),
-                'capture_id' => $response->captureId,
-                'captured_amount' => $response->amountCaptured,
-                'currency' => $response->currency,
-            ]);
-
-            // Log to request log
-            $this->logCaptureRequest($response, $event);
-
-            // Set success results
-            $context->set('captureSuccess', true);
-            $context->set('captureId', $response->captureId);
-            $context->set('capturedAmount', $response->amountCaptured);
-            $context->set('captureCurrency', $response->currency);
-            $context->set('capturedAt', $response->capturedAt->format('Y-m-d H:i:s'));
-        } catch (\Throwable $e) {
-            throw $e;
-        }
+        $this->handleCaptureResult($result, $event, $context);
     }
 
     /**
-     * Execute direct capture via Stripe API (without contract).
+     * Execute direct capture via CaptureService (without contract).
      *
-     * Used for admin panel captures where we have PaymentIntent ID but no contract.
-     *
-     * @param StripeCaptureRequestEvent $event
-     * @param string $paymentIntentId
-     * @param EventContext $context
+     * Sprint 9: Used for admin panel captures where we have PaymentIntent ID but no contract.
      */
     private function executeDirectCapture(
         StripeCaptureRequestEvent $event,
         string $paymentIntentId,
         EventContext $context
     ): void {
-        $amount = $event->getAmount();
-
         $this->logger->info('Executing Stripe direct capture (no contract)', [
             'payment_intent_id' => $paymentIntentId,
             'order_id' => $event->getOrderId(),
-            'amount' => $amount,
+            'amount' => $event->getAmount(),
             'initiator' => $event->getInitiator(),
         ]);
 
-        try {
-            // Build capture request
-            $metadata = [
-                'order_id' => $event->getOrderId(),
-                'initiator' => $event->getInitiator(),
-            ];
+        $metadata = $this->buildDirectCaptureMetadata($event);
+        $result = $this->captureService->processDirectCapture($paymentIntentId, $event->getAmount(), $metadata);
 
-            $reason = $event->getReason();
-            if ($reason !== null) {
-                $metadata['reason'] = $reason;
-            }
+        $this->handleCaptureResult($result, $event, $context);
+    }
 
-            $request = new CapturePaymentRequest(
-                providerPaymentId: $paymentIntentId,
-                amount: $amount,
-                metadata: $metadata
-            );
+    /**
+     * Build metadata for contract-based capture.
+     *
+     * @return array<string, string>
+     */
+    private function buildMetadata(StripeCaptureRequestEvent $event): array
+    {
+        $metadata = [
+            'initiator' => $event->getInitiator(),
+        ];
 
-            // Execute capture via adapter
-            $response = $this->stripeAdapter->capturePayment($request);
+        $contractId = $event->getContractId();
+        if ($contractId !== null) {
+            $metadata['contract_id'] = $contractId;
+        }
 
-            // Log success
-            $this->logger->info('Stripe direct capture successful', [
-                'payment_intent_id' => $paymentIntentId,
-                'capture_id' => $response->captureId,
-                'captured_amount' => $response->amountCaptured,
-                'currency' => $response->currency,
-            ]);
+        $reason = $event->getReason();
+        if ($reason !== null) {
+            $metadata['reason'] = $reason;
+        }
 
-            // Log to request log
-            $this->logCaptureRequest($response, $event);
+        return $metadata;
+    }
 
-            // Set success results
-            $context->set('captureSuccess', true);
-            $context->set('captureId', $response->captureId);
-            $context->set('capturedAmount', $response->amountCaptured);
-            $context->set('captureCurrency', $response->currency);
-            $context->set('capturedAt', $response->capturedAt->format('Y-m-d H:i:s'));
-        } catch (\Throwable $e) {
-            throw $e;
+    /**
+     * Build metadata for direct capture (admin panel).
+     *
+     * @return array<string, string>
+     */
+    private function buildDirectCaptureMetadata(StripeCaptureRequestEvent $event): array
+    {
+        $metadata = [
+            'initiator' => $event->getInitiator(),
+        ];
+
+        $orderId = $event->getOrderId();
+        if ($orderId !== null) {
+            $metadata['order_id'] = $orderId;
+        }
+
+        $reason = $event->getReason();
+        if ($reason !== null) {
+            $metadata['reason'] = $reason;
+        }
+
+        return $metadata;
+    }
+
+    /**
+     * Handle capture result - set context and log.
+     *
+     * Sprint 9: Centralized result handling for both capture modes.
+     */
+    private function handleCaptureResult(
+        CaptureResult $result,
+        StripeCaptureRequestEvent $event,
+        EventContext $context
+    ): void {
+        if (!$result->isSuccessful()) {
+            throw new \RuntimeException($result->getErrorMessage() ?? 'Capture failed');
+        }
+
+        $this->logger->info('Stripe capture successful', [
+            'capture_id' => $result->getCaptureId(),
+            'captured_amount' => $result->getAmountCaptured(),
+            'currency' => $result->getCurrency(),
+        ]);
+
+        $this->logCaptureResult($result, $event);
+
+        $context->set('captureSuccess', true);
+        $context->set('captureId', $result->getCaptureId());
+        $context->set('capturedAmount', $result->getAmountCaptured());
+        $context->set('captureCurrency', $result->getCurrency());
+
+        $capturedAt = $result->getCapturedAt();
+        if ($capturedAt !== null) {
+            $context->set('capturedAt', $capturedAt->format('Y-m-d H:i:s'));
         }
     }
 
     /**
-     * Log the capture request to the request log.
+     * Log the capture result to the request log.
      *
-     * @param CaptureResponse $response Capture response from adapter
-     * @param StripeCaptureRequestEvent $event
+     * Sprint 8/9: Delegates to RequestLogService (Facade pattern).
      */
-    private function logCaptureRequest(CaptureResponse $response, StripeCaptureRequestEvent $event): void
+    private function logCaptureResult(CaptureResult $result, StripeCaptureRequestEvent $event): void
     {
-        try {
-            // @phpstan-ignore-next-line - RequestLog is from legacy Stripe module
-            $requestLog = oxNew(RequestLog::class);
-            // @phpstan-ignore-next-line - RequestLog is from legacy Stripe module
-            $requestLog->logRequest(
-                ['capture_id' => $response->captureId],
-                [
-                    'amount' => $response->amountCaptured,
-                    'currency' => $response->currency,
-                    'contract_id' => $event->getContractId(),
-                    'initiator' => $event->getInitiator(),
-                ],
-                $event->getOrderId() ?? $event->getContractId(),
-                (int) \OxidEsales\Eshop\Core\Registry::getConfig()->getShopId()
-            );
-        } catch (\Throwable $e) {
-            $this->logger->warning('Failed to log capture request', ['error' => $e->getMessage()]);
-        }
+        $this->requestLogService->logRequest(
+            action: 'capture',
+            request: ['capture_id' => $result->getCaptureId()],
+            response: [
+                'amount' => $result->getAmountCaptured(),
+                'currency' => $result->getCurrency(),
+                'contract_id' => $event->getContractId(),
+                'initiator' => $event->getInitiator(),
+            ],
+            referenceId: $event->getOrderId() ?? $event->getContractId() ?? '',
+            shopId: (int) \OxidEsales\Eshop\Core\Registry::getConfig()->getShopId()
+        );
     }
 
     private function handleException(
@@ -351,27 +336,24 @@ class StripeCaptureRequestHandler implements HandlerInterface
         $this->logExceptionToRequestLog($e, $event);
     }
 
+    /**
+     * Log exception to the request log.
+     *
+     * Sprint 8: Now delegates to RequestLogService (Facade pattern).
+     */
     private function logExceptionToRequestLog(\Throwable $e, StripeCaptureRequestEvent $event): void
     {
-        try {
-            $contractId = $event->getContractId();
-            if ($contractId === null) {
-                return;
-            }
-
-            // @phpstan-ignore-next-line - RequestLog is from legacy Stripe module
-            $requestLog = oxNew(RequestLog::class);
-            // @phpstan-ignore-next-line - RequestLog is from legacy Stripe module
-            $requestLog->logExceptionResponse(
-                ['contract_id' => $contractId],
-                (int) ($e->getCode() ?: 500),
-                $e->getMessage(),
-                'capture',
-                $contractId
-            );
-        } catch (\Throwable $logError) {
-            $this->logger->warning('Failed to log capture error', ['error' => $logError->getMessage()]);
+        $referenceId = $event->getContractId() ?? $event->getOrderId() ?? '';
+        if ($referenceId === '') {
+            return;
         }
+
+        $this->requestLogService->logException(
+            action: 'capture',
+            exception: $e,
+            referenceId: $referenceId,
+            shopId: (int) \OxidEsales\Eshop\Core\Registry::getConfig()->getShopId()
+        );
     }
 
     /**

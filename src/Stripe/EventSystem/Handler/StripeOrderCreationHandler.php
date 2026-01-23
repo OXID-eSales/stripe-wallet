@@ -246,21 +246,8 @@ class StripeOrderCreationHandler implements HandlerInterface
             ]);
         }
 
-        // Commit contract to existing order
-        $contract->commitToOrder($orderId);
-        $this->contractRepository->save($contract);
-
-        // Update OXPAID only if payment was captured (not for manual capture)
-        $requiresCapture = $context->get('requiresCapture') === true;
-        if (!$requiresCapture) {
-            $this->logEvent('StripeOrderCreationHandler: Updating OXPAID on existing order (automatic capture)');
-            $this->updateOrderPaidTimestamp($orderId, $contract->getProviderOrderId());
-        } else {
-            $this->logEvent('StripeOrderCreationHandler: Skipping OXPAID (manual capture mode)');
-        }
-
-        $committedEvent = new ContractCommittedEvent($contract, $context, $orderId);
-        $this->eventDispatcher->dispatch($committedEvent);
+        // Sprint 12: Use extracted method to eliminate duplication
+        $this->commitContractAndDispatch($contract, $context, $orderId);
     }
 
     private function handlePostOrderCreation(
@@ -268,10 +255,26 @@ class StripeOrderCreationHandler implements HandlerInterface
         \OxidEsales\PaymentComponent\EventSystem\Event\EventContextInterface $context,
         string $orderId
     ): void {
+        // Sprint 12: Use extracted method to eliminate duplication
+        $this->commitContractAndDispatch($contract, $context, $orderId);
+    }
+
+    /**
+     * Commit contract to order and dispatch ContractCommittedEvent.
+     *
+     * Sprint 12: Extracted to eliminate internal duplication from handleExistingOrder()
+     * and handlePostOrderCreation() methods.
+     */
+    private function commitContractAndDispatch(
+        \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract,
+        \OxidEsales\PaymentComponent\EventSystem\Event\EventContextInterface $context,
+        string $orderId
+    ): void {
+        // Commit contract to order
         $contract->commitToOrder($orderId);
         $this->contractRepository->save($contract);
 
-        // Sprint 14/25: Update OXPAID only if payment was captured (not for manual capture)
+        // Update OXPAID only if payment was captured (not for manual capture)
         $requiresCapture = $context->get('requiresCapture') === true;
         if (!$requiresCapture) {
             $this->logEvent('StripeOrderCreationHandler: Updating OXPAID (automatic capture)');
@@ -280,6 +283,7 @@ class StripeOrderCreationHandler implements HandlerInterface
             $this->logEvent('StripeOrderCreationHandler: Skipping OXPAID (manual capture mode)');
         }
 
+        // Dispatch committed event
         $committedEvent = new ContractCommittedEvent($contract, $context, $orderId);
         $this->eventDispatcher->dispatch($committedEvent);
     }

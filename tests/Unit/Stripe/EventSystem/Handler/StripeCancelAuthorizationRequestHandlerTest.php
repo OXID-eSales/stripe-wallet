@@ -6,37 +6,43 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCancelAuthorizationRequestHandler;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
-use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
+use OxidEsales\Payments\Stripe\DTO\CancellationResult;
+use OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface;
+use OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Stripe\PaymentIntent;
 
+/**
+ * Unit tests for StripeCancelAuthorizationRequestHandler.
+ *
+ * Sprint 11: Tests updated for refactored handler with CancelAuthorizationService injection.
+ *
+ * Note: These tests focus on the handler's interface and event handling.
+ * Business logic tests are in CancelAuthorizationServiceTest.
+ */
 class StripeCancelAuthorizationRequestHandlerTest extends TestCase
 {
-    private StripeAdapterInterface $stripeAdapter;
+    private CancelAuthorizationServiceInterface&MockObject $cancelService;
+    private RequestLogServiceInterface&MockObject $requestLogService;
 
     protected function setUp(): void
     {
-        $this->stripeAdapter = $this->createMock(StripeAdapterInterface::class);
+        $this->cancelService = $this->createMock(CancelAuthorizationServiceInterface::class);
+        $this->requestLogService = $this->createMock(RequestLogServiceInterface::class);
     }
 
-    /**
-     * Create a PaymentIntent object for testing.
-     */
-    private function createPaymentIntent(string $status = 'canceled', string $id = 'pi_test'): PaymentIntent
+    private function createHandler(): StripeCancelAuthorizationRequestHandler
     {
-        return PaymentIntent::constructFrom([
-            'id' => $id,
-            'object' => 'payment_intent',
-            'status' => $status,
-        ], null);
+        return new StripeCancelAuthorizationRequestHandler(
+            $this->cancelService,
+            $this->requestLogService
+        );
     }
 
     public function testHandlerIgnoresNonCancelAuthorizationEvent(): void
     {
-        $handler = new StripeCancelAuthorizationRequestHandler(
-            $this->stripeAdapter
-        );
+        $handler = $this->createHandler();
 
         $otherEvent = new class {
             public function getContext(): EventContext
@@ -45,7 +51,7 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
             }
         };
 
-        $this->stripeAdapter->expects($this->never())->method('cancelPaymentIntent');
+        $this->cancelService->expects($this->never())->method('cancelAuthorization');
 
         $handler->handle($otherEvent);
     }
@@ -57,36 +63,27 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
         ]);
         $event = new StripeCancelAuthorizationRequestEvent($context);
 
-        $handler = new StripeCancelAuthorizationRequestHandler(
-            $this->stripeAdapter
-        );
+        $handler = $this->createHandler();
 
-        $this->stripeAdapter->expects($this->never())->method('cancelPaymentIntent');
+        $this->cancelService->expects($this->never())->method('cancelAuthorization');
 
         $handler->handle($event);
 
         $this->assertFalse($context->get('cancelSuccess'));
-        // Verify exact error message to catch mutations
         $this->assertEquals('PaymentIntent ID is missing', $context->get('error'));
     }
 
-    /**
-     * Test that empty string PaymentIntent ID also triggers error.
-     * This catches mutations that change === '' to !== ''
-     */
     public function testHandlerRejectsEmptyStringPaymentIntentId(): void
     {
         $context = new EventContext([
-            'paymentIntentId' => '',  // Empty string, not null
+            'paymentIntentId' => '',
             'cancellationReason' => 'requested_by_customer',
         ]);
         $event = new StripeCancelAuthorizationRequestEvent($context);
 
-        $handler = new StripeCancelAuthorizationRequestHandler(
-            $this->stripeAdapter
-        );
+        $handler = $this->createHandler();
 
-        $this->stripeAdapter->expects($this->never())->method('cancelPaymentIntent');
+        $this->cancelService->expects($this->never())->method('cancelAuthorization');
 
         $handler->handle($event);
 
@@ -94,7 +91,7 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
         $this->assertEquals('PaymentIntent ID is missing', $context->get('error'));
     }
 
-    public function testHandlerCancelsPaymentIntentViaStripeApi(): void
+    public function testHandlerDelegatesToCancelService(): void
     {
         $context = new EventContext([
             'paymentIntentId' => 'pi_test_cancel_123',
@@ -102,16 +99,13 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
         ]);
         $event = new StripeCancelAuthorizationRequestEvent($context);
 
-        // @phpstan-ignore-next-line
-        $this->stripeAdapter
+        $this->cancelService
             ->expects($this->once())
-            ->method('cancelPaymentIntent')
+            ->method('cancelAuthorization')
             ->with('pi_test_cancel_123', 'requested_by_customer')
-            ->willReturn($this->createPaymentIntent('canceled'));
+            ->willReturn(CancellationResult::success('pi_test_cancel_123', 'canceled'));
 
-        $handler = new StripeCancelAuthorizationRequestHandler(
-            $this->stripeAdapter
-        );
+        $handler = $this->createHandler();
 
         $handler->handle($event);
 
@@ -127,14 +121,11 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
         ]);
         $event = new StripeCancelAuthorizationRequestEvent($context);
 
-        // @phpstan-ignore-next-line
-        $this->stripeAdapter
-            ->method('cancelPaymentIntent')
-            ->willReturn($this->createPaymentIntent('canceled'));
+        $this->cancelService
+            ->method('cancelAuthorization')
+            ->willReturn(CancellationResult::success('pi_test_success', 'canceled'));
 
-        $handler = new StripeCancelAuthorizationRequestHandler(
-            $this->stripeAdapter
-        );
+        $handler = $this->createHandler();
 
         $handler->handle($event);
 
@@ -142,7 +133,7 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
         $this->assertEquals('canceled', $context->get('cancelledStatus'));
     }
 
-    public function testHandlerSetsErrorOnApiFailure(): void
+    public function testHandlerSetsErrorOnServiceFailure(): void
     {
         $context = new EventContext([
             'paymentIntentId' => 'pi_test_fail',
@@ -150,13 +141,11 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
         ]);
         $event = new StripeCancelAuthorizationRequestEvent($context);
 
-        $this->stripeAdapter
-            ->method('cancelPaymentIntent')
-            ->willThrowException(new \Exception('Stripe API error: Cannot cancel'));
+        $this->cancelService
+            ->method('cancelAuthorization')
+            ->willReturn(CancellationResult::failure('Stripe API error: Cannot cancel'));
 
-        $handler = new StripeCancelAuthorizationRequestHandler(
-            $this->stripeAdapter
-        );
+        $handler = $this->createHandler();
 
         $handler->handle($event);
 
@@ -164,7 +153,7 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
         $this->assertStringContainsString('Cannot cancel', $context->get('error'));
     }
 
-    public function testHandlerPassesCancellationReasonToAdapter(): void
+    public function testHandlerPassesCancellationReasonToService(): void
     {
         $context = new EventContext([
             'paymentIntentId' => 'pi_test_reason',
@@ -172,16 +161,13 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
         ]);
         $event = new StripeCancelAuthorizationRequestEvent($context);
 
-        // @phpstan-ignore-next-line
-        $this->stripeAdapter
+        $this->cancelService
             ->expects($this->once())
-            ->method('cancelPaymentIntent')
+            ->method('cancelAuthorization')
             ->with('pi_test_reason', 'abandoned')
-            ->willReturn($this->createPaymentIntent('canceled'));
+            ->willReturn(CancellationResult::success('pi_test_reason', 'canceled'));
 
-        $handler = new StripeCancelAuthorizationRequestHandler(
-            $this->stripeAdapter
-        );
+        $handler = $this->createHandler();
 
         $handler->handle($event);
     }
@@ -201,16 +187,13 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
         ]);
         $event = new StripeCancelAuthorizationRequestEvent($context);
 
-        // @phpstan-ignore-next-line
-        $this->stripeAdapter
+        $this->cancelService
             ->expects($this->once())
-            ->method('cancelPaymentIntent')
+            ->method('cancelAuthorization')
             ->with('pi_test_no_reason', null)
-            ->willReturn($this->createPaymentIntent('canceled'));
+            ->willReturn(CancellationResult::success('pi_test_no_reason', 'canceled'));
 
-        $handler = new StripeCancelAuthorizationRequestHandler(
-            $this->stripeAdapter
-        );
+        $handler = $this->createHandler();
 
         $handler->handle($event);
 

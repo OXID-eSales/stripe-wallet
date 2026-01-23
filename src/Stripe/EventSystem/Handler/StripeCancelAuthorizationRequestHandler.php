@@ -4,30 +4,27 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
+use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
-use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
+use OxidEsales\Payments\Stripe\DTO\CancellationResult;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
-use OxidEsales\Payments\Stripe\Application\Model\RequestLog;
+use OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface;
+use OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
 /**
  * Handles cancel authorization requests for Stripe PaymentIntents.
  *
- * This handler processes StripeCancelAuthorizationRequestEvent and cancels
- * the PaymentIntent via Stripe API, releasing the authorization hold.
+ * Sprint 11: Refactored to delegate to CancelAuthorizationService (SRP).
  *
- * Used for manual capture mode orders where the merchant decides not to
- * capture the authorized payment.
- *
- * Handler responsibilities:
+ * Handler responsibilities (ONLY):
  * 1. Receive event and extract parameters
- * 2. Validate PaymentIntent ID exists
- * 3. Call Stripe adapter to cancel the PaymentIntent
- * 4. Log request/response
- * 5. Set results in context
+ * 2. Delegate to CancelAuthorizationService
+ * 3. Delegate logging to RequestLogService
+ * 4. Set results in context
  *
  * @since 2.0.0
  */
@@ -36,7 +33,8 @@ class StripeCancelAuthorizationRequestHandler implements HandlerInterface
     private LoggerInterface $logger;
 
     public function __construct(
-        private readonly StripeAdapterInterface $stripeAdapter,
+        private readonly CancelAuthorizationServiceInterface $cancelService,
+        private readonly RequestLogServiceInterface $requestLogService,
         ?LoggerInterface $logger = null,
         private readonly ?FileLoggerInterface $eventLogger = null
     ) {
@@ -46,11 +44,6 @@ class StripeCancelAuthorizationRequestHandler implements HandlerInterface
     public static function getHandledEventClass(): string
     {
         return StripeCancelAuthorizationRequestEvent::class;
-    }
-
-    public function getPriority(): int
-    {
-        return 0;
     }
 
     public function handle(object $event): void
@@ -91,67 +84,55 @@ class StripeCancelAuthorizationRequestHandler implements HandlerInterface
             return;
         }
 
-        $this->executeCancelAuthorization($event, $paymentIntentId, $context);
+        $result = $this->cancelService->cancelAuthorization(
+            $paymentIntentId,
+            $event->getCancellationReason()
+        );
+
+        $this->handleCancellationResult($result, $event, $context);
     }
 
-    private function executeCancelAuthorization(
+    private function handleCancellationResult(
+        CancellationResult $result,
         StripeCancelAuthorizationRequestEvent $event,
-        string $paymentIntentId,
         EventContext $context
     ): void {
-        $this->logger->info('Executing Stripe cancel authorization', [
-            'payment_intent_id' => $paymentIntentId,
-            'reason' => $event->getCancellationReason(),
-            'initiator' => $event->getInitiator(),
-        ]);
-
-        try {
-            // Execute cancel via adapter
-            $cancelledPaymentIntent = $this->stripeAdapter->cancelPaymentIntent(
-                $paymentIntentId,
-                $event->getCancellationReason()
-            );
-
-            // Log success
-            $this->logger->info('Stripe cancel authorization successful', [
-                'payment_intent_id' => $paymentIntentId,
-                'status' => $cancelledPaymentIntent->status,
-            ]);
-
-            // Log to request log
-            $this->logCancelRequest($paymentIntentId, $event);
-
-            // Set success results
-            $context->set('cancelSuccess', true);
-            $context->set('cancelledPaymentIntentId', $paymentIntentId);
-            $context->set('cancelledStatus', $cancelledPaymentIntent->status);
-        } catch (\Throwable $e) {
-            throw $e;
+        if (!$result->isSuccessful()) {
+            $context->set('error', $result->getErrorMessage());
+            $context->set('cancelSuccess', false);
+            return;
         }
+
+        $this->logCancelRequest($result, $event);
+        $this->setSuccessResults($context, $result);
     }
 
-    /**
-     * Log the cancel request to the request log.
-     */
-    private function logCancelRequest(string $paymentIntentId, StripeCancelAuthorizationRequestEvent $event): void
+    private function logCancelRequest(
+        CancellationResult $result,
+        StripeCancelAuthorizationRequestEvent $event
+    ): void {
+        $this->requestLogService->logRequest(
+            action: 'cancel_authorization',
+            request: ['payment_intent_id' => $result->getPaymentIntentId()],
+            response: [
+                'status' => $result->getStatus(),
+                'reason' => $event->getCancellationReason(),
+            ],
+            referenceId: $event->getOrderId() ?? $result->getPaymentIntentId() ?? '',
+            shopId: (int) Registry::getConfig()->getShopId()
+        );
+    }
+
+    private function setSuccessResults(EventContext $context, CancellationResult $result): void
     {
-        try {
-            // @phpstan-ignore-next-line - RequestLog is from legacy Stripe module
-            $requestLog = oxNew(RequestLog::class);
-            // @phpstan-ignore-next-line - RequestLog is from legacy Stripe module
-            $requestLog->logRequest(
-                ['payment_intent_id' => $paymentIntentId],
-                [
-                    'action' => 'cancel_authorization',
-                    'reason' => $event->getCancellationReason(),
-                    'initiator' => $event->getInitiator(),
-                ],
-                $event->getOrderId() ?? $paymentIntentId,
-                (int) \OxidEsales\Eshop\Core\Registry::getConfig()->getShopId()
-            );
-        } catch (\Throwable $e) {
-            $this->logger->warning('Failed to log cancel request', ['error' => $e->getMessage()]);
-        }
+        $context->set('cancelSuccess', true);
+        $context->set('cancelledPaymentIntentId', $result->getPaymentIntentId());
+        $context->set('cancelledStatus', $result->getStatus());
+
+        $this->logger->info('Cancel authorization processed successfully', [
+            'payment_intent_id' => $result->getPaymentIntentId(),
+            'status' => $result->getStatus(),
+        ]);
     }
 
     private function handleException(
@@ -165,7 +146,6 @@ class StripeCancelAuthorizationRequestHandler implements HandlerInterface
         $this->logger->error('Cancel authorization handler exception', [
             'error' => $e->getMessage(),
             'payment_intent_id' => $event->getPaymentIntentId(),
-            'trace' => $e->getTraceAsString(),
         ]);
 
         $this->logExceptionToRequestLog($e, $event);
@@ -175,25 +155,17 @@ class StripeCancelAuthorizationRequestHandler implements HandlerInterface
         \Throwable $e,
         StripeCancelAuthorizationRequestEvent $event
     ): void {
-        try {
-            $paymentIntentId = $event->getPaymentIntentId();
-            if ($paymentIntentId === null) {
-                return;
-            }
-
-            // @phpstan-ignore-next-line - RequestLog is from legacy Stripe module
-            $requestLog = oxNew(RequestLog::class);
-            // @phpstan-ignore-next-line - RequestLog is from legacy Stripe module
-            $requestLog->logExceptionResponse(
-                ['payment_intent_id' => $paymentIntentId],
-                (int) ($e->getCode() ?: 500),
-                $e->getMessage(),
-                'cancel_authorization',
-                $paymentIntentId
-            );
-        } catch (\Throwable $logError) {
-            $this->logger->warning('Failed to log cancel error', ['error' => $logError->getMessage()]);
+        $paymentIntentId = $event->getPaymentIntentId();
+        if ($paymentIntentId === null) {
+            return;
         }
+
+        $this->requestLogService->logException(
+            action: 'cancel_authorization',
+            exception: $e,
+            referenceId: $paymentIntentId,
+            shopId: (int) Registry::getConfig()->getShopId()
+        );
     }
 
     /**

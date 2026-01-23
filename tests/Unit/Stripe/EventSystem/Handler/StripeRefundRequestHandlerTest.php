@@ -8,7 +8,9 @@ use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeRefundRequestHandler;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\Payments\Stripe\Service\OrderRefundUpdateServiceInterface;
 use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
+use OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Log\LoggerInterface;
@@ -26,12 +28,16 @@ class StripeRefundRequestHandlerTest extends TestCase
 {
     private RefundServiceInterface&MockObject $refundService;
     private ContractRepositoryInterface&MockObject $contractRepository;
+    private OrderRefundUpdateServiceInterface&MockObject $orderRefundUpdateService;
+    private RequestLogServiceInterface&MockObject $requestLogService;
     private LoggerInterface&MockObject $logger;
 
     protected function setUp(): void
     {
         $this->refundService = $this->createMock(RefundServiceInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
+        $this->orderRefundUpdateService = $this->createMock(OrderRefundUpdateServiceInterface::class);
+        $this->requestLogService = $this->createMock(RequestLogServiceInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
     }
 
@@ -40,6 +46,8 @@ class StripeRefundRequestHandlerTest extends TestCase
         return new StripeRefundRequestHandler(
             $this->refundService,
             $this->contractRepository,
+            $this->orderRefundUpdateService,
+            $this->requestLogService,
             $this->logger
         );
     }

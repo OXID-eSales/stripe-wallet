@@ -5,38 +5,44 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
 use DateTimeImmutable;
-use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
-use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
 use OxidEsales\PaymentComponent\Contract\ContractState;
 use OxidEsales\PaymentComponent\Contract\PaymentContract;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
+use OxidEsales\Payments\Stripe\DTO\CaptureResult;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCaptureRequestHandler;
+use OxidEsales\Payments\Stripe\Service\CaptureServiceInterface;
+use OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 /**
  * Unit tests for StripeCaptureRequestHandler.
+ *
+ * Sprint 9: Tests updated to use CaptureServiceInterface instead of StripeAdapterInterface.
+ * Handler now delegates capture execution to CaptureService.
  */
 class StripeCaptureRequestHandlerTest extends TestCase
 {
-    private StripeAdapterInterface&MockObject $stripeAdapter;
+    private CaptureServiceInterface&MockObject $captureService;
     private ContractRepositoryInterface&MockObject $contractRepository;
+    private RequestLogServiceInterface&MockObject $requestLogService;
     private StripeCaptureRequestHandler $handler;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->stripeAdapter = $this->createMock(StripeAdapterInterface::class);
+        $this->captureService = $this->createMock(CaptureServiceInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
+        $this->requestLogService = $this->createMock(RequestLogServiceInterface::class);
 
         $this->handler = new StripeCaptureRequestHandler(
-            $this->stripeAdapter,
+            $this->captureService,
             $this->contractRepository,
+            $this->requestLogService,
             new NullLogger()
         );
     }
@@ -101,17 +107,14 @@ class StripeCaptureRequestHandlerTest extends TestCase
         ]);
         $event = new StripeCaptureRequestEvent($context);
 
-        // Mock the adapter to return success
-        $this->stripeAdapter
-            ->method('capturePayment')
-            ->willReturn(new CaptureResponse(
-                providerPaymentId: 'pi_valid_123',
+        // Mock the capture service to return success
+        $this->captureService
+            ->method('processDirectCapture')
+            ->willReturn(CaptureResult::success(
                 captureId: 'ch_capture_123',
                 amountCaptured: 100.0,
                 currency: 'EUR',
-                status: 'captured',
-                capturedAt: new \DateTimeImmutable(),
-                providerData: []
+                capturedAt: new \DateTimeImmutable()
             ));
 
         $this->handler->handle($event);
@@ -196,24 +199,15 @@ class StripeCaptureRequestHandlerTest extends TestCase
             ->with('contract_authorized')
             ->willReturn($contract);
 
-        $this->contractRepository
+        $this->captureService
             ->expects($this->once())
-            ->method('save')
-            ->with($contract);
-
-        $captureResponse = new CaptureResponse(
-            providerPaymentId: 'pi_test_123',
-            captureId: 'ch_captured_123',
-            amountCaptured: 99.99,
-            currency: 'EUR',
-            status: 'succeeded',
-            capturedAt: new DateTimeImmutable()
-        );
-
-        $this->stripeAdapter
-            ->expects($this->once())
-            ->method('capturePayment')
-            ->willReturn($captureResponse);
+            ->method('processCapture')
+            ->willReturn(CaptureResult::success(
+                captureId: 'ch_captured_123',
+                amountCaptured: 99.99,
+                currency: 'EUR',
+                capturedAt: new DateTimeImmutable()
+            ));
 
         $this->handler->handle($event);
 
@@ -241,22 +235,17 @@ class StripeCaptureRequestHandlerTest extends TestCase
             ->method('findById')
             ->willReturn($contract);
 
-        $captureResponse = new CaptureResponse(
-            providerPaymentId: 'pi_from_event',
-            captureId: 'ch_captured',
-            amountCaptured: 50.00,
-            currency: 'USD',
-            status: 'succeeded',
-            capturedAt: new DateTimeImmutable()
-        );
-
-        $this->stripeAdapter
+        // Sprint 9: Now handler uses CaptureService which receives the contract
+        $this->captureService
             ->expects($this->once())
-            ->method('capturePayment')
-            ->with($this->callback(function ($request) {
-                return $request->providerPaymentId === 'pi_from_event';
-            }))
-            ->willReturn($captureResponse);
+            ->method('processCapture')
+            ->with($contract)
+            ->willReturn(CaptureResult::success(
+                captureId: 'ch_captured',
+                amountCaptured: 50.00,
+                currency: 'USD',
+                capturedAt: new DateTimeImmutable()
+            ));
 
         $this->handler->handle($event);
 
@@ -278,22 +267,17 @@ class StripeCaptureRequestHandlerTest extends TestCase
             ->method('findById')
             ->willReturn($contract);
 
-        $captureResponse = new CaptureResponse(
-            providerPaymentId: 'pi_partial',
-            captureId: 'ch_partial',
-            amountCaptured: 25.50,
-            currency: 'EUR',
-            status: 'succeeded',
-            capturedAt: new DateTimeImmutable()
-        );
-
-        $this->stripeAdapter
+        // Sprint 9: Verify amount is passed to CaptureService
+        $this->captureService
             ->expects($this->once())
-            ->method('capturePayment')
-            ->with($this->callback(function ($request) {
-                return $request->amount === 25.50;
-            }))
-            ->willReturn($captureResponse);
+            ->method('processCapture')
+            ->with($contract, 25.50, $this->anything())
+            ->willReturn(CaptureResult::success(
+                captureId: 'ch_partial',
+                amountCaptured: 25.50,
+                currency: 'EUR',
+                capturedAt: new DateTimeImmutable()
+            ));
 
         $this->handler->handle($event);
 
@@ -314,9 +298,10 @@ class StripeCaptureRequestHandlerTest extends TestCase
             ->method('findById')
             ->willReturn($contract);
 
-        $this->stripeAdapter
-            ->method('capturePayment')
-            ->willThrowException(new \RuntimeException('Stripe API error'));
+        // Sprint 9: CaptureService returns failure result instead of throwing
+        $this->captureService
+            ->method('processCapture')
+            ->willReturn(CaptureResult::failure('Stripe API error'));
 
         $this->handler->handle($event);
 
@@ -342,18 +327,14 @@ class StripeCaptureRequestHandlerTest extends TestCase
             ->method('findById')
             ->willReturn($contract);
 
-        $captureResponse = new CaptureResponse(
-            providerPaymentId: 'pi_context',
-            captureId: 'ch_context',
-            amountCaptured: 50.00,
-            currency: 'EUR',
-            status: 'succeeded',
-            capturedAt: new DateTimeImmutable()
-        );
-
-        $this->stripeAdapter
-            ->method('capturePayment')
-            ->willReturn($captureResponse);
+        $this->captureService
+            ->method('processCapture')
+            ->willReturn(CaptureResult::success(
+                captureId: 'ch_context',
+                amountCaptured: 50.00,
+                currency: 'EUR',
+                capturedAt: new DateTimeImmutable()
+            ));
 
         $this->handler->handle($event);
 
@@ -362,10 +343,10 @@ class StripeCaptureRequestHandlerTest extends TestCase
     }
 
     /**
-     * Test that captureAuthorization is called on contract.
-     * This catches mutation #24 that removes $contract->captureAuthorization().
+     * Test that CaptureService.processCapture is called with the contract.
+     * Sprint 9: CaptureService now handles captureAuthorization internally.
      */
-    public function testHandleCallsCaptureAuthorizationOnContract(): void
+    public function testHandleCallsCaptureServiceWithContract(): void
     {
         $context = new EventContext([
             'contractId' => 'contract_auth_test',
@@ -377,25 +358,22 @@ class StripeCaptureRequestHandlerTest extends TestCase
         $contract->method('getState')->willReturn(ContractState::authorized());
         $contract->method('getProviderOrderId')->willReturn('pi_auth_test');
 
-        // CRITICAL: Verify captureAuthorization is called
-        $contract->expects($this->once())->method('captureAuthorization');
-
         $this->contractRepository
             ->method('findById')
             ->willReturn($contract);
 
-        $captureResponse = new CaptureResponse(
-            providerPaymentId: 'pi_auth_test',
-            captureId: 'ch_auth',
-            amountCaptured: 100.00,
-            currency: 'EUR',
-            status: 'succeeded',
-            capturedAt: new DateTimeImmutable()
-        );
-
-        $this->stripeAdapter
-            ->method('capturePayment')
-            ->willReturn($captureResponse);
+        // Sprint 9: Verify CaptureService is called with the contract
+        // CaptureService internally calls captureAuthorization
+        $this->captureService
+            ->expects($this->once())
+            ->method('processCapture')
+            ->with($contract)
+            ->willReturn(CaptureResult::success(
+                captureId: 'ch_auth',
+                amountCaptured: 100.00,
+                currency: 'EUR',
+                capturedAt: new DateTimeImmutable()
+            ));
 
         $this->handler->handle($event);
     }
@@ -419,18 +397,15 @@ class StripeCaptureRequestHandlerTest extends TestCase
             ->willReturn($contract);
 
         $capturedTime = new DateTimeImmutable('2025-01-15 10:30:00');
-        $captureResponse = new CaptureResponse(
-            providerPaymentId: 'pi_time',
-            captureId: 'ch_time',
-            amountCaptured: 75.00,
-            currency: 'EUR',
-            status: 'succeeded',
-            capturedAt: $capturedTime
-        );
 
-        $this->stripeAdapter
-            ->method('capturePayment')
-            ->willReturn($captureResponse);
+        $this->captureService
+            ->method('processCapture')
+            ->willReturn(CaptureResult::success(
+                captureId: 'ch_time',
+                amountCaptured: 75.00,
+                currency: 'EUR',
+                capturedAt: $capturedTime
+            ));
 
         $this->handler->handle($event);
 
@@ -440,7 +415,7 @@ class StripeCaptureRequestHandlerTest extends TestCase
 
     /**
      * Test that reason is included in metadata when provided.
-     * This catches mutations #23, #40 that flip $reason !== null to === null.
+     * Sprint 9: Handler now passes metadata to CaptureService.
      */
     public function testHandlePassesReasonInMetadataWhenProvided(): void
     {
@@ -457,25 +432,24 @@ class StripeCaptureRequestHandlerTest extends TestCase
             ->method('findById')
             ->willReturn($contract);
 
-        $captureResponse = new CaptureResponse(
-            providerPaymentId: 'pi_reason',
-            captureId: 'ch_reason',
-            amountCaptured: 100.00,
-            currency: 'EUR',
-            status: 'succeeded',
-            capturedAt: new DateTimeImmutable()
-        );
-
-        // Verify that reason is included in the capture request metadata
-        $this->stripeAdapter
+        // Verify that reason is included in the metadata passed to CaptureService
+        $this->captureService
             ->expects($this->once())
-            ->method('capturePayment')
-            ->with($this->callback(function ($request) {
-                // Verify reason is in metadata
-                return isset($request->metadata['reason'])
-                    && $request->metadata['reason'] === 'manual_capture_by_admin';
-            }))
-            ->willReturn($captureResponse);
+            ->method('processCapture')
+            ->with(
+                $contract,
+                $this->anything(),
+                $this->callback(function ($metadata) {
+                    return isset($metadata['reason'])
+                        && $metadata['reason'] === 'manual_capture_by_admin';
+                })
+            )
+            ->willReturn(CaptureResult::success(
+                captureId: 'ch_reason',
+                amountCaptured: 100.00,
+                currency: 'EUR',
+                capturedAt: new DateTimeImmutable()
+            ));
 
         $this->handler->handle($event);
     }
@@ -498,24 +472,23 @@ class StripeCaptureRequestHandlerTest extends TestCase
             ->method('findById')
             ->willReturn($contract);
 
-        $captureResponse = new CaptureResponse(
-            providerPaymentId: 'pi_no_reason',
-            captureId: 'ch_no_reason',
-            amountCaptured: 100.00,
-            currency: 'EUR',
-            status: 'succeeded',
-            capturedAt: new DateTimeImmutable()
-        );
-
         // Verify that reason is NOT in metadata when not provided
-        $this->stripeAdapter
+        $this->captureService
             ->expects($this->once())
-            ->method('capturePayment')
-            ->with($this->callback(function ($request) {
-                // Verify reason is NOT in metadata
-                return !isset($request->metadata['reason']);
-            }))
-            ->willReturn($captureResponse);
+            ->method('processCapture')
+            ->with(
+                $contract,
+                $this->anything(),
+                $this->callback(function ($metadata) {
+                    return !isset($metadata['reason']);
+                })
+            )
+            ->willReturn(CaptureResult::success(
+                captureId: 'ch_no_reason',
+                amountCaptured: 100.00,
+                currency: 'EUR',
+                capturedAt: new DateTimeImmutable()
+            ));
 
         $this->handler->handle($event);
     }
@@ -534,18 +507,15 @@ class StripeCaptureRequestHandlerTest extends TestCase
         $event = new StripeCaptureRequestEvent($context);
 
         $capturedTime = new DateTimeImmutable('2025-01-15 11:00:00');
-        $captureResponse = new CaptureResponse(
-            providerPaymentId: 'pi_direct_time',
-            captureId: 'ch_direct_time',
-            amountCaptured: 50.00,
-            currency: 'EUR',
-            status: 'succeeded',
-            capturedAt: $capturedTime
-        );
 
-        $this->stripeAdapter
-            ->method('capturePayment')
-            ->willReturn($captureResponse);
+        $this->captureService
+            ->method('processDirectCapture')
+            ->willReturn(CaptureResult::success(
+                captureId: 'ch_direct_time',
+                amountCaptured: 50.00,
+                currency: 'EUR',
+                capturedAt: $capturedTime
+            ));
 
         $this->handler->handle($event);
 
@@ -566,18 +536,14 @@ class StripeCaptureRequestHandlerTest extends TestCase
         ]);
         $event = new StripeCaptureRequestEvent($context);
 
-        $captureResponse = new CaptureResponse(
-            providerPaymentId: 'pi_direct_full',
-            captureId: 'ch_direct_full_123',
-            amountCaptured: 199.99,
-            currency: 'USD',
-            status: 'succeeded',
-            capturedAt: new DateTimeImmutable()
-        );
-
-        $this->stripeAdapter
-            ->method('capturePayment')
-            ->willReturn($captureResponse);
+        $this->captureService
+            ->method('processDirectCapture')
+            ->willReturn(CaptureResult::success(
+                captureId: 'ch_direct_full_123',
+                amountCaptured: 199.99,
+                currency: 'USD',
+                capturedAt: new DateTimeImmutable()
+            ));
 
         $this->handler->handle($event);
 
@@ -591,7 +557,7 @@ class StripeCaptureRequestHandlerTest extends TestCase
 
     /**
      * Test that PaymentIntent ID from contract metadata is used when providerOrderId is empty.
-     * This catches mutations #14-15 that flip the empty string check.
+     * Sprint 9: Handler still resolves PaymentIntent ID, then delegates to CaptureService.
      */
     public function testHandleUsesPaymentIntentFromMetadataWhenProviderOrderIdEmpty(): void
     {
@@ -616,23 +582,17 @@ class StripeCaptureRequestHandlerTest extends TestCase
             ->method('findById')
             ->willReturn($contract);
 
-        $captureResponse = new CaptureResponse(
-            providerPaymentId: 'pi_from_metadata_123',
-            captureId: 'ch_meta',
-            amountCaptured: 100.00,
-            currency: 'EUR',
-            status: 'succeeded',
-            capturedAt: new DateTimeImmutable()
-        );
-
-        // Verify correct PaymentIntent ID is used from metadata
-        $this->stripeAdapter
+        // Sprint 9: CaptureService receives the contract and handles the PI lookup internally
+        $this->captureService
             ->expects($this->once())
-            ->method('capturePayment')
-            ->with($this->callback(function ($request) {
-                return $request->providerPaymentId === 'pi_from_metadata_123';
-            }))
-            ->willReturn($captureResponse);
+            ->method('processCapture')
+            ->with($contract)
+            ->willReturn(CaptureResult::success(
+                captureId: 'ch_meta',
+                amountCaptured: 100.00,
+                currency: 'EUR',
+                capturedAt: new DateTimeImmutable()
+            ));
 
         $this->handler->handle($event);
 
@@ -666,7 +626,7 @@ class StripeCaptureRequestHandlerTest extends TestCase
             ->method('findById')
             ->willReturn($contract);
 
-        $this->stripeAdapter->expects($this->never())->method('capturePayment');
+        $this->captureService->expects($this->never())->method('processCapture');
 
         $this->handler->handle($event);
 
@@ -676,7 +636,7 @@ class StripeCaptureRequestHandlerTest extends TestCase
 
     /**
      * Test direct capture with reason in metadata.
-     * This catches mutation #40 for direct capture path.
+     * Sprint 9: Verifies metadata is passed to CaptureService.processDirectCapture.
      */
     public function testDirectCapturePassesReasonInMetadata(): void
     {
@@ -688,24 +648,24 @@ class StripeCaptureRequestHandlerTest extends TestCase
         ]);
         $event = new StripeCaptureRequestEvent($context);
 
-        $captureResponse = new CaptureResponse(
-            providerPaymentId: 'pi_direct_reason',
-            captureId: 'ch_direct_reason',
-            amountCaptured: 100.00,
-            currency: 'EUR',
-            status: 'succeeded',
-            capturedAt: new DateTimeImmutable()
-        );
-
         // Verify reason is included in direct capture metadata
-        $this->stripeAdapter
+        $this->captureService
             ->expects($this->once())
-            ->method('capturePayment')
-            ->with($this->callback(function ($request) {
-                return isset($request->metadata['reason'])
-                    && $request->metadata['reason'] === 'ship_order';
-            }))
-            ->willReturn($captureResponse);
+            ->method('processDirectCapture')
+            ->with(
+                'pi_direct_reason',
+                $this->anything(),
+                $this->callback(function ($metadata) {
+                    return isset($metadata['reason'])
+                        && $metadata['reason'] === 'ship_order';
+                })
+            )
+            ->willReturn(CaptureResult::success(
+                captureId: 'ch_direct_reason',
+                amountCaptured: 100.00,
+                currency: 'EUR',
+                capturedAt: new DateTimeImmutable()
+            ));
 
         $this->handler->handle($event);
     }
