@@ -7,16 +7,10 @@ services:
   OxidEsales\Payments\Stripe\Service\:
     resource: 'src/Stripe/Service/*'
     exclude:
-      - 'src/Stripe/Service/EncryptionService.php'
       - 'src/Stripe/Service/Result/*'
       - 'src/Stripe/Service/ReconciliationResult.php'
-    public: true
-
-  # Encryption Service - Requires explicit encryption key configuration
-  # The encryption key should be set via environment variable or shop configuration
-  OxidEsales\Payments\Stripe\Service\EncryptionService:
-    arguments:
-      $encryptionKey: '%env(default::STRIPE_ENCRYPTION_KEY)%'
+      - 'src/Stripe/Service/RequestLogService.php'
+      - 'src/Stripe/Service/WebhookLogService.php'
     public: true
 
   # ===========================================
@@ -518,10 +512,15 @@ services:
 
   OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface:
     class: OxidEsales\Payments\Stripe\Service\RequestLogService
+    autowire: false
     arguments:
       $fileLogger: '@stripe.request_file_logger'
       $fallbackLogger: '@oxid_esales.monolog.logger'
     public: false
+
+  # Alias class name to interface for direct class type-hints
+  OxidEsales\Payments\Stripe\Service\RequestLogService:
+    alias: OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface
 
   # ==========================================
   # Webhook Log Service (Sprint 16)
@@ -539,9 +538,14 @@ services:
 
   OxidEsales\Payments\Stripe\Service\WebhookLogServiceInterface:
     class: OxidEsales\Payments\Stripe\Service\WebhookLogService
+    autowire: false
     arguments:
       $fileLogger: '@stripe.webhook_file_logger'
     public: false
+
+  # Alias class name to interface for direct class type-hints
+  OxidEsales\Payments\Stripe\Service\WebhookLogService:
+    alias: OxidEsales\Payments\Stripe\Service\WebhookLogServiceInterface
 
   # ==========================================
   # Capture Service (Sprint 9)
