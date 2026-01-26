@@ -12,21 +12,21 @@ namespace OxidEsales\Payments\Stripe\Service\Factory;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentComponent\Service\FileLogger;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
-use Symfony\Component\Filesystem\Path;
 
 /**
- * Factory for creating the reconciliation file logger.
+ * Factory for creating the request logging file logger.
  *
- * Gets the shop directory from OXID Registry to determine the log file path.
+ * Sprint 15: Logs API requests/responses to file instead of database.
+ * Logs to log/osc/stripe_requests.log
  *
- * @since Sprint 14
+ * @since 2.0.0
  */
-final class ReconciliationFileLoggerFactory
+final class RequestFileLoggerFactory
 {
-    private const LOG_FILE = 'log/osc/stripe_reconciliation.log';
+    private const LOG_FILE = 'log/osc/stripe_requests.log';
 
     /**
-     * Create the reconciliation file logger.
+     * Create the request file logger.
      *
      * @return FileLoggerInterface
      * @throws \RuntimeException If shop directory not configured
@@ -39,8 +39,8 @@ final class ReconciliationFileLoggerFactory
             throw new \RuntimeException('Shop directory not configured');
         }
 
-        $logFilePath = Path::join(rtrim($shopDir, '/'), self::LOG_FILE);
+        $logFilePath = rtrim($shopDir, '/') . '/' . self::LOG_FILE;
 
-        return new FileLogger($logFilePath, 'RECONCILE');
+        return new FileLogger($logFilePath, 'REQUEST');
     }
 }

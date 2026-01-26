@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
+use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCancelAuthorizationRequestHandler;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
 use OxidEsales\Payments\Stripe\DTO\CancellationResult;
@@ -17,6 +18,7 @@ use PHPUnit\Framework\TestCase;
  * Unit tests for StripeCancelAuthorizationRequestHandler.
  *
  * Sprint 11: Tests updated for refactored handler with CancelAuthorizationService injection.
+ * Sprint 20: Tests updated to include ShopAdapterInterface mock.
  *
  * Note: These tests focus on the handler's interface and event handling.
  * Business logic tests are in CancelAuthorizationServiceTest.
@@ -25,18 +27,22 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
 {
     private CancelAuthorizationServiceInterface&MockObject $cancelService;
     private RequestLogServiceInterface&MockObject $requestLogService;
+    private ShopAdapterInterface&MockObject $shopAdapter;
 
     protected function setUp(): void
     {
         $this->cancelService = $this->createMock(CancelAuthorizationServiceInterface::class);
         $this->requestLogService = $this->createMock(RequestLogServiceInterface::class);
+        $this->shopAdapter = $this->createMock(ShopAdapterInterface::class);
+        $this->shopAdapter->method('getShopId')->willReturn('1');
     }
 
     private function createHandler(): StripeCancelAuthorizationRequestHandler
     {
         return new StripeCancelAuthorizationRequestHandler(
             $this->cancelService,
-            $this->requestLogService
+            $this->requestLogService,
+            $this->shopAdapter
         );
     }
 

@@ -10,10 +10,12 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentComponent\Service\ServiceInterface;
-use Stripe\StripeClient;
+use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 
 /**
- * Validator for Stripe API configuration
+ * Validator for Stripe API configuration.
+ *
+ * Sprint 18: Refactored to use adapter instead of direct SDK.
  *
  * This service validates Stripe API credentials and configuration settings to ensure
  * the module is properly configured before processing payments.
@@ -25,13 +27,7 @@ use Stripe\StripeClient;
  * - Tests connection to Stripe API to verify credentials work
  * - Returns detailed validation errors for debugging
  *
- * Usage:
- * Called during module configuration in admin panel and before payment initialization
- * to prevent configuration errors that would cause runtime failures.
- *
- * @package OxidEsales\Payments\Stripe\Service
- * @author OXID eSales AG
- * @since 1.0.0
+ * @since 2.0.0
  */
 class ConfigurationValidator implements ServiceInterface
 {
@@ -39,8 +35,13 @@ class ConfigurationValidator implements ServiceInterface
     private const LIVE_KEY_PREFIX = 'sk_live_';
     private const WEBHOOK_SECRET_PREFIX = 'whsec_';
 
+    public function __construct(
+        private readonly StripeAdapterFactoryInterface $adapterFactory
+    ) {
+    }
+
     /**
-     * Validate complete module configuration
+     * Validate complete module configuration.
      *
      * @param bool $isTestMode Whether the module is in test mode
      * @param string $secretKey The Stripe secret key to validate
@@ -77,7 +78,7 @@ class ConfigurationValidator implements ServiceInterface
     }
 
     /**
-     * Validate API key format matches the expected mode
+     * Validate API key format matches the expected mode.
      *
      * @param string $apiKey The API key to validate
      * @param bool $isTestMode Whether test mode is enabled
@@ -90,18 +91,19 @@ class ConfigurationValidator implements ServiceInterface
     }
 
     /**
-     * Test connection to Stripe API
+     * Test connection to Stripe API using configured credentials.
      *
-     * @param string $secretKey The Stripe secret key to test
+     * Uses the adapter to verify API connectivity instead of creating
+     * a StripeClient directly.
+     *
      * @return bool True if connection successful, false otherwise
      */
-    public function testConnection(string $secretKey): bool
+    public function testConnection(): bool
     {
         try {
-            $stripe = new StripeClient($secretKey);
-            $stripe->balance->retrieve();
-            return true;
-        } catch (\Exception $e) {
+            $adapter = $this->adapterFactory->getStripeAdapter();
+            return $adapter->testConnection();
+        } catch (\Throwable $e) {
             return false;
         }
     }

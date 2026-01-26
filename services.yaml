@@ -205,6 +205,15 @@ services:
   OxidEsales\Payments\Stripe\Adapter\OxidShopAdapter:
     alias: OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface
 
+  # Session Adapter Interface - Sprint 20: Abstracts session access for unit testing
+  OxidEsales\Payments\Stripe\Adapter\SessionAdapterInterface:
+    class: OxidEsales\Payments\Stripe\Adapter\OxidSessionAdapter
+    public: false
+
+  # OXID Session Adapter - OXID eShop specific implementation
+  OxidEsales\Payments\Stripe\Adapter\OxidSessionAdapter:
+    alias: OxidEsales\Payments\Stripe\Adapter\SessionAdapterInterface
+
   # ==========================================
   # Shop Order Service (Order Operations)
   # ==========================================
@@ -350,6 +359,7 @@ services:
       $checkoutSessionService: '@OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface'
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
       $tokenService: '@OxidEsales\PaymentComponent\Service\TokenServiceInterface'
+      $shopAdapter: '@OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface'
       $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler, priority: 0 }
@@ -399,6 +409,7 @@ services:
       $securityValidator: '@OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface'
       $deliveryAddressHashService: '@OxidEsales\Payments\Stripe\Service\DeliveryAddressHashServiceInterface'
       $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
+      $sessionAdapter: '@OxidEsales\Payments\Stripe\Adapter\SessionAdapterInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
     tags:
@@ -431,6 +442,8 @@ services:
       $shopOrderService: '@OxidEsales\PaymentComponent\Adapter\ShopOrderServiceInterface'
       $orderPaymentStateService: '@OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface'
       $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
+      $sessionAdapter: '@OxidEsales\Payments\Stripe\Adapter\SessionAdapterInterface'
+      $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler, priority: 80 }
@@ -445,6 +458,7 @@ services:
       $captureService: '@OxidEsales\Payments\Stripe\Service\CaptureServiceInterface'
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
       $requestLogService: '@OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface'
+      $shopAdapter: '@OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
     tags:
@@ -459,6 +473,7 @@ services:
     arguments:
       $cancelService: '@OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface'
       $requestLogService: '@OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface'
+      $shopAdapter: '@OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
     tags:
@@ -488,15 +503,44 @@ services:
     public: false
 
   # ==========================================
-  # Request Log Service (Sprint 8)
+  # Request Log Service (Sprint 8, refactored Sprint 15)
   # ==========================================
-  # Facade pattern wrapping legacy RequestLog model.
-  # Centralizes logging, can swap implementation later.
+  # Sprint 15: Refactored to use file-based logging instead of database.
+  # Logs to log/osc/stripe_requests.log
+
+  # Request file logger factory
+  OxidEsales\Payments\Stripe\Service\Factory\RequestFileLoggerFactory: ~
+
+  # Request file logger instance (created by factory)
+  stripe.request_file_logger:
+    class: OxidEsales\PaymentComponent\Service\FileLoggerInterface
+    factory: ['@OxidEsales\Payments\Stripe\Service\Factory\RequestFileLoggerFactory', 'create']
 
   OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface:
     class: OxidEsales\Payments\Stripe\Service\RequestLogService
     arguments:
-      $logger: '@oxid_esales.monolog.logger'
+      $fileLogger: '@stripe.request_file_logger'
+      $fallbackLogger: '@oxid_esales.monolog.logger'
+    public: false
+
+  # ==========================================
+  # Webhook Log Service (Sprint 16)
+  # ==========================================
+  # Sprint 16: Extracted from WebhookController for SRP compliance.
+  # Logs to log/osc/stripe_webhooks.log
+
+  # Webhook file logger factory
+  OxidEsales\Payments\Stripe\Service\Factory\WebhookFileLoggerFactory: ~
+
+  # Webhook file logger instance (created by factory)
+  stripe.webhook_file_logger:
+    class: OxidEsales\PaymentComponent\Service\FileLoggerInterface
+    factory: ['@OxidEsales\Payments\Stripe\Service\Factory\WebhookFileLoggerFactory', 'create']
+
+  OxidEsales\Payments\Stripe\Service\WebhookLogServiceInterface:
+    class: OxidEsales\Payments\Stripe\Service\WebhookLogService
+    arguments:
+      $fileLogger: '@stripe.webhook_file_logger'
     public: false
 
   # ==========================================
@@ -596,6 +640,7 @@ services:
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
       $orderRefundUpdateService: '@OxidEsales\Payments\Stripe\Service\OrderRefundUpdateServiceInterface'
       $requestLogService: '@OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface'
+      $shopAdapter: '@OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
     tags:

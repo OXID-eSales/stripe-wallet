@@ -755,6 +755,31 @@ final class StripeAdapter implements StripeAdapterInterface
         }
     }
 
+    /**
+     * @inheritDoc
+     */
+    public function retrieveCharge(string $chargeId): \Stripe\Charge
+    {
+        try {
+            return $this->stripeClient->charges->retrieve($chargeId);
+        } catch (ApiErrorException $e) {
+            throw $this->convertStripeException($e);
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function testConnection(): bool
+    {
+        try {
+            $this->stripeClient->balance->retrieve();
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     // ==========================================
     // PRIVATE HELPER METHODS
     // ==========================================

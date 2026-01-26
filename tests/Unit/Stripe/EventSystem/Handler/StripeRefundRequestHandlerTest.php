@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
+use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeRefundRequestHandler;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
@@ -19,6 +20,7 @@ use Psr\Log\LoggerInterface;
  * Unit tests for StripeRefundRequestHandler.
  *
  * Sprint 21: Tests updated for refactored handler with RefundService injection.
+ * Sprint 20: Tests updated to include ShopAdapterInterface mock.
  *
  * Note: These tests focus on the handler's interface and event handling.
  * Business logic tests are in RefundServiceTest.
@@ -30,6 +32,7 @@ class StripeRefundRequestHandlerTest extends TestCase
     private ContractRepositoryInterface&MockObject $contractRepository;
     private OrderRefundUpdateServiceInterface&MockObject $orderRefundUpdateService;
     private RequestLogServiceInterface&MockObject $requestLogService;
+    private ShopAdapterInterface&MockObject $shopAdapter;
     private LoggerInterface&MockObject $logger;
 
     protected function setUp(): void
@@ -38,6 +41,8 @@ class StripeRefundRequestHandlerTest extends TestCase
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->orderRefundUpdateService = $this->createMock(OrderRefundUpdateServiceInterface::class);
         $this->requestLogService = $this->createMock(RequestLogServiceInterface::class);
+        $this->shopAdapter = $this->createMock(ShopAdapterInterface::class);
+        $this->shopAdapter->method('getShopId')->willReturn('1');
         $this->logger = $this->createMock(LoggerInterface::class);
     }
 
@@ -48,6 +53,7 @@ class StripeRefundRequestHandlerTest extends TestCase
             $this->contractRepository,
             $this->orderRefundUpdateService,
             $this->requestLogService,
+            $this->shopAdapter,
             $this->logger
         );
     }

@@ -35,16 +35,6 @@ interface StripeAdapterFactoryInterface extends PaymentAdapterFactoryInterface
     public function getStripeAdapter(): StripeAdapterInterface;
 
     /**
-     * Get Stripe SDK client for direct API access.
-     *
-     * @deprecated Use getStripeAdapter() instead for better testability and DIP compliance.
-     *
-     * @return StripeClient
-     * @throws \RuntimeException If Stripe API key is not configured
-     */
-    public function getStripeClient(): StripeClient;
-
-    /**
      * Check if Stripe is in test mode.
      *
      * @return bool

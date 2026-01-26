@@ -26,7 +26,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class WebhookEndpointE2ETest extends TestCase
 {
-    private const WEBHOOK_PATH = 'index.php?cl=osc_stripe_webhook';
+    private const WEBHOOK_PATH = 'index.php?cl=oe_stripe_webhook';
 
     private string $webhookUrl;
 

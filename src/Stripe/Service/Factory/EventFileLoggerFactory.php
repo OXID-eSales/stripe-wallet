@@ -12,6 +12,7 @@ namespace OxidEsales\Payments\Stripe\Service\Factory;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentComponent\Service\FileLogger;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
+use Symfony\Component\Filesystem\Path;
 
 /**
  * Factory for creating the event system file logger.
@@ -27,22 +28,20 @@ final class EventFileLoggerFactory
 
     /**
      * Create the event file logger.
+     *
+     * @return FileLoggerInterface
+     * @throws \RuntimeException If shop directory not configured
      */
     public function create(): FileLoggerInterface
     {
-        $shopDir = $this->getShopDir();
-        $logFilePath = rtrim($shopDir, '/') . '/' . self::LOG_FILE;
+        $shopDir = Registry::getConfig()->getConfigParam('sShopDir');
+
+        if (!is_string($shopDir)) {
+            throw new \RuntimeException('Shop directory not configured');
+        }
+
+        $logFilePath = Path::join(rtrim($shopDir, '/'), self::LOG_FILE);
 
         return new FileLogger($logFilePath, 'EVENT');
-    }
-
-    /**
-     * Get the shop directory path.
-     */
-    private function getShopDir(): string
-    {
-        /** @var string $shopDir */
-        $shopDir = Registry::getConfig()->getConfigParam('sShopDir');
-        return $shopDir;
     }
 }

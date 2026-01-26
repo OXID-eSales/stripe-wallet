@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
 use OxidEsales\Eshop\Application\Model\Order;
+use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
@@ -41,6 +42,7 @@ class StripeRefundRequestHandler implements HandlerInterface
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly OrderRefundUpdateServiceInterface $orderRefundUpdateService,
         private readonly RequestLogServiceInterface $requestLogService,
+        private readonly ShopAdapterInterface $shopAdapter,
         ?LoggerInterface $logger = null,
         private readonly ?FileLoggerInterface $eventLogger = null
     ) {
@@ -267,7 +269,7 @@ class StripeRefundRequestHandler implements HandlerInterface
                 'currency' => $result->getCurrency(),
             ],
             referenceId: (string) $order->getId(),
-            shopId: (int) \OxidEsales\Eshop\Core\Registry::getConfig()->getShopId()
+            shopId: (int) $this->shopAdapter->getShopId()
         );
     }
 
@@ -318,7 +320,7 @@ class StripeRefundRequestHandler implements HandlerInterface
             action: 'refund',
             exception: $e,
             referenceId: $orderId,
-            shopId: (int) \OxidEsales\Eshop\Core\Registry::getConfig()->getShopId()
+            shopId: (int) $this->shopAdapter->getShopId()
         );
     }
 

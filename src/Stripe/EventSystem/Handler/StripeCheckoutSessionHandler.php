@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
+use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
@@ -34,6 +35,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         private readonly CheckoutSessionServiceInterface $checkoutSessionService,
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly TokenServiceInterface $tokenService,
+        private readonly ShopAdapterInterface $shopAdapter,
         private readonly ?FileLoggerInterface $eventLogger = null
     ) {
     }
@@ -78,7 +80,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         }
 
         // Build URLs with contract ID and secure token
-        $defaultShopUrl = \OxidEsales\EshopCommunity\Core\Registry::getConfig()->getShopUrl();
+        $defaultShopUrl = $this->shopAdapter->getShopUrl();
         $shopUrl = $context->get('shopUrl', $defaultShopUrl);
         if (!is_string($shopUrl)) {
             $shopUrl = $defaultShopUrl;

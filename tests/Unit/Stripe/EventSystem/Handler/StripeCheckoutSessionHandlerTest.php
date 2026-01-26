@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
+use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
@@ -21,6 +22,7 @@ use RuntimeException;
  * Unit tests for StripeCheckoutSessionHandler.
  *
  * Sprint 21: Refactored tests for handler with CheckoutSessionService delegation.
+ * Sprint 20: Tests updated to include ShopAdapterInterface mock.
  *
  * @covers \OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler
  */
@@ -29,12 +31,16 @@ class StripeCheckoutSessionHandlerTest extends TestCase
     private CheckoutSessionServiceInterface&MockObject $checkoutSessionService;
     private ContractRepositoryInterface&MockObject $contractRepository;
     private TokenServiceInterface&MockObject $tokenService;
+    private ShopAdapterInterface&MockObject $shopAdapter;
 
     protected function setUp(): void
     {
         $this->checkoutSessionService = $this->createMock(CheckoutSessionServiceInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->tokenService = $this->createMock(TokenServiceInterface::class);
+        $this->shopAdapter = $this->createMock(ShopAdapterInterface::class);
+        $this->shopAdapter->method('getShopId')->willReturn('1');
+        $this->shopAdapter->method('getShopUrl')->willReturn('https://shop.example.com/');
 
         // Default token generation behavior
         $this->tokenService
@@ -57,7 +63,8 @@ class StripeCheckoutSessionHandlerTest extends TestCase
         return new StripeCheckoutSessionHandler(
             $this->checkoutSessionService,
             $this->contractRepository,
-            $this->tokenService
+            $this->tokenService,
+            $this->shopAdapter
         );
     }
 

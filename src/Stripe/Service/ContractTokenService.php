@@ -24,7 +24,8 @@ final class ContractTokenService implements TokenServiceInterface
 {
     private const TOKEN_SEPARATOR = ':';
     private const HASH_ALGORITHM = 'sha256';
-    private const TOKEN_SALT = 'osc_stripe_contract_token_v1';
+    private const TOKEN_SALT = 'oe_stripe_contract_token_v1';
+    private const TOKEN_SECRET = 'oe_stripe_contract_token_secret';
 
     private readonly string $secret;
 
@@ -41,7 +42,7 @@ final class ContractTokenService implements TokenServiceInterface
         }
         if (empty($apiSecret)) {
             // Last resort: use a default (less secure but prevents fatal errors)
-            $apiSecret = 'osc_stripe_default_token_secret';
+            $apiSecret = self::TOKEN_SECRET;
         }
         $this->secret = hash_hmac(self::HASH_ALGORITHM, self::TOKEN_SALT, $apiSecret);
     }

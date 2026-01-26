@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
 use DateTimeImmutable;
+use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentComponent\Contract\ContractState;
 use OxidEsales\PaymentComponent\Contract\PaymentContract;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
@@ -22,6 +23,7 @@ use Psr\Log\NullLogger;
  * Unit tests for StripeCaptureRequestHandler.
  *
  * Sprint 9: Tests updated to use CaptureServiceInterface instead of StripeAdapterInterface.
+ * Sprint 20: Tests updated to include ShopAdapterInterface mock.
  * Handler now delegates capture execution to CaptureService.
  */
 class StripeCaptureRequestHandlerTest extends TestCase
@@ -29,6 +31,7 @@ class StripeCaptureRequestHandlerTest extends TestCase
     private CaptureServiceInterface&MockObject $captureService;
     private ContractRepositoryInterface&MockObject $contractRepository;
     private RequestLogServiceInterface&MockObject $requestLogService;
+    private ShopAdapterInterface&MockObject $shopAdapter;
     private StripeCaptureRequestHandler $handler;
 
     protected function setUp(): void
@@ -38,11 +41,14 @@ class StripeCaptureRequestHandlerTest extends TestCase
         $this->captureService = $this->createMock(CaptureServiceInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->requestLogService = $this->createMock(RequestLogServiceInterface::class);
+        $this->shopAdapter = $this->createMock(ShopAdapterInterface::class);
+        $this->shopAdapter->method('getShopId')->willReturn('1');
 
         $this->handler = new StripeCaptureRequestHandler(
             $this->captureService,
             $this->contractRepository,
             $this->requestLogService,
+            $this->shopAdapter,
             new NullLogger()
         );
     }

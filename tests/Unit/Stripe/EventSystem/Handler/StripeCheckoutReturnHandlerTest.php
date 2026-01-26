@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
+use OxidEsales\Payments\Stripe\Adapter\SessionAdapterInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
 use OxidEsales\Payments\Stripe\Service\Result\SecurityValidationResult;
@@ -31,6 +32,7 @@ use Psr\Log\LoggerInterface;
  *
  * Sprint 21: Tests updated for refactored handler with CheckoutReturnService injection.
  * Sprint 22: EventDispatcher now injected via constructor (no ContainerFactory).
+ * Sprint 20: Tests updated to include SessionAdapterInterface mock.
  */
 class StripeCheckoutReturnHandlerTest extends TestCase
 {
@@ -38,6 +40,7 @@ class StripeCheckoutReturnHandlerTest extends TestCase
     private ContractRepositoryInterface&MockObject $contractRepository;
     private ReturnSecurityValidatorInterface&MockObject $securityValidator;
     private DeliveryAddressHashServiceInterface&MockObject $deliveryAddressHashService;
+    private SessionAdapterInterface&MockObject $sessionAdapter;
     private LoggerInterface&MockObject $logger;
     private EventDispatcherInterface&MockObject $eventDispatcher;
 
@@ -47,6 +50,7 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->securityValidator = $this->createMock(ReturnSecurityValidatorInterface::class);
         $this->deliveryAddressHashService = $this->createMock(DeliveryAddressHashServiceInterface::class);
+        $this->sessionAdapter = $this->createMock(SessionAdapterInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
 
@@ -81,6 +85,7 @@ class StripeCheckoutReturnHandlerTest extends TestCase
             $this->securityValidator,
             $this->deliveryAddressHashService,
             $this->eventDispatcher,
+            $this->sessionAdapter,
             $this->logger
         );
     }

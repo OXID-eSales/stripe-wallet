@@ -70,7 +70,7 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
 
         // Manually instantiate WebhookProcessingService with its dependencies
         // to avoid DI container caching issues in CI
-        $this->webhookService = $this->createWebhookProcessingService($container);
+        $this->webhookService = $this->createWebhookProcessingService();
     }
 
     /**
@@ -79,7 +79,7 @@ final class OxpaidWebhookUpdateTest extends IntegrationTestCase
      *
      * Sprint 18: Updated to use ContractFulfillmentService
      */
-    private function createWebhookProcessingService($container): WebhookProcessingService
+    private function createWebhookProcessingService(): WebhookProcessingService
     {
         // Direct instantiation for repositories (CI compatibility)
         $contractRepository = new DoctrineContractRepository($this->connection);

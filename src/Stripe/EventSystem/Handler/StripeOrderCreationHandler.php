@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
-use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentComponent\Adapter\Request\CreateOrderRequest;
 use OxidEsales\PaymentComponent\Adapter\ShopOrderServiceInterface;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
@@ -14,6 +13,9 @@ use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
+use OxidEsales\Payments\Stripe\Adapter\SessionAdapterInterface;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * Creates OXID orders when contract is ready to commit.
@@ -35,13 +37,18 @@ use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
  */
 class StripeOrderCreationHandler implements HandlerInterface
 {
+    private LoggerInterface $logger;
+
     public function __construct(
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ShopOrderServiceInterface $shopOrderService,
         private readonly OrderPaymentStateServiceInterface $orderPaymentStateService,
         private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly SessionAdapterInterface $sessionAdapter,
+        ?LoggerInterface $logger = null,
         private readonly ?FileLoggerInterface $eventLogger = null
     ) {
+        $this->logger = $logger ?? new NullLogger();
     }
 
     public static function getHandledEventClass(): string
@@ -98,7 +105,7 @@ class StripeOrderCreationHandler implements HandlerInterface
     {
         if (!$contract->getState()->isReadyToCommit()) {
             $this->logEvent('StripeOrderCreationHandler: ERROR - Contract not ready to commit');
-            Registry::getLogger()->warning('StripeOrderCreationHandler: Contract not ready to commit', [
+            $this->logger->warning('StripeOrderCreationHandler: Contract not ready to commit', [
                 'contract_id' => $contract->getId(),
                 'state' => $contract->getStateValue(),
             ]);
@@ -107,7 +114,7 @@ class StripeOrderCreationHandler implements HandlerInterface
 
         if (!$contract->areAllConditionsFulfilled()) {
             $this->logEvent('StripeOrderCreationHandler: ERROR - Not all conditions fulfilled');
-            Registry::getLogger()->warning('StripeOrderCreationHandler: Not all conditions fulfilled', [
+            $this->logger->warning('StripeOrderCreationHandler: Not all conditions fulfilled', [
                 'contract_id' => $contract->getId(),
             ]);
             return false;
@@ -119,25 +126,25 @@ class StripeOrderCreationHandler implements HandlerInterface
     private function validateAndGetBasket(
         \OxidEsales\PaymentComponent\EventSystem\Event\EventContextInterface $context
     ): ?\OxidEsales\Eshop\Application\Model\Basket {
-        $basket = Registry::getSession()->getBasket();
+        $basket = $this->sessionAdapter->getBasket();
         $basketProductsCount = $basket !== null ? $basket->getProductsCount() : 0;
         $this->logEvent('StripeOrderCreationHandler: Checking basket', [
             'basketExists' => $basket !== null,
             'basketProductsCount' => $basketProductsCount,
-            'sessionId' => Registry::getSession()->getId(),
+            'sessionId' => $this->sessionAdapter->getSessionId(),
         ]);
 
         /** @phpstan-ignore-next-line booleanNot.alwaysFalse - basket could be empty in edge cases */
         if (!$basket) {
             $this->logEvent('StripeOrderCreationHandler: ERROR - No basket in session');
-            Registry::getLogger()->error('StripeOrderCreationHandler: No basket in session');
+            $this->logger->error('StripeOrderCreationHandler: No basket in session');
             $context->set('error', 'No basket found in session');
             return null;
         }
 
         if ($basket->getProductsCount() === 0) {
             $this->logEvent('StripeOrderCreationHandler: ERROR - Basket is empty (0 products)');
-            Registry::getLogger()->error('StripeOrderCreationHandler: Basket is empty');
+            $this->logger->error('StripeOrderCreationHandler: Basket is empty');
             $context->set('error', 'Basket is empty');
             return null;
         }
@@ -165,7 +172,7 @@ class StripeOrderCreationHandler implements HandlerInterface
         ]);
 
         $request = new CreateOrderRequest(
-            sessionId: Registry::getSession()->getId(),
+            sessionId: $this->sessionAdapter->getSessionId(),
             userId: $contract->getUserId(),
             paymentId: $paymentId,
             paymentTransactionId: $paymentTransactionId,
@@ -182,7 +189,7 @@ class StripeOrderCreationHandler implements HandlerInterface
             'orderNumber' => $orderResponse->orderNumber,
         ]);
 
-        Registry::getLogger()->info('StripeOrderCreationHandler: Order created', [
+        $this->logger->info('StripeOrderCreationHandler: Order created', [
             'order_id' => $orderResponse->orderId,
             'order_number' => $orderResponse->orderNumber,
             'contract_id' => $contract->getId(),
@@ -297,7 +304,7 @@ class StripeOrderCreationHandler implements HandlerInterface
             'error' => $e->getMessage(),
             'class' => get_class($e),
         ]);
-        Registry::getLogger()->error('StripeOrderCreationHandler: Order creation failed', [
+        $this->logger->error('StripeOrderCreationHandler: Order creation failed', [
             'contract_id' => $contract->getId(),
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString(),
@@ -322,7 +329,7 @@ class StripeOrderCreationHandler implements HandlerInterface
         );
 
         if ($updated) {
-            Registry::getLogger()->info('OXPAID updated in order creation flow', [
+            $this->logger->info('OXPAID updated in order creation flow', [
                 'order_id' => $orderId,
                 'provider_order_id' => $providerOrderId,
             ]);

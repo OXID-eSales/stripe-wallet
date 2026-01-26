@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
-use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\Eshop\Core\Session;
 use OxidEsales\PaymentComponent\Contract\PaymentContract;
 use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
@@ -13,6 +11,7 @@ use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Contract\SecurityValidationResultInterface;
 use OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface;
+use OxidEsales\Payments\Stripe\Adapter\SessionAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutReturnServiceInterface;
 use OxidEsales\Payments\Stripe\DTO\CheckoutReturnResult;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
@@ -31,6 +30,7 @@ use PHPUnit\Framework\TestCase;
  *
  * Sprint 21: Updated for refactored handler with CheckoutReturnServiceInterface.
  * Sprint 22: EventDispatcher now injected via constructor (no ContainerFactory).
+ * Sprint 20: Tests updated to include SessionAdapterInterface mock.
  *
  * These tests verify that the delivery address hash is properly restored
  * to the session when returning from Stripe checkout.
@@ -41,8 +41,8 @@ class AddressHashRestorationTest extends TestCase
     private ContractRepositoryInterface&MockObject $contractRepository;
     private ReturnSecurityValidatorInterface&MockObject $securityValidator;
     private DeliveryAddressHashServiceInterface&MockObject $deliveryAddressHashService;
+    private SessionAdapterInterface&MockObject $sessionAdapter;
     private EventDispatcherInterface&MockObject $eventDispatcher;
-    private Session&MockObject $session;
 
     protected function setUp(): void
     {
@@ -50,8 +50,8 @@ class AddressHashRestorationTest extends TestCase
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->securityValidator = $this->createMock(ReturnSecurityValidatorInterface::class);
         $this->deliveryAddressHashService = $this->createMock(DeliveryAddressHashServiceInterface::class);
+        $this->sessionAdapter = $this->createMock(SessionAdapterInterface::class);
         $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $this->session = $this->createMock(Session::class);
 
         // Default: security validation passes
         $securityResult = $this->createMock(SecurityValidationResultInterface::class);
@@ -71,12 +71,15 @@ class AddressHashRestorationTest extends TestCase
             $this->contractRepository,
             $this->securityValidator,
             $this->deliveryAddressHashService,
-            $this->eventDispatcher
+            $this->eventDispatcher,
+            $this->sessionAdapter
         );
     }
 
     /**
      * Test 1: Address hash is restored to session from contract metadata.
+     *
+     * Sprint 20: Updated to use SessionAdapterInterface mock instead of Registry::getSession().
      */
     public function testAddressHashRestoredToSessionFromContract(): void
     {
@@ -111,13 +114,11 @@ class AddressHashRestorationTest extends TestCase
             ->with($contractId)
             ->willReturn($contract);
 
-        // Expect session variable to be set
-        $this->session
+        // Sprint 20: Expect sessionAdapter->setVariable to be called (not Registry::getSession())
+        $this->sessionAdapter
             ->expects($this->atLeastOnce())
             ->method('setVariable')
             ->with('sDelAddrMD5', $storedHash);
-
-        Registry::set(Session::class, $this->session);
 
         $context = new EventContext([
             'checkoutSessionId' => 'cs_test_123',
@@ -135,6 +136,8 @@ class AddressHashRestorationTest extends TestCase
 
     /**
      * Test 2: Delivery address ID is also restored to session.
+     *
+     * Sprint 20: Updated to use SessionAdapterInterface mock instead of Registry::getSession().
      */
     public function testDeliveryAddressIdRestoredToSession(): void
     {
@@ -168,16 +171,14 @@ class AddressHashRestorationTest extends TestCase
             ->with($contractId)
             ->willReturn($contract);
 
-        // Expect both session variables to be set
+        // Sprint 20: Track session adapter calls
         $setVariableCalls = [];
-        $this->session
+        $this->sessionAdapter
             ->expects($this->atLeast(2))
             ->method('setVariable')
             ->willReturnCallback(function ($key, $value) use (&$setVariableCalls) {
                 $setVariableCalls[$key] = $value;
             });
-
-        Registry::set(Session::class, $this->session);
 
         $context = new EventContext([
             'checkoutSessionId' => 'cs_test_456',
@@ -199,6 +200,8 @@ class AddressHashRestorationTest extends TestCase
 
     /**
      * Test 3: Handler proceeds without error when no hash stored.
+     *
+     * Sprint 20: Updated to use SessionAdapterInterface mock instead of Registry::getSession().
      */
     public function testHandlerProceedsWhenNoHashStored(): void
     {
@@ -229,13 +232,11 @@ class AddressHashRestorationTest extends TestCase
             ->with($contractId)
             ->willReturn($contract);
 
-        // Session setVariable should NOT be called for sDelAddrMD5
-        $this->session
+        // Sprint 20: Session adapter setVariable should NOT be called for sDelAddrMD5
+        $this->sessionAdapter
             ->expects($this->never())
             ->method('setVariable')
             ->with('sDelAddrMD5', $this->anything());
-
-        Registry::set(Session::class, $this->session);
 
         $context = new EventContext([
             'checkoutSessionId' => 'cs_test_no_hash',
@@ -256,6 +257,7 @@ class AddressHashRestorationTest extends TestCase
      * Test 4: Address hash restored BEFORE PaymentAuthorizedEvent is dispatched.
      *
      * Sprint 17: Fixed false-positive test - explicit assertions at test level
+     * Sprint 20: Updated to use SessionAdapterInterface mock instead of Registry::getSession().
      */
     public function testAddressHashRestoredBeforePaymentEvent(): void
     {
@@ -288,8 +290,8 @@ class AddressHashRestorationTest extends TestCase
             ->method('findById')
             ->willReturn($contract);
 
-        // Track when hash is restored vs when event is dispatched
-        $this->session
+        // Sprint 20: Track when hash is restored via sessionAdapter
+        $this->sessionAdapter
             ->method('setVariable')
             ->willReturnCallback(function ($key, $value) use (&$hashRestoredBeforeDispatch, $storedHash) {
                 if ($key === 'sDelAddrMD5' && $value === $storedHash) {
@@ -306,8 +308,6 @@ class AddressHashRestorationTest extends TestCase
                 $hashStateAtDispatch = $hashRestoredBeforeDispatch;
                 return $event;
             });
-
-        Registry::set(Session::class, $this->session);
 
         $context = new EventContext([
             'checkoutSessionId' => 'cs_timing',

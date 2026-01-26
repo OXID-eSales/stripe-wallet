@@ -15,6 +15,7 @@ use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
+use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
@@ -847,7 +848,7 @@ class OrderRefund extends AdminDetailsController
                     return null;
                 }
                 Registry::getLogger()->debug('OrderRefund: Retrieving PaymentIntent', ['transId' => $transId]);
-                $this->_oStripeApiOrder = $this->getStripeApiRequestModel()->paymentIntents->retrieve($transId);
+                $this->_oStripeApiOrder = $this->getStripeApiRequestModel()->retrievePaymentIntent($transId);
                 Registry::getLogger()->debug('OrderRefund: PaymentIntent retrieved', [
                     'id' => $this->_oStripeApiOrder->id ?? 'N/A',
                     'status' => $this->_oStripeApiOrder->status ?? 'N/A',
@@ -881,9 +882,9 @@ class OrderRefund extends AdminDetailsController
                     return null;
                 }
 
-                $sLastChargeId = $oApiOrder ? ($oApiOrder->latest_charge ?? null) : null;
+                $latestCharge = $oApiOrder ? ($oApiOrder->latest_charge ?? null) : null;
 
-                if (!$sLastChargeId) {
+                if (!$latestCharge) {
                     $oOrder = $this->getOrder();
                     $transId = $oOrder ? ($oOrder->oxorder__oxtransid->value ?? 'N/A') : 'N/A';
                     $this->stripeApiError = "PaymentIntent has no charge (transId: $transId)";
@@ -894,8 +895,16 @@ class OrderRefund extends AdminDetailsController
                     return null;
                 }
 
-                Registry::getLogger()->debug('OrderRefund: Retrieving Charge', ['chargeId' => $sLastChargeId]);
-                $this->_oStripeApiCharge = $this->getStripeApiRequestModel()->charges->retrieve($sLastChargeId);
+                // latest_charge can be string (ID) or Charge object (if expanded)
+                if ($latestCharge instanceof Charge) {
+                    $this->_oStripeApiCharge = $latestCharge;
+                    Registry::getLogger()->debug('OrderRefund: Using expanded Charge', [
+                        'chargeId' => $latestCharge->id,
+                    ]);
+                } else {
+                    Registry::getLogger()->debug('OrderRefund: Retrieving Charge', ['chargeId' => $latestCharge]);
+                    $this->_oStripeApiCharge = $this->getStripeApiRequestModel()->retrieveCharge($latestCharge);
+                }
                 Registry::getLogger()->debug('OrderRefund: Charge retrieved', [
                     'chargeId' => $this->_oStripeApiCharge->id ?? 'N/A',
                     'amount' => $this->_oStripeApiCharge->amount ?? 0,
@@ -913,18 +922,13 @@ class OrderRefund extends AdminDetailsController
         }
     }
 
-    /**
-     * Returns Stripe API client
-     *
-     * @return \Stripe\StripeClient
-     */
-    protected function getStripeApiRequestModel()
+    protected function getStripeApiRequestModel(): StripeAdapterInterface
     {
         /** @var StripeAdapterFactoryInterface $factory */
         $factory = ContainerFactory::getInstance()
             ->getContainer()
             ->get(StripeAdapterFactoryInterface::class);
 
-        return $factory->getStripeClient();
+        return $factory->getStripeAdapter();
     }
 }

@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Adapter;
 
 use OxidEsales\PaymentComponent\Adapter\PaymentAdapterInterface;
+use Stripe\Charge;
 use Stripe\Checkout\Session;
 use Stripe\PaymentIntent;
 use Stripe\Refund;
@@ -100,4 +101,25 @@ interface StripeAdapterInterface extends PaymentAdapterInterface
      * @return float|null Risk score (0.0-1.0) or null if not available
      */
     public function getPaymentIntentRiskScore(string $paymentIntentId): ?float;
+
+    /**
+     * Retrieve a Stripe Charge.
+     *
+     * Sprint 14: Used by OrderRefund controller to get charge details.
+     *
+     * @param string $chargeId Stripe Charge ID (ch_xxx)
+     * @return Charge Stripe Charge object
+     * @throws \OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException On API errors
+     */
+    public function retrieveCharge(string $chargeId): Charge;
+
+    /**
+     * Test API connectivity by retrieving account balance.
+     *
+     * Sprint 18: Used by ConfigurationValidator to verify API keys are valid.
+     * This method catches all exceptions and returns false instead of throwing.
+     *
+     * @return bool True if API connection successful, false otherwise
+     */
+    public function testConnection(): bool;
 }

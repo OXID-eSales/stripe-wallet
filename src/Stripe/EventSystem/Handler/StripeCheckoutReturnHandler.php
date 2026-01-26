@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
-use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
@@ -12,6 +11,7 @@ use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\Event\Payment\PaymentAuthorizedEvent;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface;
+use OxidEsales\Payments\Stripe\Adapter\SessionAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutReturnServiceInterface;
 use OxidEsales\Payments\Stripe\Service\DeliveryAddressHashServiceInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
@@ -48,6 +48,7 @@ class StripeCheckoutReturnHandler implements HandlerInterface
         private readonly ReturnSecurityValidatorInterface $securityValidator,
         private readonly DeliveryAddressHashServiceInterface $deliveryAddressHashService,
         private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly SessionAdapterInterface $sessionAdapter,
         ?LoggerInterface $logger = null,
         ?FileLoggerInterface $eventLogger = null
     ) {
@@ -233,17 +234,15 @@ class StripeCheckoutReturnHandler implements HandlerInterface
 
     private function restoreDeliveryAddressHash(PaymentContractInterface $contract, EventContext $context): void
     {
-        $session = Registry::getSession();
-
         $deliveryHash = $contract->getMetadata('delivery_address_hash');
         if ($deliveryHash !== null && is_string($deliveryHash)) {
             $this->deliveryAddressHashService->restoreHashForValidation($deliveryHash);
-            $session->setVariable('sDelAddrMD5', $deliveryHash);
+            $this->sessionAdapter->setVariable('sDelAddrMD5', $deliveryHash);
         }
 
         $deliveryId = $contract->getMetadata('delivery_address_id');
         if ($deliveryId !== null && is_string($deliveryId)) {
-            $session->setVariable('deladrid', $deliveryId);
+            $this->sessionAdapter->setVariable('deladrid', $deliveryId);
             $context->set('restoredDeliveryAddressId', $deliveryId);
         }
     }

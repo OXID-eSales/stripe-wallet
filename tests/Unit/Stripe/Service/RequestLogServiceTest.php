@@ -4,51 +4,56 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Tests\Unit\Stripe\Service;
 
+use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\Service\RequestLogService;
 use OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 
 /**
  * Unit tests for RequestLogService.
  *
- * Sprint 8: Facade pattern wrapping legacy RequestLog model.
+ * Sprint 15: Refactored to use FileLoggerInterface instead of database model.
+ * Sprint 20: Tests updated for refactored service.
  *
  * @covers \OxidEsales\Payments\Stripe\Service\RequestLogService
  */
 class RequestLogServiceTest extends TestCase
 {
-    private LoggerInterface&MockObject $logger;
+    private FileLoggerInterface&MockObject $fileLogger;
+    private LoggerInterface&MockObject $fallbackLogger;
 
     protected function setUp(): void
     {
-        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->fileLogger = $this->createMock(FileLoggerInterface::class);
+        $this->fallbackLogger = $this->createMock(LoggerInterface::class);
     }
 
     public function testImplementsInterface(): void
     {
-        $service = new RequestLogService(new NullLogger());
+        $service = new RequestLogService($this->fileLogger);
 
         $this->assertInstanceOf(RequestLogServiceInterface::class, $service);
     }
 
-    public function testCanBeConstructedWithNullLogger(): void
-    {
-        // Should not throw - NullLogger is used by default
-        $service = new RequestLogService();
-
-        $this->assertInstanceOf(RequestLogService::class, $service);
-    }
-
     public function testLogRequestDoesNotThrowOnSuccess(): void
     {
-        $mockRequestLog = $this->createMockRequestLog();
-        $mockRequestLog->expects($this->once())
-            ->method('logRequest');
+        $this->fileLogger->expects($this->once())
+            ->method('log')
+            ->with(
+                'capture',
+                $this->callback(function (array $context) {
+                    return isset($context['reference_id'])
+                        && $context['reference_id'] === 'order_123'
+                        && isset($context['shop_id'])
+                        && $context['shop_id'] === 1
+                        && isset($context['request'])
+                        && isset($context['response']);
+                })
+            );
 
-        $service = new RequestLogService(new NullLogger(), fn () => $mockRequestLog);
+        $service = new RequestLogService($this->fileLogger);
 
         // Act & Assert - no exception thrown
         $service->logRequest(
@@ -64,11 +69,19 @@ class RequestLogServiceTest extends TestCase
 
     public function testLogExceptionDoesNotThrowOnSuccess(): void
     {
-        $mockRequestLog = $this->createMockRequestLog();
-        $mockRequestLog->expects($this->once())
-            ->method('logExceptionResponse');
+        $this->fileLogger->expects($this->once())
+            ->method('log')
+            ->with(
+                'capture_EXCEPTION',
+                $this->callback(function (array $context) {
+                    return isset($context['reference_id'])
+                        && $context['reference_id'] === 'order_123'
+                        && isset($context['error_message'])
+                        && $context['error_message'] === 'Test error';
+                })
+            );
 
-        $service = new RequestLogService(new NullLogger(), fn () => $mockRequestLog);
+        $service = new RequestLogService($this->fileLogger);
         $exception = new \Exception('Test error', 500);
 
         // Act & Assert - no exception thrown
@@ -84,12 +97,11 @@ class RequestLogServiceTest extends TestCase
 
     public function testLogRequestHandlesLoggingFailureGracefully(): void
     {
-        $mockRequestLog = $this->createMockRequestLog();
-        $mockRequestLog->expects($this->once())
-            ->method('logRequest')
+        $this->fileLogger->expects($this->once())
+            ->method('log')
             ->willThrowException(new \RuntimeException('Simulated logging failure'));
 
-        $this->logger->expects($this->once())
+        $this->fallbackLogger->expects($this->once())
             ->method('warning')
             ->with(
                 $this->stringContains('Failed to log request'),
@@ -100,7 +112,7 @@ class RequestLogServiceTest extends TestCase
                 })
             );
 
-        $service = new RequestLogService($this->logger, fn () => $mockRequestLog);
+        $service = new RequestLogService($this->fileLogger, $this->fallbackLogger);
 
         // Act - should not throw, should log warning
         $service->logRequest(
@@ -114,12 +126,11 @@ class RequestLogServiceTest extends TestCase
 
     public function testLogExceptionHandlesLoggingFailureGracefully(): void
     {
-        $mockRequestLog = $this->createMockRequestLog();
-        $mockRequestLog->expects($this->once())
-            ->method('logExceptionResponse')
+        $this->fileLogger->expects($this->once())
+            ->method('log')
             ->willThrowException(new \RuntimeException('Simulated logging failure'));
 
-        $this->logger->expects($this->once())
+        $this->fallbackLogger->expects($this->once())
             ->method('warning')
             ->with(
                 $this->stringContains('Failed to log exception'),
@@ -131,7 +142,7 @@ class RequestLogServiceTest extends TestCase
                 })
             );
 
-        $service = new RequestLogService($this->logger, fn () => $mockRequestLog);
+        $service = new RequestLogService($this->fileLogger, $this->fallbackLogger);
 
         // Act - should not throw
         $service->logException(
@@ -142,17 +153,16 @@ class RequestLogServiceTest extends TestCase
         );
     }
 
-    public function testLogRequestMergesActionIntoRequest(): void
+    public function testLogRequestPassesActionToFileLogger(): void
     {
-        $capturedRequest = null;
-        $mockRequestLog = $this->createMockRequestLog();
-        $mockRequestLog->expects($this->once())
-            ->method('logRequest')
-            ->willReturnCallback(function (array $request) use (&$capturedRequest) {
-                $capturedRequest = $request;
-            });
+        $this->fileLogger->expects($this->once())
+            ->method('log')
+            ->with(
+                'capture',
+                $this->anything()
+            );
 
-        $service = new RequestLogService(new NullLogger(), fn () => $mockRequestLog);
+        $service = new RequestLogService($this->fileLogger);
 
         $service->logRequest(
             action: 'capture',
@@ -161,24 +171,18 @@ class RequestLogServiceTest extends TestCase
             referenceId: 'order_123',
             shopId: 1
         );
-
-        $this->assertIsArray($capturedRequest);
-        $this->assertArrayHasKey('action', $capturedRequest);
-        $this->assertEquals('capture', $capturedRequest['action']);
-        $this->assertArrayHasKey('payment_intent_id', $capturedRequest);
     }
 
-    public function testLogExceptionUsesExceptionCodeOrDefault500(): void
+    public function testLogExceptionUsesDefaultCode500WhenExceptionCodeIsZero(): void
     {
-        $capturedCode = null;
-        $mockRequestLog = $this->createMockRequestLog();
-        $mockRequestLog->expects($this->once())
-            ->method('logExceptionResponse')
-            ->willReturnCallback(function (array $request, int $code) use (&$capturedCode) {
-                $capturedCode = $code;
+        $capturedContext = null;
+        $this->fileLogger->expects($this->once())
+            ->method('log')
+            ->willReturnCallback(function (string $action, array $context) use (&$capturedContext) {
+                $capturedContext = $context;
             });
 
-        $service = new RequestLogService(new NullLogger(), fn () => $mockRequestLog);
+        $service = new RequestLogService($this->fileLogger);
 
         // Test with exception that has code 0 - should default to 500
         $service->logException(
@@ -188,20 +192,19 @@ class RequestLogServiceTest extends TestCase
             shopId: 1
         );
 
-        $this->assertEquals(500, $capturedCode);
+        $this->assertEquals(500, $capturedContext['error_code']);
     }
 
     public function testLogExceptionUsesProvidedExceptionCode(): void
     {
-        $capturedCode = null;
-        $mockRequestLog = $this->createMockRequestLog();
-        $mockRequestLog->expects($this->once())
-            ->method('logExceptionResponse')
-            ->willReturnCallback(function (array $request, int $code) use (&$capturedCode) {
-                $capturedCode = $code;
+        $capturedContext = null;
+        $this->fileLogger->expects($this->once())
+            ->method('log')
+            ->willReturnCallback(function (string $action, array $context) use (&$capturedContext) {
+                $capturedContext = $context;
             });
 
-        $service = new RequestLogService(new NullLogger(), fn () => $mockRequestLog);
+        $service = new RequestLogService($this->fileLogger);
 
         $service->logException(
             action: 'test',
@@ -210,30 +213,23 @@ class RequestLogServiceTest extends TestCase
             shopId: 1
         );
 
-        $this->assertEquals(403, $capturedCode);
+        $this->assertEquals(403, $capturedContext['error_code']);
     }
 
-    public function testLogRequestPassesCorrectParametersToRequestLog(): void
+    public function testLogRequestPassesCorrectParameters(): void
     {
-        $capturedParams = [];
-        $mockRequestLog = $this->createMockRequestLog();
-        $mockRequestLog->expects($this->once())
-            ->method('logRequest')
-            ->willReturnCallback(function (
-                array $request,
-                array $response,
-                string $referenceId,
-                int $shopId
-            ) use (&$capturedParams) {
-                $capturedParams = [
-                    'request' => $request,
-                    'response' => $response,
-                    'referenceId' => $referenceId,
-                    'shopId' => $shopId,
-                ];
-            });
+        $capturedContext = null;
+        $this->fileLogger->expects($this->once())
+            ->method('log')
+            ->with(
+                'refund',
+                $this->callback(function (array $context) use (&$capturedContext) {
+                    $capturedContext = $context;
+                    return true;
+                })
+            );
 
-        $service = new RequestLogService(new NullLogger(), fn () => $mockRequestLog);
+        $service = new RequestLogService($this->fileLogger);
 
         $service->logRequest(
             action: 'refund',
@@ -243,36 +239,24 @@ class RequestLogServiceTest extends TestCase
             shopId: 42
         );
 
-        $this->assertEquals('order_abc', $capturedParams['referenceId']);
-        $this->assertEquals(42, $capturedParams['shopId']);
-        $this->assertEquals('refund', $capturedParams['request']['action']);
-        $this->assertEquals('order_abc', $capturedParams['request']['order_id']);
-        $this->assertEquals('refund_xyz', $capturedParams['response']['refund_id']);
+        $this->assertEquals('order_abc', $capturedContext['reference_id']);
+        $this->assertEquals(42, $capturedContext['shop_id']);
+        $this->assertEquals(['order_id' => 'order_abc'], $capturedContext['request']);
+        $this->assertEquals(['refund_id' => 'refund_xyz', 'status' => 'succeeded'], $capturedContext['response']);
     }
 
-    public function testLogExceptionPassesCorrectParametersToRequestLog(): void
+    public function testLogExceptionPassesCorrectParameters(): void
     {
-        $capturedParams = [];
-        $mockRequestLog = $this->createMockRequestLog();
-        $mockRequestLog->expects($this->once())
-            ->method('logExceptionResponse')
-            ->willReturnCallback(function (
-                array $request,
-                int $code,
-                string $message,
-                string $action,
-                string $referenceId
-            ) use (&$capturedParams) {
-                $capturedParams = [
-                    'request' => $request,
-                    'code' => $code,
-                    'message' => $message,
-                    'action' => $action,
-                    'referenceId' => $referenceId,
-                ];
+        $capturedAction = null;
+        $capturedContext = null;
+        $this->fileLogger->expects($this->once())
+            ->method('log')
+            ->willReturnCallback(function (string $action, array $context) use (&$capturedAction, &$capturedContext) {
+                $capturedAction = $action;
+                $capturedContext = $context;
             });
 
-        $service = new RequestLogService(new NullLogger(), fn () => $mockRequestLog);
+        $service = new RequestLogService($this->fileLogger);
 
         $service->logException(
             action: 'cancel_authorization',
@@ -281,24 +265,55 @@ class RequestLogServiceTest extends TestCase
             shopId: 1
         );
 
-        $this->assertEquals('cancel_authorization', $capturedParams['action']);
-        $this->assertEquals('cancel_authorization', $capturedParams['request']['action']);
-        $this->assertEquals(404, $capturedParams['code']);
-        $this->assertEquals('Payment not found', $capturedParams['message']);
-        $this->assertEquals('pi_abc123', $capturedParams['referenceId']);
+        $this->assertEquals('cancel_authorization_EXCEPTION', $capturedAction);
+        $this->assertEquals(404, $capturedContext['error_code']);
+        $this->assertEquals('Payment not found', $capturedContext['error_message']);
+        $this->assertEquals('pi_abc123', $capturedContext['reference_id']);
+        $this->assertEquals(1, $capturedContext['shop_id']);
     }
 
-    /**
-     * Create a mock RequestLog object.
-     *
-     * @return MockObject
-     */
-    private function createMockRequestLog(): MockObject
+    public function testLogRequestIncludesTimestamp(): void
     {
-        $mock = $this->getMockBuilder(\stdClass::class)
-            ->addMethods(['logRequest', 'logExceptionResponse'])
-            ->getMock();
+        $capturedContext = null;
+        $this->fileLogger->expects($this->once())
+            ->method('log')
+            ->willReturnCallback(function (string $action, array $context) use (&$capturedContext) {
+                $capturedContext = $context;
+            });
 
-        return $mock;
+        $service = new RequestLogService($this->fileLogger);
+
+        $service->logRequest(
+            action: 'test',
+            request: [],
+            response: [],
+            referenceId: 'ref_123',
+            shopId: 1
+        );
+
+        $this->assertArrayHasKey('timestamp', $capturedContext);
+        $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $capturedContext['timestamp']);
+    }
+
+    public function testLogExceptionIncludesTimestamp(): void
+    {
+        $capturedContext = null;
+        $this->fileLogger->expects($this->once())
+            ->method('log')
+            ->willReturnCallback(function (string $action, array $context) use (&$capturedContext) {
+                $capturedContext = $context;
+            });
+
+        $service = new RequestLogService($this->fileLogger);
+
+        $service->logException(
+            action: 'test',
+            exception: new \Exception('error'),
+            referenceId: 'ref_123',
+            shopId: 1
+        );
+
+        $this->assertArrayHasKey('timestamp', $capturedContext);
+        $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $capturedContext['timestamp']);
     }
 }

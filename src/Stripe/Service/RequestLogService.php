@@ -1,43 +1,35 @@
 <?php
 
+/**
+ * Copyright © OXID eSales AG. All rights reserved.
+ * See LICENSE file for license details.
+ */
+
 declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidSolutionCatalysts\Stripe\Application\Model\RequestLog;
+use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
 /**
- * Facade service for logging payment requests to RequestLog.
+ * Service for logging payment API requests to file.
  *
- * Sprint 8: Wraps legacy RequestLog model.
- * Benefits:
- * - Handlers don't depend on legacy model directly
- * - Can swap implementation (e.g., to database repository) without changing handlers
- * - Centralized error handling for logging failures
- *
- * Follows existing patterns: NullLogger default, readonly properties, final class.
+ * Sprint 15: Refactored to use FileLoggerInterface instead of database model.
+ * Logs to log/osc/stripe_requests.log via RequestFileLoggerFactory.
  *
  * @since 2.0.0
  */
 final class RequestLogService implements RequestLogServiceInterface
 {
-    private readonly LoggerInterface $logger;
+    private readonly LoggerInterface $fallbackLogger;
 
-    /** @var callable|null */
-    private $requestLogFactory;
-
-    /**
-     * @param LoggerInterface|null $logger PSR-3 logger
-     * @param callable|null $requestLogFactory Factory for creating RequestLog instances (for testing)
-     */
     public function __construct(
-        ?LoggerInterface $logger = null,
-        ?callable $requestLogFactory = null
+        private readonly FileLoggerInterface $fileLogger,
+        ?LoggerInterface $fallbackLogger = null
     ) {
-        $this->logger = $logger ?? new NullLogger();
-        $this->requestLogFactory = $requestLogFactory;
+        $this->fallbackLogger = $fallbackLogger ?? new NullLogger();
     }
 
     public function logRequest(
@@ -48,15 +40,15 @@ final class RequestLogService implements RequestLogServiceInterface
         int $shopId
     ): void {
         try {
-            $requestLog = $this->createRequestLog();
-            $requestLog->logRequest(
-                array_merge($request, ['action' => $action]),
-                $response,
-                $referenceId,
-                $shopId
-            );
+            $this->fileLogger->log($action, [
+                'reference_id' => $referenceId,
+                'shop_id' => $shopId,
+                'request' => $request,
+                'response' => $response,
+                'timestamp' => date('Y-m-d H:i:s'),
+            ]);
         } catch (\Throwable $e) {
-            $this->logger->warning('Failed to log request to RequestLog', [
+            $this->fallbackLogger->warning('Failed to log request', [
                 'action' => $action,
                 'reference_id' => $referenceId,
                 'error' => $e->getMessage(),
@@ -71,49 +63,20 @@ final class RequestLogService implements RequestLogServiceInterface
         int $shopId
     ): void {
         try {
-            $requestLog = $this->createRequestLog();
-            $requestLog->logExceptionResponse(
-                ['action' => $action],
-                $this->resolveExceptionCode($exception),
-                $exception->getMessage(),
-                $action,
-                $referenceId
-            );
+            $this->fileLogger->log($action . '_EXCEPTION', [
+                'reference_id' => $referenceId,
+                'shop_id' => $shopId,
+                'error_code' => $exception->getCode() ?: 500,
+                'error_message' => $exception->getMessage(),
+                'timestamp' => date('Y-m-d H:i:s'),
+            ]);
         } catch (\Throwable $e) {
-            $this->logger->warning('Failed to log exception to RequestLog', [
+            $this->fallbackLogger->warning('Failed to log exception', [
                 'action' => $action,
                 'reference_id' => $referenceId,
                 'original_error' => $exception->getMessage(),
                 'log_error' => $e->getMessage(),
             ]);
         }
-    }
-
-    /**
-     * Resolve exception code, defaulting to 500 if not set.
-     */
-    private function resolveExceptionCode(\Throwable $exception): int
-    {
-        $code = $exception->getCode();
-
-        if ($code === 0 || !is_int($code)) {
-            return 500;
-        }
-
-        return $code;
-    }
-
-    /**
-     * Create RequestLog instance using factory or default.
-     *
-     * @return RequestLog|object RequestLog or compatible object (for testing)
-     */
-    private function createRequestLog(): object
-    {
-        if ($this->requestLogFactory !== null) {
-            return ($this->requestLogFactory)();
-        }
-
-        return oxNew(RequestLog::class);
     }
 }

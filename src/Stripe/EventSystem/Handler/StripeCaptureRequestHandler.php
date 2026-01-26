@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
+use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
@@ -40,6 +41,7 @@ class StripeCaptureRequestHandler implements HandlerInterface
         private readonly CaptureServiceInterface $captureService,
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly RequestLogServiceInterface $requestLogService,
+        private readonly ShopAdapterInterface $shopAdapter,
         ?LoggerInterface $logger = null,
         private readonly ?FileLoggerInterface $eventLogger = null
     ) {
@@ -315,7 +317,7 @@ class StripeCaptureRequestHandler implements HandlerInterface
                 'initiator' => $event->getInitiator(),
             ],
             referenceId: $event->getOrderId() ?? $event->getContractId() ?? '',
-            shopId: (int) \OxidEsales\Eshop\Core\Registry::getConfig()->getShopId()
+            shopId: (int) $this->shopAdapter->getShopId()
         );
     }
 
@@ -352,7 +354,7 @@ class StripeCaptureRequestHandler implements HandlerInterface
             action: 'capture',
             exception: $e,
             referenceId: $referenceId,
-            shopId: (int) \OxidEsales\Eshop\Core\Registry::getConfig()->getShopId()
+            shopId: (int) $this->shopAdapter->getShopId()
         );
     }
 

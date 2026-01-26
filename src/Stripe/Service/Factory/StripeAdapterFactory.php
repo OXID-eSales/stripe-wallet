@@ -102,27 +102,6 @@ class StripeAdapterFactory extends PaymentAdapterFactory implements StripeAdapte
     }
 
     /**
-     * Get Stripe SDK client for direct API access.
-     *
-     * @deprecated Use getStripeAdapter() instead for better testability and DIP compliance.
-     *
-     * @return StripeClient
-     * @throws \RuntimeException If Stripe API key is not configured
-     */
-    public function getStripeClient(): StripeClient
-    {
-        $client = $this->clientFactory->create();
-
-        if ($client === null) {
-            throw new \RuntimeException(
-                'Stripe API key is not configured. Please configure the Stripe secret key in module settings.'
-            );
-        }
-
-        return $client;
-    }
-
-    /**
      * Check if Stripe is in test mode.
      *
      * @return bool

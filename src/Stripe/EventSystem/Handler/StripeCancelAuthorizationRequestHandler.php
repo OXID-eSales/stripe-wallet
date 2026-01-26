@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
-use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
@@ -35,6 +35,7 @@ class StripeCancelAuthorizationRequestHandler implements HandlerInterface
     public function __construct(
         private readonly CancelAuthorizationServiceInterface $cancelService,
         private readonly RequestLogServiceInterface $requestLogService,
+        private readonly ShopAdapterInterface $shopAdapter,
         ?LoggerInterface $logger = null,
         private readonly ?FileLoggerInterface $eventLogger = null
     ) {
@@ -119,7 +120,7 @@ class StripeCancelAuthorizationRequestHandler implements HandlerInterface
                 'reason' => $event->getCancellationReason(),
             ],
             referenceId: $event->getOrderId() ?? $result->getPaymentIntentId() ?? '',
-            shopId: (int) Registry::getConfig()->getShopId()
+            shopId: (int) $this->shopAdapter->getShopId()
         );
     }
 
@@ -164,7 +165,7 @@ class StripeCancelAuthorizationRequestHandler implements HandlerInterface
             action: 'cancel_authorization',
             exception: $e,
             referenceId: $paymentIntentId,
-            shopId: (int) Registry::getConfig()->getShopId()
+            shopId: (int) $this->shopAdapter->getShopId()
         );
     }
 
