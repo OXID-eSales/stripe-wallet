@@ -72,6 +72,8 @@ docker compose exec -T \
 
 
 mkdir -p ./source/var/configuration/environment/shops/1/modules
+cp "$MODULE_ROOT"/recipe/var/configuration/shops/1/modules/oe_payments_stripe_wallet.yaml \
+  ./source/var/configuration/environment/shops/1/modules/oe_payments_stripe_wallet.yaml
 docker compose exec -T php composer update --no-interaction
 
 echo "Setting up the shop...."
