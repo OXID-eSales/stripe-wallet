@@ -55,6 +55,9 @@ mkdir -p "$PROJECT_ROOT"/source/extensions || exit 1
 cp -r "$MODULE_ROOT" "$PROJECT_ROOT"/source/extensions/stripe || exit 1
 
 docker compose exec -T \
+  php composer require oxid-esales/payment-component:dev-b-7.4.x --no-update || exit 1
+
+docker compose exec -T \
   php composer config repositories.oxid-esales/stripe-wallet \
   --json '{"type":"path", "url":"./extensions/stripe", "options": {"symlink": true}}' || exit 1
 
