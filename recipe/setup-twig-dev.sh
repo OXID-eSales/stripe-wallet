@@ -54,6 +54,11 @@ $MODULE_ROOT/recipe/parts/shared/require_demodata_package.sh -e"${edition}" -b"$
 mkdir -p "$PROJECT_ROOT"/source/extensions || exit 1
 cp -r "$MODULE_ROOT" "$PROJECT_ROOT"/source/extensions/stripe || exit 1
 
+# Register the payment-component private repository
+docker compose exec -T \
+  php composer config repositories.oxid-esales/payment-component \
+  --json '{"type":"vcs", "url":"https://github.com/OXID-eSales/payment-component"}' || exit 1
+
 docker compose exec -T \
   php composer require oxid-esales/payment-component:dev-b-7.4.x --no-update || exit 1
 
