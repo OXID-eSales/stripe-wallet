@@ -8,7 +8,7 @@ use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
-use OxidEsales\Payments\Stripe\DTO\CheckoutSessionResult;
+use OxidEsales\Payments\Stripe\Service\Result\CheckoutSessionResult;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Contract\BasketSnapshot;

@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\Payments\Stripe\DTO\CheckoutReturnResult;
+use OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult;
 
 /**
  * Service interface for processing Stripe checkout returns.

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
-use OxidEsales\Payments\Stripe\DTO\CaptureResult;
+use OxidEsales\PaymentComponent\Service\Result\CaptureResult;
 
 /**
  * Service interface for capturing Stripe payments.
@@ -28,7 +28,7 @@ interface CaptureServiceInterface
      *
      * @param PaymentContractInterface $contract The contract to capture
      * @param float|null $amount Amount in currency units (null for full capture)
-     * @param array<string, string> $metadata Metadata to attach
+     * @param array<string, mixed> $metadata Metadata to attach
      * @return CaptureResult Result object (never throws)
      */
     public function processCapture(
@@ -45,7 +45,7 @@ interface CaptureServiceInterface
      *
      * @param string $paymentIntentId Stripe PaymentIntent ID
      * @param float|null $amount Amount in currency units (null for full capture)
-     * @param array<string, string> $metadata Metadata to attach
+     * @param array<string, mixed> $metadata Metadata to attach
      * @return CaptureResult Result object (never throws)
      */
     public function processDirectCapture(

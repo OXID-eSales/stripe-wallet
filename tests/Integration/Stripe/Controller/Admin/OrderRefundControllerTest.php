@@ -133,7 +133,11 @@ class OrderRefundControllerTest extends TestCase
         $this->assertEquals('admin', $capturedEvent->getInitiator());
     }
 
-    public function testPartialRefundEmitsEventWithAmount(): void
+    /**
+     * Sprint 22: Partial refund is no longer supported.
+     * The method returns an error without dispatching any event.
+     */
+    public function testPartialRefundReturnsErrorWithoutDispatchingEvent(): void
     {
         // Arrange
         $order = $this->createOrderMock('order_456');
@@ -143,21 +147,20 @@ class OrderRefundControllerTest extends TestCase
             'refund_reason' => 'requested_by_customer',
         ]);
 
-        $capturedEvent = null;
+        // Event should NOT be dispatched for partial refunds
         $this->eventDispatcher
-            ->expects($this->once())
-            ->method('dispatch')
-            ->willReturnCallback(function ($event) use (&$capturedEvent) {
-                $capturedEvent = $event;
-                return $event; // Must return EventInterface
-            });
+            ->expects($this->never())
+            ->method('dispatch');
 
         // Act
         $this->controller->partialRefund();
 
-        // Assert
-        $this->assertEquals(50.00, $capturedEvent->getAmount());
-        $this->assertFalse($capturedEvent->isFullRefund());
+        // Assert - partial refund is rejected
+        $this->assertFalse($this->controller->wasRefundSuccessful());
+        $this->assertStringContainsString(
+            'Partial refund is not supported',
+            $this->controller->getErrorMessage()
+        );
     }
 
     public function testFullRefundSetsSuccessOnSuccessfulResult(): void

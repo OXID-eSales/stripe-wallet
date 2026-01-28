@@ -576,27 +576,33 @@ services:
     public: false
 
   # ==========================================
+  # Stock Restoration Service (Sprint 24)
+  # ==========================================
+  # Restores stock for all order articles on full refund.
+  # Implements same logic as OXID's OrderArticle::storno().
+
+  OxidEsales\PaymentComponent\Service\StockRestorationServiceInterface:
+    class: OxidEsales\Payments\Stripe\Service\OxidStockRestorationService
+    autowire: false
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+      $logger: '@oxid_esales.monolog.logger'
+      $useStock: true
+      $allowNegativeStock: false
+    public: false
+
+  # ==========================================
   # Stripe Refund Service (Sprint 21)
   # ==========================================
   # Extracted business logic from StripeRefundRequestHandler.
   # SRP: Service handles all refund processing logic.
+  # Sprint 24: Added StockRestorationService for stock restoration on refund.
 
   OxidEsales\Payments\Stripe\Service\RefundServiceInterface:
     class: OxidEsales\Payments\Stripe\Service\RefundService
     arguments:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
-      $logger: '@oxid_esales.monolog.logger'
-    public: false
-
-  # ==========================================
-  # Order Refund Update Service (Sprint 10)
-  # ==========================================
-  # Extracted order field updates from StripeRefundRequestHandler.
-  # SRP: Service handles order field updates after full refund.
-
-  OxidEsales\Payments\Stripe\Service\OrderRefundUpdateServiceInterface:
-    class: OxidEsales\Payments\Stripe\Service\OrderRefundUpdateService
-    arguments:
+      $stockRestorationService: '@OxidEsales\PaymentComponent\Service\StockRestorationServiceInterface'
       $logger: '@oxid_esales.monolog.logger'
     public: false
 
@@ -634,15 +640,14 @@ services:
   # ==========================================
   # Handles StripeRefundRequestEvent from admin panel, webhook, or API.
   # Sprint 8: Added RequestLogService for centralized logging
-  # Sprint 10: Delegates order updates to OrderRefundUpdateService (SRP).
   # Sprint 21: Delegates to RefundService for business logic (SRP).
+  # Sprint 22: Removed OrderRefundUpdateService (dead code), full refund only.
   # Sprint 25: Added event logger for debugging
 
   OxidEsales\Payments\Stripe\EventSystem\Handler\StripeRefundRequestHandler:
     arguments:
       $refundService: '@OxidEsales\Payments\Stripe\Service\RefundServiceInterface'
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
-      $orderRefundUpdateService: '@OxidEsales\Payments\Stripe\Service\OrderRefundUpdateServiceInterface'
       $requestLogService: '@OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface'
       $shopAdapter: '@OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface'
       $logger: '@oxid_esales.monolog.logger'
@@ -842,49 +847,17 @@ services:
     public: true
 
   # ==========================================
-  # Sprint 2: Condition Handlers (Stock & Fraud)
+  # Sprint 2: Condition Handlers (Fraud Check)
   # ==========================================
-  # These handlers manage stock reservation/release and fraud checking
-  # as contract conditions. Can be disabled via admin configuration.
-  #
-  # Stock Reservation:
-  # - ON: Reserves stock on contract creation (DRAFT), releases on terminal states
-  # - OFF: No stock manipulation, OXID handles stock normally on order creation
+  # Fraud check handler manages fraud checking as a contract condition.
+  # Can be disabled via admin configuration.
   #
   # Fraud Check:
   # - ON: Checks Stripe Radar score after payment authorization
   # - OFF: Fraud check condition immediately fulfilled
-
-  # Stock Service - OXID implementation for direct OXSTOCK manipulation
-  # Uses DBAL to decrement/increment oxarticles.OXSTOCK directly
-  OxidEsales\PaymentComponent\Service\StockServiceInterface:
-    class: OxidEsales\PaymentComponent\Service\OxidStockService
-    arguments:
-      $connection: '@doctrine.dbal.connection'
-    public: false
-
-  # Stock Reservation Handler - Reserves stock on contract creation (DRAFT)
-  # Priority 90: Runs early to reserve stock before other handlers
-  # Can fail contract creation if insufficient stock
-  OxidEsales\PaymentComponent\EventSystem\Handler\StockReservationHandler:
-    arguments:
-      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
-      $stockService: '@OxidEsales\PaymentComponent\Service\StockServiceInterface'
-      $enabled: '%payment.stock_reservation.enabled%'
-    tags:
-      - { name: payment.event_handler, priority: 90 }
-    public: false
-
-  # Stock Release Handler - Releases stock on terminal states (CANCELLED, EXPIRED, FAILED)
-  # Does NOT release on FULFILLED (order completed, stock stays reserved)
-  # Throws StockReleaseException on failure (strict consistency)
-  OxidEsales\PaymentComponent\EventSystem\Handler\StockReleaseHandler:
-    arguments:
-      $stockService: '@OxidEsales\PaymentComponent\Service\StockServiceInterface'
-      $enabled: '%payment.stock_reservation.enabled%'
-    tags:
-      - { name: payment.event_handler }
-    public: false
+  #
+  # Note: Stock management removed in Sprint 23.
+  # OXID handles stock automatically on order finalization.
 
   # Fraud Check Handler - Checks fraud score on payment authorization
   # Priority 85: Runs after stock reservation, before order creation
@@ -915,9 +888,6 @@ services:
 # These can be overridden in shop configuration or environment
 
 parameters:
-  # Stock reservation toggle (default: enabled)
-  payment.stock_reservation.enabled: true
-
   # Fraud check toggle (default: enabled)
   payment.fraud_check.enabled: true
 

@@ -6,7 +6,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
-use OxidEsales\Payments\Stripe\DTO\CheckoutSessionResult;
+use OxidEsales\Payments\Stripe\Service\Result\CheckoutSessionResult;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionService;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;

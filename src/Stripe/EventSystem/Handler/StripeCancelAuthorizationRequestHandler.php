@@ -8,7 +8,7 @@ use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
-use OxidEsales\Payments\Stripe\DTO\CancellationResult;
+use OxidEsales\PaymentComponent\Service\Result\CancellationResult;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
 use OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface;

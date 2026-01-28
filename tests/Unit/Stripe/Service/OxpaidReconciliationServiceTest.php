@@ -19,7 +19,7 @@ use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService;
-use OxidEsales\Payments\Stripe\Service\ReconciliationResult;
+use OxidEsales\Payments\Stripe\Service\Result\ReconciliationResult;
 use PHPUnit\Framework\TestCase;
 
 /**

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Tests\Unit\Stripe\Service;
 
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
-use OxidEsales\Payments\Stripe\DTO\CancellationResult;
+use OxidEsales\PaymentComponent\Service\Result\CancellationResult;
 use OxidEsales\Payments\Stripe\Service\CancelAuthorizationService;
 use OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface;
 use PHPUnit\Framework\TestCase;

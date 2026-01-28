@@ -74,8 +74,8 @@ class StripeCaptureServiceTest extends TestCase
         $result = $this->service->capture($contractId);
 
         $this->assertInstanceOf(CaptureResult::class, $result);
-        $this->assertEquals('ch_123', $result->captureId);
-        $this->assertEquals($amount, $result->amountCaptured);
+        $this->assertEquals('ch_123', $result->getCaptureId());
+        $this->assertEquals($amount, $result->getAmountCaptured());
     }
 
     // 2. Cannot capture when contract is in COMMITTED state (Stripe uses AUTHORIZED, not COMMITTED)
@@ -165,7 +165,7 @@ class StripeCaptureServiceTest extends TestCase
 
         $result = $this->service->capture($contractId, $partialAmount);
 
-        $this->assertEquals($partialAmount, $result->amountCaptured);
+        $this->assertEquals($partialAmount, $result->getAmountCaptured());
     }
 
     // 6. Cannot capture already fulfilled contract

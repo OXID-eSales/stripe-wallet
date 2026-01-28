@@ -10,7 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
-use OxidEsales\Payments\Stripe\DTO\CheckoutSessionResult;
+use OxidEsales\Payments\Stripe\Service\Result\CheckoutSessionResult;
 
 /**
  * Service interface for creating Stripe checkout sessions.

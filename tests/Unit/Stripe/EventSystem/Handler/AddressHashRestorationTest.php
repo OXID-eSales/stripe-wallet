@@ -13,7 +13,7 @@ use OxidEsales\PaymentComponent\Contract\SecurityValidationResultInterface;
 use OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface;
 use OxidEsales\Payments\Stripe\Adapter\SessionAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutReturnServiceInterface;
-use OxidEsales\Payments\Stripe\DTO\CheckoutReturnResult;
+use OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler;
 use OxidEsales\Payments\Stripe\Service\DeliveryAddressHashServiceInterface;

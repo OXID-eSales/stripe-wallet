@@ -11,7 +11,7 @@ namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentComponent\Service\TokenServiceInterface;
-use OxidEsales\Payments\Stripe\DTO\CheckoutReturnResult;
+use OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;

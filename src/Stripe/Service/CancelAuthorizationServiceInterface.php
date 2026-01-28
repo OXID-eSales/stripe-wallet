@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\Payments\Stripe\DTO\CancellationResult;
+use OxidEsales\PaymentComponent\Service\Result\CancellationResult;
 
 /**
  * Service interface for canceling Stripe payment authorizations.

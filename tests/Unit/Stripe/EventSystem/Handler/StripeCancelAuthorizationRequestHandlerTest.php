@@ -7,7 +7,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCancelAuthorizationRequestHandler;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
-use OxidEsales\Payments\Stripe\DTO\CancellationResult;
+use OxidEsales\PaymentComponent\Service\Result\CancellationResult;
 use OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;

@@ -9,12 +9,13 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\Payments\Stripe\DTO\RefundResult;
+use OxidEsales\PaymentComponent\Service\Result\RefundResult;
 
 /**
  * Service interface for processing Stripe refunds.
  *
  * Sprint 21: Extract business logic from StripeRefundRequestHandler.
+ * Sprint 22: Removed partial refund - Stripe module only supports full refunds.
  *
  * SOLID Principles:
  * - SRP: Handles refund processing only
@@ -44,35 +45,14 @@ interface RefundServiceInterface
     ): RefundResult;
 
     /**
-     * Process a partial refund for an order.
-     *
-     * @param string $orderId OXID order ID
-     * @param int $amountCents Amount to refund in cents
-     * @param string|null $paymentIntentId Optional PaymentIntent ID (if known)
-     * @param string|null $reason Optional refund reason
-     * @param string|null $description Optional description for metadata
-     * @param string $initiator Who triggered the refund
-     */
-    public function processPartialRefund(
-        string $orderId,
-        int $amountCents,
-        ?string $paymentIntentId = null,
-        ?string $reason = null,
-        ?string $description = null,
-        string $initiator = 'admin'
-    ): RefundResult;
-
-    /**
      * Process refund directly by charge ID (when charge is already known).
      *
      * @param string $chargeId Stripe Charge ID (ch_xxx)
-     * @param int|null $amountCents Amount in cents (null for full refund)
      * @param string|null $reason Optional refund reason
      * @param array<string, string>|null $metadata Optional metadata
      */
     public function processRefundByCharge(
         string $chargeId,
-        ?int $amountCents = null,
         ?string $reason = null,
         ?array $metadata = null
     ): RefundResult;

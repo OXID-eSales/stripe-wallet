@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
-use OxidEsales\Payments\Stripe\Service\ReconciliationResult;
+use OxidEsales\Payments\Stripe\Service\Result\ReconciliationResult;
 use PHPUnit\Framework\TestCase;
 
 /**

@@ -8,7 +8,7 @@ use OxidEsales\PaymentComponent\Adapter\Request\CapturePaymentRequest;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
-use OxidEsales\Payments\Stripe\DTO\CaptureResult;
+use OxidEsales\PaymentComponent\Service\Result\CaptureResult;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
@@ -64,6 +64,9 @@ final class CaptureService implements CaptureServiceInterface
         return $this->executeCapture($paymentIntentId, $amount, $metadata);
     }
 
+    /**
+     * @param array<string, mixed> $metadata
+     */
     private function executeCapture(
         string $paymentIntentId,
         ?float $amount,

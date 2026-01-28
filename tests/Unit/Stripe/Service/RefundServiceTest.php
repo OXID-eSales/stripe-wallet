@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
-use OxidEsales\Payments\Stripe\DTO\RefundResult;
+use OxidEsales\PaymentComponent\Service\Result\RefundResult;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\RefundService;
 use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
+use OxidEsales\PaymentComponent\Service\StockRestorationServiceInterface;
 use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -20,17 +21,20 @@ use Stripe\Refund;
  * TDD Tests for RefundService.
  *
  * Sprint 21: Extract business logic from StripeRefundRequestHandler.
+ * Sprint 24: Added StockRestorationService mock.
  */
 class RefundServiceTest extends TestCase
 {
     private StripeAdapterFactoryInterface&MockObject $adapterFactory;
     private StripeAdapterInterface&MockObject $stripeAdapter;
+    private StockRestorationServiceInterface&MockObject $stockRestorationService;
     private LoggerInterface&MockObject $logger;
 
     protected function setUp(): void
     {
         $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
         $this->stripeAdapter = $this->createMock(StripeAdapterInterface::class);
+        $this->stockRestorationService = $this->createMock(StockRestorationServiceInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->adapterFactory
@@ -42,6 +46,7 @@ class RefundServiceTest extends TestCase
     {
         return new RefundService(
             $this->adapterFactory,
+            $this->stockRestorationService,
             $this->logger
         );
     }
@@ -97,13 +102,12 @@ class RefundServiceTest extends TestCase
     {
         // Arrange
         $chargeId = 'ch_test_123';
-        $amountCents = 5000;
         $reason = 'requested_by_customer';
         $metadata = ['order_id' => 'order_123'];
 
         $refund = Refund::constructFrom([
             'id' => 're_success_123',
-            'amount' => $amountCents,
+            'amount' => 5000,
             'currency' => 'eur',
             'status' => 'succeeded',
         ]);
@@ -111,12 +115,12 @@ class RefundServiceTest extends TestCase
         $this->stripeAdapter
             ->expects($this->once())
             ->method('createRefundByCharge')
-            ->with($chargeId, $amountCents, $reason, $metadata)
+            ->with($chargeId, null, $reason, $metadata)
             ->willReturn($refund);
 
         // Act
         $service = $this->createService();
-        $result = $service->processRefundByCharge($chargeId, $amountCents, $reason, $metadata);
+        $result = $service->processRefundByCharge($chargeId, $reason, $metadata);
 
         // Assert
         $this->assertTrue($result->isSuccessful());
@@ -128,7 +132,7 @@ class RefundServiceTest extends TestCase
 
     public function testProcessRefundByChargeFullRefund(): void
     {
-        // Arrange - null amount means full refund
+        // Arrange - always full refund (Sprint 22)
         $chargeId = 'ch_full_456';
 
         $refund = Refund::constructFrom([
@@ -224,122 +228,6 @@ class RefundServiceTest extends TestCase
         $this->assertFalse($result->isSuccessful());
         $this->assertEquals('Charge already refunded', $result->getErrorMessage());
         $this->assertEquals('charge_already_refunded', $result->getErrorCode());
-    }
-
-    // --- processPartialRefund Tests ---
-
-    public function testProcessPartialRefundWithPaymentIntentId(): void
-    {
-        // Arrange
-        $paymentIntent = PaymentIntent::constructFrom([
-            'id' => 'pi_test_123',
-            'latest_charge' => 'ch_derived_123',
-        ]);
-
-        $refund = Refund::constructFrom([
-            'id' => 're_partial_123',
-            'amount' => 2500,
-            'currency' => 'eur',
-            'status' => 'succeeded',
-        ]);
-
-        $this->stripeAdapter
-            ->expects($this->once())
-            ->method('retrievePaymentIntent')
-            ->with('pi_test_123')
-            ->willReturn($paymentIntent);
-
-        $this->stripeAdapter
-            ->expects($this->once())
-            ->method('createRefundByCharge')
-            ->with(
-                'ch_derived_123',
-                2500,
-                'requested_by_customer',
-                $this->callback(function ($metadata) {
-                    return $metadata['order_id'] === 'order_123'
-                        && $metadata['initiator'] === 'admin';
-                })
-            )
-            ->willReturn($refund);
-
-        // Act
-        $service = $this->createService();
-        $result = $service->processPartialRefund(
-            'order_123',
-            2500,
-            'pi_test_123',
-            'requested_by_customer'
-        );
-
-        // Assert
-        $this->assertTrue($result->isSuccessful());
-        $this->assertEquals(2500, $result->getRefundedAmountCents());
-    }
-
-    public function testProcessPartialRefundRequiresPaymentIntentId(): void
-    {
-        // Arrange - no payment intent ID provided
-        // Note: In real scenario, this would look up the order to get PI ID
-        // For unit test, we expect failure when no PI ID is available
-
-        // Act
-        $service = $this->createService();
-        $result = $service->processPartialRefund(
-            'order_123',
-            2500,
-            null // No payment intent ID
-        );
-
-        // Assert
-        $this->assertFalse($result->isSuccessful());
-        $this->assertStringContainsString('Payment intent ID', $result->getErrorMessage() ?? '');
-    }
-
-    public function testProcessPartialRefundIncludesMetadata(): void
-    {
-        // Arrange
-        $paymentIntent = PaymentIntent::constructFrom([
-            'id' => 'pi_meta_test',
-            'latest_charge' => 'ch_meta_test',
-        ]);
-
-        $refund = Refund::constructFrom([
-            'id' => 're_meta',
-            'amount' => 1500,
-            'currency' => 'eur',
-            'status' => 'succeeded',
-        ]);
-
-        $this->stripeAdapter
-            ->method('retrievePaymentIntent')
-            ->willReturn($paymentIntent);
-
-        $capturedMetadata = null;
-        $this->stripeAdapter
-            ->expects($this->once())
-            ->method('createRefundByCharge')
-            ->willReturnCallback(function ($chargeId, $amount, $reason, $metadata) use ($refund, &$capturedMetadata) {
-                $capturedMetadata = $metadata;
-                return $refund;
-            });
-
-        // Act
-        $service = $this->createService();
-        $service->processPartialRefund(
-            'order_xyz',
-            1500,
-            'pi_meta_test',
-            'duplicate',
-            'Customer requested partial refund',
-            'mcp'
-        );
-
-        // Assert
-        $this->assertIsArray($capturedMetadata);
-        $this->assertEquals('order_xyz', $capturedMetadata['order_id']);
-        $this->assertEquals('mcp', $capturedMetadata['initiator']);
-        $this->assertEquals('Customer requested partial refund', $capturedMetadata['description']);
     }
 
     // --- processFullRefund Tests ---
@@ -452,7 +340,6 @@ class RefundServiceTest extends TestCase
         $validReasons = ['duplicate', 'fraudulent', 'requested_by_customer'];
 
         // Act & Assert - each valid reason should pass through to adapter
-        $service = $this->createService();
         foreach ($validReasons as $reason) {
             $refund = Refund::constructFrom([
                 'id' => 're_' . $reason,
@@ -461,19 +348,20 @@ class RefundServiceTest extends TestCase
                 'status' => 'succeeded',
             ]);
 
-            // Reset mock for each iteration
+            // Reset mocks for each iteration
             $this->stripeAdapter = $this->createMock(StripeAdapterInterface::class);
             $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
+            $this->stockRestorationService = $this->createMock(StockRestorationServiceInterface::class);
             $this->adapterFactory->method('getStripeAdapter')->willReturn($this->stripeAdapter);
 
             $this->stripeAdapter
                 ->expects($this->once())
                 ->method('createRefundByCharge')
-                ->with('ch_test', 1000, $reason, null)
+                ->with('ch_test', null, $reason, null)
                 ->willReturn($refund);
 
             $service = $this->createService();
-            $result = $service->processRefundByCharge('ch_test', 1000, $reason);
+            $result = $service->processRefundByCharge('ch_test', $reason);
             $this->assertTrue($result->isSuccessful(), "Reason '{$reason}' should be valid");
         }
     }
@@ -494,6 +382,7 @@ class RefundServiceTest extends TestCase
             ->method('createRefundByCharge')
             ->willReturn($refund);
 
+        // Sprint 24: Now logs twice - once for stock restoration (if orderId present), once for refund
         $this->logger
             ->expects($this->once())
             ->method('info')
@@ -504,9 +393,96 @@ class RefundServiceTest extends TestCase
                 })
             );
 
+        // Act - no metadata means no orderId, so no stock restoration log
+        $service = $this->createService();
+        $service->processRefundByCharge('ch_test'); // Full refund (no amount parameter)
+    }
+
+    // --- Stock Restoration Tests (Sprint 24) ---
+
+    public function testSuccessfulRefundCallsStockRestoration(): void
+    {
+        // Arrange
+        $orderId = 'order_stock_test';
+        $metadata = ['order_id' => $orderId];
+
+        $refund = Refund::constructFrom([
+            'id' => 're_stock',
+            'amount' => 5000,
+            'currency' => 'eur',
+            'status' => 'succeeded',
+        ]);
+
+        $this->stripeAdapter
+            ->method('createRefundByCharge')
+            ->willReturn($refund);
+
+        $this->stockRestorationService
+            ->expects($this->once())
+            ->method('restoreStockForOrder')
+            ->with($orderId)
+            ->willReturn(2);
+
         // Act
         $service = $this->createService();
-        $service->processRefundByCharge('ch_test', 3000);
+        $result = $service->processRefundByCharge('ch_test', null, $metadata);
+
+        // Assert
+        $this->assertTrue($result->isSuccessful());
+    }
+
+    public function testRefundWithoutOrderIdSkipsStockRestoration(): void
+    {
+        // Arrange - no orderId in metadata
+        $refund = Refund::constructFrom([
+            'id' => 're_no_stock',
+            'amount' => 3000,
+            'currency' => 'eur',
+            'status' => 'succeeded',
+        ]);
+
+        $this->stripeAdapter
+            ->method('createRefundByCharge')
+            ->willReturn($refund);
+
+        // Stock restoration should NOT be called
+        $this->stockRestorationService
+            ->expects($this->never())
+            ->method('restoreStockForOrder');
+
+        // Act
+        $service = $this->createService();
+        $result = $service->processRefundByCharge('ch_test');
+
+        // Assert
+        $this->assertTrue($result->isSuccessful());
+    }
+
+    public function testFailedRefundDoesNotCallStockRestoration(): void
+    {
+        // Arrange
+        $refund = Refund::constructFrom([
+            'id' => 're_failed',
+            'amount' => 2500,
+            'currency' => 'eur',
+            'status' => 'failed',
+        ]);
+
+        $this->stripeAdapter
+            ->method('createRefundByCharge')
+            ->willReturn($refund);
+
+        // Stock restoration should NOT be called on failed refund
+        $this->stockRestorationService
+            ->expects($this->never())
+            ->method('restoreStockForOrder');
+
+        // Act
+        $service = $this->createService();
+        $result = $service->processRefundByCharge('ch_test', null, ['order_id' => 'order_123']);
+
+        // Assert
+        $this->assertFalse($result->isSuccessful());
     }
 
     public function testFailedRefundIsLoggedAsError(): void

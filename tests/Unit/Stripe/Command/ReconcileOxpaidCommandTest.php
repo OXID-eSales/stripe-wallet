@@ -11,7 +11,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Command;
 
 use OxidEsales\Payments\Stripe\Command\ReconcileOxpaidCommand;
 use OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService;
-use OxidEsales\Payments\Stripe\Service\ReconciliationResult;
+use OxidEsales\Payments\Stripe\Service\Result\ReconciliationResult;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;

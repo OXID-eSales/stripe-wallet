@@ -9,7 +9,6 @@ use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeRefundRequestHandler;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\Payments\Stripe\Service\OrderRefundUpdateServiceInterface;
 use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
 use OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface;
 use PHPUnit\Framework\TestCase;
@@ -20,7 +19,7 @@ use Psr\Log\LoggerInterface;
  * Unit tests for StripeRefundRequestHandler.
  *
  * Sprint 21: Tests updated for refactored handler with RefundService injection.
- * Sprint 20: Tests updated to include ShopAdapterInterface mock.
+ * Sprint 22: Removed OrderRefundUpdateService (dead code), full refund only.
  *
  * Note: These tests focus on the handler's interface and event handling.
  * Business logic tests are in RefundServiceTest.
@@ -30,7 +29,6 @@ class StripeRefundRequestHandlerTest extends TestCase
 {
     private RefundServiceInterface&MockObject $refundService;
     private ContractRepositoryInterface&MockObject $contractRepository;
-    private OrderRefundUpdateServiceInterface&MockObject $orderRefundUpdateService;
     private RequestLogServiceInterface&MockObject $requestLogService;
     private ShopAdapterInterface&MockObject $shopAdapter;
     private LoggerInterface&MockObject $logger;
@@ -39,7 +37,6 @@ class StripeRefundRequestHandlerTest extends TestCase
     {
         $this->refundService = $this->createMock(RefundServiceInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
-        $this->orderRefundUpdateService = $this->createMock(OrderRefundUpdateServiceInterface::class);
         $this->requestLogService = $this->createMock(RequestLogServiceInterface::class);
         $this->shopAdapter = $this->createMock(ShopAdapterInterface::class);
         $this->shopAdapter->method('getShopId')->willReturn('1');
@@ -51,7 +48,6 @@ class StripeRefundRequestHandlerTest extends TestCase
         return new StripeRefundRequestHandler(
             $this->refundService,
             $this->contractRepository,
-            $this->orderRefundUpdateService,
             $this->requestLogService,
             $this->shopAdapter,
             $this->logger
@@ -79,7 +75,6 @@ class StripeRefundRequestHandlerTest extends TestCase
 
         // RefundService should never be called for non-matching events
         $this->refundService->expects($this->never())->method('processFullRefund');
-        $this->refundService->expects($this->never())->method('processPartialRefund');
         $this->refundService->expects($this->never())->method('processRefundByCharge');
 
         $handler->handle($otherEvent);

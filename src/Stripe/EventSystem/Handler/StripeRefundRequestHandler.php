@@ -11,8 +11,7 @@ use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
-use OxidEsales\Payments\Stripe\DTO\RefundResult;
-use OxidEsales\Payments\Stripe\Service\OrderRefundUpdateServiceInterface;
+use OxidEsales\PaymentComponent\Service\Result\RefundResult;
 use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
 use OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
@@ -21,15 +20,14 @@ use Psr\Log\NullLogger;
 /**
  * Handles refund requests via Stripe API.
  *
- * Sprint 10: Refactored to use OrderRefundUpdateService (SRP).
  * Sprint 21: Refactored to delegate to RefundService (SRP).
+ * Sprint 22: Removed OrderRefundUpdateService (dead code), removed partial refund.
  *
  * Handler responsibilities (ONLY):
  * 1. Receive event and extract parameters
- * 2. Delegate to RefundService
- * 3. Delegate order updates to OrderRefundUpdateService
- * 4. Delegate logging to RequestLogService
- * 5. Set results in context
+ * 2. Delegate to RefundService (full refund only)
+ * 3. Delegate logging to RequestLogService
+ * 4. Set results in context
  *
  * @since 2.0.0
  */
@@ -40,7 +38,6 @@ class StripeRefundRequestHandler implements HandlerInterface
     public function __construct(
         private readonly RefundServiceInterface $refundService,
         private readonly ContractRepositoryInterface $contractRepository,
-        private readonly OrderRefundUpdateServiceInterface $orderRefundUpdateService,
         private readonly RequestLogServiceInterface $requestLogService,
         private readonly ShopAdapterInterface $shopAdapter,
         ?LoggerInterface $logger = null,
@@ -137,53 +134,39 @@ class StripeRefundRequestHandler implements HandlerInterface
         return $transId;
     }
 
+    /**
+     * Execute full refund via RefundService.
+     *
+     * Sprint 22: Stripe module only supports full refunds.
+     */
     private function executeRefund(
         StripeRefundRequestEvent $event,
         string $orderId,
         string $paymentIntentId
     ): RefundResult {
+        // Stripe module only supports full refunds
+        if (!$event->isFullRefund()) {
+            return RefundResult::failure(
+                'Stripe module only supports full refunds. Use Stripe Dashboard for partial refunds.'
+            );
+        }
+
         $chargeId = $event->getChargeId();
         if ($chargeId !== null) {
-            $amountCents = $this->convertAmountToCents($event->getAmount());
             return $this->refundService->processRefundByCharge(
                 $chargeId,
-                $amountCents,
                 $event->getReason(),
                 $this->buildMetadata($event, $orderId)
             );
         }
 
-        if ($event->isFullRefund()) {
-            return $this->refundService->processFullRefund(
-                $orderId,
-                $paymentIntentId,
-                $event->getReason(),
-                $event->getDescription(),
-                $event->getInitiator()
-            );
-        }
-
-        $amountCents = $this->convertAmountToCents($event->getAmount());
-        if ($amountCents === null) {
-            return RefundResult::failure('Invalid refund amount');
-        }
-
-        return $this->refundService->processPartialRefund(
+        return $this->refundService->processFullRefund(
             $orderId,
-            $amountCents,
             $paymentIntentId,
             $event->getReason(),
             $event->getDescription(),
             $event->getInitiator()
         );
-    }
-
-    private function convertAmountToCents(?float $amount): ?int
-    {
-        if ($amount === null) {
-            return null;
-        }
-        return (int) round($amount * 100);
     }
 
     /**
@@ -217,24 +200,9 @@ class StripeRefundRequestHandler implements HandlerInterface
             return;
         }
 
-        $this->updateOrderAfterRefund($order, $event);
         $this->updateContractState($event);
         $this->logRefundRequest($result, $order);
         $this->setSuccessResults($context, $result, $order);
-    }
-
-    /**
-     * Update order after refund.
-     *
-     * Sprint 10: Delegates to OrderRefundUpdateService for full refunds.
-     */
-    private function updateOrderAfterRefund(Order $order, StripeRefundRequestEvent $event): void
-    {
-        if (!$event->isFullRefund()) {
-            return;
-        }
-
-        $this->orderRefundUpdateService->updateOrderAfterFullRefund($order);
     }
 
     private function updateContractState(StripeRefundRequestEvent $event): void

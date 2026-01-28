@@ -14,6 +14,7 @@ use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
+use OxidEsales\Payments\Stripe\Service\Result\ReconciliationResult;
 
 /**
  * OXPAID Reconciliation Service

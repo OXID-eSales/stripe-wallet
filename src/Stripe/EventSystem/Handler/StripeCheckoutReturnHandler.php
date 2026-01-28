@@ -248,7 +248,7 @@ class StripeCheckoutReturnHandler implements HandlerInterface
     }
 
     private function dispatchPaymentEvent(
-        \OxidEsales\Payments\Stripe\DTO\CheckoutReturnResult $result,
+        \OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult $result,
         EventContext $context
     ): void {
         $paymentIntentId = $result->getPaymentIntentId() ?? '';
@@ -302,7 +302,7 @@ class StripeCheckoutReturnHandler implements HandlerInterface
      */
     private function handleRequiresCaptureStatus(
         PaymentContractInterface $contract,
-        \OxidEsales\Payments\Stripe\DTO\CheckoutReturnResult $result,
+        \OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult $result,
         EventContext $context
     ): void {
         $paymentIntentId = $result->getPaymentIntentId() ?? '';

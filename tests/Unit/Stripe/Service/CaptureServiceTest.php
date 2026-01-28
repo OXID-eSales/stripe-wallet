@@ -9,7 +9,7 @@ use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
-use OxidEsales\Payments\Stripe\DTO\CaptureResult;
+use OxidEsales\PaymentComponent\Service\Result\CaptureResult;
 use OxidEsales\Payments\Stripe\Service\CaptureService;
 use OxidEsales\Payments\Stripe\Service\CaptureServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;

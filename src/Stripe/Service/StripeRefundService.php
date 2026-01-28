@@ -9,30 +9,43 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Adapter\PaymentAdapterInterface;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface;
+use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Service\AbstractPaymentRefundService;
-use Psr\Log\LoggerInterface;
+use OxidEsales\PaymentComponent\Service\Exception\RefundFailedException;
 
 /**
  * Stripe-specific implementation of payment refund service.
  *
  * Sprint 3: Extends AbstractPaymentRefundService with Stripe-specific behavior.
+ * Sprint 22: Rejects partial refunds - Stripe module only supports full refunds.
+ *
  * Uses contract-based refund approach (per Q&A decision Q6).
  *
- * For now, uses all default behavior from AbstractPaymentRefundService:
- * - Validates FULFILLED state before refund
- * - Logs refund to transaction repository
- *
- * Future enhancements might include:
- * - Setting contract to REFUNDED state on full refund
- * - Stripe-specific webhook integration
- *
- * @since 2.0.0
  */
 class StripeRefundService extends AbstractPaymentRefundService
 {
-    // Uses all default behavior from AbstractPaymentRefundService
-    // Stripe-specific customizations can be added here by overriding hook methods
+    /**
+     * Override to reject partial refunds.
+     *
+     * Stripe module only supports full refunds.
+     * For partial refunds, use Stripe Dashboard directly.
+     *
+     * @throws RefundFailedException If partial refund requested
+     */
+    protected function validateRefundAmount(string $contractId, float $refundAmount, float $availableForRefund): void
+    {
+        // Stripe module only supports full refund - reject partial amounts
+        if (abs($refundAmount - $availableForRefund) > 0.01) {
+            throw new RefundFailedException(
+                $contractId,
+                sprintf(
+                    'Stripe module only supports full refunds. Requested: %.2f, Available: %.2f. Use Stripe Dashboard for partial refunds.',
+                    $refundAmount,
+                    $availableForRefund
+                )
+            );
+        }
+
+        parent::validateRefundAmount($contractId, $refundAmount, $availableForRefund);
+    }
 }

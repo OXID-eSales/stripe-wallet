@@ -10,7 +10,7 @@ use OxidEsales\PaymentComponent\Contract\ContractState;
 use OxidEsales\PaymentComponent\Contract\PaymentContract;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\Payments\Stripe\DTO\CaptureResult;
+use OxidEsales\PaymentComponent\Service\Result\CaptureResult;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCaptureRequestHandler;
 use OxidEsales\Payments\Stripe\Service\CaptureServiceInterface;

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
-use OxidEsales\Payments\Stripe\DTO\CheckoutReturnResult;
+use OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutReturnService;
 use OxidEsales\Payments\Stripe\Service\CheckoutReturnServiceInterface;

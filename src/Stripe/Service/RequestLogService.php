@@ -19,7 +19,6 @@ use Psr\Log\NullLogger;
  * Sprint 15: Refactored to use FileLoggerInterface instead of database model.
  * Logs to log/osc/stripe_requests.log via RequestFileLoggerFactory.
  *
- * @since 2.0.0
  */
 final class RequestLogService implements RequestLogServiceInterface
 {

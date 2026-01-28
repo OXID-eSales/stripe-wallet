@@ -10,7 +10,8 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
-use OxidEsales\Payments\Stripe\DTO\RefundResult;
+use OxidEsales\PaymentComponent\Service\Result\RefundResult;
+use OxidEsales\PaymentComponent\Service\StockRestorationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -20,6 +21,8 @@ use Stripe\Refund;
  * Service for processing Stripe refunds.
  *
  * Sprint 21: Extract business logic from StripeRefundRequestHandler.
+ * Sprint 22: Removed partial refund - Stripe module only supports full refunds.
+ * Sprint 24: Added stock restoration on successful refund.
  *
  * SOLID Principles:
  * - SRP: Only handles refund processing logic
@@ -37,6 +40,7 @@ final class RefundService implements RefundServiceInterface
 
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,
+        private readonly StockRestorationServiceInterface $stockRestorationService,
         ?LoggerInterface $logger = null
     ) {
         $this->logger = $logger ?? new NullLogger();
@@ -61,44 +65,38 @@ final class RefundService implements RefundServiceInterface
         $metadata = $this->buildMetadata($orderId, $initiator, $description);
         $validReason = $this->validateReason($reason);
 
-        return $this->processRefundByCharge($chargeId, null, $validReason, $metadata);
-    }
-
-    public function processPartialRefund(
-        string $orderId,
-        int $amountCents,
-        ?string $paymentIntentId = null,
-        ?string $reason = null,
-        ?string $description = null,
-        string $initiator = 'admin'
-    ): RefundResult {
-        if ($paymentIntentId === null) {
-            return RefundResult::failure('Payment intent ID is required for partial refund');
-        }
-
-        $chargeId = $this->getChargeIdFromPaymentIntent($paymentIntentId);
-        if ($chargeId === null) {
-            return RefundResult::failure('No charge found for payment intent');
-        }
-
-        $metadata = $this->buildMetadata($orderId, $initiator, $description);
-        $validReason = $this->validateReason($reason);
-
-        return $this->processRefundByCharge($chargeId, $amountCents, $validReason, $metadata);
+        return $this->executeRefundByCharge($chargeId, $orderId, $validReason, $metadata);
     }
 
     public function processRefundByCharge(
         string $chargeId,
-        ?int $amountCents = null,
         ?string $reason = null,
         ?array $metadata = null
     ): RefundResult {
+        // Extract orderId from metadata if available
+        $orderId = $metadata['order_id'] ?? null;
+
+        return $this->executeRefundByCharge($chargeId, $orderId, $reason, $metadata);
+    }
+
+    /**
+     * Execute refund by charge ID with order context.
+     *
+     * @param array<string, string>|null $metadata
+     */
+    private function executeRefundByCharge(
+        string $chargeId,
+        ?string $orderId,
+        ?string $reason,
+        ?array $metadata
+    ): RefundResult {
         try {
+            // Always full refund (null amount)
             $refund = $this->adapterFactory
                 ->getStripeAdapter()
-                ->createRefundByCharge($chargeId, $amountCents, $reason, $metadata);
+                ->createRefundByCharge($chargeId, null, $reason, $metadata);
 
-            return $this->handleRefundResponse($refund, $chargeId);
+            return $this->handleRefundResponse($refund, $chargeId, $orderId);
         } catch (PaymentAdapterException $e) {
             return $this->handleRefundError($e, $chargeId);
         }
@@ -152,12 +150,21 @@ final class RefundService implements RefundServiceInterface
         return in_array($reason, self::VALID_REASONS, true) ? $reason : null;
     }
 
-    private function handleRefundResponse(Refund $refund, string $chargeId): RefundResult
+    private function handleRefundResponse(Refund $refund, string $chargeId, ?string $orderId): RefundResult
     {
         $status = $refund->status ?? 'unknown';
 
         if (!in_array($status, ['succeeded', 'pending'], true)) {
             return RefundResult::failure("Refund failed with status: {$status}");
+        }
+
+        // Restore stock for all order articles (Sprint 24)
+        if ($orderId !== null) {
+            $articlesProcessed = $this->stockRestorationService->restoreStockForOrder($orderId);
+            $this->logger->info('Stock restored after refund', [
+                'orderId' => $orderId,
+                'articlesProcessed' => $articlesProcessed,
+            ]);
         }
 
         $this->logger->info('Refund processed successfully', [

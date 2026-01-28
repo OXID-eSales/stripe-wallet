@@ -172,45 +172,20 @@ class OrderRefund extends AdminDetailsController
     }
 
     /**
-     * Execute partial refund action via event system.
+     * Partial refund is not supported.
+     *
+     * Sprint 22: Stripe module only supports full refunds.
+     * For partial refunds, use Stripe Dashboard.
      *
      * @return void
+     * @deprecated Use fullRefund() instead. Partial refund removed in Sprint 22.
      */
     public function partialRefund(): void
     {
-        $oOrder = $this->getOrder();
-        if ($oOrder === null) {
-            $this->setErrorMessage(Registry::getLang()->translateString('STRIPE_REFUND_NO_ORDER'));
-            $this->_blSuccessfulRefund = false;
-            return;
-        }
-
-        $amount = $this->getRefundAmountFromRequest();
-        if ($amount === null || $amount <= 0) {
-            $this->setErrorMessage(Registry::getLang()->translateString('STRIPE_REFUND_INVALID_AMOUNT'));
-            $this->_blSuccessfulRefund = false;
-            return;
-        }
-
-        // Create event context with refund data
-        $context = new EventContext([
-            'orderId' => $oOrder->getId(),
-            'contractId' => $this->getContractIdFromOrder($oOrder),
-            'amount' => $amount,
-            'reason' => $this->getRefundReasonFromRequest(),
-            'description' => $this->getRefundDescriptionFromRequest(),
-            'initiator' => 'admin',
-        ]);
-
-        // Dispatch event - handler does all the work
-        $event = new StripeRefundRequestEvent($context);
-        $this->getEventDispatcher()->dispatch($event);
-
-        // Store context for result processing
-        $this->_oEventContext = $context;
-
-        // Process results from handler
-        $this->processContextResults($context);
+        $this->setErrorMessage(
+            'Partial refund is not supported. Use Stripe Dashboard for partial refunds.'
+        );
+        $this->_blSuccessfulRefund = false;
     }
 
     // =========================================================================
@@ -655,36 +630,18 @@ class OrderRefund extends AdminDetailsController
     }
 
     /**
-     * Checks if there were previous partial refunds and therefore full refund is not available anymore
+     * Check if full refund is available.
+     *
+     * Sprint 22: Simplified - Stripe module only supports full refunds.
+     * Actual refund availability is determined by Stripe API via isOrderRefundable().
      *
      * @return bool
      */
     public function isFullRefundAvailable(): bool
     {
-        $oOrder = $this->getOrder();
-        if ($oOrder === null) {
-            return false;
-        }
-
-        foreach ($oOrder->getOrderArticles() as $orderArticle) {
-            $amountRefunded = (float)($orderArticle->oxorderarticles__stripeamountrefunded->value ?? 0);
-            $quantityRefunded = $orderArticle->oxorderarticles__stripequantityrefunded->value ?? 0;
-            if ($amountRefunded > 0 || $quantityRefunded > 0) {
-                return false;
-            }
-        }
-
-        if (
-            ($oOrder->oxorder__stripedelcostrefunded->value ?? 0) > 0
-            || ($oOrder->oxorder__stripepaycostrefunded->value ?? 0) > 0
-            || ($oOrder->oxorder__stripewrapcostrefunded->value ?? 0) > 0
-            || ($oOrder->oxorder__stripegiftcardrefunded->value ?? 0) > 0
-            || ($oOrder->oxorder__stripevoucherdiscountrefunded->value ?? 0) > 0
-            || ($oOrder->oxorder__stripediscountrefunded->value ?? 0) > 0
-        ) {
-            return false;
-        }
-        return true;
+        // Stripe module only supports full refunds
+        // Actual availability is checked via Stripe API in isOrderRefundable()
+        return $this->getOrder() !== null;
     }
 
     /**

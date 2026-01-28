@@ -7,12 +7,13 @@
 
 declare(strict_types=1);
 
-namespace OxidEsales\Payments\Stripe\DTO;
+namespace OxidEsales\Payments\Stripe\Service\Result;
 
 /**
  * Result object for checkout session creation.
  *
  * Sprint 21: Extract business logic from StripeCheckoutSessionHandler.
+ * Sprint 25: Moved from DTO/ to Service/Result/ for consistent organization.
  *
  * Immutable DTO following the Result Object pattern:
  * - Named constructors for success/failure states

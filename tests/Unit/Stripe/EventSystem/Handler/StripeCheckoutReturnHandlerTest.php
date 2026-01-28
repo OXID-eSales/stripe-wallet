@@ -9,7 +9,7 @@ use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
 use OxidEsales\Payments\Stripe\Service\Result\SecurityValidationResult;
 use OxidEsales\Payments\Stripe\Service\CheckoutReturnServiceInterface;
-use OxidEsales\Payments\Stripe\DTO\CheckoutReturnResult;
+use OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\Event\Payment\PaymentAuthorizedEvent;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;

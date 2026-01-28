@@ -7,12 +7,15 @@
 
 declare(strict_types=1);
 
-namespace OxidEsales\Payments\Stripe\Service;
+namespace OxidEsales\Payments\Stripe\Service\Result;
 
 /**
  * Result of a single order reconciliation attempt.
  *
- * @since Sprint 10
+ * Sprint 10: Created for reconciliation service.
+ * Sprint 25: Moved to Service/Result/ for consistent organization.
+ *
+ * @since 2.0.0
  */
 final class ReconciliationResult
 {
@@ -26,6 +29,9 @@ final class ReconciliationResult
     ) {
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [
