@@ -2,13 +2,13 @@
 
 **Last Updated:** 2026-01-28
 **Previous State:** 836 tests, 2478 assertions, COMMITABLE
-**Current State:** 606 tests, 1474 assertions, ALL CHECKS PASS, COMMITABLE
+**Current State:** 606 tests (stripe) + 599 tests (payment-component), ALL CHECKS PASS, COMMITABLE
 
-**Note:** Test count decreased because DTO tests moved from stripe to payment-component.
+**Note:** Test count in stripe decreased because DTO tests moved to payment-component.
 
 ---
 
-## Sprint 25: COMPLETED
+## Sprint 25: COMPLETED + Follow-up Fixes
 
 **DTO Consolidation and Organization**
 
@@ -20,6 +20,32 @@ Resolved duplicate DTOs between stripe and payment-component. Stripe now uses co
 - Deleted stripe's `DTO/` folder entirely
 - Moved Stripe-specific DTOs to `Service/Result/`
 - Updated all imports and tests
+
+**Follow-up Fixes (see report 03):**
+- Fixed payment-component test property access (use getters)
+- Fixed PHPStan errors for `$providerData` array types
+- Fixed DI autowiring issue for `OxidStockRestorationService`
+- Moved `ModuleConfiguration.php` to consistent location
+
+---
+
+## Additional Fixes (Post-Sprint 25)
+
+### 1. DI Container Fix - OxidStockRestorationService
+
+**Problem:** Module activation failed - autowiring couldn't resolve `Doctrine\DBAL\Connection`.
+
+**Solution:** Added `OxidStockRestorationService.php` to the exclude list in `services.yaml` so only the explicit service definition is used.
+
+### 2. Code Organization - ModuleConfiguration Move
+
+**Problem:** `ModuleConfiguration.php` was in `Application/Controller/Admin/` but all other admin controllers are in `Controller/Admin/`.
+
+**Solution:**
+- Moved `src/Stripe/Application/Controller/Admin/ModuleConfiguration.php` → `src/Stripe/Controller/Admin/ModuleConfiguration.php`
+- Updated namespace from `Application\Controller\Admin` to `Controller\Admin`
+- Updated references in `metadata.php`, `phpstan-bootstrap.php`, and recipe yaml
+- Deleted empty `Application/` directory tree
 
 ---
 
@@ -47,81 +73,59 @@ Removed dead code and simplified refund architecture.
 
 ---
 
-## Changes Made (Sprint 25)
+## All Changes Today
 
-### payment-component - Files Created (4 files)
-
-```
-# New CancellationResult DTO
-extensions/payment-component/src/Service/Result/CancellationResult.php
-
-# New Tests
-extensions/payment-component/tests/Unit/Service/Result/CaptureResultTest.php
-extensions/payment-component/tests/Unit/Service/Result/CancellationResultTest.php
-extensions/payment-component/tests/Unit/Service/Result/RefundResultTest.php
-```
-
-### payment-component - Files Modified (4 files)
+### payment-component
 
 | File | Change |
 |------|--------|
-| `src/Service/Result/RefundResult.php` | Added success/failure factory methods |
-| `src/Service/Result/CaptureResult.php` | Added success/failure factory methods |
+| `src/Service/Result/RefundResult.php` | Added success/failure factories + PHPDoc fix |
+| `src/Service/Result/CaptureResult.php` | Added success/failure factories + PHPDoc fix |
+| `src/Service/Result/CancellationResult.php` | CREATED |
 | `src/Service/AbstractPaymentRefundService.php` | Use `RefundResult::create()` |
 | `src/Service/AbstractPaymentCaptureService.php` | Use `CaptureResult::create()` |
+| `tests/Unit/Service/PaymentCaptureServiceTest.php` | Fixed property access → getters |
+| `tests/Unit/Service/Result/CaptureResultTest.php` | CREATED |
+| `tests/Unit/Service/Result/CancellationResultTest.php` | CREATED |
+| `tests/Unit/Service/Result/RefundResultTest.php` | CREATED |
 
-### stripe - Files Deleted (10 files)
+### stripe
 
-```
-# DTOs (now using component's)
-src/Stripe/DTO/RefundResult.php
-src/Stripe/DTO/CaptureResult.php
-src/Stripe/DTO/CancellationResult.php
-src/Stripe/DTO/CheckoutSessionResult.php     # Moved to Service/Result/
-src/Stripe/DTO/CheckoutReturnResult.php      # Moved to Service/Result/
-
-# Tests
-tests/Unit/Stripe/DTO/CaptureResultTest.php
-tests/Unit/Stripe/DTO/RefundResultTest.php
-tests/Unit/Stripe/DTO/CancellationResultTest.php
-tests/Unit/Stripe/DTO/CheckoutSessionResultTest.php
-tests/Unit/Stripe/DTO/CheckoutReturnResultTest.php
-```
-
-### stripe - Files Created (3 files - moved from DTO/)
-
-```
-src/Stripe/Service/Result/CheckoutSessionResult.php
-src/Stripe/Service/Result/CheckoutReturnResult.php
-src/Stripe/Service/Result/ReconciliationResult.php
-```
-
-### stripe - Files Modified (16+ files)
-
-All service and handler files updated to use new namespaces:
-- `OxidEsales\PaymentComponent\Service\Result\RefundResult`
-- `OxidEsales\PaymentComponent\Service\Result\CaptureResult`
-- `OxidEsales\PaymentComponent\Service\Result\CancellationResult`
-- `OxidEsales\Payments\Stripe\Service\Result\CheckoutSessionResult`
-- `OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult`
-- `OxidEsales\Payments\Stripe\Service\Result\ReconciliationResult`
-
-Tests updated to use getter methods instead of property access.
+| File | Change |
+|------|--------|
+| `services.yaml` | Added OxidStockRestorationService to exclude list |
+| `src/Stripe/Service/OxidStockRestorationService.php` | Added `@var Order` PHPDoc |
+| `src/Stripe/Controller/Admin/ModuleConfiguration.php` | CREATED (moved) |
+| `src/Stripe/Application/` | DELETED (entire directory tree) |
+| `metadata.php` | Updated ModuleConfiguration import |
+| `tests/PhpStan/phpstan-bootstrap.php` | Updated class_alias |
+| `recipe/.../oe_payments_stripe_wallet.yaml` | Updated classExtensions |
+| `src/Stripe/DTO/` | DELETED (entire folder) |
+| `src/Stripe/Service/Result/CheckoutSessionResult.php` | CREATED (moved from DTO/) |
+| `src/Stripe/Service/Result/CheckoutReturnResult.php` | CREATED (moved from DTO/) |
+| `src/Stripe/Service/Result/ReconciliationResult.php` | CREATED (moved from Service/) |
+| 16+ service/handler files | Updated imports to new namespaces |
+| Multiple test files | Updated property access → getters |
 
 ---
 
-## Final DTO Structure
+## Final Structure
 
-### Component (provider-agnostic):
+### Controller Admin Layout (Consistent)
+```
+stripe/src/Stripe/Controller/Admin/
+├── ModuleConfiguration.php  (MOVED from Application/)
+├── OrderRefund.php
+└── StripeConnect.php
+```
+
+### DTO/Result Layout
 ```
 payment-component/src/Service/Result/
 ├── CaptureResult.php      (with success/failure factories)
 ├── CancellationResult.php (NEW)
 └── RefundResult.php       (with success/failure factories)
-```
 
-### Stripe (provider-specific only):
-```
 stripe/src/Stripe/Service/Result/
 ├── CheckoutSessionResult.php    (Stripe-specific)
 ├── CheckoutReturnResult.php     (Stripe-specific)
@@ -129,37 +133,29 @@ stripe/src/Stripe/Service/Result/
 └── SecurityValidationResult.php (existing)
 ```
 
-**Deleted:** `stripe/src/Stripe/DTO/` folder
+**Deleted:**
+- `stripe/src/Stripe/DTO/` folder
+- `stripe/src/Stripe/Application/` folder
 
 ---
 
 ## Test Results
 
 ```
-./bin/pre-commit-check.sh
+payment-component:
+✓ PHP Code Sniffer passed
+✓ PHPUnit tests passed (599 tests, 1372 assertions)
+✓ PHPStan passed
+✓ PHPMD passed
+Status: COMMITABLE
 
+stripe:
 ✓ PHP Code Sniffer passed
 ✓ PHPUnit tests passed (606 tests, 1474 assertions)
 ✓ PHPStan passed
 ✓ PHPMD passed
-
 Status: COMMITABLE
 ```
-
----
-
-## Acceptance Criteria - Sprint 25 - ALL MET
-
-- [x] No duplicate `RefundResult` classes (Stripe uses component's)
-- [x] No duplicate `CaptureResult` classes (Stripe uses component's)
-- [x] `CancellationResult` in payment-component
-- [x] No `src/Stripe/DTO/` folder
-- [x] All Stripe-specific result DTOs in `src/Stripe/Service/Result/`
-- [x] Component's Result DTOs have success/failure factory methods
-- [x] Backward compatibility maintained via `create()` method
-- [x] All unit tests pass
-- [x] PHPStan passes
-- [x] `./bin/pre-commit-check.sh` passes
 
 ---
 
@@ -171,7 +167,8 @@ docs/payment-component/daniil_dev_log/20260128/
 ├── todo/                                         (empty)
 ├── reports/
 │   ├── 01-unused-order-refund-fields.md          (detailed analysis)
-│   └── 02-dto-inventory.md                       (DTO inventory report)
+│   ├── 02-dto-inventory.md                       (DTO inventory report)
+│   └── 03-sprint-25-followup-fixes.md            (NEW - follow-up fixes)
 └── done/
     ├── SPRINT-22-refund-cleanup.md               (completed sprint)
     ├── SPRINT-23-remove-stock-management.md      (completed sprint)
@@ -186,3 +183,4 @@ docs/payment-component/daniil_dev_log/20260128/
 - Previous dev log: `20260126/status.md`
 - Architecture docs: `docs/payment-component/architecture/07-capture-refund-operations.md`
 - DTO inventory: `reports/02-dto-inventory.md`
+- Follow-up fixes: `reports/03-sprint-25-followup-fixes.md`

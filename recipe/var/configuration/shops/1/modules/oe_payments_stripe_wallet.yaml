@@ -14,7 +14,7 @@ author: 'OXID eSales AG'
 url: 'https://www.oxid-esales.com'
 email: info@oxid-esales.com
 classExtensions:
-  OxidEsales\Eshop\Application\Controller\Admin\ModuleConfiguration: OxidEsales\Payments\Stripe\Application\Controller\Admin\ModuleConfiguration
+  OxidEsales\Eshop\Application\Controller\Admin\ModuleConfiguration: OxidEsales\Payments\Stripe\Controller\Admin\ModuleConfiguration
   OxidEsales\Eshop\Core\ViewConfig: OxidEsales\Payments\Stripe\Core\ViewConfig
   OxidEsales\Eshop\Application\Model\Payment: OxidEsales\Payments\Stripe\Model\Payment
   OxidEsales\Eshop\Application\Model\Order: OxidEsales\Payments\Stripe\Model\Order

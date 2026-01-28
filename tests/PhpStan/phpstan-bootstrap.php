@@ -15,7 +15,7 @@ class_alias(
 
 class_alias(
     OxidEsales\EshopCommunity\Application\Controller\Admin\ModuleConfiguration::class,
-    OxidEsales\Payments\Stripe\Application\Controller\Admin\ModuleConfiguration_parent::class
+    OxidEsales\Payments\Stripe\Controller\Admin\ModuleConfiguration_parent::class
 );
 
 class_alias(

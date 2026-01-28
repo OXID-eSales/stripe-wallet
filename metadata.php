@@ -13,7 +13,7 @@ use OxidEsales\Eshop\Application\Controller\PaymentController;
 use OxidEsales\Eshop\Application\Model\Order as CoreOrder;
 use OxidEsales\Eshop\Application\Model\Payment as CorePayment;
 use OxidEsales\Eshop\Core\ViewConfig;
-use OxidEsales\Payments\Stripe\Application\Controller\Admin\ModuleConfiguration as StripeModuleConfiguration;
+use OxidEsales\Payments\Stripe\Controller\Admin\ModuleConfiguration as StripeModuleConfiguration;
 use OxidEsales\Payments\Stripe\Controller\Admin\OrderRefund;
 use OxidEsales\Payments\Stripe\Controller\Admin\StripeConnect;
 use OxidEsales\Payments\Stripe\Controller\StripeOrderController as StripeOrderController;

@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OxidEsales\Payments\Stripe\Application\Controller\Admin;
+namespace OxidEsales\Payments\Stripe\Controller\Admin;
 
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
