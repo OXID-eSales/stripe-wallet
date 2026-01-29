@@ -11,7 +11,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeContractCreationHandler;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
-use OxidEsales\Payments\Stripe\Service\ContractMetadataServiceInterface;
+use OxidEsales\PaymentComponent\Service\ContractMetadataServiceInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;

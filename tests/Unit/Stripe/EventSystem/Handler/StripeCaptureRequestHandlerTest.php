@@ -14,7 +14,7 @@ use OxidEsales\PaymentComponent\Service\Result\CaptureResult;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCaptureRequestHandler;
 use OxidEsales\Payments\Stripe\Service\CaptureServiceInterface;
-use OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface;
+use OxidEsales\PaymentComponent\Service\RequestLogServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;

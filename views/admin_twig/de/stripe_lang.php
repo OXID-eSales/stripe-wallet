@@ -13,7 +13,8 @@ $aLang = array(
 
     /* SETTINGS */
     'SHOP_MODULE_GROUP_STRIPE_GENERAL'                  => 'Grundkonfiguration',
-    'SHOP_MODULE_sStripeMode'                           => 'Modus',
+    'SHOP_MODULE_sStripeMode'                           => 'Live oder Test API',
+    'SHOP_MODULE_sStripeDevMode'                        => 'Ein für Logs, Debug und Entwicklungszwecke (Testmodus)',
     'SHOP_MODULE_sStripeMode_live'                      => 'Live',
     'SHOP_MODULE_sStripeMode_test'                      => 'Test',
     'SHOP_MODULE_sStripeTestToken'                      => 'Test API Key',

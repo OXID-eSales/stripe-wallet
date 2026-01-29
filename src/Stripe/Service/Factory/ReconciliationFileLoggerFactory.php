@@ -10,37 +10,31 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service\Factory;
 
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\PaymentComponent\Service\FileLogger;
-use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
-use Symfony\Component\Filesystem\Path;
+use OxidEsales\PaymentComponent\Service\Factory\AbstractFileLoggerFactory;
 
 /**
  * Factory for creating the reconciliation file logger.
  *
- * Gets the shop directory from OXID Registry to determine the log file path.
+ * Sprint 27: Extends AbstractFileLoggerFactory using Template Method Pattern.
+ * Sprint 14: Logs to log/osc/stripe_reconciliation.log for OXPAID reconciliation.
  *
  * @since Sprint 14
  */
-final class ReconciliationFileLoggerFactory
+final class ReconciliationFileLoggerFactory extends AbstractFileLoggerFactory
 {
-    private const LOG_FILE = 'log/osc/stripe_reconciliation.log';
+    protected function getLogFile(): string
+    {
+        return 'log/osc/stripe_reconciliation.log';
+    }
 
-    /**
-     * Create the reconciliation file logger.
-     *
-     * @return FileLoggerInterface
-     * @throws \RuntimeException If shop directory not configured
-     */
-    public function create(): FileLoggerInterface
+    protected function getPrefix(): string
+    {
+        return 'RECONCILE';
+    }
+
+    protected function getShopDirectory(): string
     {
         $shopDir = Registry::getConfig()->getConfigParam('sShopDir');
-
-        if (!is_string($shopDir)) {
-            throw new \RuntimeException('Shop directory not configured');
-        }
-
-        $logFilePath = Path::join(rtrim($shopDir, '/'), self::LOG_FILE);
-
-        return new FileLogger($logFilePath, 'RECONCILE');
+        return is_string($shopDir) ? $shopDir : '';
     }
 }

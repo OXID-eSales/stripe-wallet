@@ -13,7 +13,7 @@ use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
 use OxidEsales\PaymentComponent\Service\Result\RefundResult;
 use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
-use OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface;
+use OxidEsales\PaymentComponent\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Tests\Unit\Stripe\Service;
 
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
+use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\PaymentComponent\Service\Result\CancellationResult;
 use OxidEsales\Payments\Stripe\Service\CancelAuthorizationService;
 use OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface;
@@ -17,21 +18,25 @@ use Stripe\PaymentIntent;
  * Unit tests for CancelAuthorizationService.
  *
  * Sprint 11: Tests for the extracted cancel authorization service.
+ * Sprint 26: Updated to use factory instead of direct adapter injection.
  *
  * @covers \OxidEsales\Payments\Stripe\Service\CancelAuthorizationService
  */
 class CancelAuthorizationServiceTest extends TestCase
 {
     private StripeAdapterInterface&MockObject $stripeAdapter;
+    private StripeAdapterFactoryInterface&MockObject $adapterFactory;
 
     protected function setUp(): void
     {
         $this->stripeAdapter = $this->createMock(StripeAdapterInterface::class);
+        $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
+        $this->adapterFactory->method('getStripeAdapter')->willReturn($this->stripeAdapter);
     }
 
     private function createService(): CancelAuthorizationService
     {
-        return new CancelAuthorizationService($this->stripeAdapter, new NullLogger());
+        return new CancelAuthorizationService($this->adapterFactory, new NullLogger());
     }
 
     public function testImplementsInterface(): void
@@ -43,7 +48,7 @@ class CancelAuthorizationServiceTest extends TestCase
 
     public function testConstructorAcceptsNullLogger(): void
     {
-        $service = new CancelAuthorizationService($this->stripeAdapter, null);
+        $service = new CancelAuthorizationService($this->adapterFactory, null);
 
         $this->assertInstanceOf(CancelAuthorizationServiceInterface::class, $service);
     }

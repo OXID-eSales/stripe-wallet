@@ -169,10 +169,15 @@ services:
     alias: OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactoryInterface
     public: true
 
-  # Stripe Adapter Interface - Created via factory
-  # Used by handlers that need direct adapter access (capture, cancel authorization)
-  OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface:
-    factory: ['@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface', 'getStripeAdapter']
+  # Sprint 26: Removed StripeAdapterInterface factory service definition.
+  # It was causing module activation to fail when API keys are not configured.
+  # Services now use LazyStripeAdapter which defers adapter creation until first use.
+
+  # Lazy Stripe Adapter - Defers adapter creation until first use
+  # Allows module activation without API keys configured
+  OxidEsales\Payments\Stripe\Adapter\LazyStripeAdapter:
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
     public: false
 
   # ==========================================
@@ -200,14 +205,14 @@ services:
   OxidEsales\Payments\Stripe\Adapter\OxidShopAdapter:
     alias: OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface
 
-  # Session Adapter Interface - Sprint 20: Abstracts session access for unit testing
-  OxidEsales\Payments\Stripe\Adapter\SessionAdapterInterface:
+  # Session Adapter Interface - Sprint 27: Uses payment-component interface
+  OxidEsales\PaymentComponent\Adapter\SessionAdapterInterface:
     class: OxidEsales\Payments\Stripe\Adapter\OxidSessionAdapter
     public: false
 
   # OXID Session Adapter - OXID eShop specific implementation
   OxidEsales\Payments\Stripe\Adapter\OxidSessionAdapter:
-    alias: OxidEsales\Payments\Stripe\Adapter\SessionAdapterInterface
+    alias: OxidEsales\PaymentComponent\Adapter\SessionAdapterInterface
 
   # ==========================================
   # Shop Order Service (Order Operations)
@@ -294,13 +299,13 @@ services:
     alias: OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface
 
   # ==========================================
-  # Delivery Address Hash Service (Sprint 20)
+  # Delivery Address Hash Service (Sprint 27)
   # ==========================================
+  # Sprint 27: Uses payment-component interface and implementation.
   # Encapsulates $_REQUEST modification for OXID's delivery address validation.
-  # OXID reads from $_REQUEST['sDeliveryAddressMD5'] which requires this anti-pattern.
 
-  OxidEsales\Payments\Stripe\Service\DeliveryAddressHashServiceInterface:
-    class: OxidEsales\Payments\Stripe\Service\DeliveryAddressHashService
+  OxidEsales\PaymentComponent\Service\DeliveryAddressHashServiceInterface:
+    class: OxidEsales\PaymentComponent\Service\DeliveryAddressHashService
     public: false
 
   # ==========================================
@@ -317,13 +322,13 @@ services:
     public: false
 
   # ==========================================
-  # Contract Metadata Service (Sprint 21)
+  # Contract Metadata Service (Sprint 27)
   # ==========================================
-  # Extracted business logic from StripeContractCreationHandler.
+  # Sprint 27: Uses payment-component interface and implementation.
   # SRP: Service handles contract metadata operations.
 
-  OxidEsales\Payments\Stripe\Service\ContractMetadataServiceInterface:
-    class: OxidEsales\Payments\Stripe\Service\ContractMetadataService
+  OxidEsales\PaymentComponent\Service\ContractMetadataServiceInterface:
+    class: OxidEsales\PaymentComponent\Service\ContractMetadataService
     public: false
 
   # ==========================================
@@ -338,7 +343,7 @@ services:
     arguments:
       $contractService: '@OxidEsales\PaymentComponent\Service\ContractServiceInterface'
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
-      $metadataService: '@OxidEsales\Payments\Stripe\Service\ContractMetadataServiceInterface'
+      $metadataService: '@OxidEsales\PaymentComponent\Service\ContractMetadataServiceInterface'
       $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
       $eventLogger: '@stripe.events.file_logger'
     tags:
@@ -361,10 +366,10 @@ services:
     public: false
 
   # Order Payment Completed Handler - Updates OXPAID when contract is fulfilled
+  # Sprint 27: Uses payment-component handler (provider-agnostic)
   # Sprint 14: Event-driven OXPAID update via ContractFulfilledEvent
   # Sprint 16: Uses OrderPaymentStateService for OXPAID updates (DRY)
-  # Sprint 25: Added event logger for debugging
-  OxidEsales\Payments\Stripe\EventSystem\Handler\OrderPaymentCompletedHandler:
+  OxidEsales\PaymentComponent\EventSystem\Handler\OrderPaymentCompletedHandler:
     arguments:
       $orderPaymentStateService: '@OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface'
       $logger: '@oxid_esales.monolog.logger'
@@ -402,9 +407,9 @@ services:
       $checkoutReturnService: '@OxidEsales\Payments\Stripe\Service\CheckoutReturnServiceInterface'
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
       $securityValidator: '@OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface'
-      $deliveryAddressHashService: '@OxidEsales\Payments\Stripe\Service\DeliveryAddressHashServiceInterface'
+      $deliveryAddressHashService: '@OxidEsales\PaymentComponent\Service\DeliveryAddressHashServiceInterface'
       $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
-      $sessionAdapter: '@OxidEsales\Payments\Stripe\Adapter\SessionAdapterInterface'
+      $sessionAdapter: '@OxidEsales\PaymentComponent\Adapter\SessionAdapterInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
     tags:
@@ -437,7 +442,7 @@ services:
       $shopOrderService: '@OxidEsales\PaymentComponent\Adapter\ShopOrderServiceInterface'
       $orderPaymentStateService: '@OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface'
       $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
-      $sessionAdapter: '@OxidEsales\Payments\Stripe\Adapter\SessionAdapterInterface'
+      $sessionAdapter: '@OxidEsales\PaymentComponent\Adapter\SessionAdapterInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
     tags:
@@ -452,7 +457,7 @@ services:
     arguments:
       $captureService: '@OxidEsales\Payments\Stripe\Service\CaptureServiceInterface'
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
-      $requestLogService: '@OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface'
+      $requestLogService: '@OxidEsales\PaymentComponent\Service\RequestLogServiceInterface'
       $shopAdapter: '@OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
@@ -467,7 +472,7 @@ services:
   OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCancelAuthorizationRequestHandler:
     arguments:
       $cancelService: '@OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface'
-      $requestLogService: '@OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface'
+      $requestLogService: '@OxidEsales\PaymentComponent\Service\RequestLogServiceInterface'
       $shopAdapter: '@OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
@@ -511,7 +516,8 @@ services:
     class: OxidEsales\PaymentComponent\Service\FileLoggerInterface
     factory: ['@OxidEsales\Payments\Stripe\Service\Factory\RequestFileLoggerFactory', 'create']
 
-  OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface:
+  # Sprint 27: Uses payment-component interface
+  OxidEsales\PaymentComponent\Service\RequestLogServiceInterface:
     class: OxidEsales\Payments\Stripe\Service\RequestLogService
     autowire: false
     arguments:
@@ -521,7 +527,7 @@ services:
 
   # Alias class name to interface for direct class type-hints
   OxidEsales\Payments\Stripe\Service\RequestLogService:
-    alias: OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface
+    alias: OxidEsales\PaymentComponent\Service\RequestLogServiceInterface
 
   # ==========================================
   # Webhook Log Service (Sprint 16)
@@ -555,10 +561,11 @@ services:
   # Handles both contract-based and direct captures.
   # SRP: Service handles capture execution and contract state transition.
 
+  # Sprint 26: Changed $stripeAdapter to $adapterFactory for lazy adapter creation
   OxidEsales\Payments\Stripe\Service\CaptureServiceInterface:
     class: OxidEsales\Payments\Stripe\Service\CaptureService
     arguments:
-      $stripeAdapter: '@OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface'
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
     public: false
@@ -569,10 +576,11 @@ services:
   # Extracted cancel authorization logic from StripeCancelAuthorizationRequestHandler.
   # SRP: Service handles PaymentIntent cancellation.
 
+  # Sprint 26: Changed $stripeAdapter to $adapterFactory for lazy adapter creation
   OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface:
     class: OxidEsales\Payments\Stripe\Service\CancelAuthorizationService
     arguments:
-      $stripeAdapter: '@OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface'
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
       $logger: '@oxid_esales.monolog.logger'
     public: false
 
@@ -621,18 +629,20 @@ services:
   # - Uses contract-based refund approach (per Q&A decision Q6)
   # - Validates FULFILLED state before refund
 
+  # Sprint 26: Uses LazyStripeAdapter for lazy adapter creation (module activation fix)
   OxidEsales\Payments\Stripe\Service\StripeCaptureService:
     arguments:
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
-      $paymentAdapter: '@OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface'
+      $paymentAdapter: '@OxidEsales\Payments\Stripe\Adapter\LazyStripeAdapter'
       $logger: '@oxid_esales.monolog.logger'
     public: true
 
+  # Sprint 26: Uses LazyStripeAdapter for lazy adapter creation (module activation fix)
   OxidEsales\Payments\Stripe\Service\StripeRefundService:
     arguments:
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
       $transactionRepository: '@OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface'
-      $paymentAdapter: '@OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface'
+      $paymentAdapter: '@OxidEsales\Payments\Stripe\Adapter\LazyStripeAdapter'
       $logger: '@oxid_esales.monolog.logger'
     public: true
 
@@ -649,7 +659,7 @@ services:
     arguments:
       $refundService: '@OxidEsales\Payments\Stripe\Service\RefundServiceInterface'
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
-      $requestLogService: '@OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface'
+      $requestLogService: '@OxidEsales\PaymentComponent\Service\RequestLogServiceInterface'
       $shopAdapter: '@OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
@@ -782,6 +792,9 @@ services:
     tags:
       - { name: oxid.view_controller, controller_key: order }
     public: true
+
+  # Note: ModuleConfiguration is a class extension (extends ModuleConfiguration_parent)
+  # and cannot use standard DI. It uses ContainerFactory for lazy service retrieval.
 
   # ==========================================
   # Webhook Handlers (Sprint 13)

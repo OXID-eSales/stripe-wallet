@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use DateTimeImmutable;
+use OxidEsales\PaymentComponent\Adapter\PaymentAdapterInterface;
 use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
 use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
 use OxidEsales\PaymentComponent\Contract\ContractState;
@@ -12,7 +13,6 @@ use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\Exception\CaptureFailedException;
 use OxidEsales\PaymentComponent\Service\Result\CaptureResult;
-use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\StripeCaptureService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -20,18 +20,20 @@ use Psr\Log\LoggerInterface;
 
 /**
  * @covers \OxidEsales\Payments\Stripe\Service\StripeCaptureService
+ *
+ * Sprint 26: Service now uses LazyStripeAdapter via PaymentAdapterInterface.
  */
 class StripeCaptureServiceTest extends TestCase
 {
     private ContractRepositoryInterface&MockObject $contractRepository;
-    private StripeAdapterInterface&MockObject $stripeAdapter;
+    private PaymentAdapterInterface&MockObject $stripeAdapter;
     private LoggerInterface&MockObject $logger;
     private StripeCaptureService $service;
 
     protected function setUp(): void
     {
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
-        $this->stripeAdapter = $this->createMock(StripeAdapterInterface::class);
+        $this->stripeAdapter = $this->createMock(PaymentAdapterInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->service = new StripeCaptureService(

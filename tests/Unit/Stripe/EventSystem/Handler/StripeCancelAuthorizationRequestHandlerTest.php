@@ -9,7 +9,7 @@ use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCancelAuthorizationRequ
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
 use OxidEsales\PaymentComponent\Service\Result\CancellationResult;
 use OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface;
-use OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface;
+use OxidEsales\PaymentComponent\Service\RequestLogServiceInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;

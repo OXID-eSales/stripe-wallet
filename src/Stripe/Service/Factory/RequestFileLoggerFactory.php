@@ -10,37 +10,32 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service\Factory;
 
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\PaymentComponent\Service\FileLogger;
-use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
+use OxidEsales\PaymentComponent\Service\Factory\AbstractFileLoggerFactory;
 
 /**
  * Factory for creating the request logging file logger.
  *
+ * Sprint 27: Extends AbstractFileLoggerFactory using Template Method Pattern.
  * Sprint 15: Logs API requests/responses to file instead of database.
- * Logs to log/osc/stripe_requests.log
+ * Logs to log/osc/stripe_requests.log.
  *
  * @since 2.0.0
  */
-final class RequestFileLoggerFactory
+final class RequestFileLoggerFactory extends AbstractFileLoggerFactory
 {
-    private const LOG_FILE = 'log/osc/stripe_requests.log';
+    protected function getLogFile(): string
+    {
+        return 'log/osc/stripe_requests.log';
+    }
 
-    /**
-     * Create the request file logger.
-     *
-     * @return FileLoggerInterface
-     * @throws \RuntimeException If shop directory not configured
-     */
-    public function create(): FileLoggerInterface
+    protected function getPrefix(): string
+    {
+        return 'REQUEST';
+    }
+
+    protected function getShopDirectory(): string
     {
         $shopDir = Registry::getConfig()->getConfigParam('sShopDir');
-
-        if (!is_string($shopDir)) {
-            throw new \RuntimeException('Shop directory not configured');
-        }
-
-        $logFilePath = rtrim($shopDir, '/') . '/' . self::LOG_FILE;
-
-        return new FileLogger($logFilePath, 'REQUEST');
+        return is_string($shopDir) ? $shopDir : '';
     }
 }

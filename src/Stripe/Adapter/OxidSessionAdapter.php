@@ -9,12 +9,13 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Adapter;
 
-use OxidEsales\Eshop\Application\Model\Basket;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\PaymentComponent\Adapter\SessionAdapterInterface;
 
 /**
  * OXID implementation of SessionAdapterInterface.
  *
+ * Sprint 27: Implements payment-component interface (moved from Stripe).
  * Sprint 20: Wraps Registry::getSession() to allow mocking in unit tests.
  *
  * @since 2.0.0
@@ -26,8 +27,8 @@ final class OxidSessionAdapter implements SessionAdapterInterface
         return Registry::getSession()->getId();
     }
 
-    /** @phpstan-ignore return.unusedType */
-    public function getBasket(): ?Basket
+    /** @phpstan-ignore return.unusedType (interface allows null, OXID always returns basket) */
+    public function getBasket(): ?object
     {
         return Registry::getSession()->getBasket();
     }

@@ -2,22 +2,8 @@
 
 {% block admin_module_config_var %}
 
-    {% if module_var == 'sStripeStatusPending' or module_var == 'sStripeStatusProcessing' or module_var == 'sStripeStatusCancelled' %}
-        <dl>
-            <dt>
-                <select class="select" name="confselects[{{ module_var }}]" {{  readonly  }}>
-                    <option value="PENDING" {% if confselects[module_var] == 'PENDING' %}selected{% endif %}>{{ translate({ ident: "PENDING", noerror: true }) }}</option>
-                    <option value="OK" {% if confselects[module_var] == 'OK' %}selected{% endif %}>{{ translate({ ident: "OK", noerror: true }) }}</option>
-                    <option value="ERROR" {% if confselects[module_var] == 'ERROR' %}selected{% endif %}>{{ translate({ ident: "ERROR", noerror: true }) }}</option>
-                    <option value="PROBLEMS" {% if confselects[module_var] == 'PROBLEMS' %}selected{% endif %}>{{ translate({ ident: "PROBLEMS", noerror: true }) }}</option>
-                </select>
-                {% include "inputhelp.html.twig" with {'sHelpId': help_id("HELP_SHOP_MODULE_" ~ module_var), 'sHelpText': help_text("HELP_SHOP_MODULE_" ~ module_var)} %}
-            </dt>
-            <dd>
-                {{ translate({ ident: "SHOP_MODULE_" ~ module_var }) }}
-            </dd>
-        </dl>
-    {% elseif module_var == 'sStripeTestToken' or module_var == 'sStripeLiveToken' or module_var == 'sStripeTestPk' or module_var == 'sStripeLivePk' %}
+    {# Sprint 29: Status mappings (sStripeStatusPending, etc.) moved to StatusMappingConfig class #}
+    {% if module_var == 'sStripeTestToken' or module_var == 'sStripeLiveToken' or module_var == 'sStripeTestPk' or module_var == 'sStripeLivePk' %}
         {% if module_var == 'sStripeTestToken' or module_var == 'sStripeLiveToken' %}
             <dl>
                 <dt>

@@ -151,32 +151,7 @@ class ModuleConfigurationService implements ServiceInterface
         return (bool) $this->get('blStripeLogTransactionInfo');
     }
 
-    /**
-     * Get status mapping for pending orders
-     */
-    public function getStatusPending(): string
-    {
-        $status = $this->get('sStripeStatusPending');
-        return is_string($status) ? $status : '';
-    }
-
-    /**
-     * Get status mapping for processing orders
-     */
-    public function getStatusProcessing(): string
-    {
-        $status = $this->get('sStripeStatusProcessing');
-        return is_string($status) ? $status : '';
-    }
-
-    /**
-     * Get status mapping for cancelled orders
-     */
-    public function getStatusCancelled(): string
-    {
-        $status = $this->get('sStripeStatusCancelled');
-        return is_string($status) ? $status : '';
-    }
+    // Sprint 29: Status mapping methods removed - use StatusMappingConfig constants instead
 
     /**
      * Check if payment method should be removed by billing country
@@ -252,7 +227,7 @@ class ModuleConfigurationService implements ServiceInterface
     public function getWebhookUrl(): string
     {
         $shopUrl = $this->getShopBaseUrl();
-        return rtrim($shopUrl, '/') . '/index.php?cl=osc_stripe_webhook';
+        return rtrim($shopUrl, '/') . '/index.php?cl=StripeWebhookController';
     }
 
     /**

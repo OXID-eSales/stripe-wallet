@@ -24,6 +24,8 @@ use Psr\Log\LoggerInterface;
  * - Validates AUTHORIZED state before capture (instead of COMMITTED)
  * - Calls captureAuthorization() after capture (instead of fulfill())
  *
+ * Sprint 26: Uses LazyStripeAdapter for lazy adapter creation (module activation fix).
+ *
  * This supports Stripe's delayed capture flow where:
  * 1. Payment is authorized (contract in AUTHORIZED state)
  * 2. Admin captures payment (transitions to READY_TO_COMMIT)

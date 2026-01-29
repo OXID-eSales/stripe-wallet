@@ -12,7 +12,7 @@ use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ContractServiceInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeContractCreationHandler;
-use OxidEsales\Payments\Stripe\Service\ContractMetadataServiceInterface;
+use OxidEsales\PaymentComponent\Service\ContractMetadataServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 

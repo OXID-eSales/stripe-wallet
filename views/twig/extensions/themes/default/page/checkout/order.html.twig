@@ -3,6 +3,11 @@
 {% set payment = oView.getPayment() %}
 {% set paymentId = payment.getId() %}
 
+{% block base_js %}
+    {{ parent() }}
+    {% include '@oe_payments_stripe_wallet/frontend/base_js.html.twig' %}
+{% endblock %}
+
 {% block shippingAndPayment %}
     {% if payment.isStripePaymentMethod() == false %}
         {{ parent() }}
@@ -41,7 +46,7 @@
                 </button>
             </h4>
             <div class="card-body">
-                {% set payment_id_template = paymentId|replace({'osc_': ''}) %}
+                {% set payment_id_template = paymentId|replace({'oe_payments_': ''}) %}
                 {% include [
                     "@oe_payments_stripe_wallet/frontend/" ~ payment_id_template ~ ".html.twig",
                     "@oe_payments_stripe_wallet/frontend/payment_method_unsupported.html.twig"]

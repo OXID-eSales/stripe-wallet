@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
+use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\PaymentComponent\Service\Result\CancellationResult;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -13,6 +13,7 @@ use Psr\Log\NullLogger;
  * Service for canceling Stripe payment authorizations.
  *
  * Sprint 11: Extract from StripeCancelAuthorizationRequestHandler.
+ * Sprint 26: Changed to use factory for lazy adapter creation (module activation fix).
  *
  * @since 2.0.0
  */
@@ -21,7 +22,7 @@ final class CancelAuthorizationService implements CancelAuthorizationServiceInte
     private readonly LoggerInterface $logger;
 
     public function __construct(
-        private readonly StripeAdapterInterface $stripeAdapter,
+        private readonly StripeAdapterFactoryInterface $adapterFactory,
         ?LoggerInterface $logger = null
     ) {
         $this->logger = $logger ?? new NullLogger();
@@ -32,7 +33,7 @@ final class CancelAuthorizationService implements CancelAuthorizationServiceInte
         ?string $reason = null
     ): CancellationResult {
         try {
-            $cancelledPaymentIntent = $this->stripeAdapter->cancelPaymentIntent(
+            $cancelledPaymentIntent = $this->adapterFactory->getStripeAdapter()->cancelPaymentIntent(
                 $paymentIntentId,
                 $reason
             );

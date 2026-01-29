@@ -10,37 +10,32 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service\Factory;
 
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\PaymentComponent\Service\FileLogger;
-use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
+use OxidEsales\PaymentComponent\Service\Factory\AbstractFileLoggerFactory;
 
 /**
  * Factory for creating the webhook file logger.
  *
+ * Sprint 27: Refactored to extend AbstractFileLoggerFactory using Template Method Pattern.
  * Sprint 16: Logs webhook requests/responses to file.
  * Logs to log/osc/stripe_webhooks.log
  *
  * @since 2.0.0
  */
-final class WebhookFileLoggerFactory
+final class WebhookFileLoggerFactory extends AbstractFileLoggerFactory
 {
-    private const LOG_FILE = 'log/osc/stripe_webhooks.log';
+    protected function getLogFile(): string
+    {
+        return 'log/osc/stripe_webhooks.log';
+    }
 
-    /**
-     * Create the webhook file logger.
-     *
-     * @return FileLoggerInterface
-     * @throws \RuntimeException If shop directory not configured
-     */
-    public function create(): FileLoggerInterface
+    protected function getPrefix(): string
+    {
+        return 'WEBHOOK';
+    }
+
+    protected function getShopDirectory(): string
     {
         $shopDir = Registry::getConfig()->getConfigParam('sShopDir');
-
-        if (!is_string($shopDir)) {
-            throw new \RuntimeException('Shop directory not configured');
-        }
-
-        $logFilePath = rtrim($shopDir, '/') . '/' . self::LOG_FILE;
-
-        return new FileLogger($logFilePath, 'WEBHOOK');
+        return is_string($shopDir) ? $shopDir : '';
     }
 }

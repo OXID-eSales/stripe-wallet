@@ -13,7 +13,7 @@ use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ContractServiceInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
-use OxidEsales\Payments\Stripe\Service\ContractMetadataServiceInterface;
+use OxidEsales\PaymentComponent\Service\ContractMetadataServiceInterface;
 
 /**
  * Creates payment contract for Stripe Checkout Session flow.

@@ -9,6 +9,7 @@ use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
+use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\PaymentComponent\Service\Result\CaptureResult;
 use OxidEsales\Payments\Stripe\Service\CaptureService;
 use OxidEsales\Payments\Stripe\Service\CaptureServiceInterface;
@@ -20,24 +21,28 @@ use Psr\Log\NullLogger;
  * Unit tests for CaptureService.
  *
  * Sprint 9: Tests for the extracted capture business logic.
+ * Sprint 26: Updated to use factory instead of direct adapter injection.
  *
  * @covers \OxidEsales\Payments\Stripe\Service\CaptureService
  */
 class CaptureServiceTest extends TestCase
 {
     private StripeAdapterInterface&MockObject $adapter;
+    private StripeAdapterFactoryInterface&MockObject $adapterFactory;
     private ContractRepositoryInterface&MockObject $repository;
 
     protected function setUp(): void
     {
         $this->adapter = $this->createMock(StripeAdapterInterface::class);
+        $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
+        $this->adapterFactory->method('getStripeAdapter')->willReturn($this->adapter);
         $this->repository = $this->createMock(ContractRepositoryInterface::class);
     }
 
     private function createService(): CaptureService
     {
         return new CaptureService(
-            $this->adapter,
+            $this->adapterFactory,
             $this->repository,
             new NullLogger()
         );

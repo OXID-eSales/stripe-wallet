@@ -18,9 +18,9 @@ use OxidEsales\PaymentComponent\Service\Exception\RefundFailedException;
  *
  * Sprint 3: Extends AbstractPaymentRefundService with Stripe-specific behavior.
  * Sprint 22: Rejects partial refunds - Stripe module only supports full refunds.
+ * Sprint 26: Uses LazyStripeAdapter for lazy adapter creation (module activation fix).
  *
  * Uses contract-based refund approach (per Q&A decision Q6).
- *
  */
 class StripeRefundService extends AbstractPaymentRefundService
 {

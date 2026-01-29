@@ -6,8 +6,8 @@ export class CheckoutPage extends BasePage {
     stripeWalletPayment: 'label:has-text("Digitale Börse"), label:has-text("Stripe")',
     continueButton: 'button:has-text("Weiter"), button:has-text("Continue"), button.nextStep',
     termsCheckbox: '#checkAgb, input[name*="ord_agb"]',
-    submitOrderButton: 'button:has-text("Zahlungspflichtig bestellen")',
-    submitOrderButtonAlt: '#orderConfirmAgbBottom, button:has-text("Order now"), button:has-text("Kaufen")',
+    submitOrderButton: '#stripe-checkout-btn',
+    submitOrderButtonAlt: 'button:has-text("Zahlungspflichtig bestellen"), #orderConfirmAgbBottom',
   };
 
   async navigateToCart(): Promise<void> {
@@ -70,12 +70,21 @@ export class CheckoutPage extends BasePage {
   async submitOrder(): Promise<void> {
     await this.acceptTerms();
 
-    // Try primary submit button first
+    // Try Stripe submit button first (with Stimulus controller)
     let submitBtn = this.page.locator(this.selectors.submitOrderButton).first();
-    if (!await submitBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      submitBtn = this.page.locator(this.selectors.submitOrderButtonAlt).first();
+    if (await submitBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      // Wait for Stimulus controller to be connected
+      await this.page.waitForFunction(() => {
+        const btn = document.getElementById('stripe-checkout-btn');
+        return btn && btn.hasAttribute('data-controller');
+      }, { timeout: 10000 });
+      await this.page.waitForTimeout(500);
+      await submitBtn.click();
+      return;
     }
 
+    // Fallback to alternative submit button
+    submitBtn = this.page.locator(this.selectors.submitOrderButtonAlt).first();
     if (await submitBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await submitBtn.click();
     }

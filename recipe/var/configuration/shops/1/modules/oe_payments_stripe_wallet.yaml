@@ -21,11 +21,9 @@ classExtensions:
   OxidEsales\Eshop\Application\Controller\PaymentController: OxidEsales\Payments\Stripe\Controller\PaymentController
   OxidEsales\Eshop\Application\Controller\OrderController: OxidEsales\Payments\Stripe\Controller\StripeOrderController
 controllers:
-  osc_stripe_payment: OxidEsales\Payments\Stripe\Controller\PaymentController
-  osc_stripe_webhook: OxidEsales\Payments\Stripe\Controller\Webhook\WebhookController
+  StripeWebhookController: OxidEsales\Payments\Stripe\Controller\Webhook\WebhookController
   StripeConnect: OxidEsales\Payments\Stripe\Controller\Admin\StripeConnect
-  stripe_order_refund: OxidEsales\Payments\Stripe\Controller\Admin\OrderRefund
-  orderController: OxidEsales\Payments\Stripe\Controller\StripeOrderController
+  OrderRefund: OxidEsales\Payments\Stripe\Controller\Admin\OrderRefund
 events:
   onActivate: 'OxidEsales\Payments\Stripe\Core\Events::onActivate'
   onDeactivate: 'OxidEsales\Payments\Stripe\Core\Events::onDeactivate'
@@ -93,11 +91,6 @@ moduleSettings:
     type: bool
     value: false
     position: 37
-  blStripeUseStructuredCustomId:
-    group: STRIPE_GENERAL
-    type: bool
-    value: false
-    position: 38
   sStripeCaptureMode:
     group: STRIPE_GENERAL
     type: select
@@ -106,21 +99,7 @@ moduleSettings:
       - automatic
       - manual
     position: 39
-  sStripeStatusPending:
-    group: STRIPE_STATUS_MAPPING
-    type: select
-    value: ''
-    position: 50
-  sStripeStatusProcessing:
-    group: STRIPE_STATUS_MAPPING
-    type: select
-    value: ''
-    position: 60
-  sStripeStatusCancelled:
-    group: STRIPE_STATUS_MAPPING
-    type: select
-    value: ''
-    position: 70
+  # Sprint 29: Status mappings moved to StatusMappingConfig class
   sStripeCronFinishOrdersActive:
     group: STRIPE_CRONJOBS
     type: bool

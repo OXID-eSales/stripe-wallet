@@ -10,38 +10,31 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service\Factory;
 
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\PaymentComponent\Service\FileLogger;
-use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
-use Symfony\Component\Filesystem\Path;
+use OxidEsales\PaymentComponent\Service\Factory\AbstractFileLoggerFactory;
 
 /**
  * Factory for creating the event system file logger.
  *
- * Gets the shop directory from OXID Registry to determine the log file path.
- * Logs to log/osc/stripe_events.log for debugging event handler flow.
+ * Sprint 27: Extends AbstractFileLoggerFactory using Template Method Pattern.
+ * Sprint 25: Logs to log/osc/stripe_events.log for debugging event handler flow.
  *
  * @since Sprint 25
  */
-final class EventFileLoggerFactory
+final class EventFileLoggerFactory extends AbstractFileLoggerFactory
 {
-    private const LOG_FILE = 'log/osc/stripe_events.log';
+    protected function getLogFile(): string
+    {
+        return 'log/osc/stripe_events.log';
+    }
 
-    /**
-     * Create the event file logger.
-     *
-     * @return FileLoggerInterface
-     * @throws \RuntimeException If shop directory not configured
-     */
-    public function create(): FileLoggerInterface
+    protected function getPrefix(): string
+    {
+        return 'EVENT';
+    }
+
+    protected function getShopDirectory(): string
     {
         $shopDir = Registry::getConfig()->getConfigParam('sShopDir');
-
-        if (!is_string($shopDir)) {
-            throw new \RuntimeException('Shop directory not configured');
-        }
-
-        $logFilePath = Path::join(rtrim($shopDir, '/'), self::LOG_FILE);
-
-        return new FileLogger($logFilePath, 'EVENT');
+        return is_string($shopDir) ? $shopDir : '';
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use DateTimeImmutable;
+use OxidEsales\PaymentComponent\Adapter\PaymentAdapterInterface;
 use OxidEsales\PaymentComponent\Adapter\Response\RefundResponse;
 use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
 use OxidEsales\PaymentComponent\Contract\ContractState;
@@ -13,7 +14,6 @@ use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\Exception\RefundFailedException;
 use OxidEsales\PaymentComponent\Service\Result\RefundResult;
-use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\StripeRefundService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -23,12 +23,13 @@ use Psr\Log\LoggerInterface;
  * @covers \OxidEsales\Payments\Stripe\Service\StripeRefundService
  *
  * Sprint 22: Updated tests - Stripe module only supports full refunds.
+ * Sprint 26: Service now uses LazyStripeAdapter via PaymentAdapterInterface.
  */
 class StripeRefundServiceTest extends TestCase
 {
     private ContractRepositoryInterface&MockObject $contractRepository;
     private TransactionRepositoryInterface&MockObject $transactionRepository;
-    private StripeAdapterInterface&MockObject $stripeAdapter;
+    private PaymentAdapterInterface&MockObject $stripeAdapter;
     private LoggerInterface&MockObject $logger;
     private StripeRefundService $service;
 
@@ -36,7 +37,7 @@ class StripeRefundServiceTest extends TestCase
     {
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->transactionRepository = $this->createMock(TransactionRepositoryInterface::class);
-        $this->stripeAdapter = $this->createMock(StripeAdapterInterface::class);
+        $this->stripeAdapter = $this->createMock(PaymentAdapterInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->service = new StripeRefundService(

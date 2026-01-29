@@ -121,11 +121,8 @@ test.describe('Stripe Wallet Checkout', () => {
       }
     }
 
-    // Submit order
-    const submitBtn = page.locator('button:has-text("Zahlungspflichtig bestellen")').first();
-    if (await submitBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await submitBtn.click();
-    }
+    // Click Stripe checkout button
+    await page.click('#stripe-checkout-btn');
     console.log('✓ Clicked submit order');
 
     // Step 7: Complete Stripe payment

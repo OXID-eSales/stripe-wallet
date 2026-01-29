@@ -10,12 +10,14 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
+use OxidEsales\PaymentComponent\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
 /**
  * Service for logging payment API requests to file.
  *
+ * Sprint 27: Implements payment-component RequestLogServiceInterface.
  * Sprint 15: Refactored to use FileLoggerInterface instead of database model.
  * Logs to log/osc/stripe_requests.log via RequestFileLoggerFactory.
  *

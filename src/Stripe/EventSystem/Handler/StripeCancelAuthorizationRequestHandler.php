@@ -11,7 +11,7 @@ use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 use OxidEsales\PaymentComponent\Service\Result\CancellationResult;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
 use OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface;
-use OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface;
+use OxidEsales\PaymentComponent\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 

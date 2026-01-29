@@ -10,22 +10,32 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Controller\Admin;
 
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
+use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\Payments\Stripe\Module;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
 
+/**
+ * Extended admin ModuleConfiguration controller for Stripe module settings.
+ *
+ * Note: OXID class extensions cannot use standard constructor DI because
+ * the parent class (ModuleConfiguration_parent) is a virtual class created
+ * at runtime by OXID's class chain system. We use ContainerFactory for
+ * lazy service retrieval instead.
+ */
 class ModuleConfiguration extends ModuleConfiguration_parent
 {
-    use ServiceContainer;
+    private ?ModuleConfigurationService $moduleConfig = null;
 
-    /**
-     * @var \OxidEsales\Payments\Stripe\Service\ModuleConfigurationService
-     */
-    private ModuleConfigurationService $moduleConfig;
-
-    public function __construct()
+    private function getModuleConfig(): ModuleConfigurationService
     {
-        $this->moduleConfig = $this->getServiceFromContainer(ModuleConfigurationService::class);
+        if ($this->moduleConfig === null) {
+            /** @var ModuleConfigurationService $service */
+            $service = ContainerFactory::getInstance()
+                ->getContainer()
+                ->get(ModuleConfigurationService::class);
+            $this->moduleConfig = $service;
+        }
+        return $this->moduleConfig;
     }
 
     /**
@@ -47,27 +57,15 @@ class ModuleConfiguration extends ModuleConfiguration_parent
      */
     public function stripeIsTestMode(): bool
     {
-        try {
-            return $this->moduleConfig->isTestMode();
-        } catch (\Exception $e) {
-            //@TODO log error here
-            return false;
-        }
+        return $this->getModuleConfig()->isTestMode();
     }
 
     /**
      * Check if test- or api-key is configured
-     *
-     * @return bool
      */
     public function stripeHasApiKeys(): bool
     {
-        try {
-            return !empty($this->moduleConfig->getToken());
-        } catch (\Exception $e) {
-            //@TODO log error here
-            return false;
-        }
+        return !empty($this->getModuleConfig()->getToken());
     }
 
     /**

@@ -6,7 +6,7 @@ namespace OxidEsales\Payments\Tests\Unit\Stripe\Service;
 
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\Service\RequestLogService;
-use OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface;
+use OxidEsales\PaymentComponent\Service\RequestLogServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;

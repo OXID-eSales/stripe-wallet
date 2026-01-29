@@ -2,7 +2,7 @@
    Stripe Order Refund Admin Template
 
    Controller: OxidEsales\Payments\Stripe\Controller\Admin\OrderRefund
-   Controller Key: stripe_order_refund
+   Controller Key: OrderRefund
 
    Available oView methods:
    - isStripeOrder(): bool - true if order paid with Stripe
@@ -68,7 +68,7 @@
 <form name="transfer" id="transfer" action="{{ oViewConf.getSelfLink() }}" method="post">
     {{ oViewConf.getHiddenSid()|raw }}
     <input type="hidden" name="oxid" value="{{ oxid }}">
-    <input type="hidden" name="cl" value="stripe_order_refund">
+    <input type="hidden" name="cl" value="OrderRefund">
 </form>
 
 {% if oView.isStripeOrder() == true %}
@@ -173,7 +173,7 @@
             <legend>{{ translate({ ident: "STRIPE_CAPTURE_PAYMENT" }) }}</legend>
             <form name="captureForm" id="captureForm" action="{{ oViewConf.getSelfLink() }}" method="post">
                 {{ oViewConf.getHiddenSid()|raw }}
-                <input type="hidden" name="cl" value="stripe_order_refund">
+                <input type="hidden" name="cl" value="OrderRefund">
                 <input type="hidden" name="oxid" value="{{ oxid }}">
                 <input type="hidden" name="fnc" value="capturePayment">
 
@@ -193,7 +193,7 @@
                 <legend>{{ translate({ ident: "STRIPE_CANCEL_AUTHORIZATION" }) }}</legend>
                 <form name="cancelForm" id="cancelForm" action="{{ oViewConf.getSelfLink() }}" method="post">
                     {{ oViewConf.getHiddenSid()|raw }}
-                    <input type="hidden" name="cl" value="stripe_order_refund">
+                    <input type="hidden" name="cl" value="OrderRefund">
                     <input type="hidden" name="oxid" value="{{ oxid }}">
                     <input type="hidden" name="fnc" value="cancelAuthorization">
 
@@ -220,7 +220,7 @@
             <legend>{{ translate({ ident: "STRIPE_FULL_REFUND" }) }}</legend>
             <form name="search" id="search" action="{{ oViewConf.getSelfLink() }}" method="post">
                 {{ oViewConf.getHiddenSid()|raw }}
-                <input type="hidden" name="cl" value="stripe_order_refund">
+                <input type="hidden" name="cl" value="OrderRefund">
                 <input type="hidden" name="oxid" value="{{ oxid }}">
                 <input type="hidden" name="fnc" value="fullRefund">
 

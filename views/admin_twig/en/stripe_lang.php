@@ -13,7 +13,8 @@ $aLang = array(
 
     /* SETTINGS */
     'SHOP_MODULE_GROUP_STRIPE_GENERAL'                  => 'Basic configuration',
-    'SHOP_MODULE_sStripeMode'                           => 'Mode',
+    'SHOP_MODULE_sStripeMode'                           => 'Live or Test API',
+    'SHOP_MODULE_sStripeDevMode'                        => 'Switch on for Logs, Debug and Development',
     'SHOP_MODULE_sStripeMode_live'                      => 'Live',
     'SHOP_MODULE_sStripeMode_test'                      => 'Test',
     'SHOP_MODULE_sStripeTestToken'                      => 'Test API Access Token',
@@ -40,7 +41,6 @@ $aLang = array(
     'SHOP_MODULE_sStripeWebhookEndpoint'                => 'Webhook Endpoint',
     'SHOP_MODULE_sStripeWebhookEndpointSecret'          => 'Webhook Endpoint secret',
     'SHOP_MODULE_blStripeProvideCustomerEmailAddress'   => 'Send customer email address to Stripe',
-
     'HELP_SHOP_MODULE_sStripeTestKey'                   => 'Fill in your personal TEST private API key that will be used to set up the webhook endpoint.',
     'HELP_SHOP_MODULE_sStripeLiveKey'                   => 'Fill in your personal LIVE private API key that will be used to set up the webhook endpoint.',
     'HELP_SHOP_MODULE_blStripeLogTransactionInfo'       => 'Log file to be found here: SHOPROOT/log/StripeTransactions.log',
@@ -50,6 +50,7 @@ $aLang = array(
     'HELP_SHOP_MODULE_sStripeStatusPending'             => 'Set the order status before the customer is redirected to Payment Gateway',
     'HELP_SHOP_MODULE_sStripeStatusProcessing'          => 'Set the order status for Completed Payments',
     'HELP_SHOP_MODULE_sStripeStatusCancelled'           => 'Set the order status for cancelled orders',
+
     'HELP_SHOP_MODULE_sStripeCronFinishOrdersActive'    => 'This cronjob has the job to finish orders where the customer paid successfully but seemingly didnt return to the shop to complete the order process. The cronjob only finishes orders from the last 24 hours, to not change orders that were probably handled manually.<br><br>For this cronjob to work, in addition to this checkbox you have to ensure that the Stripe cronjob is set up properly. You can find information on how to set up the cronjob in the README.md of this module.',
     'HELP_SHOP_MODULE_sStripeCronSecondChanceActive'    => 'For this cronjob to work, in addition to this checkbox you have to ensure that the Stripe cronjob is set up properly. You can find information on how to set up the cronjob in the README.md of this module.',
     'HELP_SHOP_MODULE_sStripeCronOrderShipmentActive'   => 'This cronjob is only needed if the shipping status in your shop is set by an external service and NOT by the "Ship Now" button. For this cronjob to work, in addition to this checkbox you have to ensure that the Stripe cronjob is set up properly. You can find information on how to set up the cronjob in the README.md of this module.',

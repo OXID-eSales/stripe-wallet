@@ -10,7 +10,7 @@ use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
-use OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface;
+use OxidEsales\PaymentComponent\Service\RequestLogServiceInterface;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Log\LoggerInterface;

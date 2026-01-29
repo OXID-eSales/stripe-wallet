@@ -13,7 +13,7 @@ use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 use OxidEsales\PaymentComponent\Service\Result\CaptureResult;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
 use OxidEsales\Payments\Stripe\Service\CaptureServiceInterface;
-use OxidEsales\Payments\Stripe\Service\RequestLogServiceInterface;
+use OxidEsales\PaymentComponent\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 

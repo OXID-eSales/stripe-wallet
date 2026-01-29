@@ -151,26 +151,18 @@ class MetadataTest extends TestCase
         $controllers = $this->moduleData['controllers'];
 
         $this->assertArrayHasKey(
-            'osc_stripe_webhook',
+            'StripeWebhookController',
             $controllers,
             'Webhook controller must be registered'
         );
 
-        $this->assertArrayHasKey(
-            'osc_stripe_payment',
-            $controllers,
-            'Payment controller must be registered'
-        );
+        // Note: StripePaymentController is a class extension, not a standalone controller
+        // It extends PaymentController via metadata 'extend' section
 
         // Verify controller classes exist
         $this->assertTrue(
-            class_exists($controllers['osc_stripe_webhook']),
-            'Webhook controller class must exist: ' . $controllers['osc_stripe_webhook']
-        );
-
-        $this->assertTrue(
-            class_exists($controllers['osc_stripe_payment']),
-            'Payment controller class must exist: ' . $controllers['osc_stripe_payment']
+            class_exists($controllers['StripeWebhookController']),
+            'Webhook controller class must exist: ' . $controllers['StripeWebhookController']
         );
     }
 
@@ -257,24 +249,9 @@ class MetadataTest extends TestCase
             'Transaction logging setting must be defined'
         );
 
-        // Status mapping settings
-        $this->assertContains(
-            'sStripeStatusPending',
-            $settingNames,
-            'Status pending mapping must be defined'
-        );
-
-        $this->assertContains(
-            'sStripeStatusProcessing',
-            $settingNames,
-            'Status processing mapping must be defined'
-        );
-
-        $this->assertContains(
-            'sStripeStatusCancelled',
-            $settingNames,
-            'Status cancelled mapping must be defined'
-        );
+        // Sprint 29: Status mapping settings removed - now in StatusMappingConfig class
+        // sStripeStatusPending, sStripeStatusProcessing, sStripeStatusCancelled
+        // are no longer admin-configurable settings
     }
 
     /**

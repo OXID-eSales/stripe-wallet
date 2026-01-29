@@ -7,7 +7,7 @@ namespace OxidEsales\Payments\Stripe\Service;
 use OxidEsales\PaymentComponent\Adapter\Request\CapturePaymentRequest;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
+use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\PaymentComponent\Service\Result\CaptureResult;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -16,6 +16,7 @@ use Psr\Log\NullLogger;
  * Service for capturing Stripe payments.
  *
  * Sprint 9: Extracted from StripeCaptureRequestHandler.
+ * Sprint 26: Changed to use factory for lazy adapter creation (module activation fix).
  *
  * Handles both contract-based and direct captures:
  * - processCapture(): With contract, handles state transition
@@ -30,7 +31,7 @@ final class CaptureService implements CaptureServiceInterface
     private readonly LoggerInterface $logger;
 
     public function __construct(
-        private readonly StripeAdapterInterface $stripeAdapter,
+        private readonly StripeAdapterFactoryInterface $adapterFactory,
         private readonly ContractRepositoryInterface $contractRepository,
         ?LoggerInterface $logger = null
     ) {
@@ -79,7 +80,7 @@ final class CaptureService implements CaptureServiceInterface
                 metadata: $metadata
             );
 
-            $response = $this->stripeAdapter->capturePayment($request);
+            $response = $this->adapterFactory->getStripeAdapter()->capturePayment($request);
 
             $this->logger->info('Capture processed successfully', [
                 'payment_intent_id' => $paymentIntentId,

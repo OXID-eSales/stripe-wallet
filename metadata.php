@@ -57,11 +57,11 @@ $aModule = [
         OrderController::class => StripeOrderController::class,
     ],
     'controllers' => [
-        'osc_stripe_payment' => StripePaymentController::class,
-        'osc_stripe_webhook' => StripeWebhookController::class,
+        // Note: PaymentController and OrderController are class extensions, not standalone controllers.
+        // They should NOT be registered here to avoid namespace duplication errors.
+        'StripeWebhookController' => StripeWebhookController::class,
         'StripeConnect' => StripeConnect::class,
-        'stripe_order_refund' => OrderRefund::class,
-        'orderController' => StripeOrderController::class,
+        'OrderRefund' => OrderRefund::class,
     ],
     'events' => [
         'onActivate' => StripeEvents::class . '::onActivate',
@@ -84,11 +84,8 @@ $aModule = [
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeRemoveByBillingCountry',     'type' => 'bool',       'value' => '1',         'position' => 35],
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeRemoveByBasketCurrency',     'type' => 'bool',       'value' => '1',         'position' => 36],
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeProvideCustomerEmailAddress','type' => 'bool',       'value' => '0',         'position' => 37],
-        ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeUseStructuredCustomId',      'type' => 'bool',       'value' => '0',         'position' => 38],
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeCaptureMode',                 'type' => 'select',     'value' => 'automatic', 'position' => 39, 'constraints' => 'automatic|manual'],
-        ['group' => 'STRIPE_STATUS_MAPPING',    'name' => 'sStripeStatusPending',               'type' => 'select',     'value' => '',          'position' => 50],
-        ['group' => 'STRIPE_STATUS_MAPPING',    'name' => 'sStripeStatusProcessing',            'type' => 'select',     'value' => '',          'position' => 60],
-        ['group' => 'STRIPE_STATUS_MAPPING',    'name' => 'sStripeStatusCancelled',             'type' => 'select',     'value' => '',          'position' => 70],
+        // Sprint 29: Status mappings moved to StatusMappingConfig class (not admin-configurable)
         ['group' => 'STRIPE_CRONJOBS',          'name' => 'sStripeCronFinishOrdersActive',      'type' => 'bool',       'value' => '0',         'position' => 80],
         ['group' => 'STRIPE_CRONJOBS',          'name' => 'sStripeCronSecondChanceActive',      'type' => 'bool',       'value' => '0',         'position' => 90],
         ['group' => 'STRIPE_CRONJOBS',          'name' => 'iStripeCronSecondChanceTimeDiff',    'type' => 'select',     'value' => '1',         'position' => 100],

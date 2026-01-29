@@ -11,12 +11,12 @@ use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Contract\SecurityValidationResultInterface;
 use OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface;
-use OxidEsales\Payments\Stripe\Adapter\SessionAdapterInterface;
+use OxidEsales\PaymentComponent\Adapter\SessionAdapterInterface;
+use OxidEsales\PaymentComponent\Service\DeliveryAddressHashServiceInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutReturnServiceInterface;
 use OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler;
-use OxidEsales\Payments\Stripe\Service\DeliveryAddressHashServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 

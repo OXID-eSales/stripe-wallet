@@ -13,7 +13,7 @@ use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
-use OxidEsales\Payments\Stripe\Adapter\SessionAdapterInterface;
+use OxidEsales\PaymentComponent\Adapter\SessionAdapterInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
@@ -126,23 +126,25 @@ class StripeOrderCreationHandler implements HandlerInterface
     private function validateAndGetBasket(
         \OxidEsales\PaymentComponent\EventSystem\Event\EventContextInterface $context
     ): ?\OxidEsales\Eshop\Application\Model\Basket {
-        $basket = $this->sessionAdapter->getBasket();
-        $basketProductsCount = $basket !== null ? $basket->getProductsCount() : 0;
-        $this->logEvent('StripeOrderCreationHandler: Checking basket', [
-            'basketExists' => $basket !== null,
-            'basketProductsCount' => $basketProductsCount,
-            'sessionId' => $this->sessionAdapter->getSessionId(),
-        ]);
+        $basketObject = $this->sessionAdapter->getBasket();
 
-        /** @phpstan-ignore-next-line booleanNot.alwaysFalse - basket could be empty in edge cases */
-        if (!$basket) {
+        // Type guard: ensure basket is OXID Basket instance
+        if (!$basketObject instanceof \OxidEsales\Eshop\Application\Model\Basket) {
             $this->logEvent('StripeOrderCreationHandler: ERROR - No basket in session');
             $this->logger->error('StripeOrderCreationHandler: No basket in session');
             $context->set('error', 'No basket found in session');
             return null;
         }
 
-        if ($basket->getProductsCount() === 0) {
+        $basket = $basketObject;
+        $basketProductsCount = $basket->getProductsCount();
+        $this->logEvent('StripeOrderCreationHandler: Checking basket', [
+            'basketExists' => true,
+            'basketProductsCount' => $basketProductsCount,
+            'sessionId' => $this->sessionAdapter->getSessionId(),
+        ]);
+
+        if ($basketProductsCount === 0) {
             $this->logEvent('StripeOrderCreationHandler: ERROR - Basket is empty (0 products)');
             $this->logger->error('StripeOrderCreationHandler: Basket is empty');
             $context->set('error', 'Basket is empty');
