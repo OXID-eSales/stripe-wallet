@@ -12,8 +12,8 @@ Based on: OXID Paymenter Module v2.6.2-rc.4 (Refactored to Event-Driven)
 
 This documentation describes a **modern event-driven payment component architecture** that replaces traditional controller-driven checkout flows with a headless, event-based system. Build payment modules for multiple providers on top of this foundation:
 
-- **Payment Providers:** Stripe, Paymenter, Adyen, Amazon Pay, Mollie, Klarna, etc.
-- **E-commerce Platforms:** OXID, Shopware, Magento, WooCommerce, custom platforms
+- **Payment Providers:** Stripe
+- **E-commerce Platforms:** OXID CE/EE 7.4+
 
 ## Architecture Philosophy
 
