@@ -973,7 +973,7 @@ Just register the new subscriber and it works!
 **Mock the event dispatcher:**
 
 ```php
-class OrderControllerTest extends TestCase
+use docs\daniil_dev_log\class OrderControllerTest extends TestCase
 {
     public function testExecute(): void
     {
@@ -1130,4 +1130,3 @@ All triggered by ONE event!
 1. Read [CONTROLLER_INTEGRATION.md](CONTROLLER_INTEGRATION.md) for controller implementation
 2. Read [SERVICE_LAYER.md](SERVICE_LAYER.md) for service implementation
 3. Read [WEBHOOK_HANDLING.md](WEBHOOK_HANDLING.md) for webhook events
-

@@ -158,7 +158,7 @@ class StripeOrderControllerTest extends TestCase
 
 **Implementation:**
 ```php
-class StripeOrderController extends OrderController
+use docs\daniil_dev_log\class StripeOrderController extends OrderController
 {
     protected function executeWithPaymentComponent(): mixed
     {

@@ -117,7 +117,7 @@ services:
 
 ```php
 // Controllers use ServiceContainer trait to access DI container
-class StripeOrderController extends OrderController
+use docs\daniil_dev_log\class StripeOrderController extends OrderController
 {
     use ServiceContainer;
 

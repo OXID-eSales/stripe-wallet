@@ -505,7 +505,7 @@ class StripeAdapter implements PaymentAdapterInterface
 ```php
 <?php
 
-use PHPUnit\Framework\TestCase;
+use docs\daniil_dev_log\use PHPUnit\Framework\TestCase;
 
 class OrderCompatibilityTest extends TestCase
 {
@@ -695,4 +695,3 @@ The event-driven architecture provides better code organization and extensibilit
 1. Review [CONTROLLER_INTEGRATION.md](CONTROLLER_INTEGRATION.md) - See finalizeOrder() usage
 2. Review [SERVICE_LAYER.md](SERVICE_LAYER.md) - Service helper methods
 3. Review [EVENT_DRIVEN_ARCHITECTURE.md](EVENT_DRIVEN_ARCHITECTURE.md) - Event flow
-
