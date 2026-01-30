@@ -7,7 +7,7 @@
 # Usage: ./bin/pre-commit-check.sh [OPTIONS]
 # Options:
 #   --no-phpunit    Skip PHPUnit tests
-#   --full          Run all tests including Integration tests (slower)
+#   --full          Run all tests including Integration tests (slower, requires MySQL)
 
 set +e  # Don't exit on error, we want to collect all results
 
@@ -148,7 +148,7 @@ if [ "$SKIP_PHPUNIT" = true ]; then
     echo ""
 else
     if [ "$FULL_TESTS" = true ]; then
-        echo ">>> Running PHPUnit Tests (Full: Unit + Integration)..."
+        echo ">>> Running PHPUnit Tests (Full: Unit + Integration, requires MySQL)..."
         TESTSUITE_ARG=""
     else
         echo ">>> Running PHPUnit Tests (Unit only, use --full for all)..."

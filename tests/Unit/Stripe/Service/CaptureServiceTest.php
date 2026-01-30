@@ -10,7 +10,6 @@ use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
-use OxidEsales\PaymentComponent\Service\Result\CaptureResult;
 use OxidEsales\Payments\Stripe\Service\CaptureService;
 use OxidEsales\Payments\Stripe\Service\CaptureServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -58,7 +57,7 @@ class CaptureServiceTest extends TestCase
     public function testProcessCaptureWithContractReturnsSuccess(): void
     {
         $capturedAt = new \DateTimeImmutable();
-        $response = new CaptureResponse(
+        $response = CaptureResponse::success(
             providerPaymentId: 'pi_123',
             captureId: 'ch_123',
             amountCaptured: 10.00,
@@ -82,14 +81,14 @@ class CaptureServiceTest extends TestCase
         $result = $service->processCapture($contract, 10.00, ['initiator' => 'admin']);
 
         $this->assertTrue($result->isSuccessful());
-        $this->assertSame('ch_123', $result->getCaptureId());
-        $this->assertSame(10.00, $result->getAmountCaptured());
-        $this->assertSame('eur', $result->getCurrency());
+        $this->assertSame('ch_123', $result->captureId);
+        $this->assertSame(10.00, $result->amountCaptured);
+        $this->assertSame('eur', $result->currency);
     }
 
     public function testProcessCaptureTransitionsContractState(): void
     {
-        $response = new CaptureResponse(
+        $response = CaptureResponse::success(
             providerPaymentId: 'pi_123',
             captureId: 'ch_123',
             amountCaptured: 10.00,
@@ -118,7 +117,7 @@ class CaptureServiceTest extends TestCase
             ->with($this->callback(function (CapturePaymentRequest $request) {
                 return $request->amount === 10.50; // Amount in major units
             }))
-            ->willReturn(new CaptureResponse(
+            ->willReturn(CaptureResponse::success(
                 providerPaymentId: 'pi_123',
                 captureId: 'ch_123',
                 amountCaptured: 10.50,
@@ -142,7 +141,7 @@ class CaptureServiceTest extends TestCase
             ->with($this->callback(function (CapturePaymentRequest $request) {
                 return $request->amount === null;
             }))
-            ->willReturn(new CaptureResponse(
+            ->willReturn(CaptureResponse::success(
                 providerPaymentId: 'pi_123',
                 captureId: 'ch_123',
                 amountCaptured: 50.00,
@@ -176,7 +175,7 @@ class CaptureServiceTest extends TestCase
         $result = $service->processCapture($contract, 10.00, []);
 
         $this->assertFalse($result->isSuccessful());
-        $this->assertSame('API Error', $result->getErrorMessage());
+        $this->assertSame('API Error', $result->errorMessage);
     }
 
     public function testProcessCaptureReturnsFailureWhenNoPaymentIntentId(): void
@@ -192,7 +191,7 @@ class CaptureServiceTest extends TestCase
         $result = $service->processCapture($contract, 10.00, []);
 
         $this->assertFalse($result->isSuccessful());
-        $this->assertStringContainsString('PaymentIntent ID', $result->getErrorMessage());
+        $this->assertStringContainsString('PaymentIntent ID', $result->errorMessage);
     }
 
     public function testProcessCaptureReturnsFailureWhenEmptyPaymentIntentId(): void
@@ -211,7 +210,7 @@ class CaptureServiceTest extends TestCase
 
     public function testProcessDirectCaptureWithoutContract(): void
     {
-        $response = new CaptureResponse(
+        $response = CaptureResponse::success(
             providerPaymentId: 'pi_123',
             captureId: 'ch_123',
             amountCaptured: 10.00,
@@ -231,7 +230,7 @@ class CaptureServiceTest extends TestCase
         $result = $service->processDirectCapture('pi_123', 10.00, ['order_id' => 'order_123']);
 
         $this->assertTrue($result->isSuccessful());
-        $this->assertSame('ch_123', $result->getCaptureId());
+        $this->assertSame('ch_123', $result->captureId);
     }
 
     public function testProcessDirectCaptureReturnsFailureOnException(): void
@@ -244,7 +243,7 @@ class CaptureServiceTest extends TestCase
         $result = $service->processDirectCapture('pi_123', 10.00, []);
 
         $this->assertFalse($result->isSuccessful());
-        $this->assertSame('Direct capture failed', $result->getErrorMessage());
+        $this->assertSame('Direct capture failed', $result->errorMessage);
     }
 
     public function testProcessCapturePassesMetadataToAdapter(): void
@@ -259,7 +258,7 @@ class CaptureServiceTest extends TestCase
             ->with($this->callback(function (CapturePaymentRequest $request) use ($expectedMetadata) {
                 return $request->metadata === $expectedMetadata;
             }))
-            ->willReturn(new CaptureResponse(
+            ->willReturn(CaptureResponse::success(
                 providerPaymentId: 'pi_123',
                 captureId: 'ch_123',
                 amountCaptured: 10.00,

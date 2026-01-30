@@ -9,9 +9,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use OxidEsales\PaymentComponent\Adapter\Response\FraudCheckResponse;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Service\FraudCheckServiceInterface;
-use OxidEsales\PaymentComponent\Service\Result\FraudCheckResult;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 
 /**
@@ -19,6 +19,8 @@ use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
  *
  * Sprint 2: Checks Stripe Radar risk score for the PaymentIntent
  * associated with the contract. Binary pass/fail based on threshold.
+ *
+ * Sprint 31: Returns FraudCheckResponse instead of FraudCheckResult.
  *
  * Default threshold: 0.7 (scores >= 0.7 fail)
  *
@@ -40,13 +42,13 @@ class StripeRadarFraudCheckService implements FraudCheckServiceInterface
      * Retrieves the PaymentIntent from contract metadata and checks
      * the Stripe Radar risk score.
      */
-    public function check(PaymentContractInterface $contract): FraudCheckResult
+    public function check(PaymentContractInterface $contract): FraudCheckResponse
     {
         $paymentIntentId = $contract->getMetadata('stripe_payment_intent_id');
 
         if ($paymentIntentId === null) {
             // No PaymentIntent associated - pass by default
-            return FraudCheckResult::passed(0.0);
+            return FraudCheckResponse::success(0.0);
         }
 
         try {
@@ -55,11 +57,11 @@ class StripeRadarFraudCheckService implements FraudCheckServiceInterface
 
             if ($riskScore === null) {
                 // No risk score available - pass by default
-                return FraudCheckResult::passed(0.0);
+                return FraudCheckResponse::success(0.0);
             }
 
             if ($riskScore >= $this->threshold) {
-                return FraudCheckResult::failed(
+                return FraudCheckResponse::failure(
                     $riskScore,
                     sprintf(
                         'Stripe Radar risk score %.2f exceeds threshold %.2f',
@@ -69,11 +71,11 @@ class StripeRadarFraudCheckService implements FraudCheckServiceInterface
                 );
             }
 
-            return FraudCheckResult::passed($riskScore);
+            return FraudCheckResponse::success($riskScore);
         } catch (\Throwable $e) {
             // On error, pass by default to not block legitimate transactions
             // Log the error for debugging
-            return FraudCheckResult::passed(0.0);
+            return FraudCheckResponse::success(0.0);
         }
     }
 }

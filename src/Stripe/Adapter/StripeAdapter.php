@@ -23,7 +23,7 @@ use OxidEsales\PaymentComponent\Adapter\Request\ThreeDSecureRequest;
 use OxidEsales\PaymentComponent\Adapter\Response\PaymentResponse;
 use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
 use OxidEsales\PaymentComponent\Adapter\Response\RefundResponse;
-use OxidEsales\PaymentComponent\Adapter\Response\VoidResponse;
+use OxidEsales\PaymentComponent\Adapter\Response\CancellationResponse;
 use OxidEsales\PaymentComponent\Adapter\Response\PaymentDetailsResponse;
 use OxidEsales\PaymentComponent\Adapter\Response\AuthorizationResponse;
 use OxidEsales\PaymentComponent\Adapter\Response\PaymentMethodResponse;
@@ -171,7 +171,7 @@ final class StripeAdapter implements StripeAdapterInterface
             /** @var array<string, mixed> $providerData */
             $providerData = $paymentIntent->toArray();
 
-            return new CaptureResponse(
+            return CaptureResponse::success(
                 providerPaymentId: $paymentIntent->id,
                 /** @phpstan-ignore-next-line nullsafe.neverNull */
                 captureId: $paymentIntent->latest_charge?->id ?? $paymentIntent->id,
@@ -212,7 +212,7 @@ final class StripeAdapter implements StripeAdapterInterface
             /** @var array<string, mixed> $providerData */
             $providerData = $refund->toArray();
 
-            return new RefundResponse(
+            return RefundResponse::success(
                 providerPaymentId: $request->providerPaymentId,
                 refundId: $refund->id,
                 amountRefunded: $refund->amount / 100,
@@ -228,7 +228,7 @@ final class StripeAdapter implements StripeAdapterInterface
         }
     }
 
-    public function voidPayment(VoidPaymentRequest $request): VoidResponse
+    public function voidPayment(VoidPaymentRequest $request): CancellationResponse
     {
         try {
             $params = [];
@@ -245,10 +245,11 @@ final class StripeAdapter implements StripeAdapterInterface
             /** @var array<string, mixed> $providerData */
             $providerData = $paymentIntent->toArray();
 
-            return new VoidResponse(
+            return CancellationResponse::success(
                 providerPaymentId: $paymentIntent->id,
+                authorizationId: $paymentIntent->id,
                 status: StripeStatusMapper::STATUS_CANCELLED,
-                voidedAt: new DateTimeImmutable(),
+                cancelledAt: new DateTimeImmutable(),
                 reason: $request->reason,
                 providerData: $providerData,
                 metadata: $request->metadata
@@ -390,7 +391,7 @@ final class StripeAdapter implements StripeAdapterInterface
         return $this->capturePayment($captureRequest);
     }
 
-    public function voidAuthorization(VoidAuthorizationRequest $request): VoidResponse
+    public function voidAuthorization(VoidAuthorizationRequest $request): CancellationResponse
     {
         // In Stripe, voiding an authorization is the same as cancelling a payment
         $voidRequest = new VoidPaymentRequest(

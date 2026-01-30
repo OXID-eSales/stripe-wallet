@@ -54,8 +54,8 @@ class StripeRadarFraudCheckServiceTest extends TestCase
 
         $result = $this->service->check($contract);
 
-        $this->assertTrue($result->isPassed());
-        $this->assertFalse($result->isFailed());
+        $this->assertTrue($result->isSuccessful());
+        $this->assertFalse(!$result->isSuccessful());
         $this->assertEquals(0.25, $result->score);
     }
 
@@ -71,7 +71,7 @@ class StripeRadarFraudCheckServiceTest extends TestCase
 
         $result = $this->service->check($contract);
 
-        $this->assertTrue($result->isPassed());
+        $this->assertTrue($result->isSuccessful());
     }
 
     public function testPassesWhenNoPaymentIntentId(): void
@@ -86,7 +86,7 @@ class StripeRadarFraudCheckServiceTest extends TestCase
 
         $result = $this->service->check($contract);
 
-        $this->assertTrue($result->isPassed());
+        $this->assertTrue($result->isSuccessful());
         $this->assertEquals(0.0, $result->score);
     }
 
@@ -101,7 +101,7 @@ class StripeRadarFraudCheckServiceTest extends TestCase
 
         $result = $this->service->check($contract);
 
-        $this->assertTrue($result->isPassed());
+        $this->assertTrue($result->isSuccessful());
         $this->assertEquals(0.0, $result->score);
     }
 
@@ -117,7 +117,7 @@ class StripeRadarFraudCheckServiceTest extends TestCase
         $result = $this->service->check($contract);
 
         // Should pass on error to not block legitimate transactions
-        $this->assertTrue($result->isPassed());
+        $this->assertTrue($result->isSuccessful());
         $this->assertEquals(0.0, $result->score);
     }
 
@@ -136,8 +136,8 @@ class StripeRadarFraudCheckServiceTest extends TestCase
 
         $result = $this->service->check($contract);
 
-        $this->assertFalse($result->isPassed());
-        $this->assertTrue($result->isFailed());
+        $this->assertFalse($result->isSuccessful());
+        $this->assertTrue(!$result->isSuccessful());
         $this->assertEquals(0.85, $result->score);
         $this->assertStringContainsString('0.85', $result->reason);
         $this->assertStringContainsString('0.70', $result->reason);
@@ -154,7 +154,7 @@ class StripeRadarFraudCheckServiceTest extends TestCase
 
         $result = $this->service->check($contract);
 
-        $this->assertTrue($result->isFailed());
+        $this->assertTrue(!$result->isSuccessful());
     }
 
     // =========================================================================
@@ -178,7 +178,7 @@ class StripeRadarFraudCheckServiceTest extends TestCase
         $result = $serviceWithHighThreshold->check($contract);
 
         // 0.75 < 0.9 threshold, should pass
-        $this->assertTrue($result->isPassed());
+        $this->assertTrue($result->isSuccessful());
     }
 
     // =========================================================================

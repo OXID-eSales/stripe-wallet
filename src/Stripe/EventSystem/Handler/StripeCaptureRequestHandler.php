@@ -7,10 +7,10 @@ namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
+use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
-use OxidEsales\PaymentComponent\Service\Result\CaptureResult;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
 use OxidEsales\Payments\Stripe\Service\CaptureServiceInterface;
 use OxidEsales\PaymentComponent\Service\RequestLogServiceInterface;
@@ -273,28 +273,28 @@ class StripeCaptureRequestHandler implements HandlerInterface
      * Sprint 9: Centralized result handling for both capture modes.
      */
     private function handleCaptureResult(
-        CaptureResult $result,
+        CaptureResponse $result,
         StripeCaptureRequestEvent $event,
         EventContext $context
     ): void {
         if (!$result->isSuccessful()) {
-            throw new \RuntimeException($result->getErrorMessage() ?? 'Capture failed');
+            throw new \RuntimeException($result->errorMessage ?? 'Capture failed');
         }
 
         $this->logger->info('Stripe capture successful', [
-            'capture_id' => $result->getCaptureId(),
-            'captured_amount' => $result->getAmountCaptured(),
-            'currency' => $result->getCurrency(),
+            'capture_id' => $result->captureId,
+            'captured_amount' => $result->amountCaptured,
+            'currency' => $result->currency,
         ]);
 
         $this->logCaptureResult($result, $event);
 
         $context->set('captureSuccess', true);
-        $context->set('captureId', $result->getCaptureId());
-        $context->set('capturedAmount', $result->getAmountCaptured());
-        $context->set('captureCurrency', $result->getCurrency());
+        $context->set('captureId', $result->captureId);
+        $context->set('capturedAmount', $result->amountCaptured);
+        $context->set('captureCurrency', $result->currency);
 
-        $capturedAt = $result->getCapturedAt();
+        $capturedAt = $result->capturedAt;
         if ($capturedAt !== null) {
             $context->set('capturedAt', $capturedAt->format('Y-m-d H:i:s'));
         }
@@ -305,14 +305,14 @@ class StripeCaptureRequestHandler implements HandlerInterface
      *
      * Sprint 8/9: Delegates to RequestLogService (Facade pattern).
      */
-    private function logCaptureResult(CaptureResult $result, StripeCaptureRequestEvent $event): void
+    private function logCaptureResult(CaptureResponse $result, StripeCaptureRequestEvent $event): void
     {
         $this->requestLogService->logRequest(
             action: 'capture',
-            request: ['capture_id' => $result->getCaptureId()],
+            request: ['capture_id' => $result->captureId],
             response: [
-                'amount' => $result->getAmountCaptured(),
-                'currency' => $result->getCurrency(),
+                'amount' => $result->amountCaptured,
+                'currency' => $result->currency,
                 'contract_id' => $event->getContractId(),
                 'initiator' => $event->getInitiator(),
             ],

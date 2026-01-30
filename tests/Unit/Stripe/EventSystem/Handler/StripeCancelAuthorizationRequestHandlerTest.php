@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
+use DateTimeImmutable;
+use OxidEsales\PaymentComponent\Adapter\Response\CancellationResponse;
 use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCancelAuthorizationRequestHandler;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
-use OxidEsales\PaymentComponent\Service\Result\CancellationResult;
 use OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface;
 use OxidEsales\PaymentComponent\Service\RequestLogServiceInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
@@ -19,6 +20,7 @@ use PHPUnit\Framework\TestCase;
  *
  * Sprint 11: Tests updated for refactored handler with CancelAuthorizationService injection.
  * Sprint 20: Tests updated to include ShopAdapterInterface mock.
+ * Sprint 31: Tests updated to use CancellationResponse instead of CancellationResult.
  *
  * Note: These tests focus on the handler's interface and event handling.
  * Business logic tests are in CancelAuthorizationServiceTest.
@@ -43,6 +45,16 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
             $this->cancelService,
             $this->requestLogService,
             $this->shopAdapter
+        );
+    }
+
+    private function createSuccessResponse(string $paymentIntentId, string $status = 'canceled'): CancellationResponse
+    {
+        return CancellationResponse::success(
+            providerPaymentId: $paymentIntentId,
+            authorizationId: $paymentIntentId,
+            status: $status,
+            cancelledAt: new DateTimeImmutable()
         );
     }
 
@@ -109,7 +121,7 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
             ->expects($this->once())
             ->method('cancelAuthorization')
             ->with('pi_test_cancel_123', 'requested_by_customer')
-            ->willReturn(CancellationResult::success('pi_test_cancel_123', 'canceled'));
+            ->willReturn($this->createSuccessResponse('pi_test_cancel_123'));
 
         $handler = $this->createHandler();
 
@@ -129,7 +141,7 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
 
         $this->cancelService
             ->method('cancelAuthorization')
-            ->willReturn(CancellationResult::success('pi_test_success', 'canceled'));
+            ->willReturn($this->createSuccessResponse('pi_test_success'));
 
         $handler = $this->createHandler();
 
@@ -149,7 +161,7 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
 
         $this->cancelService
             ->method('cancelAuthorization')
-            ->willReturn(CancellationResult::failure('Stripe API error: Cannot cancel'));
+            ->willReturn(CancellationResponse::failure('Stripe API error: Cannot cancel'));
 
         $handler = $this->createHandler();
 
@@ -171,7 +183,7 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
             ->expects($this->once())
             ->method('cancelAuthorization')
             ->with('pi_test_reason', 'abandoned')
-            ->willReturn(CancellationResult::success('pi_test_reason', 'canceled'));
+            ->willReturn($this->createSuccessResponse('pi_test_reason'));
 
         $handler = $this->createHandler();
 
@@ -197,7 +209,7 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
             ->expects($this->once())
             ->method('cancelAuthorization')
             ->with('pi_test_no_reason', null)
-            ->willReturn(CancellationResult::success('pi_test_no_reason', 'canceled'));
+            ->willReturn($this->createSuccessResponse('pi_test_no_reason'));
 
         $handler = $this->createHandler();
 

@@ -22,25 +22,6 @@ Documentation for merchants, shop administrators, and integration developers.
 - Troubleshooting
 - Going live checklist
 
-### For Integration Developers
-
-| Document | Description |
-|----------|-------------|
-| [02-integration-guide.md](./02-integration-guide.md) | How to integrate shipping, CRM, ERP, and other modules with the payment-component |
-
-**Topics covered:**
-- Event-driven architecture overview
-- Available payment and contract events
-- Code examples for:
-  - ERP order export
-  - CRM customer sync
-  - Shipping fulfillment
-  - Inventory management
-  - Notification services
-- Handler registration
-- Best practices
-- Database schema reference
-
 ## Quick Links
 
 - **Install the module**: See [Installation](./01-installation-configuration.md#installation)

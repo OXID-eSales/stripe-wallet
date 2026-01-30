@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Service\Result\RefundResult;
+use OxidEsales\PaymentComponent\Adapter\Response\RefundResponse;
 
 /**
  * Service interface for processing Stripe refunds.
@@ -42,7 +42,7 @@ interface RefundServiceInterface
         ?string $reason = null,
         ?string $description = null,
         string $initiator = 'admin'
-    ): RefundResult;
+    ): RefundResponse;
 
     /**
      * Process refund directly by charge ID (when charge is already known).
@@ -55,5 +55,5 @@ interface RefundServiceInterface
         string $chargeId,
         ?string $reason = null,
         ?array $metadata = null
-    ): RefundResult;
+    ): RefundResponse;
 }

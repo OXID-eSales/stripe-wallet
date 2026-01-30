@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use DateTimeImmutable;
+use OxidEsales\PaymentComponent\Adapter\Response\CancellationResponse;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
-use OxidEsales\PaymentComponent\Service\Result\CancellationResult;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
@@ -31,7 +32,7 @@ final class CancelAuthorizationService implements CancelAuthorizationServiceInte
     public function cancelAuthorization(
         string $paymentIntentId,
         ?string $reason = null
-    ): CancellationResult {
+    ): CancellationResponse {
         try {
             $cancelledPaymentIntent = $this->adapterFactory->getStripeAdapter()->cancelPaymentIntent(
                 $paymentIntentId,
@@ -43,9 +44,12 @@ final class CancelAuthorizationService implements CancelAuthorizationServiceInte
                 'status' => $cancelledPaymentIntent->status,
             ]);
 
-            return CancellationResult::success(
-                $paymentIntentId,
-                $cancelledPaymentIntent->status ?? 'canceled'
+            return CancellationResponse::success(
+                providerPaymentId: $paymentIntentId,
+                authorizationId: $paymentIntentId,
+                status: $cancelledPaymentIntent->status ?? 'canceled',
+                cancelledAt: new DateTimeImmutable(),
+                reason: $reason
             );
         } catch (\Throwable $e) {
             $this->logger->error('Cancel authorization failed', [
@@ -53,7 +57,7 @@ final class CancelAuthorizationService implements CancelAuthorizationServiceInte
                 'error' => $e->getMessage(),
             ]);
 
-            return CancellationResult::failure($e->getMessage());
+            return CancellationResponse::failure($e->getMessage());
         }
     }
 }

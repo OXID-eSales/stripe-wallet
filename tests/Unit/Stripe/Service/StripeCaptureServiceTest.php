@@ -12,7 +12,6 @@ use OxidEsales\PaymentComponent\Contract\ContractState;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\Exception\CaptureFailedException;
-use OxidEsales\PaymentComponent\Service\Result\CaptureResult;
 use OxidEsales\Payments\Stripe\Service\StripeCaptureService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -22,6 +21,7 @@ use Psr\Log\LoggerInterface;
  * @covers \OxidEsales\Payments\Stripe\Service\StripeCaptureService
  *
  * Sprint 26: Service now uses LazyStripeAdapter via PaymentAdapterInterface.
+ * Sprint 31: Updated to use CaptureResponse instead of CaptureResult.
  */
 class StripeCaptureServiceTest extends TestCase
 {
@@ -75,9 +75,9 @@ class StripeCaptureServiceTest extends TestCase
 
         $result = $this->service->capture($contractId);
 
-        $this->assertInstanceOf(CaptureResult::class, $result);
-        $this->assertEquals('ch_123', $result->getCaptureId());
-        $this->assertEquals($amount, $result->getAmountCaptured());
+        $this->assertInstanceOf(CaptureResponse::class, $result);
+        $this->assertEquals('ch_123', $result->captureId);
+        $this->assertEquals($amount, $result->amountCaptured);
     }
 
     // 2. Cannot capture when contract is in COMMITTED state (Stripe uses AUTHORIZED, not COMMITTED)
@@ -167,7 +167,7 @@ class StripeCaptureServiceTest extends TestCase
 
         $result = $this->service->capture($contractId, $partialAmount);
 
-        $this->assertEquals($partialAmount, $result->getAmountCaptured());
+        $this->assertEquals($partialAmount, $result->amountCaptured);
     }
 
     // 6. Cannot capture already fulfilled contract
@@ -302,7 +302,7 @@ class StripeCaptureServiceTest extends TestCase
 
     private function createMockCaptureResponse(string $captureId, float $amount): CaptureResponse
     {
-        return new CaptureResponse(
+        return CaptureResponse::success(
             providerPaymentId: 'pi_test',
             captureId: $captureId,
             amountCaptured: $amount,

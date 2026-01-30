@@ -10,7 +10,7 @@ use OxidEsales\PaymentComponent\Contract\ContractState;
 use OxidEsales\PaymentComponent\Contract\PaymentContract;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Service\Result\CaptureResult;
+use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCaptureRequestHandler;
 use OxidEsales\Payments\Stripe\Service\CaptureServiceInterface;
@@ -116,10 +116,12 @@ class StripeCaptureRequestHandlerTest extends TestCase
         // Mock the capture service to return success
         $this->captureService
             ->method('processDirectCapture')
-            ->willReturn(CaptureResult::success(
+            ->willReturn(CaptureResponse::success(
+                providerPaymentId: 'pi_test',
                 captureId: 'ch_capture_123',
                 amountCaptured: 100.0,
                 currency: 'EUR',
+                status: 'succeeded',
                 capturedAt: new \DateTimeImmutable()
             ));
 
@@ -208,10 +210,12 @@ class StripeCaptureRequestHandlerTest extends TestCase
         $this->captureService
             ->expects($this->once())
             ->method('processCapture')
-            ->willReturn(CaptureResult::success(
+            ->willReturn(CaptureResponse::success(
+                providerPaymentId: 'pi_test',
                 captureId: 'ch_captured_123',
                 amountCaptured: 99.99,
                 currency: 'EUR',
+                status: 'succeeded',
                 capturedAt: new DateTimeImmutable()
             ));
 
@@ -246,10 +250,12 @@ class StripeCaptureRequestHandlerTest extends TestCase
             ->expects($this->once())
             ->method('processCapture')
             ->with($contract)
-            ->willReturn(CaptureResult::success(
+            ->willReturn(CaptureResponse::success(
+                providerPaymentId: 'pi_test',
                 captureId: 'ch_captured',
                 amountCaptured: 50.00,
                 currency: 'USD',
+                status: 'succeeded',
                 capturedAt: new DateTimeImmutable()
             ));
 
@@ -278,10 +284,12 @@ class StripeCaptureRequestHandlerTest extends TestCase
             ->expects($this->once())
             ->method('processCapture')
             ->with($contract, 25.50, $this->anything())
-            ->willReturn(CaptureResult::success(
+            ->willReturn(CaptureResponse::success(
+                providerPaymentId: 'pi_test',
                 captureId: 'ch_partial',
                 amountCaptured: 25.50,
                 currency: 'EUR',
+                status: 'succeeded',
                 capturedAt: new DateTimeImmutable()
             ));
 
@@ -307,7 +315,7 @@ class StripeCaptureRequestHandlerTest extends TestCase
         // Sprint 9: CaptureService returns failure result instead of throwing
         $this->captureService
             ->method('processCapture')
-            ->willReturn(CaptureResult::failure('Stripe API error'));
+            ->willReturn(CaptureResponse::failure('Stripe API error'));
 
         $this->handler->handle($event);
 
@@ -335,10 +343,12 @@ class StripeCaptureRequestHandlerTest extends TestCase
 
         $this->captureService
             ->method('processCapture')
-            ->willReturn(CaptureResult::success(
+            ->willReturn(CaptureResponse::success(
+                providerPaymentId: 'pi_test',
                 captureId: 'ch_context',
                 amountCaptured: 50.00,
                 currency: 'EUR',
+                status: 'succeeded',
                 capturedAt: new DateTimeImmutable()
             ));
 
@@ -374,10 +384,12 @@ class StripeCaptureRequestHandlerTest extends TestCase
             ->expects($this->once())
             ->method('processCapture')
             ->with($contract)
-            ->willReturn(CaptureResult::success(
+            ->willReturn(CaptureResponse::success(
+                providerPaymentId: 'pi_test',
                 captureId: 'ch_auth',
                 amountCaptured: 100.00,
                 currency: 'EUR',
+                status: 'succeeded',
                 capturedAt: new DateTimeImmutable()
             ));
 
@@ -406,10 +418,12 @@ class StripeCaptureRequestHandlerTest extends TestCase
 
         $this->captureService
             ->method('processCapture')
-            ->willReturn(CaptureResult::success(
+            ->willReturn(CaptureResponse::success(
+                providerPaymentId: 'pi_test',
                 captureId: 'ch_time',
                 amountCaptured: 75.00,
                 currency: 'EUR',
+                status: 'succeeded',
                 capturedAt: $capturedTime
             ));
 
@@ -450,10 +464,12 @@ class StripeCaptureRequestHandlerTest extends TestCase
                         && $metadata['reason'] === 'manual_capture_by_admin';
                 })
             )
-            ->willReturn(CaptureResult::success(
+            ->willReturn(CaptureResponse::success(
+                providerPaymentId: 'pi_test',
                 captureId: 'ch_reason',
                 amountCaptured: 100.00,
                 currency: 'EUR',
+                status: 'succeeded',
                 capturedAt: new DateTimeImmutable()
             ));
 
@@ -489,10 +505,12 @@ class StripeCaptureRequestHandlerTest extends TestCase
                     return !isset($metadata['reason']);
                 })
             )
-            ->willReturn(CaptureResult::success(
+            ->willReturn(CaptureResponse::success(
+                providerPaymentId: 'pi_test',
                 captureId: 'ch_no_reason',
                 amountCaptured: 100.00,
                 currency: 'EUR',
+                status: 'succeeded',
                 capturedAt: new DateTimeImmutable()
             ));
 
@@ -516,10 +534,12 @@ class StripeCaptureRequestHandlerTest extends TestCase
 
         $this->captureService
             ->method('processDirectCapture')
-            ->willReturn(CaptureResult::success(
+            ->willReturn(CaptureResponse::success(
+                providerPaymentId: 'pi_test',
                 captureId: 'ch_direct_time',
                 amountCaptured: 50.00,
                 currency: 'EUR',
+                status: 'succeeded',
                 capturedAt: $capturedTime
             ));
 
@@ -544,10 +564,12 @@ class StripeCaptureRequestHandlerTest extends TestCase
 
         $this->captureService
             ->method('processDirectCapture')
-            ->willReturn(CaptureResult::success(
+            ->willReturn(CaptureResponse::success(
+                providerPaymentId: 'pi_test',
                 captureId: 'ch_direct_full_123',
                 amountCaptured: 199.99,
                 currency: 'USD',
+                status: 'succeeded',
                 capturedAt: new DateTimeImmutable()
             ));
 
@@ -593,10 +615,12 @@ class StripeCaptureRequestHandlerTest extends TestCase
             ->expects($this->once())
             ->method('processCapture')
             ->with($contract)
-            ->willReturn(CaptureResult::success(
+            ->willReturn(CaptureResponse::success(
+                providerPaymentId: 'pi_test',
                 captureId: 'ch_meta',
                 amountCaptured: 100.00,
                 currency: 'EUR',
+                status: 'succeeded',
                 capturedAt: new DateTimeImmutable()
             ));
 
@@ -666,10 +690,12 @@ class StripeCaptureRequestHandlerTest extends TestCase
                         && $metadata['reason'] === 'ship_order';
                 })
             )
-            ->willReturn(CaptureResult::success(
+            ->willReturn(CaptureResponse::success(
+                providerPaymentId: 'pi_test',
                 captureId: 'ch_direct_reason',
                 amountCaptured: 100.00,
                 currency: 'EUR',
+                status: 'succeeded',
                 capturedAt: new DateTimeImmutable()
             ));
 

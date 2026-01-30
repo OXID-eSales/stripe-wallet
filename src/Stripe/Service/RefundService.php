@@ -9,8 +9,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use DateTimeImmutable;
 use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
-use OxidEsales\PaymentComponent\Service\Result\RefundResult;
+use OxidEsales\PaymentComponent\Adapter\Response\RefundResponse;
 use OxidEsales\PaymentComponent\Service\StockRestorationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
@@ -52,31 +53,31 @@ final class RefundService implements RefundServiceInterface
         ?string $reason = null,
         ?string $description = null,
         string $initiator = 'admin'
-    ): RefundResult {
+    ): RefundResponse {
         if ($paymentIntentId === null) {
-            return RefundResult::failure('Payment intent ID is required for refund');
+            return RefundResponse::failure('Payment intent ID is required for refund');
         }
 
         $chargeId = $this->getChargeIdFromPaymentIntent($paymentIntentId);
         if ($chargeId === null) {
-            return RefundResult::failure('No charge found for payment intent');
+            return RefundResponse::failure('No charge found for payment intent');
         }
 
         $metadata = $this->buildMetadata($orderId, $initiator, $description);
         $validReason = $this->validateReason($reason);
 
-        return $this->executeRefundByCharge($chargeId, $orderId, $validReason, $metadata);
+        return $this->executeRefundByCharge($chargeId, $orderId, $paymentIntentId, $validReason, $metadata);
     }
 
     public function processRefundByCharge(
         string $chargeId,
         ?string $reason = null,
         ?array $metadata = null
-    ): RefundResult {
+    ): RefundResponse {
         // Extract orderId from metadata if available
         $orderId = $metadata['order_id'] ?? null;
 
-        return $this->executeRefundByCharge($chargeId, $orderId, $reason, $metadata);
+        return $this->executeRefundByCharge($chargeId, $orderId, null, $reason, $metadata);
     }
 
     /**
@@ -87,16 +88,17 @@ final class RefundService implements RefundServiceInterface
     private function executeRefundByCharge(
         string $chargeId,
         ?string $orderId,
+        ?string $paymentIntentId,
         ?string $reason,
         ?array $metadata
-    ): RefundResult {
+    ): RefundResponse {
         try {
             // Always full refund (null amount)
             $refund = $this->adapterFactory
                 ->getStripeAdapter()
                 ->createRefundByCharge($chargeId, null, $reason, $metadata);
 
-            return $this->handleRefundResponse($refund, $chargeId, $orderId);
+            return $this->handleRefundResponse($refund, $chargeId, $orderId, $paymentIntentId);
         } catch (PaymentAdapterException $e) {
             return $this->handleRefundError($e, $chargeId);
         }
@@ -150,12 +152,16 @@ final class RefundService implements RefundServiceInterface
         return in_array($reason, self::VALID_REASONS, true) ? $reason : null;
     }
 
-    private function handleRefundResponse(Refund $refund, string $chargeId, ?string $orderId): RefundResult
-    {
+    private function handleRefundResponse(
+        Refund $refund,
+        string $chargeId,
+        ?string $orderId,
+        ?string $paymentIntentId
+    ): RefundResponse {
         $status = $refund->status ?? 'unknown';
 
         if (!in_array($status, ['succeeded', 'pending'], true)) {
-            return RefundResult::failure("Refund failed with status: {$status}");
+            return RefundResponse::failure("Refund failed with status: {$status}");
         }
 
         // Restore stock for all order articles (Sprint 24)
@@ -167,22 +173,30 @@ final class RefundService implements RefundServiceInterface
             ]);
         }
 
+        // Convert amount from cents to major units
+        $amountInMajorUnits = ($refund->amount ?? 0) / 100;
+
         $this->logger->info('Refund processed successfully', [
             'refund_id' => $refund->id,
-            'amount' => ($refund->amount ?? 0) / 100,
+            'amount' => $amountInMajorUnits,
             'charge_id' => $chargeId,
             'status' => $status,
         ]);
 
-        return RefundResult::success(
-            $refund->id ?? 'unknown',
-            (int) ($refund->amount ?? 0),
-            $refund->currency ?? 'eur',
-            $status
+        return RefundResponse::success(
+            providerPaymentId: $paymentIntentId ?? $chargeId,
+            refundId: $refund->id ?? 'unknown',
+            amountRefunded: $amountInMajorUnits,
+            currency: $refund->currency ?? 'eur',
+            status: $status,
+            refundedAt: new DateTimeImmutable(),
+            reason: null,
+            providerData: ['charge_id' => $chargeId],
+            metadata: $orderId !== null ? ['order_id' => $orderId] : []
         );
     }
 
-    private function handleRefundError(PaymentAdapterException $e, string $chargeId): RefundResult
+    private function handleRefundError(PaymentAdapterException $e, string $chargeId): RefundResponse
     {
         $this->logger->error('Refund failed', [
             'error' => $e->getMessage(),
@@ -190,6 +204,6 @@ final class RefundService implements RefundServiceInterface
             'charge_id' => $chargeId,
         ]);
 
-        return RefundResult::failure($e->getMessage(), $e->getErrorCode());
+        return RefundResponse::failure($e->getMessage(), $e->getErrorCode());
     }
 }

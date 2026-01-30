@@ -13,7 +13,6 @@ use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\Exception\RefundFailedException;
-use OxidEsales\PaymentComponent\Service\Result\RefundResult;
 use OxidEsales\Payments\Stripe\Service\StripeRefundService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -65,9 +64,10 @@ class StripeRefundServiceTest extends TestCase
 
         $result = $this->service->refund($contractId);
 
-        $this->assertInstanceOf(RefundResult::class, $result);
-        $this->assertEquals('re_123', $result->getRefundId());
-        $this->assertEquals($capturedAmount, $result->getAmountRefunded());
+        $this->assertArrayHasKey('response', $result);
+        $this->assertInstanceOf(RefundResponse::class, $result['response']);
+        $this->assertEquals('re_123', $result['response']->refundId);
+        $this->assertEquals($capturedAmount, $result['response']->amountRefunded);
     }
 
     // 2. Rejects partial refund (Sprint 22: Stripe only supports full refunds)
@@ -279,7 +279,7 @@ class StripeRefundServiceTest extends TestCase
 
     private function createRefundResponse(string $refundId, float $amount): RefundResponse
     {
-        return new RefundResponse(
+        return RefundResponse::success(
             providerPaymentId: 'pi_test',
             refundId: $refundId,
             amountRefunded: $amount,

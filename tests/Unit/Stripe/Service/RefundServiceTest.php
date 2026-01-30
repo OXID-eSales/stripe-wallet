@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
+use DateTimeImmutable;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
-use OxidEsales\PaymentComponent\Service\Result\RefundResult;
+use OxidEsales\PaymentComponent\Adapter\Response\RefundResponse;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\RefundService;
 use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
@@ -51,40 +52,53 @@ class RefundServiceTest extends TestCase
         );
     }
 
-    // --- RefundResult DTO Tests ---
+    // --- RefundResponse DTO Tests ---
 
-    public function testRefundResultSuccessCreation(): void
+    public function testRefundResponseSuccessCreation(): void
     {
-        $result = RefundResult::success('re_123', 2550, 'eur', 'succeeded');
+        $refundedAt = new DateTimeImmutable();
+        $result = RefundResponse::success(
+            providerPaymentId: 'pi_123',
+            refundId: 're_123',
+            amountRefunded: 25.50,
+            currency: 'eur',
+            status: 'succeeded',
+            refundedAt: $refundedAt
+        );
 
         $this->assertTrue($result->isSuccessful());
-        $this->assertEquals('re_123', $result->getRefundId());
-        $this->assertEquals(2550, $result->getRefundedAmountCents());
-        $this->assertEquals(25.50, $result->getRefundedAmount());
-        $this->assertEquals('eur', $result->getCurrency());
-        $this->assertEquals('succeeded', $result->getStatus());
-        $this->assertNull($result->getErrorMessage());
-        $this->assertNull($result->getErrorCode());
+        $this->assertEquals('re_123', $result->refundId);
+        $this->assertEquals(25.50, $result->amountRefunded);
+        $this->assertEquals('eur', $result->currency);
+        $this->assertEquals('succeeded', $result->status);
+        $this->assertNull($result->errorMessage);
+        $this->assertNull($result->errorCode);
     }
 
-    public function testRefundResultFailureCreation(): void
+    public function testRefundResponseFailureCreation(): void
     {
-        $result = RefundResult::failure('Charge already refunded', 'charge_already_refunded');
+        $result = RefundResponse::failure('Charge already refunded', 'charge_already_refunded');
 
         $this->assertFalse($result->isSuccessful());
-        $this->assertNull($result->getRefundId());
-        $this->assertNull($result->getRefundedAmountCents());
-        $this->assertNull($result->getRefundedAmount());
-        $this->assertEquals('Charge already refunded', $result->getErrorMessage());
-        $this->assertEquals('charge_already_refunded', $result->getErrorCode());
+        $this->assertNull($result->refundId);
+        $this->assertNull($result->amountRefunded);
+        $this->assertEquals('Charge already refunded', $result->errorMessage);
+        $this->assertEquals('charge_already_refunded', $result->errorCode);
     }
 
-    public function testRefundResultPendingStatus(): void
+    public function testRefundResponsePendingStatus(): void
     {
-        $result = RefundResult::success('re_pending', 1000, 'usd', 'pending');
+        $result = RefundResponse::success(
+            providerPaymentId: 'pi_pending',
+            refundId: 're_pending',
+            amountRefunded: 10.00,
+            currency: 'usd',
+            status: 'pending',
+            refundedAt: new DateTimeImmutable()
+        );
 
         $this->assertTrue($result->isSuccessful());
-        $this->assertEquals('pending', $result->getStatus());
+        $this->assertEquals('pending', $result->status);
     }
 
     // --- Service Interface Tests ---
@@ -124,10 +138,10 @@ class RefundServiceTest extends TestCase
 
         // Assert
         $this->assertTrue($result->isSuccessful());
-        $this->assertEquals('re_success_123', $result->getRefundId());
-        $this->assertEquals(5000, $result->getRefundedAmountCents());
-        $this->assertEquals('eur', $result->getCurrency());
-        $this->assertEquals('succeeded', $result->getStatus());
+        $this->assertEquals('re_success_123', $result->refundId);
+        $this->assertEquals(50.00, $result->amountRefunded); // Amount in major units
+        $this->assertEquals('eur', $result->currency);
+        $this->assertEquals('succeeded', $result->status);
     }
 
     public function testProcessRefundByChargeFullRefund(): void
@@ -154,7 +168,7 @@ class RefundServiceTest extends TestCase
 
         // Assert
         $this->assertTrue($result->isSuccessful());
-        $this->assertEquals(10000, $result->getRefundedAmountCents());
+        $this->assertEquals(100.00, $result->amountRefunded); // Amount in major units
     }
 
     public function testProcessRefundByChargePendingStatus(): void
@@ -177,7 +191,7 @@ class RefundServiceTest extends TestCase
 
         // Assert - pending is still successful
         $this->assertTrue($result->isSuccessful());
-        $this->assertEquals('pending', $result->getStatus());
+        $this->assertEquals('pending', $result->status);
     }
 
     public function testProcessRefundByChargeFailedStatus(): void
@@ -200,7 +214,7 @@ class RefundServiceTest extends TestCase
 
         // Assert
         $this->assertFalse($result->isSuccessful());
-        $this->assertStringContainsString('failed', $result->getErrorMessage() ?? '');
+        $this->assertStringContainsString('failed', $result->errorMessage ?? '');
     }
 
     public function testProcessRefundByChargeHandlesAdapterException(): void
@@ -226,8 +240,8 @@ class RefundServiceTest extends TestCase
 
         // Assert
         $this->assertFalse($result->isSuccessful());
-        $this->assertEquals('Charge already refunded', $result->getErrorMessage());
-        $this->assertEquals('charge_already_refunded', $result->getErrorCode());
+        $this->assertEquals('Charge already refunded', $result->errorMessage);
+        $this->assertEquals('charge_already_refunded', $result->errorCode);
     }
 
     // --- processFullRefund Tests ---
@@ -272,7 +286,7 @@ class RefundServiceTest extends TestCase
 
         // Assert - Full refund returns amount from Stripe response
         $this->assertTrue($result->isSuccessful());
-        $this->assertEquals(10000, $result->getRefundedAmountCents());
+        $this->assertEquals(100.00, $result->amountRefunded); // Amount in major units
     }
 
     public function testProcessFullRefundHandlesChargeObjectInPaymentIntent(): void
@@ -329,7 +343,7 @@ class RefundServiceTest extends TestCase
 
         // Assert
         $this->assertFalse($result->isSuccessful());
-        $this->assertStringContainsString('No charge found', $result->getErrorMessage() ?? '');
+        $this->assertStringContainsString('No charge found', $result->errorMessage ?? '');
     }
 
     // --- Validation Tests ---

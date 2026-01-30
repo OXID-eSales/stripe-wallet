@@ -6,9 +6,9 @@ namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
 use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
+use OxidEsales\PaymentComponent\Adapter\Response\CancellationResponse;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
-use OxidEsales\PaymentComponent\Service\Result\CancellationResult;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
 use OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface;
 use OxidEsales\PaymentComponent\Service\RequestLogServiceInterface;
@@ -94,12 +94,12 @@ class StripeCancelAuthorizationRequestHandler implements HandlerInterface
     }
 
     private function handleCancellationResult(
-        CancellationResult $result,
+        CancellationResponse $result,
         StripeCancelAuthorizationRequestEvent $event,
         EventContext $context
     ): void {
         if (!$result->isSuccessful()) {
-            $context->set('error', $result->getErrorMessage());
+            $context->set('error', $result->errorMessage);
             $context->set('cancelSuccess', false);
             return;
         }
@@ -109,30 +109,30 @@ class StripeCancelAuthorizationRequestHandler implements HandlerInterface
     }
 
     private function logCancelRequest(
-        CancellationResult $result,
+        CancellationResponse $result,
         StripeCancelAuthorizationRequestEvent $event
     ): void {
         $this->requestLogService->logRequest(
             action: 'cancel_authorization',
-            request: ['payment_intent_id' => $result->getPaymentIntentId()],
+            request: ['payment_intent_id' => $result->providerPaymentId],
             response: [
-                'status' => $result->getStatus(),
+                'status' => $result->status,
                 'reason' => $event->getCancellationReason(),
             ],
-            referenceId: $event->getOrderId() ?? $result->getPaymentIntentId() ?? '',
+            referenceId: $event->getOrderId() ?? $result->providerPaymentId ?? '',
             shopId: (int) $this->shopAdapter->getShopId()
         );
     }
 
-    private function setSuccessResults(EventContext $context, CancellationResult $result): void
+    private function setSuccessResults(EventContext $context, CancellationResponse $result): void
     {
         $context->set('cancelSuccess', true);
-        $context->set('cancelledPaymentIntentId', $result->getPaymentIntentId());
-        $context->set('cancelledStatus', $result->getStatus());
+        $context->set('cancelledPaymentIntentId', $result->providerPaymentId);
+        $context->set('cancelledStatus', $result->status);
 
         $this->logger->info('Cancel authorization processed successfully', [
-            'payment_intent_id' => $result->getPaymentIntentId(),
-            'status' => $result->getStatus(),
+            'payment_intent_id' => $result->providerPaymentId,
+            'status' => $result->status,
         ]);
     }
 

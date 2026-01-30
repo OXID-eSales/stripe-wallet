@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentComponent\Adapter\Request\CapturePaymentRequest;
+use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
-use OxidEsales\PaymentComponent\Service\Result\CaptureResult;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
@@ -42,10 +42,10 @@ final class CaptureService implements CaptureServiceInterface
         PaymentContractInterface $contract,
         ?float $amount,
         array $metadata
-    ): CaptureResult {
+    ): CaptureResponse {
         $paymentIntentId = $contract->getProviderOrderId();
         if (!is_string($paymentIntentId) || $paymentIntentId === '') {
-            return CaptureResult::failure('Contract has no PaymentIntent ID');
+            return CaptureResponse::failure('Contract has no PaymentIntent ID');
         }
 
         $result = $this->executeCapture($paymentIntentId, $amount, $metadata);
@@ -61,7 +61,7 @@ final class CaptureService implements CaptureServiceInterface
         string $paymentIntentId,
         ?float $amount,
         array $metadata
-    ): CaptureResult {
+    ): CaptureResponse {
         return $this->executeCapture($paymentIntentId, $amount, $metadata);
     }
 
@@ -72,7 +72,7 @@ final class CaptureService implements CaptureServiceInterface
         string $paymentIntentId,
         ?float $amount,
         array $metadata
-    ): CaptureResult {
+    ): CaptureResponse {
         try {
             $request = new CapturePaymentRequest(
                 providerPaymentId: $paymentIntentId,
@@ -89,19 +89,14 @@ final class CaptureService implements CaptureServiceInterface
                 'currency' => $response->currency,
             ]);
 
-            return CaptureResult::success(
-                captureId: $response->captureId,
-                amountCaptured: $response->amountCaptured,
-                currency: $response->currency,
-                capturedAt: $this->toDateTimeImmutable($response->capturedAt)
-            );
+            return $response;
         } catch (\Throwable $e) {
             $this->logger->error('Capture failed', [
                 'payment_intent_id' => $paymentIntentId,
                 'error' => $e->getMessage(),
             ]);
 
-            return CaptureResult::failure($e->getMessage());
+            return CaptureResponse::failure($e->getMessage());
         }
     }
 
@@ -114,14 +109,5 @@ final class CaptureService implements CaptureServiceInterface
             'contract_id' => $contract->getId(),
             'new_state' => $contract->getStateValue(),
         ]);
-    }
-
-    private function toDateTimeImmutable(\DateTimeInterface $dateTime): \DateTimeImmutable
-    {
-        if ($dateTime instanceof \DateTimeImmutable) {
-            return $dateTime;
-        }
-
-        return \DateTimeImmutable::createFromMutable($dateTime);
     }
 }

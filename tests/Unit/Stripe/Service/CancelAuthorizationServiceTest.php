@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Tests\Unit\Stripe\Service;
 
+use OxidEsales\PaymentComponent\Adapter\Response\CancellationResponse;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
-use OxidEsales\PaymentComponent\Service\Result\CancellationResult;
 use OxidEsales\Payments\Stripe\Service\CancelAuthorizationService;
 use OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface;
 use PHPUnit\Framework\TestCase;
@@ -19,6 +19,7 @@ use Stripe\PaymentIntent;
  *
  * Sprint 11: Tests for the extracted cancel authorization service.
  * Sprint 26: Updated to use factory instead of direct adapter injection.
+ * Sprint 31: Updated to use CancellationResponse instead of CancellationResult.
  *
  * @covers \OxidEsales\Payments\Stripe\Service\CancelAuthorizationService
  */
@@ -70,12 +71,12 @@ class CancelAuthorizationServiceTest extends TestCase
         $result = $service->cancelAuthorization('pi_test_123', 'requested_by_customer');
 
         // Assert
-        $this->assertInstanceOf(CancellationResult::class, $result);
+        $this->assertInstanceOf(CancellationResponse::class, $result);
         $this->assertTrue($result->isSuccessful());
-        $this->assertSame('pi_test_123', $result->getPaymentIntentId());
-        $this->assertSame('canceled', $result->getStatus());
-        $this->assertNull($result->getErrorMessage());
-        $this->assertNull($result->getErrorCode());
+        $this->assertSame('pi_test_123', $result->providerPaymentId);
+        $this->assertSame('canceled', $result->status);
+        $this->assertNull($result->errorMessage);
+        $this->assertNull($result->errorCode);
     }
 
     public function testCancelAuthorizationReturnsSuccessWithNullReason(): void
@@ -96,7 +97,7 @@ class CancelAuthorizationServiceTest extends TestCase
 
         // Assert
         $this->assertTrue($result->isSuccessful());
-        $this->assertSame('canceled', $result->getStatus());
+        $this->assertSame('canceled', $result->status);
     }
 
     public function testCancelAuthorizationReturnsFailureOnException(): void
@@ -113,11 +114,11 @@ class CancelAuthorizationServiceTest extends TestCase
         $result = $service->cancelAuthorization('pi_test_789', 'duplicate');
 
         // Assert
-        $this->assertInstanceOf(CancellationResult::class, $result);
+        $this->assertInstanceOf(CancellationResponse::class, $result);
         $this->assertFalse($result->isSuccessful());
-        $this->assertNull($result->getPaymentIntentId());
-        $this->assertNull($result->getStatus());
-        $this->assertSame('API Error: Payment already canceled', $result->getErrorMessage());
+        $this->assertNull($result->providerPaymentId);
+        $this->assertSame('failed', $result->status);
+        $this->assertSame('API Error: Payment already canceled', $result->errorMessage);
     }
 
     public function testCancelAuthorizationHandlesDefaultStatusWhenNull(): void
@@ -137,6 +138,6 @@ class CancelAuthorizationServiceTest extends TestCase
 
         // Assert
         $this->assertTrue($result->isSuccessful());
-        $this->assertSame('canceled', $result->getStatus());
+        $this->assertSame('canceled', $result->status);
     }
 }

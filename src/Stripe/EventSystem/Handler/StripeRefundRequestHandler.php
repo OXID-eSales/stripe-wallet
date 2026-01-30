@@ -11,7 +11,7 @@ use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
-use OxidEsales\PaymentComponent\Service\Result\RefundResult;
+use OxidEsales\PaymentComponent\Adapter\Response\RefundResponse;
 use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
 use OxidEsales\PaymentComponent\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
@@ -143,10 +143,10 @@ class StripeRefundRequestHandler implements HandlerInterface
         StripeRefundRequestEvent $event,
         string $orderId,
         string $paymentIntentId
-    ): RefundResult {
+    ): RefundResponse {
         // Stripe module only supports full refunds
         if (!$event->isFullRefund()) {
-            return RefundResult::failure(
+            return RefundResponse::failure(
                 'Stripe module only supports full refunds. Use Stripe Dashboard for partial refunds.'
             );
         }
@@ -188,14 +188,14 @@ class StripeRefundRequestHandler implements HandlerInterface
     }
 
     private function handleRefundResult(
-        RefundResult $result,
+        RefundResponse $result,
         StripeRefundRequestEvent $event,
         Order $order,
         EventContext $context
     ): void {
         if (!$result->isSuccessful()) {
-            $context->set('error', $result->getErrorMessage());
-            $context->set('errorCode', $result->getErrorCode());
+            $context->set('error', $result->errorMessage);
+            $context->set('errorCode', $result->errorCode);
             $context->set('refundSuccess', false);
             return;
         }
@@ -226,32 +226,32 @@ class StripeRefundRequestHandler implements HandlerInterface
      *
      * Sprint 8: Now delegates to RequestLogService (Facade pattern).
      */
-    private function logRefundRequest(RefundResult $result, Order $order): void
+    private function logRefundRequest(RefundResponse $result, Order $order): void
     {
         $this->requestLogService->logRequest(
             action: 'refund',
-            request: ['refund_id' => $result->getRefundId()],
+            request: ['refund_id' => $result->refundId],
             response: [
-                'status' => $result->getStatus(),
-                'amount' => $result->getRefundedAmountCents(),
-                'currency' => $result->getCurrency(),
+                'status' => $result->status,
+                'amount' => $result->amountRefunded,
+                'currency' => $result->currency,
             ],
             referenceId: (string) $order->getId(),
             shopId: (int) $this->shopAdapter->getShopId()
         );
     }
 
-    private function setSuccessResults(EventContext $context, RefundResult $result, Order $order): void
+    private function setSuccessResults(EventContext $context, RefundResponse $result, Order $order): void
     {
         $context->set('refundSuccess', true);
-        $context->set('refundId', $result->getRefundId());
-        $context->set('refundedAmount', $result->getRefundedAmount());
-        $context->set('refundStatus', $result->getStatus());
-        $context->set('refundCurrency', $result->getCurrency());
+        $context->set('refundId', $result->refundId);
+        $context->set('refundedAmount', $result->amountRefunded);
+        $context->set('refundStatus', $result->status);
+        $context->set('refundCurrency', $result->currency);
 
         $this->logger->info('Refund processed successfully', [
-            'refund_id' => $result->getRefundId(),
-            'amount' => $result->getRefundedAmount(),
+            'refund_id' => $result->refundId,
+            'amount' => $result->amountRefunded,
             'order_id' => $order->getId(),
         ]);
     }

@@ -29,7 +29,7 @@ use OxidEsales\PaymentComponent\Adapter\Response\PaymentMethodResponse;
 use OxidEsales\PaymentComponent\Adapter\Response\PaymentResponse;
 use OxidEsales\PaymentComponent\Adapter\Response\RefundResponse;
 use OxidEsales\PaymentComponent\Adapter\Response\ThreeDSecureResponse;
-use OxidEsales\PaymentComponent\Adapter\Response\VoidResponse;
+use OxidEsales\PaymentComponent\Adapter\Response\CancellationResponse;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 
 /**
@@ -77,7 +77,7 @@ final class LazyStripeAdapter implements PaymentAdapterInterface
         return $this->getAdapter()->refundPayment($request);
     }
 
-    public function voidPayment(VoidPaymentRequest $request): VoidResponse
+    public function voidPayment(VoidPaymentRequest $request): CancellationResponse
     {
         return $this->getAdapter()->voidPayment($request);
     }
@@ -101,7 +101,7 @@ final class LazyStripeAdapter implements PaymentAdapterInterface
         return $this->getAdapter()->captureAuthorization($request);
     }
 
-    public function voidAuthorization(VoidAuthorizationRequest $request): VoidResponse
+    public function voidAuthorization(VoidAuthorizationRequest $request): CancellationResponse
     {
         return $this->getAdapter()->voidAuthorization($request);
     }
