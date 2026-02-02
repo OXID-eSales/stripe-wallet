@@ -59,6 +59,12 @@
     }
   },
   "scripts": {
+    "post-install-cmd": [
+      "vendor/oxid-esales/payment-component/bin/composer-post-update.sh"
+    ],
+    "post-update-cmd": [
+      "vendor/oxid-esales/payment-component/bin/composer-post-update.sh"
+    ],
     "phpmd": "./.github/scripts/codestyle_check.sh phpmd",
     "phpmd-commit": "./.github/scripts/codestyle_check.sh phpmd commit",
     "phpmd-generate-baseline": "phpmd src ansi tests/PhpMd/standard.xml --generate-baseline",
