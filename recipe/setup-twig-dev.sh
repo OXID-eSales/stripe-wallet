@@ -44,6 +44,10 @@ make addbasicservices
 make file=services/adminer.yml addservice
 
 echo "module root is $MODULE_ROOT"
+
+# Initialize submodules (e2e tests, recipe parts)
+cd "$MODULE_ROOT"
+git submodule update --init --recursive
 cd "$PROJECT_ROOT" || exit 1
 
 $MODULE_ROOT/recipe/parts/shared/prepare_shop_package.sh -e"${edition}" -b"${branch}" || exit 1
