@@ -59,12 +59,6 @@
     }
   },
   "scripts": {
-    "post-install-cmd": [
-      "vendor/oxid-esales/payment-component/bin/composer-post-update.sh"
-    ],
-    "post-update-cmd": [
-      "vendor/oxid-esales/payment-component/bin/composer-post-update.sh"
-    ],
     "phpmd": "./.github/scripts/codestyle_check.sh phpmd",
     "phpmd-commit": "./.github/scripts/codestyle_check.sh phpmd commit",
     "phpmd-generate-baseline": "phpmd src ansi tests/PhpMd/standard.xml --generate-baseline",
@@ -98,6 +92,7 @@
     "allow-plugins": {
       "oxid-esales/oxideshop-composer-plugin": true,
       "oxid-esales/oxideshop-unified-namespace-generator": true,
+      "oxid-esales/payment-component": true,
       "infection/extension-installer": true
     }
   }

@@ -64,6 +64,9 @@ docker compose exec -T \
   --json '{"type":"vcs", "url":"https://github.com/OXID-eSales/payment-component"}' || exit 1
 
 docker compose exec -T \
+  php composer config --no-plugins allow-plugins.oxid-esales/payment-component true
+
+docker compose exec -T \
   php composer require oxid-esales/payment-component:dev-b-7.4.x --no-update || exit 1
 
 docker compose exec -T \
