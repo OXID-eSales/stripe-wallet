@@ -90,7 +90,9 @@ docker compose exec php bin/oe-console oe:setup:shop --db-host=mysql --db-port=3
   --compile-directory="/var/www/var/cache/"
 
 docker compose exec -T php bin/oe-console oe:setup:demodata
-# Install all preconfigured dependencies
+
+# Run payment-component migrations (triggers plugin now that DB exists)
+docker compose exec -T php composer update oxid-esales/payment-component --no-interaction
 
 docker compose exec -T php bin/oe-console oe:theme:activate apex
 docker compose exec -T php bin/oe-console oe:module:install extensions/stripe
