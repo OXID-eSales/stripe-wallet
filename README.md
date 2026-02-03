@@ -34,6 +34,10 @@ OXID 7.x Module Commands:
 | Activate   | bin/oe-console oe:module:activate oe_payments_stripe_wallet   |
 | Deactivate | bin/oe-console oe:module:deactivate oe_payments_stripe_wallet |
 
+## Migrations
+
+Stripe module doesn't have any migrations. All DB-dependancies are in the payment-component package.
+
 ## Running Tests
 
 

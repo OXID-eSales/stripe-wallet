@@ -6,7 +6,7 @@ env:
   PACKAGE_NAME: 'oxid-esales/stripe-wallet'
   SONARCLOUD_ORGANIZATION: 'oxid-esales'
   SONARCLOUD_PROJECT_KEY: 'OXID-eSales_module-stripe'
-  PHP_VERSION: '8.3'
+  PHP_VERSION: '8.2'
   MYSQL_VERSION: '5.7'
   TEMPLATE_ENGINE: 'twig'
   PAYMENT_COMPONENT_BRANCH: 'dev-b-7.4.x'
@@ -173,7 +173,7 @@ jobs:
   styles:
     strategy:
       matrix:
-        php: [ '8.3' ]
+        php: [ '8.2' ]
     runs-on: [arc-runner-set]
     steps:
       - name: Checkout current module
