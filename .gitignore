@@ -9,3 +9,4 @@ tests/.phpunit.cache
 /source/
 node_modules
 /out/js/controllers/
+/tests/e2e/playwright/
