@@ -102,6 +102,8 @@ jobs:
             php composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
             php composer require oxid-esales/payment-component:${{ env.PAYMENT_COMPONENT_BRANCH }} --no-interaction --no-update
+          docker compose exec -T \
+            php composer config --no-plugins allow-plugins.oxid-esales/payment-component true
 
       - name: Install module
         run: |
