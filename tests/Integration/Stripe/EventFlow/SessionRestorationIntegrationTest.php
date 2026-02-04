@@ -7,9 +7,10 @@ namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\EventFlow;
 use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
 use OxidEsales\PaymentComponent\Contract\ContractCondition;
 use OxidEsales\PaymentComponent\Contract\PaymentContract;
+use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcher;
-use OxidEsales\PaymentComponent\Repository\ContractRepository;
+use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler;
@@ -34,7 +35,7 @@ use PHPUnit\Framework\TestCase;
  */
 class SessionRestorationIntegrationTest extends TestCase
 {
-    private ContractRepository $contractRepository;
+    private ContractRepositoryInterface $contractRepository;
     private ContractTokenService $tokenService;
     private ReturnSessionSecurityService $securityService;
     private string $testSecret = 'sk_test_integration_test_secret_key';
@@ -43,12 +44,80 @@ class SessionRestorationIntegrationTest extends TestCase
     {
         parent::setUp();
 
-        $this->contractRepository = new ContractRepository();
+        $this->contractRepository = $this->createInMemoryContractRepository();
         $this->tokenService = new ContractTokenService($this->createConfigServiceMock());
         $this->securityService = new ReturnSessionSecurityService(50);
 
         // Clear any previous $_REQUEST data
         $_REQUEST = [];
+    }
+
+    /**
+     * Create an in-memory contract repository for testing.
+     * This is a test double that stores contracts in memory without database.
+     */
+    private function createInMemoryContractRepository(): ContractRepositoryInterface
+    {
+        return new class implements ContractRepositoryInterface {
+            /** @var array<string, PaymentContractInterface> */
+            private array $contracts = [];
+
+            public function save(PaymentContractInterface $contract): void
+            {
+                $this->contracts[$contract->getId()] = $contract;
+            }
+
+            public function findById(string $id): ?PaymentContractInterface
+            {
+                return $this->contracts[$id] ?? null;
+            }
+
+            public function findByProviderOrderId(string $providerOrderId): ?PaymentContractInterface
+            {
+                foreach ($this->contracts as $contract) {
+                    if ($contract->getProviderOrderId() === $providerOrderId) {
+                        return $contract;
+                    }
+                }
+                return null;
+            }
+
+            public function findByUserId(string $userId): array
+            {
+                return array_values(array_filter(
+                    $this->contracts,
+                    fn($contract) => $contract->getUserId() === $userId
+                ));
+            }
+
+            public function findActiveByUserId(string $userId): ?PaymentContractInterface
+            {
+                foreach ($this->contracts as $contract) {
+                    if ($contract->getUserId() === $userId && !$contract->isFinal()) {
+                        return $contract;
+                    }
+                }
+                return null;
+            }
+
+            public function findByOrderId(string $orderId): ?PaymentContractInterface
+            {
+                foreach ($this->contracts as $contract) {
+                    if ($contract->getOrderId() === $orderId) {
+                        return $contract;
+                    }
+                }
+                return null;
+            }
+
+            public function findExpired(): array
+            {
+                return array_values(array_filter(
+                    $this->contracts,
+                    fn($contract) => $contract->isExpired()
+                ));
+            }
+        };
     }
 
     protected function tearDown(): void

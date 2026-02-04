@@ -1,0 +1,85 @@
+@startuml Webhook Processing Flow
+!theme plain
+title Webhook Processing - payment_intent.succeeded
+
+actor "Stripe" as Stripe
+participant "WebhookController" as WC
+participant "StripeWebhookProcessor" as SWP
+participant "WebhookIdempotency\nChecker" as WIC
+participant "WebhookContract\nFulfillmentHandler" as WCFH
+participant "ContractRepository" as CR
+participant "EventDispatcher" as ED
+participant "ContractCondition\nResolverHandler" as CCRH
+participant "StripeOrderCreation\nHandler" as SOCH
+database "Database" as DB
+
+Stripe -> WC: POST /webhook/stripe\n(payload + signature)
+activate WC
+
+WC -> SWP: process(payload, signature)
+activate SWP
+
+SWP -> SWP: parseAndValidateRequest()
+note right: Verify Stripe signature
+
+SWP -> WIC: isProcessed(eventId)
+WIC -> DB: SELECT FROM oe_payments_webhooklogs
+DB --> WIC: false (not found)
+WIC --> SWP: false
+
+SWP -> WCFH: handlePaymentSucceeded(event)
+activate WCFH
+
+WCFH -> CR: findByProviderOrderId(paymentIntentId)
+CR -> DB: SELECT FROM oe_payments_contract
+DB --> CR: contract
+CR --> WCFH: contract
+
+WCFH -> WCFH: contract.fulfillCondition(\n  'payment_authorized'\n)
+WCFH -> CR: save(contract)
+CR -> DB: UPDATE oe_payments_contract
+
+WCFH -> ED: dispatch(ContractConditionFulfilledEvent)
+activate ED
+
+ED -> CCRH: handle(event)
+activate CCRH
+
+CCRH -> CCRH: checkAllConditionsFulfilled()
+note right: All conditions met?
+
+CCRH -> CCRH: contract.transitionToReadyToCommit()
+CCRH -> CR: save(contract)
+CCRH -> ED: dispatch(ContractReadyToCommitEvent)
+
+ED -> SOCH: handle(event)
+activate SOCH
+
+SOCH -> SOCH: createOxidOrder(contract)
+SOCH -> SOCH: contract.commit(orderId)
+SOCH -> CR: save(contract)
+SOCH -> SOCH: fulfillmentService.fulfill(contract)
+SOCH --> ED: return
+deactivate SOCH
+
+CCRH --> ED: return
+deactivate CCRH
+
+ED --> WCFH: return
+deactivate ED
+
+WCFH --> SWP: WebhookResult.success(contractId)
+deactivate WCFH
+
+SWP -> WIC: markAsProcessed(eventId)
+WIC -> DB: INSERT INTO oe_payments_webhooklogs
+
+SWP -> DB: INSERT INTO oe_payments_webhooklogs\n(with full event details)
+
+SWP --> WC: WebhookResult
+deactivate SWP
+
+WC --> Stripe: HTTP 200 OK
+deactivate WC
+
+@enduml

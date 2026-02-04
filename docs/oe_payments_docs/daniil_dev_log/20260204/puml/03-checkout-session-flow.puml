@@ -1,0 +1,118 @@
+@startuml Checkout Session Flow with Early Order Creation
+!theme plain
+title Stripe Checkout Session - Early Order Creation Flow
+
+actor User
+participant "StripeOrderController" as SOC
+participant "EventDispatcher" as ED
+participant "StripeContractCreation\nHandler (P:100)" as CCH
+participant "EarlyOrderCreation\nHandler" as EOCH
+participant "StripeCheckoutSession\nHandler (P:0)" as CSH
+participant "ContractRepository" as CR
+participant "ShopOrderService" as SOS
+participant "CheckoutSessionService" as CSS
+participant "StripeAdapter" as SA
+database "oe_payments_contract" as DBC
+database "oxorder" as OXO
+
+User -> SOC: Click "Checkout with Stripe"
+activate SOC
+
+SOC -> ED: dispatch(StripeCheckoutSessionRequestEvent)
+activate ED
+
+note right of ED
+  Event dispatched to handlers
+  by priority (100 first, then 0)
+end note
+
+ED -> CCH: handle(event)
+activate CCH
+
+CCH -> CCH: createContract(\n  shopId,\n  userId,\n  basketSnapshot\n)
+note right: Contract in DRAFT state
+
+CCH -> CCH: addConditions(\n  'payment_authorized'\n)
+CCH -> CR: save(contract)
+CR -> DBC: INSERT (state=DRAFT)
+
+CCH -> CCH: context.set('contractId', contract.id)
+
+CCH -> ED: dispatch(ContractDraftCompletedEvent)
+note right #LightYellow: Triggers early order creation
+
+ED -> EOCH: handle(ContractDraftCompletedEvent)
+activate EOCH
+
+EOCH -> SOS: createOrder(request)
+activate SOS
+SOS -> OXO: INSERT oxorder
+OXO --> SOS: orderResponse
+SOS --> EOCH: orderResponse\n(orderId, orderNumber)
+deactivate SOS
+
+EOCH -> EOCH: contract.setMetadata(\n  'order_number',\n  orderNumber\n)
+note right #LightGreen: Store order number\nfor Stripe metadata
+
+EOCH -> EOCH: contract.transitionToNotFinished(orderId)
+note right: DRAFT → NOT_FINISHED
+
+EOCH -> EOCH: contract.transitionToPending()
+note right: NOT_FINISHED → PENDING
+
+EOCH -> CR: save(contract)
+CR -> DBC: UPDATE (state=PENDING,\norderId=xxx)
+
+EOCH --> ED: return
+deactivate EOCH
+
+CCH --> ED: return
+deactivate CCH
+
+ED -> CSH: handle(event)
+activate CSH
+
+CSH -> CSH: contractId = context.get('contractId')
+CSH -> CR: findById(contractId)
+CR --> CSH: contract (state=PENDING)
+
+CSH -> CSH: orderId = contract.getOrderId()
+CSH -> CSH: orderNumber = contract.getMetadata('order_number')
+note right #LightGreen: Retrieve order number\nfor Stripe API
+
+CSH -> CSS: createSession(\n  ...,\n  orderId,\n  orderNumber\n)
+activate CSS
+
+CSS -> SA: createCheckoutSession(\n  metadata: {\n    order_id: xxx,\n    order_number: 12345\n  }\n)
+note right #LightBlue: Order number sent\nto Stripe API
+activate SA
+SA -> SA: Stripe API call
+SA --> CSS: Stripe\\Checkout\\Session
+deactivate SA
+
+CSS --> CSH: CheckoutSessionResult
+deactivate CSS
+
+CSH -> CR: save(contract with providerOrderId)
+CR -> DBC: UPDATE providerOrderId
+
+CSH -> CSH: context.set('redirectUrl', session.url)
+CSH --> ED: return
+deactivate CSH
+
+ED --> SOC: return event
+deactivate ED
+
+SOC -> SOC: redirectUrl = context.get('redirectUrl')
+SOC --> User: HTTP 302 Redirect to Stripe
+deactivate SOC
+
+note right of User
+  User completes payment
+  on Stripe's hosted page.
+
+  Stripe dashboard shows
+  order_number in metadata.
+end note
+
+@enduml
