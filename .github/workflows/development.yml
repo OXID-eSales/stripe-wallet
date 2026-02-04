@@ -86,7 +86,7 @@ jobs:
           sleep 2
 
       - name: Checkout current module
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           path: source/test-module
 
@@ -191,7 +191,7 @@ jobs:
     runs-on: [arc-runner-set]
     steps:
       - name: Checkout current module
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           path: source/test-module
           fetch-depth: 0  # Fetch all commits for accurate diff
