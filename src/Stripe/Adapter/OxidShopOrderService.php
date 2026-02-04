@@ -21,7 +21,7 @@ use OxidEsales\PaymentComponent\Adapter\Response\OrderResponse;
 use OxidEsales\PaymentComponent\Adapter\Response\PaymentDetailsResponse;
 use OxidEsales\PaymentComponent\Adapter\Exception\ShopOrderException;
 use OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface;
-use OxidEsales\PaymentComponent\Transaction\Transaction;
+use OxidEsales\PaymentComponent\Contract\Transaction;
 use OxidEsales\Payments\Stripe\Module;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
 use OxidEsales\Eshop\Core\ShopVersion;

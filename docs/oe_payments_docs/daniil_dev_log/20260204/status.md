@@ -2,8 +2,8 @@
 
 **Last Updated:** 2026-02-04
 **Previous State:** Sprint 31 COMPLETED (2026-01-30)
-**Current State:** Sprint 32-35 COMPLETED
-**Focus:** Repository cleanup, dead code detection, architecture documentation, admin UI
+**Current State:** Sprint 32-36 COMPLETED
+**Focus:** Repository cleanup, dead code detection, architecture documentation, admin UI, DDD consolidation
 
 ---
 
@@ -41,6 +41,7 @@ Continuing from cleanup work done Jan 20-30:
 | **33** | Remove In-Memory Test Repositories | **COMPLETED** |
 | **34** | Architecture Documentation | **COMPLETED** |
 | **35** | Admin Stripe Tab: Contract ID & Order ID | **COMPLETED** |
+| **36** | Transaction Consolidation to Contract | **COMPLETED** |
 
 ---
 
@@ -168,6 +169,34 @@ The Payment Details section now shows (in order):
 
 ---
 
+## Sprint 36 Summary
+
+**Goal:** Consolidate `Transaction` class from isolated `Transaction/` directory into `Contract/` for DDD consistency.
+
+### Changes
+
+| Action | Files |
+|--------|-------|
+| **Created** | `src/Contract/Transaction.php` (moved), `src/Contract/TransactionInterface.php` (new) |
+| **Deleted** | `src/Transaction/` directory |
+| **Updated** | 5 files with namespace changes |
+
+### Namespace Change
+
+```
+Old: OxidEsales\PaymentComponent\Transaction\Transaction
+New: OxidEsales\PaymentComponent\Contract\Transaction
+```
+
+### Bug Fixes
+
+- `DoctrineTransactionRepositoryTest.php` - Was using non-existent `TransactionRepository` class
+- `FullDataPersistenceFlowTest.php` - Same issue, now uses `DoctrineTransactionRepository`
+
+See: `reports/05-transaction-consolidation-to-contract.md`
+
+---
+
 ## Repository Structure (After Cleanup)
 
 ```
@@ -205,7 +234,8 @@ docs/oe_payments_docs/daniil_dev_log/20260204/
 │   ├── 01-repository-architecture-analysis.md          (repository analysis)
 │   ├── 02-dead-code-analysis.md                        (dead code analysis)
 │   ├── 03-admin-stripe-tab-contract-order-id.md        (Sprint 35 report)
-│   └── 04-integration-test-repository-fix.md           (Sprint 33 follow-up)
+│   ├── 04-integration-test-repository-fix.md           (Sprint 33 follow-up)
+│   └── 05-transaction-consolidation-to-contract.md     (Sprint 36 report)
 ├── architecture/
 │   ├── 00-overview.md                                  (module overview)
 │   ├── 01-architecture-layers.md                       (layer architecture)
