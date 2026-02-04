@@ -1,0 +1,87 @@
+@startuml Event Handler Registration
+!theme plain
+title Event Handler Registration & Dispatch
+
+package "Dependency Injection Container" {
+    class "ServiceContainer" as SC {
+        +get(serviceId): object
+        +getByTag(tag): array
+    }
+}
+
+package "Event System" {
+    class "EventListenerProvider" as ELP {
+        -handlers: HandlerInterface[]
+        +__construct(handlers: iterable)
+        +getListenersForEvent(event): array
+    }
+
+    class "EventDispatcher" as ED {
+        -provider: EventListenerProviderInterface
+        -listeners: array
+        +dispatch(event): EventInterface
+        +addListener(eventClass, listener, priority)
+    }
+
+    interface "HandlerInterface" as HI {
+        +handle(event): void
+        +getHandledEventClass(): string
+    }
+
+    abstract class "AbstractHandler" as AH {
+        #contractRepository: ContractRepositoryInterface
+        #eventDispatcher: EventDispatcherInterface
+        +handle(event): void
+    }
+}
+
+package "Stripe Handlers" {
+    class "StripeContractCreationHandler" as SCCH {
+        +getHandledEventClass(): string
+        +handle(event): void
+    }
+    note right: priority: 100
+
+    class "StripeCheckoutSessionHandler" as SCSH {
+        +getHandledEventClass(): string
+        +handle(event): void
+    }
+    note right: priority: 0
+
+    class "StripeOrderCreationHandler" as SOCH {
+        +getHandledEventClass(): string
+        +handle(event): void
+    }
+    note right: priority: 80
+}
+
+package "payment-component Handlers" {
+    class "EarlyOrderCreationHandler" as EOCH {
+        +getHandledEventClass(): string
+        +handle(event): void
+    }
+    note right : Listens to\nContractDraftCompletedEvent\nCreates order early
+}
+
+SCCH --|> AH
+SCSH --|> AH
+SOCH --|> AH
+EOCH --|> AH
+AH ..|> HI
+
+SC --> ELP : tagged_iterator\n'payment.event_handler'
+ELP --> ED : provides listeners
+ED --> HI : dispatches to
+
+note bottom of SC
+  **services.yaml configuration:**
+
+  EventListenerProvider uses tagged_iterator
+  to collect all payment.event_handler services.
+
+  Handlers are sorted by priority (higher first).
+  StripeContractCreationHandler (100) runs before
+  StripeCheckoutSessionHandler (0).
+end note
+
+@enduml

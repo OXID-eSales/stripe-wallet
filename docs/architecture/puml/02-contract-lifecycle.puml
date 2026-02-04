@@ -1,0 +1,96 @@
+@startuml Contract Lifecycle State Machine
+!theme plain
+title PaymentContract State Machine (Early Order Creation)
+
+[*] --> DRAFT : createContract()
+
+DRAFT --> NOT_FINISHED : EarlyOrderCreationHandler\ncreateOrder() + transitionToNotFinished(orderId)
+note right of DRAFT
+  Contract created with:
+  - BasketSnapshot
+  - Conditions (payment_authorized)
+  - No order yet (OXORDERID = NULL)
+end note
+
+NOT_FINISHED --> PENDING : transitionToPending()
+note right of NOT_FINISHED
+  Order created early:
+  - OXORDERID set
+  - order_number in metadata
+  - Order exists in oxorder table
+end note
+
+NOT_FINISHED --> CANCELLED : cancel()
+
+PENDING --> AUTHORIZED : authorize()\n[two-step capture]
+PENDING --> READY_TO_COMMIT : fulfillAllConditions()\n[immediate capture]
+PENDING --> FAILED : fail()
+PENDING --> CANCELLED : cancel()
+note right of PENDING
+  Awaiting payment:
+  - Stripe Checkout Session created
+  - Order number in Stripe metadata
+  - User redirected to Stripe
+end note
+
+AUTHORIZED --> READY_TO_COMMIT : fulfillAllConditions()
+AUTHORIZED --> CANCELLED : voidAuthorization()
+AUTHORIZED --> FAILED : fail()
+note right of AUTHORIZED
+  Two-step capture flow:
+  - Payment authorized but not captured
+  - Manual capture from admin
+end note
+
+READY_TO_COMMIT --> COMMITTED : commit()
+READY_TO_COMMIT --> CANCELLED : cancel()
+READY_TO_COMMIT --> FAILED : fail()
+note right of READY_TO_COMMIT
+  Payment confirmed:
+  - All conditions fulfilled
+  - Ready for order finalization
+end note
+
+COMMITTED --> FULFILLED : fulfill()
+COMMITTED --> FAILED : fail()
+note right of COMMITTED
+  Order finalized:
+  - StripeOrderCreationHandler detects\n  existing order (skips creation)
+  - Updates OXTRANSID with PaymentIntent ID
+  - Sets OXPAID timestamp
+end note
+
+FULFILLED --> [*]
+CANCELLED --> [*]
+EXPIRED --> [*]
+FAILED --> [*]
+
+note right of FULFILLED
+  Terminal success state:
+  - Payment captured
+  - Order fully processed
+  - OXPAID set
+end note
+
+state DRAFT #LightBlue
+state NOT_FINISHED #LightYellow
+state PENDING #LightYellow
+state AUTHORIZED #Orange
+state READY_TO_COMMIT #LightGreen
+state COMMITTED #LightGreen
+state FULFILLED #Green
+state CANCELLED #LightCoral
+state EXPIRED #LightCoral
+state FAILED #LightCoral
+
+legend right
+  |= Color |= Meaning |
+  | <#LightBlue> | Initial |
+  | <#LightYellow> | In Progress |
+  | <#Orange> | Authorized (2-step) |
+  | <#LightGreen> | Ready/Committed |
+  | <#Green> | Success |
+  | <#LightCoral> | Terminal Error |
+endlegend
+
+@enduml

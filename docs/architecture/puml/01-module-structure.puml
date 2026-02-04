@@ -1,0 +1,107 @@
+@startuml Module Structure
+!theme plain
+title Payment System Module Structure
+
+package "stripe module" as stripe {
+    package "Adapter" {
+        [StripeAdapter]
+        [OxidShopAdapter]
+        [OxidSessionAdapter]
+        [LazyStripeAdapter]
+    }
+
+    package "EventSystem/Handler" {
+        [StripeContractCreationHandler]
+        [StripeCheckoutSessionHandler]
+        [StripeCheckoutReturnHandler]
+        [StripeOrderCreationHandler]
+        [StripeCaptureRequestHandler]
+        [StripeRefundRequestHandler]
+    }
+
+    package "Service" {
+        [CheckoutSessionService]
+        [CheckoutReturnService]
+        [CaptureService]
+        [RefundService]
+        [ContractTokenService]
+    }
+
+    package "Webhook" {
+        [StripeWebhookProcessor]
+        [WebhookContractFulfillmentHandler]
+    }
+
+    package "Controller" {
+        [WebhookController]
+        [PaymentController]
+    }
+}
+
+package "payment-component module" as pc {
+    package "Adapter" as pcAdapter {
+        interface "PaymentAdapterInterface"
+        interface "ShopAdapterInterface"
+        interface "SessionAdapterInterface"
+    }
+
+    package "Contract" {
+        [PaymentContract]
+        [BasketSnapshot]
+        [ContractCondition]
+        [ContractState]
+    }
+
+    package "EventSystem" {
+        [EventDispatcher]
+        [AbstractHandler]
+        interface "HandlerInterface"
+    }
+
+    package "Repository" {
+        interface "ContractRepositoryInterface"
+        [DoctrineContractRepository]
+        interface "WebhookLogRepositoryInterface"
+        [DoctrineWebhookLogRepository]
+    }
+
+    package "Service" as pcService {
+        [ContractService]
+        [ContractFulfillmentService]
+        interface "TokenServiceInterface"
+    }
+
+    package "Webhook" as pcWebhook {
+        [AbstractWebhookProcessor]
+        [WebhookIdempotencyChecker]
+    }
+}
+
+' Relationships
+StripeAdapter ..|> PaymentAdapterInterface
+OxidShopAdapter ..|> ShopAdapterInterface
+OxidSessionAdapter ..|> SessionAdapterInterface
+StripeContractCreationHandler --|> AbstractHandler
+StripeWebhookProcessor --|> AbstractWebhookProcessor
+ContractTokenService ..|> TokenServiceInterface
+DoctrineContractRepository ..|> ContractRepositoryInterface
+DoctrineWebhookLogRepository ..|> WebhookLogRepositoryInterface
+
+' Uses
+StripeCheckoutSessionHandler --> CheckoutSessionService
+StripeCheckoutReturnHandler --> CheckoutReturnService
+StripeOrderCreationHandler --> ContractService
+WebhookContractFulfillmentHandler --> ContractFulfillmentService
+CheckoutSessionService --> StripeAdapter
+
+note right of stripe
+  Provider-specific implementation
+  Uses payment-component abstractions
+end note
+
+note right of pc
+  Provider-agnostic library
+  Defines interfaces and base classes
+end note
+
+@enduml

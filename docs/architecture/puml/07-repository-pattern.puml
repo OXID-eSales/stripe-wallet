@@ -1,0 +1,130 @@
+@startuml Repository Pattern
+!theme plain
+title Repository Pattern with Dependency Inversion
+
+package "payment-component" {
+    package "Domain" {
+        class "PaymentContract" as PC {
+            -id: string
+            -shopId: int
+            -userId: string
+            -orderId: ?string
+            -state: ContractState
+            -basketSnapshot: BasketSnapshot
+            -conditions: ContractCondition[]
+            -metadata: array
+            +getId(): string
+            +getState(): ContractState
+            +getOrderId(): ?string
+            +addCondition(condition): void
+            +fulfillCondition(type, data): void
+            +setMetadata(key, value): void
+            +getMetadata(key): mixed
+        }
+
+        class "BasketSnapshot" as BS {
+            -items: array
+            -discounts: array
+            -totalGross: float
+            -totalNet: float
+            -currency: string
+            +fromArray(data): BasketSnapshot
+            +toArray(): array
+        }
+    }
+
+    package "Repository" {
+        interface "ContractRepositoryInterface" as CRI {
+            +save(contract): void
+            +findById(id): ?PaymentContract
+            +findByProviderOrderId(id): ?PaymentContract
+            +findActiveByUserId(userId): ?PaymentContract
+            +findExpired(before): array
+        }
+
+        class "DoctrineContractRepository" as DCR {
+            -connection: Connection
+            +save(contract): void
+            +findById(id): ?PaymentContract
+            +findByProviderOrderId(id): ?PaymentContract
+        }
+
+        interface "WebhookLogRepositoryInterface" as WLRI {
+            +save(log): void
+            +existsByEventId(eventId): bool
+        }
+
+        class "DoctrineWebhookLogRepository" as DWLR {
+            -connection: Connection
+            +save(log): void
+            +existsByEventId(eventId): bool
+        }
+    }
+
+    package "Service" {
+        class "ContractService" as CS {
+            -repository: ContractRepositoryInterface
+            +createContract(...): PaymentContract
+            +findActiveContract(userId): ?PaymentContract
+        }
+    }
+}
+
+package "Database" {
+    entity "oe_payments_contract" as DBC {
+        * OXID : varchar(32)
+        --
+        OXSHOPID : int
+        OXUSERID : varchar(32)
+        OXORDERID : varchar(32)
+        OXSTATE : varchar(32)
+        OXBASKETDATA : text (JSON)
+        OXCONDITIONS : text (JSON)
+        OXMETADATA : text (JSON)
+        OXPROVIDER : varchar(32)
+        OXPROVIDERORDERID : varchar(128)
+        OXCAPTUREDAMOUNT : decimal
+        OXREFUNDEDAMOUNT : decimal
+    }
+
+    entity "oe_payments_webhooklogs" as DBW {
+        * OXID : varchar(32)
+        --
+        OXEVENTID : varchar(128)
+        OXEVENTTYPE : varchar(64)
+        OXCONTRACTID : varchar(32)
+        OXSTATUS : varchar(32)
+        OXTIMESTAMP : datetime
+    }
+}
+
+' Relationships
+DCR ..|> CRI : implements
+DWLR ..|> WLRI : implements
+CS --> CRI : depends on\ninterface
+DCR --> DBC : persists to
+DWLR --> DBW : persists to
+PC *-- BS : contains
+DCR ..> PC : hydrates
+
+note right of CRI
+  **Dependency Inversion Principle:**
+  Services depend on interface,
+  not concrete repository
+end note
+
+note right of DCR
+  **Doctrine DBAL:**
+  Uses Connection for queries
+  Serializes BasketSnapshot to JSON
+end note
+
+note bottom of DBC
+  **Contract Table:**
+  - Stores contract state machine
+  - JSON columns for flexibility
+  - OXORDERID set early by EarlyOrderCreationHandler
+  - OXMETADATA stores order_number
+end note
+
+@enduml

@@ -1,0 +1,130 @@
+@startuml Provider Abstraction Pattern
+!theme plain
+title Provider Abstraction - Adapter Pattern
+
+package "payment-component" {
+    interface "PaymentAdapterInterface" as PAI {
+        +createPayment(request): PaymentResponse
+        +authorizePayment(request): AuthorizationResponse
+        +capturePayment(request): CaptureResponse
+        +refundPayment(request): RefundResponse
+        +voidPayment(request): VoidResponse
+        +createPaymentMethod(request): PaymentMethodResponse
+        +verifyWebhookSignature(): bool
+        +getProviderName(): string
+    }
+
+    interface "ShopAdapterInterface" as SAI {
+        +translate(key): string
+        +getConfig(key): mixed
+        +getCurrencyCode(): string
+        +getShopId(): int
+    }
+
+    interface "SessionAdapterInterface" as SSI {
+        +getVariable(key): mixed
+        +setVariable(key, value): void
+        +getBasket(): BasketInterface
+        +getUserId(): ?string
+    }
+
+    class "CreatePaymentRequest" as CPR {
+        -amount: string
+        -currency: string
+        -description: string
+        -customerId: ?string
+        -metadata: array
+    }
+
+    class "PaymentResponse" as PR {
+        -providerPaymentId: string
+        -status: string
+        -amount: string
+        -currency: string
+        -requiresAction: bool
+        -clientSecret: ?string
+        -redirectUrl: ?string
+    }
+
+    abstract class "PaymentAdapterFactory" as PAF {
+        +createAdapter(provider): PaymentAdapterInterface
+        +createDefaultAdapter(): PaymentAdapterInterface
+        +isProviderSupported(provider): bool
+    }
+}
+
+package "stripe" {
+    class "StripeAdapter" as SA {
+        -stripeClient: StripeClient
+        -config: ModuleConfigurationService
+        +createPayment(request): PaymentResponse
+        +authorizePayment(request): AuthorizationResponse
+        +capturePayment(request): CaptureResponse
+        +createCheckoutSession(params): Session
+        +retrievePaymentIntent(id): PaymentIntent
+    }
+
+    class "OxidShopAdapter" as OSA {
+        +translate(key): string
+        +getConfig(key): mixed
+        +getCurrencyCode(): string
+    }
+
+    class "OxidSessionAdapter" as OSSA {
+        +getVariable(key): mixed
+        +setVariable(key, value): void
+        +getBasket(): Basket
+    }
+
+    class "StripeAdapterFactory" as SAF {
+        -clientFactory: StripeClientFactory
+        +createAdapter(provider): StripeAdapter
+    }
+
+    class "LazyStripeAdapter" as LSA {
+        -factory: StripeAdapterFactory
+        -adapter: ?StripeAdapter
+        +createPayment(request): PaymentResponse
+    }
+}
+
+package "Future: paypal" #LightGray {
+    class "PayPalAdapter" as PPA {
+        -paypalClient: PayPalClient
+        +createPayment(request): PaymentResponse
+    }
+
+    class "PayPalAdapterFactory" as PPAF {
+        +createAdapter(provider): PayPalAdapter
+    }
+}
+
+SA ..|> PAI : implements
+OSA ..|> SAI : implements
+OSSA ..|> SSI : implements
+SAF --|> PAF : extends
+LSA ..|> PAI : implements
+LSA --> SAF : uses
+
+PPA ..|> PAI : implements
+PPAF --|> PAF : extends
+
+PAI ..> CPR : uses
+PAI ..> PR : returns
+
+note bottom of SA
+  Translates provider-agnostic
+  requests to Stripe SDK calls
+end note
+
+note bottom of LSA
+  Lazy loading pattern:
+  Creates adapter on first use
+end note
+
+note bottom of PPA
+  Future provider:
+  No changes to payment-component
+end note
+
+@enduml

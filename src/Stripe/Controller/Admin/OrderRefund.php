@@ -13,8 +13,10 @@ use OxidEsales\Eshop\Application\Controller\Admin\AdminDetailsController;
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
+use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
+use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
@@ -520,13 +522,82 @@ class OrderRefund extends AdminDetailsController
     }
 
     /**
-     * Get contract ID from order metadata (if available).
+     * Cached contract for current order.
+     */
+    protected ?PaymentContractInterface $cachedContract = null;
+
+    /**
+     * Flag indicating if contract lookup was attempted.
+     */
+    protected bool $contractLookupAttempted = false;
+
+    /**
+     * Get contract ID from order by looking up the contract repository.
      */
     protected function getContractIdFromOrder(Order $order): ?string
     {
-        // Contract ID might be stored in order's transaction reference
-        // or in a custom field - implementation depends on how contracts are linked
-        return null;
+        $contract = $this->getContractForOrder($order);
+        return $contract?->getId();
+    }
+
+    /**
+     * Get contract for the current order.
+     */
+    protected function getContractForOrder(Order $order): ?PaymentContractInterface
+    {
+        if ($this->contractLookupAttempted) {
+            return $this->cachedContract;
+        }
+
+        $this->contractLookupAttempted = true;
+
+        try {
+            $repository = $this->getContractRepository();
+            $this->cachedContract = $repository->findByOrderId($order->getId());
+        } catch (\Exception $e) {
+            Registry::getLogger()->warning('Failed to load contract for order', [
+                'orderId' => $order->getId(),
+                'error' => $e->getMessage(),
+            ]);
+            $this->cachedContract = null;
+        }
+
+        return $this->cachedContract;
+    }
+
+    /**
+     * Get contract repository from DI container.
+     */
+    protected function getContractRepository(): ContractRepositoryInterface
+    {
+        /** @var ContractRepositoryInterface $repository */
+        $repository = ContainerFactory::getInstance()
+            ->getContainer()
+            ->get(ContractRepositoryInterface::class);
+
+        return $repository;
+    }
+
+    /**
+     * Get contract ID for template display.
+     */
+    public function getContractId(): ?string
+    {
+        $order = $this->getOrder();
+        if ($order === null) {
+            return null;
+        }
+
+        return $this->getContractIdFromOrder($order);
+    }
+
+    /**
+     * Get order ID (OXID) for template display.
+     */
+    public function getOrderIdForDisplay(): ?string
+    {
+        $order = $this->getOrder();
+        return $order?->getId();
     }
 
     /**
