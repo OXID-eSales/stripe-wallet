@@ -20,11 +20,6 @@
   "license": [
     "GPL-3.0"
   ],
-  "extra": {
-    "oxideshop": {
-      "target-directory": "osc/stripe"
-    }
-  },
   "conflict": {
     "oxid-esales/oxideshop-ce": "<7.4"
   },
