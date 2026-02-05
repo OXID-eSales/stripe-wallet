@@ -9,13 +9,10 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Adapter\PaymentAdapterInterface;
 use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\AbstractPaymentCaptureService;
 use OxidEsales\PaymentComponent\Service\Exception\CaptureFailedException;
-use Psr\Log\LoggerInterface;
 
 /**
  * Stripe-specific implementation of payment capture service.

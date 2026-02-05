@@ -5,16 +5,11 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\EventFlow;
 
 use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
-use OxidEsales\PaymentComponent\Contract\ContractCondition;
 use OxidEsales\PaymentComponent\Contract\PaymentContract;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
-use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
-use OxidEsales\PaymentComponent\EventSystem\EventDispatcher;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
-use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
-use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler;
-use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler;
+use OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface;
+use OxidEsales\PaymentComponent\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Service\ContractTokenService;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
 use OxidEsales\Payments\Stripe\Service\ReturnSessionSecurityService;
@@ -36,8 +31,8 @@ use PHPUnit\Framework\TestCase;
 class SessionRestorationIntegrationTest extends TestCase
 {
     private ContractRepositoryInterface $contractRepository;
-    private ContractTokenService $tokenService;
-    private ReturnSessionSecurityService $securityService;
+    private TokenServiceInterface $tokenService;
+    private ReturnSecurityValidatorInterface $securityService;
     private string $testSecret = 'sk_test_integration_test_secret_key';
 
     protected function setUp(): void

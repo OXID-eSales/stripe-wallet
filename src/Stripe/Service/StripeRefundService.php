@@ -9,7 +9,6 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Service\AbstractPaymentRefundService;
 use OxidEsales\PaymentComponent\Service\Exception\RefundFailedException;
 

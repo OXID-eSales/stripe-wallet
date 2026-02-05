@@ -75,7 +75,6 @@ class StripeCaptureServiceTest extends TestCase
 
         $result = $this->service->capture($contractId);
 
-        $this->assertInstanceOf(CaptureResponse::class, $result);
         $this->assertEquals('ch_123', $result->captureId);
         $this->assertEquals($amount, $result->amountCaptured);
     }

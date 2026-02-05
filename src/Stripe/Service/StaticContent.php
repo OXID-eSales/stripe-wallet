@@ -26,18 +26,9 @@ use OxidEsales\EshopCommunity\Internal\Framework\Database\QueryBuilderFactoryInt
  */
 class StaticContent
 {
-    /** @var QueryBuilderFactoryInterface */
-    private $queryBuilderFactory;
-
-    /**
-     * Constructor
-     *
-     * @param QueryBuilderFactoryInterface $queryBuilderFactory
-     */
     public function __construct(
-        QueryBuilderFactoryInterface $queryBuilderFactory
+        private QueryBuilderFactoryInterface $queryBuilderFactory
     ) {
-        $this->queryBuilderFactory = $queryBuilderFactory;
     }
 
     /**
