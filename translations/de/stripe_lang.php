@@ -44,14 +44,6 @@ $aLang = [
     'STRIPE_BUY_NOW'                            => 'Jetzt kaufen',
     'STRIPE_BUY_NOW_HINT'                       => 'Schnellkauf - Warenkorb überspringen und sofort bezahlen',
 
-    // Module settings
-    'SHOP_MODULE_sStripeDevMode'                => 'Entwicklungsmodus',
-    'HELP_SHOP_MODULE_sStripeDevMode'           => 'Aktivieren, um JavaScript-Dateien separat zu laden für einfacheres Debugging. Wird automatisch auf .local, .dev, .test Domains aktiviert.',
-    'SHOP_MODULE_sStripeCaptureMode'            => 'Erfassungsmodus',
-    'SHOP_MODULE_sStripeCaptureMode_automatic'  => 'Automatisch (sofortige Erfassung)',
-    'SHOP_MODULE_sStripeCaptureMode_manual'     => 'Manuell (verzögerte Erfassung)',
-    'HELP_SHOP_MODULE_sStripeCaptureMode'       => 'Automatisch: Zahlung wird sofort nach Autorisierung erfasst. Manuell: Zahlung wird nur autorisiert und muss später erfasst werden (z.B. beim Versand). Autorisierungen verfallen nach 7 Tagen.',
-
     // Payment Element - Standard Checkout
     'OSC_STRIPE_CARD_PAYMENT'                   => 'Kreditkartenzahlung',
     'OSC_STRIPE_PAYMENT_DESC'                   => 'Zahlen Sie sicher mit Ihrer Kredit- oder Debitkarte. Ihre Zahlungsinformationen sind verschlüsselt und sicher.',

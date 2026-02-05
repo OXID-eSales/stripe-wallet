@@ -44,14 +44,6 @@ $aLang = [
     'STRIPE_BUY_NOW'                            => 'Buy Now',
     'STRIPE_BUY_NOW_HINT'                       => 'Fast checkout - Skip the cart and pay instantly',
 
-    // Module settings
-    'SHOP_MODULE_sStripeDevMode'                => 'Development Mode',
-    'HELP_SHOP_MODULE_sStripeDevMode'           => 'Enable to load JavaScript files separately for easier debugging. Automatically enabled on .local, .dev, .test domains.',
-    'SHOP_MODULE_sStripeCaptureMode'            => 'Capture Mode',
-    'SHOP_MODULE_sStripeCaptureMode_automatic'  => 'Automatic (instant capture)',
-    'SHOP_MODULE_sStripeCaptureMode_manual'     => 'Manual (delayed capture)',
-    'HELP_SHOP_MODULE_sStripeCaptureMode'       => 'Automatic: Payment is captured immediately when authorized. Manual: Payment is only authorized and must be captured later (e.g., when shipping goods). Authorizations expire after 7 days.',
-
     // Payment Element - Standard Checkout
     'OSC_STRIPE_CARD_PAYMENT'                   => 'Credit Card Payment',
     'OSC_STRIPE_PAYMENT_DESC'                   => 'Pay securely with your credit or debit card. Your payment information is encrypted and secure.',

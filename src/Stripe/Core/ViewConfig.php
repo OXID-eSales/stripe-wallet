@@ -43,8 +43,7 @@ class ViewConfig extends ViewConfig_parent
      *
      * Development mode can be enabled by:
      * 1. Setting STRIPE_DEV_MODE=1 in .env
-     * 2. Setting sStripeDevMode config in admin
-     * 3. Checking if OXID is in debug mode
+     * 2. Checking if OXID is in debug mode
      *
      * @return bool
      */
@@ -58,12 +57,6 @@ class ViewConfig extends ViewConfig_parent
 
         // Check OXID config
         $config = Registry::getConfig();
-
-        // Check module-specific setting
-        $moduleDevMode = $config->getConfigParam('sStripeDevMode');
-        if ($moduleDevMode) {
-            return true;
-        }
 
         // Check if OXID is in debug mode
         if ($config->getConfigParam('iDebug') > 0) {

@@ -28,11 +28,6 @@ events:
   onActivate: 'OxidEsales\Payments\Stripe\Core\Events::onActivate'
   onDeactivate: 'OxidEsales\Payments\Stripe\Core\Events::onDeactivate'
 moduleSettings:
-  sStripeDevMode:
-    group: STRIPE_GENERAL
-    type: bool
-    value: false
-    position: 5
   sStripeMode:
     group: STRIPE_GENERAL
     type: select
