@@ -239,10 +239,6 @@ class MetadataTest extends TestCase
             $settingNames,
             'Transaction logging setting must be defined'
         );
-
-        // Sprint 29: Status mapping settings removed - now in StatusMappingConfig class
-        // sStripeStatusPending, sStripeStatusProcessing, sStripeStatusCancelled
-        // are no longer admin-configurable settings
     }
 
     /**

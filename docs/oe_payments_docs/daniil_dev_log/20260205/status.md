@@ -41,6 +41,7 @@ Continuing from cleanup work done Jan 20 - Feb 04:
 | **37** | Admin Config Analysis - API Key Duplication | **COMPLETED** |
 | **38** | Remove Dead API Key Fields | **COMPLETED** |
 | **39** | API Key Mismatch Validation in Admin UI | **COMPLETED** |
+| **40** | StatusMappingConfig Dead Code Cleanup | **COMPLETED** |
 
 ---
 
@@ -115,10 +116,39 @@ See: `reports/01-api-key-duplication-analysis.md`
 
 ---
 
+## Sprint 40 Summary
+
+**Goal:** Remove `StatusMappingConfig` dead code class
+
+### Files Deleted
+
+| File | Reason |
+|------|--------|
+| `src/Stripe/Config/StatusMappingConfig.php` | Dead code - never used in production |
+| `tests/Unit/Stripe/Config/StatusMappingConfigTest.php` | Tests for deleted class |
+| `src/Stripe/Config/` directory | Empty after deletion |
+| `tests/Unit/Stripe/Config/` directory | Empty after deletion |
+
+### Comments Removed
+
+| File | Comment Removed |
+|------|-----------------|
+| `metadata.php` | "Sprint 29: Status mappings moved to StatusMappingConfig class" |
+| `ModuleConfigurationService.php` | "use StatusMappingConfig constants instead" |
+| `MetadataTest.php` | "now in StatusMappingConfig class" |
+| `module_config.html.twig` | "moved to StatusMappingConfig class" |
+
+### Test Count Change
+
+- Before: 818 tests
+- After: 805 tests (-13 tests from deleted `StatusMappingConfigTest.php`)
+
+---
+
 ## Test Results
 
 ```
-PHPUnit tests passed (818 tests, 2374 assertions)
+PHPUnit tests passed (805 tests, 2355 assertions)
 PHP Code Sniffer passed
 PHPStan passed
 PHPMD passed
@@ -135,7 +165,8 @@ docs/oe_payments_docs/daniil_dev_log/20260205/
 ├── todo/
 ├── done/
 │   ├── SPRINT-38-remove-dead-api-key-fields.md         (completed sprint)
-│   └── SPRINT-39-api-key-mismatch-validation.md        (completed sprint)
+│   ├── SPRINT-39-api-key-mismatch-validation.md        (completed sprint)
+│   └── SPRINT-40-statusmappingconfig-dead-code-cleanup.md (completed sprint)
 ├── reports/
 │   ├── 01-api-key-duplication-analysis.md              (API key analysis)
 │   └── 02-api-key-mismatch-root-cause.md               (mismatch root cause)

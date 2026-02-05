@@ -1,8 +1,6 @@
 {% extends "module_config.html.twig" %}
 
 {% block admin_module_config_var %}
-
-    {# Sprint 29: Status mappings (sStripeStatusPending, etc.) moved to StatusMappingConfig class #}
     {% if module_var == 'sStripeTestToken' or module_var == 'sStripeLiveToken' or module_var == 'sStripeTestPk' or module_var == 'sStripeLivePk' %}
         {# Sprint 39: Show warning banner if API keys are from different Stripe accounts #}
         {% if module_var == 'sStripeTestToken' %}

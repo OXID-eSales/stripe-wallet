@@ -151,8 +151,6 @@ class ModuleConfigurationService implements ServiceInterface
         return (bool) $this->get('blStripeLogTransactionInfo');
     }
 
-    // Sprint 29: Status mapping methods removed - use StatusMappingConfig constants instead
-
     /**
      * Check if payment method should be removed by billing country
      */
