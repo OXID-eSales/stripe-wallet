@@ -63,7 +63,7 @@ export default class extends Controller {
         button.removeAttribute('title')
       } else {
         button.classList.add('disabled')
-        button.setAttribute('title', 'Please accept the terms and conditions')
+        button.setAttribute('title', window.oStripe?.i18n?.AGB_REQUIRED || 'Please accept the terms and conditions')
       }
     })
   }

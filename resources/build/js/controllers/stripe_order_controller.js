@@ -38,7 +38,7 @@ export default class extends Controller {
     // Validate required configuration
     if (!this.publishableKeyValue) {
       console.error('Stripe publishable key not configured')
-      this.showError('Stripe configuration error. Please contact support.')
+      this.showError(window.oStripe?.i18n?.CONFIG_ERROR || 'Stripe configuration error. Please contact support.')
       return
     }
 
@@ -90,7 +90,7 @@ export default class extends Controller {
 
     } catch (error) {
       console.error('Failed to initialize Stripe:', error)
-      this.showError('Failed to initialize payment form. Please refresh the page.')
+      this.showError(window.oStripe?.i18n?.INIT_FAILED || 'Failed to initialize payment form. Please refresh the page.')
     }
   }
 

@@ -81,4 +81,21 @@ $aLang = [
     'OSC_STRIPE_CARD_LAST4'                     => 'Card ending in',
     'OSC_STRIPE_PAYMENT_DATE'                   => 'Payment Date',
     'OSC_STRIPE_PAYMENT_AMOUNT'                 => 'Payment Amount',
+
+    // JavaScript Controller Translations
+    'STRIPE_JS_AGB_REQUIRED'                    => 'Please accept the terms and conditions',
+    'STRIPE_JS_CONFIG_ERROR'                    => 'Stripe configuration error. Please contact support.',
+    'STRIPE_JS_INIT_FAILED'                     => 'Failed to initialize payment form. Please refresh the page.',
+    'STRIPE_JS_PAYMENT_FAILED'                  => 'Payment processing failed',
+    'STRIPE_JS_NOT_LOADED'                      => 'Stripe.js not loaded',
+    'STRIPE_JS_KEY_NOT_CONFIGURED'              => 'Stripe publishable key not configured',
+    'STRIPE_JS_CREATING_SESSION'                => 'Creating checkout session...',
+    'STRIPE_JS_SESSION_FAILED'                  => 'Failed to create checkout session',
+    'STRIPE_JS_SESSION_INVALID'                 => 'Invalid checkout session response',
+    'STRIPE_JS_CONTROLLER_NOT_FOUND'            => 'Stripe payment controller not found. Please refresh the page.',
+    'STRIPE_JS_FORM_NOT_READY'                  => 'Payment form not initialized. Please refresh the page.',
+    'STRIPE_JS_PAYMENT_NOT_COMPLETED'           => 'Payment not completed',
+    'STRIPE_JS_URL_NOT_CONFIGURED'              => 'Payment URL is not configured',
+    'STRIPE_JS_INTENT_INVALID'                  => 'Invalid payment intent response',
+    'STRIPE_JS_PROCESSING'                      => 'Processing...',
 ];

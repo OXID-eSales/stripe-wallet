@@ -81,4 +81,21 @@ $aLang = [
     'OSC_STRIPE_CARD_LAST4'                     => 'Karte endet auf',
     'OSC_STRIPE_PAYMENT_DATE'                   => 'Zahlungsdatum',
     'OSC_STRIPE_PAYMENT_AMOUNT'                 => 'Zahlungsbetrag',
+
+    // JavaScript Controller Translations
+    'STRIPE_JS_AGB_REQUIRED'                    => 'Bitte akzeptieren Sie die AGB',
+    'STRIPE_JS_CONFIG_ERROR'                    => 'Stripe Konfigurationsfehler. Bitte kontaktieren Sie den Support.',
+    'STRIPE_JS_INIT_FAILED'                     => 'Zahlungsformular konnte nicht initialisiert werden. Bitte laden Sie die Seite neu.',
+    'STRIPE_JS_PAYMENT_FAILED'                  => 'Zahlungsverarbeitung fehlgeschlagen',
+    'STRIPE_JS_NOT_LOADED'                      => 'Stripe.js wurde nicht geladen',
+    'STRIPE_JS_KEY_NOT_CONFIGURED'              => 'Stripe Publishable Key ist nicht konfiguriert',
+    'STRIPE_JS_CREATING_SESSION'                => 'Checkout-Session wird erstellt...',
+    'STRIPE_JS_SESSION_FAILED'                  => 'Checkout-Session konnte nicht erstellt werden',
+    'STRIPE_JS_SESSION_INVALID'                 => 'Ungültige Checkout-Session Antwort',
+    'STRIPE_JS_CONTROLLER_NOT_FOUND'            => 'Stripe Zahlungs-Controller nicht gefunden. Bitte laden Sie die Seite neu.',
+    'STRIPE_JS_FORM_NOT_READY'                  => 'Zahlungsformular nicht bereit. Bitte laden Sie die Seite neu.',
+    'STRIPE_JS_PAYMENT_NOT_COMPLETED'           => 'Zahlung nicht abgeschlossen',
+    'STRIPE_JS_URL_NOT_CONFIGURED'              => 'Zahlungs-URL ist nicht konfiguriert',
+    'STRIPE_JS_INTENT_INVALID'                  => 'Ungültige Payment Intent Antwort',
+    'STRIPE_JS_PROCESSING'                      => 'Verarbeitung...',
 ];

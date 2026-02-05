@@ -135,6 +135,11 @@ $aLang = array(
     'STRIPE_REFUND_FRAUD'                               => 'Fraud',
     'STRIPE_IS_NOT_STRIPE_ORDER'                        => 'This is not a Stripe order',
 
+    // Connect Button & Webhook Status
+    'STRIPE_CONNECT_WITH'                               => 'Connect with',
+    'STRIPE_WEBHOOK_CONFIGURED'                         => 'Configured',
+    'STRIPE_WEBHOOK_NOT_SET'                            => 'Not set - copy from Stripe Dashboard',
+
     // Capture (Manual Capture Mode)
     'STRIPE_CAPTURE_PAYMENT'                            => 'Capture Payment',
     'STRIPE_CAPTURE_REQUIRED'                           => 'Payment Capture Required',

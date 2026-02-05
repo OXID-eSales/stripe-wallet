@@ -90,7 +90,7 @@ export default class extends Controller {
       }
     } catch (error) {
       console.error('Order submission failed', error)
-      this.showError(error.message || 'Payment processing failed')
+      this.showError(error.message || window.oStripe?.i18n?.PAYMENT_FAILED || 'Payment processing failed')
     } finally {
       this.hideLoading()
     }
@@ -102,17 +102,17 @@ export default class extends Controller {
    */
   async handleStripeCheckout() {
     if (!window.Stripe) {
-      throw new Error('Stripe.js not loaded')
+      throw new Error(window.oStripe?.i18n?.JS_NOT_LOADED || 'Stripe.js not loaded')
     }
 
     // Get Stripe publishable key from Stimulus value
     if (!this.hasPublishableKeyValue || !this.publishableKeyValue) {
-      throw new Error('Stripe publishable key not configured')
+      throw new Error(window.oStripe?.i18n?.KEY_NOT_CONFIGURED || 'Stripe publishable key not configured')
     }
 
     const stripe = Stripe(this.publishableKeyValue)
 
-    this.setStatus('Creating checkout session...')
+    this.setStatus(window.oStripe?.i18n?.CREATING_SESSION || 'Creating checkout session...')
 
     // Create Checkout Session
     const response = await fetch(this.urlValue, {
@@ -128,13 +128,13 @@ export default class extends Controller {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || 'Failed to create checkout session')
+      throw new Error(errorData.error || window.oStripe?.i18n?.SESSION_FAILED || 'Failed to create checkout session')
     }
 
     const data = await response.json()
 
     if (!data.id) {
-      throw new Error('Invalid checkout session response')
+      throw new Error(window.oStripe?.i18n?.SESSION_INVALID || 'Invalid checkout session response')
     }
 
     console.log('Checkout Session created:', data.id, 'URL:', data.url)
@@ -165,7 +165,7 @@ export default class extends Controller {
     const stripeOrderController = this.getStripeOrderController()
 
     if (!stripeOrderController) {
-      throw new Error('Stripe payment controller not found. Please refresh the page.')
+      throw new Error(window.oStripe?.i18n?.CONTROLLER_NOT_FOUND || 'Stripe payment controller not found. Please refresh the page.')
     }
 
     // Verify card element and stripe are available
@@ -174,7 +174,7 @@ export default class extends Controller {
         hasCard: !!stripeOrderController.card,
         hasStripe: !!stripeOrderController.stripe
       })
-      throw new Error('Payment form not initialized. Please refresh the page.')
+      throw new Error(window.oStripe?.i18n?.FORM_NOT_READY || 'Payment form not initialized. Please refresh the page.')
     }
 
     console.log('Stripe controller ready:', {
@@ -197,7 +197,7 @@ export default class extends Controller {
       console.log('Payment succeeded', confirmPaymentResponse.paymentIntent)
       // TODO: Submit final order to backend
     } else {
-      throw new Error('Payment not completed')
+      throw new Error(window.oStripe?.i18n?.PAYMENT_NOT_COMPLETED || 'Payment not completed')
     }
   }
 
@@ -208,7 +208,7 @@ export default class extends Controller {
    */
   async handlePayment() {
     if (!this.hasUrlValue) {
-      throw new Error('Payment URL is not configured')
+      throw new Error(window.oStripe?.i18n?.URL_NOT_CONFIGURED || 'Payment URL is not configured')
     }
 
     console.log('Creating payment intent via URL:', this.urlValue)
@@ -232,7 +232,7 @@ export default class extends Controller {
     }
 
     if (!responseData.success || !responseData.clientSecret) {
-      throw new Error('Invalid payment intent response')
+      throw new Error(window.oStripe?.i18n?.INTENT_INVALID || 'Invalid payment intent response')
     }
 
     return responseData
@@ -244,7 +244,7 @@ export default class extends Controller {
   showLoading() {
     this.element.disabled = true
     this.originalText = this.element.textContent
-    this.element.textContent = 'Processing...'
+    this.element.textContent = window.oStripe?.i18n?.PROCESSING || 'Processing...'
   }
 
   /**
