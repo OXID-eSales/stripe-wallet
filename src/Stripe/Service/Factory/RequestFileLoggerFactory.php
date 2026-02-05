@@ -17,7 +17,7 @@ use OxidEsales\PaymentComponent\Service\Factory\AbstractFileLoggerFactory;
  *
  * Sprint 27: Extends AbstractFileLoggerFactory using Template Method Pattern.
  * Sprint 15: Logs API requests/responses to file instead of database.
- * Logs to log/osc/stripe_requests.log.
+ * Logs to log/stripe/stripe_requests.log.
  *
  * @since 2.0.0
  */
@@ -25,7 +25,7 @@ final class RequestFileLoggerFactory extends AbstractFileLoggerFactory
 {
     protected function getLogFile(): string
     {
-        return 'log/osc/stripe_requests.log';
+        return 'log/stripe/stripe_requests.log';
     }
 
     protected function getPrefix(): string

@@ -16,7 +16,7 @@ use OxidEsales\PaymentComponent\Service\Factory\AbstractFileLoggerFactory;
  * Factory for creating the event system file logger.
  *
  * Sprint 27: Extends AbstractFileLoggerFactory using Template Method Pattern.
- * Sprint 25: Logs to log/osc/stripe_events.log for debugging event handler flow.
+ * Sprint 25: Logs to log/stripe/stripe_events.log for debugging event handler flow.
  *
  * @since Sprint 25
  */
@@ -24,7 +24,7 @@ final class EventFileLoggerFactory extends AbstractFileLoggerFactory
 {
     protected function getLogFile(): string
     {
-        return 'log/osc/stripe_events.log';
+        return 'log/stripe/stripe_events.log';
     }
 
     protected function getPrefix(): string

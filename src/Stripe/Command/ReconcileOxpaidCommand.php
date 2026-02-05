@@ -68,7 +68,7 @@ This handles cases where webhooks were missed or delayed.
     <comment>bin/oe-console stripe:reconcile-oxpaid --max-age=14</comment>
 
 <info>Log file:</info>
-  source/log/osc/stripe_reconciliation.log
+  source/log/stripe/stripe_reconciliation.log
 HELP
             )
             ->addOption(

@@ -17,7 +17,7 @@ use OxidEsales\PaymentComponent\Service\Factory\AbstractFileLoggerFactory;
  *
  * Sprint 27: Refactored to extend AbstractFileLoggerFactory using Template Method Pattern.
  * Sprint 16: Logs webhook requests/responses to file.
- * Logs to log/osc/stripe_webhooks.log
+ * Logs to log/stripe/stripe_webhooks.log
  *
  * @since 2.0.0
  */
@@ -25,7 +25,7 @@ final class WebhookFileLoggerFactory extends AbstractFileLoggerFactory
 {
     protected function getLogFile(): string
     {
-        return 'log/osc/stripe_webhooks.log';
+        return 'log/stripe/stripe_webhooks.log';
     }
 
     protected function getPrefix(): string

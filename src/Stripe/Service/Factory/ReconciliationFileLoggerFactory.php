@@ -16,7 +16,7 @@ use OxidEsales\PaymentComponent\Service\Factory\AbstractFileLoggerFactory;
  * Factory for creating the reconciliation file logger.
  *
  * Sprint 27: Extends AbstractFileLoggerFactory using Template Method Pattern.
- * Sprint 14: Logs to log/osc/stripe_reconciliation.log for OXPAID reconciliation.
+ * Sprint 14: Logs to log/stripe/stripe_reconciliation.log for OXPAID reconciliation.
  *
  * @since Sprint 14
  */
@@ -24,7 +24,7 @@ final class ReconciliationFileLoggerFactory extends AbstractFileLoggerFactory
 {
     protected function getLogFile(): string
     {
-        return 'log/osc/stripe_reconciliation.log';
+        return 'log/stripe/stripe_reconciliation.log';
     }
 
     protected function getPrefix(): string
