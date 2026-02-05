@@ -20,7 +20,6 @@ console.log('Stimulus debug enabled')
 // This allows hot reloading and easier debugging
 async function loadControllers() {
   const controllers = [
-    { name: 'buy-now', path: './controllers/buy_now_controller.js' },
     { name: 'stripe-order', path: './controllers/stripe_order_controller.js' }
     // Add more controllers here as you create them
   ]

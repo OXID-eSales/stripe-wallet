@@ -7,7 +7,6 @@
 import { Application } from "@hotwired/stimulus"
 
 // Import controllers
-import BuyNowController from "./controllers/buy_now_controller"
 import StripeOrderController from "./controllers/stripe_order_controller"
 import OrderSubmitController from "./controllers/order_submit_controller"
 import AgbValidationController from "./controllers/agb_validation_controller"
@@ -16,7 +15,6 @@ import AgbValidationController from "./controllers/agb_validation_controller"
 window.Stimulus = Application.start()
 
 // Register controllers
-Stimulus.register("buy-now", BuyNowController)
 Stimulus.register("stripe-order", StripeOrderController)
 Stimulus.register("order-submit", OrderSubmitController)
 Stimulus.register("agb-validation", AgbValidationController)

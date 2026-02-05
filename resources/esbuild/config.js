@@ -70,7 +70,6 @@ const developmentConfig = {
     // Individual controllers for development (unbundled)
     controllers: {
         entryPoints: [
-            path.join(PATHS.build, 'js/controllers/buy_now_controller.js'),
             path.join(PATHS.build, 'js/controllers/stripe_order_controller.js')
         ],
         bundle: false,
