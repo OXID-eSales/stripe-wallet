@@ -79,6 +79,19 @@ class ModuleConfiguration extends ModuleConfiguration_parent
     }
 
     /**
+     * Get API key validation error message for template display.
+     *
+     * Returns an error message if the publishable key and secret key
+     * appear to be from different Stripe accounts, null if they match.
+     *
+     * @return string|null Error message or null if keys are valid
+     */
+    public function stripeGetKeyValidationError(): ?string
+    {
+        return $this->getModuleConfig()->getKeyValidationError();
+    }
+
+    /**
      * Generate Stripe Connect URL for onboarding
      *
      * @param string $sVarName

@@ -4,6 +4,18 @@
 
     {# Sprint 29: Status mappings (sStripeStatusPending, etc.) moved to StatusMappingConfig class #}
     {% if module_var == 'sStripeTestToken' or module_var == 'sStripeLiveToken' or module_var == 'sStripeTestPk' or module_var == 'sStripeLivePk' %}
+        {# Sprint 39: Show warning banner if API keys are from different Stripe accounts #}
+        {% if module_var == 'sStripeTestToken' %}
+            {% if attribute(oView, 'stripeGetKeyValidationError') is defined %}
+                {% set keyValidationError = oView.stripeGetKeyValidationError() %}
+                {% if keyValidationError %}
+                    <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 12px 15px; margin-bottom: 15px; border-radius: 4px;">
+                        <strong style="color: #856404;">&#9888; {{ translate({ ident: "STRIPE_KEY_MISMATCH_WARNING" }) }}</strong>
+                        <p style="color: #856404; margin: 8px 0 0 0; font-size: 12px;">{{ keyValidationError }}</p>
+                    </div>
+                {% endif %}
+            {% endif %}
+        {% endif %}
         {% if module_var == 'sStripeTestToken' or module_var == 'sStripeLiveToken' %}
             <dl>
                 <dt>
@@ -71,19 +83,6 @@
                 {% else %}
                     <span style="margin-left: 1em; color: orange;">&#9888; Not set - copy from Stripe Dashboard</span>
                 {% endif %}
-            </dd>
-            <div class="spacer"></div>
-        </dl>
-    {% elseif module_var == 'sStripeTestKey' or module_var == 'sStripeLiveKey' %}
-        <dl>
-            <dt>
-                <div>
-                    <input type="text" class="txt" style="width: 250px;" name="confstrs[{{ module_var }}]" value="{{ confstrs[module_var] }}" {{ readonly }}>
-                    {% include "inputhelp.html.twig" with {'sHelpId': help_id("HELP_SHOP_MODULE_" ~ module_var), 'sHelpText': help_text("HELP_SHOP_MODULE_" ~ module_var)} %}
-                </div>
-            </dt>
-            <dd style="white-space: nowrap;">
-                <span style="float:left;">{{ translate({ ident: "SHOP_MODULE_" ~ module_var }) }}</span>
             </dd>
             <div class="spacer"></div>
         </dl>

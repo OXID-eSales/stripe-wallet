@@ -61,16 +61,6 @@ moduleSettings:
     type: str
     value: ''
     position: 31
-  sStripeTestKey:
-    group: STRIPE_GENERAL
-    type: str
-    value: ''
-    position: 32
-  sStripeLiveKey:
-    group: STRIPE_GENERAL
-    type: str
-    value: ''
-    position: 33
   blStripeLogTransactionInfo:
     group: STRIPE_GENERAL
     type: bool

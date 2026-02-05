@@ -204,12 +204,6 @@ class MetadataTest extends TestCase
             'Test publishable key setting must be defined'
         );
 
-        $this->assertContains(
-            'sStripeTestKey',
-            $settingNames,
-            'Test secret key setting must be defined'
-        );
-
         // Live mode API keys
         $this->assertContains(
             'sStripeLiveToken',
@@ -223,11 +217,8 @@ class MetadataTest extends TestCase
             'Live publishable key setting must be defined'
         );
 
-        $this->assertContains(
-            'sStripeLiveKey',
-            $settingNames,
-            'Live secret key setting must be defined'
-        );
+        // Note: sStripeTestKey and sStripeLiveKey were removed in Sprint 38
+        // These "Private Key" fields were dead code - never used anywhere
 
         // Webhook configuration
         $this->assertContains(
