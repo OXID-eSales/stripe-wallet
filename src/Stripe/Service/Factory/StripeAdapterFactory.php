@@ -14,7 +14,7 @@ use OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactory;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapter;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeClientFactory;
-use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use Stripe\StripeClient;
 
 /**
@@ -30,7 +30,7 @@ class StripeAdapterFactory extends PaymentAdapterFactory implements StripeAdapte
     private const PROVIDER_NAME = 'stripe';
 
     public function __construct(
-        private readonly ModuleConfigurationService $configurationService,
+        private readonly ModuleConfigurationServiceInterface $configurationService,
         private readonly StripeClientFactory $clientFactory
     ) {
     }

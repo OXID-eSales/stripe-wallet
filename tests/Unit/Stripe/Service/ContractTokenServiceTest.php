@@ -10,7 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use OxidEsales\Payments\Stripe\Service\ContractTokenService;
-use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -28,11 +28,11 @@ class ContractTokenServiceTest extends TestCase
     }
 
     /**
-     * Create a mock ModuleConfigurationService with specified secret key
+     * Create a mock ModuleConfigurationServiceInterface with specified secret key
      */
-    private function createConfigServiceMock(string $secretKey, string $webhookSecret = ''): ModuleConfigurationService
+    private function createConfigServiceMock(string $secretKey, string $webhookSecret = ''): ModuleConfigurationServiceInterface
     {
-        $configService = $this->createMock(ModuleConfigurationService::class);
+        $configService = $this->createMock(ModuleConfigurationServiceInterface::class);
         $configService->method('getSecretKey')->willReturn($secretKey);
         $configService->method('getWebhookSecret')->willReturn($webhookSecret);
         return $configService;

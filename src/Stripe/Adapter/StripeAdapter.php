@@ -771,6 +771,30 @@ final class StripeAdapter implements StripeAdapterInterface
     /**
      * @inheritDoc
      */
+    public function createStripeCustomer(array $params): \Stripe\Customer
+    {
+        try {
+            return $this->stripeClient->customers->create($params);
+        } catch (ApiErrorException $e) {
+            throw $this->convertStripeException($e);
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function retrieveStripeCustomer(string $customerId): \Stripe\Customer
+    {
+        try {
+            return $this->stripeClient->customers->retrieve($customerId, []);
+        } catch (ApiErrorException $e) {
+            throw $this->convertStripeException($e);
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function testConnection(): bool
     {
         try {

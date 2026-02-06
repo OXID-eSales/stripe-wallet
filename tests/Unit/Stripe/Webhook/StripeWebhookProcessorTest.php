@@ -16,7 +16,7 @@ use OxidEsales\PaymentComponent\Webhook\Exception\WebhookSignatureException;
 use OxidEsales\PaymentComponent\Webhook\WebhookEvent;
 use OxidEsales\PaymentComponent\Webhook\WebhookRequest;
 use OxidEsales\PaymentComponent\Webhook\WebhookResult;
-use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;
 use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -32,7 +32,7 @@ class StripeWebhookProcessorTest extends TestCase
 {
     private WebhookLogRepositoryInterface&MockObject $logRepository;
     private LoggerInterface&MockObject $logger;
-    private ModuleConfigurationService&MockObject $config;
+    private ModuleConfigurationServiceInterface&MockObject $config;
     private WebhookContractFulfillmentHandlerInterface&MockObject $fulfillmentHandler;
     private ContractRepositoryInterface&MockObject $contractRepository;
 
@@ -40,7 +40,7 @@ class StripeWebhookProcessorTest extends TestCase
     {
         $this->logRepository = $this->createMock(WebhookLogRepositoryInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
-        $this->config = $this->createMock(ModuleConfigurationService::class);
+        $this->config = $this->createMock(ModuleConfigurationServiceInterface::class);
         $this->fulfillmentHandler = $this->createMock(WebhookContractFulfillmentHandlerInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
     }

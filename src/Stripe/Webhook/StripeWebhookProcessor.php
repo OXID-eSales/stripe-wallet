@@ -16,7 +16,7 @@ use OxidEsales\PaymentComponent\Webhook\Exception\WebhookSignatureException;
 use OxidEsales\PaymentComponent\Webhook\WebhookEvent;
 use OxidEsales\PaymentComponent\Webhook\WebhookRequest;
 use OxidEsales\PaymentComponent\Webhook\WebhookResult;
-use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface;
 use Psr\Log\LoggerInterface;
 use Stripe\Exception\SignatureVerificationException;
@@ -39,7 +39,7 @@ class StripeWebhookProcessor extends AbstractWebhookProcessor
     public function __construct(
         WebhookLogRepositoryInterface $logRepository,
         LoggerInterface $logger,
-        private readonly ModuleConfigurationService $config,
+        private readonly ModuleConfigurationServiceInterface $config,
         private readonly WebhookContractFulfillmentHandlerInterface $fulfillmentHandler,
         private readonly ContractRepositoryInterface $contractRepository
     ) {

@@ -23,8 +23,6 @@ use OxidEsales\PaymentComponent\Adapter\Exception\ShopOrderException;
 use OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentComponent\Contract\Transaction;
 use OxidEsales\Payments\Stripe\Module;
-use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
-use OxidEsales\Eshop\Core\ShopVersion;
 
 /**
  * OXID eShop implementation of ShopOrderServiceInterface.
@@ -41,8 +39,7 @@ use OxidEsales\Eshop\Core\ShopVersion;
 final class OxidShopOrderService implements ShopOrderServiceInterface
 {
     public function __construct(
-        private readonly TransactionRepositoryInterface $transactionRepository,
-        private readonly ModuleConfigurationService $moduleConfig // @phpstan-ignore property.onlyWritten
+        private readonly TransactionRepositoryInterface $transactionRepository
     ) {
     }
 
@@ -52,93 +49,19 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
     public function createOrder(CreateOrderRequest $request): OrderResponse
     {
         try {
-            // 1. Get basket from session (CreateOrderRequest is a DTO, basket is in session)
-            /** @var Basket|null $basket */
-            $basket = Registry::getSession()->getBasket();
-            /** @var User|null $user */
-            $user = $basket?->getBasketUser();
+            [$basket, $user] = $this->validateBasketAndUser($request);
 
-            if (!$basket) {
-                throw new ShopOrderException(
-                    message: 'Basket not found in session',
-                    errorCode: 'basket_not_found',
-                    context: ['session_id' => $request->sessionId]
-                );
-            }
-
-            if (!$user || !$user->getId()) {
-                throw new ShopOrderException(
-                    message: 'User not found',
-                    errorCode: 'user_not_found',
-                    context: ['user_id' => $request->userId]
-                );
-            }
-
-            // 2. Set order remark if provided
             if ($request->orderRemark !== null) {
                 Registry::getSession()->setVariable('ordRem', $request->orderRemark);
             }
 
-            // 3. Create order using OXID's standard method
-            // Note: Using false for $blRecalculatingOrder ensures:
-            // - Order ID is set from session
-            // - Order validation runs
-            // - Products and customer data are properly saved
-            // - executePayment() is called BUT overridden in Stripe\Model\Order to skip payment gateway
             /** @var Order $order */
             $order = oxNew(Order::class);
             /** @var int $orderState */
             $orderState = $order->finalizeOrder($basket, $user, false);
 
-            // 4. Validate order creation
-            if (!in_array($orderState, [Order::ORDER_STATE_OK, Order::ORDER_STATE_ORDEREXISTS], true)) {
-                $errorCode = $this->mapOrderStateToErrorCode((int) $orderState);
-                Registry::getLogger()->error('OxidShopOrderService: Order finalization failed', [
-                    'order_state' => $orderState,
-                    'error_code' => $errorCode,
-                    'session_id' => $request->sessionId,
-                    'user_id' => $request->userId,
-                    'payment_id' => $request->paymentId,
-                    'basket_count' => $basket->getProductsCount(),
-                    'basket_total' => $basket->getPrice()->getBruttoPrice(),
-                ]);
-                throw new ShopOrderException(
-                    message: 'Order finalization failed with state: ' . $orderState . ' (' . $errorCode . ')',
-                    errorCode: $errorCode,
-                    context: [
-                        'order_state' => $orderState,
-                        'session_id' => $request->sessionId,
-                        'user_id' => $request->userId,
-                    ]
-                );
-            }
-
-            // 5. Set order folder to NEW (default for new orders)
-            $order->oxorder__oxfolder = new \OxidEsales\Eshop\Core\Field(
-                'ORDERFOLDER_NEW',
-                \OxidEsales\Eshop\Core\Field::T_RAW
-            );
-
-            // 6. Set payment transaction ID on order if provided
-            if ($request->paymentTransactionId !== null) {
-                $order->oxorder__oxtransid = new \OxidEsales\Eshop\Core\Field(
-                    $request->paymentTransactionId,
-                    \OxidEsales\Eshop\Core\Field::T_RAW
-                );
-            }
-
-            // 7. Save order with folder and optional transaction ID
-            $order->save();
-
-            // 8. Ensure order number is always set after successful finalization
-            // This MUST be called before accessing oxordernr field
-            // The Stripe Order extension overrides setOrderNumber() to ensure it's always set
-            $order->setOrderNumber(); // @phpstan-ignore method.notFound
-
-            // 9. Store metadata if provided
-            if (!empty($request->metadata)) {
-                $this->storeOrderMetadata($order, $request->metadata);
-            }
+            $this->validateOrderState($orderState, $request, $basket);
+            $this->setOrderFieldsAfterCreation($order, $request);
 
             // 10. Build and return response
             // Use basket total directly as source of truth to avoid field loading issues
@@ -148,7 +71,7 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
             $currencyName = $currency->name ?? 'EUR';
             return new OrderResponse(
                 orderId: (string) $order->getId(),
-                orderNumber: (int) $order->getFieldData('oxordernr'),
+                orderNumber: $this->getIntField($order, 'oxordernr'),
                 userId: (string) $user->getId(),
                 totalAmount: $price ? (float) $price->getBruttoPrice() : 0.0, // @phpstan-ignore ternary.alwaysTrue
                 currency: $currencyName,
@@ -175,6 +98,94 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
                 ],
                 previous: $e
             );
+        }
+    }
+
+    /**
+     * Validate basket and user exist in session.
+     *
+     * @return array{Basket, User}
+     * @throws ShopOrderException
+     */
+    private function validateBasketAndUser(CreateOrderRequest $request): array
+    {
+        /** @var Basket|null $basket */
+        $basket = Registry::getSession()->getBasket();
+        if (!$basket) {
+            throw new ShopOrderException(
+                message: 'Basket not found in session',
+                errorCode: 'basket_not_found',
+                context: ['session_id' => $request->sessionId]
+            );
+        }
+
+        /** @var User|null $user */
+        $user = $basket->getBasketUser();
+        if (!$user || !$user->getId()) {
+            throw new ShopOrderException(
+                message: 'User not found',
+                errorCode: 'user_not_found',
+                context: ['user_id' => $request->userId]
+            );
+        }
+
+        return [$basket, $user];
+    }
+
+    /**
+     * Validate order finalization state.
+     *
+     * @throws ShopOrderException
+     */
+    private function validateOrderState(int $orderState, CreateOrderRequest $request, Basket $basket): void
+    {
+        if (in_array($orderState, [Order::ORDER_STATE_OK, Order::ORDER_STATE_ORDEREXISTS], true)) {
+            return;
+        }
+
+        $errorCode = $this->mapOrderStateToErrorCode($orderState);
+        Registry::getLogger()->error('OxidShopOrderService: Order finalization failed', [
+            'order_state' => $orderState,
+            'error_code' => $errorCode,
+            'session_id' => $request->sessionId,
+            'user_id' => $request->userId,
+            'payment_id' => $request->paymentId,
+            'basket_count' => $basket->getProductsCount(),
+            'basket_total' => $basket->getPrice()->getBruttoPrice(),
+        ]);
+        throw new ShopOrderException(
+            message: 'Order finalization failed with state: ' . $orderState . ' (' . $errorCode . ')',
+            errorCode: $errorCode,
+            context: [
+                'order_state' => $orderState,
+                'session_id' => $request->sessionId,
+                'user_id' => $request->userId,
+            ]
+        );
+    }
+
+    /**
+     * Set order folder, transaction ID, order number, and metadata after creation.
+     */
+    private function setOrderFieldsAfterCreation(Order $order, CreateOrderRequest $request): void
+    {
+        $order->oxorder__oxfolder = new \OxidEsales\Eshop\Core\Field(
+            'ORDERFOLDER_NEW',
+            \OxidEsales\Eshop\Core\Field::T_RAW
+        );
+
+        if ($request->paymentTransactionId !== null) {
+            $order->oxorder__oxtransid = new \OxidEsales\Eshop\Core\Field(
+                $request->paymentTransactionId,
+                \OxidEsales\Eshop\Core\Field::T_RAW
+            );
+        }
+
+        $order->save();
+        $order->setOrderNumber(); // @phpstan-ignore method.notFound
+
+        if (!empty($request->metadata)) {
+            $this->storeOrderMetadata($order, $request->metadata);
         }
     }
 
@@ -283,17 +294,17 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
                     'order_number' => $existingOrder->getFieldData('oxordernr')
                 ]);
 
-                $transId = $existingOrder->getFieldData('oxtransid');
+                $transId = $this->getStringField($existingOrder, 'oxtransid');
                 // Return existing order details
                 return new OrderResponse(
                     orderId: (string) $existingOrder->getId(),
-                    orderNumber: (int) $existingOrder->getFieldData('oxordernr'),
-                    userId: (string) $existingOrder->getFieldData('oxuserid'),
-                    totalAmount: (float) $existingOrder->getFieldData('oxtotalordersum'),
-                    currency: (string) $existingOrder->getFieldData('oxcurrency'),
+                    orderNumber: $this->getIntField($existingOrder, 'oxordernr'),
+                    userId: $this->getStringField($existingOrder, 'oxuserid'),
+                    totalAmount: $this->getFloatField($existingOrder, 'oxtotalordersum'),
+                    currency: $this->getStringField($existingOrder, 'oxcurrency') ?: 'EUR',
                     status: 'pending',
-                    paymentId: (string) $existingOrder->getFieldData('oxpaymenttype'),
-                    paymentTransactionId: $transId ? (string) $transId : null,
+                    paymentId: $this->getStringField($existingOrder, 'oxpaymenttype'),
+                    paymentTransactionId: $transId !== '' ? $transId : null,
                     createdAt: $this->getOrderCreationDate($existingOrder),
                     metadata: array_merge($request->metadata, ['reused' => true])
                 );
@@ -423,37 +434,6 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
     }
 
     /**
-     * Set order folder status.
-     *
-     * @param string $orderId OXID order ID
-     * @param string $folder Folder identifier (e.g., 'ORDERFOLDER_NEW', 'ORDERFOLDER_FINISHED')
-     * @return void
-     * @phpstan-ignore method.unused
-     */
-    private function setOrderFolder(string $orderId, string $folder): void
-    {
-        /** @var Order $order */
-        $order = oxNew(Order::class);
-        if (!$order->load($orderId)) {
-            Registry::getLogger()->warning('Order not found for folder update', [
-                'order_id' => $orderId
-            ]);
-            return;
-        }
-
-        $order->oxorder__oxfolder = new \OxidEsales\Eshop\Core\Field(
-            $folder,
-            \OxidEsales\Eshop\Core\Field::T_RAW
-        );
-        $order->save();
-
-        Registry::getLogger()->debug('Order folder updated', [
-            'order_id' => $orderId,
-            'folder' => $folder
-        ]);
-    }
-
-    /**
      * Build Stripe metadata from order information.
      *
      * Generates metadata to be sent to Stripe's metadata system for tracking
@@ -461,16 +441,13 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
      * allowing each piece of information to be stored separately.
      *
      * @param string $orderId OXID order ID
-     * @param bool $includeVersionInfo Whether to include module/OXID version info for debugging
      * @return array<string, string|int> Metadata array for Stripe
      */
-    public function buildStripeMetadata(string $orderId, bool $includeVersionInfo = false): array
+    public function buildStripeMetadata(string $orderId): array
     {
-        // Load order object
         /** @var Order $order */
         $order = oxNew(Order::class);
         if (!$order->load($orderId)) {
-            // If order not found, return minimal metadata
             return [
                 'order_id' => $orderId,
                 'order_number' => 0,
@@ -478,47 +455,45 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
             ];
         }
 
-        // Extract order number
-        $orderNumber = (int) $order->getFieldData('oxordernr');
-
-        // Ensure order number is set
+        $orderNumber = $this->getIntField($order, 'oxordernr');
         if ($orderNumber === 0) {
             $order->setOrderNumber(); // @phpstan-ignore method.notFound
-            $orderNumber = (int) $order->getFieldData('oxordernr');
+            $orderNumber = $this->getIntField($order, 'oxordernr');
         }
 
-        // Build base metadata
-        $metadata = [
+        return [
             'order_id' => $orderId,
             'order_number' => $orderNumber,
             'shop_id' => Registry::getConfig()->getShopId(),
         ];
-
-        // Add version information if requested (useful for debugging/support)
-        if ($includeVersionInfo) {
-            /** @var \OxidEsales\Eshop\Core\Module\Module $module */
-            $module = oxNew(\OxidEsales\Eshop\Core\Module\Module::class);
-            $module->load(Module::MODULE_ID);
-
-            $moduleVersion = $module->getInfo('version');
-            $metadata['module_version'] = is_string($moduleVersion) ? $moduleVersion : 'unknown';
-            $metadata['oxid_version'] = ShopVersion::getVersion();
-        }
-
-        /** @var array<string, int|string> $metadata */
-        return $metadata;
     }
 
     /**
-     * @deprecated Use buildStripeMetadata() instead
-     * @see buildStripeMetadata()
+     * Get a string field value from an OXID model safely.
      */
-    public function getCustomIdParameter(string $orderId): string
+    private function getStringField(Order $order, string $fieldName): string
     {
-        $metadata = $this->buildStripeMetadata($orderId, false);
-        return (string) $metadata['order_number'];
+        $value = $order->getFieldData($fieldName);
+        return is_string($value) ? $value : (is_scalar($value) ? (string) $value : '');
     }
 
+    /**
+     * Get an int field value from an OXID model safely.
+     */
+    private function getIntField(Order $order, string $fieldName): int
+    {
+        $value = $order->getFieldData($fieldName);
+        return is_numeric($value) ? (int) $value : 0;
+    }
+
+    /**
+     * Get a float field value from an OXID model safely.
+     */
+    private function getFloatField(Order $order, string $fieldName): float
+    {
+        $value = $order->getFieldData($fieldName);
+        return is_numeric($value) ? (float) $value : 0.0;
+    }
 
     /**
      * Calculate MD5 hash of delivery address for change detection.

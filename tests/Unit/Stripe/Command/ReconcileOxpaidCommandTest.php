@@ -10,7 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Command;
 
 use OxidEsales\Payments\Stripe\Command\ReconcileOxpaidCommand;
-use OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService;
+use OxidEsales\Payments\Stripe\Service\OxpaidReconciliationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\Result\ReconciliationResult;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Application;
@@ -26,7 +26,7 @@ use Symfony\Component\Console\Tester\CommandTester;
  */
 class ReconcileOxpaidCommandTest extends TestCase
 {
-    private OxpaidReconciliationService $service;
+    private OxpaidReconciliationServiceInterface $service;
     private ReconcileOxpaidCommand $command;
     private CommandTester $tester;
 
@@ -34,7 +34,7 @@ class ReconcileOxpaidCommandTest extends TestCase
     {
         parent::setUp();
 
-        $this->service = $this->createMock(OxpaidReconciliationService::class);
+        $this->service = $this->createMock(OxpaidReconciliationServiceInterface::class);
         $this->command = new ReconcileOxpaidCommand($this->service);
 
         $application = new Application();

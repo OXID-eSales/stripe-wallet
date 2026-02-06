@@ -34,6 +34,7 @@ use OxidEsales\PaymentComponent\Contract\IdempotencyRecord;
 use OxidEsales\PaymentComponent\Repository\IdempotencyRepositoryInterface;
 use Stripe\Charge;
 use Stripe\Checkout\Session;
+use Stripe\Customer;
 use Stripe\PaymentIntent;
 use Stripe\Refund;
 
@@ -291,6 +292,16 @@ class IdempotentStripeAdapter implements StripeAdapterInterface
         return $this->inner->retrieveCharge($chargeId);
     }
 
+    public function createStripeCustomer(array $params): Customer
+    {
+        return $this->inner->createStripeCustomer($params);
+    }
+
+    public function retrieveStripeCustomer(string $customerId): Customer
+    {
+        return $this->inner->retrieveStripeCustomer($customerId);
+    }
+
     public function testConnection(): bool
     {
         return $this->inner->testConnection();
@@ -353,23 +364,23 @@ class IdempotentStripeAdapter implements StripeAdapterInterface
 
     private function deserializeCaptureResponse(string $json): CaptureResponse
     {
-        /** @var array<string, mixed> $data */
+        /** @var array{successful?: bool, providerPaymentId?: string, captureId?: string, amountCaptured?: float, currency?: string, status?: string, capturedAt?: string, errorMessage?: string, errorCode?: string} $data */
         $data = json_decode($json, true);
 
         if (!($data['successful'] ?? false)) {
             return CaptureResponse::failure(
-                (string) ($data['errorMessage'] ?? 'Unknown error'),
-                isset($data['errorCode']) ? (string) $data['errorCode'] : null
+                $data['errorMessage'] ?? 'Unknown error',
+                $data['errorCode'] ?? null
             );
         }
 
         return CaptureResponse::success(
-            providerPaymentId: (string) $data['providerPaymentId'],
-            captureId: (string) $data['captureId'],
-            amountCaptured: (float) $data['amountCaptured'],
-            currency: (string) $data['currency'],
-            status: (string) $data['status'],
-            capturedAt: new DateTimeImmutable((string) ($data['capturedAt'] ?? 'now')),
+            providerPaymentId: $data['providerPaymentId'] ?? '',
+            captureId: $data['captureId'] ?? '',
+            amountCaptured: $data['amountCaptured'] ?? 0.0,
+            currency: $data['currency'] ?? '',
+            status: $data['status'] ?? '',
+            capturedAt: new DateTimeImmutable($data['capturedAt'] ?? 'now'),
         );
     }
 
@@ -391,24 +402,24 @@ class IdempotentStripeAdapter implements StripeAdapterInterface
 
     private function deserializeRefundResponse(string $json): RefundResponse
     {
-        /** @var array<string, mixed> $data */
+        /** @var array{successful?: bool, providerPaymentId?: string, refundId?: string, amountRefunded?: float, currency?: string, status?: string, refundedAt?: string, reason?: string, errorMessage?: string, errorCode?: string} $data */
         $data = json_decode($json, true);
 
         if (!($data['successful'] ?? false)) {
             return RefundResponse::failure(
-                (string) ($data['errorMessage'] ?? 'Unknown error'),
-                isset($data['errorCode']) ? (string) $data['errorCode'] : null
+                $data['errorMessage'] ?? 'Unknown error',
+                $data['errorCode'] ?? null
             );
         }
 
         return RefundResponse::success(
-            providerPaymentId: (string) $data['providerPaymentId'],
-            refundId: (string) $data['refundId'],
-            amountRefunded: (float) $data['amountRefunded'],
-            currency: (string) $data['currency'],
-            status: (string) $data['status'],
-            refundedAt: new DateTimeImmutable((string) ($data['refundedAt'] ?? 'now')),
-            reason: isset($data['reason']) ? (string) $data['reason'] : null,
+            providerPaymentId: $data['providerPaymentId'] ?? '',
+            refundId: $data['refundId'] ?? '',
+            amountRefunded: $data['amountRefunded'] ?? 0.0,
+            currency: $data['currency'] ?? '',
+            status: $data['status'] ?? '',
+            refundedAt: new DateTimeImmutable($data['refundedAt'] ?? 'now'),
+            reason: $data['reason'] ?? null,
         );
     }
 }

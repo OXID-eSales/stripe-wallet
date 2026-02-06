@@ -24,7 +24,7 @@ use OxidEsales\EshopCommunity\Internal\Framework\Database\QueryBuilderFactoryInt
  * Handles installation and management of Stripe payment methods during module activation.
  * Similar to PayPal's StaticContent service for consistency.
  */
-class StaticContent
+class StaticContent implements StaticContentInterface
 {
     public function __construct(
         private QueryBuilderFactoryInterface $queryBuilderFactory
@@ -39,6 +39,7 @@ class StaticContent
     public function ensureStripePaymentMethods(): void
     {
         foreach (StripeDefinitions::getStripeDefinitions() as $paymentId => $paymentDefinitions) {
+            /** @var EshopModelPayment $paymentMethod */
             $paymentMethod = oxNew(EshopModelPayment::class);
             if ($paymentMethod->load($paymentId)) {
                 // Payment method already exists, skip creation

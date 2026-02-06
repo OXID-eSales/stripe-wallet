@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Adapter;
 
-use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use Stripe\StripeClient;
 
 /**
@@ -25,10 +25,10 @@ final class StripeClientFactory
     private bool $testMode;
 
     /**
-     * @param ModuleConfigurationService $configurationService Module configuration service
+     * @param ModuleConfigurationServiceInterface $configurationService Module configuration service
      */
     public function __construct(
-        private readonly ModuleConfigurationService $configurationService
+        private readonly ModuleConfigurationServiceInterface $configurationService
     ) {
         $this->secretKey = $this->configurationService->getToken();
         $this->testMode = $this->configurationService->isTestMode();

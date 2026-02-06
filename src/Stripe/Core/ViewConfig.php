@@ -6,7 +6,7 @@ namespace OxidEsales\Payments\Stripe\Core;
 
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
-use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use Throwable;
 
 /**
@@ -19,17 +19,17 @@ class ViewConfig extends ViewConfig_parent
 {
     use ServiceContainer;
 
-    private ?ModuleConfigurationService $stripeConfig = null;
+    private ?ModuleConfigurationServiceInterface $stripeConfig = null;
 
     /**
-     * Get the ModuleConfigurationService lazily.
+     * Get the ModuleConfigurationServiceInterface lazily.
      * Returns null if service is not available (e.g., during module deactivation).
      */
-    private function getStripeConfig(): ?ModuleConfigurationService
+    private function getStripeConfig(): ?ModuleConfigurationServiceInterface
     {
         if ($this->stripeConfig === null) {
             try {
-                $this->stripeConfig = $this->getServiceFromContainer(ModuleConfigurationService::class);
+                $this->stripeConfig = $this->getServiceFromContainer(ModuleConfigurationServiceInterface::class);
             } catch (Throwable $e) {
                 // Service not available (module being deactivated)
                 return null;
@@ -130,7 +130,7 @@ class ViewConfig extends ViewConfig_parent
         return $config !== null && !empty($config->getPublishableKey());
     }
 
-    public function getStripeWalletConfig(): ?ModuleConfigurationService
+    public function getStripeWalletConfig(): ?ModuleConfigurationServiceInterface
     {
         return $this->getStripeConfig();
     }

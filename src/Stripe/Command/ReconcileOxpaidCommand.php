@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Command;
 
-use OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService;
+use OxidEsales\Payments\Stripe\Service\OxpaidReconciliationServiceInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -35,7 +35,7 @@ class ReconcileOxpaidCommand extends Command
     protected static $defaultDescription = 'Reconcile OXPAID timestamps with Stripe payment status';
 
     public function __construct(
-        private readonly OxpaidReconciliationService $reconciliationService
+        private readonly OxpaidReconciliationServiceInterface $reconciliationService
     ) {
         parent::__construct();
     }
@@ -91,7 +91,8 @@ HELP
         $io = new SymfonyStyle($input, $output);
 
         $dryRun = (bool) $input->getOption('dry-run');
-        $maxAgeDays = (int) $input->getOption('max-age');
+        $maxAgeRaw = $input->getOption('max-age');
+        $maxAgeDays = is_numeric($maxAgeRaw) ? (int) $maxAgeRaw : 7;
 
         $io->title('Stripe OXPAID Reconciliation');
 

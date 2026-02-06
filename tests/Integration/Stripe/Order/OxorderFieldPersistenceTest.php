@@ -27,7 +27,6 @@ use OxidEsales\PaymentComponent\Repository\DoctrineContractRepository;
  * - OXPAID: Payment completion timestamp
  * - OXFOLDER: Order folder for admin (ORDERFOLDER_NEW, ORDERFOLDER_PROBLEMS)
  *
- * @covers \OxidEsales\Payments\Stripe\Service\WebhookProcessingService
  * @group integration
  * @group order-fields
  * @group oxorder

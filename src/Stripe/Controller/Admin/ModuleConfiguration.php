@@ -12,7 +12,8 @@ namespace OxidEsales\Payments\Stripe\Controller\Admin;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\Payments\Stripe\Module;
-use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 
 /**
  * Extended admin ModuleConfiguration controller for Stripe module settings.
@@ -24,15 +25,15 @@ use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
  */
 class ModuleConfiguration extends ModuleConfiguration_parent
 {
-    private ?ModuleConfigurationService $moduleConfig = null;
+    private ?ModuleConfigurationServiceInterface $moduleConfig = null;
 
-    private function getModuleConfig(): ModuleConfigurationService
+    private function getModuleConfig(): ModuleConfigurationServiceInterface
     {
         if ($this->moduleConfig === null) {
-            /** @var ModuleConfigurationService $service */
+            /** @var ModuleConfigurationServiceInterface $service */
             $service = ContainerFactory::getInstance()
                 ->getContainer()
-                ->get(ModuleConfigurationService::class);
+                ->get(ModuleConfigurationServiceInterface::class);
             $this->moduleConfig = $service;
         }
         return $this->moduleConfig;
@@ -88,7 +89,11 @@ class ModuleConfiguration extends ModuleConfiguration_parent
      */
     public function stripeGetKeyValidationError(): ?string
     {
-        return $this->getModuleConfig()->getKeyValidationError();
+        /** @var ConfigurationValidatorInterface $validator */
+        $validator = ContainerFactory::getInstance()
+            ->getContainer()
+            ->get(ConfigurationValidatorInterface::class);
+        return $validator->getKeyValidationError();
     }
 
     /**

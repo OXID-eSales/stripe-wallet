@@ -22,3 +22,8 @@ class_alias(
     OxidEsales\Eshop\Application\Model\Order::class,
     OxidEsales\Payments\Stripe\Model\Order_parent::class
 );
+
+class_alias(
+    OxidEsales\Eshop\Core\ViewConfig::class,
+    OxidEsales\Payments\Stripe\Core\ViewConfig_parent::class
+);

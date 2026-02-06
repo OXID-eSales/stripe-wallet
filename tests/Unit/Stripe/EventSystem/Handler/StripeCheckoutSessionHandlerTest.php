@@ -8,6 +8,8 @@ use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
+use OxidEsales\Payments\Stripe\Service\StripeCustomerServiceInterface;
 use OxidEsales\Payments\Stripe\Service\Result\CheckoutSessionResult;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
@@ -32,6 +34,8 @@ class StripeCheckoutSessionHandlerTest extends TestCase
     private ContractRepositoryInterface&MockObject $contractRepository;
     private TokenServiceInterface&MockObject $tokenService;
     private ShopAdapterInterface&MockObject $shopAdapter;
+    private StripeCustomerServiceInterface&MockObject $customerService;
+    private ModuleConfigurationServiceInterface&MockObject $config;
 
     protected function setUp(): void
     {
@@ -39,8 +43,13 @@ class StripeCheckoutSessionHandlerTest extends TestCase
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->tokenService = $this->createMock(TokenServiceInterface::class);
         $this->shopAdapter = $this->createMock(ShopAdapterInterface::class);
+        $this->customerService = $this->createMock(StripeCustomerServiceInterface::class);
+        $this->config = $this->createMock(ModuleConfigurationServiceInterface::class);
         $this->shopAdapter->method('getShopId')->willReturn('1');
         $this->shopAdapter->method('getShopUrl')->willReturn('https://shop.example.com/');
+
+        // Default: customer email feature disabled
+        $this->config->method('shouldProvideCustomerEmail')->willReturn(false);
 
         // Default token generation behavior
         $this->tokenService
@@ -64,7 +73,9 @@ class StripeCheckoutSessionHandlerTest extends TestCase
             $this->checkoutSessionService,
             $this->contractRepository,
             $this->tokenService,
-            $this->shopAdapter
+            $this->shopAdapter,
+            $this->customerService,
+            $this->config
         );
     }
 
@@ -371,6 +382,121 @@ class StripeCheckoutSessionHandlerTest extends TestCase
         // Assert cancel URL does NOT contain contract_token
         $this->assertNotNull($capturedCancelUrl);
         $this->assertStringNotContainsString('contract_token', $capturedCancelUrl);
+    }
+
+    // =========================================================================
+    // Sprint 45: Customer ID Tests
+    // =========================================================================
+
+    public function testPassesCustomerIdToServiceWhenFeatureEnabled(): void
+    {
+        $this->config = $this->createMock(ModuleConfigurationServiceInterface::class);
+        $this->config->method('shouldProvideCustomerEmail')->willReturn(true);
+
+        $contract = $this->createContractMock('contract_cust_test');
+        $context = $this->createContextWithContract($contract);
+        $context->set('userId', 'user_abc');
+
+        // Add user object with getFieldData
+        $user = new class {
+            /** @param string $field */
+            public function getFieldData(string $field): ?string
+            {
+                return match ($field) {
+                    'oxusername' => 'john@example.com',
+                    'oxfname' => 'John',
+                    'oxlname' => 'Doe',
+                    default => null,
+                };
+            }
+        };
+        $context->set('user', $user);
+
+        $event = new StripeCheckoutSessionRequestEvent($context);
+
+        $this->customerService
+            ->expects($this->once())
+            ->method('resolveStripeCustomerId')
+            ->with('user_abc', 'john@example.com', 'John Doe')
+            ->willReturn('cus_resolved_123');
+
+        $capturedCustomerId = null;
+        $this->checkoutSessionService
+            ->expects($this->once())
+            ->method('createSession')
+            ->willReturnCallback(function () use (&$capturedCustomerId) {
+                $args = func_get_args();
+                $capturedCustomerId = $args[8] ?? null; // 9th param: stripeCustomerId
+                return CheckoutSessionResult::success('cs_test', 'https://checkout.stripe.com/pay/cs_test');
+            });
+
+        $handler = $this->createHandler();
+        $handler->handle($event);
+
+        $this->assertSame('cus_resolved_123', $capturedCustomerId);
+    }
+
+    public function testDoesNotResolveCustomerWhenFeatureDisabled(): void
+    {
+        $contract = $this->createContractMock('contract_no_cust');
+        $context = $this->createContextWithContract($contract);
+        $event = new StripeCheckoutSessionRequestEvent($context);
+
+        $this->customerService
+            ->expects($this->never())
+            ->method('resolveStripeCustomerId');
+
+        $this->checkoutSessionService
+            ->method('createSession')
+            ->willReturn(CheckoutSessionResult::success('cs_test', 'https://checkout.stripe.com/pay/cs_test'));
+
+        $handler = $this->createHandler();
+        $handler->handle($event);
+    }
+
+    public function testGracefullyHandlesCustomerServiceFailure(): void
+    {
+        $this->config = $this->createMock(ModuleConfigurationServiceInterface::class);
+        $this->config->method('shouldProvideCustomerEmail')->willReturn(true);
+
+        $contract = $this->createContractMock('contract_fail_cust');
+        $context = $this->createContextWithContract($contract);
+        $context->set('userId', 'user_xyz');
+
+        $user = new class {
+            public function getFieldData(string $field): ?string
+            {
+                return match ($field) {
+                    'oxusername' => 'fail@example.com',
+                    'oxfname' => 'Fail',
+                    'oxlname' => 'User',
+                    default => null,
+                };
+            }
+        };
+        $context->set('user', $user);
+
+        $event = new StripeCheckoutSessionRequestEvent($context);
+
+        $this->customerService
+            ->method('resolveStripeCustomerId')
+            ->willThrowException(new \RuntimeException('Stripe API error'));
+
+        $capturedCustomerId = null;
+        $this->checkoutSessionService
+            ->expects($this->once())
+            ->method('createSession')
+            ->willReturnCallback(function () use (&$capturedCustomerId) {
+                $args = func_get_args();
+                $capturedCustomerId = $args[8] ?? null;
+                return CheckoutSessionResult::success('cs_test', 'https://checkout.stripe.com/pay/cs_test');
+            });
+
+        $handler = $this->createHandler();
+        $handler->handle($event);
+
+        // Should proceed with null customer ID (graceful failure)
+        $this->assertNull($capturedCustomerId);
     }
 
     // --- Helper methods ---

@@ -10,7 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Adapter;
 
 use OxidEsales\Payments\Stripe\Adapter\StripeClientFactory;
-use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Stripe\StripeClient;
@@ -20,14 +20,14 @@ use Stripe\StripeClient;
  */
 final class StripeClientFactoryTest extends TestCase
 {
-    private ModuleConfigurationService|MockObject $configurationService;
+    private ModuleConfigurationServiceInterface|MockObject $configurationService;
     private StripeClientFactory $factory;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->configurationService = $this->createMock(ModuleConfigurationService::class);
+        $this->configurationService = $this->createMock(ModuleConfigurationServiceInterface::class);
     }
 
     public function testCreateReturnsStripeClientWithTestKey(): void

@@ -30,7 +30,7 @@ final class ContractTokenService implements TokenServiceInterface
     private readonly string $secret;
 
     public function __construct(
-        ModuleConfigurationService $configService
+        ModuleConfigurationServiceInterface $configService
     ) {
         // Derive token secret from the Stripe API secret key + a fixed salt
         // This ensures tokens are unique per shop installation without requiring

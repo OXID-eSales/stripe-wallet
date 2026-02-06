@@ -11,7 +11,7 @@ use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface;
 use OxidEsales\PaymentComponent\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Service\ContractTokenService;
-use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\ReturnSessionSecurityService;
 use PHPUnit\Framework\TestCase;
 
@@ -123,11 +123,11 @@ class SessionRestorationIntegrationTest extends TestCase
     }
 
     /**
-     * Create a mock ModuleConfigurationService with the test secret key
+     * Create a mock ModuleConfigurationServiceInterface with the test secret key
      */
-    private function createConfigServiceMock(): ModuleConfigurationService
+    private function createConfigServiceMock(): ModuleConfigurationServiceInterface
     {
-        $configService = $this->createMock(ModuleConfigurationService::class);
+        $configService = $this->createMock(ModuleConfigurationServiceInterface::class);
         $configService->method('getSecretKey')->willReturn($this->testSecret);
         $configService->method('getWebhookSecret')->willReturn('');
         return $configService;

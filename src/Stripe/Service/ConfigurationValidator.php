@@ -9,7 +9,6 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Service\ServiceInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 
 /**
@@ -29,14 +28,15 @@ use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
  *
  * @since 2.0.0
  */
-class ConfigurationValidator implements ServiceInterface
+class ConfigurationValidator implements ConfigurationValidatorInterface
 {
     private const TEST_KEY_PREFIX = 'sk_test_';
     private const LIVE_KEY_PREFIX = 'sk_live_';
     private const WEBHOOK_SECRET_PREFIX = 'whsec_';
 
     public function __construct(
-        private readonly StripeAdapterFactoryInterface $adapterFactory
+        private readonly StripeAdapterFactoryInterface $adapterFactory,
+        private readonly ModuleConfigurationServiceInterface $config
     ) {
     }
 
@@ -106,5 +106,82 @@ class ConfigurationValidator implements ServiceInterface
         } catch (\Throwable $e) {
             return false;
         }
+    }
+
+    /**
+     * Validate that publishable key and secret key are from the same Stripe account.
+     *
+     * Stripe keys follow the format: {type}_{mode}_{accountId}{randomChars}
+     * The account ID portion should match for both keys.
+     */
+    public function validateKeyPair(): bool
+    {
+        $publishableKey = $this->config->getPublishableKey();
+        $secretKey = $this->config->getToken();
+
+        if (empty($publishableKey) || empty($secretKey)) {
+            return false;
+        }
+
+        $pkAccountId = $this->extractAccountId($publishableKey);
+        $skAccountId = $this->extractAccountId($secretKey);
+
+        return $pkAccountId !== null
+            && $skAccountId !== null
+            && $pkAccountId === $skAccountId;
+    }
+
+    /**
+     * Get validation error message for API key configuration.
+     *
+     * @return string|null Error message or null if configuration is valid
+     */
+    public function getKeyValidationError(): ?string
+    {
+        $publishableKey = $this->config->getPublishableKey();
+        $secretKey = $this->config->getToken();
+
+        if (empty($publishableKey)) {
+            return 'Publishable key is not configured';
+        }
+
+        if (empty($secretKey)) {
+            return 'Secret key is not configured';
+        }
+
+        $pkAccountId = $this->extractAccountId($publishableKey);
+        $skAccountId = $this->extractAccountId($secretKey);
+
+        if ($pkAccountId === null) {
+            return 'Publishable key has invalid format';
+        }
+
+        if ($skAccountId === null) {
+            return 'Secret key has invalid format';
+        }
+
+        if ($pkAccountId !== $skAccountId) {
+            return sprintf(
+                'API keys appear to be from different Stripe accounts. ' .
+                'Publishable key account: %s, Secret key account: %s. ' .
+                'Please ensure both keys are from the same Stripe dashboard.',
+                $pkAccountId,
+                $skAccountId
+            );
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract account ID from Stripe key for comparison.
+     */
+    private function extractAccountId(string $key): ?string
+    {
+        if (preg_match('/^[ps]k_(test|live)_([a-zA-Z0-9]+)/', $key, $matches)) {
+            return substr($matches[2], 0, 10);
+        }
+
+        return null;
     }
 }

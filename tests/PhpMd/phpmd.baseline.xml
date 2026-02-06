@@ -26,17 +26,9 @@
     <!-- Code Size Rules -->
     <!-- ========================================== -->
     <rule ref="rulesets/codesize.xml">
-        <exclude name="TooManyPublicMethods"/>
-        <exclude name="ExcessivePublicCount"/>
-        <exclude name="TooManyMethods"/>
-        <exclude name="ExcessiveClassComplexity"/>
-        <exclude name="ExcessiveClassLength"/>
-        <exclude name="TooManyFields"/>
         <!-- DTOs/Value objects can have many constructor parameters -->
         <exclude name="ExcessiveParameterList"/>
         <!-- Exclude all complexity rules - we'll add them back with higher thresholds -->
-        <exclude name="CyclomaticComplexity"/>
-        <exclude name="NPathComplexity"/>
         <exclude name="ExcessiveMethodLength"/>
     </rule>
 
@@ -70,7 +62,7 @@
     </rule>
     <rule ref="rulesets/codesize.xml/ExcessiveClassComplexity">
         <properties>
-            <!-- WebhookProcessingService handles many event types, complexity is justified -->
+            <!-- Complex domain classes may have high weighted method count -->
             <property name="maximum" value="120"/>
         </properties>
     </rule>

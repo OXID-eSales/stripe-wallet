@@ -89,8 +89,9 @@ class StripeOrderController extends OrderController
 
         try {
             // 0. Validate API key configuration
-            $config = $this->getServiceFromContainer(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::class);
-            $keyValidationError = $config->getKeyValidationError();
+            $config = $this->getServiceFromContainer(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface::class);
+            $validator = $this->getServiceFromContainer(\OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface::class);
+            $keyValidationError = $validator->getKeyValidationError();
             if ($keyValidationError !== null) {
                 throw new \RuntimeException('Stripe configuration error: ' . $keyValidationError);
             }
@@ -140,7 +141,7 @@ class StripeOrderController extends OrderController
                 'publishableKeyPrefix' => substr($publishableKey, 0, 12) . '...',
                 'secretKeyPrefix' => $secretKeyPrefix,
                 'isTestMode' => $config->isTestMode(),
-                'keysValid' => $config->validateKeyPair(),
+                'keysValid' => $validator->validateKeyPair(),
             ]);
 
             echo json_encode([
@@ -152,7 +153,7 @@ class StripeOrderController extends OrderController
                     'pk_prefix' => substr($publishableKey, 0, 20),
                     'sk_prefix' => $secretKeyPrefix,
                     'testMode' => $config->isTestMode(),
-                    'keysValid' => $config->validateKeyPair(),
+                    'keysValid' => $validator->validateKeyPair(),
                 ],
             ]);
         } catch (\Throwable $e) {
@@ -346,7 +347,7 @@ class StripeOrderController extends OrderController
     /**
      * Get capture mode from module configuration.
      *
-     * Uses ModuleConfigurationService to determine if automatic or manual capture
+     * Uses ModuleConfigurationServiceInterface to determine if automatic or manual capture
      * should be used. Request parameter can override for testing purposes.
      */
     protected function getCaptureMode(): string
@@ -359,10 +360,10 @@ class StripeOrderController extends OrderController
 
         // Get from module configuration
         $config = $this->getServiceFromContainer(
-            \OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::class
+            \OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface::class
         );
 
-        return $config->getStripeCaptureMethod();
+        return $config->getCaptureMode();
     }
 
     /**

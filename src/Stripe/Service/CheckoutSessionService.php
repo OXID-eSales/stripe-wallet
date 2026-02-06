@@ -51,7 +51,8 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
         string $shopId = '1',
         string $captureMode = 'automatic',
         ?string $orderId = null,
-        ?string $orderNumber = null
+        ?string $orderNumber = null,
+        ?string $stripeCustomerId = null
     ): CheckoutSessionResult {
         try {
             $lineItems = $this->buildLineItems($basketSnapshot);
@@ -87,6 +88,14 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
                     'metadata' => $paymentIntentMetadata,
                 ],
             ];
+
+            // Sprint 45: Add customer for email prefill and saved cards
+            if ($stripeCustomerId !== null) {
+                $params['customer'] = $stripeCustomerId;
+                $params['saved_payment_method_options'] = [
+                    'payment_method_save' => 'enabled',
+                ];
+            }
 
             $session = $this->adapterFactory->getStripeAdapter()->createCheckoutSession($params);
 

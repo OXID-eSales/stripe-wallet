@@ -14,6 +14,23 @@ services:
       - 'src/Stripe/Service/OxidStockRestorationService.php'
     public: true
 
+  # Sprint 43: Service Interface Aliases (LSP Compliance)
+  OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface:
+    alias: OxidEsales\Payments\Stripe\Service\ModuleConfigurationService
+    public: true
+
+  OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface:
+    alias: OxidEsales\Payments\Stripe\Service\ConfigurationValidator
+    public: true
+
+  OxidEsales\Payments\Stripe\Service\OxpaidReconciliationServiceInterface:
+    alias: OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService
+    public: true
+
+  OxidEsales\Payments\Stripe\Service\StaticContentInterface:
+    alias: OxidEsales\Payments\Stripe\Service\StaticContent
+    public: false
+
   # ===========================================
   # Event System (Component Level)
   # ===========================================
@@ -323,6 +340,19 @@ services:
     public: false
 
   # ==========================================
+  # Stripe Customer Service (Sprint 45)
+  # ==========================================
+  # Resolves or creates Stripe Customer objects for email prefill and saved cards.
+
+  OxidEsales\Payments\Stripe\Service\StripeCustomerServiceInterface:
+    class: OxidEsales\Payments\Stripe\Service\StripeCustomerService
+    arguments:
+      $customerRepository: '@OxidEsales\PaymentComponent\Repository\PaymentCustomerRepositoryInterface'
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: false
+
+  # ==========================================
   # Contract Metadata Service (Sprint 27)
   # ==========================================
   # Sprint 27: Uses payment-component interface and implementation.
@@ -361,6 +391,8 @@ services:
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
       $tokenService: '@OxidEsales\PaymentComponent\Service\TokenServiceInterface'
       $shopAdapter: '@OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface'
+      $customerService: '@OxidEsales\Payments\Stripe\Service\StripeCustomerServiceInterface'
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
       $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler, priority: 0 }
@@ -697,7 +729,7 @@ services:
     arguments:
       $logRepository: '@OxidEsales\PaymentComponent\Repository\WebhookLogRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
-      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationService'
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
       $fulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
     public: true
@@ -722,6 +754,14 @@ services:
   # Alias for easier reference
   OxidEsales\PaymentComponent\Repository\DoctrineTransactionRepository:
     alias: OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface
+
+  # Payment Customer Repository - Maps OXID users to payment provider customers
+  # Sprint 45: Stripe Customer lifecycle
+  OxidEsales\PaymentComponent\Repository\PaymentCustomerRepositoryInterface:
+    class: OxidEsales\PaymentComponent\Repository\DoctrinePaymentCustomerRepository
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+    public: false
 
   # Idempotency Repository - Prevents duplicate capture/refund API calls
   # Sprint 42: Uses oe_payments_idempotency table
@@ -846,7 +886,7 @@ services:
   # Console Command: stripe:reconcile-oxpaid
   OxidEsales\Payments\Stripe\Command\ReconcileOxpaidCommand:
     arguments:
-      $reconciliationService: '@OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService'
+      $reconciliationService: '@OxidEsales\Payments\Stripe\Service\OxpaidReconciliationServiceInterface'
     tags:
       - { name: 'console.command', command: 'stripe:reconcile-oxpaid' }
     public: true

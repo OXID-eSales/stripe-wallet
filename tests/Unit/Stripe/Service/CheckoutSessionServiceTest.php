@@ -425,6 +425,69 @@ class CheckoutSessionServiceTest extends TestCase
         $this->assertStringContainsString('contract_token=token%2Bwith%2Bplus', $url);
     }
 
+    // --- Sprint 45: Stripe Customer Tests ---
+
+    public function testCreateSessionWithStripeCustomerId(): void
+    {
+        $basketSnapshot = $this->createBasketSnapshot();
+        $session = Session::constructFrom([
+            'id' => 'cs_with_customer',
+            'url' => 'https://checkout.stripe.com/pay/cs_with_customer',
+        ]);
+
+        $capturedParams = null;
+        $this->stripeAdapter
+            ->method('createCheckoutSession')
+            ->willReturnCallback(function ($params) use ($session, &$capturedParams) {
+                $capturedParams = $params;
+                return $session;
+            });
+
+        $service = $this->createService();
+        $service->createSession(
+            'contract_cust',
+            $basketSnapshot,
+            'https://shop.example.com/success',
+            'https://shop.example.com/cancel',
+            '1',
+            'automatic',
+            null,
+            null,
+            'cus_test_123'
+        );
+
+        $this->assertSame('cus_test_123', $capturedParams['customer']);
+        $this->assertSame('enabled', $capturedParams['saved_payment_method_options']['payment_method_save']);
+    }
+
+    public function testCreateSessionWithoutStripeCustomerIdOmitsCustomerParam(): void
+    {
+        $basketSnapshot = $this->createBasketSnapshot();
+        $session = Session::constructFrom([
+            'id' => 'cs_no_customer',
+            'url' => 'https://checkout.stripe.com/pay/cs_no_customer',
+        ]);
+
+        $capturedParams = null;
+        $this->stripeAdapter
+            ->method('createCheckoutSession')
+            ->willReturnCallback(function ($params) use ($session, &$capturedParams) {
+                $capturedParams = $params;
+                return $session;
+            });
+
+        $service = $this->createService();
+        $service->createSession(
+            'contract_no_cust',
+            $basketSnapshot,
+            'https://shop.example.com/success',
+            'https://shop.example.com/cancel'
+        );
+
+        $this->assertArrayNotHasKey('customer', $capturedParams);
+        $this->assertArrayNotHasKey('saved_payment_method_options', $capturedParams);
+    }
+
     // --- Logging Tests ---
 
     public function testSuccessfulSessionCreationIsLogged(): void

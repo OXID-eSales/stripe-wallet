@@ -16,16 +16,7 @@ parameters:
         - '#Function oxNew not found#'
         # Legacy constant
         - '#Constant VENDOR_PATH not found#'
-        # Missing legacy classes - to be implemented
-        - '#unknown class OxidSolutionCatalysts\\Payments\\Stripe\\Core\\Payment#'
-        - '#unknown class OxidSolutionCatalysts\\Payments\\Stripe\\Core\\PaymentConfig#'
-        - '#unknown class OxidSolutionCatalysts\\Payments\\Stripe\\Core\\RequestLog#'
-        - '#unknown class OxidSolutionCatalysts\\Payments\\Stripe\\Core\\Cronjob#'
-        # Method calls on legacy mixed types from oxNew and legacy classes
-        - '#Cannot call method generateViews\(\) on mixed#'
-        - '#Cannot call method getStripePaymentMethods\(\) on mixed#'
-        # Binary operations with VENDOR_PATH constant and static properties
-        - '#Binary operation "\." .* results in an error#'
+
         # Access to static properties on unknown classes
         - '#Access to static property \$sTableName on an unknown class#'
         # Calls to static methods on unknown classes
@@ -33,29 +24,13 @@ parameters:
         # Parameters from legacy code
         - '#Parameter .* of static method .* expects string, mixed given#'
         - '#Parameter .* of method .* expects string, mixed given#'
-        # Return types for legacy methods
-        -
-            message: '#Method .* should return array but returns mixed#'
-            path: src/Stripe/Core/Events.php
-        # OXID chain extension - protected methods/constants from parent (virtual class)
-        - '#Call to protected method setNumber\(\) of class#'
-        - '#Call to protected method getCounterIdent\(\) of class#'
-        - '#Access to undefined constant.*ORDER_STATE_INVALIDDELADDRESSCHANGED#'
-        # Mixed type casting from OXID methods
-        - '#Cannot cast mixed to int#'
-        - '#Cannot cast mixed to string#'
-        # Stripe SDK parameter types are complex - line_items type mismatch
-        - '#Parameter \#1 \$params of method Stripe\\Service\\Checkout\\SessionService::create\(\)#'
         # OXID Session::getBasket() PHPDoc says it always returns Basket, but runtime it can be null
         - '#Strict comparison using !== between.*Basket and null will always evaluate to true#'
         # OXID magic properties (database fields accessed via $model->tablename__fieldname->value)
         - '#Access to an undefined property OxidEsales\\Eshop\\Application\\Model\\Order::\$oxorder__#'
         - '#Access to an undefined property OxidEsales\\Eshop\\Application\\Model\\Order#'
         # OXID OrderArticle iterator can return null in foreach (getOrderArticles() iterator may yield null)
-        - '#Cannot access property \$oxorderarticles__.* on null#'
-        - '#Cannot call method save\(\) on null#'
         # OXID Order extension methods added by Stripe module
-        - '#Call to an undefined method OxidEsales\\Eshop\\Application\\Model\\Order::stripe#'
         # isset() on non-nullable variable - OXID legacy pattern
         - '#Variable \$soxId in isset\(\) always exists and is not nullable#'
         # Missing array value type in legacy code
@@ -64,13 +39,12 @@ parameters:
         - '#Class OxidSolutionCatalysts\\Stripe\\Application\\Model\\RequestLog not found#'
         # Sprint 44: Removed setState suppression - was hiding a runtime bug (STRP-89)
         # OrderRefund controller mixed types from OXID legacy methods
-        - '#Cannot cast mixed to float#'
-        - '#Cannot access property \$value on mixed#'
-        - '#Cannot call method load\(\) on mixed#'
         - '#Property .* does not accept mixed#'
         - '#should return .* but returns mixed#'
         - '#Parameter .* expects string, array\|string given#'
         - '#encapsed string cannot be cast to string#'
+        # Stripe SDK v18: typed array parameters are stricter than our generic adapter interface
+        - '#Parameter \#1 \$params of method Stripe\\Service\\.*::create\(\) expects array\{#'
         # Stripe SDK charge retrieval
         - '#Parameter \#1 \$id of method Stripe\\Service\\ChargeService::retrieve\(\) expects string, string\|Stripe\\Charge given#'
         # OXID basket object methods (mixed types from generic object parameter)

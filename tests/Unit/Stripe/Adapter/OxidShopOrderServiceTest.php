@@ -12,7 +12,6 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Adapter;
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService;
-use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -22,7 +21,6 @@ final class OxidShopOrderServiceTest extends TestCase
 {
     private OxidShopOrderService $service;
     private TransactionRepositoryInterface $transactionRepository;
-    private ModuleConfigurationService $moduleConfig;
 
     protected function setUp(): void
     {
@@ -30,11 +28,9 @@ final class OxidShopOrderServiceTest extends TestCase
 
         // Mock dependencies
         $this->transactionRepository = $this->createMock(TransactionRepositoryInterface::class);
-        $this->moduleConfig = $this->createMock(ModuleConfigurationService::class);
 
         $this->service = new OxidShopOrderService(
-            $this->transactionRepository,
-            $this->moduleConfig
+            $this->transactionRepository
         );
     }
 

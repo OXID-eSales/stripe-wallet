@@ -39,6 +39,9 @@ interface CheckoutSessionServiceInterface
      * @param string|null $orderId Order ID (OXID) for metadata - STRP-75
      * @param string|null $orderNumber Order number (OXORDERNR) for metadata - STRP-75
      */
+    /**
+     * @param string|null $stripeCustomerId Stripe Customer ID for email prefill and saved cards - Sprint 45
+     */
     public function createSession(
         string $contractId,
         BasketSnapshot $basketSnapshot,
@@ -47,7 +50,8 @@ interface CheckoutSessionServiceInterface
         string $shopId = '1',
         string $captureMode = 'automatic',
         ?string $orderId = null,
-        ?string $orderNumber = null
+        ?string $orderNumber = null,
+        ?string $stripeCustomerId = null
     ): CheckoutSessionResult;
 
     /**

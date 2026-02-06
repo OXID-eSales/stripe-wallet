@@ -12,6 +12,7 @@ namespace OxidEsales\Payments\Stripe\Adapter;
 use OxidEsales\PaymentComponent\Adapter\PaymentAdapterInterface;
 use Stripe\Charge;
 use Stripe\Checkout\Session;
+use Stripe\Customer;
 use Stripe\PaymentIntent;
 use Stripe\Refund;
 
@@ -112,6 +113,26 @@ interface StripeAdapterInterface extends PaymentAdapterInterface
      * @throws \OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException On API errors
      */
     public function retrieveCharge(string $chargeId): Charge;
+
+    /**
+     * Create a Stripe Customer object.
+     *
+     * Sprint 45: Used by StripeCustomerService for email prefill and saved cards.
+     *
+     * @param array<string, mixed> $params Customer creation params (email, name, metadata, etc.)
+     * @return Customer Created Stripe Customer
+     */
+    public function createStripeCustomer(array $params): Customer;
+
+    /**
+     * Retrieve a Stripe Customer object.
+     *
+     * Sprint 45: Used by StripeCustomerService to verify customer exists.
+     *
+     * @param string $customerId Stripe Customer ID (cus_xxx)
+     * @return Customer Retrieved Stripe Customer
+     */
+    public function retrieveStripeCustomer(string $customerId): Customer;
 
     /**
      * Test API connectivity by retrieving account balance.

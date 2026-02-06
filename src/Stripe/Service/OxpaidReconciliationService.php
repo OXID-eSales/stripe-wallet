@@ -33,7 +33,7 @@ use OxidEsales\Payments\Stripe\Service\Result\ReconciliationResult;
  *
  * @since Sprint 10
  */
-class OxpaidReconciliationService
+class OxpaidReconciliationService implements OxpaidReconciliationServiceInterface
 {
     public function __construct(
         private readonly Connection $connection,
@@ -150,8 +150,8 @@ class OxpaidReconciliationService
         $results = [];
 
         foreach ($unpaidOrders as $order) {
-            $orderId = (string) $order['OXID'];
-            $transId = (string) $order['OXTRANSID'];
+            $orderId = is_string($order['OXID'] ?? null) ? $order['OXID'] : '';
+            $transId = is_string($order['OXTRANSID'] ?? null) ? $order['OXTRANSID'] : '';
 
             if ($dryRun) {
                 $results[] = new ReconciliationResult(

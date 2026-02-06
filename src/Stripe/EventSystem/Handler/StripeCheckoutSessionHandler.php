@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
 use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
+use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 use OxidEsales\PaymentComponent\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
+use OxidEsales\Payments\Stripe\Service\StripeCustomerServiceInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use RuntimeException;
 
@@ -36,6 +39,8 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly TokenServiceInterface $tokenService,
         private readonly ShopAdapterInterface $shopAdapter,
+        private readonly StripeCustomerServiceInterface $customerService,
+        private readonly ModuleConfigurationServiceInterface $config,
         private readonly ?FileLoggerInterface $eventLogger = null
     ) {
     }
@@ -73,40 +78,24 @@ class StripeCheckoutSessionHandler implements HandlerInterface
 
         $contractId = $contract->getId() ?? '';
 
-        // Get capture mode from context (default: automatic)
-        $captureMode = $context->get('captureMode', 'automatic');
-        if (!is_string($captureMode)) {
-            $captureMode = 'automatic';
-        }
+        // Extract typed context values
+        $captureMode = $this->getContextString($context, 'captureMode', 'automatic');
+        $shopUrl = $this->getContextString($context, 'shopUrl', $this->shopAdapter->getShopUrl());
+        $sessionId = $this->getContextString($context, 'sessionId', '');
+        $shopIdString = $this->getContextString($context, 'shopId', '1');
 
-        // Build URLs with contract ID and secure token
-        $defaultShopUrl = $this->shopAdapter->getShopUrl();
-        $shopUrl = $context->get('shopUrl', $defaultShopUrl);
-        if (!is_string($shopUrl)) {
-            $shopUrl = $defaultShopUrl;
-        }
-
-        // Generate secure token for session restoration
+        // Generate secure token and build URLs
         $contractToken = $this->tokenService->generateToken($contractId);
-
-        // Get OXID session ID to preserve session across Stripe redirect
-        $sessionId = $context->get('sessionId', '');
-        if (!is_string($sessionId)) {
-            $sessionId = '';
-        }
-
-        // Build success and cancel URLs
         $successUrl = $this->checkoutSessionService->buildSuccessUrl($shopUrl, $contractId, $contractToken, $sessionId);
         $cancelUrl = $shopUrl . 'index.php?cl=payment';
-
-        // Get shop ID
-        $shopId = $context->get('shopId', '1');
-        $shopIdString = is_string($shopId) ? $shopId : (string) $shopId;
 
         // STRP-75: Get order ID and order number from contract
         $orderId = $contract->getOrderId();
         $orderNumber = $contract->getMetadata('order_number');
-        $orderNumberString = is_string($orderNumber) || is_int($orderNumber) ? (string) $orderNumber : null;
+        $orderNumberString = is_scalar($orderNumber) ? (string) $orderNumber : null;
+
+        // Sprint 45: Resolve Stripe Customer for email prefill and saved cards
+        $stripeCustomerId = $this->resolveCustomerId($context);
 
         // Sprint 21: Delegate session creation to service
         $this->logEvent('StripeCheckoutSessionHandler: Creating checkout session', [
@@ -114,6 +103,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
             'captureMode' => $captureMode,
             'orderId' => $orderId,
             'orderNumber' => $orderNumberString,
+            'stripeCustomerId' => $stripeCustomerId,
         ]);
 
         $result = $this->checkoutSessionService->createSession(
@@ -124,7 +114,8 @@ class StripeCheckoutSessionHandler implements HandlerInterface
             $shopIdString,
             $captureMode,
             $orderId,
-            $orderNumberString
+            $orderNumberString,
+            $stripeCustomerId
         );
 
         if (!$result->isSuccessful()) {
@@ -152,6 +143,94 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         $this->logEvent('StripeCheckoutSessionHandler::handle() END', [
             'checkoutSessionId' => $result->getSessionId(),
         ]);
+    }
+
+    /**
+     * Resolve Stripe Customer ID from context user, if feature is enabled.
+     *
+     * Sprint 45: Email prefill and saved cards.
+     */
+    private function resolveCustomerId(EventContext $context): ?string
+    {
+        if (!$this->config->shouldProvideCustomerEmail()) {
+            return null;
+        }
+
+        $customerData = $this->extractCustomerData($context);
+        if ($customerData === null) {
+            return null;
+        }
+
+        try {
+            return $this->customerService->resolveStripeCustomerId(
+                $customerData['userId'],
+                $customerData['email'],
+                $customerData['name']
+            );
+        } catch (\Throwable $e) {
+            $this->logEvent('StripeCheckoutSessionHandler: Failed to resolve customer', [
+                'userId' => $customerData['userId'],
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Extract customer data (userId, email, name) from event context.
+     *
+     * @return array{userId: string, email: string, name: string}|null
+     */
+    private function extractCustomerData(EventContext $context): ?array
+    {
+        $userId = $this->getContextString($context, 'userId', '');
+        if ($userId === '') {
+            return null;
+        }
+
+        $user = $context->getUser();
+        if ($user === null) {
+            return null;
+        }
+
+        $email = $this->getUserFieldString($user, 'oxusername');
+        if ($email === '') {
+            return null;
+        }
+
+        $firstName = $this->getUserFieldString($user, 'oxfname');
+        $lastName = $this->getUserFieldString($user, 'oxlname');
+
+        return [
+            'userId' => $userId,
+            'email' => $email,
+            'name' => trim($firstName . ' ' . $lastName),
+        ];
+    }
+
+    /**
+     * Get a typed string value from EventContext.
+     */
+    private function getContextString(EventContext $context, string $key, string $default): string
+    {
+        $value = $context->get($key, $default);
+
+        return is_string($value) ? $value : $default;
+    }
+
+    /**
+     * Extract a string field from an OXID user object via getFieldData().
+     */
+    private function getUserFieldString(object $user, string $fieldName): string
+    {
+        if (!method_exists($user, 'getFieldData')) {
+            return '';
+        }
+
+        /** @phpstan-ignore-next-line OXID core: getFieldData() on dynamic user object */
+        $value = $user->getFieldData($fieldName);
+
+        return is_string($value) ? $value : '';
     }
 
     /**

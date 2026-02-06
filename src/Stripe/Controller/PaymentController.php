@@ -11,12 +11,8 @@ namespace OxidEsales\Payments\Stripe\Controller;
 
 use OxidEsales\Eshop\Application\Controller\PaymentController as CorePaymentController;
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Module;
-use OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactoryInterface;
-use OxidEsales\PaymentComponent\Adapter\Request\CreatePaymentRequest;
-use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
-use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
 
 /**
  * Extended payment controller for Stripe integration
@@ -24,25 +20,14 @@ use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
  */
 class PaymentController extends CorePaymentController
 {
-    private ModuleConfigurationService $stripeConfig;
-    private PaymentAdapterFactoryInterface $adapterFactory;
-    private ShopAdapterInterface $shopAdapter;
+    private ModuleConfigurationServiceInterface $stripeConfig;
 
-    /**
-     * @param \OxidEsales\Payments\Stripe\Service\ModuleConfigurationService $stripeConfig
-     * @param \OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactoryInterface $adapterFactory
-     * @param \OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface $shopAdapter
-     */
     public function __construct(
-        ModuleConfigurationService $stripeConfig,
-        PaymentAdapterFactoryInterface $adapterFactory,
-        ShopAdapterInterface $shopAdapter
+        ModuleConfigurationServiceInterface $stripeConfig
     ) {
         parent::__construct();
 
         $this->stripeConfig = $stripeConfig;
-        $this->adapterFactory = $adapterFactory;
-        $this->shopAdapter = $shopAdapter;
     }
 
     /**
@@ -90,26 +75,6 @@ class PaymentController extends CorePaymentController
         }
 
         return $result;
-    }
-
-    /**
-     * Get return URL for payment processing
-     *
-     * @return string
-     */
-    private function getReturnUrl(): string
-    {
-        return Registry::getConfig()->getShopCurrentURL() . 'cl=order&fnc=execute';
-    }
-
-    /**
-     * Get cancel URL for payment processing
-     *
-     * @return string
-     */
-    private function getCancelUrl(): string
-    {
-        return Registry::getConfig()->getShopCurrentURL() . 'cl=payment';
     }
 
     /**

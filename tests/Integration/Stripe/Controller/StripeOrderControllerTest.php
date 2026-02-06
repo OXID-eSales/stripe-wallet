@@ -11,7 +11,8 @@ use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
-use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use PHPUnit\Framework\TestCase;
@@ -445,17 +446,8 @@ class StripeOrderControllerTest extends TestCase
 
             protected function getServiceFromContainer(string $serviceName): object
             {
-                // Return a mock ModuleConfigurationService with valid keys
-                if ($serviceName === ModuleConfigurationService::class) {
+                if ($serviceName === ModuleConfigurationServiceInterface::class) {
                     return new class {
-                        public function getKeyValidationError(): ?string
-                        {
-                            return null; // Keys are valid
-                        }
-                        public function validateKeyPair(): bool
-                        {
-                            return true;
-                        }
                         public function getPublishableKey(): string
                         {
                             return 'pk_test_51ABC12345DEF456GHI789';
@@ -465,6 +457,22 @@ class StripeOrderControllerTest extends TestCase
                             return 'sk_test_51ABC12345XYZ000111222';
                         }
                         public function isTestMode(): bool
+                        {
+                            return true;
+                        }
+                        public function getCaptureMode(): string
+                        {
+                            return 'automatic';
+                        }
+                    };
+                }
+                if ($serviceName === ConfigurationValidatorInterface::class) {
+                    return new class {
+                        public function getKeyValidationError(): ?string
+                        {
+                            return null;
+                        }
+                        public function validateKeyPair(): bool
                         {
                             return true;
                         }
