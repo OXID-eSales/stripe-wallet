@@ -138,7 +138,6 @@ services:
   # - 3D Secure/SCA support
   # - Webhook signature verification
   #
-  # TODO: Integrate with StripeConfigService for API key management
 
   # Stripe Client Factory - Creates configured Stripe SDK clients
   # Gets API credentials from ModuleConfigurationService
@@ -152,20 +151,22 @@ services:
     factory: ['@OxidEsales\Payments\Stripe\Adapter\StripeClientFactory', 'create']
     public: false
 
-  # Payment Adapter Factory Interface - Bind to Stripe implementation
-  # This is the main entry point for getting payment adapters
-  # Gets API credentials from ModuleConfigurationService
+  # Stripe Adapter Factory - Inner factory (raw, no idempotency)
+  # Sprint 42: Now registered as concrete service, wrapped by IdempotentStripeAdapterFactory
+  OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactory:
+    public: false
+
+  # Payment Adapter Factory Interface - Bind to IdempotentStripeAdapterFactory
+  # Sprint 42: Wraps StripeAdapterFactory with idempotency protection for capture/refund
   OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactoryInterface:
-    class: OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactory
+    class: OxidEsales\Payments\Stripe\Service\Factory\IdempotentStripeAdapterFactory
+    arguments:
+      $innerFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactory'
+      $repository: '@OxidEsales\PaymentComponent\Repository\IdempotencyRepositoryInterface'
     public: true
 
   # Stripe Adapter Factory Interface - Stripe-specific factory
   OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface:
-    alias: OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactoryInterface
-    public: true
-
-  # Stripe Adapter Factory - Concrete implementation
-  OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactory:
     alias: OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactoryInterface
     public: true
 
@@ -686,29 +687,11 @@ services:
   OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler:
     alias: OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface
 
-  # WebhookProcessingService - DEPRECATED (Sprint 5)
-  # Kept for backwards compatibility. Use StripeWebhookProcessor instead.
-  # TODO: Remove in next major version
-  OxidEsales\Payments\Stripe\Service\WebhookProcessingService:
-    arguments:
-      $contractFulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
-      $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
-      $webhookLogRepository: '@OxidEsales\PaymentComponent\Repository\WebhookLogRepositoryInterface'
-      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
-      $orderPaymentStateService: '@OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface'
-      $contractFulfillmentService: '@OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface'
-    public: true
-    deprecated:
-      package: 'oxid-esales/stripe-payment'
-      version: '1.0.0'
-      message: 'The "%service_id%" service is deprecated. Use StripeWebhookProcessor instead.'
-
   # ==========================================
   # Stripe Webhook Processor (Sprint 5)
   # ==========================================
   # New webhook processor using Template Method pattern from payment-component.
   # Consolidates: signature verification, idempotency, logging, event routing.
-  # Replaces WebhookProcessingService.
 
   OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor:
     arguments:
@@ -739,6 +722,14 @@ services:
   # Alias for easier reference
   OxidEsales\PaymentComponent\Repository\DoctrineTransactionRepository:
     alias: OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface
+
+  # Idempotency Repository - Prevents duplicate capture/refund API calls
+  # Sprint 42: Uses oe_payments_idempotency table
+  OxidEsales\PaymentComponent\Repository\IdempotencyRepositoryInterface:
+    class: OxidEsales\PaymentComponent\Repository\DoctrineIdempotencyRepository
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+    public: false
 
   # Note: StripePaymentDetailsRepository DELETED
   # Stripe-specific payment details (card info, 3DS, risk) stored in:

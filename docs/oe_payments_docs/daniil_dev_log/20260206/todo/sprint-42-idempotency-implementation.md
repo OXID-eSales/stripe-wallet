@@ -1,7 +1,7 @@
 # Sprint 42: Idempotency Implementation - Discussion & Decision
 
 **Date:** 2026-02-06
-**Status:** 📋 PENDING DISCUSSION
+**Status:** ✅ DECISIONS MADE
 **Prerequisites:** Sprint 38-41 completed (dead code cleanup)
 **Estimated Effort:** 8-16 hours (depending on chosen option)
 
@@ -175,14 +175,14 @@ payment-component/tests/
 
 ## Decision Matrix
 
-| Question | Options | Recommendation |
-|----------|---------|----------------|
-| Q1: Need custom? | A/B/C | Discuss |
-| Q2: Pattern | A/B/C | A (Decorator) |
-| Q3: Scope | capture/refund/all | capture + refund |
-| Q4: Key strategy | A/B/C/D | A (Contract-based) |
-| Q5: Cache duration | 24h/7d/30d/permanent | B (7 days) |
-| Q6: Existing table | use/modify/delete/keep | A (Use it) |
+| Question | Options | Decision |
+|----------|---------|----------|
+| Q1: Need custom? | A/B/C | **A) Build custom layer** (use existing table) |
+| Q2: Pattern | A/B/C | **A) Decorator pattern** wrapping adapter |
+| Q3: Scope | capture/refund/all | **Capture + Refund only** (highest risk) |
+| Q4: Key strategy | A/B/C/D | **A) Contract-based** (`capture:{providerPaymentId}`, `refund:{chargeId}`) |
+| Q5: Cache duration | 24h/7d/30d/permanent | **A) 24 hours** |
+| Q6: Existing table | use/modify/delete/keep | **A) Use existing** `oe_payments_idempotency` table as-is |
 
 ---
 
@@ -229,8 +229,8 @@ payment-component/tests/
 
 ## Action Items After Discussion
 
-- [ ] Finalize answers to Q1-Q6
-- [ ] Update this document with decisions
-- [ ] Create implementation tasks
+- [x] Finalize answers to Q1-Q6
+- [x] Update this document with decisions
+- [x] Create implementation tasks
 - [ ] Execute sprint with TDD approach
 - [ ] Run `./bin/pre-commit-check.sh --full` for validation

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
+use DateTimeInterface;
 use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
+use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeRefundRequestHandler;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
@@ -248,5 +250,141 @@ class StripeRefundRequestHandlerTest extends TestCase
         $event = new StripeRefundRequestEvent($context);
 
         $this->assertNull($event->getAmount());
+    }
+
+    // =========================================================================
+    // Sprint 44: updateContractState tests (Liskov-safe, interface-based)
+    // =========================================================================
+
+    private function createTestableHandler(): TestableStripeRefundRequestHandler
+    {
+        return new TestableStripeRefundRequestHandler(
+            $this->refundService,
+            $this->contractRepository,
+            $this->requestLogService,
+            $this->shopAdapter,
+            $this->logger
+        );
+    }
+
+    public function testSuccessfulRefundUpdatesContractRefundTracking(): void
+    {
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getAmount')->willReturn(99.99);
+        $contract->method('getRefundedAmount')->willReturn(null);
+
+        $contract->expects($this->once())
+            ->method('addRefundedAmount')
+            ->with(99.99);
+
+        $contract->expects($this->once())
+            ->method('setRefundedAt')
+            ->with($this->isInstanceOf(DateTimeInterface::class));
+
+        $this->contractRepository->method('findById')
+            ->with('contract_123')
+            ->willReturn($contract);
+
+        $this->contractRepository->expects($this->once())
+            ->method('save')
+            ->with($contract);
+
+        $context = new EventContext([
+            'orderId' => 'order_abc',
+            'contractId' => 'contract_123',
+            'amount' => null,
+        ]);
+        $event = new StripeRefundRequestEvent($context);
+
+        $handler = $this->createTestableHandler();
+        $handler->callUpdateContractState($event);
+    }
+
+    public function testSkipsContractUpdateWhenContractIdIsNull(): void
+    {
+        $this->contractRepository->expects($this->never())->method('findById');
+
+        $context = new EventContext([
+            'orderId' => 'order_abc',
+            'amount' => null,
+        ]);
+        $event = new StripeRefundRequestEvent($context);
+
+        $handler = $this->createTestableHandler();
+        $handler->callUpdateContractState($event);
+    }
+
+    public function testSkipsContractUpdateWhenNotFullRefund(): void
+    {
+        $this->contractRepository->expects($this->never())->method('findById');
+
+        $context = new EventContext([
+            'orderId' => 'order_abc',
+            'contractId' => 'contract_123',
+            'amount' => 25.50,
+        ]);
+        $event = new StripeRefundRequestEvent($context);
+
+        $handler = $this->createTestableHandler();
+        $handler->callUpdateContractState($event);
+    }
+
+    public function testSkipsContractUpdateWhenContractNotFound(): void
+    {
+        $this->contractRepository->method('findById')
+            ->with('contract_missing')
+            ->willReturn(null);
+
+        $this->contractRepository->expects($this->never())->method('save');
+
+        $context = new EventContext([
+            'orderId' => 'order_abc',
+            'contractId' => 'contract_missing',
+            'amount' => null,
+        ]);
+        $event = new StripeRefundRequestEvent($context);
+
+        $handler = $this->createTestableHandler();
+        $handler->callUpdateContractState($event);
+    }
+
+    public function testIdempotencyGuardSkipsAlreadyRefundedContract(): void
+    {
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getRefundedAmount')->willReturn(99.99);
+
+        $contract->expects($this->never())->method('addRefundedAmount');
+
+        $this->contractRepository->method('findById')
+            ->with('contract_123')
+            ->willReturn($contract);
+
+        $this->contractRepository->expects($this->never())->method('save');
+
+        $context = new EventContext([
+            'orderId' => 'order_abc',
+            'contractId' => 'contract_123',
+            'amount' => null,
+        ]);
+        $event = new StripeRefundRequestEvent($context);
+
+        $handler = $this->createTestableHandler();
+        $handler->callUpdateContractState($event);
+    }
+}
+
+/**
+ * Testable subclass exposing updateContractState for isolated unit testing.
+ *
+ * The production method is protected (OCP), enabling this test-only
+ * subclass without modifying the production class's public API.
+ *
+ * Sprint 44: Added to enable testing without OXID's oxNew() dependency.
+ */
+class TestableStripeRefundRequestHandler extends StripeRefundRequestHandler
+{
+    public function callUpdateContractState(StripeRefundRequestEvent $event): void
+    {
+        $this->updateContractState($event);
     }
 }

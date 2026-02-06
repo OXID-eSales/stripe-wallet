@@ -62,8 +62,7 @@ parameters:
         - '#type has no value type specified in iterable type array#'
         # Legacy RequestLog class from original Stripe module
         - '#Class OxidSolutionCatalysts\\Stripe\\Application\\Model\\RequestLog not found#'
-        # PaymentContractInterface setState method - to be added
-        - '#Call to an undefined method.*PaymentContractInterface::setState#'
+        # Sprint 44: Removed setState suppression - was hiding a runtime bug (STRP-89)
         # OrderRefund controller mixed types from OXID legacy methods
         - '#Cannot cast mixed to float#'
         - '#Cannot access property \$value on mixed#'

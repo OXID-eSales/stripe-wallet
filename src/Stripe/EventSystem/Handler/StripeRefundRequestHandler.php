@@ -205,7 +205,7 @@ class StripeRefundRequestHandler implements HandlerInterface
         $this->setSuccessResults($context, $result, $order);
     }
 
-    private function updateContractState(StripeRefundRequestEvent $event): void
+    protected function updateContractState(StripeRefundRequestEvent $event): void
     {
         $contractId = $event->getContractId();
         if ($contractId === null || !$event->isFullRefund()) {
@@ -217,7 +217,14 @@ class StripeRefundRequestHandler implements HandlerInterface
             return;
         }
 
-        $contract->setState('REFUNDED');
+        // Idempotency guard: skip if webhook already recorded the refund
+        $currentRefund = $contract->getRefundedAmount();
+        if ($currentRefund !== null && $currentRefund >= 0.01) {
+            return;
+        }
+
+        $contract->addRefundedAmount($contract->getAmount());
+        $contract->setRefundedAt(new \DateTimeImmutable());
         $this->contractRepository->save($contract);
     }
 
