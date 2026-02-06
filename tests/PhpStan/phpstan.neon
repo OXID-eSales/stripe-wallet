@@ -17,52 +17,9 @@ parameters:
         # Legacy constant
         - '#Constant VENDOR_PATH not found#'
 
-        # Access to static properties on unknown classes
-        - '#Access to static property \$sTableName on an unknown class#'
-        # Calls to static methods on unknown classes
-        - '#Call to static method .* on an unknown class#'
-        # Parameters from legacy code
-        - '#Parameter .* of static method .* expects string, mixed given#'
-        - '#Parameter .* of method .* expects string, mixed given#'
-        # OXID Session::getBasket() PHPDoc says it always returns Basket, but runtime it can be null
-        - '#Strict comparison using !== between.*Basket and null will always evaluate to true#'
-        # OXID magic properties (database fields accessed via $model->tablename__fieldname->value)
         - '#Access to an undefined property OxidEsales\\Eshop\\Application\\Model\\Order::\$oxorder__#'
         - '#Access to an undefined property OxidEsales\\Eshop\\Application\\Model\\Order#'
         # OXID OrderArticle iterator can return null in foreach (getOrderArticles() iterator may yield null)
         # OXID Order extension methods added by Stripe module
         # isset() on non-nullable variable - OXID legacy pattern
         - '#Variable \$soxId in isset\(\) always exists and is not nullable#'
-        # Missing array value type in legacy code
-        - '#type has no value type specified in iterable type array#'
-        # Legacy RequestLog class from original Stripe module
-        - '#Class OxidSolutionCatalysts\\Stripe\\Application\\Model\\RequestLog not found#'
-        # Sprint 44: Removed setState suppression - was hiding a runtime bug (STRP-89)
-        # OrderRefund controller mixed types from OXID legacy methods
-        - '#Property .* does not accept mixed#'
-        - '#should return .* but returns mixed#'
-        - '#Parameter .* expects string, array\|string given#'
-        - '#encapsed string cannot be cast to string#'
-        # Stripe SDK v18: typed array parameters are stricter than our generic adapter interface
-        - '#Parameter \#1 \$params of method Stripe\\Service\\.*::create\(\) expects array\{#'
-        # Stripe SDK charge retrieval
-        - '#Parameter \#1 \$id of method Stripe\\Service\\ChargeService::retrieve\(\) expects string, string\|Stripe\\Charge given#'
-        # OXID basket object methods (mixed types from generic object parameter)
-        - '#Cannot call method getBruttoPrice\(\) on mixed#'
-        - '#Cannot call method getNettoPrice\(\) on mixed#'
-        - '#Cannot call method getVatValue\(\) on mixed#'
-        - '#Cannot call method getId\(\) on mixed#'
-        - '#Cannot call method getTitle\(\) on mixed#'
-        - '#Cannot access property \$name on mixed#'
-        - '#Cannot access property \$oxarticles__oxtitle on mixed#'
-        # ContractService - OXID basket iteration and method calls on dynamic types
-        - '#Call to an undefined method OxidSolutionCatalysts\\Payments\\Component\\Contract\\PaymentContractInterface::expire\(\)#'
-        - '#Argument of an invalid type mixed supplied for foreach#'
-        - '#Cannot call method getArticle\(\) on class-string\|object#'
-        - '#Cannot call method getUnitPrice\(\) on class-string\|object#'
-        - '#Cannot call method getAmount\(\) on class-string\|object#'
-        - '#Parameter \#1 .* of function method_exists expects object\|string, (class-string\|object|mixed) given#'
-        - '#Binary operation "\*" between mixed and int results in an error#'
-        - '#Cannot access property \$sDiscount on mixed#'
-        - '#Cannot access property \$dDiscount on mixed#'
-        - '#Parameter \#1 \$article of method.*ContractService::extractArticleTitle\(\) expects object\|null, mixed given#'

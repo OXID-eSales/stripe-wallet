@@ -86,10 +86,12 @@ final class OxidStockRestorationService implements StockRestorationServiceInterf
     private function processOrderArticle(OrderArticle $orderArticle): bool
     {
         // Skip if already storno'd (prevents double-restore)
+        /** @phpstan-ignore-next-line OXID core: magic property oxorderarticles__oxstorno->value */
         if ((int) $orderArticle->oxorderarticles__oxstorno->value === 1) {
             return false;
         }
 
+        /** @phpstan-ignore-next-line OXID core: magic property oxorderarticles__oxamount->value */
         $amount = (float) $orderArticle->oxorderarticles__oxamount->value;
         $orderArticleId = $orderArticle->getId();
 

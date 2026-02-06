@@ -1,175 +1,205 @@
 parameters:
 	ignoreErrors:
 		-
-			message: '#^Access to an undefined property Stripe\\PaymentIntent\:\:\$charges\.$#'
-			identifier: property.notFound
-			count: 2
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Argument of an invalid type mixed supplied for foreach, only iterables are supported\.$#'
-			identifier: foreach.nonIterable
+			message: '#^Parameter \#1 \$params of method Stripe\\Service\\Checkout\\SessionService\:\:create\(\) expects array\{adaptive_pricing\?\: array\{enabled\?\: bool\}, after_expiration\?\: array\{recovery\?\: array\{allow_promotion_codes\?\: bool, enabled\: bool\}\}, allow_promotion_codes\?\: bool, automatic_tax\?\: array\{enabled\: bool, liability\?\: array\{account\?\: string, type\: string\}\}, billing_address_collection\?\: string, branding_settings\?\: array\{background_color\?\: string\|null, border_style\?\: string\|null, button_color\?\: string\|null, display_name\?\: string, font_family\?\: string\|null, icon\?\: array\{file\?\: string, type\: string, url\?\: string\}, logo\?\: array\{file\?\: string, type\: string, url\?\: string\}\}, cancel_url\?\: string, client_reference_id\?\: string, \.\.\.\}\|null, array\<string, mixed\> given\.$#'
+			identifier: argument.type
 			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Binary operation "/" between mixed and 100 results in an error\.$#'
-			identifier: binaryOp.invalid
-			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Cannot access offset 0 on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 3
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Cannot access property \$amount_refunded on mixed\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Cannot access property \$created on mixed\.$#'
-			identifier: property.nonObject
-			count: 2
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Cannot access property \$data on mixed\.$#'
-			identifier: property.nonObject
-			count: 5
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Cannot access property \$id on mixed\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Cannot access property \$param on Stripe\\ErrorObject\|null\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Cannot access property \$type on Stripe\\ErrorObject\|null\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
+			path: ../../src/Stripe/Adapter/Helper/CheckoutSessionHelper.php
 
 		-
 			message: '#^Cannot access property \$url on mixed\.$#'
 			identifier: property.nonObject
-			count: 3
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
+			count: 2
+			path: ../../src/Stripe/Adapter/Helper/PaymentIntentHelper.php
 
 		-
-			message: '#^Method OxidSolutionCatalysts\\Payments\\Stripe\\Adapter\\StripeAdapter\:\:extractPaymentMethodDetails\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method OxidEsales\\Payments\\Stripe\\Adapter\\Helper\\PaymentIntentHelper\:\:retrievePaymentIntent\(\) has parameter \$expand with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
+			path: ../../src/Stripe/Adapter/Helper/PaymentIntentHelper.php
 
 		-
-			message: '#^Parameter \#1 \$params of method Stripe\\Service\\PaymentIntentService\:\:create\(\) expects array\{amount\: int, amount_details\?\: array\{discount_amount\?\: int\|null, line_items\?\: array\<array\{discount_amount\?\: int, payment_method_options\?\: array\{card\?\: array\{commodity_code\?\: string\}, card_present\?\: array\{commodity_code\?\: string\}, klarna\?\: array\{image_url\?\: string, product_url\?\: string, reference\?\: string, subscription_reference\?\: string\}, paypal\?\: array\{category\?\: string, description\?\: string, sold_by\?\: string\}\}, product_code\?\: string, product_name\: string, quantity\: int, tax\?\: array\{total_tax_amount\: int\}, unit_cost\: int, unit_of_measure\?\: string\}\>\|null, shipping\?\: array\{amount\?\: int\|null, from_postal_code\?\: string\|null, to_postal_code\?\: string\|null\}\|null, tax\?\: array\{total_tax_amount\: int\}\|null\}, application_fee_amount\?\: int, automatic_payment_methods\?\: array\{allow_redirects\?\: string, enabled\: bool\}, capture_method\?\: string, confirm\?\: bool, confirmation_method\?\: string, confirmation_token\?\: string, \.\.\.\}\|null, array\{amount\: int, currency\: string, capture_method\: ''automatic''\|''manual'', metadata\: non\-empty\-array, customer\?\: string, return_url\?\: string\}\|array\{amount\: int, currency\: string, capture_method\: ''automatic''\|''manual'', metadata\: non\-empty\-array, payment_method\: string, confirm\: true, customer\?\: string, return_url\?\: string\} given\.$#'
+			message: '#^Parameter \#1 \$params of method Stripe\\Service\\PaymentIntentService\:\:create\(\) expects array\{amount\: int, amount_details\?\: array\{discount_amount\?\: int\|null, line_items\?\: array\<array\{discount_amount\?\: int, payment_method_options\?\: array\{card\?\: array\{commodity_code\?\: string\}, card_present\?\: array\{commodity_code\?\: string\}, klarna\?\: array\{image_url\?\: string, product_url\?\: string, reference\?\: string, subscription_reference\?\: string\}, paypal\?\: array\{category\?\: string, description\?\: string, sold_by\?\: string\}\}, product_code\?\: string, product_name\: string, quantity\: int, tax\?\: array\{total_tax_amount\: int\}, unit_cost\: int, unit_of_measure\?\: string\}\>\|null, shipping\?\: array\{amount\?\: int\|null, from_postal_code\?\: string\|null, to_postal_code\?\: string\|null\}\|null, tax\?\: array\{total_tax_amount\: int\}\|null\}, application_fee_amount\?\: int, automatic_payment_methods\?\: array\{allow_redirects\?\: string, enabled\: bool\}, capture_method\?\: string, confirm\?\: bool, confirmation_method\?\: string, confirmation_token\?\: string, \.\.\.\}\|null, array\<string, mixed\> given\.$#'
 			identifier: argument.type
 			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Parameter \#1 \$params of method Stripe\\Service\\PaymentIntentService\:\:create\(\) expects array\{amount\: int, amount_details\?\: array\{discount_amount\?\: int\|null, line_items\?\: array\<array\{discount_amount\?\: int, payment_method_options\?\: array\{card\?\: array\{commodity_code\?\: string\}, card_present\?\: array\{commodity_code\?\: string\}, klarna\?\: array\{image_url\?\: string, product_url\?\: string, reference\?\: string, subscription_reference\?\: string\}, paypal\?\: array\{category\?\: string, description\?\: string, sold_by\?\: string\}\}, product_code\?\: string, product_name\: string, quantity\: int, tax\?\: array\{total_tax_amount\: int\}, unit_cost\: int, unit_of_measure\?\: string\}\>\|null, shipping\?\: array\{amount\?\: int\|null, from_postal_code\?\: string\|null, to_postal_code\?\: string\|null\}\|null, tax\?\: array\{total_tax_amount\: int\}\|null\}, application_fee_amount\?\: int, automatic_payment_methods\?\: array\{allow_redirects\?\: string, enabled\: bool\}, capture_method\?\: string, confirm\?\: bool, confirmation_method\?\: string, confirmation_token\?\: string, \.\.\.\}\|null, array\{amount\: int, currency\: string, capture_method\: ''manual'', metadata\: non\-empty\-array\<string, mixed\>, customer\?\: string, return_url\?\: string\}\|array\{amount\: int, currency\: string, capture_method\: ''manual'', metadata\: non\-empty\-array\<string, mixed\>, payment_method\: string, confirm\: true, customer\?\: string, return_url\?\: string\} given\.$#'
-			identifier: argument.type
-			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Parameter \#1 \$params of method Stripe\\Service\\PaymentMethodService\:\:create\(\) expects array\{acss_debit\?\: array\{account_number\: string, institution_number\: string, transit_number\: string\}, affirm\?\: array\{\}, afterpay_clearpay\?\: array\{\}, alipay\?\: array\{\}, allow_redisplay\?\: string, alma\?\: array\{\}, amazon_pay\?\: array\{\}, au_becs_debit\?\: array\{account_number\: string, bsb_number\: string\}, \.\.\.\}\|null, non\-empty\-array\<string, mixed\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Parameter \#1 \$params of method Stripe\\Service\\RefundService\:\:create\(\) expects array\{amount\?\: int, charge\?\: string, currency\?\: string, customer\?\: string, expand\?\: array\<string\>, instructions_email\?\: string, metadata\?\: array\<string, string\>\|null, origin\?\: string, \.\.\.\}\|null, array\{payment_intent\: string, amount\?\: int, reason\?\: string, metadata\?\: non\-empty\-array\<string, mixed\>\} given\.$#'
-			identifier: argument.type
-			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
+			path: ../../src/Stripe/Adapter/Helper/PaymentIntentHelper.php
 
 		-
 			message: '#^Parameter \#2 \$params of method Stripe\\Service\\PaymentIntentService\:\:capture\(\) expects array\{amount_details\?\: array\{discount_amount\?\: int\|null, line_items\?\: array\<array\{discount_amount\?\: int, payment_method_options\?\: array\{card\?\: array\{commodity_code\?\: string\}, card_present\?\: array\{commodity_code\?\: string\}, klarna\?\: array\{image_url\?\: string, product_url\?\: string, reference\?\: string, subscription_reference\?\: string\}, paypal\?\: array\{category\?\: string, description\?\: string, sold_by\?\: string\}\}, product_code\?\: string, product_name\: string, quantity\: int, tax\?\: array\{total_tax_amount\: int\}, unit_cost\: int, unit_of_measure\?\: string\}\>\|null, shipping\?\: array\{amount\?\: int\|null, from_postal_code\?\: string\|null, to_postal_code\?\: string\|null\}\|null, tax\?\: array\{total_tax_amount\: int\}\|null\}, amount_to_capture\?\: int, application_fee_amount\?\: int, expand\?\: array\<string\>, final_capture\?\: bool, metadata\?\: array\<string, string\>\|null, payment_details\?\: array\{customer_reference\?\: string\|null, order_reference\?\: string\|null\}\|null, statement_descriptor\?\: string, \.\.\.\}\|null, array\{\}\|array\{amount_to_capture\?\: int, metadata\?\: non\-empty\-array\<string, mixed\>\} given\.$#'
 			identifier: argument.type
 			count: 1
+			path: ../../src/Stripe/Adapter/Helper/PaymentIntentHelper.php
+
+		-
+			message: '#^Parameter \#2 \$params of method Stripe\\Service\\PaymentIntentService\:\:retrieve\(\) expects array\{client_secret\?\: string, expand\?\: array\<string\>\}\|null, array\{\}\|array\{expand\: non\-empty\-array\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../src/Stripe/Adapter/Helper/PaymentIntentHelper.php
+
+		-
+			message: '#^Parameter \#1 \$params of method Stripe\\Service\\PaymentMethodService\:\:create\(\) expects array\{acss_debit\?\: array\{account_number\: string, institution_number\: string, transit_number\: string\}, affirm\?\: array\{\}, afterpay_clearpay\?\: array\{\}, alipay\?\: array\{\}, allow_redisplay\?\: string, alma\?\: array\{\}, amazon_pay\?\: array\{\}, au_becs_debit\?\: array\{account_number\: string, bsb_number\: string\}, \.\.\.\}\|null, non\-empty\-array\<string, mixed\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../src/Stripe/Adapter/Helper/PaymentMethodHelper.php
+
+		-
+			message: '#^Method OxidEsales\\Payments\\Stripe\\Adapter\\Helper\\RefundHelper\:\:createRefundByCharge\(\) has parameter \$metadata with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../src/Stripe/Adapter/Helper/RefundHelper.php
+
+		-
+			message: '#^Parameter \#1 \$params of method Stripe\\Service\\RefundService\:\:create\(\) expects array\{amount\?\: int, charge\?\: string, currency\?\: string, customer\?\: string, expand\?\: array\<string\>, instructions_email\?\: string, metadata\?\: array\<string, string\>\|null, origin\?\: string, \.\.\.\}\|null, array\{charge\: string, amount\?\: int, reason\?\: string, metadata\?\: array\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../src/Stripe/Adapter/Helper/RefundHelper.php
+
+		-
+			message: '#^Parameter \#1 \$params of method Stripe\\Service\\RefundService\:\:create\(\) expects array\{amount\?\: int, charge\?\: string, currency\?\: string, customer\?\: string, expand\?\: array\<string\>, instructions_email\?\: string, metadata\?\: array\<string, string\>\|null, origin\?\: string, \.\.\.\}\|null, array\{payment_intent\: string, amount\?\: int, reason\?\: string, metadata\?\: non\-empty\-array\<string, mixed\>\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../src/Stripe/Adapter/Helper/RefundHelper.php
+
+		-
+			message: '#^Cannot access property \$param on Stripe\\ErrorObject\|null\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: ../../src/Stripe/Adapter/Helper/StripeExceptionConverter.php
+
+		-
+			message: '#^Cannot access property \$type on Stripe\\ErrorObject\|null\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: ../../src/Stripe/Adapter/Helper/StripeExceptionConverter.php
+
+		-
+			message: '#^Method OxidEsales\\Payments\\Stripe\\Adapter\\OxidShopAdapter\:\:getShopCurrency\(\) should return string but returns mixed\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../src/Stripe/Adapter/OxidShopAdapter.php
+
+		-
+			message: '#^Cannot access property \$url on mixed\.$#'
+			identifier: property.nonObject
+			count: 1
 			path: ../../src/Stripe/Adapter/StripeAdapter.php
 
 		-
-			message: '#^Parameter \$captureId of class OxidSolutionCatalysts\\Payments\\Component\\Adapter\\Response\\CaptureResponse constructor expects string, mixed given\.$#'
+			message: '#^Parameter \#1 \$params of method Stripe\\Service\\CustomerService\:\:create\(\) expects array\{address\?\: array\{city\?\: string, country\?\: string, line1\?\: string, line2\?\: string, postal_code\?\: string, state\?\: string\}\|null, balance\?\: int, business_name\?\: string\|null, cash_balance\?\: array\{settings\?\: array\{reconciliation_mode\?\: string\}\}, description\?\: string, email\?\: string, expand\?\: array\<string\>, individual_name\?\: string\|null, \.\.\.\}\|null, array\<string, mixed\> given\.$#'
 			identifier: argument.type
 			count: 1
 			path: ../../src/Stripe/Adapter/StripeAdapter.php
 
 		-
-			message: '#^Parameter \$details of class OxidSolutionCatalysts\\Payments\\Component\\Adapter\\Response\\PaymentMethodResponse constructor expects array\<string, mixed\>, array given\.$#'
+			message: '#^Method OxidEsales\\Payments\\Stripe\\Adapter\\StripeWebhookEvent\:\:getPaymentId\(\) should return string\|null but returns mixed\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../src/Stripe/Adapter/StripeWebhookEvent.php
+
+		-
+			message: '#^Method OxidEsales\\Payments\\Stripe\\Controller\\Admin\\ModuleConfiguration\:\:stripeSecondChanceDayDiffs\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ../../src/Stripe/Controller/Admin/ModuleConfiguration.php
+
+		-
+			message: '#^Parameter \#1 \$paymentId of static method OxidEsales\\Payments\\Stripe\\Core\\StripeDefinitions\:\:isStripePayment\(\) expects string, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../src/Stripe/Controller/Admin/OrderRefund.php
+
+		-
+			message: '#^Parameter \#1 \$sError of method OxidEsales\\Payments\\Stripe\\Controller\\Admin\\OrderRefund\:\:setErrorMessage\(\) expects string, array\|string given\.$#'
+			identifier: argument.type
+			count: 3
+			path: ../../src/Stripe/Controller/Admin/OrderRefund.php
+
+		-
+			message: '#^Property OxidEsales\\Payments\\Stripe\\Controller\\Admin\\StripeConnect\:\:\$moduleSettingService \(OxidEsales\\EshopCommunity\\Internal\\Framework\\Module\\Configuration\\Bridge\\ModuleSettingBridge\) does not accept mixed\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: ../../src/Stripe/Controller/Admin/StripeConnect.php
+
+		-
+			message: '#^Method OxidEsales\\Payments\\Stripe\\Controller\\StripeOrderController\:\:checkoutSuccess\(\) should return string but returns mixed\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../src/Stripe/Controller/StripeOrderController.php
+
+		-
+			message: '#^Method OxidEsales\\Payments\\Stripe\\Controller\\StripeOrderController\:\:executeStripePayment\(\) should return string but returns mixed\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../src/Stripe/Controller/StripeOrderController.php
+
+		-
+			message: '#^Method OxidEsales\\Payments\\Stripe\\Controller\\StripeOrderController\:\:getServiceFromContainer\(\) should return T of object but returns mixed\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../src/Stripe/Controller/StripeOrderController.php
+
+		-
+			message: '#^Method OxidEsales\\Payments\\Stripe\\Controller\\StripeOrderController\:\:stripeReturn\(\) should return string but returns mixed\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../src/Stripe/Controller/StripeOrderController.php
+
+		-
+			message: '#^Property OxidEsales\\Payments\\Stripe\\Controller\\Webhook\\WebhookController\:\:\$processor \(OxidEsales\\Payments\\Stripe\\Webhook\\StripeWebhookProcessor\|null\) does not accept mixed\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: ../../src/Stripe/Controller/Webhook/WebhookController.php
+
+		-
+			message: '#^Property OxidEsales\\Payments\\Stripe\\Controller\\Webhook\\WebhookController\:\:\$webhookLogger \(OxidEsales\\Payments\\Stripe\\Service\\WebhookLogServiceInterface\|null\) does not accept mixed\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: ../../src/Stripe/Controller/Webhook/WebhookController.php
+
+		-
+			message: '#^Method OxidEsales\\Payments\\Stripe\\Core\\ViewConfig\:\:getServiceFromContainer\(\) should return T of object but returns mixed\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../src/Stripe/Core/ViewConfig.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between OxidEsales\\Eshop\\Application\\Model\\Basket and null will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: ../../src/Stripe/Model/Order.php
+
+		-
+			message: '#^Method OxidEsales\\Payments\\Stripe\\Service\\CheckoutReturnService\:\:extractPaymentIntentId\(\) should return string but returns mixed\.$#'
+			identifier: return.type
+			count: 1
+			path: ../../src/Stripe/Service/CheckoutReturnService.php
+
+		-
+			message: '#^Part \$order\[''OXORDERDATE''\] \(mixed\) of encapsed string cannot be cast to string\.$#'
+			identifier: encapsedStringPart.nonString
+			count: 1
+			path: ../../src/Stripe/Service/OxpaidReconciliationService.php
+
+		-
+			message: '#^Part \$order\[''OXORDERNR''\] \(mixed\) of encapsed string cannot be cast to string\.$#'
+			identifier: encapsedStringPart.nonString
+			count: 1
+			path: ../../src/Stripe/Service/OxpaidReconciliationService.php
+
+		-
+			message: '#^Parameter \#1 \$userAgent of method OxidEsales\\Payments\\Stripe\\Service\\ReturnSessionSecurityService\:\:parseUserAgent\(\) expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 2
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
+			path: ../../src/Stripe/Service/ReturnSessionSecurityService.php
 
 		-
-			message: '#^Parameter \$metadata of class OxidSolutionCatalysts\\Payments\\Component\\Adapter\\Response\\PaymentResponse constructor expects array\<string, mixed\>, array given\.$#'
+			message: '#^Parameter \#1 \$paymentIntentId of method OxidEsales\\Payments\\Stripe\\Adapter\\StripeAdapterInterface\:\:retrievePaymentIntent\(\) expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
+			path: ../../src/Stripe/Service/StripeOrderApiService.php
 
 		-
-			message: '#^Parameter \$providerData of class OxidSolutionCatalysts\\Payments\\Component\\Adapter\\Response\\AuthorizationResponse constructor expects array\<string, mixed\>, array given\.$#'
+			message: '#^Parameter \#1 \$paymentIntentId of method OxidEsales\\Payments\\Stripe\\Adapter\\StripeAdapterInterface\:\:getPaymentIntentRiskScore\(\) expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Parameter \$providerData of class OxidSolutionCatalysts\\Payments\\Component\\Adapter\\Response\\CaptureResponse constructor expects array\<string, mixed\>, array given\.$#'
-			identifier: argument.type
-			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Parameter \$providerData of class OxidSolutionCatalysts\\Payments\\Component\\Adapter\\Response\\PaymentDetailsResponse constructor expects array\<string, mixed\>, array given\.$#'
-			identifier: argument.type
-			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Parameter \$providerData of class OxidSolutionCatalysts\\Payments\\Component\\Adapter\\Response\\PaymentMethodResponse constructor expects array\<string, mixed\>, array given\.$#'
-			identifier: argument.type
-			count: 2
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Parameter \$providerData of class OxidSolutionCatalysts\\Payments\\Component\\Adapter\\Response\\PaymentResponse constructor expects array\<string, mixed\>, array given\.$#'
-			identifier: argument.type
-			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Parameter \$providerData of class OxidSolutionCatalysts\\Payments\\Component\\Adapter\\Response\\RefundResponse constructor expects array\<string, mixed\>, array given\.$#'
-			identifier: argument.type
-			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Parameter \$providerData of class OxidSolutionCatalysts\\Payments\\Component\\Adapter\\Response\\ThreeDSecureResponse constructor expects array\<string, mixed\>, array given\.$#'
-			identifier: argument.type
-			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Parameter \$providerData of class OxidSolutionCatalysts\\Payments\\Component\\Adapter\\Response\\VoidResponse constructor expects array\<string, mixed\>, array given\.$#'
-			identifier: argument.type
-			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
-
-		-
-			message: '#^Parameter \$status of class OxidSolutionCatalysts\\Payments\\Component\\Adapter\\Response\\RefundResponse constructor expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: ../../src/Stripe/Adapter/StripeAdapter.php
+			path: ../../src/Stripe/Service/StripeRadarFraudCheckService.php

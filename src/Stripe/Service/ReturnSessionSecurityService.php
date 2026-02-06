@@ -156,7 +156,7 @@ final class ReturnSessionSecurityService implements ReturnSecurityValidatorInter
             return [$score, $warnings];
         }
 
-        $elapsed = time() - (int) $createdTimestamp;
+        $elapsed = time() - (is_numeric($createdTimestamp) ? (int) $createdTimestamp : 0);
 
         if ($elapsed >= self::VERY_LATE_THRESHOLD) {
             $score -= self::PENALTY_VERY_LATE_RETURN;
@@ -219,6 +219,23 @@ final class ReturnSessionSecurityService implements ReturnSecurityValidatorInter
         return [$score, $warnings];
     }
 
+    /** @var array<string, string> */
+    private const OS_MAP = [
+        'Windows' => 'Windows',
+        'Linux' => 'Linux',
+        'Mac' => 'Mac',
+        'Android' => 'Android',
+        'iOS' => 'iOS',
+        'iPhone' => 'iOS',
+    ];
+
+    /** @var array<string, string> */
+    private const BROWSER_MAP = [
+        'Edg/' => 'Edge',
+        'Firefox/' => 'Firefox',
+        'Chrome/' => 'Chrome',
+    ];
+
     /**
      * Parse user agent string to extract OS and browser.
      *
@@ -227,30 +244,24 @@ final class ReturnSessionSecurityService implements ReturnSecurityValidatorInter
     private function parseUserAgent(string $userAgent): array
     {
         $os = 'unknown';
-        $browser = 'unknown';
-
-        // Detect OS
-        if (str_contains($userAgent, 'Windows')) {
-            $os = 'Windows';
-        } elseif (str_contains($userAgent, 'Linux')) {
-            $os = 'Linux';
-        } elseif (str_contains($userAgent, 'Mac')) {
-            $os = 'Mac';
-        } elseif (str_contains($userAgent, 'Android')) {
-            $os = 'Android';
-        } elseif (str_contains($userAgent, 'iOS') || str_contains($userAgent, 'iPhone')) {
-            $os = 'iOS';
+        foreach (self::OS_MAP as $needle => $osName) {
+            if (str_contains($userAgent, $needle)) {
+                $os = $osName;
+                break;
+            }
         }
 
-        // Detect browser (order matters - Edge contains Chrome)
-        if (str_contains($userAgent, 'Edg/')) {
-            $browser = 'Edge';
-        } elseif (str_contains($userAgent, 'Firefox/')) {
-            $browser = 'Firefox';
-        } elseif (str_contains($userAgent, 'Safari/') && !str_contains($userAgent, 'Chrome')) {
+        $browser = 'unknown';
+        foreach (self::BROWSER_MAP as $needle => $browserName) {
+            if (str_contains($userAgent, $needle)) {
+                $browser = $browserName;
+                break;
+            }
+        }
+
+        // Safari special case: contains "Safari/" but NOT "Chrome/"
+        if ($browser === 'unknown' && str_contains($userAgent, 'Safari/')) {
             $browser = 'Safari';
-        } elseif (str_contains($userAgent, 'Chrome/')) {
-            $browser = 'Chrome';
         }
 
         return ['os' => $os, 'browser' => $browser];

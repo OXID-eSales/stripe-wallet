@@ -46,7 +46,7 @@ class StripeRadarFraudCheckService implements FraudCheckServiceInterface
     {
         $paymentIntentId = $contract->getMetadata('stripe_payment_intent_id');
 
-        if ($paymentIntentId === null) {
+        if ($paymentIntentId === null || !is_string($paymentIntentId)) {
             // No PaymentIntent associated - pass by default
             return FraudCheckResponse::success(0.0);
         }

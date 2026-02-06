@@ -60,36 +60,20 @@ class WebhookController extends FrontendController
     {
         Registry::getUtils()->setHeader('Content-Type: application/json');
 
-        $payload = file_get_contents('php://input');
-        $rawSignature = $_SERVER['HTTP_STRIPE_SIGNATURE'] ?? '';
-        $signature = is_string($rawSignature) ? $rawSignature : '';
-        $remoteIp = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-        $remoteIp = is_string($remoteIp) ? $remoteIp : 'unknown';
+        [$payload, $signature, $remoteIp] = $this->extractWebhookInput();
 
-        // Log received webhook
-        $this->webhookLogger?->logReceived($payload ?: '', $signature, $remoteIp);
+        $this->webhookLogger?->logReceived($payload, $signature, $remoteIp);
 
-        // Validate input
-        if (!is_string($payload) || $payload === '') {
-            $this->webhookLogger?->logResult('', 'EMPTY_PAYLOAD', 400);
-            http_response_code(400);
-            echo json_encode(['error' => 'Empty payload']);
-            exit;
+        if ($payload === '') {
+            $this->sendErrorResponse('', 'Empty payload', 400, 'EMPTY_PAYLOAD');
         }
 
         if ($signature === '') {
-            $this->webhookLogger?->logResult($payload, 'MISSING_SIGNATURE', 400);
-            http_response_code(400);
-            echo json_encode(['error' => 'Missing signature header']);
-            exit;
+            $this->sendErrorResponse($payload, 'Missing signature header', 400, 'MISSING_SIGNATURE');
         }
 
-        // Check processor availability
         if ($this->processor === null) {
-            $this->webhookLogger?->logResult($payload, 'PROCESSOR_UNAVAILABLE', 500);
-            http_response_code(500);
-            echo json_encode(['error' => 'Webhook processor unavailable']);
-            exit;
+            $this->sendErrorResponse($payload, 'Webhook processor unavailable', 500, 'PROCESSOR_UNAVAILABLE');
         }
 
         // Create request object
@@ -106,10 +90,7 @@ class WebhookController extends FrontendController
         // Return response based on result
         if ($result->isFailure()) {
             $statusCode = $result->action === 'signature_invalid' ? 400 : 500;
-            $this->webhookLogger?->logResult($payload, "FAILED: {$result->action}", $statusCode);
-            http_response_code($statusCode);
-            echo json_encode(['error' => $result->error ?? $result->action]);
-            exit;
+            $this->sendErrorResponse($payload, $result->error ?? $result->action, $statusCode);
         }
 
         $this->webhookLogger?->logResult($payload, "SUCCESS: {$result->action}", 200);
@@ -119,5 +100,34 @@ class WebhookController extends FrontendController
 
         // @phpstan-ignore-next-line - unreachable but required for return type
         return '';
+    }
+
+    /**
+     * Extract raw webhook input from PHP globals.
+     *
+     * @return array{string, string, string} [payload, signature, remoteIp]
+     */
+    private function extractWebhookInput(): array
+    {
+        $payload = file_get_contents('php://input');
+        $rawSignature = $_SERVER['HTTP_STRIPE_SIGNATURE'] ?? '';
+        $signature = is_string($rawSignature) ? $rawSignature : '';
+        $remoteIp = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $remoteIp = is_string($remoteIp) ? $remoteIp : 'unknown';
+
+        return [is_string($payload) ? $payload : '', $signature, $remoteIp];
+    }
+
+    /**
+     * Send error response and terminate.
+     *
+     * @return never
+     */
+    private function sendErrorResponse(string $payload, string $message, int $statusCode, ?string $logAction = null): never
+    {
+        $this->webhookLogger?->logResult($payload, $logAction ?? "FAILED: {$message}", $statusCode);
+        http_response_code($statusCode);
+        echo json_encode(['error' => $message]);
+        exit;
     }
 }

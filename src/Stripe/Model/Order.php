@@ -45,9 +45,8 @@ class Order extends Order_parent
 
         /** @var EshopCoreCounter $counter */
         $counter = oxNew(EshopCoreCounter::class);
-        /** @var mixed $orderNr */
         $orderNr = $this->getFieldData('oxordernr');
-        $counter->update($this->getCounterIdent(), (int) $orderNr);
+        $counter->update($this->getCounterIdent(), is_numeric($orderNr) ? (int) $orderNr : 0);
     }
 
     /**
@@ -57,9 +56,8 @@ class Order extends Order_parent
      */
     public function hasOrderNumber(): bool
     {
-        /** @var mixed $orderNr */
         $orderNr = $this->getFieldData('oxordernr');
-        return 0 < (int) $orderNr;
+        return 0 < (is_numeric($orderNr) ? (int) $orderNr : 0);
     }
 
     /**

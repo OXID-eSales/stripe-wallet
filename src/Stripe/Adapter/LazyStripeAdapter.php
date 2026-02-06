@@ -39,6 +39,9 @@ use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
  * The factory throws when keys are missing, but this adapter delays that check
  * until actual payment operations are performed.
  *
+ * Proxy pattern: mirrors PaymentAdapterInterface from payment-component.
+ * Each method is a thin delegation to the lazily-created adapter instance.
+ *
  * @since 2.0.0
  */
 final class LazyStripeAdapter implements PaymentAdapterInterface

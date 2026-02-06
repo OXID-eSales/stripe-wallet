@@ -168,18 +168,19 @@ services:
     factory: ['@OxidEsales\Payments\Stripe\Adapter\StripeClientFactory', 'create']
     public: false
 
-  # Stripe Adapter Factory - Inner factory (raw, no idempotency)
-  # Sprint 42: Now registered as concrete service, wrapped by IdempotentStripeAdapterFactory
+  # Stripe Adapter Factory
+  # Sprint 46: Idempotency moved into helpers; factory injects repository directly.
   OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactory:
+    arguments:
+      $idempotencyRepository: '@OxidEsales\PaymentComponent\Repository\IdempotencyRepositoryInterface'
     public: false
 
-  # Payment Adapter Factory Interface - Bind to IdempotentStripeAdapterFactory
-  # Sprint 42: Wraps StripeAdapterFactory with idempotency protection for capture/refund
+  # Payment Adapter Factory Interface - Bind to StripeAdapterFactory
+  # Sprint 46: IdempotentStripeAdapterFactory removed; idempotency handled by helpers.
   OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactoryInterface:
-    class: OxidEsales\Payments\Stripe\Service\Factory\IdempotentStripeAdapterFactory
+    class: OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactory
     arguments:
-      $innerFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactory'
-      $repository: '@OxidEsales\PaymentComponent\Repository\IdempotencyRepositoryInterface'
+      $idempotencyRepository: '@OxidEsales\PaymentComponent\Repository\IdempotencyRepositoryInterface'
     public: true
 
   # Stripe Adapter Factory Interface - Stripe-specific factory
@@ -822,6 +823,21 @@ services:
   OxidEsales\Payments\Stripe\Controller\StripeOrderController:
     tags:
       - { name: oxid.view_controller, controller_key: order }
+    public: true
+
+  # Sprint 46: Extracted services for OrderRefund admin controller
+  OxidEsales\Payments\Stripe\Service\OrderContractResolver:
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+    public: true
+
+  OxidEsales\Payments\Stripe\Controller\Admin\OrderActionDispatcher:
+    arguments:
+      $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
+      $contractResolver: '@OxidEsales\Payments\Stripe\Service\OrderContractResolver'
+    public: true
+
+  OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider:
     public: true
 
   # Note: ModuleConfiguration is a class extension (extends ModuleConfiguration_parent)

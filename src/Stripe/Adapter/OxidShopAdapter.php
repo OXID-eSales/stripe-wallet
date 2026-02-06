@@ -27,12 +27,14 @@ class OxidShopAdapter implements ShopAdapterInterface
 
         if ($languageAbbr !== null) {
             $languageId = $this->getLanguageIdByAbbr($languageAbbr);
+            /** @var string|array<string> $result */
             $result = $lang->translateString($languageConstant, $languageId);
-            return is_array($result) ? (string) reset($result) : (string) $result;
+            return is_array($result) ? (string) reset($result) : $result;
         }
 
+        /** @var string|array<string> $result */
         $result = $lang->translateString($languageConstant);
-        return is_array($result) ? (string) reset($result) : (string) $result;
+        return is_array($result) ? (string) reset($result) : $result;
     }
 
     /**
@@ -74,6 +76,7 @@ class OxidShopAdapter implements ShopAdapterInterface
     public function getShopName(): string
     {
         $shop = Registry::getConfig()->getActiveShop();
+        /** @phpstan-ignore-next-line OXID core: magic property oxshops__oxname->value */
         return $shop->oxshops__oxname->value ?? 'OXID eShop';
     }
 

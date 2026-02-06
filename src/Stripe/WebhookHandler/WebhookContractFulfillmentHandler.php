@@ -53,43 +53,61 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
             return null;
         }
 
-        // Sprint 8: Record captured amount on contract
-        if ($capturedAmount > 0.0 && $contract instanceof PaymentContract) {
-            $contract->setCapturedAmount($capturedAmount);
-            $contract->setCapturedAt(new \DateTimeImmutable());
-        }
+        $this->recordCapturedAmount($contract, $capturedAmount);
 
         // Idempotency check - already fulfilled
         if ($contract->getState()->isFulfilled()) {
-            // Still save the captured amount if it changed
-            if ($capturedAmount > 0.0) {
-                $this->contractRepository->save($contract);
-            }
+            $this->saveIfAmountPositive($contract, $capturedAmount);
             return false;
         }
 
         // Sprint 7: Handle manual capture mode - AUTHORIZED -> READY_TO_COMMIT
-        if ($contract->getState()->isAuthorized() && $contract instanceof PaymentContract) {
-            $contract->captureAuthorization();
-            $this->contractRepository->save($contract);
-            // After capture, contract is READY_TO_COMMIT
-            // Continue to check if we can fulfill (need COMMITTED state)
-            // For now, just return true as capture was successful
+        if ($this->handleAuthorizedCapture($contract)) {
             return true;
         }
 
         // Validation - must be COMMITTED to fulfill
         if (!$contract->getState()->isCommitted()) {
-            // Save captured amount even if not ready to fulfill
-            if ($capturedAmount > 0.0) {
-                $this->contractRepository->save($contract);
-            }
+            $this->saveIfAmountPositive($contract, $capturedAmount);
             return false;
         }
 
-        // Sprint 18: Use ContractFulfillmentService for DRY fulfillment
-        // Note: capturedAmount is already set on contract above
         return $this->contractFulfillmentService->fulfill($contract);
+    }
+
+    /**
+     * Record captured amount on concrete PaymentContract.
+     */
+    private function recordCapturedAmount(PaymentContractInterface $contract, float $amount): void
+    {
+        if ($amount > 0.0 && $contract instanceof PaymentContract) {
+            $contract->setCapturedAmount($amount);
+            $contract->setCapturedAt(new \DateTimeImmutable());
+        }
+    }
+
+    /**
+     * Handle AUTHORIZED -> READY_TO_COMMIT transition for manual capture.
+     */
+    private function handleAuthorizedCapture(PaymentContractInterface $contract): bool
+    {
+        if (!$contract->getState()->isAuthorized() || !$contract instanceof PaymentContract) {
+            return false;
+        }
+
+        $contract->captureAuthorization();
+        $this->contractRepository->save($contract);
+        return true;
+    }
+
+    /**
+     * Save contract if captured amount is positive.
+     */
+    private function saveIfAmountPositive(PaymentContractInterface $contract, float $amount): void
+    {
+        if ($amount > 0.0) {
+            $this->contractRepository->save($contract);
+        }
     }
 
     /**

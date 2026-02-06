@@ -103,6 +103,7 @@ class StripeRefundRequestHandler implements HandlerInterface
 
     private function loadOrder(string $orderId, EventContext $context): ?Order
     {
+        /** @var Order $order */
         $order = oxNew(Order::class);
         if (!$order->load($orderId)) {
             $context->set('error', 'Order not found: ' . $orderId);
@@ -124,6 +125,7 @@ class StripeRefundRequestHandler implements HandlerInterface
             return $paymentIntentId;
         }
 
+        /** @phpstan-ignore-next-line OXID core: magic property oxorder__oxtransid->value */
         $transId = $order->oxorder__oxtransid->value ?? null;
         if (!is_string($transId) || $transId === '') {
             $context->set('error', 'Order has no payment transaction ID');

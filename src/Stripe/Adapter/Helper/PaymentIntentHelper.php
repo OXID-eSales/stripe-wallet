@@ -1,0 +1,374 @@
+<?php
+
+/**
+ * Copyright © OXID eSales AG. All rights reserved.
+ * See LICENSE file for license details.
+ */
+
+declare(strict_types=1);
+
+namespace OxidEsales\Payments\Stripe\Adapter\Helper;
+
+use DateTimeImmutable;
+use OxidEsales\PaymentComponent\Adapter\Request\CreatePaymentRequest;
+use OxidEsales\PaymentComponent\Adapter\Request\CapturePaymentRequest;
+use OxidEsales\PaymentComponent\Adapter\Request\AuthorizePaymentRequest;
+use OxidEsales\PaymentComponent\Adapter\Response\PaymentResponse;
+use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
+use OxidEsales\PaymentComponent\Adapter\Response\PaymentDetailsResponse;
+use OxidEsales\PaymentComponent\Adapter\Response\AuthorizationResponse;
+use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
+use OxidEsales\PaymentComponent\Contract\IdempotencyRecord;
+use OxidEsales\PaymentComponent\Repository\IdempotencyRepositoryInterface;
+use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
+use Stripe\Exception\ApiErrorException;
+use Stripe\PaymentIntent;
+use Stripe\StripeClient;
+
+/**
+ * Helper for PaymentIntent operations.
+ *
+ * Sprint 46: Extracted from StripeAdapter to reduce ECC.
+ * Sprint 46: Idempotency for capturePaymentIntent (moved from IdempotentStripeAdapter).
+ *
+ * @since 2.0.0
+ */
+final class PaymentIntentHelper
+{
+    private const STATUS_PROCESSING = 'processing';
+    private const STATUS_COMPLETED = 'completed';
+    private const STATUS_FAILED = 'failed';
+    private const DEFAULT_TTL_SECONDS = 86400;
+
+    public function __construct(
+        private readonly ?IdempotencyRepositoryInterface $idempotencyRepository = null,
+        private readonly int $ttlSeconds = self::DEFAULT_TTL_SECONDS
+    ) {
+    }
+
+    public function createPaymentIntent(StripeClient $client, CreatePaymentRequest $request): PaymentResponse
+    {
+        try {
+            $amountInCents = (int) ($request->amount * 100);
+            $captureMethod = $request->directCapture ? 'automatic' : 'manual';
+
+            $params = $this->buildPaymentIntentParams($amountInCents, $request->currency, $captureMethod, $request);
+
+            /** @var array{amount: int, currency: string, capture_method: 'automatic'|'manual', metadata: array<string, string>, payment_method?: string, confirm?: true, customer?: string, return_url?: string} $params */
+            $paymentIntent = $client->paymentIntents->create($params);
+
+            /** @var array<string, mixed> $providerData */
+            $providerData = $paymentIntent->toArray();
+
+            return new PaymentResponse(
+                providerPaymentId: $paymentIntent->id,
+                status: StripeStatusMapper::toNormalized($paymentIntent->status),
+                amount: $request->amount,
+                currency: $request->currency,
+                requiresAction: StripeStatusMapper::requiresAction($paymentIntent->status),
+                clientSecret: $paymentIntent->client_secret,
+                redirectUrl: $paymentIntent->next_action->redirect_to_url->url ?? null,
+                providerData: $providerData,
+                metadata: $request->metadata
+            );
+        } catch (ApiErrorException $e) {
+            throw StripeExceptionConverter::convert($e);
+        }
+    }
+
+    public function capturePaymentIntent(StripeClient $client, CapturePaymentRequest $request): CaptureResponse
+    {
+        if ($this->idempotencyRepository !== null) {
+            return $this->captureWithIdempotency($client, $request);
+        }
+
+        return $this->executeCapturePaymentIntent($client, $request);
+    }
+
+    public function getPaymentDetails(StripeClient $client, string $providerPaymentId): PaymentDetailsResponse
+    {
+        try {
+            $paymentIntent = $client->paymentIntents->retrieve(
+                $providerPaymentId,
+                ['expand' => ['latest_charge']]
+            );
+
+            $amount = $paymentIntent->amount / 100;
+            $amountCaptured = $paymentIntent->amount_received / 100;
+
+            $amountRefunded = 0.0;
+            if ($paymentIntent->latest_charge) {
+                $amountRefunded = ($paymentIntent->latest_charge->amount_refunded ?? 0) / 100;
+            }
+
+            $capturedAt = null;
+            if ($paymentIntent->latest_charge && isset($paymentIntent->latest_charge->created)) {
+                $capturedAt = new DateTimeImmutable('@' . $paymentIntent->latest_charge->created);
+            }
+
+            /** @var array<string, mixed> $providerData */
+            $providerData = $paymentIntent->toArray();
+
+            return new PaymentDetailsResponse(
+                providerPaymentId: $paymentIntent->id,
+                status: StripeStatusMapper::toNormalized($paymentIntent->status),
+                amount: $amount,
+                currency: strtoupper($paymentIntent->currency),
+                amountCaptured: $amountCaptured,
+                amountRefunded: $amountRefunded,
+                isCaptured: StripeStatusMapper::isCaptured($paymentIntent->status),
+                isRefunded: $amountRefunded > 0,
+                isCancelled: StripeStatusMapper::isCancelled($paymentIntent->status),
+                createdAt: new DateTimeImmutable('@' . $paymentIntent->created),
+                capturedAt: $capturedAt,
+                providerData: $providerData
+            );
+        } catch (ApiErrorException $e) {
+            throw StripeExceptionConverter::convert($e);
+        }
+    }
+
+    public function authorizePayment(StripeClient $client, AuthorizePaymentRequest $request): AuthorizationResponse
+    {
+        try {
+            $amountInCents = (int) ($request->amount * 100);
+
+            $params = $this->buildPaymentIntentParams($amountInCents, $request->currency, 'manual', $request);
+
+            $paymentIntent = $client->paymentIntents->create($params);
+
+            $expiresAt = new DateTimeImmutable('+7 days');
+
+            /** @var array<string, mixed> $providerData */
+            $providerData = $paymentIntent->toArray();
+
+            return new AuthorizationResponse(
+                authorizationId: $paymentIntent->id,
+                providerPaymentId: $paymentIntent->id,
+                status: StripeStatusMapper::toNormalized($paymentIntent->status),
+                amount: $request->amount,
+                currency: $request->currency,
+                authorizedAt: new DateTimeImmutable('@' . $paymentIntent->created),
+                expiresAt: $expiresAt,
+                requiresAction: StripeStatusMapper::requiresAction($paymentIntent->status),
+                clientSecret: $paymentIntent->client_secret,
+                redirectUrl: $paymentIntent->next_action->redirect_to_url->url ?? null,
+                providerData: $providerData,
+                metadata: $request->metadata
+            );
+        } catch (ApiErrorException $e) {
+            throw StripeExceptionConverter::convert($e);
+        }
+    }
+
+    /**
+     * @param array<string> $expand
+     */
+    public function retrievePaymentIntent(StripeClient $client, string $paymentIntentId, array $expand = []): PaymentIntent
+    {
+        try {
+            $options = [];
+            if (!empty($expand)) {
+                $options['expand'] = $expand;
+            }
+            return $client->paymentIntents->retrieve($paymentIntentId, $options);
+        } catch (ApiErrorException $e) {
+            throw StripeExceptionConverter::convert($e);
+        }
+    }
+
+    public function cancelPaymentIntent(StripeClient $client, string $paymentIntentId, ?string $cancellationReason = null): PaymentIntent
+    {
+        try {
+            $params = [];
+            if ($cancellationReason !== null) {
+                $params['cancellation_reason'] = match ($cancellationReason) {
+                    'requested_by_customer', 'fraudulent', 'duplicate', 'abandoned' => $cancellationReason,
+                    default => 'requested_by_customer',
+                };
+            }
+            return $client->paymentIntents->cancel($paymentIntentId, $params);
+        } catch (ApiErrorException $e) {
+            throw StripeExceptionConverter::convert($e);
+        }
+    }
+
+    public function getRiskScore(StripeClient $client, string $paymentIntentId): ?float
+    {
+        try {
+            $paymentIntent = $client->paymentIntents->retrieve(
+                $paymentIntentId,
+                ['expand' => ['latest_charge']]
+            );
+
+            if ($paymentIntent->latest_charge === null) {
+                return null;
+            }
+
+            $outcome = $paymentIntent->latest_charge->outcome ?? null;
+            $riskScore = $outcome->risk_score ?? null;
+
+            return $riskScore !== null ? $riskScore / 100.0 : null;
+        } catch (ApiErrorException $e) {
+            throw StripeExceptionConverter::convert($e);
+        }
+    }
+
+    /**
+     * Build params array for PaymentIntent creation.
+     *
+     * @param CreatePaymentRequest|AuthorizePaymentRequest $request
+     * @return array<string, mixed>
+     */
+    private function buildPaymentIntentParams(int $amountInCents, string $currency, string $captureMethod, object $request): array
+    {
+        $params = [
+            'amount' => $amountInCents,
+            'currency' => strtolower($currency),
+            'capture_method' => $captureMethod,
+            'metadata' => array_merge($request->metadata, [
+                'order_id' => $request->orderId,
+                'shop_id' => $request->shopId,
+            ]),
+        ];
+
+        $willConfirm = $request->paymentMethodId !== null;
+        if ($request->paymentMethodId !== null) {
+            $params['payment_method'] = $request->paymentMethodId;
+            $params['confirm'] = true;
+
+            if ($request->returnUrl === null) {
+                throw new PaymentAdapterException(
+                    providerName: 'stripe',
+                    errorCode: 'missing_return_url',
+                    message: 'return_url is required when confirming a PaymentIntent with a saved payment method',
+                    context: [
+                        'payment_method_id' => $request->paymentMethodId,
+                        'order_id' => $request->orderId,
+                    ]
+                );
+            }
+        }
+
+        if ($request->customerId !== null) {
+            $params['customer'] = $request->customerId;
+        }
+
+        if ($request->returnUrl !== null && $willConfirm) {
+            $params['return_url'] = $request->returnUrl;
+        }
+
+        return $params;
+    }
+
+    private function captureWithIdempotency(StripeClient $client, CapturePaymentRequest $request): CaptureResponse
+    {
+        $key = 'capture:' . $request->providerPaymentId;
+        /** @var IdempotencyRepositoryInterface $repository */
+        $repository = $this->idempotencyRepository;
+        $existing = $repository->findByKey($key);
+
+        if ($existing !== null && !$existing->isExpired()) {
+            if ($existing->getStatus() === self::STATUS_COMPLETED && $existing->getResult() !== null) {
+                return $this->deserializeCaptureResponse($existing->getResult());
+            }
+            if ($existing->getStatus() === self::STATUS_PROCESSING) {
+                throw new \RuntimeException('Capture operation already in progress for: ' . $request->providerPaymentId);
+            }
+        }
+
+        $record = IdempotencyHelper::reuseOrCreate($existing, $key, $request->providerPaymentId, 'capture', $this->ttlSeconds);
+        $repository->save($record);
+
+        try {
+            $result = $this->executeCapturePaymentIntent($client, $request);
+            $record->setStatus(self::STATUS_COMPLETED);
+            $record->setResult($this->serializeCaptureResponse($result));
+            $repository->save($record);
+            return $result;
+        } catch (\Throwable $e) {
+            $record->setStatus(self::STATUS_FAILED);
+            $record->setResult(json_encode(['error' => $e->getMessage()]) ?: null);
+            $repository->save($record);
+            throw $e;
+        }
+    }
+
+    private function executeCapturePaymentIntent(StripeClient $client, CapturePaymentRequest $request): CaptureResponse
+    {
+        try {
+            $params = [];
+            if ($request->amount !== null) {
+                $params['amount_to_capture'] = (int) ($request->amount * 100);
+            }
+            if (!empty($request->metadata)) {
+                $params['metadata'] = $request->metadata;
+            }
+
+            $client->paymentIntents->capture($request->providerPaymentId, $params);
+
+            $paymentIntent = $client->paymentIntents->retrieve(
+                $request->providerPaymentId,
+                ['expand' => ['latest_charge']]
+            );
+
+            $amountCaptured = $paymentIntent->amount_received / 100;
+            /** @phpstan-ignore-next-line nullsafe.neverNull */
+            $capturedAtTimestamp = $paymentIntent->latest_charge?->created ?? time();
+
+            /** @var array<string, mixed> $providerData */
+            $providerData = $paymentIntent->toArray();
+
+            return CaptureResponse::success(
+                providerPaymentId: $paymentIntent->id,
+                /** @phpstan-ignore-next-line nullsafe.neverNull */
+                captureId: $paymentIntent->latest_charge?->id ?? $paymentIntent->id,
+                amountCaptured: $amountCaptured,
+                currency: strtoupper($paymentIntent->currency),
+                status: StripeStatusMapper::STATUS_CAPTURED,
+                capturedAt: new DateTimeImmutable('@' . $capturedAtTimestamp),
+                providerData: $providerData,
+                metadata: $request->metadata
+            );
+        } catch (ApiErrorException $e) {
+            throw StripeExceptionConverter::convert($e);
+        }
+    }
+
+    private function serializeCaptureResponse(CaptureResponse $response): string
+    {
+        return (string) json_encode([
+            'successful' => $response->successful,
+            'providerPaymentId' => $response->providerPaymentId,
+            'captureId' => $response->captureId,
+            'amountCaptured' => $response->amountCaptured,
+            'currency' => $response->currency,
+            'status' => $response->status,
+            'capturedAt' => $response->capturedAt?->format('Y-m-d H:i:s'),
+            'errorMessage' => $response->errorMessage,
+            'errorCode' => $response->errorCode,
+        ]);
+    }
+
+    private function deserializeCaptureResponse(string $json): CaptureResponse
+    {
+        /** @var array{successful?: bool, providerPaymentId?: string, captureId?: string, amountCaptured?: float, currency?: string, status?: string, capturedAt?: string, errorMessage?: string, errorCode?: string} $data */
+        $data = json_decode($json, true);
+
+        if (!($data['successful'] ?? false)) {
+            return CaptureResponse::failure(
+                $data['errorMessage'] ?? 'Unknown error',
+                $data['errorCode'] ?? null
+            );
+        }
+
+        return CaptureResponse::success(
+            providerPaymentId: $data['providerPaymentId'] ?? '',
+            captureId: $data['captureId'] ?? '',
+            amountCaptured: $data['amountCaptured'] ?? 0.0,
+            currency: $data['currency'] ?? '',
+            status: $data['status'] ?? '',
+            capturedAt: new DateTimeImmutable($data['capturedAt'] ?? 'now'),
+        );
+    }
+}

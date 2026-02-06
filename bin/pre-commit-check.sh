@@ -104,7 +104,7 @@ run_phpmd_docker() {
     if [ -n "$files" ]; then
         echo "Running PHPMD on changed files: $files"
         docker compose exec -w /var/www/extensions/stripe -T php \
-            vendor/bin/phpmd $files text tests/PhpMd/phpmd.baseline.xml --exclude tests/,migration/data/ --suffixes php --strict
+            vendor/bin/phpmd $files text tests/PhpMd/phpmd.xml --baseline-file tests/PhpMd/phpmd.baseline.xml --exclude tests/,migration/data/ --suffixes php --strict
     else
         echo "No PHP files to check with PHPMD"
         return 0

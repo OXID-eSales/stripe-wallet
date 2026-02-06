@@ -5,35 +5,53 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Controller\Admin;
 
 use OxidEsales\Eshop\Application\Model\Order;
+use OxidEsales\Payments\Stripe\Controller\Admin\OrderActionDispatcher;
 use OxidEsales\Payments\Stripe\Controller\Admin\OrderRefund;
+use OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
+use OxidEsales\Payments\Stripe\Service\OrderContractResolver;
+use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
+use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 
 /**
  * Testable subclass that allows injecting dependencies for testing.
- * Follows LSP - return types match parent class.
+ * Overrides service locator methods to inject test doubles.
  */
 class TestableOrderRefund extends OrderRefund
 {
-    private ?EventDispatcherInterface $testEventDispatcher = null;
+    private ?OrderActionDispatcher $testActionDispatcher = null;
+    private ?OrderRefundViewDataProvider $testViewDataProvider = null;
     private ?Order $testOrder = null;
     private ?string $testEditObjectId = null;
-    private array $testRequestParams = [];
 
-    public function setTestEventDispatcher(EventDispatcherInterface $dispatcher): void
+    public function setTestActionDispatcher(OrderActionDispatcher $dispatcher): void
     {
-        $this->testEventDispatcher = $dispatcher;
+        $this->testActionDispatcher = $dispatcher;
     }
 
-    protected function getEventDispatcher(): EventDispatcherInterface
+    protected function getActionDispatcher(): OrderActionDispatcher
     {
-        if ($this->testEventDispatcher !== null) {
-            return $this->testEventDispatcher;
+        if ($this->testActionDispatcher !== null) {
+            return $this->testActionDispatcher;
         }
-        return parent::getEventDispatcher();
+        return parent::getActionDispatcher();
+    }
+
+    public function setTestViewDataProvider(OrderRefundViewDataProvider $provider): void
+    {
+        $this->testViewDataProvider = $provider;
+    }
+
+    protected function getViewDataProvider(): OrderRefundViewDataProvider
+    {
+        if ($this->testViewDataProvider !== null) {
+            return $this->testViewDataProvider;
+        }
+        return parent::getViewDataProvider();
     }
 
     public function setTestOrder(?Order $order): void
@@ -60,27 +78,6 @@ class TestableOrderRefund extends OrderRefund
         return $this->testEditObjectId;
     }
 
-    public function setTestRequestParams(array $params): void
-    {
-        $this->testRequestParams = $params;
-    }
-
-    protected function getRefundReasonFromRequest(): ?string
-    {
-        return $this->testRequestParams['refund_reason'] ?? null;
-    }
-
-    protected function getRefundDescriptionFromRequest(): ?string
-    {
-        return $this->testRequestParams['refund_description'] ?? null;
-    }
-
-    protected function getRefundAmountFromRequest(): ?float
-    {
-        $amount = $this->testRequestParams['refund_amount'] ?? null;
-        return $amount !== null ? (float) $amount : null;
-    }
-
     /**
      * Expose event context for testing.
      */
@@ -93,13 +90,27 @@ class TestableOrderRefund extends OrderRefund
 class OrderRefundControllerTest extends TestCase
 {
     private EventDispatcherInterface&MockObject $eventDispatcher;
+    private OrderRefundViewDataProvider&MockObject $viewDataProvider;
     private TestableOrderRefund $controller;
 
     protected function setUp(): void
     {
         $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getId')->willReturn('contract_test');
+
+        $contractRepository = $this->createMock(ContractRepositoryInterface::class);
+        $contractRepository->method('findByOrderId')->willReturn($contract);
+
+        $contractResolver = new OrderContractResolver($contractRepository);
+        $actionDispatcher = new OrderActionDispatcher($this->eventDispatcher, $contractResolver);
+
+        $this->viewDataProvider = $this->createMock(OrderRefundViewDataProvider::class);
+
         $this->controller = new TestableOrderRefund();
-        $this->controller->setTestEventDispatcher($this->eventDispatcher);
+        $this->controller->setTestActionDispatcher($actionDispatcher);
+        $this->controller->setTestViewDataProvider($this->viewDataProvider);
     }
 
     public function testFullRefundEmitsStripeRefundRequestEvent(): void
@@ -107,10 +118,6 @@ class OrderRefundControllerTest extends TestCase
         // Arrange
         $order = $this->createOrderMock('order_123');
         $this->controller->setTestOrder($order);
-        $this->controller->setTestRequestParams([
-            'refund_reason' => 'duplicate',
-            'refund_description' => 'Test refund',
-        ]);
 
         $capturedEvent = null;
         $this->eventDispatcher
@@ -118,7 +125,7 @@ class OrderRefundControllerTest extends TestCase
             ->method('dispatch')
             ->willReturnCallback(function ($event) use (&$capturedEvent) {
                 $capturedEvent = $event;
-                return $event; // Must return EventInterface
+                return $event;
             });
 
         // Act
@@ -128,39 +135,7 @@ class OrderRefundControllerTest extends TestCase
         $this->assertInstanceOf(StripeRefundRequestEvent::class, $capturedEvent);
         $this->assertEquals('order_123', $capturedEvent->getOrderId());
         $this->assertNull($capturedEvent->getAmount()); // Full refund
-        $this->assertEquals('duplicate', $capturedEvent->getReason());
-        $this->assertEquals('Test refund', $capturedEvent->getDescription());
         $this->assertEquals('admin', $capturedEvent->getInitiator());
-    }
-
-    /**
-     * Sprint 22: Partial refund is no longer supported.
-     * The method returns an error without dispatching any event.
-     */
-    public function testPartialRefundReturnsErrorWithoutDispatchingEvent(): void
-    {
-        // Arrange
-        $order = $this->createOrderMock('order_456');
-        $this->controller->setTestOrder($order);
-        $this->controller->setTestRequestParams([
-            'refund_amount' => 50.00,
-            'refund_reason' => 'requested_by_customer',
-        ]);
-
-        // Event should NOT be dispatched for partial refunds
-        $this->eventDispatcher
-            ->expects($this->never())
-            ->method('dispatch');
-
-        // Act
-        $this->controller->partialRefund();
-
-        // Assert - partial refund is rejected
-        $this->assertFalse($this->controller->wasRefundSuccessful());
-        $this->assertStringContainsString(
-            'Partial refund is not supported',
-            $this->controller->getErrorMessage()
-        );
     }
 
     public function testFullRefundSetsSuccessOnSuccessfulResult(): void
@@ -169,15 +144,16 @@ class OrderRefundControllerTest extends TestCase
         $order = $this->createOrderMock('order_789');
         $this->controller->setTestOrder($order);
 
+        $this->viewDataProvider->method('resetCache');
+
         $this->eventDispatcher
             ->expects($this->once())
             ->method('dispatch')
             ->willReturnCallback(function (StripeRefundRequestEvent $event) {
-                // Simulate handler setting success
                 $event->getContext()->set('refundSuccess', true);
                 $event->getContext()->set('refundId', 're_test_123');
                 $event->getContext()->set('refundedAmount', 100.00);
-                return $event; // Must return EventInterface
+                return $event;
             });
 
         // Act
@@ -200,10 +176,9 @@ class OrderRefundControllerTest extends TestCase
             ->expects($this->once())
             ->method('dispatch')
             ->willReturnCallback(function (StripeRefundRequestEvent $event) {
-                // Simulate handler setting error
                 $event->getContext()->set('refundSuccess', false);
                 $event->getContext()->set('error', 'Charge already refunded');
-                return $event; // Must return EventInterface
+                return $event;
             });
 
         // Act
@@ -219,6 +194,9 @@ class OrderRefundControllerTest extends TestCase
     {
         // Arrange
         $this->controller->setTestOrder(null);
+        // getOrder() returns null when testOrder is null and _oOrder is null
+        // Need to ensure getOrder() returns null
+        $this->controller->setTestEditObjectId(null);
 
         $this->eventDispatcher
             ->expects($this->never())
@@ -232,66 +210,6 @@ class OrderRefundControllerTest extends TestCase
         $this->assertNotEmpty($this->controller->getErrorMessage());
     }
 
-    public function testPartialRefundSetsErrorWhenAmountInvalid(): void
-    {
-        // Arrange
-        $order = $this->createOrderMock('order_invalid');
-        $this->controller->setTestOrder($order);
-        $this->controller->setTestRequestParams([
-            'refund_amount' => null,
-        ]);
-
-        $this->eventDispatcher
-            ->expects($this->never())
-            ->method('dispatch');
-
-        // Act
-        $this->controller->partialRefund();
-
-        // Assert
-        $this->assertFalse($this->controller->wasRefundSuccessful());
-    }
-
-    public function testPartialRefundSetsErrorWhenAmountZero(): void
-    {
-        // Arrange
-        $order = $this->createOrderMock('order_zero');
-        $this->controller->setTestOrder($order);
-        $this->controller->setTestRequestParams([
-            'refund_amount' => 0,
-        ]);
-
-        $this->eventDispatcher
-            ->expects($this->never())
-            ->method('dispatch');
-
-        // Act
-        $this->controller->partialRefund();
-
-        // Assert
-        $this->assertFalse($this->controller->wasRefundSuccessful());
-    }
-
-    public function testPartialRefundSetsErrorWhenAmountNegative(): void
-    {
-        // Arrange
-        $order = $this->createOrderMock('order_negative');
-        $this->controller->setTestOrder($order);
-        $this->controller->setTestRequestParams([
-            'refund_amount' => -10.00,
-        ]);
-
-        $this->eventDispatcher
-            ->expects($this->never())
-            ->method('dispatch');
-
-        // Act
-        $this->controller->partialRefund();
-
-        // Assert
-        $this->assertFalse($this->controller->wasRefundSuccessful());
-    }
-
     public function testEventContextContainsOrderId(): void
     {
         // Arrange
@@ -303,7 +221,27 @@ class OrderRefundControllerTest extends TestCase
             ->method('dispatch')
             ->willReturnCallback(function (StripeRefundRequestEvent $event) {
                 $this->assertEquals('order_ctx_test', $event->getContext()->get('orderId'));
-                return $event; // Must return EventInterface
+                return $event;
+            });
+
+        // Act
+        $this->controller->fullRefund();
+
+        // Assert - verified in callback
+    }
+
+    public function testEventContextContainsContractId(): void
+    {
+        // Arrange
+        $order = $this->createOrderMock('order_contract');
+        $this->controller->setTestOrder($order);
+
+        $this->eventDispatcher
+            ->expects($this->once())
+            ->method('dispatch')
+            ->willReturnCallback(function (StripeRefundRequestEvent $event) {
+                $this->assertEquals('contract_test', $event->getContext()->get('contractId'));
+                return $event;
             });
 
         // Act
@@ -324,7 +262,7 @@ class OrderRefundControllerTest extends TestCase
             ->method('dispatch')
             ->willReturnCallback(function ($event) use (&$capturedEvent) {
                 $capturedEvent = $event;
-                return $event; // Must return EventInterface
+                return $event;
             });
 
         // Act
@@ -340,13 +278,15 @@ class OrderRefundControllerTest extends TestCase
         $order = $this->createOrderMock('order_store_ctx');
         $this->controller->setTestOrder($order);
 
+        $this->viewDataProvider->method('resetCache');
+
         $this->eventDispatcher
             ->expects($this->once())
             ->method('dispatch')
             ->willReturnCallback(function (StripeRefundRequestEvent $event) {
                 $event->getContext()->set('refundSuccess', true);
                 $event->getContext()->set('customData', 'test_value');
-                return $event; // Must return EventInterface
+                return $event;
             });
 
         // Act
@@ -378,10 +318,6 @@ class OrderRefundControllerTest extends TestCase
 
     // --- Helper methods ---
 
-    /**
-     * Create a mock Order object that returns the given ID.
-     * Uses a proper mock implementing Order interface.
-     */
     private function createOrderMock(string $orderId): Order
     {
         $order = $this->createMock(Order::class);

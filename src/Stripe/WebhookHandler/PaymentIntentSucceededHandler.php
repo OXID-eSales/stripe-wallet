@@ -104,26 +104,41 @@ final class PaymentIntentSucceededHandler implements WebhookEventHandlerInterfac
      */
     private function extractCapturedAt(WebhookEvent $event): \DateTimeImmutable
     {
-        $object = $event->getObject();
+        return $this->extractChargeTimestamp($event->getObject())
+            ?? ($event->created > 0 ? new \DateTimeImmutable('@' . $event->created) : new \DateTimeImmutable());
+    }
 
-        // Try to get timestamp from charges
-        $charges = $object['charges'] ?? [];
-        if (is_array($charges) && isset($charges['data']) && is_array($charges['data'])) {
-            foreach ($charges['data'] as $charge) {
-                if (is_array($charge) && ($charge['paid'] ?? false) && isset($charge['created'])) {
-                    $timestamp = (int) $charge['created'];
-                    return new \DateTimeImmutable('@' . $timestamp);
-                }
+    /**
+     * Extract timestamp from the first paid charge in event data.
+     *
+     * @param array<string, mixed> $object
+     */
+    private function extractChargeTimestamp(array $object): ?\DateTimeImmutable
+    {
+        $chargesData = $this->getChargesData($object);
+
+        foreach ($chargesData as $charge) {
+            if (!is_array($charge) || empty($charge['paid']) || !isset($charge['created'])) {
+                continue;
             }
+            $timestamp = is_numeric($charge['created']) ? (int) $charge['created'] : 0;
+            return new \DateTimeImmutable('@' . $timestamp);
         }
 
-        // Fallback to event created time
-        if ($event->created > 0) {
-            return new \DateTimeImmutable('@' . $event->created);
-        }
+        return null;
+    }
 
-        // Last resort: current time
-        return new \DateTimeImmutable();
+    /**
+     * @param array<string, mixed> $object
+     * @return array<mixed>
+     */
+    private function getChargesData(array $object): array
+    {
+        $charges = $object['charges'] ?? [];
+        if (!is_array($charges) || !isset($charges['data']) || !is_array($charges['data'])) {
+            return [];
+        }
+        return $charges['data'];
     }
 
     /**

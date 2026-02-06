@@ -10,7 +10,10 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service\Factory;
 
 use OxidEsales\PaymentComponent\Adapter\PaymentAdapterInterface;
+use OxidEsales\PaymentComponent\Repository\IdempotencyRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactory;
+use OxidEsales\Payments\Stripe\Adapter\Helper\PaymentIntentHelper;
+use OxidEsales\Payments\Stripe\Adapter\Helper\RefundHelper;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapter;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeClientFactory;
@@ -23,6 +26,8 @@ use Stripe\StripeClient;
  * Extends the provider-agnostic PaymentAdapterFactory base class
  * and implements StripeAdapterFactoryInterface for Stripe-specific methods.
  *
+ * Sprint 46: Idempotency moved into helpers; factory injects repository directly.
+ *
  * @since 1.0.0
  */
 class StripeAdapterFactory extends PaymentAdapterFactory implements StripeAdapterFactoryInterface
@@ -31,7 +36,8 @@ class StripeAdapterFactory extends PaymentAdapterFactory implements StripeAdapte
 
     public function __construct(
         private readonly ModuleConfigurationServiceInterface $configurationService,
-        private readonly StripeClientFactory $clientFactory
+        private readonly StripeClientFactory $clientFactory,
+        private readonly ?IdempotencyRepositoryInterface $idempotencyRepository = null
     ) {
     }
 
@@ -85,7 +91,10 @@ class StripeAdapterFactory extends PaymentAdapterFactory implements StripeAdapte
             );
         }
 
-        return new StripeAdapter($stripeClient);
+        $paymentIntentHelper = new PaymentIntentHelper($this->idempotencyRepository);
+        $refundHelper = new RefundHelper($this->idempotencyRepository);
+
+        return new StripeAdapter($stripeClient, $paymentIntentHelper, $refundHelper);
     }
 
     /**

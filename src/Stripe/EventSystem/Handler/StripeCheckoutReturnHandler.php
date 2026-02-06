@@ -72,31 +72,13 @@ class StripeCheckoutReturnHandler implements HandlerInterface
 
         $context = $event->getContext();
 
-        // Step 1: Extract and validate parameters
-        $sessionId = $event->getCheckoutSessionId();
-        $this->logEvent('Step 1: Extract parameters', [
-            'sessionId' => $sessionId,
-        ]);
-
-        if ($sessionId === null) {
-            $this->logEvent('ERROR: Checkout session ID is missing');
-            $this->setError($context, 'Checkout session ID is missing');
+        // Steps 1-1b: Extract and validate parameters
+        $params = $this->extractAndValidateParams($event, $context);
+        if ($params === null) {
             return;
         }
 
-        $contractId = $this->getStringFromContext($context, 'contract_id');
-        $contractToken = $this->getStringFromContext($context, 'contract_token');
-
-        $this->logEvent('Step 1b: Contract params', [
-            'contractId' => $contractId,
-            'contractToken' => $contractToken ? 'present' : 'missing',
-        ]);
-
-        if ($contractId === null || $contractToken === null) {
-            $this->logEvent('ERROR: Contract ID or token is missing');
-            $this->setError($context, 'Contract ID or token is missing');
-            return;
-        }
+        [$sessionId, $contractId, $contractToken] = $params;
 
         // Step 2: Delegate validation to service
         $this->logEvent('Step 2: Validating return with service...');
@@ -121,10 +103,6 @@ class StripeCheckoutReturnHandler implements HandlerInterface
             $this->logEvent('ERROR: Contract not found');
             return;
         }
-        $this->logEvent('Step 3b: Contract loaded', [
-            'state' => $contract->getStateValue(),
-            'userId' => $contract->getUserId(),
-        ]);
 
         // Step 4: Perform security validation
         $this->logEvent('Step 4: Security validation...');
@@ -132,33 +110,71 @@ class StripeCheckoutReturnHandler implements HandlerInterface
             $this->logEvent('ERROR: Security validation failed');
             return;
         }
-        $this->logEvent('Step 4b: Security validation passed');
 
-        // Step 5: Restore session state
-        $this->logEvent('Step 5: Restoring session state...');
+        // Steps 5-6: Restore session and handle payment result
         $this->restoreDeliveryAddressHash($contract, $context);
-
-        // Step 6: Handle based on PaymentIntent status
-        $this->logEvent('Step 6: Handle payment status', [
-            'isRequiresCapture' => $result->isRequiresCapture(),
-            'paymentIntentStatus' => $result->getPaymentIntentStatus(),
-        ]);
-
-        if ($result->isRequiresCapture()) {
-            // Manual capture mode: transition to AUTHORIZED, wait for capture
-            $this->logEvent('Step 6a: Manual capture mode - calling handleRequiresCaptureStatus');
-            $this->handleRequiresCaptureStatus($contract, $result, $context);
-        } else {
-            // Automatic capture or succeeded: dispatch normal payment flow
-            $this->logEvent('Step 6b: Automatic capture - calling dispatchPaymentEvent');
-            $this->dispatchPaymentEvent($result, $context);
-        }
+        $this->handlePaymentResult($contract, $result, $context);
 
         $this->logEvent('StripeCheckoutReturnHandler::handle() END', [
             'redirectTarget' => $context->get('redirectTarget'),
             'orderId' => $context->get('orderId'),
             'error' => $context->get('error'),
         ]);
+    }
+
+    /**
+     * Extract and validate required parameters from event and context.
+     *
+     * @return array{string, string, string}|null [sessionId, contractId, contractToken] or null on failure
+     */
+    private function extractAndValidateParams(StripeCheckoutReturnEvent $event, EventContext $context): ?array
+    {
+        $sessionId = $event->getCheckoutSessionId();
+        $this->logEvent('Step 1: Extract parameters', ['sessionId' => $sessionId]);
+
+        if ($sessionId === null) {
+            $this->logEvent('ERROR: Checkout session ID is missing');
+            $this->setError($context, 'Checkout session ID is missing');
+            return null;
+        }
+
+        $contractId = $this->getStringFromContext($context, 'contract_id');
+        $contractToken = $this->getStringFromContext($context, 'contract_token');
+
+        $this->logEvent('Step 1b: Contract params', [
+            'contractId' => $contractId,
+            'contractToken' => $contractToken ? 'present' : 'missing',
+        ]);
+
+        if ($contractId === null || $contractToken === null) {
+            $this->logEvent('ERROR: Contract ID or token is missing');
+            $this->setError($context, 'Contract ID or token is missing');
+            return null;
+        }
+
+        return [$sessionId, $contractId, $contractToken];
+    }
+
+    /**
+     * Handle payment result: restore session and dispatch appropriate event.
+     */
+    private function handlePaymentResult(
+        PaymentContractInterface $contract,
+        \OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult $result,
+        EventContext $context
+    ): void {
+        $this->logEvent('Step 6: Handle payment status', [
+            'isRequiresCapture' => $result->isRequiresCapture(),
+            'paymentIntentStatus' => $result->getPaymentIntentStatus(),
+        ]);
+
+        if ($result->isRequiresCapture()) {
+            $this->logEvent('Step 6a: Manual capture mode - calling handleRequiresCaptureStatus');
+            $this->handleRequiresCaptureStatus($contract, $result, $context);
+        } else {
+            $this->logEvent('Step 6b: Automatic capture - calling dispatchPaymentEvent');
+            $this->dispatchPaymentEvent($result, $context);
+        }
     }
 
     private function getStringFromContext(EventContext $context, string $key): ?string

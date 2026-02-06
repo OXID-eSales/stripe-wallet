@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
 use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
+use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
@@ -76,45 +77,27 @@ class StripeCheckoutSessionHandler implements HandlerInterface
             'contractId' => $contract->getId(),
         ]);
 
-        $contractId = $contract->getId() ?? '';
-
-        // Extract typed context values
-        $captureMode = $this->getContextString($context, 'captureMode', 'automatic');
-        $shopUrl = $this->getContextString($context, 'shopUrl', $this->shopAdapter->getShopUrl());
-        $sessionId = $this->getContextString($context, 'sessionId', '');
-        $shopIdString = $this->getContextString($context, 'shopId', '1');
-
-        // Generate secure token and build URLs
-        $contractToken = $this->tokenService->generateToken($contractId);
-        $successUrl = $this->checkoutSessionService->buildSuccessUrl($shopUrl, $contractId, $contractToken, $sessionId);
-        $cancelUrl = $shopUrl . 'index.php?cl=payment';
-
-        // STRP-75: Get order ID and order number from contract
-        $orderId = $contract->getOrderId();
-        $orderNumber = $contract->getMetadata('order_number');
-        $orderNumberString = is_scalar($orderNumber) ? (string) $orderNumber : null;
-
-        // Sprint 45: Resolve Stripe Customer for email prefill and saved cards
+        // Build checkout parameters and resolve customer
+        $params = $this->buildCheckoutParams($context, $contract);
         $stripeCustomerId = $this->resolveCustomerId($context);
 
-        // Sprint 21: Delegate session creation to service
         $this->logEvent('StripeCheckoutSessionHandler: Creating checkout session', [
-            'contractId' => $contractId,
-            'captureMode' => $captureMode,
-            'orderId' => $orderId,
-            'orderNumber' => $orderNumberString,
+            'contractId' => $params['contractId'],
+            'captureMode' => $params['captureMode'],
+            'orderId' => $params['orderId'],
+            'orderNumber' => $params['orderNumber'],
             'stripeCustomerId' => $stripeCustomerId,
         ]);
 
         $result = $this->checkoutSessionService->createSession(
-            $contractId,
+            $params['contractId'],
             $contract->getBasketSnapshot(),
-            $successUrl,
-            $cancelUrl,
-            $shopIdString,
-            $captureMode,
-            $orderId,
-            $orderNumberString,
+            $params['successUrl'],
+            $params['cancelUrl'],
+            $params['shopId'],
+            $params['captureMode'],
+            $params['orderId'],
+            $params['orderNumber'],
             $stripeCustomerId
         );
 
@@ -132,7 +115,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         ]);
 
         // Store session ID in contract via setProvider
-        $contract->setProvider('stripe', $result->getSessionId() ?? '', $successUrl);
+        $contract->setProvider('stripe', $result->getSessionId() ?? '', $params['successUrl']);
 
         $this->contractRepository->save($contract);
 
@@ -143,6 +126,38 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         $this->logEvent('StripeCheckoutSessionHandler::handle() END', [
             'checkoutSessionId' => $result->getSessionId(),
         ]);
+    }
+
+    /**
+     * Build all parameters needed for checkout session creation.
+     *
+     * @return array{contractId: string, captureMode: string, shopId: string, successUrl: string, cancelUrl: string, orderId: ?string, orderNumber: ?string}
+     */
+    private function buildCheckoutParams(EventContext $context, PaymentContractInterface $contract): array
+    {
+        $contractId = $contract->getId() ?? '';
+        $captureMode = $this->getContextString($context, 'captureMode', 'automatic');
+        $shopUrl = $this->getContextString($context, 'shopUrl', $this->shopAdapter->getShopUrl());
+        $sessionId = $this->getContextString($context, 'sessionId', '');
+        $shopId = $this->getContextString($context, 'shopId', '1');
+
+        $contractToken = $this->tokenService->generateToken($contractId);
+        $successUrl = $this->checkoutSessionService->buildSuccessUrl($shopUrl, $contractId, $contractToken, $sessionId);
+        $cancelUrl = $shopUrl . 'index.php?cl=payment';
+
+        $orderId = $contract->getOrderId();
+        $orderNumber = $contract->getMetadata('order_number');
+        $orderNumberString = is_scalar($orderNumber) ? (string) $orderNumber : null;
+
+        return [
+            'contractId' => $contractId,
+            'captureMode' => $captureMode,
+            'shopId' => $shopId,
+            'successUrl' => $successUrl,
+            'cancelUrl' => $cancelUrl,
+            'orderId' => $orderId,
+            'orderNumber' => $orderNumberString,
+        ];
     }
 
     /**
