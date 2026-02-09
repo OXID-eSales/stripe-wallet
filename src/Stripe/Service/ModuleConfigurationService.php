@@ -293,5 +293,4 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     {
         return (bool) $this->get('blStripeEnableLogging');
     }
-
 }
