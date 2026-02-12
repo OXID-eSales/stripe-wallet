@@ -14,7 +14,7 @@ Implement the Playwright E2E testing infrastructure designed yesterday. Focus on
 ---
 
 Use this as an example of general plan and login/password datasouorce
-/home/dtkachev/osc/strpwt7-nov26/e2e-agent/demo/_generated_prob_654/paypal-payment-test.spec.ts
+/home/oxidshop/osc/strpwt7-nov26/e2e-agent/demo/_generated_prob_654/paypal-payment-test.spec.ts
 This is from previous version for paypal now adapt it for stripe. 
 
 Use https://daniil.oxddev.de/ as the test shop URL.

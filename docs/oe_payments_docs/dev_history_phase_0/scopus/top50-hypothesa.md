@@ -189,5 +189,5 @@ High parity (> 95%) reduces production bugs by 70%.
 
 ---
 
-**Source Document:** /home/dtkachev/osc/strpwt7-oct21/stripe-wallet/docs/payment-component/scopus/top50-measurable-research-ideas.md
+**Source Document:** /home/oxidshop/osc/strpwt7-oct21/stripe-wallet/docs/payment-component/scopus/top50-measurable-research-ideas.md
 **Extraction Date:** 2025-10-27

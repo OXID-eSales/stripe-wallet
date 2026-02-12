@@ -2,7 +2,7 @@
 
 **Date:** 2025-11-28
 **Reviewer:** Daniil Tkachev (AI-assisted analysis)
-**Codebase:** `/home/dtkachev/osc/strpwt7-nov26/source/extensions/stripe`
+**Codebase:** `/home/oxidshop/osc/strpwt7-nov26/source/extensions/stripe`
 
 ---
 

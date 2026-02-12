@@ -27,7 +27,7 @@ yarn global add @marp-team/marp-cli
 #### Convert to PPTX
 ```bash
 # Navigate to directory
-cd /home/dtkachev/osc/strp7-oct8/source/extensions/stripe/docs/payment-component/
+cd /home/oxidshop/osc/strp7-oct8/source/extensions/stripe/docs/payment-component/
 
 # Convert to PPTX (PowerPoint)
 marp PRESENTATION.md --pptx -o PRESENTATION.pptx

@@ -27,7 +27,7 @@ Set up a complete Playwright E2E testing infrastructure for the Stripe payment m
 
 ### Reference Implementation
 
-The `e2e-agent` project at `/home/dtkachev/osc/strpwt7-nov26/e2e-agent/` provides excellent patterns:
+The `e2e-agent` project at `/home/oxidshop/osc/strpwt7-nov26/e2e-agent/` provides excellent patterns:
 - TypeScript configuration
 - Playwright setup
 - Test organization

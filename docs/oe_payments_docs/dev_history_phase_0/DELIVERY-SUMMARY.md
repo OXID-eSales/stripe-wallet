@@ -682,7 +682,7 @@ class AuthorizePaymentMutation {
 
 All documentation is located at:
 ```
-/home/dtkachev/osc/strp7-oct14/stripe-install/docs/payment-component/
+/home/oxidshop/osc/strp7-oct14/stripe-install/docs/payment-component/
 ```
 
 ### Directory Structure (Updated 2025-10-16)

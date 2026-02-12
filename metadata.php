@@ -62,6 +62,10 @@ $aModule = [
         'StripeWebhookController' => StripeWebhookController::class,
         'StripeConnect' => StripeConnect::class,
         'OrderRefund' => OrderRefund::class,
+        // Sprint 47: MCP/ACP/UCP controllers
+        'stripemcp' => \OxidEsales\Payments\Stripe\Mcp\Controller\McpController::class,
+        'stripeucp' => \OxidEsales\Payments\Stripe\Mcp\Controller\UcpCheckoutController::class,
+        'stripeucpprofile' => \OxidEsales\Payments\Stripe\Mcp\Controller\UcpProfileController::class,
     ],
     'events' => [
         'onActivate' => StripeEvents::class . '::onActivate',
@@ -89,5 +93,7 @@ $aModule = [
         ['group' => 'STRIPE_CRONJOBS',          'name' => 'sStripeCronSecureKey',               'type' => 'str',        'value' => '',          'position' => 120],
         ['group' => 'STRIPE_WEBHOOKS',          'name' => 'sStripeWebhookEndpoint',             'type' => 'str',        'value' => '',          'position' => 130],
         ['group' => 'STRIPE_WEBHOOKS',          'name' => 'sStripeWebhookEndpointSecret',       'type' => 'str',        'value' => '',          'position' => 140],
+        // Sprint 47: Agent API key for MCP/ACP/UCP authentication
+        ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeAgentApiKey',                 'type' => 'str',        'value' => '',          'position' => 42],
     ]
 ];

@@ -101,7 +101,7 @@ Visit: https://www.plantuml.com/plantuml/uml/
 
 **Generate PNG images:**
 ```bash
-cd /home/dtkachev/osc/strpwt7-oct21/source/extensions/stripe/docs/work-analysis/puml
+cd /home/oxidshop/osc/strpwt7-oct21/source/extensions/stripe/docs/work-analysis/puml
 plantuml -tpng *.puml
 ```
 
@@ -296,7 +296,7 @@ The **domain model and architecture**. The use of aggregate roots, value objects
 For questions about this analysis:
 - **Created by:** Claude Code AI Agent
 - **Date:** 2025-11-07
-- **Source:** `/home/dtkachev/osc/strpwt7-oct21/source/extensions/stripe/`
+- **Source:** `/home/oxidshop/osc/strpwt7-oct21/source/extensions/stripe/`
 
 ---
 

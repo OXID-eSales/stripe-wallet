@@ -10,12 +10,12 @@
 ## Today's Objectives
 
 Always run pre-commit-check.sh before finishing spring;
-Always create reports in /home/dtkachev/osc/strpwt7-nov26/source/extensions/stripe/docs/payment-component/daniil_dev_log/20251203/done
+Always create reports in /home/oxidshop/osc/strpwt7-nov26/source/extensions/stripe/docs/payment-component/daniil_dev_log/20251203/done
 Always update status.md in this folder.
 
 ### 1. Webhook Tests for Different Stripe Events
-Create comprehensive unit and integration tests for all critical Stripe webhook events. The integration tests should call actual url endpoints and verify end-to-end processing. The test should test the actual data flow and event handling logic. Refer to previous works /home/dtkachev/osc/strpwt7-nov26/source/extensions/stripe/docs/payment-component/daniil_dev_log/20251201/puml
- /home/dtkachev/osc/strpwt7-nov26/source/extensions/stripe/docs/payment-component/daniil_dev_log/20251202/puml and general architecture design
+Create comprehensive unit and integration tests for all critical Stripe webhook events. The integration tests should call actual url endpoints and verify end-to-end processing. The test should test the actual data flow and event handling logic. Refer to previous works /home/oxidshop/osc/strpwt7-nov26/source/extensions/stripe/docs/payment-component/daniil_dev_log/20251201/puml
+ /home/oxidshop/osc/strpwt7-nov26/source/extensions/stripe/docs/payment-component/daniil_dev_log/20251202/puml and general architecture design
 
 Run tests and fix oir develop the code. Do not over-engineer, focus on critical paths first. Do not create duplicated code, reuse existing services and handlers and make them better where it is needed. 
 

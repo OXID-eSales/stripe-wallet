@@ -41,7 +41,7 @@ Choose a theme that matches your audience and presentation style:
 ### Build All Themes
 
 ```bash
-cd /home/dtkachev/osc/strpwt7-oct21/stripe-wallet/docs/payment-component/vc/summary
+cd /home/oxidshop/osc/strpwt7-oct21/stripe-wallet/docs/payment-component/vc/summary
 
 # Professional (default)
 make pptx              # Uses index.md

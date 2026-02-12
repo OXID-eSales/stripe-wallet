@@ -1,7 +1,7 @@
 # Generated Files Inventory
 
 **Generated:** 2025-11-07 08:53
-**Location:** `/home/dtkachev/osc/strpwt7-oct21/source/extensions/stripe/docs/work-analysis/`
+**Location:** `/home/oxidshop/osc/strpwt7-oct21/source/extensions/stripe/docs/work-analysis/`
 
 ---
 
@@ -238,7 +238,7 @@ Use diagrams when:
 
 ### View Analysis
 ```bash
-cd /home/dtkachev/osc/strpwt7-oct21/source/extensions/stripe/docs/work-analysis
+cd /home/oxidshop/osc/strpwt7-oct21/source/extensions/stripe/docs/work-analysis
 cat README.md
 less production-readiness-analysis.md
 ```

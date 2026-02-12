@@ -25,7 +25,7 @@ Successfully converted the legacy Smarty template (`stripe_order_refund.tpl`) to
 
 ### New Twig Template: `views/twig/stripe_order_refund.html.twig`
 
-**Location:** `/home/dtkachev/osc/strpwt7-nov26/source/extensions/stripe/views/twig/stripe_order_refund.html.twig`
+**Location:** `/home/oxidshop/osc/strpwt7-nov26/source/extensions/stripe/views/twig/stripe_order_refund.html.twig`
 
 **Key Features:**
 1. **Modern Twig Syntax** - Uses native Twig syntax instead of legacy Smarty

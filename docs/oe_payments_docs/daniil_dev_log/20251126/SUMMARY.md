@@ -172,7 +172,7 @@ Events: 2 (onActivate, onDeactivate)
 
 All detailed reports are available in:
 ```
-/home/dtkachev/osc/strpwt7-nov26/source/extensions/stripe/docs/payment-component/daniil_dev_log/20251126/
+/home/oxidshop/osc/strpwt7-nov26/source/extensions/stripe/docs/payment-component/daniil_dev_log/20251126/
 
 ├── STRP-67-module-activation-fix.md
 ├── STRP-67-template-conversion-to-twig.md

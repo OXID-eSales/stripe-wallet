@@ -17,8 +17,8 @@ This is a **Docker-based application**. All commands must be run inside the PHP 
 
 | Local Path | Container Path |
 |------------|----------------|
-| `/home/dtkachev/osc/strpwt7-nov26/source` | `/var/www` |
-| `/home/dtkachev/osc/strpwt7-nov26/source/extensions/stripe` | `/var/www/extensions/stripe` |
+| `/home/oxidshop/osc/strpwt7-nov26/source` | `/var/www` |
+| `/home/oxidshop/osc/strpwt7-nov26/source/extensions/stripe` | `/var/www/extensions/stripe` |
 
 ### Running Commands
 

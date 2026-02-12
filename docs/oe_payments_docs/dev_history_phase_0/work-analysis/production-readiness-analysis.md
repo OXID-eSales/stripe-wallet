@@ -253,7 +253,7 @@ declare(strict_types=1);
 
 ### 4.2 Repository Implementations ✅ **Good**
 
-**DoctrineContractRepository** (`/home/dtkachev/osc/strpwt7-oct21/source/extensions/stripe/src/Component/Repository/DoctrineContractRepository.php`):
+**DoctrineContractRepository** (`/home/oxidshop/osc/strpwt7-oct21/source/extensions/stripe/src/Component/Repository/DoctrineContractRepository.php`):
 - ✅ Uses Doctrine DBAL properly
 - ✅ Parameterized queries (SQL injection safe)
 - ✅ JSON encoding/decoding for complex types

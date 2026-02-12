@@ -29,7 +29,7 @@ The container was using Docker's internal DNS resolver (`127.0.0.11:53`) which w
 Added explicit external DNS servers to the docker-compose configuration:
 
 ### File Modified
-`/home/dtkachev/osc/cf-tunnel-template/docker-compose.yaml`
+`/home/oxidshop/osc/cf-tunnel-template/docker-compose.yaml`
 
 ### Change
 ```yaml

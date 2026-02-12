@@ -204,17 +204,17 @@ Timeline: All subsequent requests successful
 
 **OXID Shop Log:**
 ```
-/home/dtkachev/osc/strpwt7-nov26/source/source/log/oxideshop.log
+/home/oxidshop/osc/strpwt7-nov26/source/source/log/oxideshop.log
 ```
 
 **PHP Error Log:**
 ```
-/home/dtkachev/osc/strpwt7-nov26/data/php/logs/error_log.txt
+/home/oxidshop/osc/strpwt7-nov26/data/php/logs/error_log.txt
 ```
 
 **Module Configuration:**
 ```
-/home/dtkachev/osc/strpwt7-nov26/source/var/configuration/shops/1/modules/osc_stripe_wallet.yaml
+/home/oxidshop/osc/strpwt7-nov26/source/var/configuration/shops/1/modules/osc_stripe_wallet.yaml
 ```
 
 ---

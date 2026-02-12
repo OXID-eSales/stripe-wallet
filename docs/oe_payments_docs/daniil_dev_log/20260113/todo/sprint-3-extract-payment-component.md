@@ -18,7 +18,7 @@
 
 ## Objective
 
-Extract the provider-agnostic payment component (`src/Component`) to a separate composer package at `/home/dtkachev/osc/strpwt7-nov26/source/extensions/payment-component`.
+Extract the provider-agnostic payment component (`src/Component`) to a separate composer package at `/home/oxidshop/osc/strpwt7-nov26/source/extensions/payment-component`.
 
 This package will be:
 - **Package Name:** `oxid-esales/payment-component`
@@ -110,10 +110,10 @@ extensions/payment-component/
 
 ### Step 1: Create Package Directory Structure
 ```bash
-mkdir -p /home/dtkachev/osc/strpwt7-nov26/source/extensions/payment-component
-mkdir -p /home/dtkachev/osc/strpwt7-nov26/source/extensions/payment-component/src
-mkdir -p /home/dtkachev/osc/strpwt7-nov26/source/extensions/payment-component/tests/Unit
-mkdir -p /home/dtkachev/osc/strpwt7-nov26/source/extensions/payment-component/tests/Integration
+mkdir -p /home/oxidshop/osc/strpwt7-nov26/source/extensions/payment-component
+mkdir -p /home/oxidshop/osc/strpwt7-nov26/source/extensions/payment-component/src
+mkdir -p /home/oxidshop/osc/strpwt7-nov26/source/extensions/payment-component/tests/Unit
+mkdir -p /home/oxidshop/osc/strpwt7-nov26/source/extensions/payment-component/tests/Integration
 ```
 
 ### Step 2: Create composer.json

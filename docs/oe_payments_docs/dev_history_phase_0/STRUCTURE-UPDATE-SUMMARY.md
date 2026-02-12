@@ -295,4 +295,4 @@ These files may reference old structure and should be reviewed:
 
 **Updated By:** Claude Code
 **Update Date:** 2025-10-23
-**Based On:** Actual codebase at `/home/dtkachev/osc/strpwt7-oct21/stripe-wallet/src/Component`
+**Based On:** Actual codebase at `/home/oxidshop/osc/strpwt7-oct21/stripe-wallet/src/Component`

@@ -42,7 +42,7 @@ summary/
 ### Option 1: Quick Build (PPTX only)
 
 ```bash
-cd /home/dtkachev/osc/strpwt7-oct21/stripe-wallet/docs/payment-component/vc/summary
+cd /home/oxidshop/osc/strpwt7-oct21/stripe-wallet/docs/payment-component/vc/summary
 make pptx
 ```
 

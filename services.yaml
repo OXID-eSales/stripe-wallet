@@ -948,6 +948,99 @@ services:
 # ==========================================
 # These can be overridden in shop configuration or environment
 
+  # ==========================================
+  # MCP/ACP/UCP Infrastructure (Sprint 47)
+  # ==========================================
+
+  # MCP Server (payment-component classes, wired by stripe)
+  OxidEsales\PaymentComponent\Mcp\McpServerInterface:
+    class: OxidEsales\PaymentComponent\Mcp\McpServer
+    arguments:
+      $taggedTools: !tagged_iterator payment.mcp_tool
+      $serverName: 'oxid-stripe-acp'
+      $serverVersion: '1.0.0'
+    public: true
+
+  OxidEsales\PaymentComponent\Mcp\Auth\McpAuthGuardInterface:
+    class: OxidEsales\PaymentComponent\Mcp\Auth\McpAuthGuard
+    arguments:
+      $expectedToken: '%stripe.agent_api_key%'
+
+  # MCP Event Handler
+  OxidEsales\PaymentComponent\Mcp\Handler\McpRequestHandler:
+    tags:
+      - { name: payment.event_handler, priority: 100 }
+
+  # HTTP Client
+  OxidEsales\PaymentComponent\Mcp\Http\HttpClientInterface:
+    class: OxidEsales\Payments\Stripe\Mcp\Http\CurlHttpClient
+
+  # ACP Tools
+  OxidEsales\PaymentComponent\Mcp\Acp\Tool\CreateCheckoutTool:
+    tags: [{ name: payment.mcp_tool }]
+
+  OxidEsales\PaymentComponent\Mcp\Acp\Tool\GetCheckoutTool:
+    tags: [{ name: payment.mcp_tool }]
+
+  OxidEsales\PaymentComponent\Mcp\Acp\Tool\UpdateCheckoutTool:
+    tags: [{ name: payment.mcp_tool }]
+
+  OxidEsales\PaymentComponent\Mcp\Acp\Tool\CompleteCheckoutTool:
+    tags: [{ name: payment.mcp_tool }]
+
+  OxidEsales\PaymentComponent\Mcp\Acp\Tool\CancelCheckoutTool:
+    tags: [{ name: payment.mcp_tool }]
+
+  OxidEsales\PaymentComponent\Mcp\Acp\Tool\ListProductsTool:
+    tags: [{ name: payment.mcp_tool }]
+
+  # ACP Services
+  OxidEsales\PaymentComponent\Mcp\Acp\AcpCheckoutServiceInterface:
+    class: OxidEsales\Payments\Stripe\Mcp\Service\StripeAcpCheckoutService
+
+  OxidEsales\PaymentComponent\Mcp\Acp\AcpResponseFormatterInterface:
+    class: OxidEsales\PaymentComponent\Mcp\Acp\AcpResponseFormatter
+    arguments:
+      $paymentProviders:
+        - { provider: 'stripe', supported_payment_methods: ['card'] }
+
+  OxidEsales\PaymentComponent\Mcp\Acp\AcpProductServiceInterface:
+    class: OxidEsales\Payments\Stripe\Mcp\Service\StripeAcpProductService
+
+  # Stripe SPT Service
+  OxidEsales\Payments\Stripe\Mcp\Service\SptPaymentServiceInterface:
+    class: OxidEsales\Payments\Stripe\Mcp\Service\SptPaymentService
+    arguments:
+      $stripeAdapter: '@OxidEsales\Payments\Stripe\Adapter\LazyStripeAdapter'
+      $shopAdapter: '@OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface'
+      $requestLogger: '@stripe.request_file_logger'
+
+  # UCP Profile
+  OxidEsales\PaymentComponent\Mcp\Ucp\UcpProfileInterface:
+    class: OxidEsales\PaymentComponent\Mcp\Ucp\UcpProfile
+    arguments:
+      $restEndpoint: '%stripe.ucp.rest_endpoint%'
+      $capabilities:
+        - !service
+          class: OxidEsales\PaymentComponent\Mcp\Ucp\UcpCapability
+          arguments:
+            $name: 'dev.ucp.shopping.checkout'
+            $version: '2026-01-11'
+      $paymentHandlers:
+        - { id: 'stripe', spec: 'https://stripe.com/ucp-handler', version: '2026-01-11' }
+
+  OxidEsales\PaymentComponent\Mcp\Ucp\UcpResponseFormatterInterface:
+    class: OxidEsales\PaymentComponent\Mcp\Ucp\UcpResponseFormatter
+
+  OxidEsales\PaymentComponent\Mcp\Ucp\UcpCapabilityNegotiationService: ~
+
+  OxidEsales\PaymentComponent\Mcp\Ucp\UcpRequestValidator: ~
+
+  # UCP Event Handler
+  OxidEsales\Payments\Stripe\Mcp\Handler\UcpCheckoutRequestHandler:
+    tags:
+      - { name: payment.event_handler, priority: 100 }
+
 parameters:
   # Fraud check toggle (default: enabled)
   payment.fraud_check.enabled: true
@@ -955,3 +1048,7 @@ parameters:
   # Fraud check threshold (default: 0.7 = 70% risk score)
   # Scores >= threshold fail the fraud check
   payment.fraud_check.threshold: 0.7
+
+  # MCP/ACP/UCP parameters (Sprint 47)
+  stripe.agent_api_key: ''
+  stripe.ucp.rest_endpoint: ''

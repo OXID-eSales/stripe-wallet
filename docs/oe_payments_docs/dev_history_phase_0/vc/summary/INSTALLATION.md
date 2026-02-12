@@ -39,7 +39,7 @@ marp --version
 ### Step 2: Build All Themes
 
 ```bash
-cd /home/dtkachev/osc/strpwt7-oct21/stripe-wallet/docs/payment-component/vc/summary
+cd /home/oxidshop/osc/strpwt7-oct21/stripe-wallet/docs/payment-component/vc/summary
 make all
 ```
 
@@ -200,7 +200,7 @@ make help     # Show all available commands
 
 View diagrams:
 ```bash
-cd /home/dtkachev/osc/strpwt7-oct21/stripe-wallet/docs/payment-component/vc/puml
+cd /home/oxidshop/osc/strpwt7-oct21/stripe-wallet/docs/payment-component/vc/puml
 ls ../_generated/*.svg
 ```
 
@@ -224,7 +224,7 @@ If you don't have npm, install Node.js first:
 
 1. Make sure you're in the right directory:
    ```bash
-   cd /home/dtkachev/osc/strpwt7-oct21/stripe-wallet/docs/payment-component/vc/summary
+   cd /home/oxidshop/osc/strpwt7-oct21/stripe-wallet/docs/payment-component/vc/summary
    ```
 
 2. Check that theme files exist:
