@@ -965,6 +965,7 @@ services:
     class: OxidEsales\PaymentComponent\Mcp\Auth\McpAuthGuard
     arguments:
       $expectedToken: '%stripe.agent_api_key%'
+    public: true
 
   # MCP Event Handler
   OxidEsales\PaymentComponent\Mcp\Handler\McpRequestHandler:
@@ -974,6 +975,14 @@ services:
   # HTTP Client
   OxidEsales\PaymentComponent\Mcp\Http\HttpClientInterface:
     class: OxidEsales\Payments\Stripe\Mcp\Http\CurlHttpClient
+
+  # Rate Limiter (APCu-based, 60 requests/minute per IP)
+  OxidEsales\PaymentComponent\Mcp\Http\RateLimiterInterface:
+    class: OxidEsales\PaymentComponent\Mcp\Http\ApcuRateLimiter
+    arguments:
+      $maxRequests: '%stripe.mcp.rate_limit_max_requests%'
+      $windowSeconds: '%stripe.mcp.rate_limit_window_seconds%'
+    public: true
 
   # ACP Tools
   OxidEsales\PaymentComponent\Mcp\Acp\Tool\CreateCheckoutTool:
@@ -1004,9 +1013,6 @@ services:
       $paymentProviders:
         - { provider: 'stripe', supported_payment_methods: ['card'] }
 
-  OxidEsales\PaymentComponent\Mcp\Acp\AcpProductServiceInterface:
-    class: OxidEsales\Payments\Stripe\Mcp\Service\StripeAcpProductService
-
   # Stripe SPT Service
   OxidEsales\Payments\Stripe\Mcp\Service\SptPaymentServiceInterface:
     class: OxidEsales\Payments\Stripe\Mcp\Service\SptPaymentService
@@ -1028,18 +1034,152 @@ services:
             $version: '2026-01-11'
       $paymentHandlers:
         - { id: 'stripe', spec: 'https://stripe.com/ucp-handler', version: '2026-01-11' }
+    public: true
 
   OxidEsales\PaymentComponent\Mcp\Ucp\UcpResponseFormatterInterface:
     class: OxidEsales\PaymentComponent\Mcp\Ucp\UcpResponseFormatter
+    public: true
 
-  OxidEsales\PaymentComponent\Mcp\Ucp\UcpCapabilityNegotiationService: ~
+  OxidEsales\PaymentComponent\Mcp\Ucp\UcpCapabilityNegotiationService:
+    public: true
 
-  OxidEsales\PaymentComponent\Mcp\Ucp\UcpRequestValidator: ~
+  OxidEsales\PaymentComponent\Mcp\Ucp\UcpRequestValidator:
+    public: true
 
   # UCP Event Handler
   OxidEsales\Payments\Stripe\Mcp\Handler\UcpCheckoutRequestHandler:
     tags:
       - { name: payment.event_handler, priority: 100 }
+
+  # ==========================================
+  # Sprint 48: Product Feed
+  # ==========================================
+
+  OxidEsales\PaymentComponent\Mcp\Acp\ProductFieldMapperInterface:
+    class: OxidEsales\Payments\Stripe\Mcp\Service\OxidProductFieldMapper
+
+  OxidEsales\PaymentComponent\Mcp\Acp\ProductFeedGeneratorInterface:
+    class: OxidEsales\Payments\Stripe\Mcp\ProductFeed\CsvFeedGenerator
+
+  stripe.feed.jsonl_generator:
+    class: OxidEsales\Payments\Stripe\Mcp\ProductFeed\JsonlFeedGenerator
+    arguments:
+      $storeCountry: '%stripe.feed.store_country%'
+      $targetCountries: '%stripe.feed.target_countries%'
+
+  OxidEsales\Payments\Stripe\Mcp\Service\OxidArticleQueryServiceInterface:
+    class: OxidEsales\Payments\Stripe\Mcp\Service\OxidArticleQueryService
+
+  OxidEsales\Payments\Stripe\Mcp\Service\OxidProductService:
+    arguments:
+      $fieldMapper: '@OxidEsales\PaymentComponent\Mcp\Acp\ProductFieldMapperInterface'
+      $articleQuery: '@OxidEsales\Payments\Stripe\Mcp\Service\OxidArticleQueryServiceInterface'
+
+  # Override stub product service with real implementation
+  OxidEsales\PaymentComponent\Mcp\Acp\AcpProductServiceInterface:
+    class: OxidEsales\Payments\Stripe\Mcp\Service\OxidProductService
+    arguments:
+      $fieldMapper: '@OxidEsales\PaymentComponent\Mcp\Acp\ProductFieldMapperInterface'
+      $articleQuery: '@OxidEsales\Payments\Stripe\Mcp\Service\OxidArticleQueryServiceInterface'
+
+  OxidEsales\Payments\Stripe\Mcp\Handler\ProductFeedRequestHandler:
+    tags:
+      - { name: payment.event_handler, priority: 100 }
+
+  OxidEsales\Payments\Stripe\Mcp\Command\ProductFeedCommand:
+    tags: [{ name: console.command }]
+
+  # ==========================================
+  # Sprint 49: Custom Condition Types
+  # ==========================================
+
+  OxidEsales\PaymentComponent\Contract\ConditionTypeRegistryInterface:
+    class: OxidEsales\PaymentComponent\Contract\ConditionTypeRegistry
+    arguments:
+      $providers: !tagged_iterator payment.condition_type_provider
+
+  OxidEsales\PaymentComponent\Contract\Provider\CoreConditionTypeProvider:
+    tags: [{ name: payment.condition_type_provider }]
+
+  OxidEsales\PaymentComponent\Contract\Provider\AgentConditionTypeProvider:
+    tags: [{ name: payment.condition_type_provider }]
+
+  OxidEsales\PaymentComponent\Contract\ConditionTypeRegistryBootService:
+    arguments:
+      $registry: '@OxidEsales\PaymentComponent\Contract\ConditionTypeRegistryInterface'
+
+  # ==========================================
+  # Sprint 50: Agent Webhooks
+  # ==========================================
+
+  OxidEsales\PaymentComponent\Mcp\Notification\AgentCallbackRegistryInterface:
+    class: OxidEsales\PaymentComponent\Mcp\Notification\AgentCallbackRegistry
+
+  OxidEsales\PaymentComponent\Mcp\Notification\AgentNotificationServiceInterface:
+    class: OxidEsales\PaymentComponent\Mcp\Notification\AgentNotificationService
+    arguments:
+      $httpClient: '@OxidEsales\PaymentComponent\Mcp\Http\HttpClientInterface'
+      $signingSecret: '%stripe.agent_webhook_secret%'
+      $logger: '@stripe.events.file_logger'
+
+  OxidEsales\PaymentComponent\Mcp\Handler\AgentNotificationHandler:
+    tags:
+      - { name: payment.event_handler, priority: 10 }
+
+  OxidEsales\Payments\Stripe\WebhookHandler\SptTokenUsedHandler:
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $logger: '@stripe.webhook_file_logger'
+
+  OxidEsales\Payments\Stripe\WebhookHandler\SptTokenDeactivatedHandler:
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $logger: '@stripe.webhook_file_logger'
+
+  # ==========================================
+  # Sprint 51: Stripe Hosted ACP
+  # ==========================================
+
+  OxidEsales\Payments\Stripe\Mcp\Service\StripeProductCatalogSyncService:
+    arguments:
+      $httpClient: '@OxidEsales\PaymentComponent\Mcp\Http\HttpClientInterface'
+      $productService: '@OxidEsales\PaymentComponent\Mcp\Acp\AcpProductServiceInterface'
+      $feedGenerator: '@OxidEsales\PaymentComponent\Mcp\Acp\ProductFeedGeneratorInterface'
+      $stripeApiKey: '%stripe.api_secret_key%'
+      $logger: '@stripe.request_file_logger'
+
+  OxidEsales\PaymentComponent\Mcp\Acp\HostedCommerceServiceInterface:
+    class: OxidEsales\Payments\Stripe\Mcp\Service\StripeProductCatalogSyncService
+    arguments:
+      $httpClient: '@OxidEsales\PaymentComponent\Mcp\Http\HttpClientInterface'
+      $productService: '@OxidEsales\PaymentComponent\Mcp\Acp\AcpProductServiceInterface'
+      $feedGenerator: '@OxidEsales\PaymentComponent\Mcp\Acp\ProductFeedGeneratorInterface'
+      $stripeApiKey: '%stripe.api_secret_key%'
+      $logger: '@stripe.request_file_logger'
+
+  OxidEsales\Payments\Stripe\WebhookHandler\HostedAcpOrderHandler:
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $logger: '@stripe.webhook_file_logger'
+
+  OxidEsales\Payments\Stripe\Mcp\Command\ProductCatalogSyncCommand:
+    tags: [{ name: console.command }]
+
+  # ==========================================
+  # Sprint 52: OAuth Agent Auth
+  # ==========================================
+
+  OxidEsales\PaymentComponent\Mcp\Auth\TokenValidatorInterface:
+    class: OxidEsales\PaymentComponent\Mcp\Auth\JwtTokenValidator
+    arguments:
+      $issuer: '%stripe.oauth.issuer%'
+      $audience: '%stripe.oauth.audience%'
+      $jwksUri: '%stripe.oauth.jwks_uri%'
+
+  OxidEsales\PaymentComponent\Mcp\Auth\ProtectedResourceMetadata:
+    arguments:
+      $resource: '%stripe.mcp.server_url%'
+      $authorizationServers: ['%stripe.oauth.authorization_server%']
 
 parameters:
   # Fraud check toggle (default: enabled)
@@ -1050,5 +1190,24 @@ parameters:
   payment.fraud_check.threshold: 0.7
 
   # MCP/ACP/UCP parameters (Sprint 47)
-  stripe.agent_api_key: ''
+  stripe.agent_api_key: 'test-agent-key-e2e'
   stripe.ucp.rest_endpoint: ''
+  stripe.mcp.rate_limit_max_requests: 60
+  stripe.mcp.rate_limit_window_seconds: 60
+
+  # Sprint 48: Product Feed
+  stripe.feed.store_country: 'DE'
+  stripe.feed.target_countries: 'DE,AT,CH'
+
+  # Sprint 50: Agent Webhooks
+  stripe.agent_webhook_secret: ''
+
+  # Sprint 51: Hosted ACP
+  stripe.api_secret_key: ''
+
+  # Sprint 52: OAuth
+  stripe.oauth.issuer: ''
+  stripe.oauth.audience: ''
+  stripe.oauth.jwks_uri: ''
+  stripe.oauth.authorization_server: ''
+  stripe.mcp.server_url: ''

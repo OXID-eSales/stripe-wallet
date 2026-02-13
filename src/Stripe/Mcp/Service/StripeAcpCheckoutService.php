@@ -11,7 +11,7 @@ use OxidEsales\PaymentComponent\EventSystem\Event\Payment\PaymentAuthorizedEvent
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentComponent\Mcp\Acp\AbstractAcpCheckoutService;
 use OxidEsales\PaymentComponent\Mcp\Acp\AcpResponseFormatterInterface;
-use OxidEsales\PaymentComponent\Mcp\AgentContext;
+use OxidEsales\PaymentComponent\Mcp\AgentContextInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ContractServiceInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
@@ -29,7 +29,7 @@ class StripeAcpCheckoutService extends AbstractAcpCheckoutService
         parent::__construct($contractService, $contractRepository, $eventDispatcher, $formatter);
     }
 
-    public function createCheckout(array $arguments, AgentContext $agentContext): array
+    public function createCheckout(array $arguments, AgentContextInterface $agentContext): array
     {
         $context = new EventContext([
             'acp_items' => $arguments['items'] ?? [],
@@ -54,7 +54,7 @@ class StripeAcpCheckoutService extends AbstractAcpCheckoutService
     protected function completePayment(
         PaymentContractInterface $contract,
         array $paymentData,
-        AgentContext $agentContext
+        AgentContextInterface $agentContext
     ): array {
         /** @var string $sptToken */
         $sptToken = $paymentData['token'] ?? '';

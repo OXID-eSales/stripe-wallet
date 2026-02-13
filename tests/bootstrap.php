@@ -41,6 +41,24 @@ if ($shopBootstrap === null) {
 // Load shop bootstrap (includes shop's autoloader and oxfunctions.php which defines oxNew())
 require_once $shopBootstrap;
 
+// Load tests/.env file (makes credentials available via getenv() and $_ENV)
+$envFile = __DIR__ . '/.env';
+if (file_exists($envFile)) {
+    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        if (str_starts_with(trim($line), '#') || !str_contains($line, '=')) {
+            continue;
+        }
+        [$key, $value] = explode('=', $line, 2);
+        $key = trim($key);
+        $value = trim($value);
+        if ($key !== '' && getenv($key) === false) {
+            putenv("{$key}={$value}");
+            $_ENV[$key] = $value;
+        }
+    }
+}
+
 // Register autoloader for test classes (autoload-dev may not be loaded in some contexts)
 $testDir = __DIR__;
 spl_autoload_register(static function (string $class) use ($testDir): void {

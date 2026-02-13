@@ -8,9 +8,64 @@ use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentComponent\Mcp\AgentContext;
 use OxidEsales\PaymentComponent\Mcp\Auth\AuthResult;
 use OxidEsales\PaymentComponent\Mcp\Auth\McpAuthGuardInterface;
+use OxidEsales\PaymentComponent\Mcp\Http\RateLimiterInterface;
 use OxidEsales\Payments\Stripe\Mcp\Controller\McpController;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
+use RuntimeException;
+
+/**
+ * Exception thrown by TestableMcpController::terminate() to replace exit.
+ * Allows unit tests to capture the point where the controller would terminate.
+ */
+class McpTerminateException extends RuntimeException
+{
+}
+
+/**
+ * Testable subclass of McpController.
+ *
+ * Overrides init() to skip ContainerFactory and parent::init() (FrontendController),
+ * allowing mock injection in unit tests without the full OXID framework.
+ * Overrides terminate() to throw an exception instead of calling exit.
+ */
+class TestableMcpController extends McpController
+{
+    private McpAuthGuardInterface $testAuthGuard;
+    private EventDispatcherInterface $testEventDispatcher;
+    private RateLimiterInterface $testRateLimiter;
+
+    public function setTestDependencies(
+        McpAuthGuardInterface $authGuard,
+        EventDispatcherInterface $eventDispatcher,
+        RateLimiterInterface $rateLimiter
+    ): void {
+        $this->testAuthGuard = $authGuard;
+        $this->testEventDispatcher = $eventDispatcher;
+        $this->testRateLimiter = $rateLimiter;
+    }
+
+    public function init(): void
+    {
+        // Skip parent::init() and ContainerFactory — inject mocks via reflection
+        $reflection = new ReflectionClass(McpController::class);
+
+        $authGuardProp = $reflection->getProperty('authGuard');
+        $authGuardProp->setValue($this, $this->testAuthGuard);
+
+        $dispatcherProp = $reflection->getProperty('eventDispatcher');
+        $dispatcherProp->setValue($this, $this->testEventDispatcher);
+
+        $rateLimiterProp = $reflection->getProperty('rateLimiter');
+        $rateLimiterProp->setValue($this, $this->testRateLimiter);
+    }
+
+    protected function terminate(): never
+    {
+        throw new McpTerminateException('Controller terminated');
+    }
+}
 
 /**
  * Unit tests for McpController.
@@ -25,19 +80,46 @@ class McpControllerTest extends TestCase
 {
     private McpAuthGuardInterface&MockObject $authGuard;
     private EventDispatcherInterface&MockObject $eventDispatcher;
+    private RateLimiterInterface&MockObject $rateLimiter;
 
     protected function setUp(): void
     {
         $this->authGuard = $this->createMock(McpAuthGuardInterface::class);
         $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $this->rateLimiter = $this->createMock(RateLimiterInterface::class);
+
+        // Default: rate limiter allows requests
+        $this->rateLimiter->method('isAllowed')->willReturn(true);
     }
 
-    private function createController(): McpController
+    private function createController(): TestableMcpController
     {
-        return new McpController(
+        $controller = new TestableMcpController();
+        $controller->setTestDependencies(
             $this->authGuard,
-            $this->eventDispatcher
+            $this->eventDispatcher,
+            $this->rateLimiter
         );
+        $controller->init();
+
+        return $controller;
+    }
+
+    /**
+     * Calls render() and captures echo output, catching the terminate exception.
+     *
+     * @return string The captured output
+     */
+    private function callRenderAndCapture(TestableMcpController $controller): string
+    {
+        ob_start();
+        try {
+            @$controller->render();
+        } catch (McpTerminateException) {
+            // Expected — controller called terminate() instead of exit
+        }
+
+        return (string) ob_get_clean();
     }
 
     public function testControllerCanBeConstructed(): void
@@ -48,11 +130,35 @@ class McpControllerTest extends TestCase
     }
 
     /**
+     * When rate limit is exceeded, the controller returns 429
+     * without checking auth or dispatching events.
+     */
+    public function testRateLimitExceededReturns429(): void
+    {
+        $this->rateLimiter = $this->createMock(RateLimiterInterface::class);
+        $this->rateLimiter->method('isAllowed')->willReturn(false);
+
+        $this->authGuard
+            ->expects($this->never())
+            ->method('authenticate');
+
+        $this->eventDispatcher
+            ->expects($this->never())
+            ->method('dispatch');
+
+        $controller = $this->createController();
+        $output = $this->callRenderAndCapture($controller);
+
+        $decoded = json_decode($output, true);
+        $this->assertIsArray($decoded);
+        $this->assertSame('2.0', $decoded['jsonrpc']);
+        $this->assertSame(-32000, $decoded['error']['code']);
+        $this->assertSame('Too many requests', $decoded['error']['message']);
+    }
+
+    /**
      * When authentication fails, the controller should return early
      * without dispatching any event.
-     *
-     * We verify the event dispatcher is never called, which proves
-     * the auth guard failure short-circuits the request handling.
      */
     public function testAuthFailureReturns401Response(): void
     {
@@ -67,10 +173,7 @@ class McpControllerTest extends TestCase
             ->method('dispatch');
 
         $controller = $this->createController();
-
-        ob_start();
-        @$controller->handleRequest();
-        $output = ob_get_clean();
+        $output = $this->callRenderAndCapture($controller);
 
         $decoded = json_decode($output, true);
         $this->assertIsArray($decoded);
@@ -81,16 +184,13 @@ class McpControllerTest extends TestCase
     }
 
     /**
-     * When authentication succeeds, the controller reads php://input.
-     * In a unit test environment php://input is empty, so the controller
-     * will hit the empty-body branch before dispatching.
+     * When authentication succeeds but Content-Type is not application/json,
+     * the controller rejects with 415 before reading the body.
      *
-     * We verify:
-     * 1. Auth guard is called and succeeds
-     * 2. Event dispatcher is NOT called (because php://input is empty in test)
-     * 3. The error response indicates an empty request body
+     * In a unit test environment, CONTENT_TYPE is not set, so the controller
+     * will reject with 415 (missing Content-Type = not application/json).
      */
-    public function testValidAuthWithEmptyInputReturnsEmptyBodyError(): void
+    public function testMissingContentTypeReturns415(): void
     {
         $agentContext = new AgentContext('agent_1', 'token_abc');
         $authResult = AuthResult::success($agentContext);
@@ -105,15 +205,12 @@ class McpControllerTest extends TestCase
             ->method('dispatch');
 
         $controller = $this->createController();
-
-        ob_start();
-        @$controller->handleRequest();
-        $output = ob_get_clean();
+        $output = $this->callRenderAndCapture($controller);
 
         $decoded = json_decode($output, true);
         $this->assertIsArray($decoded);
         $this->assertSame('2.0', $decoded['jsonrpc']);
         $this->assertSame(-32700, $decoded['error']['code']);
-        $this->assertSame('Empty request body', $decoded['error']['message']);
+        $this->assertStringContainsString('Content-Type', $decoded['error']['message']);
     }
 }

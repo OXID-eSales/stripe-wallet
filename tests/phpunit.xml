@@ -22,6 +22,16 @@
     </testsuite>
     <testsuite name="Integration">
       <directory>Integration/</directory>
+      <exclude>Integration/Mcp</exclude>
+    </testsuite>
+    <testsuite name="McpIntegration">
+      <directory>Integration/Mcp</directory>
+    </testsuite>
+    <testsuite name="McpHttp">
+      <directory>Http/Mcp</directory>
+    </testsuite>
+    <testsuite name="McpE2e">
+      <directory>e2e/Mcp</directory>
     </testsuite>
   </testsuites>
   <php>

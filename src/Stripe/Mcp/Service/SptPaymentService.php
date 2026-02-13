@@ -6,14 +6,14 @@ namespace OxidEsales\Payments\Stripe\Mcp\Service;
 
 use OxidEsales\PaymentComponent\Adapter\Request\CreatePaymentRequest;
 use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
+use OxidEsales\PaymentComponent\Adapter\PaymentAdapterInterface;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
-use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 
 class SptPaymentService implements SptPaymentServiceInterface
 {
     public function __construct(
-        private readonly StripeAdapterInterface $stripeAdapter,
+        private readonly PaymentAdapterInterface $stripeAdapter,
         private readonly ShopAdapterInterface $shopAdapter,
         private readonly ?FileLoggerInterface $requestLogger = null
     ) {

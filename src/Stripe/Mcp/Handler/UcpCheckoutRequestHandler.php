@@ -6,7 +6,7 @@ namespace OxidEsales\Payments\Stripe\Mcp\Handler;
 
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\Mcp\Acp\AcpCheckoutServiceInterface;
-use OxidEsales\PaymentComponent\Mcp\AgentContext;
+use OxidEsales\PaymentComponent\Mcp\AgentContextInterface;
 use OxidEsales\Payments\Stripe\Mcp\Event\UcpCheckoutRequestEvent;
 
 class UcpCheckoutRequestHandler implements HandlerInterface
@@ -32,7 +32,7 @@ class UcpCheckoutRequestHandler implements HandlerInterface
         $segments = $context->get('pathSegments');
         /** @var array<string, mixed> $body */
         $body = $context->get('requestBody');
-        /** @var AgentContext $agentContext */
+        /** @var AgentContextInterface $agentContext */
         $agentContext = $context->get('agentContext');
 
         $checkoutId = $segments[1] ?? '';
