@@ -367,6 +367,16 @@ services:
   # Stripe Checkout Session Handlers
   # ==========================================
 
+  # ACP Context Resolver - Transforms ACP buyer/items into OXID User + Basket
+  # Priority 200: Runs BEFORE StripeContractCreationHandler (priority 100)
+  # Activates only when source === 'acp'
+  OxidEsales\Payments\Stripe\Mcp\Handler\AcpContextResolverHandler:
+    arguments:
+      $eventLogger: '@stripe.events.file_logger'
+    tags:
+      - { name: payment.event_handler, priority: 200 }
+    public: false
+
   # Stripe Contract Creation Handler - Creates contract for checkout flow
   # Priority 100: Runs BEFORE StripeCheckoutSessionHandler (priority 0)
   # Sprint 21: Refactored to delegate metadata to ContractMetadataService
