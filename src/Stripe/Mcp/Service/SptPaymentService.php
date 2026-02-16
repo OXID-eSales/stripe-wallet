@@ -37,6 +37,7 @@ class SptPaymentService implements SptPaymentServiceInterface
                 shopId: $this->shopAdapter->getShopId(),
                 paymentMethod: 'stripe_spt',
                 paymentMethodId: $sptToken,
+                returnUrl: $this->shopAdapter->getShopUrl() . '?cl=order',
                 billingAddress: $billingAddress !== []
                     ? array_map(static fn (mixed $v): string => is_string($v) ? $v : '', $billingAddress)
                     : null,

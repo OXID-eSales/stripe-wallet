@@ -20,13 +20,12 @@ class JwtTokenValidatorTest extends TestCase
 {
     private const ISSUER = 'https://auth.example.com';
     private const AUDIENCE = 'https://mcp.shop.example.com';
-    private const JWKS_URI = 'https://auth.example.com/.well-known/jwks.json';
 
     private function createValidator(
         string $issuer = self::ISSUER,
         string $audience = self::AUDIENCE
     ): JwtTokenValidator {
-        return new JwtTokenValidator($issuer, $audience, self::JWKS_URI);
+        return new JwtTokenValidator($issuer, $audience);
     }
 
     private function buildJwt(array $payloadClaims): string

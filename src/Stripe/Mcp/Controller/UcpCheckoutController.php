@@ -13,16 +13,19 @@ use OxidEsales\PaymentComponent\Mcp\Http\RateLimiterInterface;
 use OxidEsales\PaymentComponent\Mcp\Ucp\UcpRequestValidator;
 use OxidEsales\PaymentComponent\Mcp\Ucp\UcpResponseFormatterInterface;
 use OxidEsales\Payments\Stripe\Mcp\Event\UcpCheckoutRequestEvent;
+use OxidEsales\Payments\Stripe\Mcp\Service\McpLogServiceInterface;
 
 class UcpCheckoutController extends FrontendController
 {
     private const MAX_BODY_BYTES = 1_048_576; // 1 MB
+    private const CONTROLLER_TYPE = 'UCP_CHECKOUT';
 
     private ?McpAuthGuardInterface $authGuard = null;
     private ?UcpRequestValidator $requestValidator = null;
     private ?UcpResponseFormatterInterface $responseFormatter = null;
     private ?EventDispatcherInterface $eventDispatcher = null;
     private ?RateLimiterInterface $rateLimiter = null;
+    private ?McpLogServiceInterface $mcpLogger = null;
 
     public function init(): void
     {
@@ -35,12 +38,16 @@ class UcpCheckoutController extends FrontendController
         $this->responseFormatter = $container->get(UcpResponseFormatterInterface::class); // @phpstan-ignore assign.propertyType
         $this->eventDispatcher = $container->get(EventDispatcherInterface::class); // @phpstan-ignore assign.propertyType
         $this->rateLimiter = $container->get(RateLimiterInterface::class); // @phpstan-ignore assign.propertyType
+        $this->mcpLogger = $container->get(McpLogServiceInterface::class); // @phpstan-ignore assign.propertyType
     }
 
     public function render(): string
     {
         $clientIp = $this->getClientIp();
         if ($this->rateLimiter !== null && !$this->rateLimiter->isAllowed($clientIp)) {
+            $this->mcpLogger?->logError(self::CONTROLLER_TYPE, 429, 'Too many requests', [
+                'client_ip' => $clientIp,
+            ]);
             $this->jsonResponse(429, $this->formatError('rate_limit_exceeded', 'Too many requests'));
             $this->terminate();
 
@@ -48,6 +55,7 @@ class UcpCheckoutController extends FrontendController
         }
 
         if ($this->authGuard === null) {
+            $this->mcpLogger?->logError(self::CONTROLLER_TYPE, 500, 'Auth guard not available');
             $this->jsonResponse(500, $this->formatError('internal_error', 'Auth guard not available'));
             $this->terminate();
 
@@ -56,10 +64,11 @@ class UcpCheckoutController extends FrontendController
 
         $authResult = $this->authGuard->authenticate();
         if (!$authResult->isAuthenticated()) {
-            $this->jsonResponse(401, $this->formatError(
-                'authentication_error',
-                $authResult->getErrorMessage() ?? 'Unauthorized'
-            ));
+            $errorMsg = $authResult->getErrorMessage() ?? 'Unauthorized';
+            $this->mcpLogger?->logError(self::CONTROLLER_TYPE, 401, $errorMsg, [
+                'client_ip' => $clientIp,
+            ]);
+            $this->jsonResponse(401, $this->formatError('authentication_error', $errorMsg));
             $this->terminate();
 
             return ''; // @phpstan-ignore deadCode.unreachable
@@ -69,10 +78,9 @@ class UcpCheckoutController extends FrontendController
         if ($this->requestValidator !== null) {
             $validation = $this->requestValidator->validateHeaders($headers);
             if (!$validation['valid']) {
-                $this->jsonResponse(400, $this->formatError(
-                    'invalid_request',
-                    implode(', ', $validation['errors'])
-                ));
+                $errorMsg = implode(', ', $validation['errors']);
+                $this->mcpLogger?->logError(self::CONTROLLER_TYPE, 400, $errorMsg);
+                $this->jsonResponse(400, $this->formatError('invalid_request', $errorMsg));
                 $this->terminate();
 
                 return ''; // @phpstan-ignore deadCode.unreachable
@@ -96,6 +104,14 @@ class UcpCheckoutController extends FrontendController
             $body = $bodyResult;
         }
 
+        $this->mcpLogger?->logRequest(self::CONTROLLER_TYPE, [
+            'client_ip' => $clientIp,
+            'http_method' => $method,
+            'path_info' => $pathInfo,
+            'request_id' => $headers['request-id'],
+            'ucp_agent' => $headers['ucp-agent'],
+        ]);
+
         $context = new EventContext([
             'httpMethod' => $method,
             'pathSegments' => $segments,
@@ -114,6 +130,12 @@ class UcpCheckoutController extends FrontendController
             'internal_error',
             'No handler produced a response'
         );
+
+        if ($statusCode >= 400) {
+            $this->mcpLogger?->logError(self::CONTROLLER_TYPE, $statusCode, 'Handler error', $responseData);
+        } else {
+            $this->mcpLogger?->logResponse(self::CONTROLLER_TYPE, $statusCode, $responseData);
+        }
 
         $this->jsonResponse($statusCode, $responseData);
         $this->terminate();
@@ -139,17 +161,20 @@ class UcpCheckoutController extends FrontendController
     private function readJsonBody(): ?array
     {
         if (!$this->isJsonContentType()) {
+            $this->mcpLogger?->logError(self::CONTROLLER_TYPE, 415, 'Content-Type must be application/json');
             $this->jsonResponse(415, $this->formatError('invalid_request', 'Content-Type must be application/json'));
             return null;
         }
 
         if ($this->getContentLength() > self::MAX_BODY_BYTES) {
+            $this->mcpLogger?->logError(self::CONTROLLER_TYPE, 413, 'Request body too large');
             $this->jsonResponse(413, $this->formatError('invalid_request', 'Request body too large'));
             return null;
         }
 
         $rawBody = file_get_contents('php://input', false, null, 0, self::MAX_BODY_BYTES + 1);
         if ($rawBody !== false && strlen($rawBody) > self::MAX_BODY_BYTES) {
+            $this->mcpLogger?->logError(self::CONTROLLER_TYPE, 413, 'Request body too large');
             $this->jsonResponse(413, $this->formatError('invalid_request', 'Request body too large'));
             return null;
         }

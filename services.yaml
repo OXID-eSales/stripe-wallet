@@ -876,6 +876,29 @@ services:
     factory: ['@OxidEsales\Payments\Stripe\Service\Factory\EventFileLoggerFactory', 'create']
     public: false
 
+  # MCP File Logger Factory (test-mode gated)
+  # Sprint 56: Returns NullFileLogger in production, FileLogger in test mode
+  OxidEsales\Payments\Stripe\Service\Factory\McpFileLoggerFactory:
+    arguments:
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+    public: false
+
+  # MCP File Logger - Writes to log/stripe/mcp.log (test mode only)
+  # Sprint 56: Request/response logging for MCP/ACP/UCP debugging
+  stripe.mcp.file_logger:
+    class: OxidEsales\PaymentComponent\Service\FileLoggerInterface
+    factory: ['@OxidEsales\Payments\Stripe\Service\Factory\McpFileLoggerFactory', 'create']
+    public: false
+
+  # MCP Log Service - Structured logging for all MCP controllers
+  # Sprint 56: Silent-fail pattern, 4KB payload truncation
+  OxidEsales\Payments\Stripe\Mcp\Service\McpLogServiceInterface:
+    class: OxidEsales\Payments\Stripe\Mcp\Service\McpLogService
+    autowire: false
+    arguments:
+      $fileLogger: '@stripe.mcp.file_logger'
+    public: true
+
   # Reconciliation File Logger Factory - Creates logger with correct shop path
   # Sprint 14: Factory approach for OXID compatibility (no kernel.project_dir)
   OxidEsales\Payments\Stripe\Service\Factory\ReconciliationFileLoggerFactory:
@@ -1075,12 +1098,39 @@ services:
       $fieldMapper: '@OxidEsales\PaymentComponent\Mcp\Acp\ProductFieldMapperInterface'
       $articleQuery: '@OxidEsales\Payments\Stripe\Mcp\Service\OxidArticleQueryServiceInterface'
 
-  # Override stub product service with real implementation
-  OxidEsales\PaymentComponent\Mcp\Acp\AcpProductServiceInterface:
-    class: OxidEsales\Payments\Stripe\Mcp\Service\OxidProductService
+  # ==========================================
+  # Sprint 55: GraphQL Product Discovery (hybrid approach)
+  # ==========================================
+
+  OxidEsales\Payments\Stripe\Mcp\Service\GraphqlQueryBuilder: ~
+
+  OxidEsales\Payments\Stripe\Mcp\Service\GraphqlResponseMapper: ~
+
+  OxidEsales\Payments\Stripe\Mcp\Service\GraphqlProductService:
     arguments:
-      $fieldMapper: '@OxidEsales\PaymentComponent\Mcp\Acp\ProductFieldMapperInterface'
-      $articleQuery: '@OxidEsales\Payments\Stripe\Mcp\Service\OxidArticleQueryServiceInterface'
+      $httpClient: '@OxidEsales\PaymentComponent\Mcp\Http\HttpClientInterface'
+      $queryBuilder: '@OxidEsales\Payments\Stripe\Mcp\Service\GraphqlQueryBuilder'
+      $responseMapper: '@OxidEsales\Payments\Stripe\Mcp\Service\GraphqlResponseMapper'
+      $graphqlEndpoint: '%stripe.graphql.endpoint%'
+
+  # Fallback decorator: tries GraphQL, falls back to direct OXID model
+  OxidEsales\Payments\Stripe\Mcp\Service\FallbackProductService:
+    arguments:
+      $graphqlService: '@OxidEsales\Payments\Stripe\Mcp\Service\GraphqlProductService'
+      $directService: '@OxidEsales\Payments\Stripe\Mcp\Service\OxidProductService'
+      $httpClient: '@OxidEsales\PaymentComponent\Mcp\Http\HttpClientInterface'
+      $logger: '@oxid_esales.monolog.logger'
+      $graphqlEndpoint: '%stripe.graphql.endpoint%'
+
+  # Bind AcpProductServiceInterface to FallbackProductService (Sprint 55 replaces Sprint 48 binding)
+  OxidEsales\PaymentComponent\Mcp\Acp\AcpProductServiceInterface:
+    class: OxidEsales\Payments\Stripe\Mcp\Service\FallbackProductService
+    arguments:
+      $graphqlService: '@OxidEsales\Payments\Stripe\Mcp\Service\GraphqlProductService'
+      $directService: '@OxidEsales\Payments\Stripe\Mcp\Service\OxidProductService'
+      $httpClient: '@OxidEsales\PaymentComponent\Mcp\Http\HttpClientInterface'
+      $logger: '@oxid_esales.monolog.logger'
+      $graphqlEndpoint: '%stripe.graphql.endpoint%'
 
   OxidEsales\Payments\Stripe\Mcp\Handler\ProductFeedRequestHandler:
     tags:
@@ -1174,7 +1224,6 @@ services:
     arguments:
       $issuer: '%stripe.oauth.issuer%'
       $audience: '%stripe.oauth.audience%'
-      $jwksUri: '%stripe.oauth.jwks_uri%'
 
   OxidEsales\PaymentComponent\Mcp\Auth\ProtectedResourceMetadata:
     arguments:
@@ -1199,6 +1248,9 @@ parameters:
   stripe.feed.store_country: 'DE'
   stripe.feed.target_countries: 'DE,AT,CH'
 
+  # Sprint 55: GraphQL Product Discovery
+  stripe.graphql.endpoint: 'http://localhost/graphql/'
+
   # Sprint 50: Agent Webhooks
   stripe.agent_webhook_secret: ''
 
@@ -1208,6 +1260,5 @@ parameters:
   # Sprint 52: OAuth
   stripe.oauth.issuer: ''
   stripe.oauth.audience: ''
-  stripe.oauth.jwks_uri: ''
   stripe.oauth.authorization_server: ''
   stripe.mcp.server_url: ''
