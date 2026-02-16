@@ -421,6 +421,9 @@ def run_chat(initial_message: str | None = None) -> None:
             except (KeyboardInterrupt, EOFError):
                 print("\nBye!")
                 break
+            except UnicodeDecodeError:
+                print("\n(Could not decode input — please re-type in plain ASCII/UTF-8)")
+                continue
             if not user_input:
                 continue
             if user_input.lower() in ("quit", "exit", "q"):
