@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Mcp\Handler;
 
 use OxidEsales\Eshop\Application\Model\Basket;
+use OxidEsales\Eshop\Application\Model\Country;
 use OxidEsales\Eshop\Application\Model\User;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 
 /**
@@ -27,7 +29,7 @@ use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEve
  */
 class AcpContextResolverHandler implements HandlerInterface
 {
-    private const PAYMENT_ID = 'oxidstripe';
+    private const PAYMENT_ID = StripeDefinitions::STRIPE_WALLET_PAYMENT_ID;
 
     public function __construct(
         private readonly ?FileLoggerInterface $eventLogger = null
@@ -66,18 +68,20 @@ class AcpContextResolverHandler implements HandlerInterface
         $buyer = $context->get('acp_buyer', []);
         /** @var list<array<string, mixed>> $items */
         $items = $context->get('acp_items', []);
+        /** @var array<string, string> $address */
+        $address = $context->get('acp_fulfillment_address', []);
 
-        $user = $this->resolveUser($buyer);
+        $user = $this->resolveUser($buyer, $address);
+        $this->validateUserId($user);
+
         $basket = $this->buildBasket($user, $items);
 
-        $session = Registry::getSession();
-        $session->setBasket($basket);
-        $session->setUser($user);
+        $this->setSession($user, $basket);
 
         $context->set('userId', $user->getId());
         $context->set('user', $user);
         $context->set('basket', $basket);
-        $context->set('sessionId', $session->getId());
+        $context->set('sessionId', $this->getSessionId());
 
         if (!$context->has('conditionTypes')) {
             $context->set('conditionTypes', ['payment_authorized']);
@@ -91,8 +95,9 @@ class AcpContextResolverHandler implements HandlerInterface
 
     /**
      * @param array<string, string> $buyer
+     * @param array<string, string> $address
      */
-    protected function resolveUser(array $buyer): User
+    protected function resolveUser(array $buyer, array $address = []): User
     {
         $email = $buyer['email'] ?? '';
         if ($email === '') {
@@ -109,29 +114,112 @@ class AcpContextResolverHandler implements HandlerInterface
             return $user;
         }
 
-        return $this->createGuestUser($email, $buyer);
+        return $this->createGuestUser($email, $buyer, $address);
     }
 
     /**
      * @param array<string, string> $buyer
+     * @param array<string, string> $address
      */
-    protected function createGuestUser(string $email, array $buyer): User
+    protected function createGuestUser(string $email, array $buyer, array $address = []): User
     {
         /** @var User $user */
         $user = oxNew(User::class);
 
-        $user->assign([
+        $countryId = $this->resolveCountryId($address['country'] ?? '');
+
+        $userData = [
             'oxusername' => $email,
             'oxfname' => $buyer['first_name'] ?? '',
             'oxlname' => $buyer['last_name'] ?? '',
             'oxactive' => 1,
-        ]);
+            'oxstreet' => $address['line_one'] ?? '',
+            'oxcity' => $address['city'] ?? '',
+            'oxzip' => $address['postal_code'] ?? '',
+        ];
 
+        if ($countryId !== '') {
+            $userData['oxcountryid'] = $countryId;
+        }
+
+        $user->assign($userData);
         $user->save();
 
         $this->logEvent('AcpContextResolverHandler: Created guest user', ['userId' => $user->getId()]);
 
         return $user;
+    }
+
+    /**
+     * Resolve country input to OXID country ID.
+     *
+     * Accepts ISO 3166-1 alpha-2 codes ("DE") or full country names ("Germany").
+     * Tries ISO code first, then falls back to title lookup.
+     */
+    protected function resolveCountryId(string $countryInput): string
+    {
+        if ($countryInput === '') {
+            return '';
+        }
+
+        /** @var Country $country */
+        $country = oxNew(Country::class);
+
+        // Try ISO alpha-2 code first (e.g., "DE", "US")
+        if (strlen($countryInput) === 2) {
+            $countryId = $country->getIdByCode(strtoupper($countryInput));
+            if (is_string($countryId) && $countryId !== '') { // @phpstan-ignore function.alreadyNarrowedType (OXID core: getIdByCode can return null at runtime)
+                return $countryId;
+            }
+        }
+
+        // Fall back to title lookup (e.g., "Germany", "Deutschland")
+        return $this->findCountryIdByTitle($countryInput);
+    }
+
+    /**
+     * Look up OXID country ID by country title (any language).
+     */
+    private function findCountryIdByTitle(string $title): string
+    {
+        $db = \OxidEsales\Eshop\Core\DatabaseProvider::getDb();
+        $countryId = $db->getOne(
+            'SELECT OXID FROM oxcountry WHERE OXTITLE = ? OR OXTITLE_1 = ? OR OXTITLE_2 = ? OR OXTITLE_3 = ?',
+            [$title, $title, $title, $title]
+        );
+
+        return is_string($countryId) ? $countryId : ''; // @phpstan-ignore function.alreadyNarrowedType (OXID core: getOne can return false at runtime)
+    }
+
+    private function validateUserId(User $user): void
+    {
+        $userId = $user->getId();
+        if (!is_string($userId) || $userId === '') { // @phpstan-ignore function.alreadyNarrowedType (OXID core: getId can return null at runtime)
+            throw new \RuntimeException(
+                'ACP checkout failed: could not resolve or create user. '
+                . 'Ensure the buyer email is valid and the database is accessible.'
+            );
+        }
+    }
+
+    /**
+     * Set user and basket on OXID session.
+     * Extracted for testability — subclasses can override.
+     */
+    protected function setSession(User $user, Basket $basket): void
+    {
+        $session = Registry::getSession();
+        $session->setBasket($basket);
+        $session->setUser($user);
+    }
+
+    /**
+     * Get current session ID.
+     * Extracted for testability — subclasses can override.
+     */
+    protected function getSessionId(): string
+    {
+        return Registry::getSession()->getId();
     }
 
     /**
@@ -143,17 +231,38 @@ class AcpContextResolverHandler implements HandlerInterface
         $basket = oxNew(Basket::class);
         $basket->setBasketUser($user);
 
+        $requestedCount = 0;
         foreach ($items as $item) {
             $articleId = isset($item['id']) && is_string($item['id']) ? $item['id'] : '';
             $rawQuantity = $item['quantity'] ?? 1;
             $quantity = is_numeric($rawQuantity) ? (int) $rawQuantity : 1;
             if ($articleId !== '' && $quantity > 0) {
                 $basket->addToBasket($articleId, $quantity);
+                $requestedCount++;
             }
+        }
+
+        if ($requestedCount === 0) {
+            throw new \InvalidArgumentException('ACP checkout requires at least one valid item');
         }
 
         $basket->setPayment(self::PAYMENT_ID);
         $basket->calculateBasket(true);
+
+        $actualCount = $basket->getProductsCount();
+        if ($actualCount === 0) {
+            throw new \RuntimeException(
+                'ACP checkout failed: none of the requested items could be added to basket. '
+                . 'Items may be out of stock, inactive, or require variant selection.'
+            );
+        }
+
+        if ($actualCount < $requestedCount) {
+            $this->logEvent('AcpContextResolverHandler: Some items were not added to basket', [
+                'requested' => $requestedCount,
+                'actual' => $actualCount,
+            ]);
+        }
 
         return $basket;
     }

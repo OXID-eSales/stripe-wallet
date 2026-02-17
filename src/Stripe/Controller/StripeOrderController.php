@@ -183,12 +183,14 @@ class StripeOrderController extends OrderController
         // 2. Get contract_id and contract_token from URL (passed in return URL)
         $contractId = Registry::getRequest()->getRequestParameter('contract_id');
         $contractToken = Registry::getRequest()->getRequestParameter('contract_token');
+        $source = Registry::getRequest()->getRequestParameter('source');
 
         // 3. Create context with URL parameters
         $context = new EventContext([
             'checkoutSessionId' => $sessionId,
             'contract_id' => $contractId,
             'contract_token' => $contractToken,
+            'source' => is_string($source) ? $source : 'web',
             // Also pass session contract ID as fallback
             'contractId' => $this->getContractIdFromSession(),
         ]);
@@ -197,13 +199,20 @@ class StripeOrderController extends OrderController
         $event = new StripeCheckoutReturnEvent($context);
         $this->getEventDispatcher()->dispatch($event);
 
-        // 4. Process results
+        // 5. Process results
         $this->processContextResults($context);
 
         // Set order in session for thank you page
         if ($orderId = $context->get('orderId')) {
             $this->setSessionVariable('sess_challenge', $orderId);
             $this->clearStripeSessionVariables();
+        }
+
+        // 6. Ensure basket is available for ThankYou page
+        // In ACP flow, the session basket may not survive the external redirect
+        // because the session was created during an API call. Rebuild from contract snapshot.
+        if ($context->get('redirectTarget') === 'thankyou') {
+            $this->ensureBasketForThankYouPage($context);
         }
 
         return $context->get('redirectTarget') ?? 'payment';
@@ -269,6 +278,79 @@ class StripeOrderController extends OrderController
         if ($context->get('orderId') !== null) {
             $this->setSessionVariable('sess_challenge', $context->get('orderId'));
         }
+    }
+
+    /**
+     * Ensure session basket has products for ThankYouController.
+     *
+     * ThankYouController requires a basket with getProductsCount() > 0.
+     * In ACP flow (or when force_sid fails to restore the session), the basket
+     * may be empty. Rebuild it from the contract's BasketSnapshot.
+     */
+    protected function ensureBasketForThankYouPage(EventContext $context): void
+    {
+        $basket = $this->getBasketFromSession();
+        if ($basket->getProductsCount() > 0) {
+            return;
+        }
+
+        $contract = $context->getContract();
+        if ($contract === null) {
+            return;
+        }
+
+        $snapshot = $contract->getBasketSnapshot();
+        $restoredBasket = $this->rebuildBasketFromSnapshot($snapshot);
+        if ($restoredBasket !== null) {
+            Registry::getSession()->setBasket($restoredBasket);
+        }
+    }
+
+    /**
+     * Rebuild an OXID basket from a BasketSnapshot.
+     *
+     * Adds only real product items (skips shipping, payment fees, etc.)
+     * so ThankYouController can display them.
+     *
+     * @return \OxidEsales\Eshop\Application\Model\Basket|null
+     */
+    protected function rebuildBasketFromSnapshot(
+        \OxidEsales\PaymentComponent\Contract\BasketSnapshot $snapshot
+    ): ?\OxidEsales\Eshop\Application\Model\Basket {
+        /** @var \OxidEsales\Eshop\Application\Model\Basket $basket */
+        $basket = oxNew(\OxidEsales\Eshop\Application\Model\Basket::class);
+        $addedCount = 0;
+
+        foreach ($snapshot->getItems() as $item) {
+            if (
+                !empty($item['isShipping']) || !empty($item['isPaymentFee'])
+                || !empty($item['isWrapping']) || !empty($item['isGiftCard'])
+            ) {
+                continue;
+            }
+
+            $productId = $item['productId'] ?? $item['articleId'] ?? '';
+            $rawQuantity = $item['quantity'] ?? 1;
+            $quantity = is_numeric($rawQuantity) ? (int) $rawQuantity : 1;
+
+            if (!is_string($productId) || $productId === '' || $quantity < 1) {
+                continue;
+            }
+
+            try {
+                $basket->addToBasket($productId, $quantity);
+                $addedCount++;
+            } catch (\Throwable $e) {
+                // Skip items that can't be added (out of stock, inactive, etc.)
+            }
+        }
+
+        if ($addedCount === 0) {
+            return null;
+        }
+
+        $basket->calculateBasket(true);
+        return $basket;
     }
 
     protected function clearStripeSessionVariables(): void

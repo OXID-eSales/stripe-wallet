@@ -115,7 +115,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         ]);
 
         // Store session ID in contract via setProvider
-        $contract->setProvider('stripe', $result->getSessionId() ?? '', $params['successUrl']);
+        $contract->setProvider('stripe', $result->getSessionId() ?? '', $result->getCheckoutUrl());
 
         $this->contractRepository->save($contract);
 
@@ -140,10 +140,16 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         $shopUrl = $this->getContextString($context, 'shopUrl', $this->shopAdapter->getShopUrl());
         $sessionId = $this->getContextString($context, 'sessionId', '');
         $shopId = $this->getContextString($context, 'shopId', '1');
+        $source = $this->getContextString($context, 'source', 'web');
 
         $contractToken = $this->tokenService->generateToken($contractId);
         $successUrl = $this->checkoutSessionService->buildSuccessUrl($shopUrl, $contractId, $contractToken, $sessionId);
         $cancelUrl = $shopUrl . 'index.php?cl=payment';
+
+        if ($source === 'acp') {
+            $successUrl .= '&source=acp';
+            $cancelUrl = $shopUrl;
+        }
 
         $orderId = $contract->getOrderId();
         $orderNumber = $contract->getMetadata('order_number');
