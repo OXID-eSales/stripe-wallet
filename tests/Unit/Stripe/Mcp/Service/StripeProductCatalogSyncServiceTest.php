@@ -7,43 +7,44 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Mcp\Service;
 use OxidEsales\PaymentComponent\Mcp\Acp\AcpProductServiceInterface;
 use OxidEsales\PaymentComponent\Mcp\Acp\HostedCommerceServiceInterface;
 use OxidEsales\PaymentComponent\Mcp\Acp\ProductFeedGeneratorInterface;
-use OxidEsales\PaymentComponent\Mcp\Http\HttpClientInterface;
-use OxidEsales\PaymentComponent\Mcp\Http\HttpClientResponse;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
+use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Mcp\Service\StripeProductCatalogSyncService;
+use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 /**
  * Unit tests for StripeProductCatalogSyncService.
  *
- * Tests catalog sync operations via HTTP client, including success/failure
- * response parsing and the composed syncAllProducts flow.
+ * Sprint 57: Refactored to mock adapter layer instead of raw HTTP client.
  *
  * @covers \OxidEsales\Payments\Stripe\Mcp\Service\StripeProductCatalogSyncService
  */
 class StripeProductCatalogSyncServiceTest extends TestCase
 {
-    private HttpClientInterface&MockObject $httpClient;
+    private StripeAdapterFactoryInterface&MockObject $adapterFactory;
+    private StripeAdapterInterface&MockObject $adapter;
     private AcpProductServiceInterface&MockObject $productService;
     private ProductFeedGeneratorInterface&MockObject $feedGenerator;
     private FileLoggerInterface&MockObject $logger;
 
     protected function setUp(): void
     {
-        $this->httpClient = $this->createMock(HttpClientInterface::class);
+        $this->adapter = $this->createMock(StripeAdapterInterface::class);
+        $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
+        $this->adapterFactory->method('getStripeAdapter')->willReturn($this->adapter);
         $this->productService = $this->createMock(AcpProductServiceInterface::class);
         $this->feedGenerator = $this->createMock(ProductFeedGeneratorInterface::class);
         $this->logger = $this->createMock(FileLoggerInterface::class);
     }
 
-    private function createService(string $apiKey = 'sk_test_abc123'): StripeProductCatalogSyncService
+    private function createService(): StripeProductCatalogSyncService
     {
         return new StripeProductCatalogSyncService(
-            $this->httpClient,
+            $this->adapterFactory,
             $this->productService,
             $this->feedGenerator,
-            $apiKey,
             $this->logger
         );
     }
@@ -61,25 +62,16 @@ class StripeProductCatalogSyncServiceTest extends TestCase
 
     public function testSyncCatalogSuccessReturnsSuccessfulResult(): void
     {
-        $responseBody = json_encode([
-            'products_processed' => 50,
-            'products_created' => 30,
-            'products_updated' => 20,
-        ]);
-
-        $this->httpClient
+        $this->adapter
             ->expects($this->once())
-            ->method('post')
-            ->with(
-                'https://api.stripe.com/v1/products/import',
-                'csv-feed-content',
-                $this->callback(function (array $headers) {
-                    return ($headers['Authorization'] ?? '') === 'Bearer sk_test_abc123'
-                        && ($headers['Content-Type'] ?? '') === 'text/csv';
-                }),
-                30
-            )
-            ->willReturn(new HttpClientResponse(200, $responseBody));
+            ->method('syncProductCatalog')
+            ->with('csv-feed-content', 'csv')
+            ->willReturn([
+                'successful' => true,
+                'products_processed' => 50,
+                'products_created' => 30,
+                'products_updated' => 20,
+            ]);
 
         $service = $this->createService();
         $result = $service->syncCatalog('csv-feed-content', 'csv');
@@ -90,26 +82,18 @@ class StripeProductCatalogSyncServiceTest extends TestCase
         $this->assertSame(20, $result->getProductsUpdated());
     }
 
-    public function testSyncCatalogWithJsonlFormatSetsCorrectContentType(): void
+    public function testSyncCatalogWithJsonlFormatPassesCorrectFormat(): void
     {
-        $responseBody = json_encode([
-            'products_processed' => 10,
-            'products_created' => 10,
-            'products_updated' => 0,
-        ]);
-
-        $this->httpClient
+        $this->adapter
             ->expects($this->once())
-            ->method('post')
-            ->with(
-                $this->anything(),
-                $this->anything(),
-                $this->callback(function (array $headers) {
-                    return ($headers['Content-Type'] ?? '') === 'application/x-jsonlines';
-                }),
-                $this->anything()
-            )
-            ->willReturn(new HttpClientResponse(200, $responseBody));
+            ->method('syncProductCatalog')
+            ->with('{"id":"p1"}\n', 'jsonl')
+            ->willReturn([
+                'successful' => true,
+                'products_processed' => 10,
+                'products_created' => 10,
+                'products_updated' => 0,
+            ]);
 
         $service = $this->createService();
         $result = $service->syncCatalog('{"id":"p1"}\n', 'jsonl');
@@ -121,12 +105,15 @@ class StripeProductCatalogSyncServiceTest extends TestCase
     // syncCatalog() - failed response
     // ==========================================
 
-    public function testSyncCatalogFailedHttpResponseReturnsFailure(): void
+    public function testSyncCatalogFailedAdapterResponseReturnsFailure(): void
     {
-        $this->httpClient
+        $this->adapter
             ->expects($this->once())
-            ->method('post')
-            ->willReturn(new HttpClientResponse(500, '', 'Internal Server Error'));
+            ->method('syncProductCatalog')
+            ->willReturn([
+                'successful' => false,
+                'error' => 'Internal Server Error',
+            ]);
 
         $service = $this->createService();
         $result = $service->syncCatalog('feed-data', 'csv');
@@ -135,31 +122,22 @@ class StripeProductCatalogSyncServiceTest extends TestCase
         $this->assertSame(['Internal Server Error'], $result->getErrorMessages());
     }
 
-    public function testSyncCatalogHttpErrorWithoutMessageFallsBackToStatusCode(): void
-    {
-        $this->httpClient
-            ->expects($this->once())
-            ->method('post')
-            ->willReturn(new HttpClientResponse(403, ''));
-
-        $service = $this->createService();
-        $result = $service->syncCatalog('feed-data', 'csv');
-
-        $this->assertFalse($result->isSuccessful());
-        $this->assertSame(['HTTP 403'], $result->getErrorMessages());
-    }
-
     // ==========================================
-    // syncCatalog() - empty API key
+    // syncCatalog() - missing API key
     // ==========================================
 
-    public function testSyncCatalogWithEmptyApiKeyReturnsFailure(): void
+    public function testSyncCatalogWithMissingApiKeyReturnsFailure(): void
     {
-        $this->httpClient
-            ->expects($this->never())
-            ->method('post');
+        $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
+        $this->adapterFactory->method('getStripeAdapter')
+            ->willThrowException(new \RuntimeException('Stripe API key is not configured'));
 
-        $service = $this->createService('');
+        $service = new StripeProductCatalogSyncService(
+            $this->adapterFactory,
+            $this->productService,
+            $this->feedGenerator,
+            $this->logger
+        );
         $result = $service->syncCatalog('feed-data', 'csv');
 
         $this->assertFalse($result->isSuccessful());
@@ -170,7 +148,7 @@ class StripeProductCatalogSyncServiceTest extends TestCase
     // syncAllProducts() - composed flow
     // ==========================================
 
-    public function testSyncAllProductsComposesProductServiceFeedGeneratorAndUpload(): void
+    public function testSyncAllProductsComposesProductServiceFeedGeneratorAndAdapter(): void
     {
         $products = [
             ['id' => 'prod_1', 'name' => 'Widget', 'price' => 9.99],
@@ -194,22 +172,16 @@ class StripeProductCatalogSyncServiceTest extends TestCase
             ->method('getFileExtension')
             ->willReturn('csv');
 
-        $responseBody = json_encode([
-            'products_processed' => 2,
-            'products_created' => 2,
-            'products_updated' => 0,
-        ]);
-
-        $this->httpClient
+        $this->adapter
             ->expects($this->once())
-            ->method('post')
-            ->with(
-                'https://api.stripe.com/v1/products/import',
-                'generated-feed-content',
-                $this->anything(),
-                30
-            )
-            ->willReturn(new HttpClientResponse(200, $responseBody));
+            ->method('syncProductCatalog')
+            ->with('generated-feed-content', 'csv')
+            ->willReturn([
+                'successful' => true,
+                'products_processed' => 2,
+                'products_created' => 2,
+                'products_updated' => 0,
+            ]);
 
         $service = $this->createService();
         $result = $service->syncAllProducts();
@@ -219,7 +191,7 @@ class StripeProductCatalogSyncServiceTest extends TestCase
         $this->assertSame(2, $result->getProductsCreated());
     }
 
-    public function testSyncAllProductsWithEmptyApiKeyFailsBeforeHttpCall(): void
+    public function testSyncAllProductsWithMissingApiKeyFailsBeforeAdapterCall(): void
     {
         $this->productService
             ->method('listProducts')
@@ -233,33 +205,66 @@ class StripeProductCatalogSyncServiceTest extends TestCase
             ->method('getFileExtension')
             ->willReturn('csv');
 
-        $this->httpClient
-            ->expects($this->never())
-            ->method('post');
+        $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
+        $this->adapterFactory->method('getStripeAdapter')
+            ->willThrowException(new \RuntimeException('Stripe API key is not configured'));
 
-        $service = $this->createService('');
+        $service = new StripeProductCatalogSyncService(
+            $this->adapterFactory,
+            $this->productService,
+            $this->feedGenerator,
+            $this->logger
+        );
         $result = $service->syncAllProducts();
 
         $this->assertFalse($result->isSuccessful());
     }
 
     // ==========================================
-    // syncCatalog() - malformed JSON response
+    // updateFulfillmentStatus()
     // ==========================================
 
-    public function testSyncCatalogWithNonJsonResponseDefaultsToZeroCounts(): void
+    public function testUpdateFulfillmentStatusDelegatesToAdapter(): void
     {
-        $this->httpClient
+        $this->adapter
             ->expects($this->once())
-            ->method('post')
-            ->willReturn(new HttpClientResponse(200, 'not-valid-json'));
+            ->method('updateFulfillmentStatus')
+            ->with('order_123', 'shipped', ['tracking' => 'ABC'])
+            ->willReturn(true);
 
         $service = $this->createService();
-        $result = $service->syncCatalog('feed-data', 'csv');
+        $result = $service->updateFulfillmentStatus('order_123', 'shipped', ['tracking' => 'ABC']);
 
-        $this->assertTrue($result->isSuccessful());
-        $this->assertSame(0, $result->getProductsProcessed());
-        $this->assertSame(0, $result->getProductsCreated());
-        $this->assertSame(0, $result->getProductsUpdated());
+        $this->assertTrue($result);
+    }
+
+    public function testUpdateFulfillmentStatusReturnsFalseOnAdapterFailure(): void
+    {
+        $this->adapter
+            ->expects($this->once())
+            ->method('updateFulfillmentStatus')
+            ->willReturn(false);
+
+        $service = $this->createService();
+        $result = $service->updateFulfillmentStatus('order_456', 'shipped');
+
+        $this->assertFalse($result);
+    }
+
+    public function testUpdateFulfillmentStatusReturnsFalseWhenApiKeyMissing(): void
+    {
+        $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
+        $this->adapterFactory->method('getStripeAdapter')
+            ->willThrowException(new \RuntimeException('Stripe API key is not configured'));
+
+        $service = new StripeProductCatalogSyncService(
+            $this->adapterFactory,
+            $this->productService,
+            $this->feedGenerator,
+            $this->logger
+        );
+        $result = $service->updateFulfillmentStatus('order_789', 'shipped');
+
+        $this->assertFalse($result);
     }
 }
