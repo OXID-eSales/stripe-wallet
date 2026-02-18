@@ -30,6 +30,7 @@ use OxidEsales\PaymentComponent\Adapter\Response\AuthorizationResponse;
 use OxidEsales\PaymentComponent\Adapter\Response\PaymentMethodResponse;
 use OxidEsales\PaymentComponent\Adapter\Response\ThreeDSecureResponse;
 use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
+use OxidEsales\PaymentComponent\Mcp\Http\HttpClientInterface;
 use OxidEsales\Payments\Stripe\Adapter\Helper\PaymentIntentHelper;
 use OxidEsales\Payments\Stripe\Adapter\Helper\RefundHelper;
 use OxidEsales\Payments\Stripe\Adapter\Helper\CheckoutSessionHelper;
@@ -65,7 +66,9 @@ final class StripeAdapter implements StripeAdapterInterface
         ?PaymentIntentHelper $paymentIntentHelper = null,
         ?RefundHelper $refundHelper = null,
         ?CheckoutSessionHelper $checkoutSessionHelper = null,
-        ?PaymentMethodHelper $paymentMethodHelper = null
+        ?PaymentMethodHelper $paymentMethodHelper = null,
+        private readonly ?HttpClientInterface $httpClient = null,
+        private readonly string $apiKey = ''
     ) {
         $this->paymentIntentHelper = $paymentIntentHelper ?? new PaymentIntentHelper();
         $this->refundHelper = $refundHelper ?? new RefundHelper();
@@ -344,6 +347,74 @@ final class StripeAdapter implements StripeAdapterInterface
         } catch (\Throwable $e) {
             return false;
         }
+    }
+
+    // ==========================================
+    // CATALOG SYNC (Sprint 57)
+    // ==========================================
+
+    public function syncProductCatalog(string $feedContent, string $feedFormat): array
+    {
+        if ($this->httpClient === null || $this->apiKey === '') {
+            return ['successful' => false, 'error' => 'HTTP client or API key not configured'];
+        }
+
+        $contentType = $feedFormat === 'csv' ? 'text/csv' : 'application/x-jsonlines';
+        $response = $this->httpClient->post(
+            'https://api.stripe.com/v1/products/import',
+            $feedContent,
+            [
+                'Authorization' => 'Bearer ' . $this->apiKey,
+                'Content-Type' => $contentType,
+            ],
+            30
+        );
+
+        if (!$response->isSuccessful()) {
+            $error = $response->getError() ?? 'HTTP ' . $response->getStatusCode();
+            return ['successful' => false, 'error' => $error];
+        }
+
+        $result = json_decode($response->getBody(), true);
+        if (!is_array($result)) {
+            $result = [];
+        }
+
+        return [
+            'successful' => true,
+            'products_processed' => is_numeric($result['products_processed'] ?? null) ? (int) $result['products_processed'] : 0,
+            'products_created' => is_numeric($result['products_created'] ?? null) ? (int) $result['products_created'] : 0,
+            'products_updated' => is_numeric($result['products_updated'] ?? null) ? (int) $result['products_updated'] : 0,
+        ];
+    }
+
+    public function syncProductInventory(string $csvContent): array
+    {
+        return $this->syncProductCatalog($csvContent, 'csv');
+    }
+
+    public function updateFulfillmentStatus(string $orderId, string $status, array $metadata = []): bool
+    {
+        if ($this->httpClient === null || $this->apiKey === '') {
+            return false;
+        }
+
+        $body = json_encode([
+            'status' => $status,
+            'metadata' => $metadata,
+        ], JSON_THROW_ON_ERROR);
+
+        $response = $this->httpClient->post(
+            'https://api.stripe.com/v1/orders/' . $orderId . '/fulfillment',
+            $body,
+            [
+                'Authorization' => 'Bearer ' . $this->apiKey,
+                'Content-Type' => 'application/json',
+            ],
+            10
+        );
+
+        return $response->isSuccessful();
     }
 
     // ==========================================

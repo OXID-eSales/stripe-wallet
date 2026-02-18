@@ -8,16 +8,15 @@ use OxidEsales\PaymentComponent\Mcp\Acp\AcpProductServiceInterface;
 use OxidEsales\PaymentComponent\Mcp\Acp\CatalogSyncResult;
 use OxidEsales\PaymentComponent\Mcp\Acp\HostedCommerceServiceInterface;
 use OxidEsales\PaymentComponent\Mcp\Acp\ProductFeedGeneratorInterface;
-use OxidEsales\PaymentComponent\Mcp\Http\HttpClientInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
+use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 
 class StripeProductCatalogSyncService implements HostedCommerceServiceInterface
 {
     public function __construct(
-        private readonly HttpClientInterface $httpClient,
+        private readonly StripeAdapterFactoryInterface $adapterFactory,
         private readonly AcpProductServiceInterface $productService,
         private readonly ProductFeedGeneratorInterface $feedGenerator,
-        private readonly string $stripeApiKey = '',
         private readonly ?FileLoggerInterface $logger = null
     ) {
     }
@@ -29,44 +28,29 @@ class StripeProductCatalogSyncService implements HostedCommerceServiceInterface
             'contentLength' => strlen($feedContent),
         ]);
 
-        if ($this->stripeApiKey === '') {
+        try {
+            $adapter = $this->adapterFactory->getStripeAdapter();
+        } catch (\RuntimeException $e) {
             return CatalogSyncResult::failed('Stripe API key not configured');
         }
 
-        $response = $this->httpClient->post(
-            'https://api.stripe.com/v1/products/import',
-            $feedContent,
-            [
-                'Authorization' => 'Bearer ' . $this->stripeApiKey,
-                'Content-Type' => $feedFormat === 'csv' ? 'text/csv' : 'application/x-jsonlines',
-            ],
-            30
-        );
+        $result = $adapter->syncProductCatalog($feedContent, $feedFormat);
 
-        if (!$response->isSuccessful()) {
-            $error = $response->getError() ?? 'HTTP ' . $response->getStatusCode();
+        if (!$result['successful']) {
+            $error = isset($result['error']) ? (string) $result['error'] : 'Unknown error';
             $this->logger?->log('CatalogSync: upload failed', ['error' => $error]);
             return CatalogSyncResult::failed($error);
         }
-
-        $result = json_decode($response->getBody(), true);
-        if (!is_array($result)) {
-            $result = [];
-        }
-
-        $this->logger?->log('CatalogSync: upload complete', [
-            'processed' => $result['products_processed'] ?? 0,
-        ]);
 
         $processed = $result['products_processed'] ?? 0;
         $created = $result['products_created'] ?? 0;
         $updated = $result['products_updated'] ?? 0;
 
-        return CatalogSyncResult::success(
-            is_numeric($processed) ? (int) $processed : 0,
-            is_numeric($created) ? (int) $created : 0,
-            is_numeric($updated) ? (int) $updated : 0
-        );
+        $this->logger?->log('CatalogSync: upload complete', [
+            'processed' => $processed,
+        ]);
+
+        return CatalogSyncResult::success($processed, $created, $updated);
     }
 
     public function syncInventory(array $inventoryUpdates): CatalogSyncResult
@@ -84,35 +68,22 @@ class StripeProductCatalogSyncService implements HostedCommerceServiceInterface
         string $status,
         array $metadata = []
     ): bool {
-        if ($this->stripeApiKey === '') {
+        try {
+            $adapter = $this->adapterFactory->getStripeAdapter();
+        } catch (\RuntimeException $e) {
             return false;
         }
 
-        $body = json_encode([
-            'status' => $status,
-            'metadata' => $metadata,
-        ], JSON_THROW_ON_ERROR);
+        $success = $adapter->updateFulfillmentStatus($orderId, $status, $metadata);
 
-        $response = $this->httpClient->post(
-            'https://api.stripe.com/v1/orders/' . $orderId . '/fulfillment',
-            $body,
-            [
-                'Authorization' => 'Bearer ' . $this->stripeApiKey,
-                'Content-Type' => 'application/json',
-            ],
-            10
-        );
-
-        if (!$response->isSuccessful()) {
+        if (!$success) {
             $this->logger?->log('FulfillmentUpdate: failed', [
                 'orderId' => $orderId,
                 'status' => $status,
-                'error' => $response->getError() ?? 'HTTP ' . $response->getStatusCode(),
             ]);
-            return false;
         }
 
-        return true;
+        return $success;
     }
 
     /**

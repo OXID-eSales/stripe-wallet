@@ -173,6 +173,7 @@ services:
   OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactory:
     arguments:
       $idempotencyRepository: '@OxidEsales\PaymentComponent\Repository\IdempotencyRepositoryInterface'
+      $httpClient: '@OxidEsales\PaymentComponent\Mcp\Http\HttpClientInterface'
     public: false
 
   # Payment Adapter Factory Interface - Bind to StripeAdapterFactory
@@ -181,6 +182,7 @@ services:
     class: OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactory
     arguments:
       $idempotencyRepository: '@OxidEsales\PaymentComponent\Repository\IdempotencyRepositoryInterface'
+      $httpClient: '@OxidEsales\PaymentComponent\Mcp\Http\HttpClientInterface'
     public: true
 
   # Stripe Adapter Factory Interface - Stripe-specific factory
@@ -372,6 +374,7 @@ services:
   # Activates only when source === 'acp'
   OxidEsales\Payments\Stripe\Mcp\Handler\AcpContextResolverHandler:
     arguments:
+      $sessionAdapter: '@OxidEsales\PaymentComponent\Adapter\SessionAdapterInterface'
       $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler, priority: 200 }
@@ -404,6 +407,7 @@ services:
       $shopAdapter: '@OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface'
       $customerService: '@OxidEsales\Payments\Stripe\Service\StripeCustomerServiceInterface'
       $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+      $configValidator: '@OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface'
       $eventLogger: '@stripe.events.file_logger'
     tags:
       - { name: payment.event_handler, priority: 0 }
@@ -1202,19 +1206,17 @@ services:
 
   OxidEsales\Payments\Stripe\Mcp\Service\StripeProductCatalogSyncService:
     arguments:
-      $httpClient: '@OxidEsales\PaymentComponent\Mcp\Http\HttpClientInterface'
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
       $productService: '@OxidEsales\PaymentComponent\Mcp\Acp\AcpProductServiceInterface'
       $feedGenerator: '@OxidEsales\PaymentComponent\Mcp\Acp\ProductFeedGeneratorInterface'
-      $stripeApiKey: '%stripe.api_secret_key%'
       $logger: '@stripe.request_file_logger'
 
   OxidEsales\PaymentComponent\Mcp\Acp\HostedCommerceServiceInterface:
     class: OxidEsales\Payments\Stripe\Mcp\Service\StripeProductCatalogSyncService
     arguments:
-      $httpClient: '@OxidEsales\PaymentComponent\Mcp\Http\HttpClientInterface'
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
       $productService: '@OxidEsales\PaymentComponent\Mcp\Acp\AcpProductServiceInterface'
       $feedGenerator: '@OxidEsales\PaymentComponent\Mcp\Acp\ProductFeedGeneratorInterface'
-      $stripeApiKey: '%stripe.api_secret_key%'
       $logger: '@stripe.request_file_logger'
 
   OxidEsales\Payments\Stripe\WebhookHandler\HostedAcpOrderHandler:

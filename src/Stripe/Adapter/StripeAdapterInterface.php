@@ -29,4 +29,29 @@ interface StripeAdapterInterface extends
     StripeRefundAdapterInterface,
     StripeCustomerAdapterInterface
 {
+    /**
+     * Upload a product catalog feed to the Stripe API.
+     *
+     * @param string $feedContent Feed content (CSV or JSONL)
+     * @param string $feedFormat Format identifier ('csv' or 'jsonl')
+     * @return array{successful: bool, error?: string, products_processed?: int, products_created?: int, products_updated?: int}
+     */
+    public function syncProductCatalog(string $feedContent, string $feedFormat): array;
+
+    /**
+     * Upload inventory updates to the Stripe API.
+     *
+     * @param string $csvContent CSV content with ID,Availability columns
+     * @return array{successful: bool, error?: string, products_processed?: int, products_created?: int, products_updated?: int}
+     */
+    public function syncProductInventory(string $csvContent): array;
+
+    /**
+     * Update fulfillment status for a Stripe order.
+     *
+     * @param string $orderId Stripe order ID
+     * @param string $status Fulfillment status
+     * @param array<string, mixed> $metadata Additional metadata
+     */
+    public function updateFulfillmentStatus(string $orderId, string $status, array $metadata = []): bool;
 }

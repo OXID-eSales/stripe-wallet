@@ -23,6 +23,7 @@ class McpController extends FrontendController
     private ?RateLimiterInterface $rateLimiter = null;
     private ?McpLogServiceInterface $mcpLogger = null;
 
+    // OXID constraint: controllers use ContainerFactory, not constructor DI
     public function init(): void
     {
         parent::init();

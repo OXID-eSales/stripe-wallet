@@ -180,4 +180,44 @@ final class LazyStripeAdapter implements PaymentAdapterInterface
     {
         return $this->getAdapter()->parseWebhook($payload, $signature, $secret);
     }
+
+    // ==========================================
+    // CATALOG SYNC (Sprint 57)
+    // ==========================================
+
+    /**
+     * @return array{successful: bool, error?: string, products_processed?: int, products_created?: int, products_updated?: int}
+     */
+    public function syncProductCatalog(string $feedContent, string $feedFormat): array
+    {
+        $adapter = $this->getAdapter();
+        if ($adapter instanceof StripeAdapterInterface) {
+            return $adapter->syncProductCatalog($feedContent, $feedFormat);
+        }
+        return ['successful' => false, 'error' => 'Adapter does not support catalog sync'];
+    }
+
+    /**
+     * @return array{successful: bool, error?: string, products_processed?: int, products_created?: int, products_updated?: int}
+     */
+    public function syncProductInventory(string $csvContent): array
+    {
+        $adapter = $this->getAdapter();
+        if ($adapter instanceof StripeAdapterInterface) {
+            return $adapter->syncProductInventory($csvContent);
+        }
+        return ['successful' => false, 'error' => 'Adapter does not support inventory sync'];
+    }
+
+    /**
+     * @param array<string, mixed> $metadata
+     */
+    public function updateFulfillmentStatus(string $orderId, string $status, array $metadata = []): bool
+    {
+        $adapter = $this->getAdapter();
+        if ($adapter instanceof StripeAdapterInterface) {
+            return $adapter->updateFulfillmentStatus($orderId, $status, $metadata);
+        }
+        return false;
+    }
 }

@@ -42,4 +42,14 @@ final class OxidSessionAdapter implements SessionAdapterInterface
     {
         return Registry::getSession()->getVariable($name);
     }
+
+    public function setBasket(object $basket): void
+    {
+        Registry::getSession()->setBasket($basket); // @phpstan-ignore argument.type (OXID core: setBasket expects Basket, interface uses object)
+    }
+
+    public function setUser(object $user): void
+    {
+        Registry::getSession()->setUser($user); // @phpstan-ignore argument.type (OXID core: setUser expects User, interface uses object)
+    }
 }

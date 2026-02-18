@@ -12,6 +12,7 @@ use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 use OxidEsales\PaymentComponent\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
+use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\StripeCustomerServiceInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
@@ -42,6 +43,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         private readonly ShopAdapterInterface $shopAdapter,
         private readonly StripeCustomerServiceInterface $customerService,
         private readonly ModuleConfigurationServiceInterface $config,
+        private readonly ?ConfigurationValidatorInterface $configValidator = null,
         private readonly ?FileLoggerInterface $eventLogger = null
     ) {
     }
@@ -64,6 +66,8 @@ class StripeCheckoutSessionHandler implements HandlerInterface
             $this->logEvent('StripeCheckoutSessionHandler: Wrong event type, skipping');
             return;
         }
+
+        $this->validateConfiguration();
 
         $context = $event->getContext();
         $contract = $context->getContract();
@@ -126,6 +130,22 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         $this->logEvent('StripeCheckoutSessionHandler::handle() END', [
             'checkoutSessionId' => $result->getSessionId(),
         ]);
+    }
+
+    /**
+     * Validate Stripe API key configuration before proceeding.
+     */
+    private function validateConfiguration(): void
+    {
+        if ($this->configValidator === null) {
+            return;
+        }
+
+        $error = $this->configValidator->getKeyValidationError();
+        if ($error !== null) {
+            $this->logEvent('StripeCheckoutSessionHandler: Configuration invalid', ['error' => $error]);
+            throw new RuntimeException('Stripe configuration error: ' . $error);
+        }
     }
 
     /**

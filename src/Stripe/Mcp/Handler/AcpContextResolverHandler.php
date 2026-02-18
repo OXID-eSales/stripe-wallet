@@ -8,6 +8,7 @@ use OxidEsales\Eshop\Application\Model\Basket;
 use OxidEsales\Eshop\Application\Model\Country;
 use OxidEsales\Eshop\Application\Model\User;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\PaymentComponent\Adapter\SessionAdapterInterface;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
@@ -32,6 +33,7 @@ class AcpContextResolverHandler implements HandlerInterface
     private const PAYMENT_ID = StripeDefinitions::STRIPE_WALLET_PAYMENT_ID;
 
     public function __construct(
+        private readonly ?SessionAdapterInterface $sessionAdapter = null,
         private readonly ?FileLoggerInterface $eventLogger = null
     ) {
     }
@@ -128,14 +130,24 @@ class AcpContextResolverHandler implements HandlerInterface
 
         $countryId = $this->resolveCountryId($address['country'] ?? '');
 
+        // All fields that Order::assignUserInformation() clones must be initialized,
+        // otherwise OXID's magic __get returns null and `clone null` crashes.
         $userData = [
             'oxusername' => $email,
             'oxfname' => $buyer['first_name'] ?? '',
             'oxlname' => $buyer['last_name'] ?? '',
+            'oxsal' => '',
+            'oxcompany' => '',
             'oxactive' => 1,
             'oxstreet' => $address['line_one'] ?? '',
+            'oxstreetnr' => '',
+            'oxaddinfo' => '',
             'oxcity' => $address['city'] ?? '',
             'oxzip' => $address['postal_code'] ?? '',
+            'oxstateid' => '',
+            'oxustid' => '',
+            'oxfon' => $buyer['phone_number'] ?? '',
+            'oxfax' => '',
         ];
 
         if ($countryId !== '') {
@@ -202,23 +214,25 @@ class AcpContextResolverHandler implements HandlerInterface
         }
     }
 
-    /**
-     * Set user and basket on OXID session.
-     * Extracted for testability — subclasses can override.
-     */
     protected function setSession(User $user, Basket $basket): void
     {
+        if ($this->sessionAdapter !== null) {
+            $this->sessionAdapter->setBasket($basket);
+            $this->sessionAdapter->setUser($user);
+            return;
+        }
+
         $session = Registry::getSession();
         $session->setBasket($basket);
         $session->setUser($user);
     }
 
-    /**
-     * Get current session ID.
-     * Extracted for testability — subclasses can override.
-     */
     protected function getSessionId(): string
     {
+        if ($this->sessionAdapter !== null) {
+            return $this->sessionAdapter->getSessionId();
+        }
+
         return Registry::getSession()->getId();
     }
 
