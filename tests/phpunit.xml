@@ -27,6 +27,9 @@
     <testsuite name="McpIntegration">
       <directory>Integration/Mcp</directory>
     </testsuite>
+    <testsuite name="Security">
+      <directory>Security/</directory>
+    </testsuite>
     <testsuite name="McpHttp">
       <directory>Http/Mcp</directory>
     </testsuite>
