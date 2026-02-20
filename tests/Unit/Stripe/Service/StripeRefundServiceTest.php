@@ -254,6 +254,135 @@ class StripeRefundServiceTest extends TestCase
         $this->service->refund($contractId); // null amount = full refund
     }
 
+    // ==========================================
+    // Sprint 47: Fix 7 - Refund ceiling uses captured amount (STRP-99)
+    // ==========================================
+
+    public function testRefundUsesContractCapturedAmountNotTotalGross(): void
+    {
+        $contractId = 'contract_partial_capture';
+        $providerOrderId = 'pi_stripe_789';
+        $totalGross = 100.00;
+        $capturedAmount = 50.00;
+
+        $contract = $this->createMockContractWithCapturedAmount(
+            $contractId,
+            $providerOrderId,
+            $totalGross,
+            $capturedAmount,
+            0.0,
+            ContractState::fulfilled()
+        );
+
+        $this->contractRepository->method('findById')->willReturn($contract);
+        $this->transactionRepository->method('getTotalRefundedForContract')->willReturn(0.00);
+
+        $refundResponse = $this->createRefundResponse('re_789', $capturedAmount);
+        $this->stripeAdapter->method('refundPayment')->willReturn($refundResponse);
+
+        $result = $this->service->refund($contractId);
+
+        // Max refundable should be 50 (capturedAmount), NOT 100 (totalGross)
+        $this->assertEquals(50.00, $result['response']->amountRefunded);
+        $this->assertEquals(50.00, $result['totalRefunded']);
+        $this->assertEquals(0.00, $result['availableForRefund']);
+    }
+
+    public function testRefundFailsWhenNoCapturedAmountRecorded(): void
+    {
+        $contractId = 'contract_no_capture';
+        $contract = $this->createMockContractWithCapturedAmount(
+            $contractId,
+            'pi_123',
+            100.00,
+            null,
+            0.0,
+            ContractState::fulfilled()
+        );
+
+        $this->contractRepository->method('findById')->willReturn($contract);
+
+        $this->expectException(RefundFailedException::class);
+        $this->expectExceptionMessage('no captured amount');
+
+        $this->service->refund($contractId);
+    }
+
+    public function testRefundWithPartialCaptureAndPriorRefund(): void
+    {
+        $contractId = 'contract_partial';
+        $capturedAmount = 50.00;
+        $alreadyRefunded = 10.00;
+
+        $contract = $this->createMockContractWithCapturedAmount(
+            $contractId,
+            'pi_partial',
+            100.00,
+            $capturedAmount,
+            0.0,
+            ContractState::fulfilled()
+        );
+
+        $this->contractRepository->method('findById')->willReturn($contract);
+        $this->transactionRepository->method('getTotalRefundedForContract')->willReturn($alreadyRefunded);
+
+        // Available = 50 - 10 = 40, but StripeRefundService only allows full refunds
+        // So it should reject because 40 != 40 is false... actually full remaining = 40
+        $refundResponse = $this->createRefundResponse('re_partial', 40.00);
+        $this->stripeAdapter->method('refundPayment')->willReturn($refundResponse);
+
+        $result = $this->service->refund($contractId);
+
+        $this->assertEquals(40.00, $result['response']->amountRefunded);
+        $this->assertEquals(50.00, $result['totalRefunded']);
+    }
+
+    // ==========================================
+    // Sprint 47: Fix 9 - is_finite validation (STRP-99)
+    // ==========================================
+
+    public function testRefundRejectsNanAmount(): void
+    {
+        $contractId = 'contract_nan';
+        $contract = $this->createMockContractWithCapturedAmount(
+            $contractId,
+            'pi_nan',
+            100.00,
+            100.00,
+            0.0,
+            ContractState::fulfilled()
+        );
+
+        $this->contractRepository->method('findById')->willReturn($contract);
+        $this->transactionRepository->method('getTotalRefundedForContract')->willReturn(0.00);
+
+        $this->expectException(RefundFailedException::class);
+        $this->expectExceptionMessage('finite');
+
+        $this->service->refund($contractId, NAN);
+    }
+
+    public function testRefundRejectsInfinityAmount(): void
+    {
+        $contractId = 'contract_inf';
+        $contract = $this->createMockContractWithCapturedAmount(
+            $contractId,
+            'pi_inf',
+            100.00,
+            100.00,
+            0.0,
+            ContractState::fulfilled()
+        );
+
+        $this->contractRepository->method('findById')->willReturn($contract);
+        $this->transactionRepository->method('getTotalRefundedForContract')->willReturn(0.00);
+
+        $this->expectException(RefundFailedException::class);
+        $this->expectExceptionMessage('finite');
+
+        $this->service->refund($contractId, INF);
+    }
+
     // Helper methods
 
     private function createMockContract(
@@ -262,14 +391,34 @@ class StripeRefundServiceTest extends TestCase
         float $amount,
         ContractState $state
     ): PaymentContractInterface&MockObject {
+        return $this->createMockContractWithCapturedAmount(
+            $id,
+            $providerOrderId,
+            $amount,
+            $amount,
+            0.0,
+            $state
+        );
+    }
+
+    private function createMockContractWithCapturedAmount(
+        string $id,
+        string $providerOrderId,
+        float $totalGross,
+        ?float $capturedAmount,
+        float $refundedAmount,
+        ContractState $state
+    ): PaymentContractInterface&MockObject {
         $contract = $this->createMock(PaymentContractInterface::class);
 
         $contract->method('getId')->willReturn($id);
         $contract->method('getProviderOrderId')->willReturn($providerOrderId);
         $contract->method('getState')->willReturn($state);
+        $contract->method('getCapturedAmount')->willReturn($capturedAmount);
+        $contract->method('getRefundedAmount')->willReturn($refundedAmount);
 
         $basketSnapshot = $this->createMock(BasketSnapshot::class);
-        $basketSnapshot->method('getTotalGross')->willReturn($amount);
+        $basketSnapshot->method('getTotalGross')->willReturn($totalGross);
         $basketSnapshot->method('getCurrency')->willReturn('EUR');
 
         $contract->method('getBasketSnapshot')->willReturn($basketSnapshot);

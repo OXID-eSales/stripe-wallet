@@ -800,16 +800,6 @@ services:
   # osc_payment_order_state table has been dropped.
 
   # ==========================================
-  # Twig Extensions
-  # ==========================================
-
-  # Dump Extension - Provides dump() and dd() functions for debugging templates
-  OxidEsales\Payments\Stripe\Twig\DumpExtension:
-    tags:
-      - { name: twig.extension }
-    public: false
-
-  # ==========================================
   # Controllers
   # ==========================================
 

@@ -89,7 +89,6 @@ class StripeOrderController extends OrderController
 
         try {
             // 0. Validate API key configuration
-            $config = $this->getServiceFromContainer(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface::class);
             $validator = $this->getServiceFromContainer(\OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface::class);
             $keyValidationError = $validator->getKeyValidationError();
             if ($keyValidationError !== null) {
@@ -131,35 +130,15 @@ class StripeOrderController extends OrderController
                 $this->setSessionVariable('stripe_contract_id', $contractId);
             }
 
-            // Debug: Log session creation details
-            $publishableKey = $config->getPublishableKey();
-            $secretKeyPrefix = substr($config->getToken(), 0, 12) . '...';
-
-            Registry::getLogger()->info('Checkout session created', [
-                'sessionId' => $context->get('checkoutSessionId'),
-                'contractId' => $context->get('contractId'),
-                'publishableKeyPrefix' => substr($publishableKey, 0, 12) . '...',
-                'secretKeyPrefix' => $secretKeyPrefix,
-                'isTestMode' => $config->isTestMode(),
-                'keysValid' => $validator->validateKeyPair(),
-            ]);
-
             echo json_encode([
                 'id' => $context->get('checkoutSessionId'),
-                'url' => $context->get('checkoutUrl'), // Direct URL for redirect
+                'url' => $context->get('checkoutUrl'),
                 'contract_id' => $context->get('contractId'),
-                // Debug info (remove in production)
-                '_debug' => [
-                    'pk_prefix' => substr($publishableKey, 0, 20),
-                    'sk_prefix' => $secretKeyPrefix,
-                    'testMode' => $config->isTestMode(),
-                    'keysValid' => $validator->validateKeyPair(),
-                ],
             ]);
         } catch (\Throwable $e) {
             http_response_code(500);
             $this->logError('createCheckoutSession failed', $e);
-            echo json_encode(['error' => $e->getMessage()]);
+            echo json_encode(['error' => 'Payment processing failed. Please try again.']);
         }
 
         $this->exitWithJson();
@@ -184,13 +163,23 @@ class StripeOrderController extends OrderController
         $contractId = Registry::getRequest()->getRequestParameter('contract_id');
         $contractToken = Registry::getRequest()->getRequestParameter('contract_token');
 
-        // 3. Create context with URL parameters
+        // 3. Validate contract_id from URL matches session
+        $sessionContractId = $this->getContractIdFromSession();
+        if (
+            is_string($contractId)
+            && is_string($sessionContractId)
+            && $contractId !== $sessionContractId
+        ) {
+            Registry::getUtilsView()->addErrorToDisplay('Payment verification failed');
+            return 'payment';
+        }
+
+        // 4. Create context with URL parameters
         $context = new EventContext([
             'checkoutSessionId' => $sessionId,
             'contract_id' => $contractId,
             'contract_token' => $contractToken,
-            // Also pass session contract ID as fallback
-            'contractId' => $this->getContractIdFromSession(),
+            'contractId' => $sessionContractId,
         ]);
 
         // 4. Dispatch event - HANDLERS DO THE WORK
@@ -352,13 +341,6 @@ class StripeOrderController extends OrderController
      */
     protected function getCaptureMode(): string
     {
-        // Allow override from request (for testing)
-        $override = Registry::getRequest()->getRequestParameter('capture_mode_override');
-        if (is_string($override) && in_array($override, ['automatic', 'manual'], true)) {
-            return $override;
-        }
-
-        // Get from module configuration
         $config = $this->getServiceFromContainer(
             \OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface::class
         );
