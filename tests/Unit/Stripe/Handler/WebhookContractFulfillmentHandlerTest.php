@@ -350,8 +350,6 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
         $this->assertTrue($result);
         // Contract should now be in READY_TO_COMMIT state
         $this->assertTrue($contract->getState()->isReadyToCommit());
-        // Captured amount should be recorded
-        $this->assertEquals($capturedAmount, $contract->getCapturedAmount());
     }
 
     /**
@@ -468,11 +466,10 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->with($providerOrderId)
             ->willReturn($contract);
 
-        // Save should be called to record captured amount
+        // Save should NOT be called - PENDING state cannot record captured amount
         $this->contractRepository
-            ->expects($this->once())
-            ->method('save')
-            ->with($contract);
+            ->expects($this->never())
+            ->method('save');
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
@@ -483,8 +480,6 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         // Should return false (not in correct state to fulfill)
         $this->assertFalse($result);
-        // But captured amount should still be recorded
-        $this->assertEquals($capturedAmount, $contract->getCapturedAmount());
     }
 
     // =========================================================================

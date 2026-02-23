@@ -53,10 +53,9 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
             return null;
         }
 
-        $this->recordCapturedAmount($contract, $capturedAmount);
-
-        // Idempotency check - already fulfilled
+        // Idempotency check - already fulfilled (can record amount in this state)
         if ($contract->getState()->isFulfilled()) {
+            $this->recordCapturedAmount($contract, $capturedAmount);
             $this->saveIfAmountPositive($contract, $capturedAmount);
             return false;
         }
@@ -68,9 +67,11 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
 
         // Validation - must be COMMITTED to fulfill
         if (!$contract->getState()->isCommitted()) {
-            $this->saveIfAmountPositive($contract, $capturedAmount);
             return false;
         }
+
+        // Record amount on COMMITTED contract before fulfillment
+        $this->recordCapturedAmount($contract, $capturedAmount);
 
         return $this->contractFulfillmentService->fulfill($contract);
     }

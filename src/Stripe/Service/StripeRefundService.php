@@ -33,6 +33,12 @@ class StripeRefundService extends AbstractPaymentRefundService
      */
     protected function validateRefundAmount(string $contractId, float $refundAmount, float $availableForRefund): void
     {
+        // Validate finite before partial refund check (parent has is_finite guard)
+        if (!is_finite($refundAmount)) {
+            parent::validateRefundAmount($contractId, $refundAmount, $availableForRefund);
+            return;
+        }
+
         // Stripe module only supports full refund - reject partial amounts
         if (abs($refundAmount - $availableForRefund) > 0.01) {
             throw new RefundFailedException(

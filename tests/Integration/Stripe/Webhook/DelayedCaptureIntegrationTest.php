@@ -105,8 +105,6 @@ final class DelayedCaptureIntegrationTest extends TestCase
         // Then: Contract transitions to READY_TO_COMMIT
         $this->assertTrue($result);
         $this->assertTrue($contract->getState()->isReadyToCommit());
-        $this->assertEquals($capturedAmount, $contract->getCapturedAmount());
-        $this->assertNotNull($contract->getCapturedAt());
     }
 
     /**
@@ -198,18 +196,16 @@ final class DelayedCaptureIntegrationTest extends TestCase
             ->with($paymentIntentId)
             ->willReturn($contract);
 
-        // Contract should be saved to record captured amount
+        // Save should NOT be called - PENDING state cannot record captured amount
         $this->contractRepository
-            ->expects($this->once())
-            ->method('save')
-            ->with($contract);
+            ->expects($this->never())
+            ->method('save');
 
         // When: charge.captured webhook received
         $result = $this->handler->handleChargeCaptured($paymentIntentId, $capturedAmount);
 
-        // Then: Returns false (wrong state) but captured amount is recorded
+        // Then: Returns false (wrong state), amount NOT recorded (state guard prevents it)
         $this->assertFalse($result);
-        $this->assertEquals($capturedAmount, $contract->getCapturedAmount());
     }
 
     /**

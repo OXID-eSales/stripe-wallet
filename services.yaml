@@ -800,6 +800,30 @@ services:
   # osc_payment_order_state table has been dropped.
 
   # ==========================================
+  # Twig Extensions
+  # ==========================================
+
+  # Environment Checker - Determines dev/prod mode from Stripe test/live config
+  # Sprint 63d (STRP-99 H1): Used by DumpExtension to gate debug functions
+  OxidEsales\Payments\Stripe\Environment\DevelopmentEnvironmentCheckerInterface:
+    alias: OxidEsales\Payments\Stripe\Environment\ModuleConfigurationDevelopmentChecker
+    public: false
+
+  OxidEsales\Payments\Stripe\Environment\ModuleConfigurationDevelopmentChecker:
+    arguments:
+      - '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+    public: false
+
+  # Dump Extension - Provides dump() for debugging templates (dev mode only)
+  # Sprint 63d (STRP-99 H1): Gated by DevelopmentEnvironmentCheckerInterface
+  OxidEsales\Payments\Stripe\Twig\DumpExtension:
+    arguments:
+      - '@OxidEsales\Payments\Stripe\Environment\DevelopmentEnvironmentCheckerInterface'
+    tags:
+      - { name: twig.extension }
+    public: false
+
+  # ==========================================
   # Controllers
   # ==========================================
 
