@@ -64,13 +64,12 @@ class ViewConfig extends ViewConfig_parent
         }
 
         // Check if we're on localhost/development domain
-        $serverName = $_SERVER['SERVER_NAME'] ?? '';
-        if (!is_string($serverName)) {
-            $serverName = '';
-        }
+        // Sprint 70a (M2): Strict suffix matching — prevents false positives
+        // like "attacker.localhost.com" matching "localhost"
+        $serverName = $this->getServerName();
         $devDomains = ['localhost', '.local', '.dev', '.test', 'oxiddev.de'];
         foreach ($devDomains as $domain) {
-            if (strpos($serverName, $domain) !== false) {
+            if ($serverName === $domain || str_ends_with($serverName, $domain)) {
                 return true;
             }
         }
@@ -144,5 +143,11 @@ class ViewConfig extends ViewConfig_parent
     {
         $config = $this->getStripeConfig();
         return $config !== null ? $config->getPublishableKey() : '';
+    }
+
+    protected function getServerName(): string
+    {
+        $serverName = $_SERVER['SERVER_NAME'] ?? '';
+        return is_string($serverName) ? $serverName : '';
     }
 }

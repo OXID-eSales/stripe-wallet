@@ -21,6 +21,7 @@ use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;
  * Webhook endpoint controller.
  *
  * Sprint 16: Refactored to use WebhookLogService for logging.
+ * Sprint 64d: Added guard chain for rate limiting, payload size, IP allowlist.
  * Controller only handles HTTP concerns (SRP).
  *
  * URL: /index.php?cl=stripe_webhook
@@ -31,6 +32,7 @@ class WebhookController extends FrontendController
 {
     private ?StripeWebhookProcessor $processor = null;
     private ?WebhookLogServiceInterface $webhookLogger = null;
+    private ?WebhookRequestGuardInterface $guard = null;
 
     /**
      * Initialize services.
@@ -49,6 +51,13 @@ class WebhookController extends FrontendController
                 'error' => $e->getMessage(),
             ]);
         }
+
+        try {
+            $guard = $container->get(WebhookRequestGuardInterface::class);
+            $this->guard = $guard instanceof WebhookRequestGuardInterface ? $guard : null;
+        } catch (\Exception $e) {
+            // Guard not available — proceed without (fail-open for compatibility)
+        }
     }
 
     /**
@@ -61,6 +70,12 @@ class WebhookController extends FrontendController
         Registry::getUtils()->setHeader('Content-Type: application/json');
 
         [$payload, $signature, $remoteIp] = $this->extractWebhookInput();
+
+        // Sprint 64d: Run guard chain BEFORE any processing
+        $guardResult = $this->getGuard()?->check($payload, $signature, $remoteIp);
+        if ($guardResult !== null) {
+            $this->sendErrorResponse($payload, $guardResult->message, $guardResult->httpStatusCode, $guardResult->reason);
+        }
 
         $this->webhookLogger?->logReceived($payload, $signature, $remoteIp);
 
@@ -103,11 +118,21 @@ class WebhookController extends FrontendController
     }
 
     /**
+     * Get the guard chain (protected for testable subclass override).
+     */
+    protected function getGuard(): ?WebhookRequestGuardInterface
+    {
+        return $this->guard;
+    }
+
+    /**
      * Extract raw webhook input from PHP globals.
+     *
+     * Protected for testable subclass override.
      *
      * @return array{string, string, string} [payload, signature, remoteIp]
      */
-    private function extractWebhookInput(): array
+    protected function extractWebhookInput(): array
     {
         $payload = file_get_contents('php://input');
         $rawSignature = $_SERVER['HTTP_STRIPE_SIGNATURE'] ?? '';
@@ -121,9 +146,11 @@ class WebhookController extends FrontendController
     /**
      * Send error response and terminate.
      *
+     * Protected for testable subclass override.
+     *
      * @return never
      */
-    private function sendErrorResponse(string $payload, string $message, int $statusCode, ?string $logAction = null): never
+    protected function sendErrorResponse(string $payload, string $message, int $statusCode, ?string $logAction = null): never
     {
         $this->webhookLogger?->logResult($payload, $logAction ?? "FAILED: {$message}", $statusCode);
         http_response_code($statusCode);

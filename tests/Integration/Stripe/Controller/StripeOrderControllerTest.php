@@ -117,6 +117,8 @@ class StripeOrderControllerTest extends TestCase
 
         $controller = $this->createControllerWithMocks($eventDispatcher, [
             'sessionId' => 'cs_test_success',
+            'contractId' => 'contract_xyz',
+            'contractToken' => 'valid_token_123',
         ]);
 
         $result = $controller->checkoutSuccess();
@@ -380,6 +382,24 @@ class StripeOrderControllerTest extends TestCase
                 return $this->options['redirectStatus'] ?? null;
             }
 
+            protected function getContractIdFromRequest(): ?string
+            {
+                return $this->options['contractId'] ?? null;
+            }
+
+            protected function getContractTokenFromRequest(): ?string
+            {
+                return $this->options['contractToken'] ?? null;
+            }
+
+            protected function validateContractToken(?string $contractId, ?string $contractToken): bool
+            {
+                if ($contractId === null || $contractToken === null) {
+                    return false;
+                }
+                return true;
+            }
+
             protected function getContractIdFromSession(): ?string
             {
                 return $this->options['contractId'] ?? null;
@@ -432,6 +452,11 @@ class StripeOrderControllerTest extends TestCase
             protected function addErrorToDisplay(string $message): void
             {
                 $this->errors[] = $message;
+            }
+
+            protected function validateSessionChallenge(): bool
+            {
+                return true; // Skip CSRF in integration tests
             }
 
             protected function exitWithJson(): void

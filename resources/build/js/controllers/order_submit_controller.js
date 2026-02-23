@@ -114,8 +114,8 @@ export default class extends Controller {
 
     this.setStatus(window.oStripe?.i18n?.CREATING_SESSION || 'Creating checkout session...')
 
-    // Create Checkout Session
-    const response = await fetch(this.urlValue, {
+    // Create Checkout Session (include stoken for CSRF protection)
+    const response = await fetch(this.buildUrlWithCsrfToken(this.urlValue), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -213,7 +213,7 @@ export default class extends Controller {
 
     console.log('Creating payment intent via URL:', this.urlValue)
 
-    const response = await fetch(this.urlValue, {
+    const response = await fetch(this.buildUrlWithCsrfToken(this.urlValue), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -236,6 +236,22 @@ export default class extends Controller {
     }
 
     return responseData
+  }
+
+  /**
+   * Append stoken (CSRF token) to URL for session challenge validation.
+   * OXID includes stoken in forms via oViewConf.getSessionChallengeToken().
+   * @param {string} url - The base URL
+   * @returns {string} URL with stoken parameter appended
+   */
+  buildUrlWithCsrfToken(url) {
+    const stoken = document.querySelector('input[name="stoken"]')?.value || ''
+    if (!stoken) {
+      console.warn('CSRF token (stoken) not found in form')
+      return url
+    }
+    const separator = url.includes('?') ? '&' : '?'
+    return url + separator + 'stoken=' + encodeURIComponent(stoken)
   }
 
   /**

@@ -66,6 +66,11 @@ class OrderRefund extends AdminDetailsController
 
     public function fullRefund(): void
     {
+        if (!$this->validateCsrfToken()) {
+            $this->_blSuccessfulRefund = false;
+            return;
+        }
+
         $order = $this->getOrder();
         if ($order === null) {
             $this->setErrorMessage(Registry::getLang()->translateString('STRIPE_REFUND_NO_ORDER'));
@@ -84,6 +89,11 @@ class OrderRefund extends AdminDetailsController
 
     public function capturePayment(): void
     {
+        if (!$this->validateCsrfToken()) {
+            $this->_blSuccessfulCapture = false;
+            return;
+        }
+
         $this->dispatchTransactionAction(
             'capture',
             'STRIPE_CAPTURE_NO_ORDER',
@@ -96,6 +106,11 @@ class OrderRefund extends AdminDetailsController
 
     public function cancelAuthorization(): void
     {
+        if (!$this->validateCsrfToken()) {
+            $this->_blSuccessfulCancel = false;
+            return;
+        }
+
         $this->dispatchTransactionAction(
             'cancel',
             'STRIPE_CANCEL_NO_ORDER',
@@ -324,6 +339,22 @@ class OrderRefund extends AdminDetailsController
     {
         $value = Registry::getRequest()->getRequestEscapedParameter($name);
         return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /**
+     * Validate CSRF token (stoken) from session challenge.
+     *
+     * Sprint 64e: Must be called at the start of every state-changing action.
+     * OXID admin forms include stoken automatically via form helpers.
+     */
+    protected function validateCsrfToken(): bool
+    {
+        if (!Registry::getSession()->checkSessionChallenge()) {
+            $this->setErrorMessage('Session expired or invalid request.');
+            return false;
+        }
+
+        return true;
     }
 
     // =========================================================================

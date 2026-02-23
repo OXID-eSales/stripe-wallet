@@ -2,6 +2,7 @@ name: Development
 
 on: [ push, pull_request ]
 
+
 env:
   PACKAGE_NAME: 'oxid-esales/stripe-wallet'
   SONARCLOUD_ORGANIZATION: 'oxid-esales'

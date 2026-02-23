@@ -359,8 +359,16 @@ services:
   # Sprint 27: Uses payment-component interface and implementation.
   # SRP: Service handles contract metadata operations.
 
+  # Sprint 68b (M9): Address HMAC service — signs delivery address hashes
+  OxidEsales\PaymentComponent\Service\AddressHmacService:
+    arguments:
+      $secret: '%stripe.address_hmac_secret%'
+    public: false
+
   OxidEsales\PaymentComponent\Service\ContractMetadataServiceInterface:
     class: OxidEsales\PaymentComponent\Service\ContractMetadataService
+    arguments:
+      $addressHmacService: '@OxidEsales\PaymentComponent\Service\AddressHmacService'
     public: false
 
   # ==========================================
@@ -962,6 +970,45 @@ services:
 # ==========================================
 # These can be overridden in shop configuration or environment
 
+  # ==========================================
+  # Sprint 64d: Webhook Guard Chain (security hardening)
+  # ==========================================
+
+  # Payload size guard (64KB max — Stripe events are typically 2-5KB)
+  OxidEsales\Payments\Stripe\Controller\Webhook\WebhookPayloadSizeGuard:
+    arguments:
+      $maxBytes: 65536
+
+  # Rate limiter: 100 requests per 60 seconds per IP
+  stripe.webhook.rate_limiter:
+    class: OxidEsales\PaymentComponent\Mcp\Http\ApcuRateLimiter
+    arguments: [100, 60, 'stripe_webhook_rate:']
+
+  OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRateLimitGuard:
+    arguments:
+      $rateLimiter: '@stripe.webhook.rate_limiter'
+
+  # IP allowlist: disabled by default (empty list = all IPs allowed)
+  OxidEsales\Payments\Stripe\Controller\Webhook\WebhookIpAllowlistGuard:
+    arguments:
+      $allowedCidrs: []
+      $allowLoopback: true
+
+  # Sprint 67b (M6): HTTPS enforcement guard
+  OxidEsales\Payments\Stripe\Controller\Webhook\WebhookHttpsGuard:
+    arguments:
+      $allowInsecureLoopback: true
+
+  # Guard chain: ordered cheapest → most expensive
+  OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRequestGuardInterface:
+    class: OxidEsales\Payments\Stripe\Controller\Webhook\WebhookGuardChain
+    public: true
+    arguments:
+      - - '@OxidEsales\Payments\Stripe\Controller\Webhook\WebhookHttpsGuard'
+        - '@OxidEsales\Payments\Stripe\Controller\Webhook\WebhookPayloadSizeGuard'
+        - '@OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRateLimitGuard'
+        - '@OxidEsales\Payments\Stripe\Controller\Webhook\WebhookIpAllowlistGuard'
+
 parameters:
   # Fraud check toggle (default: enabled)
   payment.fraud_check.enabled: true
@@ -969,3 +1016,7 @@ parameters:
   # Fraud check threshold (default: 0.7 = 70% risk score)
   # Scores >= threshold fail the fraud check
   payment.fraud_check.threshold: 0.7
+
+  # Sprint 68b (M9): Server-side secret for address hash HMAC
+  # Derived from a fixed salt — unique per installation via Stripe secret key injection at runtime
+  stripe.address_hmac_secret: 'oe_stripe_address_hmac_v1_secret'

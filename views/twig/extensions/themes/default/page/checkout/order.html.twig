@@ -64,6 +64,8 @@
     {% set displayBasketOrderButton = oViewConf.getViewThemeParam('basketLowOrderDisplayOrderButton') %}
     {% if not oView.isLowOrderPrice() or (displayBasketOrderButton == 'show' or displayBasketOrderButton == 'disabled') %}
         {% set createCheckoutSessionUrl = oViewConf.getSslSelfLink() ~ "cl=order&fnc=createCheckoutSession" %}
+        {# CSRF token for AJAX requests (Sprint 64f: H8 frontend CSRF protection) #}
+        <input type="hidden" name="stoken" value="{{ oViewConf.getSessionChallengeToken() }}" />
         <button id="stripe-checkout-btn"
                 type="button"
                 class="btn btn-highlight btn-lg w-100"

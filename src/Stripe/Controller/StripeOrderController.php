@@ -13,6 +13,7 @@ use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEve
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
+use OxidEsales\Payments\Stripe\Service\ContractTokenService;
 
 /**
  * Thin Stripe Order Controller.
@@ -42,6 +43,11 @@ class StripeOrderController extends OrderController
      */
     public function executeStripePayment(): string
     {
+        if (!$this->validateSessionChallenge()) {
+            Registry::getUtilsView()->addErrorToDisplay('Session expired. Please reload the page.');
+            return 'payment';
+        }
+
         // 1. Validate
         $basket = $this->getBasketFromSession();
         if ($basket->getProductsCount() === 0) {
@@ -86,6 +92,13 @@ class StripeOrderController extends OrderController
     public function createCheckoutSession(): void
     {
         header('Content-Type: application/json');
+
+        if (!$this->validateSessionChallenge()) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Session expired. Please reload the page.']);
+            $this->exitWithJson();
+            return;
+        }
 
         try {
             // 0. Validate API key configuration
@@ -155,26 +168,33 @@ class StripeOrderController extends OrderController
         $sessionId = $this->getCheckoutSessionIdFromRequest();
 
         if ($sessionId === null) {
-            Registry::getUtilsView()->addErrorToDisplay('Payment information missing');
+            $this->addErrorToDisplay('Payment information missing');
             return 'payment';
         }
 
         // 2. Get contract_id and contract_token from URL (passed in return URL)
-        $contractId = Registry::getRequest()->getRequestParameter('contract_id');
-        $contractToken = Registry::getRequest()->getRequestParameter('contract_token');
+        $contractId = $this->getContractIdFromRequest();
+        $contractToken = $this->getContractTokenFromRequest();
 
-        // 3. Validate contract_id from URL matches session
-        $sessionContractId = $this->getContractIdFromSession();
-        if (
-            is_string($contractId)
-            && is_string($sessionContractId)
-            && $contractId !== $sessionContractId
-        ) {
-            Registry::getUtilsView()->addErrorToDisplay('Payment verification failed');
+        // 3. Sprint 67a (H3): Validate contract token BEFORE any business logic
+        if (!is_string($contractId) || !is_string($contractToken)) {
+            $this->addErrorToDisplay('Payment verification failed');
             return 'payment';
         }
 
-        // 4. Create context with URL parameters
+        if (!$this->validateContractToken($contractId, $contractToken)) {
+            $this->addErrorToDisplay('Payment verification failed');
+            return 'payment';
+        }
+
+        // 4. Validate contract_id from URL matches session
+        $sessionContractId = $this->getContractIdFromSession();
+        if (is_string($sessionContractId) && $contractId !== $sessionContractId) {
+            $this->addErrorToDisplay('Payment verification failed');
+            return 'payment';
+        }
+
+        // 5. Create context with validated URL parameters
         $context = new EventContext([
             'checkoutSessionId' => $sessionId,
             'contract_id' => $contractId,
@@ -182,11 +202,11 @@ class StripeOrderController extends OrderController
             'contractId' => $sessionContractId,
         ]);
 
-        // 4. Dispatch event - HANDLERS DO THE WORK
+        // 6. Dispatch event - HANDLERS DO THE WORK
         $event = new StripeCheckoutReturnEvent($context);
         $this->getEventDispatcher()->dispatch($event);
 
-        // 4. Process results
+        // 7. Process results
         $this->processContextResults($context);
 
         // Set order in session for thank you page
@@ -296,6 +316,18 @@ class StripeOrderController extends OrderController
         return is_string($value) ? $value : null;
     }
 
+    protected function getContractIdFromRequest(): ?string
+    {
+        $value = Registry::getRequest()->getRequestParameter('contract_id');
+        return is_string($value) ? $value : null;
+    }
+
+    protected function getContractTokenFromRequest(): ?string
+    {
+        $value = Registry::getRequest()->getRequestParameter('contract_token');
+        return is_string($value) ? $value : null;
+    }
+
     protected function getRedirectStatusFromRequest(): ?string
     {
         $value = Registry::getRequest()->getRequestParameter('redirect_status');
@@ -387,5 +419,45 @@ class StripeOrderController extends OrderController
     protected function exitWithJson(): void
     {
         exit;
+    }
+
+    /**
+     * Validate contract token for the given contract ID.
+     *
+     * Sprint 67a (H3): Ensures return URL tokens are cryptographically valid.
+     */
+    protected function validateContractToken(?string $contractId, ?string $contractToken): bool
+    {
+        if ($contractId === null || $contractToken === null) {
+            return false;
+        }
+
+        return $this->getContractTokenService()->validateToken($contractToken, $contractId);
+    }
+
+    protected function getContractTokenService(): ContractTokenService
+    {
+        return $this->getServiceFromContainer(ContractTokenService::class);
+    }
+
+    /**
+     * Add error message to display.
+     *
+     * Sprint 67a: Extracted for testability.
+     */
+    protected function addErrorToDisplay(string $message): void
+    {
+        Registry::getUtilsView()->addErrorToDisplay($message);
+    }
+
+    /**
+     * Validate CSRF token from session challenge.
+     *
+     * Sprint 64f: Must be called at the start of every state-changing action.
+     * OXID frontend forms include stoken automatically via oViewConf.getSessionChallengeToken().
+     */
+    protected function validateSessionChallenge(): bool
+    {
+        return Registry::getSession()->checkSessionChallenge();
     }
 }

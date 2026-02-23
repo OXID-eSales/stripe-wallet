@@ -78,6 +78,11 @@ class TestableOrderRefund extends OrderRefund
         return $this->testEditObjectId;
     }
 
+    protected function validateCsrfToken(): bool
+    {
+        return true; // Skip CSRF in integration tests
+    }
+
     /**
      * Expose event context for testing.
      */

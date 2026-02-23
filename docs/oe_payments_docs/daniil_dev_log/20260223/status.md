@@ -8,9 +8,18 @@
 
 ## Active Sprint Queue
 
-| Sprint | Title | Status |
-|--------|-------|--------|
-| 64 | Penetration Testing & Stress/DDoS Plan | PLANNED (plan ready, awaiting execution) |
+| Sprint | Title | Findings | Status |
+|--------|-------|----------|--------|
+| 64a | Guard Infrastructure + Payload Size Guard (TDD) | M8 | PLANNED |
+| 64b | Webhook Rate Limiter (TDD) | M7 | PLANNED |
+| 64c | Webhook IP Allowlist Guard (TDD) | H9 | PLANNED |
+| 64d | WebhookController Guard Integration (TDD) | M7+M8+H9 | PLANNED |
+| 64e | CSRF on Admin Endpoints (TDD) | H8 | PLANNED |
+| 64f | CSRF on Frontend AJAX + JS (TDD) | H8 | PLANNED |
+| 64g | Atomic Idempotency / TOCTOU Race (TDD) | C3 | PLANNED |
+| 64h | Automated Pentest Verification (DevOps) | All | PLANNED |
+
+**Plan:** `sprints/sprint-64-pentest-stress-plan.md` (~45 new tests, 17 new files, 9 modified)
 
 ---
 
@@ -61,7 +70,7 @@
 | 63c | C5 | 2026-02-23 | 2026-02-23 | ALREADY FIXED — `reports/02-sprint-63abc-already-fixed.md` |
 | 63d | H1 | 2026-02-23 | 2026-02-23 | `reports/03-sprint-63d-h1-dump-extension-completed.md` |
 | 63e | M5 test fixes | 2026-02-23 | 2026-02-23 | `reports/04-sprint-63e-m5-test-fixes.md` |
-| 64 | Pentest plan | 2026-02-23 | — | `sprints/sprint-64-pentest-stress-plan.md` |
+| 64a–f | Pentest + hardening plan | 2026-02-23 | — | `sprints/sprint-64-pentest-stress-plan.md` |
 
 ---
 
