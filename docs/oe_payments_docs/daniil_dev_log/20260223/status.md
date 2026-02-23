@@ -8,9 +8,9 @@
 
 ## Active Sprint Queue
 
-No active sprints. All Sprint 63 work complete.
-
-**Next up:** Investigate and fix 5 pre-existing test failures (M5 state guard + refund message).
+| Sprint | Title | Status |
+|--------|-------|--------|
+| 64 | Penetration Testing & Stress/DDoS Plan | PLANNED (plan ready, awaiting execution) |
 
 ---
 
@@ -37,7 +37,7 @@ No active sprints. All Sprint 63 work complete.
 | M2 | MEDIUM | — | Dev Mode via Env Variable | 70 | PLANNED |
 | M3 | MEDIUM | 3.0 | File Permissions (0755) | 70 | PLANNED |
 | M4 | MEDIUM | — | Weak DateTime Parsing | 70 | PLANNED |
-| M5 | MEDIUM | 4.0 | No State Guard on Amounts | — | DONE (pre-existing, but tests broken) |
+| M5 | MEDIUM | 4.0 | No State Guard on Amounts | — | DONE (tests fixed) |
 | M6 | MEDIUM | 3.5 | No HTTPS on Webhook | 70 | PLANNED |
 | M7 | MEDIUM | 3.0 | No Rate Limiting | 70 | PLANNED |
 | M8 | MEDIUM | 2.5 | Webhook Payload Size Unlimited | 70 | PLANNED |
@@ -47,7 +47,7 @@ No active sprints. All Sprint 63 work complete.
 | L3 | LOW | — | Error Messages Leak Paths | 71 | PLANNED |
 | L4 | LOW | — | No Config Change Audit Trail | 71 | PLANNED |
 
-**Summary:** 9/28 DONE (7 pre-existing + 1 new + M5 partial), 19 PLANNED
+**Summary:** 10/28 DONE (7 pre-existing + 2 new + M5 full), 18 PLANNED
 
 ---
 
@@ -60,6 +60,8 @@ No active sprints. All Sprint 63 work complete.
 | 63b | H2 | 2026-02-23 | 2026-02-23 | ALREADY FIXED — `reports/02-sprint-63abc-already-fixed.md` |
 | 63c | C5 | 2026-02-23 | 2026-02-23 | ALREADY FIXED — `reports/02-sprint-63abc-already-fixed.md` |
 | 63d | H1 | 2026-02-23 | 2026-02-23 | `reports/03-sprint-63d-h1-dump-extension-completed.md` |
+| 63e | M5 test fixes | 2026-02-23 | 2026-02-23 | `reports/04-sprint-63e-m5-test-fixes.md` |
+| 64 | Pentest plan | 2026-02-23 | — | `sprints/sprint-64-pentest-stress-plan.md` |
 
 ---
 
@@ -67,23 +69,22 @@ No active sprints. All Sprint 63 work complete.
 
 | Metric | Value | Updated |
 |--------|-------|---------|
-| Total tests | 822 | 2026-02-23 |
-| Total assertions | 2288 | 2026-02-23 |
+| Stripe tests | 822 | 2026-02-23 |
+| Stripe assertions | 2300 | 2026-02-23 |
+| Stripe failures | 0 | 2026-02-23 |
+| payment-component integration tests | 76 | 2026-02-23 |
+| payment-component failures | 0 | 2026-02-23 |
 | PHPCS errors | 0 | 2026-02-23 |
 | PHPStan errors (max) | 0 | 2026-02-23 |
 | PHPMD new violations | 0 | 2026-02-23 |
-| Pre-existing failures | 5 | 2026-02-23 |
-| Sprint 63d tests added | 12 (pre-existing test files, 1 deleted conflicting) | 2026-02-23 |
 
-### Pre-existing Test Failures (not caused by Sprint 63)
+### M5 Test Fixes (Sprint 63e)
 
-1. `WebhookContractFulfillmentHandlerTest::handlerTransitionsAuthorizedContractOnCapture` — M5 state guard
-2. `WebhookContractFulfillmentHandlerTest::handlerReturnsFalseForPendingContractOnCapture` — M5 state guard
-3. `DelayedCaptureIntegrationTest::chargeCapturedTransitionsAuthorizedContractToReadyToCommit` — M5 state guard
-4. `DelayedCaptureIntegrationTest::chargeCapturedRecordsAmountForPendingContract` — M5 state guard
-5. `StripeRefundServiceTest::testRefundRejectsInfinityAmount` — message mismatch
-
-Root cause: `PaymentContract::setCapturedAmount()` now has state guards (M5 fix applied in payment-component) but 4 handler tests + 1 refund test not yet updated to match.
+Previously 5 pre-existing failures, now all resolved:
+- **4 handler tests:** Removed `getCapturedAmount()` assertions on AUTHORIZED/PENDING contracts (state guard prevents setting amount in those states)
+- **1 refund test:** Added `is_finite()` guard in `StripeRefundService::validateRefundAmount()` before partial refund check
+- **1 OxidSessionAdapter:** Added missing `setBasket()`/`setUser()` methods from `SessionAdapterInterface`
+- **4 payment-component tests:** Transitioned contracts to COMMITTED/FULFILLED state before calling `setCapturedAmount()`
 
 ---
 
@@ -106,9 +107,10 @@ Root cause: `PaymentContract::setCapturedAmount()` now has state guards (M5 fix 
 ├── reports/
 │   ├── 01-security-audit-status-review.md
 │   ├── 02-sprint-63abc-already-fixed.md
-│   └── 03-sprint-63d-h1-dump-extension-completed.md
+│   ├── 03-sprint-63d-h1-dump-extension-completed.md
+│   └── 04-sprint-63e-m5-test-fixes.md
 ├── sprints/
-│   └── (empty — all sprints completed)
+│   └── sprint-64-pentest-stress-plan.md
 └── done/
     ├── sprint-63a-c1-api-key-exposure.md
     ├── sprint-63b-h2-capture-mode-override.md
