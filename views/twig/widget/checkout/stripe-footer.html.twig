@@ -1,0 +1,324 @@
+{#
+ # Stripe Checkout Footer Widget Template
+ #
+ # Custom footer for Stripe payments with enhanced disclaimers and branding.
+ #
+ # Data Available:
+ # - checkoutData: Standard checkout data (basketId, totalPrice, currency, etc.)
+ # - stripeConfig: Stripe configuration (mode, publishableKey, termsUrl, privacyUrl)
+ # - isDebugMode: Boolean flag for debug output
+ #
+ # Integration:
+ # - Uses stimulus controller: stripe-checkout-footer
+ # - Integrates with EventBus for state synchronization
+ # - Emits: oe:footer:terms-accepted, oe:footer:submit-clicked
+ # - Listens: oe:basket:updated, oe:payment:processing, oe:payment:complete
+ #
+ # @see docs/FOOTER_WIDGET_ARCHITECTURE.md
+ # @see resources/build/js/controllers/stripe_checkout_footer_controller.js
+ #}
+
+<div class="checkout-footer-stripe"
+     data-controller="stripe-checkout-footer"
+     data-stripe-checkout-footer-basket-id-value="{{ checkoutData.basketId }}"
+     data-stripe-checkout-footer-payment-method-value="{{ checkoutData.paymentMethodId }}"
+     data-stripe-checkout-footer-total-price-value="{{ checkoutData.totalPrice }}"
+     data-stripe-checkout-footer-currency-value="{{ checkoutData.currency }}"
+     data-stripe-checkout-footer-csrf-token-value="{{ checkoutData.csrfToken }}">
+
+    {# ===================================================================
+        Stripe Security Disclaimers
+        ===================================================================
+        Inform users about Stripe's security measures and PCI compliance
+    =================================================================== #}
+    <div class="stripe-disclaimers mb-3">
+        <div class="alert alert-info small py-2">
+            <div class="d-flex align-items-start">
+                <i class="fas fa-shield-alt me-2 mt-1 text-primary"></i>
+                <div>
+                    <strong>{{ translate({ ident: "STRIPE_SECURE_PAYMENT_TITLE" }) }}</strong>
+                    <p class="mb-0 mt-1">
+                        {{ translate({ ident: "STRIPE_PCI_DISCLAIMER" }) }}
+                        <a href="{{ stripeConfig.privacyUrl }}" target="_blank" rel="noopener noreferrer" class="alert-link">
+                            {{ translate({ ident: "STRIPE_PRIVACY_POLICY" }) }}
+                        </a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ===================================================================
+        Terms and Conditions with Stripe Terms
+        ===================================================================
+        Extended terms checkbox including Stripe's consumer terms
+    =================================================================== #}
+    <div class="form-check mt-4">
+        <input class="form-check-input"
+               type="checkbox"
+               name="confirmTerms"
+               id="confirmTermsStripe"
+               data-stripe-checkout-footer-target="termsCheckbox"
+               data-action="change->stripe-checkout-footer#validateTerms"
+               required>
+        <label class="form-check-label" for="confirmTermsStripe">
+            {{ translate({ ident: "OSC_ONEPAGE_ACCEPT_TERMS" }) }}
+            <a href="{{ oViewConf.getBaseUrl() }}AGB/" target="_blank">
+                {{ translate({ ident: "OSC_ONEPAGE_TERMS_AND_CONDITIONS" }) }}
+            </a>
+            {{ translate({ ident: "STRIPE_AND_STRIPE_TERMS_CONNECTOR" }) }}
+            <a href="{{ stripeConfig.termsUrl }}" target="_blank" rel="noopener noreferrer">
+                {{ translate({ ident: "STRIPE_CONSUMER_TERMS" }) }}
+            </a>
+        </label>
+    </div>
+
+    {# ===================================================================
+        Custom Submit Button with Stripe Branding
+        ===================================================================
+        Styled button with Stripe's signature purple color and branding
+    =================================================================== #}
+    <button type="button"
+            class="btn btn-primary btn-lg w-100 mt-4 stripe-submit-button"
+            data-stripe-checkout-footer-target="submitButton"
+            data-action="click->stripe-checkout-footer#processPayment"
+            disabled>
+        <span class="button-content">
+            <i class="fas fa-lock me-2"></i>
+            <span class="button-text">
+                {{ translate({ ident: "STRIPE_PAY_SECURELY" }) }}
+            </span>
+            <span class="button-amount ms-2">
+                {{ checkoutData.totalPrice|number_format(2, ',', '.') }} {{ checkoutData.currency }}
+            </span>
+        </span>
+        <span class="button-spinner d-none">
+            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            {{ translate({ ident: "STRIPE_PROCESSING_PAYMENT" }) }}
+        </span>
+    </button>
+
+    {# ===================================================================
+        Stripe Branding
+        ===================================================================
+        "Powered by Stripe" logo and secure payment messaging
+    =================================================================== #}
+    <div class="stripe-branding mt-3 text-center">
+        <div class="d-flex align-items-center justify-content-center text-muted small">
+            <img src="{{ oViewConf.getModuleUrl('oe_payments_stripe_wallet', 'assets/img/powered_by_stripe.svg') }}"
+                 alt="Powered by Stripe"
+                 height="20"
+                 class="me-2"
+                 onerror="this.style.display='none'">
+            <span>{{ translate({ ident: "STRIPE_SECURE_PAYMENT_BADGE" }) }}</span>
+        </div>
+    </div>
+
+    {# ===================================================================
+        Loading Overlay
+        ===================================================================
+        Full-screen overlay shown during payment processing
+    =================================================================== #}
+    <div class="stripe-loading-overlay"
+         data-stripe-checkout-footer-target="loader"
+         style="display: none;">
+        <div class="loading-content">
+            <div class="spinner-border text-primary mb-3" role="status">
+                <span class="visually-hidden">{{ translate({ ident: "STRIPE_PROCESSING_PAYMENT" }) }}</span>
+            </div>
+            <p class="mb-0 text-muted">{{ translate({ ident: "STRIPE_PROCESSING_PAYMENT_MESSAGE" }) }}</p>
+            <p class="small text-muted mt-2">{{ translate({ ident: "STRIPE_DO_NOT_CLOSE" }) }}</p>
+        </div>
+    </div>
+
+    {# ===================================================================
+        Error Message Container
+        ===================================================================
+        Alert shown when payment processing fails
+    =================================================================== #}
+    <div class="alert alert-danger stripe-error mt-3"
+         data-stripe-checkout-footer-target="error"
+         style="display: none;"
+         role="alert">
+        <div class="d-flex align-items-start">
+            <i class="fas fa-exclamation-circle me-2 mt-1"></i>
+            <div>
+                <strong>{{ translate({ ident: "STRIPE_PAYMENT_ERROR_TITLE" }) }}</strong>
+                <p class="mb-0 mt-1" data-stripe-checkout-footer-target="errorMessage">
+                    {# Error message will be inserted here by JavaScript #}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    {# ===================================================================
+        Debug Information (Development Only)
+        ===================================================================
+        Shows configuration details in debug mode
+    =================================================================== #}
+    {% if isDebugMode %}
+        <div class="stripe-debug alert alert-warning mt-3 small">
+            <strong><i class="fas fa-bug me-1"></i> {{ translate({ ident: "STRIPE_DEBUG_MODE" }) }}</strong>
+            <ul class="mb-0 mt-2">
+                <li>Mode: <code>{{ stripeConfig.mode }}</code></li>
+                <li>Publishable Key: <code>{{ stripeConfig.publishableKey|slice(0, 20) }}...</code></li>
+                <li>Controller: <code>stripe-checkout-footer</code></li>
+                <li>Basket ID: <code>{{ checkoutData.basketId }}</code></li>
+                <li>Payment Method: <code>{{ checkoutData.paymentMethodId }}</code></li>
+                <li>Total: <code>{{ checkoutData.totalPrice }} {{ checkoutData.currency }}</code></li>
+                <li>Configured: <code>{{ stripeConfig.isConfigured ? 'Yes' : 'No' }}</code></li>
+            </ul>
+        </div>
+    {% endif %}
+</div>
+
+{# ===================================================================
+    Inline Styles
+    ===================================================================
+    Stripe-specific styling for footer elements
+=================================================================== #}
+<style>
+    /* Stripe Submit Button - Signature purple gradient */
+    .stripe-submit-button {
+        background: linear-gradient(135deg, #635bff 0%, #4640d6 100%);
+        border: none;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stripe-submit-button:hover:not(:disabled) {
+        background: linear-gradient(135deg, #4640d6 0%, #3730c0 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(99, 91, 255, 0.4);
+    }
+
+    .stripe-submit-button:active:not(:disabled) {
+        transform: translateY(0);
+        box-shadow: 0 2px 8px rgba(99, 91, 255, 0.3);
+    }
+
+    .stripe-submit-button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .stripe-submit-button .button-content,
+    .stripe-submit-button .button-spinner {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .stripe-submit-button .button-amount {
+        font-weight: 700;
+        font-size: 1.1em;
+    }
+
+    /* Loading Overlay */
+    .stripe-loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.95);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        backdrop-filter: blur(2px);
+    }
+
+    .stripe-loading-overlay .loading-content {
+        text-align: center;
+        max-width: 300px;
+    }
+
+    .stripe-loading-overlay .spinner-border {
+        width: 3rem;
+        height: 3rem;
+        border-width: 0.3em;
+    }
+
+    /* Stripe Branding */
+    .stripe-branding img {
+        vertical-align: middle;
+        opacity: 0.8;
+        transition: opacity 0.2s ease;
+    }
+
+    .stripe-branding:hover img {
+        opacity: 1;
+    }
+
+    /* Error Message Animation */
+    .stripe-error {
+        animation: slideInDown 0.3s ease-out;
+    }
+
+    @keyframes slideInDown {
+        from {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Disclaimers */
+    .stripe-disclaimers .alert-info {
+        background-color: #e7f3ff;
+        border-color: #b3d9ff;
+        color: #004085;
+    }
+
+    .stripe-disclaimers .alert-info .alert-link {
+        color: #002752;
+        font-weight: 600;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .stripe-submit-button {
+            font-size: 0.95rem;
+            padding: 0.75rem 1rem;
+        }
+
+        .stripe-submit-button .button-amount {
+            font-size: 1em;
+        }
+
+        .stripe-loading-overlay .loading-content {
+            padding: 1rem;
+        }
+    }
+
+    /* Debug Panel */
+    .stripe-debug {
+        font-family: 'Courier New', monospace;
+    }
+
+    .stripe-debug code {
+        background: rgba(0, 0, 0, 0.1);
+        padding: 0.2em 0.4em;
+        border-radius: 3px;
+    }
+
+    /* Accessibility improvements */
+    .stripe-submit-button:focus {
+        outline: 3px solid rgba(99, 91, 255, 0.5);
+        outline-offset: 2px;
+    }
+
+    /* Print styles */
+    @media print {
+        .stripe-loading-overlay,
+        .stripe-debug {
+            display: none !important;
+        }
+    }
+</style>

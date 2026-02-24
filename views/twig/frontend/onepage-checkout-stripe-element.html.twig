@@ -1,0 +1,120 @@
+{#
+ # One-Page Checkout Stripe Payment Element Template
+ #
+ # Integrates Stripe Payment Element with one-page checkout module.
+ # Uses Stimulus controller (onepage-stripe) for EventBus communication.
+ #
+ # Required Stimulus Values:
+ # - publishableKey: Stripe publishable key (pk_test_xxx or pk_live_xxx)
+ # - mode: Stripe mode (test or live)
+ # - returnUrl: URL to return after 3D Secure
+ #
+ # Required Stimulus Targets:
+ # - element: Container for Stripe Payment Element
+ # - loader: Loading indicator
+ # - error: Error message container
+ #
+ # @see resources/build/js/controllers/onepage_stripe_controller.js
+ # @see docs/boilerplate/payment-provider-template/views/twig/.../provider-element.html.twig
+ #}
+
+{% set stripeConfig = oViewConf.getStripeConfig() %}
+{% set publishableKey = stripeConfig.publishableKey ?? '' %}
+{% set mode = stripeConfig.mode ?? 'test' %}
+{% set returnUrl = oViewConf.getSslSelfLink() ~ 'cl=order' %}
+
+<div class="stripe-onepage-checkout-wrapper"
+     data-controller="onepage-stripe"
+     data-payment-provider="stripe"
+     data-onepage-stripe-publishable-key-value="{{ publishableKey }}"
+     data-onepage-stripe-mode-value="{{ mode }}"
+     data-onepage-stripe-return-url-value="{{ returnUrl }}"
+     style="display: none;">
+
+    {# Stripe Payment Element Container #}
+    <div class="stripe-payment-element-container mb-3">
+        <div id="stripe-payment-element"
+             data-onepage-stripe-target="element"
+             style="display: none;">
+            {# Stripe Payment Element will be mounted here by JavaScript #}
+        </div>
+    </div>
+
+    {# Loading Indicator #}
+    <div class="stripe-loader text-center py-3"
+         data-onepage-stripe-target="loader"
+         style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">{{ translate({ ident: "STRIPE_PROCESSING_PAYMENT" }) }}</span>
+        </div>
+        <p class="mt-2 text-muted">{{ translate({ ident: "STRIPE_PROCESSING_PAYMENT" }) }}</p>
+    </div>
+
+    {# Error Message Container #}
+    <div class="alert alert-danger stripe-error"
+         data-onepage-stripe-target="error"
+         style="display: none;"
+         role="alert">
+        {# Error message will be inserted here by JavaScript #}
+    </div>
+
+    {# Stripe Branding #}
+    <div class="stripe-branding mt-3 text-center text-muted small">
+        <img src="{{ oViewConf.getModuleUrl('oe_payments_stripe_wallet', 'assets/img/powered_by_stripe.svg') }}"
+             alt="Powered by Stripe"
+             height="20"
+             class="me-2">
+        {{ translate({ ident: "STRIPE_SECURE_PAYMENT" }) }}
+    </div>
+
+    {# Debug Information (Development Only) #}
+    {% if oViewConf.isStripeDebugMode() %}
+        <div class="stripe-debug alert alert-info mt-3">
+            <strong>{{ translate({ ident: "STRIPE_DEBUG_MODE" }) }}</strong>
+            <ul class="mb-0 mt-2 small">
+                <li>Mode: <code>{{ mode }}</code></li>
+                <li>Publishable Key: <code>{{ publishableKey|slice(0, 20) }}...</code></li>
+                <li>Controller: <code>onepage-stripe</code></li>
+                <li>Return URL: <code>{{ returnUrl }}</code></li>
+            </ul>
+        </div>
+    {% endif %}
+</div>
+
+{# Inline Styles for Better UX #}
+<style>
+    .stripe-onepage-checkout-wrapper {
+        max-width: 500px;
+        margin: 0 auto;
+    }
+
+    .stripe-payment-element-container {
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 0.375rem;
+        border: 1px solid #dee2e6;
+    }
+
+    #stripe-payment-element {
+        min-height: 200px;
+    }
+
+    .stripe-loader .spinner-border {
+        width: 3rem;
+        height: 3rem;
+    }
+
+    .stripe-branding img {
+        vertical-align: middle;
+    }
+
+    .stripe-error {
+        animation: shake 0.5s ease-in-out;
+    }
+
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-10px); }
+        75% { transform: translateX(10px); }
+    }
+</style>
