@@ -844,6 +844,20 @@ services:
   # and cannot use standard DI. It uses ContainerFactory for lazy service retrieval.
 
   # ==========================================
+  # One-Page Checkout Integration
+  # ==========================================
+
+  # Stripe Payment Handler - Implements PaymentHandlerInterface for one-page checkout
+  # Automatically registered via Symfony tagged service
+  OxidEsales\Payments\Stripe\PaymentHandler\StripePaymentHandler:
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $logger: '@Psr\Log\LoggerInterface'
+    tags:
+      - { name: oe.payment.handler }
+    public: true
+
+  # ==========================================
   # Webhook Handlers (Sprint 13)
   # ==========================================
 

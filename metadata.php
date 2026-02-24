@@ -62,6 +62,9 @@ $aModule = [
         'StripeWebhookController' => StripeWebhookController::class,
         'StripeConnect' => StripeConnect::class,
         'OrderRefund' => OrderRefund::class,
+
+        // Footer Widget for One-Page Checkout
+        'stripecheckoutfooter' => \OxidEsales\Payments\Stripe\Component\Widget\StripeCheckoutFooter::class,
     ],
     'events' => [
         'onActivate' => StripeEvents::class . '::onActivate',

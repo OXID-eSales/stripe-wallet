@@ -20,14 +20,40 @@ use OxidEsales\Payments\Stripe\Module;
  */
 class PaymentController extends CorePaymentController
 {
-    private ModuleConfigurationServiceInterface $stripeConfig;
+    private ?ModuleConfigurationServiceInterface $stripeConfig = null;
 
+    /**
+     * Constructor - supports both DI container and OXID class chain instantiation
+     *
+     * OXID's class chain mechanism (used by oxNew()) instantiates controllers
+     * without constructor arguments. We must support both:
+     * 1. DI container instantiation (with $stripeConfig injected)
+     * 2. oxNew() instantiation (no arguments, lazy-load from container)
+     *
+     * @param ModuleConfigurationServiceInterface|null $stripeConfig Optional DI config service
+     */
     public function __construct(
-        ModuleConfigurationServiceInterface $stripeConfig
+        ?ModuleConfigurationServiceInterface $stripeConfig = null
     ) {
         parent::__construct();
 
         $this->stripeConfig = $stripeConfig;
+    }
+
+    /**
+     * Get Stripe configuration service (lazy-loaded if not injected)
+     *
+     * @return ModuleConfigurationServiceInterface
+     */
+    private function getStripeConfig(): ModuleConfigurationServiceInterface
+    {
+        if ($this->stripeConfig === null) {
+            // Lazy-load from DI container when instantiated via oxNew()
+            $this->stripeConfig = Registry::getContainer()
+                ->get(ModuleConfigurationServiceInterface::class);
+        }
+
+        return $this->stripeConfig;
     }
 
     /**
@@ -52,7 +78,7 @@ class PaymentController extends CorePaymentController
 
         // Additional Stripe-specific validation
         if ($this->isStripeSelected()) {
-            if (!$this->stripeConfig->isConfigured()) {
+            if (!$this->getStripeConfig()->isConfigured()) {
                 Registry::getUtilsView()->addErrorToDisplay(
                     'Payment method temporarily unavailable'
                 );
@@ -62,7 +88,7 @@ class PaymentController extends CorePaymentController
             // Validate minimum order amount
             $basket = Registry::getSession()->getBasket();
             $total = $basket->getPrice()->getBruttoPrice();
-            $minimumAmount = $this->stripeConfig->getMinimumOrderAmount();
+            $minimumAmount = $this->getStripeConfig()->getMinimumOrderAmount();
 
             if ($total < $minimumAmount) {
                 /** @var string $currencyName */
