@@ -295,11 +295,12 @@ services:
   # Derives secret from ModuleConfigurationService (no extra env var needed)
   OxidEsales\PaymentComponent\Service\TokenServiceInterface:
     class: OxidEsales\Payments\Stripe\Service\ContractTokenService
-    public: false
+    public: true
 
   # Stripe Contract Token Service
   OxidEsales\Payments\Stripe\Service\ContractTokenService:
     alias: OxidEsales\PaymentComponent\Service\TokenServiceInterface
+    public: true
 
   # ==========================================
   # Security Validator (Fraud Prevention)
