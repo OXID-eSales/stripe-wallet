@@ -135,6 +135,7 @@ final class PaymentIntentHelper
 
             $params = $this->buildPaymentIntentParams($amountInCents, $request->currency, 'manual', $request);
 
+            /** @phpstan-ignore argument.type (dynamic params built by buildPaymentIntentParams) */
             $paymentIntent = $client->paymentIntents->create($params);
 
             $expiresAt = new DateTimeImmutable('+7 days');
@@ -305,6 +306,7 @@ final class PaymentIntentHelper
                 $params['metadata'] = $request->metadata;
             }
 
+            /** @phpstan-ignore argument.type (capture params are conditionally built) */
             $client->paymentIntents->capture($request->providerPaymentId, $params);
 
             $paymentIntent = $client->paymentIntents->retrieve(
