@@ -63,9 +63,13 @@ final class OxidStockRestorationService implements StockRestorationServiceInterf
             }
         }
 
-        // Recalculate order after all articles processed
+        // Log stock restoration results.
+        // NOTE: Do NOT call $order->recalculateOrder() here.
+        // recalculateOrder() rebuilds totals from a virtual basket excluding storno'd articles.
+        // Since all articles are now storno'd, the basket would be empty and all totals
+        // would be overwritten with zeros (oxtotalordersum, oxtotalbrutsum, etc.).
+        // Order totals must remain intact after refund for accounting/auditing purposes.
         if ($processedCount > 0) {
-            $order->recalculateOrder();
             $this->logger->info('Stock restored for order', [
                 'orderId' => $orderId,
                 'articlesProcessed' => $processedCount,

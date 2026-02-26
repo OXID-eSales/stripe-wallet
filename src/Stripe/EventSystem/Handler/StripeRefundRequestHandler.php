@@ -225,6 +225,18 @@ class StripeRefundRequestHandler implements HandlerInterface
             return;
         }
 
+        // addRefundedAmount() requires FULFILLED state. Skip recording the refund amount
+        // on the contract if it hasn't been fulfilled yet (e.g. still COMMITTED).
+        // The Stripe refund already succeeded at this point — we must not throw here
+        // as that would report an error to the admin despite the refund being processed.
+        if (!$contract->getState()->isFulfilled()) {
+            $this->logger->warning('Cannot record refund on contract: not in FULFILLED state', [
+                'contractId' => $contractId,
+                'state' => $contract->getState()->getValue(),
+            ]);
+            return;
+        }
+
         $contract->addRefundedAmount($contract->getAmount());
         $contract->setRefundedAt(new \DateTimeImmutable());
         $this->contractRepository->save($contract);

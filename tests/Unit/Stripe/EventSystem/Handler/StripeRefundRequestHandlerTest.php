@@ -6,6 +6,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
 use DateTimeInterface;
 use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
+use OxidEsales\PaymentComponent\Contract\ContractState;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeRefundRequestHandler;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
@@ -270,6 +271,7 @@ class StripeRefundRequestHandlerTest extends TestCase
     public function testSuccessfulRefundUpdatesContractRefundTracking(): void
     {
         $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getState')->willReturn(ContractState::fulfilled());
         $contract->method('getAmount')->willReturn(99.99);
         $contract->method('getRefundedAmount')->willReturn(null);
 
@@ -360,6 +362,38 @@ class StripeRefundRequestHandlerTest extends TestCase
             ->willReturn($contract);
 
         $this->contractRepository->expects($this->never())->method('save');
+
+        $context = new EventContext([
+            'orderId' => 'order_abc',
+            'contractId' => 'contract_123',
+            'amount' => null,
+        ]);
+        $event = new StripeRefundRequestEvent($context);
+
+        $handler = $this->createTestableHandler();
+        $handler->callUpdateContractState($event);
+    }
+
+    public function testSkipsRefundAmountWhenContractNotInFulfilledState(): void
+    {
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getState')->willReturn(ContractState::committed());
+        $contract->method('getRefundedAmount')->willReturn(null);
+
+        $contract->expects($this->never())->method('addRefundedAmount');
+
+        $this->contractRepository->method('findById')
+            ->with('contract_123')
+            ->willReturn($contract);
+
+        $this->contractRepository->expects($this->never())->method('save');
+
+        $this->logger->expects($this->once())
+            ->method('warning')
+            ->with(
+                'Cannot record refund on contract: not in FULFILLED state',
+                $this->callback(fn(array $ctx) => $ctx['contractId'] === 'contract_123' && $ctx['state'] === 'committed')
+            );
 
         $context = new EventContext([
             'orderId' => 'order_abc',
