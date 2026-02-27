@@ -45,7 +45,7 @@ $aModule = [
     ],
     'thumbnail' => 'img/stripe_logo.png',
     'version' => '1.0.0',
-    'author' => 'OXID Solution Catalysts',
+    'author' => 'OXID eSales AG',
     'url' => 'https://www.oxid-esales.com',
     'email' => 'info@oxid-esales.com',
     'extend' => [
