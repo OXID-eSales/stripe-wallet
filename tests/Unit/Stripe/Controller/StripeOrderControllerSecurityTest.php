@@ -6,6 +6,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller;
 
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
+use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Controller\StripeOrderController;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
@@ -71,13 +72,15 @@ class StripeOrderControllerSecurityTest extends TestCase
 
     public function testGetCaptureModeIgnoresRequestParameter(): void
     {
-        $controller = new TestableStripeOrderControllerForCaptureMode();
-        $controller->setMockCaptureMode('automatic');
-        $controller->setRequestParameter('capture_mode_override', 'manual');
+        $moduleConfig = $this->createMock(ModuleConfigurationServiceInterface::class);
+        $moduleConfig->method('getCaptureMode')->willReturn('automatic');
 
-        $result = $controller->exposedGetCaptureMode();
+        $tokenService = $this->createMock(\OxidEsales\PaymentComponent\Service\TokenServiceInterface::class);
 
-        $this->assertEquals('automatic', $result);
+        $helper = new ControllerRequestHelper($tokenService, $moduleConfig);
+
+        // Helper reads from config service, not from request params
+        $this->assertEquals('automatic', $helper->getCaptureMode());
     }
 
     // ==========================================
@@ -216,37 +219,6 @@ class TestableStripeOrderControllerForSession extends StripeOrderController
     protected function exitWithJson(): void
     {
         // Don't exit in tests
-    }
-}
-
-/**
- * Testable subclass for getCaptureMode() tests.
- */
-class TestableStripeOrderControllerForCaptureMode extends StripeOrderController
-{
-    private string $mockCaptureMode = 'automatic';
-    /** @var array<string, mixed> */
-    private array $requestParams = [];
-
-    public function setMockCaptureMode(string $mode): void
-    {
-        $this->mockCaptureMode = $mode;
-    }
-
-    public function setRequestParameter(string $key, string $value): void
-    {
-        $this->requestParams[$key] = $value;
-    }
-
-    public function exposedGetCaptureMode(): string
-    {
-        return $this->getCaptureMode();
-    }
-
-    protected function getCaptureMode(): string
-    {
-        // Simulate the fixed method: only reads from config, ignores request params
-        return $this->mockCaptureMode;
     }
 }
 

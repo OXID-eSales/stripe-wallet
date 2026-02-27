@@ -6,6 +6,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Controller;
 
 use OxidEsales\Eshop\Application\Model\Basket;
 use OxidEsales\Eshop\Application\Model\User;
+use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Controller\StripeOrderController;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
@@ -13,6 +14,7 @@ use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
+use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller\StubControllerRequestHelper;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use PHPUnit\Framework\TestCase;
@@ -22,6 +24,8 @@ use PHPUnit\Framework\TestCase;
  *
  * These tests verify that the controller is THIN - it only dispatches events
  * and processes results from the context. No business logic in the controller.
+ *
+ * Sprint 71: Updated to use StubControllerRequestHelper after accessor extraction.
  */
 class StripeOrderControllerTest extends TestCase
 {
@@ -321,35 +325,56 @@ class StripeOrderControllerTest extends TestCase
         EventDispatcherInterface $eventDispatcher,
         array $options = []
     ): StripeOrderController {
-        // Create basket mock if not provided
-        if (!isset($options['basket'])) {
-            $options['basket'] = $this->createBasketMock($options);
-        }
-
-        // Create user mock if not provided (and hasUser is true)
+        // Create user mock if needed
         if (!isset($options['user']) && ($options['hasUser'] ?? true)) {
             $options['user'] = $this->createUserMock($options['userId'] ?? 'user_123');
         }
 
-        return new class($eventDispatcher, $options) extends StripeOrderController {
+        // Create basket mock
+        $basket = $this->createBasketMock($options);
+
+        // Build the stub helper
+        $helper = new StubControllerRequestHelper();
+        $helper->paymentIntentIdFromRequest = $options['paymentIntentId'] ?? null;
+        $helper->sessionPaymentIntentId = $options['sessionPaymentIntentId'] ?? null;
+        $helper->checkoutSessionId = $options['sessionId'] ?? null;
+        $helper->redirectStatus = $options['redirectStatus'] ?? null;
+        $helper->contractIdFromRequest = $options['contractId'] ?? null;
+        $helper->contractTokenFromRequest = $options['contractToken'] ?? null;
+        $helper->contractIdFromSession = $options['contractId'] ?? null;
+        $helper->tokenValidationResult = true;
+        $helper->sessionChallengeResult = true;
+        $helper->captureMode = $options['captureMode'] ?? 'automatic';
+        $helper->shopId = 1;
+        $helper->shopUrl = 'https://test-shop.example.com/';
+        $helper->sessionId = 'test_session_123';
+        $helper->basket = $basket;
+
+        return new class ($eventDispatcher, $helper, $options) extends StripeOrderController {
             private EventDispatcherInterface $mockDispatcher;
+            private StubControllerRequestHelper $stubHelper;
             /** @var array<string, mixed> */
             private array $options;
             /** @var array<string, mixed> */
-            private array $sessionVars = [];
-            /** @var array<string, mixed> */
             private array $tplParams = [];
-            /** @var string[] */
-            private array $errors = [];
 
             /**
              * @param array<string, mixed> $options
              */
-            public function __construct(EventDispatcherInterface $dispatcher, array $options)
-            {
+            public function __construct(
+                EventDispatcherInterface $dispatcher,
+                StubControllerRequestHelper $helper,
+                array $options
+            ) {
                 $this->mockDispatcher = $dispatcher;
+                $this->stubHelper = $helper;
                 $this->options = $options;
                 // Don't call parent constructor - it requires OXID framework
+            }
+
+            protected function getRequestHelper(): ControllerRequestHelper
+            {
+                return $this->stubHelper;
             }
 
             protected function getEventDispatcher(): EventDispatcherInterface
@@ -357,91 +382,12 @@ class StripeOrderControllerTest extends TestCase
                 return $this->mockDispatcher;
             }
 
-            protected function getBasketFromSession(): Basket
-            {
-                return $this->options['basket'];
-            }
-
-            protected function getPaymentIntentIdFromRequest(): ?string
-            {
-                return $this->options['paymentIntentId'] ?? null;
-            }
-
-            protected function getSessionPaymentIntentId(): ?string
-            {
-                return $this->options['sessionPaymentIntentId'] ?? null;
-            }
-
-            protected function getCheckoutSessionIdFromRequest(): ?string
-            {
-                return $this->options['sessionId'] ?? null;
-            }
-
-            protected function getRedirectStatusFromRequest(): ?string
-            {
-                return $this->options['redirectStatus'] ?? null;
-            }
-
-            protected function getContractIdFromRequest(): ?string
-            {
-                return $this->options['contractId'] ?? null;
-            }
-
-            protected function getContractTokenFromRequest(): ?string
-            {
-                return $this->options['contractToken'] ?? null;
-            }
-
-            protected function validateContractToken(?string $contractId, ?string $contractToken): bool
-            {
-                if ($contractId === null || $contractToken === null) {
-                    return false;
-                }
-                return true;
-            }
-
-            protected function getContractIdFromSession(): ?string
-            {
-                return $this->options['contractId'] ?? null;
-            }
-
-            protected function getSessionId(): string
-            {
-                return 'test_session_123';
-            }
-
-            protected function getShopId(): int
-            {
-                return 1;
-            }
-
-            protected function getShopUrl(): string
-            {
-                return 'https://test-shop.example.com/';
-            }
-
-            protected function getCaptureMode(): string
-            {
-                return $this->options['captureMode'] ?? 'automatic';
-            }
-
             public function getUser(): ?User
             {
                 if (!($this->options['hasUser'] ?? true)) {
                     return null;
                 }
-
                 return $this->options['user'] ?? null;
-            }
-
-            protected function setSessionVariable(string $key, mixed $value): void
-            {
-                $this->sessionVars[$key] = $value;
-            }
-
-            protected function deleteSessionVariable(string $key): void
-            {
-                unset($this->sessionVars[$key]);
             }
 
             public function addTplParam($name, $value): void
@@ -449,54 +395,20 @@ class StripeOrderControllerTest extends TestCase
                 $this->tplParams[$name] = $value;
             }
 
-            protected function addErrorToDisplay(string $message): void
-            {
-                $this->errors[] = $message;
-            }
-
-            protected function validateSessionChallenge(): bool
-            {
-                return true; // Skip CSRF in integration tests
-            }
-
             protected function exitWithJson(): void
             {
                 // Don't exit in tests
             }
 
-            protected function logError(string $message, \Throwable $e): void
-            {
-                // Don't log in tests
-            }
-
             protected function getServiceFromContainer(string $serviceName): object
             {
-                if ($serviceName === ModuleConfigurationServiceInterface::class) {
-                    return new class {
-                        public function getPublishableKey(): string
-                        {
-                            return 'pk_test_51ABC12345DEF456GHI789';
-                        }
-                        public function getToken(): string
-                        {
-                            return 'sk_test_51ABC12345XYZ000111222';
-                        }
-                        public function isTestMode(): bool
-                        {
-                            return true;
-                        }
-                        public function getCaptureMode(): string
-                        {
-                            return 'automatic';
-                        }
-                    };
-                }
                 if ($serviceName === ConfigurationValidatorInterface::class) {
                     return new class {
                         public function getKeyValidationError(): ?string
                         {
                             return null;
                         }
+
                         public function validateKeyPair(): bool
                         {
                             return true;
@@ -532,6 +444,11 @@ class StripeOrderControllerTest extends TestCase
             $user = $this->createMock(User::class);
             $user->method('getId')->willReturn($userId);
             $basket->method('getBasketUser')->willReturn($user);
+
+            // Store user in options for getUser()
+            if (!isset($options['user']) && ($options['hasUser'] ?? true)) {
+                $options['user'] = $user;
+            }
         }
 
         return $basket;
