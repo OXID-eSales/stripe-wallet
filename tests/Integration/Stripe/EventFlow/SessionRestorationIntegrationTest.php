@@ -112,6 +112,11 @@ class SessionRestorationIntegrationTest extends TestCase
                     fn($contract) => $contract->isExpired()
                 ));
             }
+
+            public function findStaleNotFinished(int $minutesOld): array
+            {
+                return [];
+            }
         };
     }
 

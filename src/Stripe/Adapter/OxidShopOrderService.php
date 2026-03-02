@@ -185,12 +185,38 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
             );
         }
 
+        if ($request->initialStatus !== null) {
+            $order->oxorder__oxtransstatus = new \OxidEsales\Eshop\Core\Field(
+                $request->initialStatus,
+                \OxidEsales\Eshop\Core\Field::T_RAW
+            );
+        }
+
         $order->save();
         $order->setOrderNumber(); // @phpstan-ignore method.notFound
 
         if (!empty($request->metadata)) {
             $this->storeOrderMetadata($order, $request->metadata);
         }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function deleteNotFinishedOrder(string $orderId): bool
+    {
+        /** @var Order $order */
+        $order = oxNew(Order::class);
+        if (!$order->load($orderId)) {
+            return false;
+        }
+
+        $status = $order->getFieldData('oxtransstatus');
+        if ($status !== 'NOT_FINISHED') {
+            return false;
+        }
+
+        return (bool) $order->delete();
     }
 
     /**

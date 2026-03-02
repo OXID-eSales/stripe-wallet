@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Adapter;
 
 use OxidEsales\Eshop\Application\Model\Order;
+use OxidEsales\PaymentComponent\Adapter\Request\CreateOrderRequest;
 use OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService;
 use PHPUnit\Framework\TestCase;
@@ -95,5 +96,40 @@ final class OxidShopOrderServiceTest extends TestCase
             'Voucher error' => [Order::ORDER_STATE_VOUCHERERROR, 'voucher_error'],
             'Unknown error' => [999, 'order_creation_failed'],
         ];
+    }
+
+    // ==========================================
+    // CreateOrderRequest initialStatus TESTS
+    // ==========================================
+
+    public function testCreateOrderRequestAcceptsInitialStatus(): void
+    {
+        $request = new CreateOrderRequest(
+            sessionId: 'sess123',
+            userId: 'user123',
+            paymentId: 'oe_payments_stripe_wallet',
+            initialStatus: 'NOT_FINISHED'
+        );
+
+        $this->assertSame('NOT_FINISHED', $request->initialStatus);
+    }
+
+    public function testCreateOrderRequestInitialStatusDefaultsToNull(): void
+    {
+        $request = new CreateOrderRequest(
+            sessionId: 'sess123',
+            userId: 'user123',
+            paymentId: 'oe_payments_stripe_wallet'
+        );
+
+        $this->assertNull($request->initialStatus);
+    }
+
+    public function testServiceImplementsDeleteNotFinishedOrder(): void
+    {
+        $this->assertTrue(
+            method_exists($this->service, 'deleteNotFinishedOrder'),
+            'OxidShopOrderService must implement deleteNotFinishedOrder()'
+        );
     }
 }

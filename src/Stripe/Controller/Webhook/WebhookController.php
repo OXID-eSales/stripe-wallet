@@ -14,6 +14,7 @@ use OxidEsales\Eshop\Application\Controller\FrontendController;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\PaymentComponent\Webhook\WebhookRequest;
+use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use OxidEsales\Payments\Stripe\Service\WebhookLogServiceInterface;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;
 
@@ -30,6 +31,8 @@ use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;
  */
 class WebhookController extends FrontendController
 {
+    protected int $staleThresholdMinutes = 30;
+
     private ?StripeWebhookProcessor $processor = null;
     private ?WebhookLogServiceInterface $webhookLogger = null;
     private ?WebhookRequestGuardInterface $guard = null;
@@ -108,6 +111,9 @@ class WebhookController extends FrontendController
             $this->sendErrorResponse($payload, $result->error ?? $result->action, $statusCode);
         }
 
+        // STRP-100: Clean up stale NOT_FINISHED orders (>30 min) after each webhook
+        $this->cleanupStaleNotFinishedOrders();
+
         $this->webhookLogger?->logResult($payload, "SUCCESS: {$result->action}", 200);
         http_response_code(200);
         echo json_encode(['received' => true, 'action' => $result->action]);
@@ -141,6 +147,31 @@ class WebhookController extends FrontendController
         $remoteIp = is_string($remoteIp) ? $remoteIp : 'unknown';
 
         return [is_string($payload) ? $payload : '', $signature, $remoteIp];
+    }
+
+    /**
+     * Clean up stale NOT_FINISHED contracts/orders older than 30 minutes.
+     *
+     * Runs after each webhook to garbage-collect abandoned checkouts.
+     * Failures are logged but do not affect the webhook response.
+     *
+     * @since 2.0.0 STRP-100
+     */
+    protected function cleanupStaleNotFinishedOrders(): void
+    {
+        try {
+            $container = ContainerFactory::getInstance()->getContainer();
+            /** @var RetryCleanupService $cleanupService */
+            $cleanupService = $container->get(RetryCleanupService::class);
+            $cleaned = $cleanupService->cleanupStaleContracts($this->staleThresholdMinutes);
+            if ($cleaned > 0) {
+                Registry::getLogger()->info('Cleaned up ' . $cleaned . ' stale NOT_FINISHED order(s)');
+            }
+        } catch (\Throwable $e) {
+            Registry::getLogger()->warning('Stale order cleanup failed', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

@@ -219,11 +219,9 @@ class StripeOrderCreationHandler implements HandlerInterface
         \OxidEsales\PaymentComponent\EventSystem\Event\EventContextInterface $context,
         string $orderId
     ): void {
-        // Load order to get order number
-        /** @var \OxidEsales\Eshop\Application\Model\Order $order */
-        $order = \oxNew(\OxidEsales\Eshop\Application\Model\Order::class);
+        $order = $this->loadOrder($orderId);
         $orderNumber = null;
-        if ($order->load($orderId)) {
+        if ($order !== null) {
             $orderNumber = $order->getFieldData('oxordernr');
         }
 
@@ -244,20 +242,43 @@ class StripeOrderCreationHandler implements HandlerInterface
         $paymentTransactionId = is_string($paymentIntentId) ? $paymentIntentId
             : (is_string($authorizationId) ? $authorizationId : null);
 
-        if ($paymentTransactionId !== null && $order->getId() !== null) { // @phpstan-ignore notIdentical.alwaysTrue
+        if ($order !== null && $paymentTransactionId !== null) {
             $order->oxorder__oxtransid = new \OxidEsales\Eshop\Core\Field(
                 $paymentTransactionId,
                 \OxidEsales\Eshop\Core\Field::T_RAW
             );
+
+            // STRP-100: Transition order from NOT_FINISHED to OK on successful commit
+            $order->oxorder__oxtransstatus = new \OxidEsales\Eshop\Core\Field(
+                'OK',
+                \OxidEsales\Eshop\Core\Field::T_RAW
+            );
+
             $order->save();
-            $this->logEvent('StripeOrderCreationHandler: Updated order transaction ID', [
+            $this->logEvent('StripeOrderCreationHandler: Updated order transaction ID and status', [
                 'orderId' => $orderId,
                 'transactionId' => $paymentTransactionId,
+                'status' => 'OK',
             ]);
         }
 
         // Sprint 12: Use extracted method to eliminate duplication
         $this->commitContractAndDispatch($contract, $context, $orderId);
+    }
+
+    /**
+     * Load an order by ID.
+     *
+     * Extracted to allow overriding in tests (testable subclass pattern).
+     */
+    protected function loadOrder(string $orderId): ?\OxidEsales\Eshop\Application\Model\Order
+    {
+        /** @var \OxidEsales\Eshop\Application\Model\Order $order */
+        $order = \oxNew(\OxidEsales\Eshop\Application\Model\Order::class);
+        if ($order->load($orderId)) {
+            return $order;
+        }
+        return null;
     }
 
     private function handlePostOrderCreation(

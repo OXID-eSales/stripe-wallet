@@ -143,7 +143,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
 
         $contractToken = $this->tokenService->generateToken($contractId);
         $successUrl = $this->checkoutSessionService->buildSuccessUrl($shopUrl, $contractId, $contractToken, $sessionId);
-        $cancelUrl = $shopUrl . 'index.php?cl=payment';
+        $cancelUrl = $shopUrl . 'index.php?cl=order&fnc=checkoutCancel';
 
         $orderId = $contract->getOrderId();
         $orderNumber = $contract->getMetadata('order_number');

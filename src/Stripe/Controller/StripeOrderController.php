@@ -17,6 +17,7 @@ use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\ContractTokenService;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
+use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 
 /**
  * Thin Stripe Order Controller.
@@ -108,6 +109,9 @@ class StripeOrderController extends OrderController
         }
 
         try {
+            // STRP-100: Clean up previous checkout attempt on retry
+            $this->cleanupPreviousCheckoutAttempt($helper);
+
             // 0. Validate API key configuration
             $validator = $this->getServiceFromContainer(ConfigurationValidatorInterface::class);
             $keyValidationError = $validator->getKeyValidationError();
@@ -263,9 +267,64 @@ class StripeOrderController extends OrderController
         return $context->get('redirectTarget') ?? 'payment';
     }
 
+    /**
+     * Handle cancel/back-navigation from Stripe Checkout.
+     *
+     * When user cancels on Stripe hosted page, Stripe redirects here.
+     * Cleans up the NOT_FINISHED order and cancels the contract,
+     * then redirects to the payment page.
+     *
+     * @since 2.0.0 STRP-100
+     */
+    public function checkoutCancel(): string
+    {
+        $helper = $this->getRequestHelper();
+        $contractId = $helper->getContractIdFromSession();
+
+        if ($contractId !== null) {
+            try {
+                $cleanupService = $this->getServiceFromContainer(RetryCleanupService::class);
+                $cleanupService->cleanupPreviousAttempt($contractId);
+            } catch (\Throwable $e) {
+                $helper->logError('checkoutCancel cleanup failed', $e);
+            }
+            $helper->clearStripeSessionVariables();
+        }
+
+        return 'payment';
+    }
+
     // ==========================================
     // CONTROLLER-SPECIFIC METHODS
     // ==========================================
+
+    /**
+     * Clean up previous checkout attempt before creating a new session.
+     *
+     * If the session has a contractId from a previous attempt, cancels that contract
+     * and deletes the NOT_FINISHED order. Otherwise falls back to userId lookup
+     * (covers the case where user closed the tab and lost the session).
+     *
+     * @since 2.0.0 STRP-100
+     */
+    protected function cleanupPreviousCheckoutAttempt(ControllerRequestHelper $helper): void
+    {
+        $cleanupService = $this->getServiceFromContainer(RetryCleanupService::class);
+        $previousContractId = $helper->getContractIdFromSession();
+
+        if ($previousContractId !== null) {
+            $cleanupService->cleanupPreviousAttempt($previousContractId);
+            $helper->clearStripeSessionVariables();
+            $helper->setSessionVariable('sess_challenge', $this->generateNewSessChallenge());
+            return;
+        }
+
+        // Fallback: user closed tab, session lost — look up by userId
+        $user = $this->getUser();
+        if ($user !== null) {
+            $cleanupService->cleanupForUser((string) $user->getId());
+        }
+    }
 
     /**
      * Process results from event context.
@@ -301,7 +360,10 @@ class StripeOrderController extends OrderController
      */
     public function getUser(): ?\OxidEsales\Eshop\Application\Model\User
     {
-        return $this->getRequestHelper()->getBasketFromSession()->getBasketUser();
+        /** @var \OxidEsales\Eshop\Application\Model\User|false $user OXID returns false when not logged in */
+        $user = $this->getRequestHelper()->getBasketFromSession()->getBasketUser();
+
+        return $user instanceof \OxidEsales\Eshop\Application\Model\User ? $user : null;
     }
 
     public function addTplParam($name, $value): void
@@ -318,6 +380,11 @@ class StripeOrderController extends OrderController
     protected function exitWithJson(): void
     {
         exit;
+    }
+
+    protected function generateNewSessChallenge(): string
+    {
+        return Registry::getUtilsObject()->generateUId();
     }
 
     protected function getRequestHelper(): ControllerRequestHelper

@@ -149,7 +149,7 @@ class StripeCheckoutSessionHandlerTest extends TestCase
                 'contract_xyz',
                 $basketSnapshot,
                 $this->stringContains('checkoutSuccess'),
-                $this->stringContains('cl=payment'),
+                $this->stringContains('checkoutCancel'),
                 '42',
                 'manual'
             )
