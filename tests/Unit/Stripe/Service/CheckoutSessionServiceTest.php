@@ -46,17 +46,25 @@ class CheckoutSessionServiceTest extends TestCase
         );
     }
 
-    private function createBasketSnapshot(array $items = [], float $totalGross = 100.0): BasketSnapshot
-    {
+    /**
+     * @param array<int, array<string, mixed>> $items
+     * @param array<int, array<string, mixed>> $discounts
+     */
+    private function createBasketSnapshot(
+        array $items = [],
+        float $totalGross = 100.0,
+        array $discounts = [],
+        string $currency = 'EUR'
+    ): BasketSnapshot {
         return BasketSnapshot::fromArray([
             'items' => $items ?: [
                 ['title' => 'Test Product', 'unitPrice' => 50.00, 'quantity' => 2],
             ],
-            'discounts' => [],
+            'discounts' => $discounts,
             'totalGross' => $totalGross,
             'totalNet' => $totalGross * 0.84,
             'totalVat' => $totalGross * 0.16,
-            'currency' => 'EUR',
+            'currency' => $currency,
         ]);
     }
 
@@ -299,9 +307,10 @@ class CheckoutSessionServiceTest extends TestCase
     public function testBuildLineItemsSingleProduct(): void
     {
         // Arrange
-        $basketSnapshot = $this->createBasketSnapshot([
-            ['title' => 'Widget', 'unitPrice' => 29.99, 'quantity' => 1],
-        ]);
+        $basketSnapshot = $this->createBasketSnapshot(
+            items: [['title' => 'Widget', 'unitPrice' => 29.99, 'quantity' => 1]],
+            totalGross: 29.99
+        );
 
         // Act
         $service = $this->createService();
@@ -317,12 +326,15 @@ class CheckoutSessionServiceTest extends TestCase
 
     public function testBuildLineItemsMultipleProducts(): void
     {
-        // Arrange
-        $basketSnapshot = $this->createBasketSnapshot([
-            ['title' => 'Product A', 'unitPrice' => 10.00, 'quantity' => 2],
-            ['title' => 'Product B', 'unitPrice' => 25.50, 'quantity' => 1],
-            ['title' => 'Product C', 'unitPrice' => 5.00, 'quantity' => 5],
-        ]);
+        // Arrange: 10*2 + 25.50*1 + 5*5 = 70.50
+        $basketSnapshot = $this->createBasketSnapshot(
+            items: [
+                ['title' => 'Product A', 'unitPrice' => 10.00, 'quantity' => 2],
+                ['title' => 'Product B', 'unitPrice' => 25.50, 'quantity' => 1],
+                ['title' => 'Product C', 'unitPrice' => 5.00, 'quantity' => 5],
+            ],
+            totalGross: 70.50
+        );
 
         // Act
         $service = $this->createService();
@@ -343,9 +355,10 @@ class CheckoutSessionServiceTest extends TestCase
     public function testBuildLineItemsHandlesMissingTitle(): void
     {
         // Arrange
-        $basketSnapshot = $this->createBasketSnapshot([
-            ['unitPrice' => 10.00, 'quantity' => 1], // No title
-        ]);
+        $basketSnapshot = $this->createBasketSnapshot(
+            items: [['unitPrice' => 10.00, 'quantity' => 1]], // No title
+            totalGross: 10.00
+        );
 
         // Act
         $service = $this->createService();
@@ -357,10 +370,11 @@ class CheckoutSessionServiceTest extends TestCase
 
     public function testBuildLineItemsHandlesMissingQuantity(): void
     {
-        // Arrange
-        $basketSnapshot = $this->createBasketSnapshot([
-            ['title' => 'Test', 'unitPrice' => 10.00], // No quantity
-        ]);
+        // Arrange (missing quantity defaults to 1, so total = 10.00)
+        $basketSnapshot = $this->createBasketSnapshot(
+            items: [['title' => 'Test', 'unitPrice' => 10.00]], // No quantity
+            totalGross: 10.00
+        );
 
         // Act
         $service = $this->createService();
@@ -486,6 +500,272 @@ class CheckoutSessionServiceTest extends TestCase
 
         $this->assertArrayNotHasKey('customer', $capturedParams);
         $this->assertArrayNotHasKey('saved_payment_method_options', $capturedParams);
+    }
+
+    // --- Discount & Total Amount Tests (STRP-amount-mismatch) ---
+
+    /**
+     * When basket has discounts, line items total must match totalGross, not sum of items.
+     *
+     * Scenario: Products €100 + Shipping €10 - Discount €5 - Voucher €10 = €95
+     * The amount sent to Stripe MUST be €95 (9500 cents), not €110.
+     */
+    public function testBuildLineItemsTotalMatchesTotalGrossWithDiscounts(): void
+    {
+        // Arrange
+        $snapshot = $this->createBasketSnapshot(
+            items: [
+                ['title' => 'Product A', 'unitPrice' => 50.00, 'quantity' => 2],
+                ['title' => 'Shipping', 'unitPrice' => 10.00, 'quantity' => 1],
+            ],
+            totalGross: 95.00,
+            discounts: [
+                ['name' => 'Summer Sale', 'amount' => 5.00],
+                ['name' => 'Voucher ABC', 'amount' => 10.00],
+            ]
+        );
+
+        // Act
+        $service = $this->createService();
+        $lineItems = $service->buildLineItems($snapshot);
+
+        // Assert — sum of line items in cents must equal totalGross in cents
+        $totalCents = 0;
+        foreach ($lineItems as $li) {
+            $totalCents += $li['price_data']['unit_amount'] * $li['quantity'];
+        }
+        $this->assertEquals(9500, $totalCents, 'Line items total must match totalGross (€95.00 = 9500 cents)');
+    }
+
+    /**
+     * With a single discount, the correct total must be sent.
+     */
+    public function testBuildLineItemsTotalMatchesTotalGrossWithSingleDiscount(): void
+    {
+        // Arrange: Product €29.99 - 10% discount (€3.00) = €26.99
+        $snapshot = $this->createBasketSnapshot(
+            items: [
+                ['title' => 'Widget', 'unitPrice' => 29.99, 'quantity' => 1],
+            ],
+            totalGross: 26.99,
+            discounts: [
+                ['name' => '10% Off', 'amount' => 3.00],
+            ]
+        );
+
+        // Act
+        $service = $this->createService();
+        $lineItems = $service->buildLineItems($snapshot);
+
+        // Assert
+        $totalCents = 0;
+        foreach ($lineItems as $li) {
+            $totalCents += $li['price_data']['unit_amount'] * $li['quantity'];
+        }
+        $this->assertEquals(2699, $totalCents, 'Line items total must match totalGross (€26.99 = 2699 cents)');
+    }
+
+    /**
+     * Without discounts, line items should still match totalGross and include all items.
+     */
+    public function testBuildLineItemsNoDiscountsStillMatchesTotalGross(): void
+    {
+        // Arrange: Products match total exactly
+        $snapshot = $this->createBasketSnapshot(
+            items: [
+                ['title' => 'Product A', 'unitPrice' => 10.00, 'quantity' => 3],
+                ['title' => 'Shipping', 'unitPrice' => 5.00, 'quantity' => 1],
+            ],
+            totalGross: 35.00,
+            discounts: []
+        );
+
+        // Act
+        $service = $this->createService();
+        $lineItems = $service->buildLineItems($snapshot);
+
+        // Assert
+        $totalCents = 0;
+        foreach ($lineItems as $li) {
+            $totalCents += $li['price_data']['unit_amount'] * $li['quantity'];
+        }
+        $this->assertEquals(3500, $totalCents);
+        // Should still have individual items when no discounts
+        $this->assertGreaterThanOrEqual(2, count($lineItems));
+    }
+
+    /**
+     * Discounts must appear as visible line items so the customer sees them on the Stripe page.
+     */
+    public function testBuildLineItemsIncludesDiscountsAsVisibleItems(): void
+    {
+        // Arrange
+        $snapshot = $this->createBasketSnapshot(
+            items: [
+                ['title' => 'Product', 'unitPrice' => 50.00, 'quantity' => 1],
+            ],
+            totalGross: 40.00,
+            discounts: [
+                ['name' => 'Loyalty Discount', 'amount' => 10.00],
+            ]
+        );
+
+        // Act
+        $service = $this->createService();
+        $lineItems = $service->buildLineItems($snapshot);
+
+        // Assert — there should be more than just the product (discount should be visible)
+        $totalCents = 0;
+        foreach ($lineItems as $li) {
+            $totalCents += $li['price_data']['unit_amount'] * $li['quantity'];
+        }
+        $this->assertEquals(4000, $totalCents, 'Total must be €40.00 (after €10 discount)');
+    }
+
+    /**
+     * Multiple discounts must all be applied correctly.
+     */
+    public function testBuildLineItemsWithMultipleDiscountsAndShipping(): void
+    {
+        // Arrange: Complex basket
+        // Product A: €25 x 2 = €50
+        // Product B: €15 x 1 = €15
+        // Shipping: €7.50
+        // Discount 1: -€5.00 (percentage)
+        // Discount 2: -€12.50 (voucher)
+        // Total: €50 + €15 + €7.50 - €5 - €12.50 = €55.00
+        $snapshot = $this->createBasketSnapshot(
+            items: [
+                ['title' => 'Product A', 'unitPrice' => 25.00, 'quantity' => 2],
+                ['title' => 'Product B', 'unitPrice' => 15.00, 'quantity' => 1],
+                ['title' => 'Shipping', 'unitPrice' => 7.50, 'quantity' => 1],
+            ],
+            totalGross: 55.00,
+            discounts: [
+                ['name' => '5% Off', 'amount' => 5.00],
+                ['name' => 'Welcome Voucher', 'amount' => 12.50],
+            ]
+        );
+
+        // Act
+        $service = $this->createService();
+        $lineItems = $service->buildLineItems($snapshot);
+
+        // Assert
+        $totalCents = 0;
+        foreach ($lineItems as $li) {
+            $totalCents += $li['price_data']['unit_amount'] * $li['quantity'];
+        }
+        $this->assertEquals(5500, $totalCents, 'Total must be €55.00 after all discounts');
+    }
+
+    /**
+     * Ensure line items sent to Stripe API in createSession use correct total with discounts.
+     * End-to-end: basket with discounts → createSession → Stripe API receives correct amount.
+     */
+    public function testCreateSessionSendsCorrectAmountWithDiscounts(): void
+    {
+        // Arrange
+        $snapshot = $this->createBasketSnapshot(
+            items: [
+                ['title' => 'Product', 'unitPrice' => 100.00, 'quantity' => 1],
+                ['title' => 'Shipping', 'unitPrice' => 10.00, 'quantity' => 1],
+            ],
+            totalGross: 85.00,
+            discounts: [
+                ['name' => 'Coupon A', 'amount' => 15.00],
+                ['name' => 'Coupon B', 'amount' => 10.00],
+            ]
+        );
+
+        $session = Session::constructFrom([
+            'id' => 'cs_discount_test',
+            'url' => 'https://checkout.stripe.com/pay/cs_discount_test',
+        ]);
+
+        $capturedParams = null;
+        $this->stripeAdapter
+            ->expects($this->once())
+            ->method('createCheckoutSession')
+            ->willReturnCallback(function ($params) use ($session, &$capturedParams) {
+                $capturedParams = $params;
+                return $session;
+            });
+
+        // Act
+        $service = $this->createService();
+        $service->createSession(
+            'contract_discount',
+            $snapshot,
+            'https://shop.example.com/success',
+            'https://shop.example.com/cancel'
+        );
+
+        // Assert — verify the line items sent to Stripe total to €85.00
+        $this->assertIsArray($capturedParams);
+        $this->assertArrayHasKey('line_items', $capturedParams);
+
+        $totalCents = 0;
+        foreach ($capturedParams['line_items'] as $li) {
+            $totalCents += $li['price_data']['unit_amount'] * $li['quantity'];
+        }
+        $this->assertEquals(8500, $totalCents, 'Stripe must receive €85.00 (8500 cents), not €110.00');
+    }
+
+    /**
+     * Vouchers are now included in snapshot discounts (extracted from basket->getVouchers()).
+     * When a voucher is applied, it appears in getDiscounts() and triggers totalGross mode.
+     */
+    public function testBuildLineItemsUsesTotalGrossWhenVoucherApplied(): void
+    {
+        // Arrange: Voucher of €10 applied
+        // Items sum to €60, totalGross is €50 after voucher
+        $snapshot = $this->createBasketSnapshot(
+            items: [
+                ['title' => 'Product', 'unitPrice' => 50.00, 'quantity' => 1],
+                ['title' => 'Shipping', 'unitPrice' => 10.00, 'quantity' => 1],
+            ],
+            totalGross: 50.00,
+            discounts: [
+                ['name' => 'Voucher: SAVE10', 'amount' => 10.00],
+            ]
+        );
+
+        // Act
+        $service = $this->createService();
+        $lineItems = $service->buildLineItems($snapshot);
+
+        // Assert — must use totalGross
+        $totalCents = 0;
+        foreach ($lineItems as $li) {
+            $totalCents += $li['price_data']['unit_amount'] * $li['quantity'];
+        }
+        $this->assertEquals(5000, $totalCents, 'Must charge €50.00 (totalGross), not €60.00 (item sum)');
+    }
+
+    /**
+     * When items sum exactly matches totalGross (no discounts), keep itemized display.
+     */
+    public function testBuildLineItemsKeepsItemizedWhenSumMatchesTotalGross(): void
+    {
+        // Arrange: No discounts, items sum equals totalGross exactly
+        $snapshot = $this->createBasketSnapshot(
+            items: [
+                ['title' => 'Product A', 'unitPrice' => 25.00, 'quantity' => 2],
+                ['title' => 'Shipping', 'unitPrice' => 5.00, 'quantity' => 1],
+            ],
+            totalGross: 55.00,
+            discounts: []
+        );
+
+        // Act
+        $service = $this->createService();
+        $lineItems = $service->buildLineItems($snapshot);
+
+        // Assert — should keep individual items (not collapsed to single line)
+        $this->assertCount(2, $lineItems);
+        $this->assertEquals('Product A', $lineItems[0]['price_data']['product_data']['name']);
+        $this->assertEquals('Shipping', $lineItems[1]['price_data']['product_data']['name']);
     }
 
     // --- Logging Tests ---

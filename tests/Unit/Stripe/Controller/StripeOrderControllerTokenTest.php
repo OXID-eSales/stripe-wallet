@@ -12,6 +12,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventInterface;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
+use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Controller\StripeOrderController;
 use PHPUnit\Framework\TestCase;
 
@@ -20,6 +21,8 @@ use PHPUnit\Framework\TestCase;
  *
  * Ensures that checkoutSuccess() validates the contract_token parameter
  * via ContractTokenService BEFORE dispatching any events.
+ *
+ * Sprint 71: Updated to use StubControllerRequestHelper after accessor extraction.
  *
  * @covers \OxidEsales\Payments\Stripe\Controller\StripeOrderController
  * @group sprint-67a
@@ -30,29 +33,33 @@ final class StripeOrderControllerTokenTest extends TestCase
     /** @test */
     public function checkoutSuccessRejectsInvalidContractToken(): void
     {
-        $controller = new TestableStripeOrderControllerForToken();
-        $controller->setCheckoutSessionId('cs_test_123');
-        $controller->setContractIdFromRequest('contract_abc');
-        $controller->setContractTokenFromRequest('invalid_token');
-        $controller->setContractIdFromSession('contract_abc');
-        $controller->setTokenValidationResult(false);
+        $helper = new StubControllerRequestHelper();
+        $helper->checkoutSessionId = 'cs_test_123';
+        $helper->contractIdFromRequest = 'contract_abc';
+        $helper->contractTokenFromRequest = 'invalid_token';
+        $helper->contractIdFromSession = 'contract_abc';
+        $helper->tokenValidationResult = false;
+
+        $controller = new TestableStripeOrderControllerForToken($helper);
 
         $result = $controller->checkoutSuccess();
 
         $this->assertSame('payment', $result);
-        $this->assertStringContainsString('Payment verification failed', $controller->getLastError());
+        $this->assertStringContainsString('Payment verification failed', $helper->lastError ?? '');
         $this->assertFalse($controller->wasEventDispatched(), 'Event should NOT be dispatched for invalid token');
     }
 
     /** @test */
     public function checkoutSuccessAcceptsValidContractToken(): void
     {
-        $controller = new TestableStripeOrderControllerForToken();
-        $controller->setCheckoutSessionId('cs_test_123');
-        $controller->setContractIdFromRequest('contract_abc');
-        $controller->setContractTokenFromRequest('valid_token');
-        $controller->setContractIdFromSession('contract_abc');
-        $controller->setTokenValidationResult(true);
+        $helper = new StubControllerRequestHelper();
+        $helper->checkoutSessionId = 'cs_test_123';
+        $helper->contractIdFromRequest = 'contract_abc';
+        $helper->contractTokenFromRequest = 'valid_token';
+        $helper->contractIdFromSession = 'contract_abc';
+        $helper->tokenValidationResult = true;
+
+        $controller = new TestableStripeOrderControllerForToken($helper);
 
         $result = $controller->checkoutSuccess();
 
@@ -62,96 +69,69 @@ final class StripeOrderControllerTokenTest extends TestCase
     /** @test */
     public function checkoutSuccessRejectsMissingContractToken(): void
     {
-        $controller = new TestableStripeOrderControllerForToken();
-        $controller->setCheckoutSessionId('cs_test_123');
-        $controller->setContractIdFromRequest('contract_abc');
-        $controller->setContractTokenFromRequest(null);
-        $controller->setContractIdFromSession('contract_abc');
+        $helper = new StubControllerRequestHelper();
+        $helper->checkoutSessionId = 'cs_test_123';
+        $helper->contractIdFromRequest = 'contract_abc';
+        $helper->contractTokenFromRequest = null;
+        $helper->contractIdFromSession = 'contract_abc';
+
+        $controller = new TestableStripeOrderControllerForToken($helper);
 
         $result = $controller->checkoutSuccess();
 
         $this->assertSame('payment', $result);
-        $this->assertStringContainsString('Payment verification failed', $controller->getLastError());
+        $this->assertStringContainsString('Payment verification failed', $helper->lastError ?? '');
     }
 
     /** @test */
     public function checkoutSuccessRejectsMissingContractId(): void
     {
-        $controller = new TestableStripeOrderControllerForToken();
-        $controller->setCheckoutSessionId('cs_test_123');
-        $controller->setContractIdFromRequest(null);
-        $controller->setContractTokenFromRequest('some_token');
-        $controller->setContractIdFromSession('contract_abc');
+        $helper = new StubControllerRequestHelper();
+        $helper->checkoutSessionId = 'cs_test_123';
+        $helper->contractIdFromRequest = null;
+        $helper->contractTokenFromRequest = 'some_token';
+        $helper->contractIdFromSession = 'contract_abc';
+
+        $controller = new TestableStripeOrderControllerForToken($helper);
 
         $result = $controller->checkoutSuccess();
 
         $this->assertSame('payment', $result);
-        $this->assertStringContainsString('Payment verification failed', $controller->getLastError());
+        $this->assertStringContainsString('Payment verification failed', $helper->lastError ?? '');
     }
 
     /** @test */
     public function checkoutSuccessValidatesTokenBeforeSessionCheck(): void
     {
-        $controller = new TestableStripeOrderControllerForToken();
-        $controller->setCheckoutSessionId('cs_test_123');
-        $controller->setContractIdFromRequest('contract_abc');
-        $controller->setContractTokenFromRequest('invalid_token');
-        $controller->setContractIdFromSession('different_contract');
-        $controller->setTokenValidationResult(false);
+        $helper = new StubControllerRequestHelper();
+        $helper->checkoutSessionId = 'cs_test_123';
+        $helper->contractIdFromRequest = 'contract_abc';
+        $helper->contractTokenFromRequest = 'invalid_token';
+        $helper->contractIdFromSession = 'different_contract';
+        $helper->tokenValidationResult = false;
+
+        $controller = new TestableStripeOrderControllerForToken($helper);
 
         $result = $controller->checkoutSuccess();
 
         $this->assertSame('payment', $result);
-        $this->assertStringContainsString('Payment verification failed', $controller->getLastError());
+        $this->assertStringContainsString('Payment verification failed', $helper->lastError ?? '');
         $this->assertFalse($controller->wasEventDispatched());
     }
 }
 
 /**
- * Testable subclass for token validation tests.
+ * Testable subclass that injects a StubControllerRequestHelper.
  *
- * Overrides framework-dependent methods to avoid OXID bootstrap in unit tests.
+ * Sprint 71: Overrides getRequestHelper() instead of individual accessor methods.
  */
 class TestableStripeOrderControllerForToken extends StripeOrderController
 {
-    private ?string $checkoutSessionId = null;
-    private ?string $contractIdFromRequest = null;
-    private ?string $contractTokenFromRequest = null;
-    private ?string $contractIdFromSession = null;
-    private bool $tokenValidationResult = false;
     private bool $eventDispatched = false;
-    private ?string $lastError = null;
-    /** @var array<string, mixed> */
-    private array $sessionVars = [];
 
-    public function __construct()
+    public function __construct(private readonly StubControllerRequestHelper $stubHelper)
     {
         // No parent constructor — skip OXID bootstrap
-    }
-
-    public function setCheckoutSessionId(?string $id): void
-    {
-        $this->checkoutSessionId = $id;
-    }
-
-    public function setContractIdFromRequest(?string $id): void
-    {
-        $this->contractIdFromRequest = $id;
-    }
-
-    public function setContractTokenFromRequest(?string $token): void
-    {
-        $this->contractTokenFromRequest = $token;
-    }
-
-    public function setContractIdFromSession(?string $id): void
-    {
-        $this->contractIdFromSession = $id;
-    }
-
-    public function setTokenValidationResult(bool $result): void
-    {
-        $this->tokenValidationResult = $result;
     }
 
     public function wasEventDispatched(): bool
@@ -159,37 +139,9 @@ class TestableStripeOrderControllerForToken extends StripeOrderController
         return $this->eventDispatched;
     }
 
-    public function getLastError(): ?string
+    protected function getRequestHelper(): ControllerRequestHelper
     {
-        return $this->lastError;
-    }
-
-    protected function getCheckoutSessionIdFromRequest(): ?string
-    {
-        return $this->checkoutSessionId;
-    }
-
-    protected function getContractIdFromRequest(): ?string
-    {
-        return $this->contractIdFromRequest;
-    }
-
-    protected function getContractTokenFromRequest(): ?string
-    {
-        return $this->contractTokenFromRequest;
-    }
-
-    protected function getContractIdFromSession(): ?string
-    {
-        return $this->contractIdFromSession;
-    }
-
-    protected function validateContractToken(?string $contractId, ?string $contractToken): bool
-    {
-        if ($contractId === null || $contractToken === null) {
-            return false;
-        }
-        return $this->tokenValidationResult;
+        return $this->stubHelper;
     }
 
     protected function getEventDispatcher(): EventDispatcherInterface
@@ -211,24 +163,9 @@ class TestableStripeOrderControllerForToken extends StripeOrderController
         };
     }
 
-    protected function addErrorToDisplay(string $message): void
-    {
-        $this->lastError = $message;
-    }
-
     protected function processContextResults(EventContext $context): void
     {
         // No-op in tests
-    }
-
-    protected function setSessionVariable(string $key, mixed $value): void
-    {
-        $this->sessionVars[$key] = $value;
-    }
-
-    protected function deleteSessionVariable(string $key): void
-    {
-        unset($this->sessionVars[$key]);
     }
 
     public function addTplParam($name, $value): void
@@ -236,7 +173,7 @@ class TestableStripeOrderControllerForToken extends StripeOrderController
         // No-op in tests
     }
 
-    protected function logError(string $message, \Throwable $e): void
+    protected function exitWithJson(): void
     {
         // No-op in tests
     }

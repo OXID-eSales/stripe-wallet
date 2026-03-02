@@ -119,11 +119,38 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
 
     /**
      * @inheritDoc
+     *
+     * Builds Stripe-formatted line items from basket snapshot.
+     *
+     * When discounts or vouchers are present in the snapshot, uses totalGross
+     * (the authoritative basket total from OXID) as a single line item.
+     * Stripe doesn't support negative line item amounts, so itemized display
+     * is only possible when no discounts are applied.
+     *
+     * When no discounts are present, items are sent individually for better
+     * visibility on the Stripe Checkout page.
      */
     public function buildLineItems(BasketSnapshot $snapshot): array
     {
-        $lineItems = [];
         $currency = strtolower($snapshot->getCurrency());
+
+        if (!empty($snapshot->getDiscounts())) {
+            return $this->buildTotalLineItem($snapshot, $currency);
+        }
+
+        return $this->buildItemizedLineItems($snapshot, $currency);
+    }
+
+    /**
+     * Build individual line items from snapshot items (products, shipping, fees).
+     *
+     * Used when no discounts are applied, so item sum matches totalGross.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildItemizedLineItems(BasketSnapshot $snapshot, string $currency): array
+    {
+        $lineItems = [];
 
         foreach ($snapshot->getItems() as $item) {
             $title = isset($item['title']) && is_string($item['title']) ? $item['title'] : 'Product';
@@ -145,6 +172,33 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
         }
 
         return $lineItems;
+    }
+
+    /**
+     * Build a single line item using totalGross from the basket snapshot.
+     *
+     * Used when discounts/vouchers are present. Stripe doesn't support negative
+     * line item amounts, so we use the authoritative totalGross from OXID's
+     * basket engine which already includes all discounts, shipping, and fees.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildTotalLineItem(BasketSnapshot $snapshot, string $currency): array
+    {
+        $totalCents = (int) round($snapshot->getTotalGross() * 100);
+
+        return [
+            [
+                'price_data' => [
+                    'currency' => $currency,
+                    'unit_amount' => $totalCents,
+                    'product_data' => [
+                        'name' => 'Order Total',
+                    ],
+                ],
+                'quantity' => 1,
+            ],
+        ];
     }
 
     /**

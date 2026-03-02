@@ -13,6 +13,7 @@ use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface;
 use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\PaymentComponent\Adapter\SessionAdapterInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -166,7 +167,7 @@ class StripeOrderCreationHandler implements HandlerInterface
             : (is_string($authorizationId) ? $authorizationId : null);
 
         /** @phpstan-ignore-next-line nullCoalesce.expr - getPaymentId can return null in edge cases */
-        $paymentId = $basket->getPaymentId() ?? 'oxidstripe';
+        $paymentId = $basket->getPaymentId() ?? StripeDefinitions::STRIPE_WALLET_PAYMENT_ID;
 
         $this->logEvent('StripeOrderCreationHandler: Creating order', [
             'userId' => $contract->getUserId(),

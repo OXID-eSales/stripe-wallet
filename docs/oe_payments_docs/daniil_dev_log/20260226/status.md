@@ -12,3 +12,9 @@
   - Root cause: `StripeRefundRequestHandler::updateContractState()` calls `addRefundedAmount()` without checking contract state; throws DomainException if not FULFILLED, but Stripe refund already succeeded
   - Fix: Added state guard — skip refund recording gracefully when contract not in FULFILLED state
   - Verified: 715 unit tests pass (+1 new test for the guard)
+
+- [BUG] Payment amount mismatch between cart and Stripe Checkout → root cause identified
+  - Report: `reports/03-checkout-amount-mismatch.md`
+  - Root cause: `CheckoutSessionService::buildLineItems()` only reads `snapshot->getItems()`, completely ignores `snapshot->getDiscounts()` — discounts/vouchers not sent to Stripe
+  - Result: Customers overcharged when discounts or vouchers applied
+  - Recommended fix: Option A — use `snapshot->getTotalGross()` as single line item (simplest, safest)
