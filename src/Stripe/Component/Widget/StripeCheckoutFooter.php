@@ -34,9 +34,9 @@ class StripeCheckoutFooter extends WidgetController
 
     /**
      * Current class template name.
-     * Path is relative to module's views/twig directory
+     * Must include module namespace for OXID 7 Twig integration
      */
-    protected $_sThisTemplate = 'widget/checkout/stripe-footer';
+    protected $_sThisTemplate = '@oe_payments_stripe_wallet/widget/checkout/stripe-footer';
 
     private ?ModuleConfigurationServiceInterface $stripeConfig = null;
 

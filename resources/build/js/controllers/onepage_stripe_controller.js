@@ -17,7 +17,7 @@
  */
 
 import { Controller } from "@hotwired/stimulus"
-import { withEventBus } from "../../../../../onepage-checkout/resources/build/js/mixins/event_bus_mixin.js"
+import { withEventBus } from "../mixins/event_bus_mixin.js"
 
 export default class extends withEventBus(Controller) {
   static values = {
@@ -37,6 +37,7 @@ export default class extends withEventBus(Controller) {
     // Register EventBus listeners (automatic cleanup via withEventBus mixin)
     this.listen('oe:payment:method-selected', this.handleMethodSelected.bind(this))
     this.listen('oe:payment:confirm-requested', this.handleConfirmRequest.bind(this))
+    this.listen('oe:footer:submit-clicked', this.handleFooterSubmit.bind(this))
 
     // Initialize state
     this.stripe = null
@@ -97,6 +98,46 @@ export default class extends withEventBus(Controller) {
 
     // Initialize Payment Element
     await this.initializePaymentElement()
+  }
+
+  /**
+   * Handle oe:footer:submit-clicked event
+   *
+   * Event Detail:
+   * {
+   *   paymentMethod: string,
+   *   basketId: string,
+   *   totalPrice: number,
+   *   currency: string,
+   *   confirmed: boolean
+   * }
+   *
+   * Responsibility:
+   * - Trigger payment confirmation request
+   * - Broadcast oe:payment:confirm-requested for checkout lifecycle
+   */
+  async handleFooterSubmit(event) {
+    const { paymentMethod, basketId, totalPrice, currency } = event.detail
+
+    console.log('[OnePageStripeController] Footer submit clicked:', {
+      paymentMethod,
+      basketId,
+      totalPrice,
+      currency
+    })
+
+    if (!this.isStripeMethod(paymentMethod)) {
+      return // Not Stripe payment
+    }
+
+    // Broadcast payment confirmation request
+    // This will trigger the checkout lifecycle to call our handleConfirmRequest
+    this.broadcast('oe:payment:confirm-requested', {
+      paymentMethodId: paymentMethod,
+      basketId: basketId,
+      totalPrice: totalPrice,
+      currency: currency
+    })
   }
 
   /**

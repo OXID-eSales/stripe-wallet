@@ -98,4 +98,19 @@ $aLang = [
     'STRIPE_JS_URL_NOT_CONFIGURED'              => 'Payment URL is not configured',
     'STRIPE_JS_INTENT_INVALID'                  => 'Invalid payment intent response',
     'STRIPE_JS_PROCESSING'                      => 'Processing...',
+
+    // Stripe Checkout Footer Widget
+    'STRIPE_SECURE_PAYMENT_TITLE'               => 'Secure Payment with Stripe',
+    'STRIPE_PCI_DISCLAIMER'                     => 'Your payment information is processed securely. We do not store credit card details. All payments are processed through Stripe\'s PCI-DSS Level 1 certified platform. Learn more in the',
+    'STRIPE_PRIVACY_POLICY'                     => 'Stripe Privacy Policy',
+    'STRIPE_AND_STRIPE_TERMS_CONNECTOR'         => 'and the',
+    'STRIPE_CONSUMER_TERMS'                     => 'Stripe Consumer Terms',
+    'STRIPE_TERMS_NOTICE'                       => 'By completing this purchase, you agree to Stripe\'s',
+    'STRIPE_PAY_SECURELY'                       => 'Pay Securely with Stripe',
+    'STRIPE_PROCESSING_PAYMENT'                 => 'Processing payment...',
+    'STRIPE_PROCESSING_PAYMENT_MESSAGE'         => 'Your payment is being processed securely. This may take a few seconds.',
+    'STRIPE_DO_NOT_CLOSE'                       => 'Please do not close this window.',
+    'STRIPE_PAYMENT_ERROR_TITLE'                => 'Payment Failed',
+    'STRIPE_SECURE_PAYMENT_BADGE'               => 'Secure payment powered by Stripe',
+    'STRIPE_DEBUG_MODE'                         => 'Debug Mode Active',
 ];

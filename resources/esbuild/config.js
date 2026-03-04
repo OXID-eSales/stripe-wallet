@@ -64,7 +64,10 @@ const developmentConfig = {
         target: ['es2017'],
         define: {
             'process.env.NODE_ENV': '"development"'
-        }
+        },
+        // Allow external module resolution
+        external: [],
+        absWorkingDir: path.resolve(__dirname, '../../')
     },
 
     // Individual controllers for development (unbundled)
@@ -78,7 +81,9 @@ const developmentConfig = {
         outdir: path.join(PATHS.assets, 'js/controllers'),
         format: 'esm',
         platform: 'browser',
-        target: ['es2017']
+        target: ['es2017'],
+        // Allow external module resolution
+        absWorkingDir: path.resolve(__dirname, '../../')
     }
 };
 

@@ -22,6 +22,8 @@ interface ModuleConfigurationServiceInterface
 
     public function isTestMode(): bool;
 
+    public function getMode(): string;
+
     public function getPublishableKey(): string;
 
     public function getSecretKey(): string;

@@ -98,4 +98,19 @@ $aLang = [
     'STRIPE_JS_URL_NOT_CONFIGURED'              => 'Zahlungs-URL ist nicht konfiguriert',
     'STRIPE_JS_INTENT_INVALID'                  => 'Ungültige Payment Intent Antwort',
     'STRIPE_JS_PROCESSING'                      => 'Verarbeitung...',
+
+    // Stripe Checkout Footer Widget
+    'STRIPE_SECURE_PAYMENT_TITLE'               => 'Sichere Zahlung mit Stripe',
+    'STRIPE_PCI_DISCLAIMER'                     => 'Ihre Zahlungsinformationen werden sicher verarbeitet. Wir speichern keine Kreditkartendaten. Alle Zahlungen werden über die PCI-DSS Level 1 zertifizierte Stripe-Plattform abgewickelt. Weitere Informationen finden Sie in der',
+    'STRIPE_PRIVACY_POLICY'                     => 'Stripe Datenschutzerklärung',
+    'STRIPE_AND_STRIPE_TERMS_CONNECTOR'         => 'und die',
+    'STRIPE_CONSUMER_TERMS'                     => 'Stripe Nutzungsbedingungen',
+    'STRIPE_TERMS_NOTICE'                       => 'Mit dem Abschluss dieses Kaufs stimmen Sie den',
+    'STRIPE_PAY_SECURELY'                       => 'Jetzt sicher bezahlen mit Stripe',
+    'STRIPE_PROCESSING_PAYMENT'                 => 'Zahlung wird verarbeitet...',
+    'STRIPE_PROCESSING_PAYMENT_MESSAGE'         => 'Ihre Zahlung wird sicher verarbeitet. Dies kann einige Sekunden dauern.',
+    'STRIPE_DO_NOT_CLOSE'                       => 'Bitte schließen Sie dieses Fenster nicht.',
+    'STRIPE_PAYMENT_ERROR_TITLE'                => 'Zahlung fehlgeschlagen',
+    'STRIPE_SECURE_PAYMENT_BADGE'               => 'Sichere Zahlung powered by Stripe',
+    'STRIPE_DEBUG_MODE'                         => 'Debug-Modus aktiv',
 ];

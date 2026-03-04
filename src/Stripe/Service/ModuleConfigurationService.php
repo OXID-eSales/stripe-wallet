@@ -83,6 +83,17 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     }
 
     /**
+     * Get current Stripe mode (test or live)
+     *
+     * @return string Returns 'test' or 'live', defaults to 'test' if not set
+     */
+    public function getMode(): string
+    {
+        $mode = $this->get('sStripeMode');
+        return is_string($mode) && in_array($mode, ['test', 'live'], true) ? $mode : 'test';
+    }
+
+    /**
      * Get the publishable key based on current mode (test/live)
      */
     public function getPublishableKey(): string
