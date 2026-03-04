@@ -218,14 +218,15 @@ class Events
             /** @var \OxidEsales\OnePageCheckout\Service\FooterWidgetRegistry $registry */
             $registry = $container->get(\OxidEsales\OnePageCheckout\Service\FooterWidgetRegistry::class);
 
-            // Register Stripe footer widget for 'oxidstripe' payment method
+            // Register Stripe footer widget for 'oe_payments_stripe_wallet' payment method
             // Widget renders in: Buy Now modal footer, checkout page footer (not global shop footer!)
             // Activation: When user selects Stripe as payment method
-            $registry->registerWidget('oxidstripe', 'stripecheckoutfooter');
+            // NOTE: Payment method ID is the module ID (oe_payments_stripe_wallet), not 'oxidstripe'
+            $registry->registerWidget('oe_payments_stripe_wallet', 'stripecheckoutfooter');
 
             Registry::getLogger()->info(
                 '[StripeModule] One-Page Checkout footer widget registered successfully. ' .
-                'Payment method: oxidstripe, Widget: stripecheckoutfooter. ' .
+                'Payment method: oe_payments_stripe_wallet, Widget: stripecheckoutfooter. ' .
                 'Widget will render in Buy Now modal and checkout page footers when Stripe is selected.'
             );
         } catch (\Exception $e) {

@@ -881,6 +881,23 @@ services:
     public: true
 
   # ==========================================
+  # One-Page Checkout Footer Widget Registration
+  # ==========================================
+  # IMPORTANT: FooterWidgetRegistry is NOT persistent (no database storage).
+  # Widgets must be registered on EVERY request, not just on module activation.
+  # Using Symfony service decoration pattern - decorator registers Stripe widget on instantiation.
+
+  # Decorate FooterWidgetRegistry to auto-register Stripe widget
+  # The decorator's constructor registers the widget before delegating to inner registry
+  OxidEsales\Payments\Stripe\Service\StripeFooterWidgetRegistry:
+    class: OxidEsales\Payments\Stripe\Service\StripeFooterWidgetRegistry
+    decorates: OxidEsales\OnePageCheckout\Service\FooterWidgetRegistry
+    arguments:
+      $innerRegistry: '@OxidEsales\Payments\Stripe\Service\StripeFooterWidgetRegistry.inner'
+      $logger: '@?Psr\Log\LoggerInterface'
+    public: false
+
+  # ==========================================
   # Webhook Handlers (Sprint 13)
   # ==========================================
 

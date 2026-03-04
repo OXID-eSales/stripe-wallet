@@ -1,5 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
-import { withEventBus } from "../../../../onepage-checkout/resources/build/js/mixins/event_bus_mixin.js"
+import { withEventBus } from "../mixins/event_bus_mixin.js"
 
 /**
  * Stripe Checkout Footer Controller
@@ -31,7 +31,6 @@ import { withEventBus } from "../../../../onepage-checkout/resources/build/js/mi
  */
 export default class extends withEventBus(Controller) {
     static targets = [
-        "termsCheckbox",    // Terms and conditions checkbox
         "submitButton",     // Main submit button
         "loader",           // Loading overlay
         "error",            // Error message container
@@ -102,60 +101,93 @@ export default class extends withEventBus(Controller) {
     }
 
     /**
-     * Validate terms checkbox
+     * NOTE: Terms validation removed - handled by checkout-footer-manager
      *
-     * Updates submit button state and broadcasts event when terms are accepted
+     * Terms checkbox is now in Part 1 (standard consents) of footer architecture.
+     * checkout-footer-manager controller handles all terms validation.
      */
-    validateTerms() {
-        const isChecked = this.termsCheckboxTarget.checked
-        this.updateButtonState()
-
-        if (isChecked) {
-            console.log('[StripeCheckoutFooter] Terms accepted')
-
-            this.broadcast('oe:footer:terms-accepted', {
-                paymentMethod: this.paymentMethodValue,
-                basketId: this.basketIdValue,
-                timestamp: Date.now()
-            })
-
-            // Hide error if visible
-            this.hideError()
-        }
-    }
 
     /**
-     * Process payment
+     * Process payment - Redirect to Stripe Checkout
      *
-     * Validates terms and broadcasts submit event for payment controller
+     * Creates a Stripe Checkout Session and redirects user to hosted payment page.
+     * This is different from Payment Element - full page redirect instead of embedded form.
      */
     async processPayment(event) {
         event.preventDefault()
 
-        console.log('[StripeCheckoutFooter] Submit button clicked')
+        console.log('[StripeCheckoutFooter] Submit button clicked - redirecting to Stripe Checkout')
 
-        // Validate terms
-        if (!this.termsCheckboxTarget.checked) {
-            this.showError('Please accept the terms and conditions to continue.')
-            this.termsCheckboxTarget.focus()
-            return
+        // Show loading state
+        this.showLoader()
+
+        try {
+            // Create Stripe Checkout Session
+            const session = await this.createCheckoutSession()
+
+            console.log('[StripeCheckoutFooter] Checkout session created:', session.id)
+            console.log('[StripeCheckoutFooter] Redirecting to:', session.url)
+
+            // Redirect to Stripe hosted checkout page
+            if (session.url) {
+                window.location.href = session.url
+            } else {
+                throw new Error('Stripe Checkout URL not provided')
+            }
+        } catch (error) {
+            console.error('[StripeCheckoutFooter] Error creating checkout session:', error)
+            this.hideLoader()
+            this.showError(error.message || 'Failed to start checkout. Please try again.')
         }
+    }
 
-        // Disable button to prevent double submission
-        this.submitButtonTarget.disabled = true
+    /**
+     * Create Stripe Checkout Session via backend API
+     *
+     * @returns {Promise<{id: string, url: string, contract_id: string}>}
+     */
+    async createCheckoutSession() {
+        const endpoint = this.getCheckoutSessionUrl()
 
-        // Broadcast submit event
-        this.broadcast('oe:footer:submit-clicked', {
-            paymentMethod: this.paymentMethodValue,
-            basketId: this.basketIdValue,
-            totalPrice: this.totalPriceValue,
-            currency: this.currencyValue,
-            confirmed: true,
-            timestamp: Date.now()
+        console.log('[StripeCheckoutFooter] Creating checkout session at:', endpoint)
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': this.csrfTokenValue
+            },
+            body: JSON.stringify({
+                capture: 'automatic' // Can be made configurable
+            }),
+            credentials: 'same-origin'
         })
 
-        // Note: Actual payment processing is handled by payment controller
-        // This footer just coordinates the UI state
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            throw new Error(errorData.error || 'Failed to create checkout session')
+        }
+
+        const data = await response.json()
+
+        if (!data.id || !data.url) {
+            throw new Error('Invalid checkout session response')
+        }
+
+        return data
+    }
+
+    /**
+     * Get checkout session creation URL
+     *
+     * @returns {string}
+     */
+    getCheckoutSessionUrl() {
+        // Get base URL from current page
+        const baseUrl = window.location.origin
+
+        // Build URL to StripeOrderController::createCheckoutSession
+        return `${baseUrl}/index.php?cl=StripeOrder&fnc=createCheckoutSession`
     }
 
     /**
@@ -215,11 +247,14 @@ export default class extends withEventBus(Controller) {
     }
 
     /**
-     * Update submit button state based on terms acceptance
+     * Update submit button state
+     *
+     * Button is enabled by default. checkout-footer-manager handles terms validation.
      */
     updateButtonState() {
-        const isTermsChecked = this.termsCheckboxTarget.checked
-        this.submitButtonTarget.disabled = !isTermsChecked
+        // Button state is now controlled by checkout-footer-manager (Part 1)
+        // This widget just handles payment-specific UI states
+        // Keep button enabled unless explicitly disabled by loading state
     }
 
     /**

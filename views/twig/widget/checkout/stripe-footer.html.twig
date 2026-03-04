@@ -1,7 +1,11 @@
 {#
- # Stripe Checkout Footer Widget Template
+ # Stripe Checkout Footer Widget Template (Refactored)
  #
- # Custom footer for Stripe payments with enhanced disclaimers and branding.
+ # IMPORTANT: This widget now renders ONLY the Stripe-specific part.
+ # Standard consents (AGB, Privacy) are handled by checkout-footer-manager
+ # in modal-footer.html.twig (Part 1 - always visible).
+ #
+ # This is Part 2 (dynamic/swappable) of the two-part footer architecture.
  #
  # Data Available:
  # - checkoutData: Standard checkout data (basketId, totalPrice, currency, etc.)
@@ -11,13 +15,12 @@
  # Integration:
  # - Uses stimulus controller: stripe-checkout-footer
  # - Integrates with EventBus for state synchronization
- # - Emits: oe:footer:terms-accepted, oe:footer:submit-clicked
+ # - Emits: oe:footer:submit-clicked, oe:payment:processing
  # - Listens: oe:basket:updated, oe:payment:processing, oe:payment:complete
  #
- # @see docs/FOOTER_WIDGET_ARCHITECTURE.md
+ # @see docs/FOOTER_REFACTORING.md
  # @see resources/build/js/controllers/stripe_checkout_footer_controller.js
  #}
-STRIPE324234
 <div class="checkout-footer-stripe"
      data-controller="stripe-checkout-footer"
      data-stripe-checkout-footer-basket-id-value="{{ checkoutData.basketId }}"
@@ -26,93 +29,30 @@ STRIPE324234
      data-stripe-checkout-footer-currency-value="{{ checkoutData.currency }}"
      data-stripe-checkout-footer-csrf-token-value="{{ checkoutData.csrfToken }}">
 
-    {# ===================================================================
-        Stripe Security Disclaimers
-        ===================================================================
-        Inform users about Stripe's security measures and PCI compliance
-    =================================================================== #}
-    <div class="stripe-disclaimers mb-3">
-        <div class="alert alert-info small py-2">
-            <div class="d-flex align-items-start">
-                <i class="fas fa-shield-alt me-2 mt-1 text-primary"></i>
-                <div>
-                    <strong>{{ translate({ ident: "STRIPE_SECURE_PAYMENT_TITLE" }) }}</strong>
-                    <p class="mb-0 mt-1">
-                        {{ translate({ ident: "STRIPE_PCI_DISCLAIMER" }) }}
-                        <a href="{{ stripeConfig.privacyUrl }}" target="_blank" rel="noopener noreferrer" class="alert-link">
-                            {{ translate({ ident: "STRIPE_PRIVACY_POLICY" }) }}
-                        </a>
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>
 
     {# ===================================================================
-        Terms and Conditions with Stripe Terms
+        Custom Submit Button with Stripe Branding (NO AMOUNT)
         ===================================================================
-        Extended terms checkbox including Stripe's consumer terms
-    =================================================================== #}
-    <div class="form-check mt-4">
-        <input class="form-check-input"
-               type="checkbox"
-               name="confirmTerms"
-               id="confirmTermsStripe"
-               data-stripe-checkout-footer-target="termsCheckbox"
-               data-action="change->stripe-checkout-footer#validateTerms"
-               required>
-        <label class="form-check-label" for="confirmTermsStripe">
-            {{ translate({ ident: "OSC_ONEPAGE_ACCEPT_TERMS" }) }}
-            <a href="{{ oViewConf.getBaseUrl() }}AGB/" target="_blank">
-                {{ translate({ ident: "OSC_ONEPAGE_TERMS_AND_CONDITIONS" }) }}
-            </a>
-            {{ translate({ ident: "STRIPE_AND_STRIPE_TERMS_CONNECTOR" }) }}
-            <a href="{{ stripeConfig.termsUrl }}" target="_blank" rel="noopener noreferrer">
-                {{ translate({ ident: "STRIPE_CONSUMER_TERMS" }) }}
-            </a>
-        </label>
-    </div>
-
-    {# ===================================================================
-        Custom Submit Button with Stripe Branding
-        ===================================================================
-        Styled button with Stripe's signature purple color and branding
+        Styled button with Stripe's signature purple color and branding.
+        Total amount is shown in summary section, not here.
     =================================================================== #}
     <button type="button"
-            class="btn btn-primary btn-lg w-100 mt-4 stripe-submit-button"
+            class="btn btn-primary btn-lg w-100 mt-4 stripe-submit-button oe-checkout-submit-button"
             data-stripe-checkout-footer-target="submitButton"
+            data-checkout-footer-manager-target="submitButton"
             data-action="click->stripe-checkout-footer#processPayment"
             disabled>
         <span class="button-content">
             <i class="fas fa-lock me-2"></i>
             <span class="button-text">
-                {{ translate({ ident: "STRIPE_PAY_SECURELY" }) }}
-            </span>
-            <span class="button-amount ms-2">
-                {{ checkoutData.totalPrice|number_format(2, ',', '.') }} {{ checkoutData.currency }}
+                {{ translate({ ident: "STRIPE_PAY_SECURELY" }) | default("Pay Securely with Stripe") }}
             </span>
         </span>
         <span class="button-spinner d-none">
             <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-            {{ translate({ ident: "STRIPE_PROCESSING_PAYMENT" }) }}
+            {{ translate({ ident: "STRIPE_PROCESSING_PAYMENT" }) | default("Processing...") }}
         </span>
     </button>
-
-    {# ===================================================================
-        Stripe Branding
-        ===================================================================
-        "Powered by Stripe" logo and secure payment messaging
-    =================================================================== #}
-    <div class="stripe-branding mt-3 text-center">
-        <div class="d-flex align-items-center justify-content-center text-muted small">
-            <img src="{{ oViewConf.getModuleUrl('oe_payments_stripe_wallet', 'assets/img/powered_by_stripe.svg') }}"
-                 alt="Powered by Stripe"
-                 height="20"
-                 class="me-2"
-                 onerror="this.style.display='none'">
-            <span>{{ translate({ ident: "STRIPE_SECURE_PAYMENT_BADGE" }) }}</span>
-        </div>
-    </div>
 
     {# ===================================================================
         Loading Overlay
