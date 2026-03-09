@@ -108,86 +108,34 @@ export default class extends withEventBus(Controller) {
      */
 
     /**
-     * Process payment - Redirect to Stripe Checkout
+     * Handle submit button click
      *
-     * Creates a Stripe Checkout Session and redirects user to hosted payment page.
-     * This is different from Payment Element - full page redirect instead of embedded form.
+     * IMPORTANT: Footer widget does NOT process payment directly!
+     * It only broadcasts oe:footer:submit-clicked event.
+     * Payment processing is handled by:
+     * 1. checkout-lifecycle-controller → broadcasts oe:payment:confirm-requested
+     * 2. onepage-stripe-controller → confirms payment with Stripe
+     * 3. checkout-lifecycle-controller → places order via API
+     *
+     * This separation allows payment providers to handle their own payment logic
+     * while footer widget remains generic and reusable.
      */
     async processPayment(event) {
         event.preventDefault()
 
-        console.log('[StripeCheckoutFooter] Submit button clicked - redirecting to Stripe Checkout')
+        console.log('[StripeCheckoutFooter] Submit button clicked - broadcasting event')
 
-        // Show loading state
-        this.showLoader()
-
-        try {
-            // Create Stripe Checkout Session
-            const session = await this.createCheckoutSession()
-
-            console.log('[StripeCheckoutFooter] Checkout session created:', session.id)
-            console.log('[StripeCheckoutFooter] Redirecting to:', session.url)
-
-            // Redirect to Stripe hosted checkout page
-            if (session.url) {
-                window.location.href = session.url
-            } else {
-                throw new Error('Stripe Checkout URL not provided')
-            }
-        } catch (error) {
-            console.error('[StripeCheckoutFooter] Error creating checkout session:', error)
-            this.hideLoader()
-            this.showError(error.message || 'Failed to start checkout. Please try again.')
-        }
-    }
-
-    /**
-     * Create Stripe Checkout Session via backend API
-     *
-     * @returns {Promise<{id: string, url: string, contract_id: string}>}
-     */
-    async createCheckoutSession() {
-        const endpoint = this.getCheckoutSessionUrl()
-
-        console.log('[StripeCheckoutFooter] Creating checkout session at:', endpoint)
-
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-Token': this.csrfTokenValue
-            },
-            body: JSON.stringify({
-                capture: 'automatic' // Can be made configurable
-            }),
-            credentials: 'same-origin'
+        // Broadcast footer submit event
+        // checkout-lifecycle-controller will orchestrate the payment flow
+        this.broadcast('oe:footer:submit-clicked', {
+            paymentMethod: this.paymentMethodValue,
+            basketId: this.basketIdValue,
+            totalPrice: this.totalPriceValue,
+            currency: this.currencyValue,
+            confirmed: true // Terms already confirmed by checkout-footer-manager
         })
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}))
-            throw new Error(errorData.error || 'Failed to create checkout session')
-        }
-
-        const data = await response.json()
-
-        if (!data.id || !data.url) {
-            throw new Error('Invalid checkout session response')
-        }
-
-        return data
-    }
-
-    /**
-     * Get checkout session creation URL
-     *
-     * @returns {string}
-     */
-    getCheckoutSessionUrl() {
-        // Get base URL from current page
-        const baseUrl = window.location.origin
-
-        // Build URL to StripeOrderController::createCheckoutSession
-        return `${baseUrl}/index.php?cl=StripeOrder&fnc=createCheckoutSession`
+        console.log('[StripeCheckoutFooter] Event broadcasted - waiting for checkout lifecycle')
     }
 
     /**
