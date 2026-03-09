@@ -15,6 +15,9 @@ use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\OnePageCheckout\Contract\PaymentContext;
 use OxidEsales\OnePageCheckout\Contract\PaymentHandlerInterface;
 use OxidEsales\OnePageCheckout\Contract\PaymentHandlerResult;
+use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
+use OxidEsales\PaymentComponent\Contract\ContractCondition;
+use OxidEsales\PaymentComponent\Contract\PaymentContract;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Module;
@@ -46,6 +49,7 @@ final class StripePaymentHandler implements PaymentHandlerInterface
 
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,
+        private readonly ContractRepositoryInterface $contractRepository,
         private readonly LoggerInterface $logger
     ) {
     }
@@ -86,24 +90,83 @@ final class StripePaymentHandler implements PaymentHandlerInterface
             /** @var User $user */
             $user = $context->getUser();
 
+            $paymentMethodId = $context->getPaymentMethodId();
+
             $this->logger->info('[StripePaymentHandler] Processing Stripe payment', [
-                'paymentMethodId' => $context->getPaymentMethodId(),
+                'paymentMethodId' => $paymentMethodId,
                 'basketTotal' => $basket->getPrice()->getBruttoPrice(),
             ]);
 
-            // Create Stripe PaymentIntent
-            $paymentIntent = $this->createPaymentIntent($basket, $user);
+            // 1. Create BasketSnapshot from OXID basket
+            $basketPrice = $basket->getPrice();
+            $currency = Registry::getConfig()->getActShopCurrencyObject();
 
-            // Return success with clientSecret for frontend confirmation
-            // Note: Contract creation will be handled by CheckoutService
+            $basketSnapshot = BasketSnapshot::fromArray([
+                'items' => $this->getBasketItems($basket),
+                'discounts' => $this->getBasketDiscounts($basket),
+                'totalGross' => $basketPrice->getBruttoPrice(),
+                'totalNet' => $basketPrice->getNettoPrice(),
+                'totalVat' => $basketPrice->getVatValue(),
+                'currency' => $currency->name ?? 'EUR',
+            ]);
+
+            // 2. Create PaymentContract (using constructor, not repository->create())
+            $shopId = (int) Registry::getConfig()->getShopId();
+            $userId = $user->getId() ?? '';
+
+            $contract = new PaymentContract(
+                shopId: $shopId,
+                userId: $userId,
+                basketSnapshot: $basketSnapshot
+            );
+
+            // 3. Create Stripe PaymentIntent BEFORE saving contract
+            // We need the contract temporarily to link PaymentIntent metadata
+            $paymentIntent = $this->createPaymentIntent($basket, $user, $contract);
+
+            // 4. Set provider information and store PaymentIntent ID
+            $contract->setProvider(self::HANDLER_ID, $paymentMethodId);
+            $contract->setProviderOrderId($paymentIntent->id);
+
+            // 5. Store metadata
+            $contract->setMetadata('payment_method_id', $paymentMethodId);
+            $contract->setMetadata('handler', self::HANDLER_ID);
+            $contract->setMetadata('payment_intent_id', $paymentIntent->id);
+            $contract->setMetadata('stripe_amount', $paymentIntent->amount);
+            $contract->setMetadata('stripe_currency', $paymentIntent->currency);
+
+            // 6. Add payment condition (required for state transitions)
+            // Note: Condition will be fulfilled AFTER Stripe confirms payment (webhook or confirmPayment)
+            $paymentCondition = new ContractCondition(
+                ContractCondition::TYPE_PAYMENT_AUTHORIZED
+            );
+            $contract->addCondition($paymentCondition);
+
+            // 7. Save contract in DRAFT state
+            // IMPORTANT: State transitions will happen later:
+            // - Frontend confirms payment with Stripe
+            // - Webhook or confirmPayment() fulfills payment condition
+            // - placeOrder() performs early order creation and state transitions
+            $this->contractRepository->save($contract);
+
+            $this->logger->info('[StripePaymentHandler] Contract created successfully', [
+                'contractId' => $contract->getId(),
+                'paymentIntentId' => $paymentIntent->id,
+                'amount' => $paymentIntent->amount,
+                'state' => 'draft',
+            ]);
+
+            // 8. Return success with contractId AND clientSecret
             return PaymentHandlerResult::success(
-                contractId: null, // Will be set by CheckoutService after contract creation
+                contractId: $contract->getId(),
                 clientSecret: $paymentIntent->client_secret ?? '',
                 metadata: [
                     'provider' => self::HANDLER_ID,
                     'paymentIntentId' => $paymentIntent->id,
                     'amount' => $paymentIntent->amount,
                     'currency' => $paymentIntent->currency,
+                    'requiresConfirmation' => true,
+                    'state' => 'draft',
                 ]
             );
         } catch (\Exception $e) {
@@ -187,10 +250,9 @@ final class StripePaymentHandler implements PaymentHandlerInterface
     /**
      * Create Stripe PaymentIntent for the basket.
      *
-     * Note: ContractId will be added to PaymentIntent metadata later,
-     * after the contract is created by CheckoutService.
+     * Links PaymentIntent with PaymentContract for tracking.
      */
-    private function createPaymentIntent(Basket $basket, User $user): PaymentIntent
+    private function createPaymentIntent(Basket $basket, User $user, PaymentContract $contract): PaymentIntent
     {
         $adapter = $this->getAdapter();
 
@@ -203,12 +265,16 @@ final class StripePaymentHandler implements PaymentHandlerInterface
         $customerEmail = $user->oxuser__oxusername->value;
 
         // Create PaymentIntent via Stripe SDK
+        // Note: We link contractId in metadata so webhooks can find the contract
         $paymentIntent = \Stripe\PaymentIntent::create([
             'amount' => $amount,
             'currency' => $currency,
             'metadata' => [
                 'module' => Module::MODULE_ID,
-                'paymentMethodId' => 'oxidstripe',
+                'paymentMethodId' => 'oe_payments_stripe_wallet',
+                'contractId' => $contract->getId(),
+                'shopId' => $contract->getShopId(),
+                'userId' => $contract->getUserId(),
             ],
             'receipt_email' => $customerEmail ?: null,
             'automatic_payment_methods' => [
@@ -218,11 +284,70 @@ final class StripePaymentHandler implements PaymentHandlerInterface
 
         $this->logger->info('[StripePaymentHandler] PaymentIntent created', [
             'paymentIntentId' => $paymentIntent->id,
+            'contractId' => $contract->getId(),
             'amount' => $amount,
             'currency' => $currency,
         ]);
 
         return $paymentIntent;
+    }
+
+    /**
+     * Extract basket items for BasketSnapshot.
+     *
+     * @param Basket $basket OXID basket
+     * @return array<int, array{articleId: string, title: string, amount: float, price: float, totalPrice: float}>
+     */
+    private function getBasketItems(Basket $basket): array
+    {
+        $items = [];
+
+        foreach ($basket->getContents() as $basketItem) {
+            $items[] = [
+                'articleId' => $basketItem->getProductId(),
+                'title' => $basketItem->getTitle(),
+                'amount' => $basketItem->getAmount(),
+                'price' => $basketItem->getUnitPrice()->getBruttoPrice(),
+                'totalPrice' => $basketItem->getPrice()->getBruttoPrice(),
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * Extract basket discounts for BasketSnapshot.
+     *
+     * @param Basket $basket OXID basket
+     * @return array<int, array{name: string, amount: float}>
+     */
+    private function getBasketDiscounts(Basket $basket): array
+    {
+        $discounts = [];
+
+        // Get voucher discounts
+        $vouchers = $basket->getVouchers();
+        if ($vouchers) {
+            foreach ($vouchers as $voucherId => $voucher) {
+                $discounts[] = [
+                    'name' => $voucher->sVoucherNr ?? 'Voucher',
+                    'amount' => (float) ($voucher->dVoucherdiscount ?? 0),
+                ];
+            }
+        }
+
+        // Get other discounts (e.g., basket discounts)
+        $basketDiscounts = $basket->getDiscounts();
+        if ($basketDiscounts) {
+            foreach ($basketDiscounts as $discount) {
+                $discounts[] = [
+                    'name' => $discount->sOXID ?? 'Discount',
+                    'amount' => (float) ($discount->dDiscount ?? 0),
+                ];
+            }
+        }
+
+        return $discounts;
     }
 
     /**

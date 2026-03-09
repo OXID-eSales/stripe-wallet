@@ -849,9 +849,11 @@ services:
 
   # Stripe Payment Handler - Implements PaymentHandlerInterface for one-page checkout
   # Automatically registered via Symfony tagged service
+  # Updated to create PaymentContract directly (same pattern as StandardPaymentHandler)
   OxidEsales\Payments\Stripe\PaymentHandler\StripePaymentHandler:
     arguments:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
       $logger: '@Psr\Log\LoggerInterface'
     tags:
       - { name: oe.payment.handler }
@@ -866,9 +868,11 @@ services:
 
   # Decorate FooterWidgetRegistry to auto-register Stripe widget
   # The decorator's constructor registers the widget before delegating to inner registry
+  # decoration_on_invalid: ignore - Skip decoration if OnePageCheckout module is not activated
   OxidEsales\Payments\Stripe\Service\StripeFooterWidgetRegistry:
     class: OxidEsales\Payments\Stripe\Service\StripeFooterWidgetRegistry
     decorates: OxidEsales\OnePageCheckout\Service\FooterWidgetRegistry
+    decoration_on_invalid: ignore
     arguments:
       $innerRegistry: '@OxidEsales\Payments\Stripe\Service\StripeFooterWidgetRegistry.inner'
       $logger: '@?Psr\Log\LoggerInterface'
