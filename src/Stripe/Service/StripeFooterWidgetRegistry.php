@@ -52,7 +52,11 @@ class StripeFooterWidgetRegistry extends FooterWidgetRegistry
 
         // Register Stripe widget IMMEDIATELY in INNER registry (not parent)
         // Use module ID as payment method ID (oe_payments_stripe_wallet, not oxidstripe)
-        $this->innerRegistry->registerWidget('oe_payments_stripe_wallet', 'stripecheckoutfooter');
+        // Use full class name for cross-module compatibility
+        $this->innerRegistry->registerWidget(
+            'oe_payments_stripe_wallet',
+            \OxidEsales\Payments\Stripe\Component\Widget\StripeCheckoutFooter::class
+        );
     }
 
     // Override ALL methods to delegate to inner registry
