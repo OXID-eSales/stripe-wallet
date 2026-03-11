@@ -42,4 +42,14 @@ final class OxidSessionAdapter implements SessionAdapterInterface
     {
         return Registry::getSession()->getVariable($name);
     }
+
+    public function setBasket(object $basket): void
+    {
+        Registry::getSession()->setBasket($basket);
+    }
+
+    public function setUser(object $user): void
+    {
+        Registry::getSession()->setUser($user);
+    }
 }
