@@ -104,15 +104,15 @@ class ModuleConfiguration extends ModuleConfiguration_parent
      */
     public function stripeGetConnectUrl(string $sVarName): string
     {
-        $sMode = $sVarName == 'sStripeTestToken' ? 'test' : 'live';
+        $sMode = $sVarName === 'sStripeTestToken' ? 'test' : 'live';
         $redirectUrl = Registry::getConfig()->getShopUrl(0, true) . 'admin/index.php?cl=StripeConnect&fnc=stripeFinishOnBoarding';
         $redirectUrl .= '&stoken=' . Registry::getSession()->getSessionChallengeToken();
         $redirectUrl .= '&shop_param=' . $sMode;
         $redirectUrl .= '&shp=' . Registry::getConfig()->getShopId();
 
-        if ($sMode == 'test') {
-            return 'https://dev-osm.oxid-esales.com/stripe-connect?shop_redirect_url=' . rawurlencode($redirectUrl);
+        if ($sMode === 'test') {
+            return 'https://stripe-middleware-test.oxid-esales.com/stripe-connect?shop_redirect_url=' . rawurlencode($redirectUrl);
         }
-        return 'https://osm.oxid-esales.com/stripe-connect?shop_redirect_url=' . rawurlencode($redirectUrl);
+        return 'https://stripe-middleware.oxid-esales.com/stripe-connect?shop_redirect_url=' . rawurlencode($redirectUrl);
     }
 }
