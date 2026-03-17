@@ -40,20 +40,6 @@ class ModuleConfiguration extends ModuleConfiguration_parent
     }
 
     /**
-     * Returns array with options for iStripeCronSecondChanceTimeDiff config option
-     *
-     * @return array
-     */
-    public function stripeSecondChanceDayDiffs(): array
-    {
-        $aReturn = [];
-        for ($i = 1; $i <= 14; $i++) {
-            $aReturn[] = $i;
-        }
-        return $aReturn;
-    }
-
-    /**
      * @return bool
      */
     public function stripeIsTestMode(): bool

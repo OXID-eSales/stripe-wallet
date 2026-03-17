@@ -52,20 +52,6 @@
                 <div class="spacer"></div>
             </dl>
         {% endif %}
-    {% elseif module_var == 'iStripeCronSecondChanceTimeDiff' %}
-        <dl>
-            <dt>
-                <select class="select" name="confselects[{{ module_var }}]" {{  readonly  }}>
-                    {% for iDayDiff in oView.stripeSecondChanceDayDiffs() %}
-                        <option value="{{ iDayDiff }}" {% if confselects[module_var] == iDayDiff %}selected{% endif %}>{{ iDayDiff }}&nbsp;{% if iDayDiff == 1 %}{{ translate({ ident: "STRIPE_DAY" }) }}{% else %}{{ translate({ ident: "STRIPE_DAYS" }) }}{% endif %}</option>
-                    {% endfor %}
-                </select>
-                {% include "inputhelp.html.twig" with {'sHelpId': help_id("HELP_SHOP_MODULE_" ~ module_var), 'sHelpText': help_text("HELP_SHOP_MODULE_" ~ module_var)} %}
-            </dt>
-            <dd>
-                {{ translate({ ident: "SHOP_MODULE_" ~ module_var }) }}
-            </dd>
-        </dl>
     {% elseif module_var == 'sStripeWebhookEndpoint' %}
         {# Skip - URL is auto-generated, not needed in UI #}
     {% elseif module_var == 'sStripeWebhookEndpointSecret' %}

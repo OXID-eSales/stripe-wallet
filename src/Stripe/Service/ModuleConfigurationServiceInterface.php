@@ -40,16 +40,6 @@ interface ModuleConfigurationServiceInterface
 
     public function shouldProvideCustomerEmail(): bool;
 
-    public function isCronFinishOrdersActive(): bool;
-
-    public function isCronSecondChanceActive(): bool;
-
-    public function getCronSecondChanceTimeDiff(): int;
-
-    public function isCronOrderShipmentActive(): bool;
-
-    public function getCronSecureKey(): string;
-
     public function getWebhookUrl(): string;
 
     public function isConfigured(): bool;

@@ -28,7 +28,7 @@ use Throwable;
  * - Retrieves API keys (publishable and secret) based on current mode
  * - Provides access to webhook configuration
  * - Handles order status mappings
- * - Manages cron job settings
+ * - Manages webhook settings
  * - Controls payment method restrictions (country, currency)
  * - Provides transaction logging settings
  *
@@ -172,48 +172,6 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     public function shouldProvideCustomerEmail(): bool
     {
         return (bool) $this->get('blStripeProvideCustomerEmailAddress');
-    }
-
-    /**
-     * Check if cron job for finishing orders is active
-     */
-    public function isCronFinishOrdersActive(): bool
-    {
-        return (bool) $this->get('sStripeCronFinishOrdersActive');
-    }
-
-    /**
-     * Check if cron job for second chance emails is active
-     */
-    public function isCronSecondChanceActive(): bool
-    {
-        return (bool) $this->get('sStripeCronSecondChanceActive');
-    }
-
-    /**
-     * Get time difference for second chance cron job (in days)
-     */
-    public function getCronSecondChanceTimeDiff(): int
-    {
-        $value = $this->get('iStripeCronSecondChanceTimeDiff');
-        return is_numeric($value) ? (int)$value : 1;
-    }
-
-    /**
-     * Check if cron job for order shipment is active
-     */
-    public function isCronOrderShipmentActive(): bool
-    {
-        return (bool) $this->get('sStripeCronOrderShipmentActive');
-    }
-
-    /**
-     * Get secure key for cron job execution
-     */
-    public function getCronSecureKey(): string
-    {
-        $key = $this->get('sStripeCronSecureKey');
-        return is_string($key) ? $key : '';
     }
 
     /**
