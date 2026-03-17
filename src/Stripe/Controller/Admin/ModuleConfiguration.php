@@ -113,6 +113,6 @@ class ModuleConfiguration extends ModuleConfiguration_parent
         if ($sMode === 'test') {
             return 'https://stripe-middleware-test.oxid-esales.com/stripe-connect?shop_redirect_url=' . rawurlencode($redirectUrl);
         }
-        return 'https://stripe-middleware.oxid-esales.com/stripe-connect?shop_redirect_url=' . rawurlencode($redirectUrl);
+        return 'https://osm.oxid-esales.com/stripe-connect?shop_redirect_url=' . rawurlencode($redirectUrl);
     }
 }
