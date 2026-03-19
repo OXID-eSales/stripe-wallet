@@ -25,7 +25,8 @@ final class WebhookFileLoggerFactory extends AbstractFileLoggerFactory
 {
     protected function getLogFile(): string
     {
-        return 'log/stripe/stripe_webhooks.log';
+        $date = date('Y-m-d');
+        return "log/stripe/stripe_webhooks_{$date}.log";
     }
 
     protected function getPrefix(): string

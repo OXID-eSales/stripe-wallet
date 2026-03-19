@@ -25,7 +25,8 @@ final class RequestFileLoggerFactory extends AbstractFileLoggerFactory
 {
     protected function getLogFile(): string
     {
-        return 'log/stripe/stripe_requests.log';
+        $date = date('Y-m-d');
+        return "log/stripe/stripe_requests_{$date}.log";
     }
 
     protected function getPrefix(): string

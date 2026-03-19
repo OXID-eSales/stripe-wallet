@@ -24,7 +24,8 @@ final class ReconciliationFileLoggerFactory extends AbstractFileLoggerFactory
 {
     protected function getLogFile(): string
     {
-        return 'log/stripe/stripe_reconciliation.log';
+        $date = date('Y-m-d');
+        return "log/stripe/stripe_reconciliation_{$date}.log";
     }
 
     protected function getPrefix(): string
