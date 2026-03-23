@@ -10,7 +10,7 @@ env:
   PHP_VERSION: '8.2'
   MYSQL_VERSION: '5.7'
   TEMPLATE_ENGINE: 'twig'
-  PAYMENT_COMPONENT_BRANCH: 'dev-b-7.4.x-order-cancellation-STRP-100' # dev-b-7.x...
+  PAYMENT_COMPONENT_BRANCH: 'dev-b-7.4.x' # dev-b-7.x...
 
 jobs:
   install_shop_with_module:
