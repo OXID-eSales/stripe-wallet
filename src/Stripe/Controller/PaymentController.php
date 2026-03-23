@@ -12,7 +12,9 @@ namespace OxidEsales\Payments\Stripe\Controller;
 use OxidEsales\Eshop\Application\Controller\PaymentController as CorePaymentController;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
+use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use OxidEsales\Payments\Stripe\Module;
+use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
 
 /**
  * Extended payment controller for Stripe integration
@@ -20,6 +22,8 @@ use OxidEsales\Payments\Stripe\Module;
  */
 class PaymentController extends CorePaymentController
 {
+    use ServiceContainer;
+
     private ModuleConfigurationServiceInterface $stripeConfig;
 
     public function __construct(
@@ -31,14 +35,53 @@ class PaymentController extends CorePaymentController
     }
 
     /**
-     * Render payment selection page
-     * Creates PaymentIntent for Stripe Payment Element if Stripe is selected
+     * Render payment selection page.
+     *
+     * STRP-105: Clean up stale checkout attempts when user navigates back
+     * to the payment page. This covers all back-navigation scenarios
+     * (Stripe back arrow, browser back, direct URL) and ensures vouchers
+     * consumed by NOT_FINISHED orders are released.
      *
      * @return string Template name
      */
     public function render()
     {
+        $this->cleanupStaleCheckoutAttempt();
+
         return parent::render();
+    }
+
+    /**
+     * Clean up a stale Stripe checkout attempt if one exists in the session.
+     *
+     * When a user navigates back from Stripe Checkout without completing
+     * payment, the early-created NOT_FINISHED order still holds vouchers
+     * as "used". This method detects that state and runs the cleanup,
+     * releasing the vouchers so they can be reused.
+     *
+     * @since 2.0.0 STRP-105
+     */
+    private function cleanupStaleCheckoutAttempt(): void
+    {
+        $session = Registry::getSession();
+        /** @var string|null $contractId */
+        $contractId = $session->getVariable('stripe_contract_id');
+
+        if ($contractId === null) {
+            return;
+        }
+
+        try {
+            $cleanupService = $this->getServiceFromContainer(RetryCleanupService::class);
+            $cleanupService->cleanupPreviousAttempt($contractId);
+        } catch (\Throwable $e) {
+            Registry::getLogger()->error('STRP-105: Payment page cleanup failed', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $session->deleteVariable('stripe_contract_id');
+        $session->deleteVariable('stripe_checkout_session_id');
     }
 
     /**

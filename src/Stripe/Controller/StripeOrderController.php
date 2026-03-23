@@ -42,6 +42,53 @@ class StripeOrderController extends OrderController
     private ?ControllerRequestHelper $requestHelper = null;
 
     /**
+     * Render the order confirmation page.
+     *
+     * STRP-105: Before rendering, detect if the user navigated back from
+     * Stripe Checkout without completing payment. If a stale contract exists
+     * in the session, clean it up — this releases vouchers that were marked
+     * as "used" during early order creation so OXID's basket recalculation
+     * won't invalidate them.
+     *
+     * @return string
+     */
+    public function render(): string
+    {
+        $this->cleanupStaleCheckoutOnRender();
+
+        return parent::render();
+    }
+
+    /**
+     * If the session holds a stripe_contract_id but the user is simply
+     * viewing the order page (not submitting), the previous checkout attempt
+     * is stale. Cancel the contract and delete the NOT_FINISHED order so
+     * that vouchers are released before the basket is recalculated.
+     *
+     * @since 2.0.0 STRP-105
+     */
+    private function cleanupStaleCheckoutOnRender(): void
+    {
+        $helper = $this->getRequestHelper();
+        $contractId = $helper->getContractIdFromSession();
+
+        if ($contractId === null) {
+            return;
+        }
+
+        try {
+            $cleanupService = $this->getServiceFromContainer(RetryCleanupService::class);
+            $cleanupService->cleanupPreviousAttempt($contractId);
+        } catch (\Throwable $e) {
+            Registry::getLogger()->error('STRP-105: Order page cleanup failed', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $helper->clearStripeSessionVariables();
+    }
+
+    /**
      * Execute Stripe payment via Payment Element flow.
      *
      * Called when customer submits payment form with Payment Element.

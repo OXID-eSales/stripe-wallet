@@ -216,7 +216,29 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
             return false;
         }
 
+        $this->resetVouchersForOrder($orderId);
+
         return (bool) $order->delete();
+    }
+
+    /**
+     * Reset vouchers that were marked as used for a given order.
+     *
+     * During early order creation, Order::finalizeOrder() calls markVouchers()
+     * which sets OXORDERID, OXUSERID, OXDISCOUNT, and OXDATEUSED on vouchers.
+     * When the NOT_FINISHED order is deleted (e.g. user navigated back from
+     * Stripe Checkout), these fields must be cleared so the voucher can be
+     * reused.
+     *
+     * @since 2.0.0 STRP-105
+     */
+    private function resetVouchersForOrder(string $orderId): void
+    {
+        $db = \OxidEsales\Eshop\Core\DatabaseProvider::getDb();
+        $db->execute(
+            'UPDATE oxvouchers SET OXORDERID = \'\', OXUSERID = \'\', OXDISCOUNT = 0, OXDATEUSED = NULL, OXRESERVED = 0 WHERE OXORDERID = ?',
+            [$orderId]
+        );
     }
 
     /**
