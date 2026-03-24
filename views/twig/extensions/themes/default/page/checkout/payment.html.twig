@@ -52,6 +52,25 @@
     {% endif %}
 {% endblock %}
 
+{% block checkout_payment_nextstep %}
+    {% if not oView.getAllSets() or not oView.getPaymentList() %}
+        <div class="alert alert-warning mt-3">
+            {{ translate({ ident: "MESSAGE_NO_SHIPPING_METHOD_FOUND" }) }}
+        </div>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                var btn = document.querySelector('button[onclick*="requestSubmit"]');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.classList.remove('btn-highlight');
+                    btn.classList.add('btn-secondary');
+                    btn.removeAttribute('onclick');
+                }
+            });
+        </script>
+    {% endif %}
+{% endblock %}
+
 {% block change_payment %}
     {% if vaultedPaymentSources %}
         <h4 class="card-header card-title">{{ 'OSC_STRIPE_VAULTING_VAULTED_PAYMENTS'|translate }}</h4>
