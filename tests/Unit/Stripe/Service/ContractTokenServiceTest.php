@@ -173,16 +173,19 @@ class ContractTokenServiceTest extends TestCase
         $this->assertTrue($service->validateToken($token, 'contract_123'));
     }
 
-    public function testUsesDefaultSecretWhenNoneConfigured(): void
+    /**
+     * S1: ContractTokenService must throw when no secret is configured.
+     *
+     * A hardcoded fallback secret is predictable — tokens become forgeable.
+     * The service must refuse to operate without a real secret.
+     */
+    public function testThrowsExceptionWhenNoSecretConfigured(): void
     {
-        // When both secretKey and webhookSecret are empty, should use default
-        $service = new ContractTokenService(
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('secret');
+
+        new ContractTokenService(
             $this->createConfigServiceMock('', '')
         );
-
-        $token = $service->generateToken('contract_123');
-
-        $this->assertNotEmpty($token);
-        $this->assertTrue($service->validateToken($token, 'contract_123'));
     }
 }

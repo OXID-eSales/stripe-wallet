@@ -208,7 +208,7 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
      */
     public function isConfigured(): bool
     {
-        return !empty($this->getToken())/* && !empty($this->getSecretKey())/* && !empty($this->getWebhookSecret())*/;
+        return !empty($this->getToken()) && !empty($this->getWebhookSecret());
     }
 
     /**

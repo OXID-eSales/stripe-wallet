@@ -59,7 +59,9 @@ class WebhookController extends FrontendController
             $guard = $container->get(WebhookRequestGuardInterface::class);
             $this->guard = $guard instanceof WebhookRequestGuardInterface ? $guard : null;
         } catch (\Exception $e) {
-            // Guard not available — proceed without (fail-open for compatibility)
+            Registry::getLogger()->warning('Webhook guard chain unavailable — processing without rate limiting/IP checks', [
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

@@ -25,7 +25,6 @@ final class ContractTokenService implements TokenServiceInterface
     private const TOKEN_SEPARATOR = ':';
     private const HASH_ALGORITHM = 'sha256';
     private const TOKEN_SALT = 'oe_stripe_contract_token_v1';
-    private const TOKEN_SECRET = 'oe_stripe_contract_token_secret';
 
     private readonly string $secret;
 
@@ -41,8 +40,10 @@ final class ContractTokenService implements TokenServiceInterface
             $apiSecret = $configService->getWebhookSecret();
         }
         if (empty($apiSecret)) {
-            // Last resort: use a default (less secure but prevents fatal errors)
-            $apiSecret = self::TOKEN_SECRET;
+            throw new \RuntimeException(
+                'Stripe contract token service requires a configured API secret key or webhook secret. '
+                . 'Configure sStripeTestToken/sStripeLiveToken or sStripeWebhookEndpointSecret in module settings.'
+            );
         }
         $this->secret = hash_hmac(self::HASH_ALGORITHM, self::TOKEN_SALT, $apiSecret);
     }

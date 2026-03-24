@@ -13,11 +13,11 @@ use Doctrine\DBAL\Connection;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionProviderInterface;
 use OxidEsales\EshopCommunity\Tests\Integration\IntegrationTestCase;
-use OxidEsales\PaymentComponent\Adapter\ShopOrderServiceInterface;
 use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
 use OxidEsales\PaymentComponent\Contract\ContractCondition;
 use OxidEsales\PaymentComponent\Contract\PaymentContract;
 use OxidEsales\PaymentComponent\Repository\DoctrineContractRepository;
+use OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 
 /**
@@ -54,8 +54,7 @@ final class StaleOrderCleanupIntegrationTest extends IntegrationTestCase
 
         $this->contractRepository = new DoctrineContractRepository($this->connection);
 
-        /** @var ShopOrderServiceInterface $orderService */
-        $orderService = $container->get(ShopOrderServiceInterface::class);
+        $orderService = new OxidShopOrderService();
         $this->cleanupService = new RetryCleanupService($this->contractRepository, $orderService);
     }
 
