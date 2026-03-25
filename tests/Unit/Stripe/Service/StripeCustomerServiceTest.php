@@ -66,6 +66,12 @@ class StripeCustomerServiceTest extends TestCase
             ->willReturn($existing);
 
         $this->adapter
+            ->expects($this->once())
+            ->method('retrieveStripeCustomer')
+            ->with('cus_existing_123')
+            ->willReturn($this->createStripeCustomerObject('cus_existing_123'));
+
+        $this->adapter
             ->expects($this->never())
             ->method('createStripeCustomer');
 
@@ -76,6 +82,41 @@ class StripeCustomerServiceTest extends TestCase
         $result = $this->service->resolveStripeCustomerId('user_abc', 'test@example.com', 'Test User');
 
         $this->assertSame('cus_existing_123', $result);
+    }
+
+    public function testCreatesNewCustomerWhenExistingIsStale(): void
+    {
+        $existing = $this->createExistingCustomer('cus_stale_123');
+
+        $this->customerRepo
+            ->expects($this->once())
+            ->method('findByUserId')
+            ->with('user_abc')
+            ->willReturn($existing);
+
+        $this->adapter
+            ->expects($this->once())
+            ->method('retrieveStripeCustomer')
+            ->with('cus_stale_123')
+            ->willThrowException(new \Exception('No such customer'));
+
+        $stripeCustomer = $this->createStripeCustomerObject('cus_new_999');
+
+        $this->adapter
+            ->expects($this->once())
+            ->method('createStripeCustomer')
+            ->willReturn($stripeCustomer);
+
+        $this->customerRepo
+            ->expects($this->once())
+            ->method('save')
+            ->with($this->callback(function (PaymentCustomer $customer) {
+                return $customer->getPaymentCustomerId() === 'cus_new_999';
+            }));
+
+        $result = $this->service->resolveStripeCustomerId('user_abc', 'test@example.com', 'Test User');
+
+        $this->assertSame('cus_new_999', $result);
     }
 
     public function testCreatesNewCustomerWhenNotFound(): void

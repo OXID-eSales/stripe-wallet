@@ -39,11 +39,18 @@ class StripeCustomerService implements StripeCustomerServiceInterface
     {
         $existing = $this->customerRepository->findByUserId($userId);
         if ($existing !== null && $existing->getPaymentCustomerId() !== null) {
-            $this->logger->debug('Reusing existing Stripe Customer', [
+            if ($this->stripeCustomerExists($existing->getPaymentCustomerId())) {
+                $this->logger->debug('Reusing existing Stripe Customer', [
+                    'userId' => $userId,
+                    'customerId' => $existing->getPaymentCustomerId(),
+                ]);
+                return $existing->getPaymentCustomerId();
+            }
+
+            $this->logger->warning('Stale Stripe Customer ID, creating new one', [
                 'userId' => $userId,
-                'customerId' => $existing->getPaymentCustomerId(),
+                'staleCustomerId' => $existing->getPaymentCustomerId(),
             ]);
-            return $existing->getPaymentCustomerId();
         }
 
         $adapter = $this->adapterFactory->getStripeAdapter();
@@ -76,5 +83,16 @@ class StripeCustomerService implements StripeCustomerServiceInterface
         ]);
 
         return $stripeCustomer->id;
+    }
+
+    private function stripeCustomerExists(string $customerId): bool
+    {
+        try {
+            $adapter = $this->adapterFactory->getStripeAdapter();
+            $adapter->retrieveStripeCustomer($customerId);
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 }
