@@ -184,8 +184,18 @@ class ContractTokenServiceTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('secret');
 
-        new ContractTokenService(
+        $service = new ContractTokenService(
             $this->createConfigServiceMock('', '')
         );
+        $service->generateToken('contract_123');
+    }
+
+    public function testConstructionSucceedsWithoutConfiguredKeys(): void
+    {
+        $service = new ContractTokenService(
+            $this->createConfigServiceMock('', '')
+        );
+
+        $this->assertInstanceOf(ContractTokenService::class, $service);
     }
 }

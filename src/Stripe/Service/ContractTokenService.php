@@ -26,18 +26,22 @@ final class ContractTokenService implements TokenServiceInterface
     private const HASH_ALGORITHM = 'sha256';
     private const TOKEN_SALT = 'oe_stripe_contract_token_v1';
 
-    private readonly string $secret;
+    private ?string $secret = null;
 
     public function __construct(
-        ModuleConfigurationServiceInterface $configService
+        private readonly ModuleConfigurationServiceInterface $configService
     ) {
-        // Derive token secret from the Stripe API secret key + a fixed salt
-        // This ensures tokens are unique per shop installation without requiring
-        // an additional environment variable
-        $apiSecret = $configService->getSecretKey();
+    }
+
+    private function getSecret(): string
+    {
+        if ($this->secret !== null) {
+            return $this->secret;
+        }
+
+        $apiSecret = $this->configService->getSecretKey();
         if (empty($apiSecret)) {
-            // Fallback to webhook secret if API secret is not configured
-            $apiSecret = $configService->getWebhookSecret();
+            $apiSecret = $this->configService->getWebhookSecret();
         }
         if (empty($apiSecret)) {
             throw new \RuntimeException(
@@ -46,6 +50,8 @@ final class ContractTokenService implements TokenServiceInterface
             );
         }
         $this->secret = hash_hmac(self::HASH_ALGORITHM, self::TOKEN_SALT, $apiSecret);
+
+        return $this->secret;
     }
 
     /**
@@ -118,7 +124,7 @@ final class ContractTokenService implements TokenServiceInterface
      */
     private function generateHmac(string $contractId): string
     {
-        return hash_hmac(self::HASH_ALGORITHM, $contractId, $this->secret);
+        return hash_hmac(self::HASH_ALGORITHM, $contractId, $this->getSecret());
     }
 
     /**

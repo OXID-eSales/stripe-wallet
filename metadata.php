@@ -36,8 +36,8 @@ $sMetadataVersion = '2.1';
 $aModule = [
     'id' => Module::MODULE_ID,
     'title' => [
-        'de' => 'Stripe Payment Gateway',
-        'en' => 'Stripe Payment Gateway',
+        'de' => 'Stripe Wallet',
+        'en' => 'Stripe Wallet',
     ],
     'description' => [
         'de' => 'Stripe-Zahlungsintegration mit Smart Contracts für OXID eShop 7',

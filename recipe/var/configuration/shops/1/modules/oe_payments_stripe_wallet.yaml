@@ -1,10 +1,10 @@
 id: oe_payments_stripe_wallet
 moduleSource: extensions/stripe
-version: 1.0.0
+version: 3.0.0
 activated: true
 title:
-  de: 'Stripe Payment Gateway'
-  en: 'Stripe Payment Gateway'
+  de: 'Stripe Wallet'
+  en: 'Stripe Wallet'
 description:
   de: 'Stripe-Zahlungsintegration mit Smart Contracts für OXID eShop 7'
   en: 'Stripe payment integration with Smart Contracts for OXID eShop 7'
