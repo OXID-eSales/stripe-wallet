@@ -20,8 +20,6 @@ use OxidEsales\Payments\Stripe\Module;
  */
 class PaymentController extends CorePaymentController
 {
-    use ServiceContainer;
-
     private ModuleConfigurationServiceInterface $stripeConfig;
 
     public function __construct(
