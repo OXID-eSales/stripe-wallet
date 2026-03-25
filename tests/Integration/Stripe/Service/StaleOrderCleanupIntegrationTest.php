@@ -19,6 +19,7 @@ use OxidEsales\PaymentComponent\Contract\PaymentContract;
 use OxidEsales\PaymentComponent\Repository\DoctrineContractRepository;
 use OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Integration tests for stale NOT_FINISHED order cleanup via RetryCleanupService.
@@ -26,10 +27,10 @@ use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
  * Verifies that abandoned checkout contracts/orders older than the threshold
  * are cleaned up, while recent ones are preserved.
  *
- * @group integration
- * @group stale-cleanup
- * @group strp-100
  */
+    #[Group('integration')]
+    #[Group('stale-cleanup')]
+    #[Group('strp-100')]
 final class StaleOrderCleanupIntegrationTest extends IntegrationTestCase
 {
     private const TEST_PREFIX = 'ox_test_';
@@ -64,10 +65,7 @@ final class StaleOrderCleanupIntegrationTest extends IntegrationTestCase
         parent::tearDown();
     }
 
-    /**
-     * @test
-     */
-    public function cleanupDeletesStaleNotFinishedOrderAndCancelsContract(): void
+        public function testCleanupDeletesStaleNotFinishedOrderAndCancelsContract(): void
     {
         // Arrange: Create user, order, and contract backdated 35 minutes
         $userId = $this->createTestUser();
@@ -108,10 +106,7 @@ final class StaleOrderCleanupIntegrationTest extends IntegrationTestCase
         $this->assertSame('cancelled', $contractRow['OXSTATE'], 'Contract should be cancelled');
     }
 
-    /**
-     * @test
-     */
-    public function cleanupSkipsRecentNotFinishedOrder(): void
+        public function testCleanupSkipsRecentNotFinishedOrder(): void
     {
         // Arrange: Create user, order, and contract with current timestamp (fresh)
         $userId = $this->createTestUser();

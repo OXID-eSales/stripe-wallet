@@ -19,6 +19,7 @@ use OxidEsales\PaymentComponent\Service\TokenServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Unit tests for StripeCheckoutSessionHandler.
@@ -26,8 +27,8 @@ use RuntimeException;
  * Sprint 21: Refactored tests for handler with CheckoutSessionService delegation.
  * Sprint 20: Tests updated to include ShopAdapterInterface mock.
  *
- * @covers \OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler::class)]
 class StripeCheckoutSessionHandlerTest extends TestCase
 {
     private CheckoutSessionServiceInterface&MockObject $checkoutSessionService;

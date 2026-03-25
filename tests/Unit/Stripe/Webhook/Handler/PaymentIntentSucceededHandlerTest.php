@@ -20,16 +20,16 @@ use OxidEsales\Payments\Stripe\WebhookHandler\PaymentIntentSucceededHandler;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\WebhookHandler\PaymentIntentSucceededHandler
- * @group sprint-13
- * @group sprint-15
- * @group sprint-16
- * @group sprint-18
- * @group webhook
- * @group handler
- */
+#[CoversClass(\OxidEsales\Payments\Stripe\WebhookHandler\PaymentIntentSucceededHandler::class)]
+    #[Group('sprint-13')]
+    #[Group('sprint-15')]
+    #[Group('sprint-16')]
+    #[Group('sprint-18')]
+    #[Group('webhook')]
+    #[Group('handler')]
 final class PaymentIntentSucceededHandlerTest extends TestCase
 {
     private OrderPaymentStateServiceInterface&MockObject $orderPaymentStateService;
@@ -55,26 +55,17 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     */
-    public function implementsInterface(): void
+        public function testImplementsInterface(): void
     {
         $this->assertInstanceOf(WebhookEventHandlerInterface::class, $this->handler);
     }
 
-    /**
-     * @test
-     */
-    public function supportsPaymentIntentSucceededEvent(): void
+        public function testSupportsPaymentIntentSucceededEvent(): void
     {
         $this->assertTrue($this->handler->supports('payment_intent.succeeded'));
     }
 
-    /**
-     * @test
-     */
-    public function doesNotSupportOtherEvents(): void
+        public function testDoesNotSupportOtherEvents(): void
     {
         $this->assertFalse($this->handler->supports('payment_intent.created'));
         $this->assertFalse($this->handler->supports('charge.refunded'));
@@ -82,12 +73,11 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 15: OXPAID is only updated when contract exists
      * Sprint 16: Uses OrderPaymentStateService for OXPAID updates
      * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
      */
-    public function updatesOxpaidTimestampWithContract(): void
+    public function testUpdatesOxpaidTimestampWithContract(): void
     {
         $event = $this->createEvent('pi_test_123', [
             'status' => 'succeeded',
@@ -128,11 +118,10 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 15: NO_CONTRACT is ERROR - logs error but returns success (200)
      * Sprint 16: Uses OrderPaymentStateService for OXPAID updates
      */
-    public function logsErrorWhenNoContractFound(): void
+    public function testLogsErrorWhenNoContractFound(): void
     {
         $event = $this->createEvent('pi_no_contract', ['status' => 'succeeded']);
 
@@ -163,10 +152,9 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
      */
-    public function fulfillsContractWhenCommitted(): void
+    public function testFulfillsContractWhenCommitted(): void
     {
         $event = $this->createEvent('pi_test_456', ['status' => 'succeeded']);
 
@@ -192,12 +180,11 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 15: Contract must be in COMMITTED state to be fulfilled
      * Sprint 16: Uses OrderPaymentStateService for OXPAID updates
      * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
      */
-    public function doesNotFulfillContractIfNotCommitted(): void
+    public function testDoesNotFulfillContractIfNotCommitted(): void
     {
         $event = $this->createEvent('pi_test_789', ['status' => 'succeeded']);
 
@@ -222,10 +209,9 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
      */
-    public function logsSuccessfulHandling(): void
+    public function testLogsSuccessfulHandling(): void
     {
         $event = $this->createEvent('pi_log_test', ['status' => 'succeeded']);
 
@@ -251,10 +237,7 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
         $this->handler->handle($event);
     }
 
-    /**
-     * @test
-     */
-    public function returnsFailureWhenPaymentIntentIdMissing(): void
+        public function testReturnsFailureWhenPaymentIntentIdMissing(): void
     {
         $event = new WebhookEvent(
             'evt_123',
@@ -270,11 +253,10 @@ final class PaymentIntentSucceededHandlerTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 16: Uses OrderPaymentStateService for OXPAID updates
      * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
      */
-    public function extractsCapturedAtFromChargeData(): void
+    public function testExtractsCapturedAtFromChargeData(): void
     {
         $chargeCreatedTimestamp = time(); // Use current time for consistent test
         $event = $this->createEvent('pi_charge_test', [

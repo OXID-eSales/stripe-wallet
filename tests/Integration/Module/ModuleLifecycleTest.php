@@ -10,6 +10,9 @@ use OxidEsales\EshopCommunity\Internal\Framework\Module\State\ModuleStateService
 use OxidEsales\Payments\Stripe\Module;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Depends;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Integration tests for module activation/deactivation lifecycle.
@@ -20,12 +23,12 @@ use Psr\Container\ContainerInterface;
  * IMPORTANT: These tests require a fully initialized OXID shop environment.
  * They must be run in the Docker container with the shop bootstrapped.
  *
- * @group integration
- * @group module
- * @group lifecycle
  *
- * @covers \OxidEsales\Payments\Stripe\Core\ModuleEvents
  */
+    #[Group('integration')]
+    #[Group('module')]
+    #[Group('lifecycle')]
+#[CoversClass(\OxidEsales\Payments\Stripe\Core\ModuleEvents::class)]
 class ModuleLifecycleTest extends TestCase
 {
     private const MODULE_ID = 'oe_payments_stripe_wallet';
@@ -84,8 +87,8 @@ class ModuleLifecycleTest extends TestCase
     /**
      * Test 2: Module can be deactivated without errors
      *
-     * @depends testModuleCanBeActivated
      */
+    #[Depends('testModuleCanBeActivated')]
     public function testModuleCanBeDeactivated(): void
     {
         // Given: Module is active
@@ -115,8 +118,8 @@ class ModuleLifecycleTest extends TestCase
     /**
      * Test 3: Module can be reactivated after deactivation
      *
-     * @depends testModuleCanBeDeactivated
      */
+    #[Depends('testModuleCanBeDeactivated')]
     public function testModuleCanBeReactivatedAfterDeactivation(): void
     {
         // Given: Module was deactivated
@@ -158,8 +161,8 @@ class ModuleLifecycleTest extends TestCase
     /**
      * Test 5: Services are available after module activation
      *
-     * @depends testModuleCanBeActivated
      */
+    #[Depends('testModuleCanBeActivated')]
     public function testServicesAvailableAfterActivation(): void
     {
         // Given: Module is active

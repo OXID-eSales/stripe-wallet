@@ -7,15 +7,17 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 use OxidEsales\PaymentComponent\Service\DeliveryAddressHashService;
 use OxidEsales\PaymentComponent\Service\DeliveryAddressHashServiceInterface;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Unit tests for DeliveryAddressHashService.
  *
  * Sprint 20: Encapsulate $_REQUEST modification for delivery address hash.
  *
- * @covers \OxidEsales\PaymentComponent\Service\DeliveryAddressHashService
- * @group sprint-20
  */
+#[CoversClass(\OxidEsales\PaymentComponent\Service\DeliveryAddressHashService::class)]
+    #[Group('sprint-20')]
 final class DeliveryAddressHashServiceTest extends TestCase
 {
     private DeliveryAddressHashService $service;
@@ -39,10 +41,9 @@ final class DeliveryAddressHashServiceTest extends TestCase
     }
 
     /**
-     * @test
      * LSP: Service implements interface
      */
-    public function implementsInterface(): void
+    public function testImplementsInterface(): void
     {
         $this->assertInstanceOf(
             DeliveryAddressHashServiceInterface::class,
@@ -51,10 +52,9 @@ final class DeliveryAddressHashServiceTest extends TestCase
     }
 
     /**
-     * @test
      * SRP: Restores hash to $_REQUEST for OXID validation
      */
-    public function restoresHashToRequest(): void
+    public function testRestoresHashToRequest(): void
     {
         // Arrange
         $hash = 'abc123def456';
@@ -67,10 +67,9 @@ final class DeliveryAddressHashServiceTest extends TestCase
     }
 
     /**
-     * @test
      * Does nothing when hash is null
      */
-    public function doesNothingWhenHashIsNull(): void
+    public function testDoesNothingWhenHashIsNull(): void
     {
         // Arrange - ensure $_REQUEST is clear
         unset($_REQUEST['sDeliveryAddressMD5']);
@@ -83,10 +82,9 @@ final class DeliveryAddressHashServiceTest extends TestCase
     }
 
     /**
-     * @test
      * Does nothing when hash is empty string
      */
-    public function doesNothingWhenHashIsEmpty(): void
+    public function testDoesNothingWhenHashIsEmpty(): void
     {
         // Arrange - ensure $_REQUEST is clear
         unset($_REQUEST['sDeliveryAddressMD5']);
@@ -99,10 +97,9 @@ final class DeliveryAddressHashServiceTest extends TestCase
     }
 
     /**
-     * @test
      * Clears hash from $_REQUEST
      */
-    public function clearsHashFromRequest(): void
+    public function testClearsHashFromRequest(): void
     {
         // Arrange
         $_REQUEST['sDeliveryAddressMD5'] = 'some_hash';
@@ -115,10 +112,9 @@ final class DeliveryAddressHashServiceTest extends TestCase
     }
 
     /**
-     * @test
      * Checks if hash exists in $_REQUEST
      */
-    public function checksIfHashExists(): void
+    public function testChecksIfHashExists(): void
     {
         // Arrange - no hash
         unset($_REQUEST['sDeliveryAddressMD5']);
@@ -130,10 +126,9 @@ final class DeliveryAddressHashServiceTest extends TestCase
     }
 
     /**
-     * @test
      * Gets hash from $_REQUEST
      */
-    public function getsHashFromRequest(): void
+    public function testGetsHashFromRequest(): void
     {
         // Arrange
         $expectedHash = 'abc123def456';
@@ -147,10 +142,9 @@ final class DeliveryAddressHashServiceTest extends TestCase
     }
 
     /**
-     * @test
      * Returns null when no hash in $_REQUEST
      */
-    public function returnsNullWhenNoHash(): void
+    public function testReturnsNullWhenNoHash(): void
     {
         // Arrange
         unset($_REQUEST['sDeliveryAddressMD5']);

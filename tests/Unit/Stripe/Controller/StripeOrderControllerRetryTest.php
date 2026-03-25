@@ -14,12 +14,13 @@ use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Sprint 72: Tests for retry cleanup in StripeOrderController::createCheckoutSession().
  *
- * @covers \OxidEsales\Payments\Stripe\Controller\StripeOrderController
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Controller\StripeOrderController::class)]
 class StripeOrderControllerRetryTest extends TestCase
 {
     private EventDispatcherInterface&MockObject $eventDispatcher;

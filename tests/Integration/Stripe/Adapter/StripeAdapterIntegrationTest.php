@@ -17,18 +17,20 @@ use OxidEsales\PaymentComponent\Adapter\Request\AuthorizePaymentRequest;
 use OxidEsales\PaymentComponent\Adapter\Request\CaptureAuthorizationRequest;
 use OxidEsales\PaymentComponent\Adapter\Request\VoidAuthorizationRequest;
 use OxidEsales\Payments\Stripe\Tests\Integration\Stripe\StripeIntegrationTestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Integration tests for StripeAdapter with real Stripe API.
  *
  * Tests real Stripe SDK → Stripe API interactions using test credentials.
  *
- * @group integration
- * @group stripe
- * @group api
  *
- * @covers \OxidEsales\Payments\Stripe\Adapter\StripeAdapter
  */
+    #[Group('integration')]
+    #[Group('stripe')]
+    #[Group('api')]
+#[CoversClass(\OxidEsales\Payments\Stripe\Adapter\StripeAdapter::class)]
 final class StripeAdapterIntegrationTest extends StripeIntegrationTestCase
 {
     // ==========================================

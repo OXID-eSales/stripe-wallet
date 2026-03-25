@@ -17,6 +17,7 @@ use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
 use OxidEsales\PaymentComponent\Contract\ContractCondition;
 use OxidEsales\PaymentComponent\Contract\PaymentContract;
 use OxidEsales\PaymentComponent\Repository\DoctrineContractRepository;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Tests that OXORDER fields are correctly populated during checkout.
@@ -27,11 +28,11 @@ use OxidEsales\PaymentComponent\Repository\DoctrineContractRepository;
  * - OXPAID: Payment completion timestamp
  * - OXFOLDER: Order folder for admin (ORDERFOLDER_NEW, ORDERFOLDER_PROBLEMS)
  *
- * @group integration
- * @group order-fields
- * @group oxorder
- * @group sprint-2
  */
+    #[Group('integration')]
+    #[Group('order-fields')]
+    #[Group('oxorder')]
+    #[Group('sprint-2')]
 final class OxorderFieldPersistenceTest extends IntegrationTestCase
 {
     private const TEST_PREFIX = 'ox_test_';
@@ -65,11 +66,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
     // OXTRANSID Tests
     // =========================================================================
 
-    /**
-     * @test
-     * @group tdd-red
-     */
-    public function oxtransidIsSetToPaymentIntentIdOnOrderCreation(): void
+        #[Group('tdd-red')]
+    public function testOxtransidIsSetToPaymentIntentIdOnOrderCreation(): void
     {
         // Arrange
         $userId = $this->createTestUser();
@@ -91,11 +89,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         );
     }
 
-    /**
-     * @test
-     * @group tdd-red
-     */
-    public function oxtransidIsNotOverwrittenOnSubsequentUpdates(): void
+        #[Group('tdd-red')]
+    public function testOxtransidIsNotOverwrittenOnSubsequentUpdates(): void
     {
         // Arrange
         $userId = $this->createTestUser();
@@ -120,11 +115,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         );
     }
 
-    /**
-     * @test
-     * @group tdd-red
-     */
-    public function oxtransidAccepts64CharacterPaymentIntentId(): void
+        #[Group('tdd-red')]
+    public function testOxtransidAccepts64CharacterPaymentIntentId(): void
     {
         // Arrange - Stripe PaymentIntent IDs can be up to 27 chars, but field is VARCHAR(64)
         $userId = $this->createTestUser();
@@ -146,11 +138,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
     // OXTRANSSTATUS Tests
     // =========================================================================
 
-    /**
-     * @test
-     * @group tdd-red
-     */
-    public function oxtransstatusIsNotFinishedOnOrderCreation(): void
+        #[Group('tdd-red')]
+    public function testOxtransstatusIsNotFinishedOnOrderCreation(): void
     {
         // Arrange & Act
         $userId = $this->createTestUser();
@@ -169,11 +158,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         );
     }
 
-    /**
-     * @test
-     * @group tdd-red
-     */
-    public function oxtransstatusIsOkAfterPaymentSucceeds(): void
+        #[Group('tdd-red')]
+    public function testOxtransstatusIsOkAfterPaymentSucceeds(): void
     {
         // Arrange
         $userId = $this->createTestUser();
@@ -193,11 +179,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         $this->assertEquals('OK', $dbOrder['OXTRANSSTATUS']);
     }
 
-    /**
-     * @test
-     * @group tdd-red
-     */
-    public function oxtransstatusIsErrorAfterPaymentFails(): void
+        #[Group('tdd-red')]
+    public function testOxtransstatusIsErrorAfterPaymentFails(): void
     {
         // Arrange
         $userId = $this->createTestUser();
@@ -221,11 +204,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
     // OXPAID Tests
     // =========================================================================
 
-    /**
-     * @test
-     * @group tdd-red
-     */
-    public function oxpaidIsZeroOnOrderCreation(): void
+        #[Group('tdd-red')]
+    public function testOxpaidIsZeroOnOrderCreation(): void
     {
         // Arrange & Act
         $userId = $this->createTestUser();
@@ -244,11 +224,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         );
     }
 
-    /**
-     * @test
-     * @group tdd-red
-     */
-    public function oxpaidIsSetOnPaymentCapture(): void
+        #[Group('tdd-red')]
+    public function testOxpaidIsSetOnPaymentCapture(): void
     {
         // Arrange
         $userId = $this->createTestUser();
@@ -279,11 +256,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         );
     }
 
-    /**
-     * @test
-     * @group tdd-red
-     */
-    public function oxpaidRemainsZeroOnPaymentFailure(): void
+        #[Group('tdd-red')]
+    public function testOxpaidRemainsZeroOnPaymentFailure(): void
     {
         // Arrange
         $userId = $this->createTestUser();
@@ -312,11 +286,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
     // OXFOLDER Tests
     // =========================================================================
 
-    /**
-     * @test
-     * @group tdd-red
-     */
-    public function oxfolderIsNewOnOrderCreation(): void
+        #[Group('tdd-red')]
+    public function testOxfolderIsNewOnOrderCreation(): void
     {
         // Arrange & Act
         $userId = $this->createTestUser();
@@ -335,11 +306,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         );
     }
 
-    /**
-     * @test
-     * @group tdd-red
-     */
-    public function oxfolderIsProblemsOnPaymentFailure(): void
+        #[Group('tdd-red')]
+    public function testOxfolderIsProblemsOnPaymentFailure(): void
     {
         // Arrange
         $userId = $this->createTestUser();
@@ -368,12 +336,9 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
     // Combined Flow Tests
     // =========================================================================
 
-    /**
-     * @test
-     * @group tdd-red
-     * @group complete-flow
-     */
-    public function completePaymentFlowSetsAllFieldsCorrectly(): void
+        #[Group('tdd-red')]
+    #[Group('complete-flow')]
+    public function testCompletePaymentFlowSetsAllFieldsCorrectly(): void
     {
         // Arrange
         $userId = $this->createTestUser();
@@ -408,12 +373,9 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         $this->assertEquals('ORDERFOLDER_NEW', $finalOrder['OXFOLDER'], 'OXFOLDER mismatch');
     }
 
-    /**
-     * @test
-     * @group tdd-red
-     * @group complete-flow
-     */
-    public function failedPaymentFlowSetsFieldsCorrectly(): void
+        #[Group('tdd-red')]
+    #[Group('complete-flow')]
+    public function testFailedPaymentFlowSetsFieldsCorrectly(): void
     {
         // Arrange
         $userId = $this->createTestUser();
@@ -438,12 +400,9 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         $this->assertEquals('ORDERFOLDER_PROBLEMS', $dbOrder['OXFOLDER'], 'OXFOLDER should be PROBLEMS');
     }
 
-    /**
-     * @test
-     * @group tdd-red
-     * @group contract-flow
-     */
-    public function contractCommitSetsOxtransidFromProviderInfo(): void
+        #[Group('tdd-red')]
+    #[Group('contract-flow')]
+    public function testContractCommitSetsOxtransidFromProviderInfo(): void
     {
         // Arrange
         $userId = $this->createTestUser();

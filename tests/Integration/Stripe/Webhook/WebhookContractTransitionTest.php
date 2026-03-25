@@ -22,6 +22,8 @@ use OxidEsales\Payments\Stripe\WebhookHandler\PaymentIntentSucceededHandler;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Integration tests for webhook events triggering contract state transitions.
@@ -29,14 +31,14 @@ use Psr\Log\LoggerInterface;
  * Tests that webhook handlers correctly update contract states
  * according to the state machine rules.
  *
- * @covers \OxidEsales\Payments\Stripe\WebhookHandler\PaymentIntentSucceededHandler
- * @group sprint-14
- * @group sprint-15
- * @group sprint-16
- * @group sprint-18
- * @group webhook
- * @group contract
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\WebhookHandler\PaymentIntentSucceededHandler::class)]
+    #[Group('sprint-14')]
+    #[Group('sprint-15')]
+    #[Group('sprint-16')]
+    #[Group('sprint-18')]
+    #[Group('webhook')]
+    #[Group('contract')]
 final class WebhookContractTransitionTest extends TestCase
 {
     private OrderPaymentStateServiceInterface&MockObject $orderPaymentStateService;
@@ -74,10 +76,9 @@ final class WebhookContractTransitionTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 18: Uses ContractFulfillmentService for fulfillment
      */
-    public function paymentIntentSucceededFulfillsCommittedContract(): void
+    public function testPaymentIntentSucceededFulfillsCommittedContract(): void
     {
         $paymentIntentId = 'pi_test_fulfill_' . uniqid();
 
@@ -106,7 +107,6 @@ final class WebhookContractTransitionTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 15: Already fulfilled contracts are not re-fulfilled
      * Sprint 18: Uses ContractFulfillmentService for fulfillment
      *
@@ -114,7 +114,7 @@ final class WebhookContractTransitionTest extends TestCase
      * OXPAID for any existing contract, regardless of state. This is intentional
      * to ensure payment timestamps are always recorded.
      */
-    public function paymentIntentSucceededIgnoresAlreadyFulfilledContract(): void
+    public function testPaymentIntentSucceededIgnoresAlreadyFulfilledContract(): void
     {
         $paymentIntentId = 'pi_test_already_fulfilled_' . uniqid();
 
@@ -149,7 +149,6 @@ final class WebhookContractTransitionTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 15: Pending contracts cannot be fulfilled directly
      * Sprint 18: Uses ContractFulfillmentService for fulfillment
      *
@@ -157,7 +156,7 @@ final class WebhookContractTransitionTest extends TestCase
      * OXPAID for any existing contract, regardless of state. This is intentional
      * to ensure payment timestamps are always recorded.
      */
-    public function paymentIntentSucceededIgnoresPendingContract(): void
+    public function testPaymentIntentSucceededIgnoresPendingContract(): void
     {
         $paymentIntentId = 'pi_test_pending_' . uniqid();
 
@@ -192,11 +191,10 @@ final class WebhookContractTransitionTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 15: NO_CONTRACT is ERROR - logs error, returns success (200)
      * Sprint 16: Uses OrderPaymentStateService
      */
-    public function paymentIntentSucceededLogsErrorWhenNoContract(): void
+    public function testPaymentIntentSucceededLogsErrorWhenNoContract(): void
     {
         $paymentIntentId = 'pi_test_no_contract_' . uniqid();
 
@@ -230,12 +228,11 @@ final class WebhookContractTransitionTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 15: OXPAID is only updated when contract exists and is COMMITTED
      * Sprint 16: Uses OrderPaymentStateService
      * Sprint 18: Uses ContractFulfillmentService for fulfillment
      */
-    public function paymentIntentSucceededUpdatesOxpaidTimestamp(): void
+    public function testPaymentIntentSucceededUpdatesOxpaidTimestamp(): void
     {
         $paymentIntentId = 'pi_test_oxpaid_' . uniqid();
         $chargeTimestamp = time();
@@ -275,10 +272,7 @@ final class WebhookContractTransitionTest extends TestCase
         $this->assertEquals('contract_fulfilled', $result->action);
     }
 
-    /**
-     * @test
-     */
-    public function handlerFailsWhenPaymentIntentIdMissing(): void
+        public function testHandlerFailsWhenPaymentIntentIdMissing(): void
     {
         // Given: Event without payment intent ID
         $event = new WebhookEvent(

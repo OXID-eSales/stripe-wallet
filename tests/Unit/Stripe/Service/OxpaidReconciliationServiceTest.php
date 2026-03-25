@@ -21,6 +21,8 @@ use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService;
 use OxidEsales\Payments\Stripe\Service\Result\ReconciliationResult;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Unit tests for OxpaidReconciliationService
@@ -28,13 +30,13 @@ use PHPUnit\Framework\TestCase;
  * Sprint 10: Tests for OXPAID reconciliation with Stripe API.
  * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment.
  *
- * @covers \OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService
- * @group sprint-10
- * @group sprint-14
- * @group sprint-15
- * @group sprint-18
- * @group reconciliation
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService::class)]
+    #[Group('sprint-10')]
+    #[Group('sprint-14')]
+    #[Group('sprint-15')]
+    #[Group('sprint-18')]
+    #[Group('reconciliation')]
 class OxpaidReconciliationServiceTest extends TestCase
 {
     private Connection $connection;
@@ -65,18 +67,12 @@ class OxpaidReconciliationServiceTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     */
-    public function serviceCanBeInstantiated(): void
+        public function testServiceCanBeInstantiated(): void
     {
         $this->assertInstanceOf(OxpaidReconciliationService::class, $this->service);
     }
 
-    /**
-     * @test
-     */
-    public function findUnpaidOrdersQueriesCorrectCriteria(): void
+        public function testFindUnpaidOrdersQueriesCorrectCriteria(): void
     {
         $expectedOrders = [
             ['OXID' => 'order1', 'OXTRANSID' => 'pi_123', 'OXORDERNR' => 1, 'OXORDERDATE' => '2025-12-05'],
@@ -99,10 +95,7 @@ class OxpaidReconciliationServiceTest extends TestCase
         $this->assertEquals('pi_123', $result[0]['OXTRANSID']);
     }
 
-    /**
-     * @test
-     */
-    public function findUnpaidOrdersReturnsEmptyArrayWhenNoOrders(): void
+        public function testFindUnpaidOrdersReturnsEmptyArrayWhenNoOrders(): void
     {
         $this->connection
             ->method('fetchAllAssociative')
@@ -115,10 +108,9 @@ class OxpaidReconciliationServiceTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 15: NO_CONTRACT is ERROR - contract is required for reconciliation
      */
-    public function reconcileOrderFailsWithoutContract(): void
+    public function testReconcileOrderFailsWithoutContract(): void
     {
         $orderId = 'test_order_no_contract';
         $paymentIntentId = 'pi_no_contract';
@@ -155,11 +147,10 @@ class OxpaidReconciliationServiceTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 15: OXPAID is only updated when contract exists and is COMMITTED
      * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
      */
-    public function reconcileOrderUpdatesOxpaidWhenPaymentIsCaptured(): void
+    public function testReconcileOrderUpdatesOxpaidWhenPaymentIsCaptured(): void
     {
         $orderId = 'test_order_123';
         $paymentIntentId = 'pi_test_456';
@@ -228,10 +219,9 @@ class OxpaidReconciliationServiceTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 15: Skips when payment not captured (but contract exists)
      */
-    public function reconcileOrderSkipsWhenPaymentNotCaptured(): void
+    public function testReconcileOrderSkipsWhenPaymentNotCaptured(): void
     {
         $orderId = 'test_order_123';
         $paymentIntentId = 'pi_test_456';
@@ -281,10 +271,9 @@ class OxpaidReconciliationServiceTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 15: API errors are handled (with contract)
      */
-    public function reconcileOrderHandlesApiError(): void
+    public function testReconcileOrderHandlesApiError(): void
     {
         $orderId = 'test_order_123';
         $paymentIntentId = 'pi_test_456';
@@ -316,10 +305,9 @@ class OxpaidReconciliationServiceTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
      */
-    public function reconcileOrderFulfillsContractWhenFound(): void
+    public function testReconcileOrderFulfillsContractWhenFound(): void
     {
         $orderId = 'test_order_123';
         $paymentIntentId = 'pi_test_456';
@@ -377,10 +365,9 @@ class OxpaidReconciliationServiceTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
      */
-    public function reconcileOrderDoesNotFulfillContractIfNotCommitted(): void
+    public function testReconcileOrderDoesNotFulfillContractIfNotCommitted(): void
     {
         $orderId = 'test_order_123';
         $paymentIntentId = 'pi_test_456';
@@ -436,10 +423,9 @@ class OxpaidReconciliationServiceTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 15: reconcileAll requires contracts for each order
      */
-    public function reconcileAllProcessesAllOrders(): void
+    public function testReconcileAllProcessesAllOrders(): void
     {
         $orders = [
             ['OXID' => 'order1', 'OXTRANSID' => 'pi_111', 'OXORDERNR' => 1, 'OXORDERDATE' => '2025-12-05'],
@@ -492,10 +478,9 @@ class OxpaidReconciliationServiceTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 15: reconcileAll skips orders without contracts
      */
-    public function reconcileAllFailsOrdersWithoutContracts(): void
+    public function testReconcileAllFailsOrdersWithoutContracts(): void
     {
         $orders = [
             ['OXID' => 'order1', 'OXTRANSID' => 'pi_111', 'OXORDERNR' => 1, 'OXORDERDATE' => '2025-12-05'],
@@ -522,10 +507,7 @@ class OxpaidReconciliationServiceTest extends TestCase
         $this->assertEquals('no_contract', $results[0]->action);
     }
 
-    /**
-     * @test
-     */
-    public function reconcileAllDryRunDoesNotMakeChanges(): void
+        public function testReconcileAllDryRunDoesNotMakeChanges(): void
     {
         $orders = [
             ['OXID' => 'order1', 'OXTRANSID' => 'pi_111', 'OXORDERNR' => 1, 'OXORDERDATE' => '2025-12-05'],

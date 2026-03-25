@@ -7,10 +7,10 @@ env:
   PACKAGE_NAME: 'oxid-esales/stripe-wallet'
   SONARCLOUD_ORGANIZATION: 'oxid-esales'
   SONARCLOUD_PROJECT_KEY: 'OXID-eSales_module-stripe'
-  PHP_VERSION: '8.2'
+  PHP_VERSION: '8.3'
   MYSQL_VERSION: '5.7'
   TEMPLATE_ENGINE: 'twig'
-  PAYMENT_COMPONENT_BRANCH: 'dev-b-7.4.x' # dev-b-7.x...
+  PAYMENT_COMPONENT_BRANCH: 'dev-b-7.5.x' # dev-b-7.x...
 
 jobs:
   install_shop_with_module:
@@ -35,7 +35,7 @@ jobs:
         run: git clone https://github.com/OXID-eSales/docker-eshop-sdk.git .
 
       - name: Clone the shop
-        run: git clone --depth 1 https://github.com/OXID-eSales/oxideshop_ce.git --branch b-7.4.x --single-branch source
+        run: git clone --depth 1 https://github.com/OXID-eSales/oxideshop_ce.git --branch b-7.5.x --single-branch source
 
       - name: Cache current installation
         uses: actions/cache@v4
@@ -126,7 +126,7 @@ jobs:
             php composer config repositories.oxid-esales/oxideshop-demodata-ce \
             --json '{"type":"git", "url":"https://github.com/OXID-eSales/oxideshop_demodata_ce"}'
           docker compose exec -T php composer require oxid-esales/oxideshop-demodata-ce:dev-master --no-update
-          docker compose exec -T php composer require oxid-esales/apex-theme:dev-b-7.4.x --no-update
+          docker compose exec -T php composer require oxid-esales/apex-theme:dev-b-7.5.x --no-update
 
 
       - name: Install dependencies, reset shop, activate theme
@@ -188,7 +188,7 @@ jobs:
   styles:
     strategy:
       matrix:
-        php: [ '8.2' ]
+        php: [ '8.3' ]
     runs-on: [arc-runner-set]
     steps:
       - name: Checkout current module
@@ -240,7 +240,7 @@ jobs:
       fail-fast: false
       max-parallel: 1
       matrix:
-        php: [  '8.2']
+        php: [  '8.3' ]
         mysql: [ '5.7' ]
     needs: [ install_shop_with_module ]
     runs-on: [arc-runner-set]
@@ -284,15 +284,15 @@ jobs:
 
       - name: Run isolated unit tests
         run: |
-          docker compose exec -T php bash -c "cd /var/www/test-module && vendor/bin/phpunit -c tests/phpunit.xml --testsuite Unit"
+          docker compose exec -T php vendor/bin/phpunit -c /var/www/test-module/tests/phpunit.xml --testsuite Unit
 
   integration_tests:
     strategy:
       fail-fast: false
       max-parallel: 1
       matrix:
-        php:  [ '8.2',  '8.4' ]
-        mysql: [ '8.1' ]
+        php:  [ '8.3',  '8.4', '8.5' ]
+        mysql: [ '8.1', '8.2' ]
     needs: [ install_shop_with_module ]
     runs-on: [arc-runner-set]
     steps:

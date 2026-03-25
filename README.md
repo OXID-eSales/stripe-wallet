@@ -6,7 +6,7 @@
 composer config --global github-oauth.github.com YOUR_GITHUB_TOKEN 
 git clone git@github.com:OXID-eSales/docker-eshop-sdk.git oxidshop --branch=b-8.0.x
 cd oxidshop
-git clone git@github.com:OXID-eSales/stripe-wallet.git stripe-install --recursive
+git clone git@github.com:OXID-eSales/stripe-wallet.git stripe-install --recursive --branch=b-7.5.x
 ./stripe-install/recipe/setup-twig-dev.sh
 ```
 

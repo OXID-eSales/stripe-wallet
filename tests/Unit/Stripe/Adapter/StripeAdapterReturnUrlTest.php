@@ -16,6 +16,8 @@ use OxidEsales\Payments\Stripe\Adapter\StripeAdapter;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Stripe\StripeClient;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Test double for StripeClient that allows setting paymentIntents property.
@@ -37,12 +39,12 @@ class TestStripeClient extends StripeClient
  * When a PaymentIntent is confirmed (by providing a payment_method_id), Stripe requires
  * a return_url to redirect customers after payment completion.
  *
- * @group unit
- * @group stripe
- * @group adapter
  *
- * @covers \OxidEsales\Payments\Stripe\Adapter\StripeAdapter
  */
+    #[Group('unit')]
+    #[Group('stripe')]
+    #[Group('adapter')]
+#[CoversClass(\OxidEsales\Payments\Stripe\Adapter\StripeAdapter::class)]
 final class StripeAdapterReturnUrlTest extends TestCase
 {
     private StripeClient $stripeClient;

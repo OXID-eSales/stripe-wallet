@@ -12,6 +12,8 @@ namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Adapter;
 use OxidEsales\PaymentComponent\Adapter\Request\CreatePaymentRequest;
 use OxidEsales\PaymentComponent\Adapter\Request\ThreeDSecureRequest;
 use OxidEsales\Payments\Stripe\Tests\Integration\Stripe\StripeIntegrationTestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Integration tests for StripeAdapter 3D Secure (SCA) flow with real Stripe API.
@@ -24,13 +26,13 @@ use OxidEsales\Payments\Stripe\Tests\Integration\Stripe\StripeIntegrationTestCas
  * Note: Full 3DS flow requires browser automation.
  * These tests verify the API-level integration.
  *
- * @group integration
- * @group stripe
- * @group api
- * @group 3ds
  *
- * @covers \OxidEsales\Payments\Stripe\Adapter\StripeAdapter
  */
+    #[Group('integration')]
+    #[Group('stripe')]
+    #[Group('api')]
+    #[Group('3ds')]
+#[CoversClass(\OxidEsales\Payments\Stripe\Adapter\StripeAdapter::class)]
 final class Stripe3DSecureIntegrationTest extends StripeIntegrationTestCase
 {
     // ==========================================

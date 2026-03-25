@@ -11,6 +11,8 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller;
 
 use OxidEsales\Payments\Stripe\Controller\StripeOrderController;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Sprint 64f: CSRF protection tests for frontend AJAX endpoints.
@@ -19,15 +21,14 @@ use PHPUnit\Framework\TestCase;
  * when CSRF token validation fails. Uses testable subclass that overrides
  * validateSessionChallenge() and framework-dependent methods.
  *
- * @covers \OxidEsales\Payments\Stripe\Controller\StripeOrderController
- * @group sprint-64f
- * @group security
- * @group csrf
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Controller\StripeOrderController::class)]
+    #[Group('sprint-64f')]
+    #[Group('security')]
+    #[Group('csrf')]
 final class StripeOrderControllerCsrfTest extends TestCase
 {
-    /** @test */
-    public function createCheckoutSessionRejectsWithoutCsrfToken(): void
+    public function testCreateCheckoutSessionRejectsWithoutCsrfToken(): void
     {
         $controller = new TestableStripeOrderControllerForCsrf();
         $controller->setSessionChallengeResult(false);
@@ -42,8 +43,7 @@ final class StripeOrderControllerCsrfTest extends TestCase
         $this->assertSame(403, $controller->getLastHttpStatusCode());
     }
 
-    /** @test */
-    public function createCheckoutSessionProceedsWithValidCsrfToken(): void
+    public function testCreateCheckoutSessionProceedsWithValidCsrfToken(): void
     {
         $controller = new TestableStripeOrderControllerForCsrf();
         $controller->setSessionChallengeResult(true);
@@ -57,8 +57,7 @@ final class StripeOrderControllerCsrfTest extends TestCase
         $this->assertNotSame(403, $controller->getLastHttpStatusCode());
     }
 
-    /** @test */
-    public function executeStripePaymentRejectsWithoutCsrfToken(): void
+    public function testExecuteStripePaymentRejectsWithoutCsrfToken(): void
     {
         $controller = new TestableStripeOrderControllerForCsrf();
         $controller->setSessionChallengeResult(false);
@@ -69,8 +68,7 @@ final class StripeOrderControllerCsrfTest extends TestCase
         $this->assertStringContainsString('Session expired', $controller->getLastError());
     }
 
-    /** @test */
-    public function executeStripePaymentProceedsWithValidCsrfToken(): void
+    public function testExecuteStripePaymentProceedsWithValidCsrfToken(): void
     {
         $controller = new TestableStripeOrderControllerForCsrf();
         $controller->setSessionChallengeResult(true);
@@ -81,8 +79,7 @@ final class StripeOrderControllerCsrfTest extends TestCase
         $this->assertNotEquals('Session expired', $controller->getLastError());
     }
 
-    /** @test */
-    public function csrfRejectionReturnsJsonFor403(): void
+    public function testCsrfRejectionReturnsJsonFor403(): void
     {
         $controller = new TestableStripeOrderControllerForCsrf();
         $controller->setSessionChallengeResult(false);

@@ -12,10 +12,9 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 use OxidEsales\Payments\Stripe\Service\ContractTokenService;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Service\ContractTokenService
- */
+#[CoversClass(\OxidEsales\Payments\Stripe\Service\ContractTokenService::class)]
 class ContractTokenServiceTest extends TestCase
 {
     private ContractTokenService $service;

@@ -14,10 +14,10 @@ use OxidEsales\PaymentComponent\Adapter\Request\CreateOrderRequest;
 use OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService
- */
+#[CoversClass(\OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService::class)]
 final class OxidShopOrderServiceTest extends TestCase
 {
     private OxidShopOrderService $service;
@@ -35,9 +35,7 @@ final class OxidShopOrderServiceTest extends TestCase
         );
     }
 
-    /**
-     * @dataProvider orderStateProvider
-     */
+        #[DataProvider('orderStateProvider')]
     public function testOrderStateMapping(int $orderState, string $expectedStatus): void
     {
         // Use reflection to test private mapping method
@@ -68,9 +66,7 @@ final class OxidShopOrderServiceTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider errorCodeProvider
-     */
+        #[DataProvider('errorCodeProvider')]
     public function testErrorCodeMapping(int $orderState, string $expectedErrorCode): void
     {
         // Use reflection to test private mapping method

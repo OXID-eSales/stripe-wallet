@@ -11,14 +11,15 @@ use OxidEsales\Payments\Stripe\Controller\StripeOrderController;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
- * @covers \OxidEsales\Payments\Stripe\Controller\StripeOrderController
  *
  * Sprint 47: Security tests for controller hardening (STRP-99).
  * Tests Fix 1 (no debug output), Fix 2 (no capture_mode_override),
  * Fix 10 (contract token validation), Fix 11 (error sanitization).
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Controller\StripeOrderController::class)]
 class StripeOrderControllerSecurityTest extends TestCase
 {
     // ==========================================

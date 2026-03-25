@@ -16,17 +16,19 @@ use OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionProviderInte
 use OxidEsales\PaymentComponent\Contract\IdempotencyRecord;
 use OxidEsales\PaymentComponent\Repository\DoctrineIdempotencyRepository;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Integration tests for DoctrineIdempotencyRepository against real database.
  *
  * Sprint 42: Idempotency implementation.
  *
- * @covers \OxidEsales\PaymentComponent\Repository\DoctrineIdempotencyRepository
- * @group sprint-42
- * @group idempotency
- * @group database
  */
+#[CoversClass(\OxidEsales\PaymentComponent\Repository\DoctrineIdempotencyRepository::class)]
+    #[Group('sprint-42')]
+    #[Group('idempotency')]
+    #[Group('database')]
 final class DoctrineIdempotencyRepositoryTest extends TestCase
 {
     private const TABLE = 'oe_payments_idempotency';
@@ -59,10 +61,7 @@ final class DoctrineIdempotencyRepositoryTest extends TestCase
         parent::tearDown();
     }
 
-    /**
-     * @test
-     */
-    public function saveInsertsRecordAndFindByKeyRetrievesIt(): void
+        public function testSaveInsertsRecordAndFindByKeyRetrievesIt(): void
     {
         $record = $this->createRecord('test_save_find_' . uniqid(), 'capture:pi_test1', 'pi_test1', 'capture');
         $this->repository->save($record);
@@ -78,10 +77,7 @@ final class DoctrineIdempotencyRepositoryTest extends TestCase
         $this->assertNull($found->getResult());
     }
 
-    /**
-     * @test
-     */
-    public function saveUpdatesExistingRecord(): void
+        public function testSaveUpdatesExistingRecord(): void
     {
         $record = $this->createRecord('test_update_' . uniqid(), 'capture:pi_update', 'pi_update', 'capture');
         $this->repository->save($record);
@@ -97,20 +93,14 @@ final class DoctrineIdempotencyRepositoryTest extends TestCase
         $this->assertSame('{"successful":true}', $found->getResult());
     }
 
-    /**
-     * @test
-     */
-    public function findByKeyReturnsNullForNonExistentKey(): void
+        public function testFindByKeyReturnsNullForNonExistentKey(): void
     {
         $found = $this->repository->findByKey('nonexistent_key_' . uniqid());
 
         $this->assertNull($found);
     }
 
-    /**
-     * @test
-     */
-    public function savePreservesAllFieldsOnRoundTrip(): void
+        public function testSavePreservesAllFieldsOnRoundTrip(): void
     {
         $now = new DateTimeImmutable('2026-02-06 12:00:00');
         $expires = new DateTimeImmutable('2026-02-07 12:00:00');
@@ -143,10 +133,7 @@ final class DoctrineIdempotencyRepositoryTest extends TestCase
         $this->assertSame('2026-02-07 12:00:00', $found->getExpiresAt()->format('Y-m-d H:i:s'));
     }
 
-    /**
-     * @test
-     */
-    public function saveWithNullResultStoresNull(): void
+        public function testSaveWithNullResultStoresNull(): void
     {
         $record = $this->createRecord('test_null_result_' . uniqid(), 'capture:pi_null', 'pi_null', 'capture');
         $this->repository->save($record);
@@ -157,10 +144,7 @@ final class DoctrineIdempotencyRepositoryTest extends TestCase
         $this->assertNull($found->getResult());
     }
 
-    /**
-     * @test
-     */
-    public function deleteExpiredRemovesOnlyExpiredRecords(): void
+        public function testDeleteExpiredRemovesOnlyExpiredRecords(): void
     {
         $expiredId = 'test_expired_' . uniqid();
         $activeId = 'test_active_' . uniqid();
@@ -206,10 +190,7 @@ final class DoctrineIdempotencyRepositoryTest extends TestCase
         $this->assertEquals(1, $foundActive, 'Active record should still exist');
     }
 
-    /**
-     * @test
-     */
-    public function uniqueKeyConstraintPreventsDirectDuplicateInsert(): void
+        public function testUniqueKeyConstraintPreventsDirectDuplicateInsert(): void
     {
         $key = 'capture:pi_unique_' . uniqid();
         $record1 = $this->createRecord('test_dup1_' . uniqid(), $key, 'pi_unique', 'capture');
@@ -230,10 +211,7 @@ final class DoctrineIdempotencyRepositoryTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
-    public function hydratedRecordIsExpiredWhenExpiresAtIsInPast(): void
+        public function testHydratedRecordIsExpiredWhenExpiresAtIsInPast(): void
     {
         $id = 'test_expired_check_' . uniqid();
         $this->createdIds[] = $id;
@@ -255,10 +233,7 @@ final class DoctrineIdempotencyRepositoryTest extends TestCase
         $this->assertTrue($found->isExpired());
     }
 
-    /**
-     * @test
-     */
-    public function hydratedRecordIsNotExpiredWhenExpiresAtIsInFuture(): void
+        public function testHydratedRecordIsNotExpiredWhenExpiresAtIsInFuture(): void
     {
         $record = $this->createRecord(
             'test_not_expired_' . uniqid(),

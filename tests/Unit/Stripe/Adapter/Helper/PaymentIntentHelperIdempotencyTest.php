@@ -20,16 +20,18 @@ use Stripe\Charge;
 use Stripe\PaymentIntent;
 use Stripe\Service\PaymentIntentService;
 use Stripe\StripeClient;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Unit tests for PaymentIntentHelper idempotency logic.
  *
  * Sprint 46: Idempotency moved from IdempotentStripeAdapter into helper.
  *
- * @covers \OxidEsales\Payments\Stripe\Adapter\Helper\PaymentIntentHelper
- * @group sprint-46
- * @group idempotency
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Adapter\Helper\PaymentIntentHelper::class)]
+    #[Group('sprint-46')]
+    #[Group('idempotency')]
 final class PaymentIntentHelperIdempotencyTest extends TestCase
 {
     private StripeClient&MockObject $stripeClient;
@@ -45,10 +47,7 @@ final class PaymentIntentHelperIdempotencyTest extends TestCase
         $this->helper = new PaymentIntentHelper($this->repository);
     }
 
-    /**
-     * @test
-     */
-    public function captureCallsStripeWhenNoExistingRecord(): void
+        public function testCaptureCallsStripeWhenNoExistingRecord(): void
     {
         $request = new CapturePaymentRequest('pi_abc123', 50.0);
 
@@ -72,10 +71,7 @@ final class PaymentIntentHelperIdempotencyTest extends TestCase
         $this->assertSame(50.0, $result->amountCaptured);
     }
 
-    /**
-     * @test
-     */
-    public function captureReturnsCachedResultWhenCompleted(): void
+        public function testCaptureReturnsCachedResultWhenCompleted(): void
     {
         $request = new CapturePaymentRequest('pi_abc123', 50.0);
 
@@ -116,10 +112,7 @@ final class PaymentIntentHelperIdempotencyTest extends TestCase
         $this->assertSame(50.0, $result->amountCaptured);
     }
 
-    /**
-     * @test
-     */
-    public function captureThrowsWhenProcessing(): void
+        public function testCaptureThrowsWhenProcessing(): void
     {
         $request = new CapturePaymentRequest('pi_abc123');
 
@@ -144,10 +137,7 @@ final class PaymentIntentHelperIdempotencyTest extends TestCase
         $this->helper->capturePaymentIntent($this->stripeClient, $request);
     }
 
-    /**
-     * @test
-     */
-    public function captureCallsStripeWhenExpiredRecord(): void
+        public function testCaptureCallsStripeWhenExpiredRecord(): void
     {
         $request = new CapturePaymentRequest('pi_abc123', 50.0);
 
@@ -176,10 +166,7 @@ final class PaymentIntentHelperIdempotencyTest extends TestCase
         $this->assertSame('ch_new', $result->captureId);
     }
 
-    /**
-     * @test
-     */
-    public function captureRecordsFailureOnException(): void
+        public function testCaptureRecordsFailureOnException(): void
     {
         $request = new CapturePaymentRequest('pi_abc123');
 
@@ -202,10 +189,7 @@ final class PaymentIntentHelperIdempotencyTest extends TestCase
         $this->helper->capturePaymentIntent($this->stripeClient, $request);
     }
 
-    /**
-     * @test
-     */
-    public function captureDeserializesFailedCachedResponse(): void
+        public function testCaptureDeserializesFailedCachedResponse(): void
     {
         $request = new CapturePaymentRequest('pi_abc123');
 
@@ -238,10 +222,7 @@ final class PaymentIntentHelperIdempotencyTest extends TestCase
         $this->assertSame('card_declined', $result->errorCode);
     }
 
-    /**
-     * @test
-     */
-    public function captureWithoutIdempotencyCallsStripeDirectly(): void
+        public function testCaptureWithoutIdempotencyCallsStripeDirectly(): void
     {
         $helperNoIdempotency = new PaymentIntentHelper();
         $request = new CapturePaymentRequest('pi_abc123', 50.0);

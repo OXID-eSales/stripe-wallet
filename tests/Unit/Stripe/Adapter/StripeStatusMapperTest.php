@@ -11,10 +11,9 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Adapter;
 
 use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper
- */
+#[CoversClass(\OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper::class)]
 final class StripeStatusMapperTest extends TestCase
 {
     public function testToNormalizedMapsRequiresPaymentMethod(): void

@@ -15,6 +15,7 @@ use OxidEsales\Payments\Stripe\Service\CaptureServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Unit tests for CaptureService.
@@ -22,8 +23,8 @@ use Psr\Log\NullLogger;
  * Sprint 9: Tests for the extracted capture business logic.
  * Sprint 26: Updated to use factory instead of direct adapter injection.
  *
- * @covers \OxidEsales\Payments\Stripe\Service\CaptureService
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Service\CaptureService::class)]
 class CaptureServiceTest extends TestCase
 {
     private StripeAdapterInterface&MockObject $adapter;

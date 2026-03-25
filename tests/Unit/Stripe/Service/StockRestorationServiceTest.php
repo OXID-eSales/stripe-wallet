@@ -15,14 +15,15 @@ use OxidEsales\PaymentComponent\Service\StockRestorationServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Unit tests for OxidStockRestorationService.
  *
  * Sprint 24: TDD - tests written first.
  *
- * @covers \OxidEsales\Payments\Stripe\Service\OxidStockRestorationService
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Service\OxidStockRestorationService::class)]
 class StockRestorationServiceTest extends TestCase
 {
     private Connection&MockObject $connection;

@@ -19,6 +19,8 @@ use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Integration tests for delayed/manual capture feature.
@@ -28,13 +30,13 @@ use PHPUnit\Framework\TestCase;
  * - charge.captured webhook handling
  * - Contract state machine integration
  *
- * @covers \OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler
- * @group sprint-7
- * @group sprint-9
- * @group delayed-capture
- * @group webhook
- * @group contract
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler::class)]
+    #[Group('sprint-7')]
+    #[Group('sprint-9')]
+    #[Group('delayed-capture')]
+    #[Group('webhook')]
+    #[Group('contract')]
 final class DelayedCaptureIntegrationTest extends TestCase
 {
     private ContractRepositoryInterface&MockObject $contractRepository;
@@ -70,9 +72,6 @@ final class DelayedCaptureIntegrationTest extends TestCase
     // =========================================================================
 
     /**
-     * @test
-     * @group sprint-7
-     * @group delayed-capture
      *
      * Tests the complete delayed capture flow:
      * 1. Contract created in PENDING state
@@ -80,7 +79,9 @@ final class DelayedCaptureIntegrationTest extends TestCase
      * 3. Admin captures payment -> charge.captured webhook received
      * 4. Contract transitions from AUTHORIZED -> READY_TO_COMMIT
      */
-    public function chargeCapturedTransitionsAuthorizedContractToReadyToCommit(): void
+    #[Group('sprint-7')]
+    #[Group('delayed-capture')]
+    public function testChargeCapturedTransitionsAuthorizedContractToReadyToCommit(): void
     {
         $paymentIntentId = 'pi_delayed_capture_' . uniqid();
         $capturedAmount = 99.99;
@@ -108,13 +109,12 @@ final class DelayedCaptureIntegrationTest extends TestCase
     }
 
     /**
-     * @test
-     * @group sprint-7
-     * @group delayed-capture
      *
      * Tests idempotency: multiple charge.captured webhooks for same contract.
      */
-    public function chargeCapturedIsIdempotentForFulfilledContract(): void
+    #[Group('sprint-7')]
+    #[Group('delayed-capture')]
+    public function testChargeCapturedIsIdempotentForFulfilledContract(): void
     {
         $paymentIntentId = 'pi_idempotent_' . uniqid();
         $capturedAmount = 50.00;
@@ -143,13 +143,12 @@ final class DelayedCaptureIntegrationTest extends TestCase
     }
 
     /**
-     * @test
-     * @group sprint-7
-     * @group delayed-capture
      *
      * Tests capture of COMMITTED contract (auto-capture mode or late webhook).
      */
-    public function chargeCapturedFulfillsCommittedContract(): void
+    #[Group('sprint-7')]
+    #[Group('delayed-capture')]
+    public function testChargeCapturedFulfillsCommittedContract(): void
     {
         $paymentIntentId = 'pi_committed_' . uniqid();
         $capturedAmount = 75.00;
@@ -177,13 +176,12 @@ final class DelayedCaptureIntegrationTest extends TestCase
     }
 
     /**
-     * @test
-     * @group sprint-7
-     * @group delayed-capture
      *
      * Tests that capture amount is recorded even when contract is not in expected state.
      */
-    public function chargeCapturedRecordsAmountForPendingContract(): void
+    #[Group('sprint-7')]
+    #[Group('delayed-capture')]
+    public function testChargeCapturedRecordsAmountForPendingContract(): void
     {
         $paymentIntentId = 'pi_pending_' . uniqid();
         $capturedAmount = 100.00;
@@ -209,13 +207,12 @@ final class DelayedCaptureIntegrationTest extends TestCase
     }
 
     /**
-     * @test
-     * @group sprint-7
-     * @group delayed-capture
      *
      * Tests handling when no contract exists for the payment intent.
      */
-    public function chargeCapturedReturnsNullWhenNoContract(): void
+    #[Group('sprint-7')]
+    #[Group('delayed-capture')]
+    public function testChargeCapturedReturnsNullWhenNoContract(): void
     {
         $paymentIntentId = 'pi_no_contract_' . uniqid();
 
@@ -237,13 +234,12 @@ final class DelayedCaptureIntegrationTest extends TestCase
     // =========================================================================
 
     /**
-     * @test
-     * @group sprint-7
-     * @group delayed-capture
      *
      * Tests payment_intent.succeeded handling (auto-capture mode).
      */
-    public function paymentSucceededDelegatesToFulfillmentService(): void
+    #[Group('sprint-7')]
+    #[Group('delayed-capture')]
+    public function testPaymentSucceededDelegatesToFulfillmentService(): void
     {
         $paymentIntentId = 'pi_auto_capture_' . uniqid();
 
@@ -266,13 +262,12 @@ final class DelayedCaptureIntegrationTest extends TestCase
     // =========================================================================
 
     /**
-     * @test
-     * @group sprint-7
-     * @group delayed-capture
      *
      * Tests refund handling accumulates partial refunds.
      */
-    public function chargeRefundedAccumulatesPartialRefunds(): void
+    #[Group('sprint-7')]
+    #[Group('delayed-capture')]
+    public function testChargeRefundedAccumulatesPartialRefunds(): void
     {
         $paymentIntentId = 'pi_partial_refund_' . uniqid();
 
@@ -300,13 +295,12 @@ final class DelayedCaptureIntegrationTest extends TestCase
     }
 
     /**
-     * @test
-     * @group sprint-7
-     * @group delayed-capture
      *
      * Tests refund is rejected for non-fulfilled contract.
      */
-    public function chargeRefundedRejectsNonFulfilledContract(): void
+    #[Group('sprint-7')]
+    #[Group('delayed-capture')]
+    public function testChargeRefundedRejectsNonFulfilledContract(): void
     {
         $paymentIntentId = 'pi_refund_pending_' . uniqid();
 
@@ -330,13 +324,12 @@ final class DelayedCaptureIntegrationTest extends TestCase
     // =========================================================================
 
     /**
-     * @test
-     * @group sprint-7
-     * @group delayed-capture
      *
      * Tests payment failure transitions contract to FAILED state.
      */
-    public function paymentFailedTransitionsContractToFailed(): void
+    #[Group('sprint-7')]
+    #[Group('delayed-capture')]
+    public function testPaymentFailedTransitionsContractToFailed(): void
     {
         $paymentIntentId = 'pi_failed_' . uniqid();
         $failureReason = 'card_declined';
@@ -363,13 +356,12 @@ final class DelayedCaptureIntegrationTest extends TestCase
     }
 
     /**
-     * @test
-     * @group sprint-7
-     * @group delayed-capture
      *
      * Tests payment failure is ignored for terminal contracts.
      */
-    public function paymentFailedIgnoresTerminalContract(): void
+    #[Group('sprint-7')]
+    #[Group('delayed-capture')]
+    public function testPaymentFailedIgnoresTerminalContract(): void
     {
         $paymentIntentId = 'pi_fail_terminal_' . uniqid();
 

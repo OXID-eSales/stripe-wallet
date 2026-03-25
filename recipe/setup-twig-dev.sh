@@ -12,7 +12,7 @@ set -e  # Stops script on any error
 
 
 edition='EE'
-branch='b-7.4.x'
+branch='b-7.5.x'
 while getopts e: flag; do
   case "${flag}" in
   e) edition=${OPTARG} ;;
@@ -67,7 +67,7 @@ docker compose exec -T \
   php composer config --no-plugins allow-plugins.oxid-esales/payment-component true
 
 docker compose exec -T \
-  php composer require oxid-esales/payment-component:dev-b-7.4.x --no-update || exit 1
+  php composer require oxid-esales/payment-component:dev-b-7.5.x --no-update || exit 1
 
 docker compose exec -T \
   php composer config repositories.oxid-esales/stripe-wallet \

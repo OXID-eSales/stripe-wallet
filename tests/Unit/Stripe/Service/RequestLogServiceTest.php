@@ -10,6 +10,7 @@ use OxidEsales\PaymentComponent\Service\RequestLogServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Unit tests for RequestLogService.
@@ -17,8 +18,8 @@ use Psr\Log\LoggerInterface;
  * Sprint 15: Refactored to use FileLoggerInterface instead of database model.
  * Sprint 20: Tests updated for refactored service.
  *
- * @covers \OxidEsales\Payments\Stripe\Service\RequestLogService
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Service\RequestLogService::class)]
 class RequestLogServiceTest extends TestCase
 {
     private FileLoggerInterface&MockObject $fileLogger;

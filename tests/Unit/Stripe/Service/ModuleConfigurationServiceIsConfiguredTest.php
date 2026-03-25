@@ -13,6 +13,7 @@ use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Dao\Module
 use OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * S2: isConfigured() must check webhook secret.
@@ -21,8 +22,8 @@ use PHPUnit\Framework\TestCase;
  * so isConfigured() must return false — preventing Stripe from being offered
  * as a payment method.
  *
- * @covers \OxidEsales\Payments\Stripe\Service\ModuleConfigurationService
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::class)]
 class ModuleConfigurationServiceIsConfiguredTest extends TestCase
 {
     /**

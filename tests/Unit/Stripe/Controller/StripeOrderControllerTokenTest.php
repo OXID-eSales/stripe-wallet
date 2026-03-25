@@ -15,6 +15,8 @@ use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Controller\StripeOrderController;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Sprint 67a: H3 — Contract token validation in checkoutSuccess().
@@ -24,14 +26,13 @@ use PHPUnit\Framework\TestCase;
  *
  * Sprint 71: Updated to use StubControllerRequestHelper after accessor extraction.
  *
- * @covers \OxidEsales\Payments\Stripe\Controller\StripeOrderController
- * @group sprint-67a
- * @group security
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Controller\StripeOrderController::class)]
+    #[Group('sprint-67a')]
+    #[Group('security')]
 final class StripeOrderControllerTokenTest extends TestCase
 {
-    /** @test */
-    public function checkoutSuccessRejectsInvalidContractToken(): void
+    public function testCheckoutSuccessRejectsInvalidContractToken(): void
     {
         $helper = new StubControllerRequestHelper();
         $helper->checkoutSessionId = 'cs_test_123';
@@ -49,8 +50,7 @@ final class StripeOrderControllerTokenTest extends TestCase
         $this->assertFalse($controller->wasEventDispatched(), 'Event should NOT be dispatched for invalid token');
     }
 
-    /** @test */
-    public function checkoutSuccessAcceptsValidContractToken(): void
+    public function testCheckoutSuccessAcceptsValidContractToken(): void
     {
         $helper = new StubControllerRequestHelper();
         $helper->checkoutSessionId = 'cs_test_123';
@@ -66,8 +66,7 @@ final class StripeOrderControllerTokenTest extends TestCase
         $this->assertTrue($controller->wasEventDispatched(), 'Event SHOULD be dispatched for valid token');
     }
 
-    /** @test */
-    public function checkoutSuccessRejectsMissingContractToken(): void
+    public function testCheckoutSuccessRejectsMissingContractToken(): void
     {
         $helper = new StubControllerRequestHelper();
         $helper->checkoutSessionId = 'cs_test_123';
@@ -83,8 +82,7 @@ final class StripeOrderControllerTokenTest extends TestCase
         $this->assertStringContainsString('Payment verification failed', $helper->lastError ?? '');
     }
 
-    /** @test */
-    public function checkoutSuccessRejectsMissingContractId(): void
+    public function testCheckoutSuccessRejectsMissingContractId(): void
     {
         $helper = new StubControllerRequestHelper();
         $helper->checkoutSessionId = 'cs_test_123';
@@ -100,8 +98,7 @@ final class StripeOrderControllerTokenTest extends TestCase
         $this->assertStringContainsString('Payment verification failed', $helper->lastError ?? '');
     }
 
-    /** @test */
-    public function checkoutSuccessValidatesTokenBeforeSessionCheck(): void
+    public function testCheckoutSuccessValidatesTokenBeforeSessionCheck(): void
     {
         $helper = new StubControllerRequestHelper();
         $helper->checkoutSessionId = 'cs_test_123';

@@ -11,21 +11,18 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Helper;
 
 use OxidEsales\Payments\Stripe\Tests\Helper\StripeWebhookTestHelper;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Tests\Helper\StripeWebhookTestHelper
- * @group sprint-13
- * @group webhook
- * @group helper
- */
+#[CoversClass(\OxidEsales\Payments\Stripe\Tests\Helper\StripeWebhookTestHelper::class)]
+    #[Group('sprint-13')]
+    #[Group('webhook')]
+    #[Group('helper')]
 final class StripeWebhookTestHelperTest extends TestCase
 {
     private const TEST_SECRET = 'whsec_test_secret_key_12345';
 
-    /**
-     * @test
-     */
-    public function generateSignatureCreatesValidFormat(): void
+        public function testGenerateSignatureCreatesValidFormat(): void
     {
         $payload = '{"id":"evt_123"}';
         $timestamp = 1733400000;
@@ -35,10 +32,7 @@ final class StripeWebhookTestHelperTest extends TestCase
         $this->assertStringStartsWith('t=1733400000,v1=', $signature);
     }
 
-    /**
-     * @test
-     */
-    public function verifySignatureAcceptsValidSignature(): void
+        public function testVerifySignatureAcceptsValidSignature(): void
     {
         $payload = '{"id":"evt_123","type":"payment_intent.succeeded"}';
         $signature = StripeWebhookTestHelper::generateSignature($payload, self::TEST_SECRET);
@@ -48,10 +42,7 @@ final class StripeWebhookTestHelperTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /**
-     * @test
-     */
-    public function verifySignatureRejectsInvalidSignature(): void
+        public function testVerifySignatureRejectsInvalidSignature(): void
     {
         $payload = '{"id":"evt_123"}';
         $signature = StripeWebhookTestHelper::generateSignature($payload, self::TEST_SECRET);
@@ -64,10 +55,7 @@ final class StripeWebhookTestHelperTest extends TestCase
         $this->assertFalse($result);
     }
 
-    /**
-     * @test
-     */
-    public function verifySignatureRejectsWrongSecret(): void
+        public function testVerifySignatureRejectsWrongSecret(): void
     {
         $payload = '{"id":"evt_123"}';
         $signature = StripeWebhookTestHelper::generateSignature($payload, self::TEST_SECRET);
@@ -77,10 +65,7 @@ final class StripeWebhookTestHelperTest extends TestCase
         $this->assertFalse($result);
     }
 
-    /**
-     * @test
-     */
-    public function verifySignatureRejectsExpiredTimestamp(): void
+        public function testVerifySignatureRejectsExpiredTimestamp(): void
     {
         $payload = '{"id":"evt_123"}';
         $oldTimestamp = time() - 400; // 400 seconds ago
@@ -91,10 +76,7 @@ final class StripeWebhookTestHelperTest extends TestCase
         $this->assertFalse($result);
     }
 
-    /**
-     * @test
-     */
-    public function createPaymentIntentSucceededPayloadReturnsValidJson(): void
+        public function testCreatePaymentIntentSucceededPayloadReturnsValidJson(): void
     {
         $payload = StripeWebhookTestHelper::createPaymentIntentSucceededPayload('pi_test_123', 5000);
 
@@ -106,10 +88,7 @@ final class StripeWebhookTestHelperTest extends TestCase
         $this->assertSame(5000, $data['data']['object']['amount']);
     }
 
-    /**
-     * @test
-     */
-    public function createChargeRefundedPayloadReturnsValidJson(): void
+        public function testCreateChargeRefundedPayloadReturnsValidJson(): void
     {
         $payload = StripeWebhookTestHelper::createChargeRefundedPayload('pi_test_456', 2500);
 
@@ -121,10 +100,7 @@ final class StripeWebhookTestHelperTest extends TestCase
         $this->assertSame(2500, $data['data']['object']['amount_refunded']);
     }
 
-    /**
-     * @test
-     */
-    public function createCheckoutSessionCompletedPayloadReturnsValidJson(): void
+        public function testCreateCheckoutSessionCompletedPayloadReturnsValidJson(): void
     {
         $payload = StripeWebhookTestHelper::createCheckoutSessionCompletedPayload('cs_test_789', 'pi_test_789');
 
@@ -136,10 +112,7 @@ final class StripeWebhookTestHelperTest extends TestCase
         $this->assertSame('pi_test_789', $data['data']['object']['payment_intent']);
     }
 
-    /**
-     * @test
-     */
-    public function parseSignatureExtractsComponents(): void
+        public function testParseSignatureExtractsComponents(): void
     {
         $signature = 't=1733400000,v1=abc123,v1=def456';
 
@@ -151,10 +124,7 @@ final class StripeWebhookTestHelperTest extends TestCase
         $this->assertContains('def456', $result['signatures']);
     }
 
-    /**
-     * @test
-     */
-    public function generatedSignatureWorksWithStripeVerifier(): void
+        public function testGeneratedSignatureWorksWithStripeVerifier(): void
     {
         $payload = StripeWebhookTestHelper::createPaymentIntentSucceededPayload('pi_integration_test');
         $signature = StripeWebhookTestHelper::generateSignature($payload, self::TEST_SECRET);

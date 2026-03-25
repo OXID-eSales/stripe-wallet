@@ -15,6 +15,8 @@ use OxidEsales\PaymentComponent\Adapter\Request\VoidAuthorizationRequest;
 use OxidEsales\PaymentComponent\Adapter\Request\ReauthorizePaymentRequest;
 use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\Payments\Stripe\Tests\Integration\Stripe\StripeIntegrationTestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Integration tests for StripeAdapter authorization flow with real Stripe API.
@@ -23,13 +25,13 @@ use OxidEsales\Payments\Stripe\Tests\Integration\Stripe\StripeIntegrationTestCas
  * 1. Authorization (hold funds)
  * 2. Capture (take funds) or Void (release funds)
  *
- * @group integration
- * @group stripe
- * @group api
- * @group authorization
  *
- * @covers \OxidEsales\Payments\Stripe\Adapter\StripeAdapter
  */
+    #[Group('integration')]
+    #[Group('stripe')]
+    #[Group('api')]
+    #[Group('authorization')]
+#[CoversClass(\OxidEsales\Payments\Stripe\Adapter\StripeAdapter::class)]
 final class StripeAuthorizationFlowIntegrationTest extends StripeIntegrationTestCase
 {
     // ==========================================

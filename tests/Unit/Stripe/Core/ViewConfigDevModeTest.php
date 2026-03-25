@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Core;
 
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Sprint 70a: M2 — Dev mode domain matching fix.
@@ -20,13 +21,12 @@ use PHPUnit\Framework\TestCase;
  * Uses a standalone stub (not extending ViewConfig) to avoid
  * OXID's virtual parent class chain which requires framework bootstrap.
  *
- * @group sprint-70a
- * @group security
  */
+    #[Group('sprint-70a')]
+    #[Group('security')]
 final class ViewConfigDevModeTest extends TestCase
 {
-    /** @test */
-    public function devModeDetectsLocalhost(): void
+    public function testDevModeDetectsLocalhost(): void
     {
         $config = new StubDevModeChecker();
         $config->setServerName('localhost');
@@ -34,8 +34,7 @@ final class ViewConfigDevModeTest extends TestCase
         $this->assertTrue($config->isStripeDevelopmentMode());
     }
 
-    /** @test */
-    public function devModeDetectsDotLocal(): void
+    public function testDevModeDetectsDotLocal(): void
     {
         $config = new StubDevModeChecker();
         $config->setServerName('shop.local');
@@ -43,8 +42,7 @@ final class ViewConfigDevModeTest extends TestCase
         $this->assertTrue($config->isStripeDevelopmentMode());
     }
 
-    /** @test */
-    public function devModeRejectsPartialMatch(): void
+    public function testDevModeRejectsPartialMatch(): void
     {
         $config = new StubDevModeChecker();
         $config->setServerName('attacker.localhost.com');
@@ -52,8 +50,7 @@ final class ViewConfigDevModeTest extends TestCase
         $this->assertFalse($config->isStripeDevelopmentMode());
     }
 
-    /** @test */
-    public function devModeRejectsSubdomainTrick(): void
+    public function testDevModeRejectsSubdomainTrick(): void
     {
         $config = new StubDevModeChecker();
         $config->setServerName('evil.test.attacker.com');
@@ -61,8 +58,7 @@ final class ViewConfigDevModeTest extends TestCase
         $this->assertFalse($config->isStripeDevelopmentMode());
     }
 
-    /** @test */
-    public function devModeAcceptsEnvVariable(): void
+    public function testDevModeAcceptsEnvVariable(): void
     {
         $config = new StubDevModeChecker();
         $config->setServerName('production.shop.com');
@@ -71,8 +67,7 @@ final class ViewConfigDevModeTest extends TestCase
         $this->assertTrue($config->isStripeDevelopmentMode());
     }
 
-    /** @test */
-    public function devModeDefaultsFalseInProduction(): void
+    public function testDevModeDefaultsFalseInProduction(): void
     {
         $config = new StubDevModeChecker();
         $config->setServerName('production.shop.com');

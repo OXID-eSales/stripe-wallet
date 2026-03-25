@@ -12,6 +12,8 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller\Admin;
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Payments\Stripe\Controller\Admin\OrderRefund;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Sprint 64e: CSRF protection tests for admin order actions.
@@ -20,15 +22,14 @@ use PHPUnit\Framework\TestCase;
  * when CSRF token validation fails. Uses testable subclass that overrides
  * both validateCsrfToken() and getOrder() to avoid OXID framework calls.
  *
- * @covers \OxidEsales\Payments\Stripe\Controller\Admin\OrderRefund
- * @group sprint-64e
- * @group security
- * @group csrf
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Controller\Admin\OrderRefund::class)]
+    #[Group('sprint-64e')]
+    #[Group('security')]
+    #[Group('csrf')]
 final class OrderRefundCsrfTest extends TestCase
 {
-    /** @test */
-    public function fullRefundRejectsInvalidCsrfToken(): void
+    public function testFullRefundRejectsInvalidCsrfToken(): void
     {
         $controller = new TestableOrderRefundForCsrf(csrfValid: false);
 
@@ -38,8 +39,7 @@ final class OrderRefundCsrfTest extends TestCase
         $this->assertStringContainsString('Session expired', (string) $controller->getErrorMessage());
     }
 
-    /** @test */
-    public function capturePaymentRejectsInvalidCsrfToken(): void
+    public function testCapturePaymentRejectsInvalidCsrfToken(): void
     {
         $controller = new TestableOrderRefundForCsrf(csrfValid: false);
 
@@ -49,8 +49,7 @@ final class OrderRefundCsrfTest extends TestCase
         $this->assertStringContainsString('Session expired', (string) $controller->getErrorMessage());
     }
 
-    /** @test */
-    public function cancelAuthorizationRejectsInvalidCsrfToken(): void
+    public function testCancelAuthorizationRejectsInvalidCsrfToken(): void
     {
         $controller = new TestableOrderRefundForCsrf(csrfValid: false);
 
@@ -60,8 +59,7 @@ final class OrderRefundCsrfTest extends TestCase
         $this->assertStringContainsString('Session expired', (string) $controller->getErrorMessage());
     }
 
-    /** @test */
-    public function fullRefundProceedsWithValidCsrfToken(): void
+    public function testFullRefundProceedsWithValidCsrfToken(): void
     {
         $controller = new TestableOrderRefundForCsrf(csrfValid: true);
 
@@ -73,8 +71,7 @@ final class OrderRefundCsrfTest extends TestCase
         $this->assertStringNotContainsString('Session expired', $error);
     }
 
-    /** @test */
-    public function capturePaymentProceedsWithValidCsrfToken(): void
+    public function testCapturePaymentProceedsWithValidCsrfToken(): void
     {
         $controller = new TestableOrderRefundForCsrf(csrfValid: true);
 
@@ -85,8 +82,7 @@ final class OrderRefundCsrfTest extends TestCase
         $this->assertStringNotContainsString('Session expired', $error);
     }
 
-    /** @test */
-    public function cancelAuthorizationProceedsWithValidCsrfToken(): void
+    public function testCancelAuthorizationProceedsWithValidCsrfToken(): void
     {
         $controller = new TestableOrderRefundForCsrf(csrfValid: true);
 

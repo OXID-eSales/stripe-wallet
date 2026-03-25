@@ -13,6 +13,7 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Log\NullLogger;
 use Stripe\PaymentIntent;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Unit tests for CancelAuthorizationService.
@@ -21,8 +22,8 @@ use Stripe\PaymentIntent;
  * Sprint 26: Updated to use factory instead of direct adapter injection.
  * Sprint 31: Updated to use CancellationResponse instead of CancellationResult.
  *
- * @covers \OxidEsales\Payments\Stripe\Service\CancelAuthorizationService
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Service\CancelAuthorizationService::class)]
 class CancelAuthorizationServiceTest extends TestCase
 {
     private StripeAdapterInterface&MockObject $stripeAdapter;

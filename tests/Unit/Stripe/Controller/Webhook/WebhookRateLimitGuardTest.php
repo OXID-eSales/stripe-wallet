@@ -12,16 +12,15 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller\Webhook;
 use OxidEsales\PaymentComponent\Mcp\Http\RateLimiterInterface;
 use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRateLimitGuard;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRateLimitGuard
- * @group sprint-64b
- * @group security
- */
+#[CoversClass(\OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRateLimitGuard::class)]
+    #[Group('sprint-64b')]
+    #[Group('security')]
 final class WebhookRateLimitGuardTest extends TestCase
 {
-    /** @test */
-    public function guardRejectsWhenRateLimitExceeded(): void
+    public function testGuardRejectsWhenRateLimitExceeded(): void
     {
         $rateLimiter = $this->createMock(RateLimiterInterface::class);
         $rateLimiter->method('isAllowed')->with('192.168.1.1')->willReturn(false);
@@ -34,8 +33,7 @@ final class WebhookRateLimitGuardTest extends TestCase
         $this->assertSame('rate_limited', $result->reason);
     }
 
-    /** @test */
-    public function guardAllowsWhenUnderLimit(): void
+    public function testGuardAllowsWhenUnderLimit(): void
     {
         $rateLimiter = $this->createMock(RateLimiterInterface::class);
         $rateLimiter->method('isAllowed')->with('10.0.0.1')->willReturn(true);
@@ -46,8 +44,7 @@ final class WebhookRateLimitGuardTest extends TestCase
         $this->assertNull($result);
     }
 
-    /** @test */
-    public function guardUsesIpAsRateLimitIdentifier(): void
+    public function testGuardUsesIpAsRateLimitIdentifier(): void
     {
         $rateLimiter = $this->createMock(RateLimiterInterface::class);
         $rateLimiter->expects($this->once())
@@ -59,8 +56,7 @@ final class WebhookRateLimitGuardTest extends TestCase
         $guard->check('{}', 'sig', '203.0.113.50');
     }
 
-    /** @test */
-    public function guardReturns429WithRetryMessage(): void
+    public function testGuardReturns429WithRetryMessage(): void
     {
         $rateLimiter = $this->createMock(RateLimiterInterface::class);
         $rateLimiter->method('isAllowed')->willReturn(false);

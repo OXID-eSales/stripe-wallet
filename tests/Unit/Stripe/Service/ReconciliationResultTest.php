@@ -11,20 +11,19 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use OxidEsales\Payments\Stripe\Service\Result\ReconciliationResult;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Unit tests for ReconciliationResult DTO
  *
- * @covers \OxidEsales\Payments\Stripe\Service\ReconciliationResult
- * @group sprint-10
- * @group reconciliation
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Service\ReconciliationResult::class)]
+    #[Group('sprint-10')]
+    #[Group('reconciliation')]
 class ReconciliationResultTest extends TestCase
 {
-    /**
-     * @test
-     */
-    public function canCreateSuccessResult(): void
+        public function testCanCreateSuccessResult(): void
     {
         $result = new ReconciliationResult(
             orderId: 'order_123',
@@ -43,10 +42,7 @@ class ReconciliationResultTest extends TestCase
         $this->assertTrue($result->contractUpdated);
     }
 
-    /**
-     * @test
-     */
-    public function canCreateFailureResult(): void
+        public function testCanCreateFailureResult(): void
     {
         $result = new ReconciliationResult(
             orderId: 'order_789',
@@ -61,10 +57,7 @@ class ReconciliationResultTest extends TestCase
         $this->assertFalse($result->contractUpdated);
     }
 
-    /**
-     * @test
-     */
-    public function contractUpdatedDefaultsToFalse(): void
+        public function testContractUpdatedDefaultsToFalse(): void
     {
         $result = new ReconciliationResult(
             orderId: 'order_123',
@@ -77,10 +70,7 @@ class ReconciliationResultTest extends TestCase
         $this->assertFalse($result->contractUpdated);
     }
 
-    /**
-     * @test
-     */
-    public function toArrayReturnsCorrectStructure(): void
+        public function testToArrayReturnsCorrectStructure(): void
     {
         $result = new ReconciliationResult(
             orderId: 'order_123',
@@ -102,10 +92,7 @@ class ReconciliationResultTest extends TestCase
         $this->assertTrue($array['contract_updated']);
     }
 
-    /**
-     * @test
-     */
-    public function propertiesAreReadOnly(): void
+        public function testPropertiesAreReadOnly(): void
     {
         $result = new ReconciliationResult(
             orderId: 'order_123',

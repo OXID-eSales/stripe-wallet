@@ -11,18 +11,19 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller\Webhook;
 
 use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookHttpsGuard;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Sprint 67b: M6 — HTTPS enforcement on webhook endpoints.
  *
- * @covers \OxidEsales\Payments\Stripe\Controller\Webhook\WebhookHttpsGuard
- * @group sprint-67b
- * @group security
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Controller\Webhook\WebhookHttpsGuard::class)]
+    #[Group('sprint-67b')]
+    #[Group('security')]
 final class WebhookHttpsGuardTest extends TestCase
 {
-    /** @test */
-    public function guardAllowsHttpsRequest(): void
+    public function testGuardAllowsHttpsRequest(): void
     {
         $guard = new TestableWebhookHttpsGuard(allowInsecureLoopback: false);
         $guard->setServerVars(['HTTPS' => 'on']);
@@ -32,8 +33,7 @@ final class WebhookHttpsGuardTest extends TestCase
         $this->assertNull($result);
     }
 
-    /** @test */
-    public function guardRejectsHttpRequest(): void
+    public function testGuardRejectsHttpRequest(): void
     {
         $guard = new TestableWebhookHttpsGuard(allowInsecureLoopback: false);
         $guard->setServerVars([]);
@@ -45,8 +45,7 @@ final class WebhookHttpsGuardTest extends TestCase
         $this->assertSame('insecure_connection', $result->reason);
     }
 
-    /** @test */
-    public function guardAcceptsXForwardedProtoHttps(): void
+    public function testGuardAcceptsXForwardedProtoHttps(): void
     {
         $guard = new TestableWebhookHttpsGuard(allowInsecureLoopback: false);
         $guard->setServerVars(['HTTP_X_FORWARDED_PROTO' => 'https']);
@@ -56,8 +55,7 @@ final class WebhookHttpsGuardTest extends TestCase
         $this->assertNull($result);
     }
 
-    /** @test */
-    public function guardRejectsXForwardedProtoHttp(): void
+    public function testGuardRejectsXForwardedProtoHttp(): void
     {
         $guard = new TestableWebhookHttpsGuard(allowInsecureLoopback: false);
         $guard->setServerVars(['HTTP_X_FORWARDED_PROTO' => 'http']);
@@ -68,8 +66,7 @@ final class WebhookHttpsGuardTest extends TestCase
         $this->assertSame(400, $result->httpStatusCode);
     }
 
-    /** @test */
-    public function guardAllowsLocalhostWhenInsecureLoopbackEnabled(): void
+    public function testGuardAllowsLocalhostWhenInsecureLoopbackEnabled(): void
     {
         $guard = new TestableWebhookHttpsGuard(allowInsecureLoopback: true);
         $guard->setServerVars([]);
@@ -79,8 +76,7 @@ final class WebhookHttpsGuardTest extends TestCase
         $this->assertNull($result);
     }
 
-    /** @test */
-    public function guardRejectsLocalhostWhenInsecureLoopbackDisabled(): void
+    public function testGuardRejectsLocalhostWhenInsecureLoopbackDisabled(): void
     {
         $guard = new TestableWebhookHttpsGuard(allowInsecureLoopback: false);
         $guard->setServerVars([]);

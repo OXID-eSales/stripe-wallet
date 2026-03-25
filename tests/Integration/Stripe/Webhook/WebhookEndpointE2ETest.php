@@ -12,6 +12,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Webhook;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Tests\Helper\StripeWebhookTestHelper;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * End-to-End integration tests for the webhook HTTP endpoint.
@@ -19,11 +20,11 @@ use PHPUnit\Framework\TestCase;
  * These tests make actual HTTP requests to the webhook endpoint
  * to verify it's reachable and responds correctly.
  *
- * @group integration
- * @group e2e
- * @group webhook-e2e
- * @group sprint-13
  */
+    #[Group('integration')]
+    #[Group('e2e')]
+    #[Group('webhook-e2e')]
+    #[Group('sprint-13')]
 final class WebhookEndpointE2ETest extends TestCase
 {
     private const WEBHOOK_PATH = 'index.php?cl=oe_stripe_webhook';
@@ -37,11 +38,8 @@ final class WebhookEndpointE2ETest extends TestCase
         $this->webhookUrl = rtrim($shopUrl, '/') . '/' . self::WEBHOOK_PATH;
     }
 
-    /**
-     * @test
-     * @group critical
-     */
-    public function webhookEndpointExistsAndDoesNotReturn404(): void
+        #[Group('critical')]
+    public function testWebhookEndpointExistsAndDoesNotReturn404(): void
     {
         $response = $this->sendHttpRequest('POST', $this->webhookUrl, '{}', [
             'Content-Type: application/json',
@@ -61,10 +59,7 @@ final class WebhookEndpointE2ETest extends TestCase
         );
     }
 
-    /**
-     * @test
-     */
-    public function webhookReturns400Or401ForMissingSignature(): void
+        public function testWebhookReturns400Or401ForMissingSignature(): void
     {
         $payload = StripeWebhookTestHelper::createPaymentIntentSucceededPayload('pi_test_no_sig');
 
@@ -81,10 +76,7 @@ final class WebhookEndpointE2ETest extends TestCase
         );
     }
 
-    /**
-     * @test
-     */
-    public function webhookReturns400ForInvalidSignature(): void
+        public function testWebhookReturns400ForInvalidSignature(): void
     {
         $payload = StripeWebhookTestHelper::createPaymentIntentSucceededPayload('pi_test_invalid_sig');
         $invalidSignature = 't=' . time() . ',v1=invalid_signature_abc123';
@@ -103,10 +95,7 @@ final class WebhookEndpointE2ETest extends TestCase
         );
     }
 
-    /**
-     * @test
-     */
-    public function webhookReturns400ForExpiredSignature(): void
+        public function testWebhookReturns400ForExpiredSignature(): void
     {
         $payload = StripeWebhookTestHelper::createPaymentIntentSucceededPayload('pi_test_expired');
 
@@ -128,10 +117,7 @@ final class WebhookEndpointE2ETest extends TestCase
         );
     }
 
-    /**
-     * @test
-     */
-    public function webhookReturns400ForMalformedJson(): void
+        public function testWebhookReturns400ForMalformedJson(): void
     {
         $malformedPayload = '{ invalid json !!!';
 
@@ -147,10 +133,7 @@ final class WebhookEndpointE2ETest extends TestCase
         );
     }
 
-    /**
-     * @test
-     */
-    public function webhookHandlesAllEventTypes(): void
+        public function testWebhookHandlesAllEventTypes(): void
     {
         $eventPayloads = [
             'payment_intent.succeeded' => StripeWebhookTestHelper::createPaymentIntentSucceededPayload('pi_e2e_1'),
@@ -177,10 +160,7 @@ final class WebhookEndpointE2ETest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
-    public function webhookResponseTimeIsAcceptable(): void
+        public function testWebhookResponseTimeIsAcceptable(): void
     {
         $payload = StripeWebhookTestHelper::createPaymentIntentSucceededPayload('pi_perf_test');
 
@@ -203,10 +183,7 @@ final class WebhookEndpointE2ETest extends TestCase
         $this->assertNotEquals(404, $response['status']);
     }
 
-    /**
-     * @test
-     */
-    public function webhookIsAccessibleViaHttps(): void
+        public function testWebhookIsAccessibleViaHttps(): void
     {
         $httpsUrl = str_replace('http://', 'https://', $this->webhookUrl);
 
@@ -222,10 +199,7 @@ final class WebhookEndpointE2ETest extends TestCase
         $this->assertNotEquals(404, $response['status']);
     }
 
-    /**
-     * @test
-     */
-    public function webhookReturnsNon404Status(): void
+        public function testWebhookReturnsNon404Status(): void
     {
         $response = $this->sendHttpRequest('POST', $this->webhookUrl, '{}', [
             'Content-Type: application/json',

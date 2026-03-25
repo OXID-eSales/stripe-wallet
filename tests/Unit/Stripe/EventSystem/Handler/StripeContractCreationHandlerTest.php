@@ -19,6 +19,7 @@ use OxidEsales\PaymentComponent\Service\ContractServiceInterface;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Unit tests for StripeContractCreationHandler.
@@ -26,8 +27,8 @@ use PHPUnit\Framework\TestCase;
  * Sprint 21: Refactored tests for handler with ContractMetadataService delegation.
  * Sprint 1 (2026): Updated for Template Method pattern - handler now extends ContractCreationHandler.
  *
- * @covers \OxidEsales\Payments\Stripe\EventSystem\Handler\StripeContractCreationHandler
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\EventSystem\Handler\StripeContractCreationHandler::class)]
 class StripeContractCreationHandlerTest extends TestCase
 {
     private ContractServiceInterface&MockObject $contractService;

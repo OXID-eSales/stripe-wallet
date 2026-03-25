@@ -7,6 +7,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Event;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class StripeRefundRequestEventTest extends TestCase
 {
@@ -207,8 +208,8 @@ class StripeRefundRequestEventTest extends TestCase
     /**
      * Test all Stripe-valid refund reasons.
      *
-     * @dataProvider validRefundReasonsProvider
      */
+    #[DataProvider('validRefundReasonsProvider')]
     public function testValidRefundReasons(string $reason): void
     {
         $context = new EventContext([
@@ -236,8 +237,8 @@ class StripeRefundRequestEventTest extends TestCase
     /**
      * Test multi-channel initiators.
      *
-     * @dataProvider initiatorProvider
      */
+    #[DataProvider('initiatorProvider')]
     public function testMultiChannelInitiators(string $initiator): void
     {
         $context = new EventContext([

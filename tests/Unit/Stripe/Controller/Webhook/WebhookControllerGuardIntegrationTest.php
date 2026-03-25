@@ -13,6 +13,8 @@ use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookController;
 use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookGuardResult;
 use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRequestGuardInterface;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Tests guard chain integration into WebhookController.
@@ -20,14 +22,13 @@ use PHPUnit\Framework\TestCase;
  * Uses testable subclass pattern: overrides the full render() to avoid
  * OXID Registry bootstrap, but preserves the guard check logic.
  *
- * @covers \OxidEsales\Payments\Stripe\Controller\Webhook\WebhookController
- * @group sprint-64d
- * @group security
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Controller\Webhook\WebhookController::class)]
+    #[Group('sprint-64d')]
+    #[Group('security')]
 final class WebhookControllerGuardIntegrationTest extends TestCase
 {
-    /** @test */
-    public function controllerRejectsWhenGuardChainRejects(): void
+    public function testControllerRejectsWhenGuardChainRejects(): void
     {
         $rejection = new WebhookGuardResult('rate_limited', 429, 'Too many requests');
         $guard = $this->createMock(WebhookRequestGuardInterface::class);
@@ -43,8 +44,7 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
         $this->assertStringContainsString('Too many requests', $controller->getLastOutput());
     }
 
-    /** @test */
-    public function controllerProceedsWhenGuardChainAllows(): void
+    public function testControllerProceedsWhenGuardChainAllows(): void
     {
         $guard = $this->createMock(WebhookRequestGuardInterface::class);
         $guard->method('check')->willReturn(null);
@@ -59,8 +59,7 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
         $this->assertSame(400, $controller->getLastHttpStatusCode());
     }
 
-    /** @test */
-    public function controllerCallsGuardWithCorrectArguments(): void
+    public function testControllerCallsGuardWithCorrectArguments(): void
     {
         $guard = $this->createMock(WebhookRequestGuardInterface::class);
         $guard->expects($this->once())
@@ -75,8 +74,7 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
         $controller->render();
     }
 
-    /** @test */
-    public function controllerWorksWithoutGuard(): void
+    public function testControllerWorksWithoutGuard(): void
     {
         $controller = new TestableWebhookControllerForGuard();
         // No guard set — should proceed normally
@@ -88,8 +86,7 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
         $this->assertSame(400, $controller->getLastHttpStatusCode());
     }
 
-    /** @test */
-    public function guardRejectionPreventsFurtherProcessing(): void
+    public function testGuardRejectionPreventsFurtherProcessing(): void
     {
         $rejection = new WebhookGuardResult('payload_too_large', 413, 'Payload too large');
         $guard = $this->createMock(WebhookRequestGuardInterface::class);

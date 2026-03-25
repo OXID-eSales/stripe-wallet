@@ -15,15 +15,17 @@ use OxidEsales\Payments\Stripe\Service\Result\ReconciliationResult;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Unit tests for ReconcileOxpaidCommand
  *
- * @covers \OxidEsales\Payments\Stripe\Command\ReconcileOxpaidCommand
- * @group sprint-10
- * @group reconciliation
- * @group command
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Command\ReconcileOxpaidCommand::class)]
+    #[Group('sprint-10')]
+    #[Group('reconciliation')]
+    #[Group('command')]
 class ReconcileOxpaidCommandTest extends TestCase
 {
     private OxpaidReconciliationServiceInterface $service;
@@ -43,45 +45,30 @@ class ReconcileOxpaidCommandTest extends TestCase
         $this->tester = new CommandTester($this->command);
     }
 
-    /**
-     * @test
-     */
-    public function commandHasCorrectName(): void
+        public function testCommandHasCorrectName(): void
     {
         $this->assertEquals('stripe:reconcile-oxpaid', $this->command->getName());
     }
 
-    /**
-     * @test
-     */
-    public function commandHasDescription(): void
+        public function testCommandHasDescription(): void
     {
         $this->assertNotEmpty($this->command->getDescription());
     }
 
-    /**
-     * @test
-     */
-    public function commandHasDryRunOption(): void
+        public function testCommandHasDryRunOption(): void
     {
         $definition = $this->command->getDefinition();
         $this->assertTrue($definition->hasOption('dry-run'));
     }
 
-    /**
-     * @test
-     */
-    public function commandHasMaxAgeOption(): void
+        public function testCommandHasMaxAgeOption(): void
     {
         $definition = $this->command->getDefinition();
         $this->assertTrue($definition->hasOption('max-age'));
         $this->assertEquals('7', $definition->getOption('max-age')->getDefault());
     }
 
-    /**
-     * @test
-     */
-    public function executeWithNoUnpaidOrders(): void
+        public function testExecuteWithNoUnpaidOrders(): void
     {
         $this->service
             ->method('findUnpaidOrders')
@@ -93,10 +80,7 @@ class ReconcileOxpaidCommandTest extends TestCase
         $this->assertStringContainsString('No unpaid orders', $this->tester->getDisplay());
     }
 
-    /**
-     * @test
-     */
-    public function executeWithDryRun(): void
+        public function testExecuteWithDryRun(): void
     {
         $this->service
             ->method('findUnpaidOrders')
@@ -118,10 +102,7 @@ class ReconcileOxpaidCommandTest extends TestCase
         $this->assertStringContainsString('DRY RUN MODE', $this->tester->getDisplay());
     }
 
-    /**
-     * @test
-     */
-    public function executeWithCustomMaxAge(): void
+        public function testExecuteWithCustomMaxAge(): void
     {
         $this->service
             ->method('findUnpaidOrders')
@@ -134,10 +115,7 @@ class ReconcileOxpaidCommandTest extends TestCase
         $this->assertStringContainsString('last 14 days', $this->tester->getDisplay());
     }
 
-    /**
-     * @test
-     */
-    public function executeWithSuccessfulReconciliation(): void
+        public function testExecuteWithSuccessfulReconciliation(): void
     {
         $this->service
             ->method('findUnpaidOrders')
@@ -159,10 +137,7 @@ class ReconcileOxpaidCommandTest extends TestCase
         $this->assertStringContainsString('Successfully reconciled 2 order(s)', $this->tester->getDisplay());
     }
 
-    /**
-     * @test
-     */
-    public function executeWithErrors(): void
+        public function testExecuteWithErrors(): void
     {
         $this->service
             ->method('findUnpaidOrders')
@@ -182,10 +157,7 @@ class ReconcileOxpaidCommandTest extends TestCase
         $this->assertStringContainsString('error(s)', $this->tester->getDisplay());
     }
 
-    /**
-     * @test
-     */
-    public function executeShowsSkippedOrders(): void
+        public function testExecuteShowsSkippedOrders(): void
     {
         $this->service
             ->method('findUnpaidOrders')
@@ -205,10 +177,7 @@ class ReconcileOxpaidCommandTest extends TestCase
         $this->assertStringContainsString('Skipped: 1', $this->tester->getDisplay());
     }
 
-    /**
-     * @test
-     */
-    public function executeShowsContractUpdates(): void
+        public function testExecuteShowsContractUpdates(): void
     {
         $this->service
             ->method('findUnpaidOrders')

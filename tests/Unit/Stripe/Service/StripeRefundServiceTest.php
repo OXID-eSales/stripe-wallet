@@ -17,13 +17,14 @@ use OxidEsales\Payments\Stripe\Service\StripeRefundService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
- * @covers \OxidEsales\Payments\Stripe\Service\StripeRefundService
  *
  * Sprint 22: Updated tests - Stripe module only supports full refunds.
  * Sprint 26: Service now uses LazyStripeAdapter via PaymentAdapterInterface.
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Service\StripeRefundService::class)]
 class StripeRefundServiceTest extends TestCase
 {
     private ContractRepositoryInterface&MockObject $contractRepository;

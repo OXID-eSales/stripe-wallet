@@ -18,15 +18,17 @@ use OxidEsales\Payments\Stripe\Service\StripeCustomerServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Stripe\Customer;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Unit tests for StripeCustomerService.
  *
  * Sprint 45: Stripe Customer lifecycle.
  *
- * @covers \OxidEsales\Payments\Stripe\Service\StripeCustomerService
- * @group sprint-45
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Service\StripeCustomerService::class)]
+    #[Group('sprint-45')]
 class StripeCustomerServiceTest extends TestCase
 {
     private PaymentCustomerRepositoryInterface&MockObject $customerRepo;

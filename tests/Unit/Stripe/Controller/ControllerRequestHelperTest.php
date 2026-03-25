@@ -9,6 +9,7 @@ use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Sprint 71: Tests for ControllerRequestHelper.
@@ -17,8 +18,8 @@ use PHPUnit\Framework\TestCase;
  * Registry-dependent methods (getBasketFromSession, getSessionId, etc.) are
  * tested indirectly through controller integration tests.
  *
- * @covers \OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper::class)]
 final class ControllerRequestHelperTest extends TestCase
 {
     private TokenServiceInterface&MockObject $tokenService;

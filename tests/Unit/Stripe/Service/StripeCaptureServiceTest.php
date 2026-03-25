@@ -16,13 +16,14 @@ use OxidEsales\Payments\Stripe\Service\StripeCaptureService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
- * @covers \OxidEsales\Payments\Stripe\Service\StripeCaptureService
  *
  * Sprint 26: Service now uses LazyStripeAdapter via PaymentAdapterInterface.
  * Sprint 31: Updated to use CaptureResponse instead of CaptureResult.
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Service\StripeCaptureService::class)]
 class StripeCaptureServiceTest extends TestCase
 {
     private ContractRepositoryInterface&MockObject $contractRepository;

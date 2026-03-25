@@ -12,6 +12,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller;
 use OxidEsales\Payments\Stripe\Controller\PaymentController;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * STRP-104: PaymentController::isStripeSelected() crashes when basket paymentId is null.
@@ -29,8 +30,8 @@ use PHPUnit\Framework\TestCase;
  *   return str_starts_with($selectedPayment, 'oe_payments_stripe_');
  * where $selectedPayment is null because getPaymentId() returns null when no shipping method is available.
  *
- * @covers \OxidEsales\Payments\Stripe\Controller\PaymentController
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Controller\PaymentController::class)]
 class PaymentControllerNullPaymentIdTest extends TestCase
 {
     /**

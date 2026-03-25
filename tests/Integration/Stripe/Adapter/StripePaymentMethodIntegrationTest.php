@@ -11,6 +11,8 @@ namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Adapter;
 
 use OxidEsales\PaymentComponent\Adapter\Request\CreatePaymentMethodRequest;
 use OxidEsales\Payments\Stripe\Tests\Integration\Stripe\StripeIntegrationTestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Integration tests for StripeAdapter payment method management with real Stripe API.
@@ -20,13 +22,13 @@ use OxidEsales\Payments\Stripe\Tests\Integration\Stripe\StripeIntegrationTestCas
  * - Listing customer payment methods
  * - Deleting payment methods
  *
- * @group integration
- * @group stripe
- * @group api
- * @group payment-methods
  *
- * @covers \OxidEsales\Payments\Stripe\Adapter\StripeAdapter
  */
+    #[Group('integration')]
+    #[Group('stripe')]
+    #[Group('api')]
+    #[Group('payment-methods')]
+#[CoversClass(\OxidEsales\Payments\Stripe\Adapter\StripeAdapter::class)]
 final class StripePaymentMethodIntegrationTest extends StripeIntegrationTestCase
 {
     // ==========================================

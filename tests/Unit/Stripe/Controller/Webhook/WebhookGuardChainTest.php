@@ -13,16 +13,15 @@ use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookGuardChain;
 use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookGuardResult;
 use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRequestGuardInterface;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Controller\Webhook\WebhookGuardChain
- * @group sprint-64a
- * @group security
- */
+#[CoversClass(\OxidEsales\Payments\Stripe\Controller\Webhook\WebhookGuardChain::class)]
+    #[Group('sprint-64a')]
+    #[Group('security')]
 final class WebhookGuardChainTest extends TestCase
 {
-    /** @test */
-    public function chainAllowsWhenAllGuardsPass(): void
+    public function testChainAllowsWhenAllGuardsPass(): void
     {
         $guard1 = $this->createMock(WebhookRequestGuardInterface::class);
         $guard1->method('check')->willReturn(null);
@@ -34,8 +33,7 @@ final class WebhookGuardChainTest extends TestCase
         $this->assertNull($chain->check('{}', 'sig', '1.2.3.4'));
     }
 
-    /** @test */
-    public function chainShortCircuitsOnFirstRejection(): void
+    public function testChainShortCircuitsOnFirstRejection(): void
     {
         $rejection = new WebhookGuardResult('rate_limited', 429, 'Too many requests');
         $guard1 = $this->createMock(WebhookRequestGuardInterface::class);
@@ -48,16 +46,14 @@ final class WebhookGuardChainTest extends TestCase
         $this->assertSame($rejection, $chain->check('{}', 'sig', '1.2.3.4'));
     }
 
-    /** @test */
-    public function emptyChainAllowsAll(): void
+    public function testEmptyChainAllowsAll(): void
     {
         $chain = new WebhookGuardChain([]);
 
         $this->assertNull($chain->check('{}', 'sig', '1.2.3.4'));
     }
 
-    /** @test */
-    public function chainReturnsFirstRejectionNotSecond(): void
+    public function testChainReturnsFirstRejectionNotSecond(): void
     {
         $rejection1 = new WebhookGuardResult('payload_too_large', 413, 'Too large');
         $rejection2 = new WebhookGuardResult('rate_limited', 429, 'Rate limited');

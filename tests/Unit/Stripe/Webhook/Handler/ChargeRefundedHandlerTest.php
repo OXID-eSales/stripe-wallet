@@ -16,13 +16,13 @@ use OxidEsales\PaymentComponent\Webhook\WebhookEventHandlerInterface;
 use OxidEsales\Payments\Stripe\WebhookHandler\ChargeRefundedHandler;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\WebhookHandler\ChargeRefundedHandler
- * @group sprint-13
- * @group webhook
- * @group handler
- */
+#[CoversClass(\OxidEsales\Payments\Stripe\WebhookHandler\ChargeRefundedHandler::class)]
+    #[Group('sprint-13')]
+    #[Group('webhook')]
+    #[Group('handler')]
 final class ChargeRefundedHandlerTest extends TestCase
 {
     private ContractRepositoryInterface $contractRepository;
@@ -42,35 +42,23 @@ final class ChargeRefundedHandlerTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     */
-    public function implementsInterface(): void
+        public function testImplementsInterface(): void
     {
         $this->assertInstanceOf(WebhookEventHandlerInterface::class, $this->handler);
     }
 
-    /**
-     * @test
-     */
-    public function supportsChargeRefundedEvent(): void
+        public function testSupportsChargeRefundedEvent(): void
     {
         $this->assertTrue($this->handler->supports('charge.refunded'));
     }
 
-    /**
-     * @test
-     */
-    public function doesNotSupportOtherEvents(): void
+        public function testDoesNotSupportOtherEvents(): void
     {
         $this->assertFalse($this->handler->supports('charge.succeeded'));
         $this->assertFalse($this->handler->supports('payment_intent.succeeded'));
     }
 
-    /**
-     * @test
-     */
-    public function updatesContractRefundedAmount(): void
+        public function testUpdatesContractRefundedAmount(): void
     {
         $event = $this->createRefundEvent('pi_test_123', 5000, 1000);
 
@@ -99,10 +87,7 @@ final class ChargeRefundedHandlerTest extends TestCase
         $this->assertSame('refund_recorded', $result->action);
     }
 
-    /**
-     * @test
-     */
-    public function returnsSkippedWhenNoContractFound(): void
+        public function testReturnsSkippedWhenNoContractFound(): void
     {
         $event = $this->createRefundEvent('pi_no_contract', 5000, 1000);
 
@@ -116,10 +101,7 @@ final class ChargeRefundedHandlerTest extends TestCase
         $this->assertSame('skipped', $result->action);
     }
 
-    /**
-     * @test
-     */
-    public function logsRefundProcessing(): void
+        public function testLogsRefundProcessing(): void
     {
         $event = $this->createRefundEvent('pi_log_test', 5000, 2500);
 
@@ -139,10 +121,7 @@ final class ChargeRefundedHandlerTest extends TestCase
         $this->assertNotEmpty($handlingLog, 'Should log handling event');
     }
 
-    /**
-     * @test
-     */
-    public function extractsPaymentIntentIdFromCharge(): void
+        public function testExtractsPaymentIntentIdFromCharge(): void
     {
         $event = new WebhookEvent(
             'evt_123',

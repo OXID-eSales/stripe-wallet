@@ -12,12 +12,13 @@ use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Sprint 72: Tests for RetryCleanupService.
  *
- * @covers \OxidEsales\Payments\Stripe\Service\RetryCleanupService
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Service\RetryCleanupService::class)]
 class RetryCleanupServiceTest extends TestCase
 {
     private ContractRepositoryInterface&MockObject $contractRepository;

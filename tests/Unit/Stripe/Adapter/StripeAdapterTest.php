@@ -21,16 +21,18 @@ use Stripe\Service\Checkout\SessionService;
 use Stripe\Service\PaymentIntentService;
 use Stripe\Service\RefundService;
 use Stripe\StripeClient;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Unit tests for StripeAdapter Stripe-specific methods.
  *
  * Sprint 19: Route Stripe SDK calls through adapter
  *
- * @covers \OxidEsales\Payments\Stripe\Adapter\StripeAdapter
- * @group sprint-19
- * @group adapter
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Adapter\StripeAdapter::class)]
+    #[Group('sprint-19')]
+    #[Group('adapter')]
 final class StripeAdapterTest extends TestCase
 {
     private StripeClient&MockObject $stripeClient;
@@ -45,19 +47,17 @@ final class StripeAdapterTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 19: Adapter should implement StripeAdapterInterface
      */
-    public function implementsStripeAdapterInterface(): void
+    public function testImplementsStripeAdapterInterface(): void
     {
         $this->assertInstanceOf(StripeAdapterInterface::class, $this->adapter);
     }
 
     /**
-     * @test
      * Sprint 19: Retrieves checkout session through adapter
      */
-    public function retrievesCheckoutSession(): void
+    public function testRetrievesCheckoutSession(): void
     {
         $sessionId = 'cs_test_123';
         $expectedSession = $this->createMock(Session::class);
@@ -79,10 +79,9 @@ final class StripeAdapterTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 19: Retrieves checkout session with default expand
      */
-    public function retrievesCheckoutSessionWithDefaultExpand(): void
+    public function testRetrievesCheckoutSessionWithDefaultExpand(): void
     {
         $sessionId = 'cs_test_456';
         $expectedSession = $this->createMock(Session::class);
@@ -104,10 +103,9 @@ final class StripeAdapterTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 19: Creates checkout session through adapter
      */
-    public function createsCheckoutSession(): void
+    public function testCreatesCheckoutSession(): void
     {
         $params = [
             'mode' => 'payment',
@@ -137,10 +135,9 @@ final class StripeAdapterTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 19: Retrieves payment intent through adapter
      */
-    public function retrievesPaymentIntent(): void
+    public function testRetrievesPaymentIntent(): void
     {
         $paymentIntentId = 'pi_test_123';
         $expectedIntent = $this->createMock(PaymentIntent::class);
@@ -159,10 +156,9 @@ final class StripeAdapterTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 19: Retrieves payment intent with expand options
      */
-    public function retrievesPaymentIntentWithExpand(): void
+    public function testRetrievesPaymentIntentWithExpand(): void
     {
         $paymentIntentId = 'pi_test_789';
         $expectedIntent = $this->createMock(PaymentIntent::class);
@@ -181,10 +177,9 @@ final class StripeAdapterTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 19: Creates refund by charge ID through adapter
      */
-    public function createsRefundByChargeId(): void
+    public function testCreatesRefundByChargeId(): void
     {
         $chargeId = 'ch_test_123';
         $amount = 1000;
@@ -210,10 +205,9 @@ final class StripeAdapterTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 19: Creates full refund by charge ID (no amount specified)
      */
-    public function createsFullRefundByChargeId(): void
+    public function testCreatesFullRefundByChargeId(): void
     {
         $chargeId = 'ch_test_456';
 
@@ -233,10 +227,9 @@ final class StripeAdapterTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 19: Creates refund with metadata through adapter
      */
-    public function createsRefundWithMetadata(): void
+    public function testCreatesRefundWithMetadata(): void
     {
         $chargeId = 'ch_test_789';
         $amount = 500;

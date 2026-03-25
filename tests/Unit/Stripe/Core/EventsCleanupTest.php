@@ -12,6 +12,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Core;
 use OxidEsales\Payments\Stripe\Core\Events;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * TDD Tests for Events.php cleanup
@@ -24,18 +25,17 @@ use ReflectionClass;
  * - NO CREATE TABLE (use Doctrine migrations)
  * - All STRIPE* column additions disabled
  *
- * @group sprint-2
- * @group sprint-5
- * @group events-cleanup
- * @group unit
  */
+    #[Group('sprint-2')]
+    #[Group('sprint-5')]
+    #[Group('events-cleanup')]
+    #[Group('unit')]
 class EventsCleanupTest extends TestCase
 {
     /**
-     * @test
      * RED: Events.php should not create oe_payments_webhook_log table
      */
-    public function eventsDoesNotCreateWebhookLogTable(): void
+    public function testEventsDoesNotCreateWebhookLogTable(): void
     {
         $reflection = new ReflectionClass(Events::class);
         $source = file_get_contents($reflection->getFileName());
@@ -48,10 +48,9 @@ class EventsCleanupTest extends TestCase
     }
 
     /**
-     * @test
      * RED: Events.php should not create osc_stripe_customer_mapping table
      */
-    public function eventsDoesNotCreateCustomerMappingTable(): void
+    public function testEventsDoesNotCreateCustomerMappingTable(): void
     {
         $reflection = new ReflectionClass(Events::class);
         $source = file_get_contents($reflection->getFileName());
@@ -64,10 +63,9 @@ class EventsCleanupTest extends TestCase
     }
 
     /**
-     * @test
      * RED: Events.php should not create osc_stripe_payment_details table
      */
-    public function eventsDoesNotCreatePaymentDetailsTable(): void
+    public function testEventsDoesNotCreatePaymentDetailsTable(): void
     {
         $reflection = new ReflectionClass(Events::class);
         $source = file_get_contents($reflection->getFileName());
@@ -80,10 +78,9 @@ class EventsCleanupTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 5: Events.php should NOT add STRIPE* columns to oxorder table
      */
-    public function eventsDoesNotAddStripeColumnsToOxorder(): void
+    public function testEventsDoesNotAddStripeColumnsToOxorder(): void
     {
         $reflection = new ReflectionClass(Events::class);
         $source = file_get_contents($reflection->getFileName());
@@ -112,10 +109,9 @@ class EventsCleanupTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 5: Events.php should NOT add STRIPE* columns to oxorderarticles table
      */
-    public function eventsDoesNotAddStripeColumnsToOxorderarticles(): void
+    public function testEventsDoesNotAddStripeColumnsToOxorderarticles(): void
     {
         $reflection = new ReflectionClass(Events::class);
         $source = file_get_contents($reflection->getFileName());
@@ -141,10 +137,9 @@ class EventsCleanupTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 5: Events.php should NOT add STRIPE* columns to oxuser table
      */
-    public function eventsDoesNotAddStripeColumnsToOxuser(): void
+    public function testEventsDoesNotAddStripeColumnsToOxuser(): void
     {
         $reflection = new ReflectionClass(Events::class);
         $source = file_get_contents($reflection->getFileName());
@@ -170,10 +165,9 @@ class EventsCleanupTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 5: Events.php should NOT create oe_payments_* tables (use migrations)
      */
-    public function eventsDoesNotCreateOscPaymentTables(): void
+    public function testEventsDoesNotCreateOscPaymentTables(): void
     {
         $reflection = new ReflectionClass(Events::class);
         $source = file_get_contents($reflection->getFileName());
@@ -202,10 +196,9 @@ class EventsCleanupTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 5: Events.php should NOT have addDatabaseStructure method
      */
-    public function eventsDoesNotHaveAddDatabaseStructureMethod(): void
+    public function testEventsDoesNotHaveAddDatabaseStructureMethod(): void
     {
         $reflection = new ReflectionClass(Events::class);
 
@@ -216,10 +209,9 @@ class EventsCleanupTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 5: Events.php should NOT have addStandardCheckoutTables method
      */
-    public function eventsDoesNotHaveAddStandardCheckoutTablesMethod(): void
+    public function testEventsDoesNotHaveAddStandardCheckoutTablesMethod(): void
     {
         $reflection = new ReflectionClass(Events::class);
 
@@ -230,10 +222,9 @@ class EventsCleanupTest extends TestCase
     }
 
     /**
-     * @test
      * Sprint 5: Events.php should state that migrations handle database schema
      */
-    public function eventsDocumentationMentionsMigrations(): void
+    public function testEventsDocumentationMentionsMigrations(): void
     {
         $reflection = new ReflectionClass(Events::class);
         $source = file_get_contents($reflection->getFileName());

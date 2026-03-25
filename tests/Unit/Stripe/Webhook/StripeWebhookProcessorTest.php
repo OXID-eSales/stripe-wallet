@@ -22,12 +22,13 @@ use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerI
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Tests for StripeWebhookProcessor.
  *
- * @covers \OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor::class)]
 class StripeWebhookProcessorTest extends TestCase
 {
     private WebhookLogRepositoryInterface&MockObject $logRepository;

@@ -13,13 +13,12 @@ use OxidEsales\Payments\Stripe\Environment\DevelopmentEnvironmentCheckerInterfac
 use OxidEsales\Payments\Stripe\Environment\ModuleConfigurationDevelopmentChecker;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Environment\ModuleConfigurationDevelopmentChecker
- *
- * @group security
- * @group owasp-a05
- */
+#[CoversClass(\OxidEsales\Payments\Stripe\Environment\ModuleConfigurationDevelopmentChecker::class)]
+    #[Group('security')]
+    #[Group('owasp-a05')]
 class ModuleConfigurationDevelopmentCheckerTest extends TestCase
 {
     public function testImplementsInterface(): void

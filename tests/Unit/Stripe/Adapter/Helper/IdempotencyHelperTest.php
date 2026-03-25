@@ -13,22 +13,21 @@ use DateTimeImmutable;
 use OxidEsales\PaymentComponent\Contract\IdempotencyRecord;
 use OxidEsales\Payments\Stripe\Adapter\Helper\IdempotencyHelper;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Unit tests for IdempotencyHelper shared utility.
  *
  * Sprint 46: Extracted from IdempotentStripeAdapter.
  *
- * @covers \OxidEsales\Payments\Stripe\Adapter\Helper\IdempotencyHelper
- * @group sprint-46
- * @group idempotency
  */
+#[CoversClass(\OxidEsales\Payments\Stripe\Adapter\Helper\IdempotencyHelper::class)]
+    #[Group('sprint-46')]
+    #[Group('idempotency')]
 final class IdempotencyHelperTest extends TestCase
 {
-    /**
-     * @test
-     */
-    public function createsNewRecordWhenExistingIsNull(): void
+        public function testCreatesNewRecordWhenExistingIsNull(): void
     {
         $record = IdempotencyHelper::reuseOrCreate(null, 'capture:pi_test', 'pi_test', 'capture', 86400);
 
@@ -38,10 +37,7 @@ final class IdempotencyHelperTest extends TestCase
         $this->assertFalse($record->isExpired());
     }
 
-    /**
-     * @test
-     */
-    public function reusesExistingRecordAndResetsStatus(): void
+        public function testReusesExistingRecordAndResetsStatus(): void
     {
         $existing = new IdempotencyRecord(
             'id_existing',
@@ -61,10 +57,7 @@ final class IdempotencyHelperTest extends TestCase
         $this->assertNull($record->getResult());
     }
 
-    /**
-     * @test
-     */
-    public function newRecordHasCorrectExpiration(): void
+        public function testNewRecordHasCorrectExpiration(): void
     {
         $before = new DateTimeImmutable();
         $record = IdempotencyHelper::reuseOrCreate(null, 'test:key', 'order1', 'test', 3600);
@@ -74,10 +67,7 @@ final class IdempotencyHelperTest extends TestCase
         $this->assertSame('test:key', $record->getKey());
     }
 
-    /**
-     * @test
-     */
-    public function newRecordHasUniqueId(): void
+        public function testNewRecordHasUniqueId(): void
     {
         $record1 = IdempotencyHelper::reuseOrCreate(null, 'key1', 'order1', 'test', 3600);
         $record2 = IdempotencyHelper::reuseOrCreate(null, 'key2', 'order2', 'test', 3600);

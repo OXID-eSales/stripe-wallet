@@ -13,6 +13,7 @@ use Doctrine\DBAL\Connection;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionProviderInterface;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Integration tests for database migration structure
@@ -20,9 +21,9 @@ use PHPUnit\Framework\TestCase;
  * These tests verify that migrations correctly create all tables, columns,
  * indexes, and foreign keys as specified in the architecture documentation.
  *
- * @group database
- * @group migration
  */
+    #[Group('database')]
+    #[Group('migration')]
 class MigrationStructureTest extends TestCase
 {
     private Connection $connection;
