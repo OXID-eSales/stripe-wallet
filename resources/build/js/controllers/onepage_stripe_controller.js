@@ -24,6 +24,7 @@ export default class extends withEventBus(Controller) {
     publishableKey: String,
     mode: String,
     returnUrl: String,
+    apiUrl: String,  // API base URL (e.g., /index.php?cl=OeCheckoutApi)
   }
 
   static targets = ["element", "loader", "error"]
@@ -67,7 +68,7 @@ export default class extends withEventBus(Controller) {
   /**
    * Handle oe:payment:method-selected event
    *
-   * Event Detail:
+   * Event Data:
    * {
    *   paymentMethodId: string,  // e.g., 'oxidstripe', 'paypal'
    *   paymentMethodTitle: string // e.g., 'Credit Card (Stripe)'
@@ -78,8 +79,8 @@ export default class extends withEventBus(Controller) {
    * - Show Stripe UI if match
    * - Hide Stripe UI if no match
    */
-  async handleMethodSelected(event) {
-    const { paymentMethodId } = event.detail
+  async handleMethodSelected(data) {
+    const { paymentMethodId } = data
 
     console.log('[OnePageStripeController] Payment method selected:', paymentMethodId)
 
@@ -103,7 +104,7 @@ export default class extends withEventBus(Controller) {
   /**
    * Handle oe:footer:submit-clicked event
    *
-   * Event Detail:
+   * Event Data:
    * {
    *   paymentMethod: string,
    *   basketId: string,
@@ -113,11 +114,10 @@ export default class extends withEventBus(Controller) {
    * }
    *
    * Responsibility:
-   * - Trigger payment confirmation request
-   * - Broadcast oe:payment:confirm-requested for checkout lifecycle
+   * - Process full payment flow: create contract → confirm payment → place order
    */
-  async handleFooterSubmit(event) {
-    const { paymentMethod, basketId, totalPrice, currency } = event.detail
+  async handleFooterSubmit(data) {
+    const { paymentMethod, basketId, totalPrice, currency } = data
 
     console.log('[OnePageStripeController] Footer submit clicked:', {
       paymentMethod,
@@ -130,20 +130,71 @@ export default class extends withEventBus(Controller) {
       return // Not Stripe payment
     }
 
-    // Broadcast payment confirmation request
-    // This will trigger the checkout lifecycle to call our handleConfirmRequest
-    this.broadcast('oe:payment:confirm-requested', {
-      paymentMethodId: paymentMethod,
-      basketId: basketId,
-      totalPrice: totalPrice,
-      currency: currency
+    // Show Stripe UI (wrapper and element container)
+    this.showStripeUI()
+
+    // Show loader
+    this.showLoader()
+    this.hideError()
+
+    // Broadcast processing event
+    this.broadcast('oe:payment:processing', {
+      paymentMethod: paymentMethod
     })
+
+    try {
+      // Step 1: Create contract via OPC API (which creates Checkout Session)
+      console.log('[OnePageStripeController] Step 1: Creating payment contract...')
+      const contractResult = await this.createContract(paymentMethod)
+
+      if (!contractResult.success) {
+        throw new Error(contractResult.errorMessage || 'Failed to create payment contract')
+      }
+
+      console.log('[OnePageStripeController] Contract created:', {
+        contractId: contractResult.contractId,
+        metadata: contractResult.metadata
+      })
+
+      // Step 2: Check if we have redirect URL (Checkout Session)
+      const redirectUrl = contractResult.metadata?.redirectUrl || contractResult.metadata?.checkoutUrl
+
+      if (!redirectUrl) {
+        throw new Error('No redirect URL provided by payment handler')
+      }
+
+      console.log('[OnePageStripeController] Redirecting to Stripe Checkout:', redirectUrl)
+
+      // Broadcast processing event
+      this.broadcast('oe:payment:redirect', {
+        provider: 'stripe',
+        contractId: contractResult.contractId,
+        redirectUrl: redirectUrl
+      })
+
+      // Redirect to Stripe Checkout
+      window.location.href = redirectUrl
+
+    } catch (error) {
+      console.error('[OnePageStripeController] Payment processing failed:', error)
+
+      // Show error
+      this.showError(error.message || 'Payment processing failed')
+
+      // Broadcast error
+      this.broadcast('oe:payment:error', {
+        error: error.message,
+        paymentMethod: paymentMethod
+      })
+    } finally {
+      this.hideLoader()
+    }
   }
 
   /**
    * Handle oe:payment:confirm-requested event
    *
-   * Event Detail:
+   * Event Data:
    * {
    *   contractId: string,       // PaymentContract ID
    *   clientSecret: string,     // Stripe client secret (from PaymentIntent)
@@ -156,8 +207,8 @@ export default class extends withEventBus(Controller) {
    * - Process payment with Stripe SDK
    * - Emit oe:payment:confirmed or oe:payment:failed
    */
-  async handleConfirmRequest(event) {
-    const { paymentMethodId, clientSecret, contractId, orderId } = event.detail
+  async handleConfirmRequest(data) {
+    const { paymentMethodId, clientSecret, contractId, orderId } = data
 
     console.log('[OnePageStripeController] Confirm request:', {
       paymentMethodId,
@@ -211,6 +262,8 @@ export default class extends withEventBus(Controller) {
       'oxidstripe',
       'oxidstripe_card',
       'oxidstripe_wallet',
+      'oe_payments_stripe_wallet',  // Module ID
+      'stripe',
     ]
 
     return stripePaymentMethods.some(method =>
@@ -244,34 +297,67 @@ export default class extends withEventBus(Controller) {
   }
 
   /**
-   * Initialize Stripe Payment Element
+   * Initialize Stripe Payment Element with client secret
+   *
+   * @param {string} clientSecret - Stripe PaymentIntent client secret
    */
-  async initializePaymentElement() {
+  async initializePaymentElement(clientSecret = null) {
     if (!this.stripe) {
       console.error('[OnePageStripeController] Stripe SDK not loaded')
       return
     }
 
     if (this.paymentElement) {
-      // Already initialized
-      return
+      // Already initialized - destroy and recreate with new client secret
+      console.log('[OnePageStripeController] Destroying existing Payment Element...')
+      this.paymentElement.destroy()
+      this.paymentElement = null
+      this.elements = null
     }
 
-    console.log('[OnePageStripeController] Initializing Payment Element...')
+    console.log('[OnePageStripeController] Initializing Payment Element...', {
+      hasClientSecret: !!clientSecret
+    })
 
-    // Create Elements instance (will be configured with client secret later)
-    this.elements = this.stripe.elements({
-      mode: 'payment',
-      amount: 1000, // Placeholder, will be updated with real client secret
-      currency: 'eur',
+    // Make sure the element container is visible before mounting
+    if (this.hasElementTarget) {
+      this.elementTarget.style.display = 'block'
+    }
+
+    // Create Elements instance
+    const elementsOptions = {
       appearance: {
         theme: 'stripe',
       },
-    })
+    }
+
+    // If we have a client secret, use it. Otherwise use placeholder mode.
+    if (clientSecret) {
+      elementsOptions.clientSecret = clientSecret
+    } else {
+      // Placeholder mode for initial UI rendering
+      elementsOptions.mode = 'payment'
+      elementsOptions.amount = 1000
+      elementsOptions.currency = 'eur'
+    }
+
+    this.elements = this.stripe.elements(elementsOptions)
 
     // Create and mount Payment Element
     this.paymentElement = this.elements.create('payment')
-    this.paymentElement.mount(this.elementTarget)
+
+    // Ensure target exists and is visible
+    if (!this.hasElementTarget) {
+      throw new Error('Payment Element target not found')
+    }
+
+    try {
+      this.paymentElement.mount(this.elementTarget)
+      console.log('[OnePageStripeController] Payment Element mounted successfully')
+    } catch (error) {
+      console.error('[OnePageStripeController] Failed to mount Payment Element:', error)
+      throw error
+    }
 
     console.log('[OnePageStripeController] Payment Element initialized')
   }
@@ -279,7 +365,7 @@ export default class extends withEventBus(Controller) {
   /**
    * Confirm payment with Stripe SDK
    *
-   * @param {string} clientSecret - Stripe PaymentIntent client secret
+   * @param {string} clientSecret - Stripe PaymentIntent client secret (not used - Elements already has it)
    * @returns {Promise<Object>} - Payment result
    */
   async confirmPayment(clientSecret) {
@@ -287,14 +373,11 @@ export default class extends withEventBus(Controller) {
       throw new Error('Stripe SDK not initialized')
     }
 
-    console.log('[OnePageStripeController] Confirming payment with Stripe...')
-
-    // Update elements with client secret
-    this.elements.update({
-      clientSecret: clientSecret,
+    console.log('[OnePageStripeController] Confirming payment with Stripe...', {
+      hasClientSecret: !!clientSecret
     })
 
-    // Confirm payment
+    // Confirm payment (Elements instance already has the client secret)
     const result = await this.stripe.confirmPayment({
       elements: this.elements,
       confirmParams: {
@@ -410,5 +493,71 @@ export default class extends withEventBus(Controller) {
       this.errorTarget.style.display = 'none'
       this.errorTarget.textContent = ''
     }
+  }
+
+  /**
+   * API: Create payment contract
+   *
+   * @param {string} paymentMethodId - Payment method ID
+   * @returns {Promise<Object>} - Contract result with clientSecret
+   */
+  async createContract(paymentMethodId) {
+    const apiUrl = this.apiUrlValue || '/index.php?cl=OeCheckoutApi'
+
+    console.log('[OnePageStripeController] Creating contract via API:', apiUrl)
+
+    const response = await fetch(`${apiUrl}&fnc=processCheckout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        paymentMethodId: paymentMethodId,
+        returnUrl: this.returnUrlValue,
+        cancelUrl: window.location.href,
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json()
+    console.log('[OnePageStripeController] Contract API response:', data)
+
+    return data
+  }
+
+  /**
+   * API: Place order
+   *
+   * @param {string} contractId - Contract ID
+   * @returns {Promise<Object>} - Order result
+   */
+  async placeOrder(contractId) {
+    const apiUrl = this.apiUrlValue || '/index.php?cl=OeCheckoutApi'
+
+    console.log('[OnePageStripeController] Placing order via API:', apiUrl)
+
+    const response = await fetch(`${apiUrl}&fnc=placeOrder`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contractId: contractId,
+        confirmTermsAndConditions: true,  // Already confirmed by footer
+        remark: ''
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json()
+    console.log('[OnePageStripeController] Order API response:', data)
+
+    return data
   }
 }

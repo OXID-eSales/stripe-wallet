@@ -21,6 +21,10 @@
  # @see docs/FOOTER_REFACTORING.md
  # @see resources/build/js/controllers/stripe_checkout_footer_controller.js
  #}
+
+{# Include Stripe Payment Element Controller - handles API calls and Stripe SDK #}
+{% include '@oe_payments_stripe_wallet/frontend/onepage-checkout-stripe-element.html.twig' ignore missing %}
+
 <div class="checkout-footer-stripe"
      data-controller="stripe-checkout-footer"
      data-stripe-checkout-footer-basket-id-value="{{ checkoutData.basketId }}"

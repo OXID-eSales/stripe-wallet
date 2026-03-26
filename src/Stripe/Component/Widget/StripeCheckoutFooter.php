@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Component\Widget;
 
 use OxidEsales\Eshop\Application\Component\Widget\WidgetController;
+use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
 
@@ -124,6 +125,11 @@ class StripeCheckoutFooter extends WidgetController
     {
         $config = $this->getStripeConfig();
 
+        // Get base URLs for API and return/cancel
+        $baseUrl = Registry::getConfig()->getSslShopUrl();
+        $apiUrl = $baseUrl . 'index.php?cl=OeCheckoutApi';
+        $returnUrl = $baseUrl . 'index.php?cl=order';
+
         if (!$config) {
             return [
                 'mode' => 'test',
@@ -131,6 +137,8 @@ class StripeCheckoutFooter extends WidgetController
                 'termsUrl' => $this->getStripeTermsUrl(),
                 'privacyUrl' => $this->getStripePrivacyUrl(),
                 'isConfigured' => false,
+                'apiUrl' => $apiUrl,
+                'returnUrl' => $returnUrl,
             ];
         }
 
@@ -140,6 +148,8 @@ class StripeCheckoutFooter extends WidgetController
             'termsUrl' => $this->getStripeTermsUrl(),
             'privacyUrl' => $this->getStripePrivacyUrl(),
             'isConfigured' => !empty($config->getPublishableKey()),
+            'apiUrl' => $apiUrl,
+            'returnUrl' => $returnUrl,
         ];
     }
 

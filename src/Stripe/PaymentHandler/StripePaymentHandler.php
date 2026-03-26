@@ -22,6 +22,8 @@ use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Module;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
+use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
+use OxidEsales\PaymentComponent\Service\TokenServiceInterface;
 use Psr\Log\LoggerInterface;
 use Stripe\PaymentIntent;
 
@@ -50,6 +52,8 @@ final class StripePaymentHandler implements PaymentHandlerInterface
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,
         private readonly ContractRepositoryInterface $contractRepository,
+        private readonly CheckoutSessionServiceInterface $checkoutSessionService,
+        private readonly TokenServiceInterface $tokenService,
         private readonly LoggerInterface $logger
     ) {
     }
@@ -120,52 +124,48 @@ final class StripePaymentHandler implements PaymentHandlerInterface
                 basketSnapshot: $basketSnapshot
             );
 
-            // 3. Create Stripe PaymentIntent BEFORE saving contract
-            // We need the contract temporarily to link PaymentIntent metadata
-            $paymentIntent = $this->createPaymentIntent($basket, $user, $contract);
-
-            // 4. Set provider information and store PaymentIntent ID
-            $contract->setProvider(self::HANDLER_ID, $paymentMethodId);
-            $contract->setProviderOrderId($paymentIntent->id);
-
-            // 5. Store metadata
-            $contract->setMetadata('payment_method_id', $paymentMethodId);
-            $contract->setMetadata('handler', self::HANDLER_ID);
-            $contract->setMetadata('payment_intent_id', $paymentIntent->id);
-            $contract->setMetadata('stripe_amount', $paymentIntent->amount);
-            $contract->setMetadata('stripe_currency', $paymentIntent->currency);
-
-            // 6. Add payment condition (required for state transitions)
-            // Note: Condition will be fulfilled AFTER Stripe confirms payment (webhook or confirmPayment)
+            // 3. Add payment condition (required for state transitions)
             $paymentCondition = new ContractCondition(
                 ContractCondition::TYPE_PAYMENT_AUTHORIZED
             );
             $contract->addCondition($paymentCondition);
 
-            // 7. Save contract in DRAFT state
-            // IMPORTANT: State transitions will happen later:
-            // - Frontend confirms payment with Stripe
-            // - Webhook or confirmPayment() fulfills payment condition
-            // - placeOrder() performs early order creation and state transitions
+            // 4. Save contract in DRAFT state BEFORE creating Checkout Session
             $this->contractRepository->save($contract);
 
-            $this->logger->info('[StripePaymentHandler] Contract created successfully', [
+            // 5. Create Stripe Checkout Session (redirect URL)
+            $checkoutSession = $this->createCheckoutSession($basket, $user, $contract);
+
+            // 6. Set provider information with session ID and redirect URL
+            $contract->setProvider(self::HANDLER_ID, $checkoutSession['sessionId'], $checkoutSession['checkoutUrl']);
+
+            // 7. Store metadata
+            $contract->setMetadata('payment_method_id', $paymentMethodId);
+            $contract->setMetadata('handler', self::HANDLER_ID);
+            $contract->setMetadata('checkout_session_id', $checkoutSession['sessionId']);
+            $contract->setMetadata('stripe_amount', $basketSnapshot->getTotalGross());
+            $contract->setMetadata('stripe_currency', $currency->name ?? 'EUR');
+
+            // 8. Update contract with session info
+            $this->contractRepository->save($contract);
+
+            $this->logger->info('[StripePaymentHandler] Checkout Session created successfully', [
                 'contractId' => $contract->getId(),
-                'paymentIntentId' => $paymentIntent->id,
-                'amount' => $paymentIntent->amount,
+                'sessionId' => $checkoutSession['sessionId'],
+                'checkoutUrl' => $checkoutSession['checkoutUrl'],
                 'state' => 'draft',
             ]);
 
-            // 8. Return success with contractId AND clientSecret
+            // 9. Return success with contractId AND redirectUrl
             return PaymentHandlerResult::success(
                 contractId: $contract->getId(),
-                clientSecret: $paymentIntent->client_secret ?? '',
+                clientSecret: '', // Not needed for Checkout Session
                 metadata: [
                     'provider' => self::HANDLER_ID,
-                    'paymentIntentId' => $paymentIntent->id,
-                    'amount' => $paymentIntent->amount,
-                    'currency' => $paymentIntent->currency,
-                    'requiresConfirmation' => true,
+                    'sessionId' => $checkoutSession['sessionId'],
+                    'checkoutUrl' => $checkoutSession['checkoutUrl'],
+                    'requiresRedirect' => true,
+                    'redirectUrl' => $checkoutSession['checkoutUrl'],
                     'state' => 'draft',
                 ]
             );
@@ -248,48 +248,56 @@ final class StripePaymentHandler implements PaymentHandlerInterface
     }
 
     /**
-     * Create Stripe PaymentIntent for the basket.
+     * Create Stripe Checkout Session for redirect-based payment.
      *
-     * Links PaymentIntent with PaymentContract for tracking.
+     * @return array{sessionId: string, checkoutUrl: string}
      */
-    private function createPaymentIntent(Basket $basket, User $user, PaymentContract $contract): PaymentIntent
+    private function createCheckoutSession(Basket $basket, User $user, PaymentContract $contract): array
     {
-        $adapter = $this->getAdapter();
+        $config = Registry::getConfig();
+        $shopUrl = $config->getSslShopUrl();
+        $sessionId = Registry::getSession()->getId();
 
-        // Get basket total in cents
-        $amount = (int) round($basket->getPrice()->getBruttoPrice() * 100);
-        $currency = strtolower($basket->getBasketCurrency()->name);
+        // Build URLs - use simpler success URL for one-page checkout
+        // Frontend will handle placeOrder() call after return
+        $contractId = $contract->getId();
+        $successUrl = $shopUrl . 'index.php?cl=OeCheckoutApi&fnc=stripeSuccess&contractId=' . urlencode($contractId);
+        $cancelUrl = $shopUrl . 'index.php?cl=basket';
 
-        // Get customer email
-        /** @phpstan-ignore-next-line OXID core: magic property */
-        $customerEmail = $user->oxuser__oxusername->value;
-
-        // Create PaymentIntent via Stripe SDK
-        // Note: We link contractId in metadata so webhooks can find the contract
-        $paymentIntent = \Stripe\PaymentIntent::create([
-            'amount' => $amount,
-            'currency' => $currency,
-            'metadata' => [
-                'module' => Module::MODULE_ID,
-                'paymentMethodId' => 'oe_payments_stripe_wallet',
-                'contractId' => $contract->getId(),
-                'shopId' => $contract->getShopId(),
-                'userId' => $contract->getUserId(),
-            ],
-            'receipt_email' => $customerEmail ?: null,
-            'automatic_payment_methods' => [
-                'enabled' => true,
-            ],
-        ]);
-
-        $this->logger->info('[StripePaymentHandler] PaymentIntent created', [
-            'paymentIntentId' => $paymentIntent->id,
+        $this->logger->info('[StripePaymentHandler] Creating Checkout Session', [
             'contractId' => $contract->getId(),
-            'amount' => $amount,
-            'currency' => $currency,
+            'successUrl' => $successUrl,
+            'cancelUrl' => $cancelUrl,
         ]);
 
-        return $paymentIntent;
+        // Create Checkout Session via service
+        $result = $this->checkoutSessionService->createSession(
+            contractId: $contract->getId(),
+            basketSnapshot: $contract->getBasketSnapshot(),
+            successUrl: $successUrl,
+            cancelUrl: $cancelUrl,
+            shopId: (string) $contract->getShopId(),
+            captureMode: 'automatic', // Auto-capture for one-page checkout
+            orderId: null, // No order yet
+            orderNumber: null, // No order number yet
+            stripeCustomerId: null // TODO: Support saved cards
+        );
+
+        if (!$result->isSuccessful()) {
+            throw new \RuntimeException(
+                'Failed to create Stripe Checkout Session: ' . ($result->getErrorMessage() ?? 'Unknown error')
+            );
+        }
+
+        $this->logger->info('[StripePaymentHandler] Checkout Session created', [
+            'sessionId' => $result->getSessionId(),
+            'checkoutUrl' => $result->getCheckoutUrl(),
+        ]);
+
+        return [
+            'sessionId' => $result->getSessionId() ?? '',
+            'checkoutUrl' => $result->getCheckoutUrl() ?? '',
+        ];
     }
 
     /**

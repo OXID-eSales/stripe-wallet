@@ -18,10 +18,15 @@
  # @see docs/boilerplate/payment-provider-template/views/twig/.../provider-element.html.twig
  #}
 
-{% set stripeConfig = oViewConf.getStripeConfig() %}
+{#
+  This template is ONLY used in widget context.
+  Configuration is passed as 'stripeConfig' parameter by StripeCheckoutFooter widget.
+  If this template is included elsewhere, the parent must provide stripeConfig.
+#}
 {% set publishableKey = stripeConfig.publishableKey ?? '' %}
 {% set mode = stripeConfig.mode ?? 'test' %}
-{% set returnUrl = oViewConf.getSslSelfLink() ~ 'cl=order' %}
+{% set returnUrl = stripeConfig.returnUrl ?? '' %}
+{% set apiUrl = stripeConfig.apiUrl ?? '' %}
 
 <div class="stripe-onepage-checkout-wrapper"
      data-controller="onepage-stripe"
@@ -29,6 +34,7 @@
      data-onepage-stripe-publishable-key-value="{{ publishableKey }}"
      data-onepage-stripe-mode-value="{{ mode }}"
      data-onepage-stripe-return-url-value="{{ returnUrl }}"
+     data-onepage-stripe-api-url-value="{{ apiUrl }}"
      style="display: none;">
 
     {# Stripe Payment Element Container #}
@@ -68,14 +74,15 @@
     </div>
 
     {# Debug Information (Development Only) #}
-    {% if oViewConf.isStripeDebugMode() %}
+    {% if isDebugMode is defined and isDebugMode %}
         <div class="stripe-debug alert alert-info mt-3">
-            <strong>{{ translate({ ident: "STRIPE_DEBUG_MODE" }) }}</strong>
+            <strong>{{ translate({ ident: "STRIPE_DEBUG_MODE" }) | default("Debug Mode") }}</strong>
             <ul class="mb-0 mt-2 small">
                 <li>Mode: <code>{{ mode }}</code></li>
                 <li>Publishable Key: <code>{{ publishableKey|slice(0, 20) }}...</code></li>
                 <li>Controller: <code>onepage-stripe</code></li>
                 <li>Return URL: <code>{{ returnUrl }}</code></li>
+                <li>API URL: <code>{{ apiUrl }}</code></li>
             </ul>
         </div>
     {% endif %}

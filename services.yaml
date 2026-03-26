@@ -837,7 +837,10 @@ services:
   # ==========================================
 
   # PaymentController - Extended OXID PaymentController with Stripe payment integration
+  # Note: Uses lazy service retrieval instead of constructor injection
+  # because OXID's class chain mechanism bypasses DI container (oxNew).
   OxidEsales\Payments\Stripe\Controller\PaymentController:
+    autowire: false
     tags:
       - { name: oxid.view_controller, controller_key: payment }
     public: true
@@ -872,11 +875,13 @@ services:
 
   # Stripe Payment Handler - Implements PaymentHandlerInterface for one-page checkout
   # Automatically registered via Symfony tagged service
-  # Updated to create PaymentContract directly (same pattern as StandardPaymentHandler)
+  # Uses Stripe Checkout Session (redirect flow) instead of Payment Element
   OxidEsales\Payments\Stripe\PaymentHandler\StripePaymentHandler:
     arguments:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $checkoutSessionService: '@OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface'
+      $tokenService: '@OxidEsales\PaymentComponent\Service\TokenServiceInterface'
       $logger: '@Psr\Log\LoggerInterface'
     tags:
       - { name: oe.payment.handler }
