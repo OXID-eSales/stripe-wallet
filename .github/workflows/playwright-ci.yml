@@ -2,6 +2,8 @@ name: Playwright E2E
 
 on:
   push:
+    branches:
+      - b-7.4.x
   workflow_dispatch:
 
 env:
