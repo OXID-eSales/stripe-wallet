@@ -1,0 +1,95 @@
+name: Playwright E2E
+
+on:
+  push:
+  workflow_dispatch:
+
+env:
+  SHOP_PATH: /var/www/oxid/oxid75
+  MODULE_PATH: /var/www/oxid/oxid75/source/extensions/stripe
+  PLAYWRIGHT_PATH: tests/e2e/playwright/playwright
+
+jobs:
+  deploy:
+    name: Deploy & activate module
+    runs-on: [arc-runner-set]
+    steps:
+      - name: Checkout module on remote shop
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SHOP_HOST }}
+          username: ${{ secrets.SHOP_SSH_USER }}
+          key: ${{ secrets.SHOP_SSH_KEY }}
+          script: |
+            cd ${{ env.MODULE_PATH }}
+            git fetch origin
+            git checkout ${{ github.ref_name }}
+            git reset --hard origin/${{ github.ref_name }}
+
+      - name: Update dependencies and activate module
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SHOP_HOST }}
+          username: ${{ secrets.SHOP_SSH_USER }}
+          key: ${{ secrets.SHOP_SSH_KEY }}
+          script: |
+            cd ${{ env.SHOP_PATH }}
+            make php CMD="composer update --no-interaction"
+            make php CMD="bin/oe-console oe:module:deactivate oe_payments_stripe_wallet"
+            make php CMD="bin/oe-console oe:module:activate oe_payments_stripe_wallet"
+            make php CMD="bin/oe-console o:c:c"
+
+  playwright:
+    name: Run Playwright tests
+    needs: deploy
+    runs-on: [arc-runner-set]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          submodules: true
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Verify Playwright submodule branch
+        run: |
+          cd ${{ env.PLAYWRIGHT_PATH }}
+          ls -la
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        working-directory: ${{ env.PLAYWRIGHT_PATH }}
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Create .env
+        working-directory: ${{ env.PLAYWRIGHT_PATH }}
+        run: |
+          rm .env
+          cat <<EOF > .env
+          SHOP_URL=${{ secrets.SHOP_HOME_URL }}
+          ADMIN_URL=${{ secrets.SHOP_HOME_URL }}/admin/
+          TEST_USER_EMAIL=${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD=${{ secrets.TEST_USER_PASSWORD }}
+          HEADLESS=true
+          EOF
+
+      - name: Run Playwright tests
+        working-directory: ${{ env.PLAYWRIGHT_PATH }}
+        env:
+          CI: true
+        run: npx playwright test
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            ${{ env.PLAYWRIGHT_PATH }}/reports/html-report/
+            ${{ env.PLAYWRIGHT_PATH }}/reports/test-results/
+          retention-days: 14
