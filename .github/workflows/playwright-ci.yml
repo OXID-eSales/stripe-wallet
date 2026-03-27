@@ -71,7 +71,7 @@ jobs:
       - name: Create .env
         working-directory: ${{ env.PLAYWRIGHT_PATH }}
         run: |
-          rm .env
+          ls -la
           cat <<EOF > .env
           SHOP_URL=${{ secrets.SHOP_HOME_URL }}
           ADMIN_URL=${{ secrets.SHOP_HOME_URL }}/admin/
@@ -94,4 +94,4 @@ jobs:
           path: |
             ${{ env.PLAYWRIGHT_PATH }}/reports/html-report/
             ${{ env.PLAYWRIGHT_PATH }}/reports/test-results/
-          retention-days: 14
+          retention-days: 2
