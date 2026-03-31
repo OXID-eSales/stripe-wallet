@@ -23,6 +23,7 @@ use OxidEsales\Payments\Stripe\Core\Events as StripeEvents;
 use OxidEsales\Payments\Stripe\Core\ViewConfig as StripeViewConfig;
 use OxidEsales\Payments\Stripe\Model\Order as StripeOrderModel;
 use OxidEsales\Payments\Stripe\Model\Payment as StripePaymentModel;
+use OxidEsales\Payments\Stripe\Component\Widget\StripeCheckoutFooter;
 use OxidEsales\Payments\Stripe\Module;
 
 /**
@@ -62,6 +63,7 @@ $aModule = [
         'StripeWebhookController' => StripeWebhookController::class,
         'StripeConnect' => StripeConnect::class,
         'OrderRefund' => OrderRefund::class,
+        'stripecheckoutfooter' => StripeCheckoutFooter::class,
     ],
     'events' => [
         'onActivate' => StripeEvents::class . '::onActivate',
