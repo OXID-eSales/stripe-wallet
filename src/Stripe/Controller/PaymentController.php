@@ -11,6 +11,7 @@ namespace OxidEsales\Payments\Stripe\Controller;
 
 use OxidEsales\Eshop\Application\Controller\PaymentController as CorePaymentController;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Module;
 
@@ -33,7 +34,9 @@ class PaymentController extends CorePaymentController
     private function getStripeConfig(): ModuleConfigurationServiceInterface
     {
         if ($this->stripeConfig === null) {
-            $this->stripeConfig = Registry::get(ModuleConfigurationServiceInterface::class);
+            // Get service from DI container (Registry::get() doesn't work with interfaces)
+            $container = ContainerFactory::getInstance()->getContainer();
+            $this->stripeConfig = $container->get(ModuleConfigurationServiceInterface::class);
         }
 
         return $this->stripeConfig;
