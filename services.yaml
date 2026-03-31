@@ -32,6 +32,16 @@ services:
     public: false
 
   # ===========================================
+  # One-Page-Checkout Integration (Sprint 80)
+  # ===========================================
+
+  OxidEsales\Payments\Stripe\PaymentHandler\StripePaymentHandler:
+    tags:
+      - { name: oe.payment.handler }
+    public: true
+
+
+  # ===========================================
   # Event System (Component Level)
   # ===========================================
 
@@ -838,6 +848,8 @@ services:
 
   # PaymentController - Extended OXID PaymentController with Stripe payment integration
   OxidEsales\Payments\Stripe\Controller\PaymentController:
+    arguments:
+      - '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
     tags:
       - { name: oxid.view_controller, controller_key: payment }
     public: true

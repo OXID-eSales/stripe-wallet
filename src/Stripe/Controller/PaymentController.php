@@ -13,7 +13,6 @@ use OxidEsales\Eshop\Application\Controller\PaymentController as CorePaymentCont
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
-use OxidEsales\Payments\Stripe\Module;
 use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
 
 /**
@@ -24,14 +23,9 @@ class PaymentController extends CorePaymentController
 {
     use ServiceContainer;
 
-    private ModuleConfigurationServiceInterface $stripeConfig;
-
-    public function __construct(
-        ModuleConfigurationServiceInterface $stripeConfig
-    ) {
-        parent::__construct();
-
-        $this->stripeConfig = $stripeConfig;
+    private function getStripeConfig(): ModuleConfigurationServiceInterface
+    {
+        return $this->getServiceFromContainer(ModuleConfigurationServiceInterface::class);
     }
 
     /**
@@ -95,7 +89,7 @@ class PaymentController extends CorePaymentController
 
         // Additional Stripe-specific validation
         if ($this->isStripeSelected()) {
-            if (!$this->stripeConfig->isConfigured()) {
+            if (!$this->getStripeConfig()->isConfigured()) {
                 Registry::getUtilsView()->addErrorToDisplay(
                     'Payment method temporarily unavailable'
                 );
@@ -105,7 +99,7 @@ class PaymentController extends CorePaymentController
             // Validate minimum order amount
             $basket = Registry::getSession()->getBasket();
             $total = $basket->getPrice()->getBruttoPrice();
-            $minimumAmount = $this->stripeConfig->getMinimumOrderAmount();
+            $minimumAmount = $this->getStripeConfig()->getMinimumOrderAmount();
 
             if ($total < $minimumAmount) {
                 /** @var string $currencyName */
