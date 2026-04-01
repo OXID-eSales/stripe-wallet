@@ -168,7 +168,8 @@
                 <td class="edittext">
                     {% set transactionId = order.getFieldData('oxtransid') %}
                     {% if transactionId starts with 'pi_' %}
-                        <a href="https://dashboard.stripe.com/payments/{{ transactionId }}" target="_blank" title="Open in Stripe Dashboard">
+                        {% set dashboardPrefix = isTestMode ? '/test' : '' %}
+                        <a href="https://dashboard.stripe.com{{ dashboardPrefix }}/payments/{{ transactionId }}" target="_blank" title="Open in Stripe Dashboard">
                             {{ transactionId }}
                         </a>
                     {% else %}

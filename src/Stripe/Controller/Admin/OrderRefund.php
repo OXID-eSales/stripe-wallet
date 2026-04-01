@@ -57,6 +57,16 @@ class OrderRefund extends AdminDetailsController
             $this->_aViewData["edit"] = $oOrder;
         }
 
+        try {
+            $container = ContainerFactory::getInstance()->getContainer();
+            $configService = $container->get(
+                \OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface::class
+            );
+            $this->_aViewData["isTestMode"] = $configService->isTestMode();
+        } catch (\Throwable $e) {
+            $this->_aViewData["isTestMode"] = false;
+        }
+
         return $this->_sThisTemplate;
     }
 

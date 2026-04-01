@@ -40,7 +40,6 @@ services:
       - { name: oe.payment.handler }
     public: true
 
-
   # ===========================================
   # Event System (Component Level)
   # ===========================================
