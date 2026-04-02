@@ -8,15 +8,19 @@
 
 This sprint establishes a comprehensive load testing framework for the Stripe payment module using k6 at the HTTP protocol level. The existing Playwright e2e tests (83 specs, 97.5% pass rate) validate UI correctness; this sprint validates **backend resilience, data consistency, and performance** under realistic concurrent traffic.
 
-## Why k6, Not Playwright for Load?
+## Why k6 Browser Module?
 
-Playwright runs a full Chromium browser per virtual user — at 100 concurrent users, that's 100 browsers consuming ~300MB RAM each = **30GB RAM minimum**. Impossible.
+k6's browser module runs Chromium under the hood — same engine as Playwright — but with load testing primitives: `ramping-arrival-rate` executor, thresholds, custom metrics, JSON export.
 
-k6 runs at the HTTP level — 100 virtual users consume ~50MB total. It can simulate thousands of users from a single machine.
+**Why not raw Playwright for load?** Playwright has no built-in load orchestration. You'd need custom wrappers for ramp-up, concurrent VUs, metrics collection, and CI thresholds.
 
-**The two tools are complementary:**
-- **Playwright** answers: "Does the UI work correctly?" (functional correctness)
-- **k6** answers: "Does the backend hold up under load?" (performance + data integrity)
+**Why not k6 HTTP-only?** Stripe Checkout is a hosted page (checkout.stripe.com) that requires browser interaction — filling card forms, handling 3DS iframes, JS-rendered UI. HTTP-level requests can't replicate this.
+
+**k6 browser = best of both:**
+- Same Chromium browser interactions as Playwright
+- Same test data (cards, coupons, selectors) from `stripe-test-cards.ts`
+- Built-in load orchestration, thresholds, and CI/CD integration
+- k6 manages browser pool efficiently via arrival rate executor
 
 ## Scenario Design (SOLID)
 

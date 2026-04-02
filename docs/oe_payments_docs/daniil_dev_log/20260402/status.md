@@ -112,46 +112,127 @@ _Derived from: `tests/e2e/Checkout.spec.ts` — 3DS tests_
 
 ---
 
-### Sprint Steps
+### Sprint Subtasks
 
-| Step | Description | Status |
-|------|-------------|--------|
-| 1 | **Infrastructure Setup** — Provision k6 + InfluxDB + Grafana on pay1.oxid.dev or CI runner | todo |
-| 2 | **Stripe Test Data Seeding** — Create 200+ test users, seed coupon codes, ensure product stock | todo |
-| 3 | **Scenario 1: Happy Path** — k6 script with login → browse → basket → checkout → payment → verify | todo |
-| 4 | **Scenario 2: Cancellation** — k6 script simulating Stripe Checkout abandonment via API | todo |
-| 5 | **Scenario 3: Guest + Coupon** — k6 script for guest flow with discount codes | todo |
-| 6 | **Scenario 4: Payment Failure & Retry** — k6 script with declined cards and retry logic | todo |
-| 7 | **Scenario 5: 3DS Flow** — k6 script with 3DS card and authentication simulation | todo |
-| 8 | **Shared Helpers Module** — Extract reusable HTTP request builders (DRY from Playwright helpers) | todo |
-| 9 | **Threshold Definitions** — Codify pass/fail criteria as k6 thresholds (TDD: define before run) | todo |
-| 10 | **Baseline Run** — Single-user dry run per scenario to establish baseline metrics | todo |
-| 11 | **Ramp-Up Test** — 0 → 50 → 100 users/min, 13-minute full cycle | todo |
-| 12 | **Sustained Load Test** — 100 users/min for 30 minutes (extended endurance) | todo |
-| 13 | **Post-Run Validation** — DB consistency checks: orphan orders, contract states, coupon integrity | todo |
-| 14 | **Monitoring Dashboard** — Grafana dashboard for real-time metrics during load test | todo |
-| 15 | **CI Integration** — Docker Compose service for k6, triggered via `make load-test` | todo |
-| 16 | **Report & Analysis** — Document findings, bottlenecks, recommendations | todo |
+#### Phase 1: Foundation (CI + Infrastructure)
 
-**Overall status:** not started
+| # | Subtask | Files | Status | Notes |
+|---|---------|-------|--------|-------|
+| 1.1 | **GitHub Actions workflow** — `workflow_dispatch` with 5 inputs | `.github/workflows/load-test.yml` | done | 292 lines, 4 jobs |
+| 1.2 | **k6 orchestrator** — scenario builder, thresholds, re-exports | `tests/load/k6.config.js` | done | 85 lines, imports from helpers/ + scenarios/ |
+| 1.3 | **Helpers: config + metrics** — env vars, test data, custom k6 metrics | `tests/load/helpers/config.js`, `metrics.js` | done | Cards, coupons, users from Playwright fixtures |
+| 1.4 | **Helpers: auth** — login, cookie accept, language switch | `tests/load/helpers/auth.js` | done | Mirrors Helper.setupLoggedInSession() |
+| 1.5 | **Helpers: shop** — products, cart, checkout, coupon | `tests/load/helpers/shop.js` | done | Mirrors 5 Playwright Helper methods |
+| 1.6 | **Helpers: stripe** — card fill, pay, 3DS, thank you | `tests/load/helpers/stripe.js` | done | Mirrors StripeCheckoutPage + Helper 3DS/verify |
+| 1.7 | **Pre-flight job** — shop health + Stripe test mode check | `.github/workflows/load-test.yml` | done | Fails CI if Stripe mode != "test" |
+| 1.8 | **Post-validation job** — DB consistency queries | `.github/workflows/load-test.yml` | done | Orphan orders, stuck contracts, double-used coupons |
+
+#### Phase 2: Scenarios (k6 browser + Chromium)
+
+| # | Subtask | Traffic | File | Status | Notes |
+|---|---------|---------|------|--------|-------|
+| 2.1 | **Happy Path** — login → browse → cart → Stripe → card → 3DS → thank you | 40% | `scenarios/happy-path.js` | done | Full browser flow, mirrors Playwright Checkout.spec.ts |
+| 2.2 | **Cancellation** — same flow → `page.goBack()` from Stripe | 20% | `scenarios/cancellation.js` | done | Tests contract cleanup, no orphan orders |
+| 2.3 | **Guest + Coupon** — no login → cart → apply voucher → user step | 15% | `scenarios/guest-coupon.js` | done | Random coupon per iteration: E2E_10PCT/50PCT/5FLAT |
+| 2.4 | **Payment Failure + Retry** — declined card → error → retry with valid card | 15% | `scenarios/payment-failure.js` | done | Tests idempotency table + Stripe error display |
+| 2.5 | **3DS Flow** — 3DS card → iframe challenge → Complete → thank you | 10% | `scenarios/threeds.js` | done | Tests 3DS iframe interaction under load |
+
+#### Phase 3: Data Seeding
+
+| # | Subtask | Status | Notes |
+|---|---------|--------|-------|
+| 3.1 | **Seed 200 test users** via SSH in CI job | done | `loadtest_user_001..200@oxid-esales.dev`, password: `useruser` |
+| 3.2 | **Set product stock to 99999** | done | Prevents stock-out during test |
+| 3.3 | **Coupon pool** | done | Reusing Playwright coupons: `E2E_10PCT`, `E2E_50PCT`, `E2E_5FLAT` (same as e2e tests) |
+
+#### Phase 4: Refinement & Analysis
+
+| # | Subtask | Status | Notes |
+|---|---------|--------|-------|
+| 4.1 | **Dry-run validation** — 1 VU, 1 iteration, verify each scenario works | todo | First CI run |
+| 4.2 | **Baseline run** — 10 VU/min for 2 min, capture p95 metrics | todo | Establish reference |
+| 4.3 | **Full load run** — 100 VU/min for 10 min | todo | Primary test |
+| 4.4 | **Endurance run** — 100 VU/min for 30 min | todo | Memory leak / connection pool detection |
+| 4.5 | **Results analysis + report** — document bottlenecks, recommendations | todo | |
+
+**Overall status:** Phase 1-3 implemented (11 files, 851 lines), Phase 4 ready to execute
+
+**Completed subsprint docs (in `done/`):**
+- [Sprint 81a: Phase 1 — CI Infrastructure](done/sprint-81a-phase1-ci-infrastructure.md) — **done** (25 subtasks)
+- [Sprint 81b: Phase 2 — Browser Scenarios](done/sprint-81b-phase2-browser-scenarios.md) — **done** (5 scenarios, 20 subtasks)
+- [Sprint 81c: Phase 3 — Data Seeding](done/sprint-81c-phase3-data-seeding.md) — **done** (10 subtasks)
+- [Completion Report: Phases 1-3](done/report-sprint-81-phases-1-3.md) — decisions, issues found, dry-run results
+
+**Remaining (in `sprints/`):**
+- [Sprint 81d: Phase 4 — Execution & Analysis](sprints/sprint-81d-phase4-execution-analysis.md) — **blocked** (4 runs, 30 subtasks)
+
+**Blocker: OXID Session Not Preserved Across k6 Browser Navigations**
+
+Login works (Step 1). Products added via `page.evaluate(fetch(...))` (Step 2). But navigating to `cl=payment` (Step 3) gets a new `force_sid` — OXID creates a new empty session, basket is lost, redirects to `cl=start`.
+
+Root cause: OXID uses URL-based sessions (`force_sid`) when session cookies aren't available. k6 Chromium browser should carry cookies, but something (Cloudflare CF proxy, OXID `blSessionUseCookies` config, or HTTPS/SameSite cookie flags) prevents the session cookie from being sent with `page.goto()`.
+
+**Dry-run progress so far:**
+- Login: works (`#loginUser`, `#loginPwd`, `#loginButton` — same as Playwright)
+- Add to cart: works (via `page.evaluate(fetch(...))`)
+- Navigate to checkout: FAILS (session lost, `cl=payment` → `cl=start`)
+- Stripe, 3DS, thank you: untested
+
+**Next steps to unblock:**
+1. Investigate k6 browser cookie handling: `page.context().cookies()` to see what cookies exist
+2. Check if OXID sets `sid` or `oxidesales_session` cookie via `Set-Cookie` header
+3. If no cookie: try passing `force_sid` in all URLs (extract from login, thread through all helpers)
+4. Alternative: run against localhost (no Cloudflare) to isolate the issue
+
+---
+
+### CI Workflow: `load-test.yml`
+
+**Trigger:** Manual only (`workflow_dispatch`) — never runs on push/PR.
+
+**Inputs:**
+
+| Input | Options | Default | Purpose |
+|-------|---------|---------|---------|
+| `target_vus` | 10, 25, 50, 100, 200 | 100 | Virtual users per minute |
+| `duration` | 2, 5, 10, 20, 30 | 10 | Steady-state duration (minutes) |
+| `ramp_up` | 1, 2, 3, 5 | 2 | Ramp-up period (minutes) |
+| `scenario` | all, happy_path, cancellation, guest_coupon, payment_failure, threeds | all | Which scenario(s) to run |
+| `dry_run` | true/false | false | 1 VU, 1 iteration (smoke test) |
+
+**Jobs:**
+
+```
+pre-flight ──→ seed-data ──→ load-test ──→ post-validation
+   │                            │               │
+   │ Check shop health          │ Run k6         │ DB consistency
+   │ Verify Stripe test mode    │ Upload results │ Contract states
+   │                            │                │ Coupon integrity
+```
+
+**Artifacts:** `k6-results-{run_number}` (JSON + console output, 30-day retention)
+
+**File:** `.github/workflows/load-test.yml`
 
 ---
 
 ### Technical Architecture
 
-#### Tool Choice: k6 (Grafana Labs)
+#### Tool Choice: k6 Browser Module (Grafana Labs)
 
-**Why k6 over Playwright for load testing:**
-- Playwright e2e tests run at browser level (heavy, ~1 browser per VU) — unsuitable for 100+ concurrent users
-- k6 operates at HTTP/protocol level — lightweight, thousands of VUs per machine
-- k6 has native Stripe API support via HTTP requests
-- k6 thresholds provide built-in pass/fail for CI/CD
-- k6 exports metrics to InfluxDB/Grafana for real-time dashboards
+**Why k6 with browser module:**
+- k6 browser module uses Chromium — same engine as Playwright
+- Reuses Playwright test data: same cards, coupons, selectors, user flows
+- Full browser interaction: navigates shop UI, fills Stripe Checkout forms, handles 3DS
+- Built-in thresholds for CI/CD pass/fail
+- `ramping-arrival-rate` executor manages browser lifecycle efficiently
+- JSON metric export for post-analysis
 
-**Why we still keep Playwright e2e:**
-- Playwright validates UI rendering, JavaScript behavior, Stripe.js iframe interaction
-- k6 validates backend performance, API correctness, data consistency under load
-- **Complementary, not competing** — Playwright = correctness, k6 = performance
+**Relationship to Playwright e2e:**
+- Playwright e2e = functional correctness (83 specs, 97.5% pass rate)
+- k6 browser = same flows under concurrent load (100 VU/min)
+- k6 helpers mirror Playwright Helper.ts methods exactly (same selectors, same flow)
+- Test data shared: `stripe-test-cards.ts` values hardcoded in k6 config
 
 #### Project Structure (proposed)
 
@@ -285,16 +366,21 @@ export const options = {
 };
 ```
 
-#### Mapping Playwright Helpers → k6 Helpers
+#### Mapping Playwright Helpers → k6 Browser Functions
 
-| Playwright (Browser-Level) | k6 (HTTP-Level) | Notes |
-|---------------------------|-----------------|-------|
-| `Helper.setupLoggedInSession()` | `auth.login(user)` → cookie jar | HTTP POST to login endpoint |
-| `Helper.addProductToCart(url)` | `basket.addProduct(productId)` | POST to basket controller |
-| `Helper.applyCoupon(code)` | `basket.applyCoupon(code)` | POST to voucher controller |
-| `Helper.proceedToStripeCheckout()` | `checkout.initiateStripe()` | POST order → get Stripe session |
-| `StripeCheckoutPage.fillCardDetails()` | `stripe.confirmPayment(sessionId, card)` | Direct Stripe API call |
-| `ThankYouPage.verifyOrderSuccess()` | `assertions.checkOrderCreated()` | HTTP GET thank-you + status check |
+k6 browser module uses same Chromium selectors as Playwright. Functions mirror Helper.ts exactly:
+
+| Playwright Helper | k6 Function | Same Selectors |
+|-------------------|-------------|----------------|
+| `setupLoggedInSession()` | `loginAndSetup(page, user)` | `input[name="lgn_usr"]`, cookie accept |
+| `goToAxlePartsFromMenu()` + `addFirstTwoProducts...()` | `addProductsToCart(page)` | `#navigation .nav-item`, `#productList button.btn-highlight` |
+| `startCheckoutViaMiniBasket()` | `navigateToCheckout(page)` | `button[data-bs-target="#basketModal"]` |
+| `selectDigitalWalletPayment()` + `clickNext()` + `clickOrderNow()` | `selectStripeAndOrder(page)` | `#payment_oe_payments_stripe_wallet`, `#stripe-checkout-btn` |
+| `fillStripeCardDetailsWithCard()` | `fillStripeCard(page, card)` | `#cardNumber`, Card radio, `#cardExpiry`, `#cardCvc` |
+| `clickPayOnStripeCheckout()` | `clickStripePay(page)` | `[data-testid="hosted-payment-submit-button"]` |
+| `click3DSComplete()` | `handle3DS(page, 'Complete')` | `iframe#challengeFrame`, `#test-source-authorize-3ds` |
+| `assertThankYouPageAndGetOrderNumber()` | `verifyThankYou(page)` | `#thankyouPage`, regex `/order with number\s+(\d+)/` |
+| `applyCoupon(code)` | `applyCoupon(page, code)` | `input[name="voucherNr"]` |
 
 #### Post-Run Validation Queries
 
