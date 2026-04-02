@@ -1,0 +1,169 @@
+{#
+ # Stripe Checkout Footer Widget Template
+ #
+ # Self-contained: OPC knows nothing about Stripe.
+ # Self-registers a Stimulus controller with OPC's exported Controller base class.
+ #
+ # Flow:
+ # 1. Widget loaded by OPC FooterWidgetService (AJAX)
+ # 2. Script self-registers stripe-checkout-footer controller with OPC's Stimulus app
+ # 3. User clicks Pay → processCheckout API → gets redirectUrl → redirect to Stripe
+ # 4. After payment, Stripe redirects back to shop's checkoutSuccess handler
+ #}
+
+<div class="checkout-footer-stripe"
+     data-controller="stripe-checkout-footer"
+     data-stripe-checkout-footer-payment-method-value="{{ checkoutData.paymentMethodId }}"
+     data-stripe-checkout-footer-csrf-token-value="{{ checkoutData.csrfToken }}">
+
+    <div class="alert alert-danger mt-2"
+         data-stripe-checkout-footer-target="error"
+         style="display: none;" role="alert">
+        <i class="fas fa-exclamation-circle me-2"></i>
+        <span data-stripe-checkout-footer-target="errorMessage"></span>
+    </div>
+
+    <div class="d-flex justify-content-end align-items-center mt-3">
+        <button type="button" class="btn btn-primary btn-lg"
+                data-stripe-checkout-footer-target="submitButton"
+                data-checkout-footer-manager-target="submitButton"
+                data-action="click->stripe-checkout-footer#submitPayment"
+                disabled>
+            <span class="button-content">
+                <i class="fas fa-lock me-2"></i>
+                <span class="button-text">Pay with Stripe</span>
+            </span>
+            <span class="button-spinner d-none">
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                Redirecting to Stripe...
+            </span>
+        </button>
+    </div>
+
+    <div data-stripe-checkout-footer-target="loader"
+         class="stripe-loading-overlay" style="display: none;">
+        <div class="loading-content">
+            <div class="spinner-border text-primary mb-3" role="status"></div>
+            <p class="mb-0 text-muted">Redirecting to Stripe...</p>
+            <p class="small text-muted mt-2">Please do not close this window.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  var opc = window.OnepageCheckout;
+  if (!opc || !opc.stimulus || !opc.Controller) {
+    console.error('[StripeCheckoutFooter] OnepageCheckout not found - stimulus:', !!opc?.stimulus, 'Controller:', !!opc?.Controller);
+    return;
+  }
+
+  // Always register (idempotent) — needed for dynamic widget loading
+  var BaseController = opc.Controller;
+
+  class StripeCheckoutFooterController extends BaseController {
+    static values = {
+      paymentMethod: String,
+      csrfToken: String
+    }
+
+    static targets = [
+      'submitButton', 'error', 'errorMessage', 'loader'
+    ]
+
+    connect() {
+      console.log('[StripeCheckoutFooter] Connected (redirect mode)');
+      if (this.hasSubmitButtonTarget) {
+        this.submitButtonTarget.disabled = false;
+      }
+    }
+
+    async submitPayment(event) {
+      if (event) event.preventDefault();
+
+      this._showLoading();
+      this._hideError();
+
+      try {
+        // Step 1: Create checkout session via processCheckout API
+        var checkoutResult = await this._processCheckout();
+
+        if (!checkoutResult.success) {
+          throw new Error(checkoutResult.error || 'Failed to create checkout session');
+        }
+
+        // Step 2: Get redirect URL from metadata
+        var redirectUrl = checkoutResult.metadata && checkoutResult.metadata.redirectUrl;
+        if (!redirectUrl) {
+          throw new Error('No redirect URL returned from Stripe');
+        }
+
+        console.log('[StripeCheckoutFooter] Redirecting to Stripe checkout:', redirectUrl);
+
+        // Step 3: Redirect to Stripe hosted checkout page
+        window.location.href = redirectUrl;
+
+      } catch (err) {
+        console.error('[StripeCheckoutFooter] Payment failed:', err);
+        this._showError(err.message);
+        this._hideLoading();
+      }
+    }
+
+    async _processCheckout() {
+      var resp = await fetch('/index.php?cl=OeCheckoutApi&fnc=processCheckout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': this.csrfTokenValue
+        },
+        body: JSON.stringify({ paymentMethodId: this.paymentMethodValue })
+      });
+      if (!resp.ok) throw new Error('HTTP error: ' + resp.status);
+      var text = await resp.text();
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        console.error('[StripeCheckoutFooter] Invalid JSON response:', text.substring(0, 200));
+        throw new Error('Server returned invalid response. Please try again.');
+      }
+    }
+
+    _showError(msg) {
+      if (this.hasErrorTarget && this.hasErrorMessageTarget) {
+        this.errorMessageTarget.textContent = msg;
+        this.errorTarget.style.display = 'block';
+      }
+    }
+    _hideError() { if (this.hasErrorTarget) this.errorTarget.style.display = 'none'; }
+    _showLoading() {
+      if (this.hasSubmitButtonTarget) {
+        this.submitButtonTarget.disabled = true;
+        this.submitButtonTarget.classList.add('processing');
+      }
+      if (this.hasLoaderTarget) this.loaderTarget.style.display = 'flex';
+    }
+    _hideLoading() {
+      if (this.hasSubmitButtonTarget) {
+        this.submitButtonTarget.disabled = false;
+        this.submitButtonTarget.classList.remove('processing');
+      }
+      if (this.hasLoaderTarget) this.loaderTarget.style.display = 'none';
+    }
+  }
+
+  opc.stimulus.register('stripe-checkout-footer', StripeCheckoutFooterController);
+  console.log('[StripeCheckoutFooter] Registered with OnepageCheckout.stimulus');
+})();
+</script>
+
+<style>
+  .stripe-loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+  .stripe-loading-overlay .loading-content { background: #fff; padding: 2rem 3rem; border-radius: 8px; text-align: center; max-width: 400px; }
+  .checkout-footer-stripe button[disabled] { opacity: 0.6; cursor: not-allowed; }
+  .checkout-footer-stripe .button-spinner { display: none; }
+  .checkout-footer-stripe button.processing .button-content { display: none; }
+  .checkout-footer-stripe button.processing .button-spinner { display: inline-flex; align-items: center; }
+</style>
