@@ -122,7 +122,7 @@ mkdir -p /home/dtkachev/osc/strpwt7-nov26/source/extensions/payment-component/te
     "name": "oxid-esales/payment-component",
     "description": "Provider-agnostic payment component with smart-contract architecture",
     "type": "library",
-    "license": "GPL-3.0-only",
+    "license": "proprietary",
     "authors": [
         {
             "name": "OXID eSales AG",

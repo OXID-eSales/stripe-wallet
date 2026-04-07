@@ -394,7 +394,7 @@ CREATE TABLE IF NOT EXISTS oe_payments_basket_snapshot (
   "name": "osc/oxid-payment-stripe",
   "description": "OXID Payment Component with Stripe implementation",
   "type": "oxideshop-module",
-  "license": "GPL-3.0",
+  "license": "proprietary",
   "require": {
     "php": "^8.0",
     "psr/event-dispatcher": "^1.0",

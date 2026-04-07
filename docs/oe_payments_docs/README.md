@@ -454,7 +454,7 @@ Contact OXID eSales development team
 
 This documentation is part of the OXID Paymenter module developed by OXID eSales AG.
 
-GPL-3.0 License - See LICENSE file in repository root.
+proprietary License - See LICENSE file in repository root.
 
 ---
 

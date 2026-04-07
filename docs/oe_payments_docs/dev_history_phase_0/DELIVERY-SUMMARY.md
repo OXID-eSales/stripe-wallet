@@ -861,7 +861,7 @@ Review the documentation in order:
 **Additional Analysis:** Adyen, PayPal, Unzer modules + 5 provider APIs
 **Organization:** OXID eSales AG
 **Date:** 2025-10-16 (v3.0.0), 2025-10-09 (v1.0.0)
-**License:** GPL-3.0
+**License:** proprietary
 **Platform:** OXID eShop 7.4+ (compatible with 7.5, 8.0+)
 
 ---

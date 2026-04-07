@@ -349,5 +349,5 @@ Before switching to live mode:
 
 ---
 
-**License:** GPL-3.0
+**License:** proprietary
 **Copyright:** OXID eSales AG

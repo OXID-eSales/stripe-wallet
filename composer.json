@@ -18,7 +18,7 @@
   ],
   "homepage": "https://www.oxid-esales.com",
   "license": [
-    "GPL-3.0"
+    "proprietary"
   ],
   "conflict": {
     "oxid-esales/oxideshop-ce": "<7.4"
