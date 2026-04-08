@@ -70,26 +70,34 @@ class StripeRefundServiceTest extends TestCase
         $this->assertEquals($capturedAmount, $result['response']->amountRefunded);
     }
 
-    // 2. Rejects partial refund (Sprint 22: Stripe only supports full refunds)
-    public function testRejectsPartialRefund(): void
+    // 2. Sprint 87: Partial refund is now accepted (was rejected in Sprint 22)
+    public function testAcceptsPartialRefund(): void
     {
         $contractId = 'contract123';
         $providerOrderId = 'pi_stripe_123';
         $capturedAmount = 100.00;
-        $partialAmount = 30.00; // Less than full amount
+        $partialAmount = 30.00;
 
         $contract = $this->createMockContract($contractId, $providerOrderId, $capturedAmount, ContractState::fulfilled());
 
         $this->contractRepository->method('findById')->willReturn($contract);
         $this->transactionRepository->method('getTotalRefundedForContract')->willReturn(0.00);
 
-        // Stripe adapter should NOT be called for partial refunds
-        $this->stripeAdapter->expects($this->never())->method('refundPayment');
+        $this->stripeAdapter->method('refundPayment')->willReturn(
+            \OxidEsales\PaymentComponent\Adapter\Response\RefundResponse::success(
+                providerPaymentId: $providerOrderId,
+                refundId: 're_partial',
+                amountRefunded: $partialAmount,
+                currency: 'eur',
+                status: 'succeeded',
+                refundedAt: new \DateTimeImmutable()
+            )
+        );
 
-        $this->expectException(RefundFailedException::class);
-        $this->expectExceptionMessage('Stripe module only supports full refunds');
+        $result = $this->service->refund($contractId, $partialAmount);
 
-        $this->service->refund($contractId, $partialAmount);
+        $this->assertArrayHasKey('response', $result);
+        $this->assertEquals($partialAmount, $result['response']->amountRefunded);
     }
 
     // 3. Cannot refund uncommitted contract
@@ -107,7 +115,7 @@ class StripeRefundServiceTest extends TestCase
         $this->service->refund($contractId);
     }
 
-    // 4. Cannot refund more than captured amount (rejected as partial refund)
+    // 4. Cannot refund more than captured amount
     public function testCannotRefundMoreThanCaptured(): void
     {
         $contractId = 'contract123';
@@ -119,9 +127,8 @@ class StripeRefundServiceTest extends TestCase
         $this->contractRepository->method('findById')->willReturn($contract);
         $this->transactionRepository->method('getTotalRefundedForContract')->willReturn(0.00);
 
-        // Sprint 22: Attempting to refund amount != available is rejected as partial refund
         $this->expectException(RefundFailedException::class);
-        $this->expectExceptionMessage('Stripe module only supports full refunds');
+        $this->expectExceptionMessage('Cannot refund');
 
         $this->service->refund($contractId, $requestedAmount);
     }

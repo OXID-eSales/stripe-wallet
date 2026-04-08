@@ -7,7 +7,9 @@ namespace OxidEsales\Payments\Tests\Unit\Stripe\Service;
 use OxidEsales\PaymentComponent\Adapter\Request\CapturePaymentRequest;
 use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
+use OxidEsales\PaymentComponent\Contract\Transaction;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
@@ -31,6 +33,7 @@ class CaptureServiceTest extends TestCase
     private StripeAdapterFactoryInterface&MockObject $adapterFactory;
     private ContractRepositoryInterface&MockObject $repository;
     private ContractFulfillmentServiceInterface&MockObject $fulfillmentService;
+    private TransactionRepositoryInterface&MockObject $transactionRepository;
 
     protected function setUp(): void
     {
@@ -39,6 +42,7 @@ class CaptureServiceTest extends TestCase
         $this->adapterFactory->method('getStripeAdapter')->willReturn($this->adapter);
         $this->repository = $this->createMock(ContractRepositoryInterface::class);
         $this->fulfillmentService = $this->createMock(ContractFulfillmentServiceInterface::class);
+        $this->transactionRepository = $this->createMock(TransactionRepositoryInterface::class);
     }
 
     private function createService(): CaptureService
@@ -47,6 +51,7 @@ class CaptureServiceTest extends TestCase
             $this->adapterFactory,
             $this->repository,
             $this->fulfillmentService,
+            $this->transactionRepository,
             new NullLogger()
         );
     }
@@ -336,6 +341,65 @@ class CaptureServiceTest extends TestCase
         $result = $service->processCapture($contract, null, []);
 
         $this->assertTrue($result->isSuccessful());
+    }
+
+    // --- Sprint 84: Transaction recording ---
+
+    /**
+     * Sprint 84: Successful capture records a transaction in the repository.
+     */
+    public function testProcessCaptureRecordsTransaction(): void
+    {
+        $response = CaptureResponse::success(
+            providerPaymentId: 'pi_record',
+            captureId: 'ch_record',
+            amountCaptured: 99.99,
+            currency: 'eur',
+            status: 'succeeded',
+            capturedAt: new \DateTimeImmutable()
+        );
+
+        $this->adapter->method('capturePayment')->willReturn($response);
+
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getProviderOrderId')->willReturn('pi_record');
+        $contract->method('getId')->willReturn('contract_rec');
+        $contract->method('getOrderId')->willReturn('order_rec');
+        $contract->method('getState')->willReturn(
+            \OxidEsales\PaymentComponent\Contract\ContractState::committed()
+        );
+
+        $this->transactionRepository->expects($this->once())
+            ->method('save')
+            ->with($this->callback(function (Transaction $tx) {
+                return $tx->getType() === 'capture'
+                    && $tx->getStatus() === 'completed'
+                    && $tx->getAmount() === 99.99
+                    && $tx->getCurrency() === 'eur'
+                    && $tx->getContractId() === 'contract_rec'
+                    && $tx->getOrderId() === 'order_rec'
+                    && $tx->getTransactionId() === 'ch_record';
+            }));
+
+        $service = $this->createService();
+        $service->processCapture($contract, null, []);
+    }
+
+    /**
+     * Sprint 84: Failed capture does NOT record a transaction.
+     */
+    public function testProcessCaptureDoesNotRecordTransactionOnFailure(): void
+    {
+        $this->adapter->method('capturePayment')
+            ->willThrowException(new \Exception('Capture failed'));
+
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getProviderOrderId')->willReturn('pi_fail');
+
+        $this->transactionRepository->expects($this->never())->method('save');
+
+        $service = $this->createService();
+        $service->processCapture($contract, 10.00, []);
     }
 
     public function testProcessCapturePassesMetadataToAdapter(): void

@@ -137,22 +137,15 @@ class StripeRefundRequestHandler implements HandlerInterface
     }
 
     /**
-     * Execute full refund via RefundService.
+     * Execute refund via RefundService.
      *
-     * Sprint 22: Stripe module only supports full refunds.
+     * Sprint 87: Supports both full (amount=null) and partial refunds.
      */
     private function executeRefund(
         StripeRefundRequestEvent $event,
         string $orderId,
         string $paymentIntentId
     ): RefundResponse {
-        // Stripe module only supports full refunds
-        if (!$event->isFullRefund()) {
-            return RefundResponse::failure(
-                'Stripe module only supports full refunds. Use Stripe Dashboard for partial refunds.'
-            );
-        }
-
         $chargeId = $event->getChargeId();
         if ($chargeId !== null) {
             return $this->refundService->processRefundByCharge(

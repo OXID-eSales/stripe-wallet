@@ -218,13 +218,22 @@ case FAILED = 'failed';
 |---------|---------|
 | CheckoutSessionService | Creates Stripe Checkout sessions |
 | CheckoutReturnService | Validates return from Stripe |
-| CaptureService | Executes payment capture |
+| CaptureService | Executes payment capture (full + partial) |
 | CancelAuthorizationService | Cancels authorized payments |
-| RefundService | Executes refunds |
+| RefundService / StripeRefundService | Executes refunds (full + partial) |
+| StripeOrderApiService | Stripe API calls for admin (PaymentIntent, Charge) |
+| OxpaidReconciliationService | Self-healing for OXPAID timestamps |
 | ContractTokenService | Secure token generation |
 | ReturnSessionSecurityService | Return request validation |
 | RequestLogService | API request logging |
 | ModuleConfigurationService | Configuration access |
+| OrderContractResolver | Maps OXID orders to payment contracts |
+
+**Admin Services (Stripe tab):**
+| Service | Purpose |
+|---------|---------|
+| OrderRefundViewDataProvider | Stripe API data for admin template (captured/refundable amounts, transaction history) |
+| OrderActionDispatcher | Dispatches capture/refund/cancel events from admin (supports partial amounts) |
 
 ---
 

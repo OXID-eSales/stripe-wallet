@@ -11,6 +11,9 @@ namespace OxidEsales\Payments\Stripe\Model;
 
 use OxidEsales\Eshop\Core\Counter as EshopCoreCounter;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\Payments\Stripe\Service\StripeOrderApiService;
 
 /**
  * Stripe Order Model Extension
@@ -162,5 +165,87 @@ class Order extends Order_parent
 
         // For non-Stripe payments, use standard OXID validation
         return parent::validateDeliveryAddress($oUser);
+    }
+
+    // =========================================================================
+    // Stripe Amount Display (for order overview tab)
+    // =========================================================================
+
+    /**
+     * Get factual captured amount from Stripe, formatted.
+     * Returns empty string for non-Stripe orders.
+     */
+    public function getStripeCapturedAmount(): string
+    {
+        $charge = $this->getStripeCharge();
+        if ($charge === null) {
+            return '';
+        }
+
+        $amount = ((int) ($charge->amount_captured ?? 0)) / 100;
+        return $this->formatStripeAmount($amount);
+    }
+
+    /**
+     * Get refunded amount from Stripe, formatted.
+     * Returns empty string for non-Stripe orders or no refunds.
+     */
+    public function getStripeRefundedAmount(): string
+    {
+        $charge = $this->getStripeCharge();
+        if ($charge === null) {
+            return '';
+        }
+
+        $refunded = (int) ($charge->amount_refunded ?? 0);
+        if ($refunded <= 0) {
+            return '';
+        }
+
+        return $this->formatStripeAmount($refunded / 100);
+    }
+
+    /**
+     * Check if order has any Stripe refunds.
+     */
+    public function hasStripeRefunds(): bool
+    {
+        $charge = $this->getStripeCharge();
+        if ($charge === null) {
+            return false;
+        }
+
+        return ((int) ($charge->amount_refunded ?? 0)) > 0;
+    }
+
+    private function getStripeCharge(): ?\Stripe\Charge
+    {
+        /** @phpstan-ignore-next-line OXID core: magic property */
+        $paymentType = (string) ($this->oxorder__oxpaymenttype->value ?? '');
+        if (!StripeDefinitions::isStripePayment($paymentType)) {
+            return null;
+        }
+
+        try {
+            /** @var StripeOrderApiService $apiService */
+            $apiService = ContainerFactory::getInstance()->getContainer()->get(StripeOrderApiService::class);
+            /** @phpstan-ignore-next-line OXID core: virtual parent — $this is Order extension */
+            $paymentIntent = $apiService->getPaymentIntent($this);
+            if ($paymentIntent === null) {
+                return null;
+            }
+            return $apiService->getLastCharge($paymentIntent);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function formatStripeAmount(float $amount): string
+    {
+        /** @phpstan-ignore-next-line OXID core: magic property */
+        $currencyName = (string) ($this->oxorder__oxcurrency->value ?? '');
+        $currency = Registry::getConfig()->getCurrencyObject($currencyName);
+
+        return Registry::getLang()->formatCurrency($amount, $currency);
     }
 }

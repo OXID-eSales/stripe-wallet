@@ -462,6 +462,7 @@ services:
       $deliveryAddressHashService: '@OxidEsales\PaymentComponent\Service\DeliveryAddressHashServiceInterface'
       $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
       $sessionAdapter: '@OxidEsales\PaymentComponent\Adapter\SessionAdapterInterface'
+      $transactionRepository: '@OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
     tags:
@@ -621,6 +622,7 @@ services:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
       $contractFulfillmentService: '@OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface'
+      $transactionRepository: '@OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
     public: false
 
@@ -891,6 +893,7 @@ services:
       $orderPaymentStateService: '@OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface'
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
       $contractFulfillmentService: '@OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface'
+      $transactionRepository: '@OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
     public: false
 

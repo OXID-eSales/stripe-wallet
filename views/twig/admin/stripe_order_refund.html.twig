@@ -20,51 +20,161 @@
    ============================================================================ #}
 
 <style>
-    .refundTable TD {
-        padding-top: 10px;
-        padding-bottom: 10px;
+    /* Reset OXID admin styles within our container */
+    .stripe-admin,
+    .stripe-admin * {
+        box-sizing: border-box !important;
     }
-    TD.borderTop {
-        border-top: 1px solid black!important;
+    .stripe-admin {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+        font-size: 13px !important;
+        color: #1a1a2e !important;
+        padding: 16px !important;
+        max-width: 960px !important;
+        background: transparent !important;
     }
-    FIELDSET {
-        border-radius: 15px;
-        margin-bottom: 20px;
-        padding: 10px;
+    .stripe-admin table { border: none !important; background: none !important; }
+    .stripe-admin td, .stripe-admin th { border: none !important; background: none !important; }
+    .stripe-admin input[type="text"], .stripe-admin select { margin: 0 !important; }
+
+    /* Cards */
+    .stripe-admin .s-card {
+        background: #fff !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 8px !important;
+        margin-bottom: 16px !important;
+        overflow: hidden !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,.04) !important;
     }
-    FIELDSET.fullRefund SPAN{
-        margin-left: 2px;
+    .stripe-admin .s-card-header {
+        padding: 12px 16px !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        color: #1a1a2e !important;
+        border-bottom: 1px solid #e5e7eb !important;
+        background: #f9fafb !important;
     }
-    FIELDSET .refundSubmit,
-    FIELDSET .captureSubmit,
-    FIELDSET .cancelSubmit {
-        margin-top: 15px;
+    .stripe-admin .s-card-body {
+        padding: 16px !important;
     }
-    .typeSelect {
-        margin-bottom: 10px;
+
+    /* Alerts */
+    .stripe-admin .s-alert {
+        padding: 12px 16px !important;
+        border-radius: 8px !important;
+        margin-bottom: 12px !important;
+        font-size: 13px !important;
+        display: flex !important;
+        align-items: flex-start !important;
+        gap: 10px !important;
     }
-    FIELDSET.refundError {
-        background-color: #FF8282;
-        color: black;
-        border: 3px solid #F00000;
+    .stripe-admin .s-alert-success { background: #ecfdf5 !important; border: 1px solid #a7f3d0 !important; color: #065f46 !important; }
+    .stripe-admin .s-alert-danger  { background: #fef2f2 !important; border: 1px solid #fecaca !important; color: #991b1b !important; }
+    .stripe-admin .s-alert-warning { background: #fffbeb !important; border: 1px solid #fde68a !important; color: #92400e !important; }
+    .stripe-admin .s-alert-info    { background: #eff6ff !important; border: 1px solid #bfdbfe !important; color: #1e40af !important; }
+    .stripe-admin .s-alert strong  { font-weight: 600 !important; }
+
+    /* Detail table (key-value pairs) */
+    .stripe-admin .s-details { width: 100%; border-collapse: collapse; }
+    .stripe-admin .s-details td { padding: 8px 16px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+    .stripe-admin .s-details tr:last-child td { border-bottom: none; }
+    .stripe-admin .s-details .s-label { font-weight: 500; color: #6b7280; width: 200px; white-space: nowrap; }
+    .stripe-admin .s-details .s-value { color: #111827; }
+
+    /* Data table (transaction history) */
+    .stripe-admin .s-table { width: 100% !important; border-collapse: collapse !important; }
+    .stripe-admin .s-table th {
+        padding: 8px 12px !important;
+        text-align: left !important;
+        font-weight: 600 !important;
+        font-size: 11px !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        color: #6b7280 !important;
+        background: #f9fafb !important;
+        border-bottom: 1px solid #e5e7eb !important;
     }
-    FIELDSET.refundNotice {
-        background-color: #ffeeb5;
-        border: 3px solid #FFE385;
+    .stripe-admin .s-table th.text-right { text-align: right !important; }
+    .stripe-admin .s-table td { padding: 10px 12px !important; border-bottom: 1px solid #f3f4f6 !important; vertical-align: middle !important; }
+    .stripe-admin .s-table tr:last-child td { border-bottom: none !important; }
+    .stripe-admin .s-table tr:hover td { background: #f9fafb !important; }
+
+    /* Badges */
+    .stripe-admin .s-badge {
+        display: inline-block !important;
+        padding: 2px 8px !important;
+        border-radius: 4px !important;
+        font-size: 12px !important;
+        font-weight: 500 !important;
+        text-transform: capitalize !important;
+        line-height: 18px !important;
     }
-    FIELDSET.refundSuccess,
-    FIELDSET.captureSuccess {
-        background-color: #7aff9e;
-        border: 3px solid #00b02f;
+    .stripe-admin .s-badge-blue   { background: #dbeafe !important; color: #1e40af !important; }
+    .stripe-admin .s-badge-green  { background: #dcfce7 !important; color: #166534 !important; }
+    .stripe-admin .s-badge-orange { background: #fef3c7 !important; color: #92400e !important; }
+    .stripe-admin .s-badge-gray   { background: #f3f4f6 !important; color: #4b5563 !important; }
+
+    /* Status colors */
+    .stripe-admin .s-status-ok   { color: #059669 !important; font-weight: 500 !important; }
+    .stripe-admin .s-status-warn { color: #d97706 !important; font-weight: 500 !important; }
+    .stripe-admin .s-status-fail { color: #dc2626 !important; font-weight: 500 !important; }
+
+    /* Code / monospace */
+    .stripe-admin .s-code {
+        font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+        font-size: 12px;
+        color: #6b7280;
     }
-    FIELDSET.captureNotice {
-        background-color: #b5d4ff;
-        border: 3px solid #4a90d9;
+    .stripe-admin .s-muted { color: #9ca3af; }
+    .stripe-admin .s-amount { text-align: right; font-weight: 500; font-variant-numeric: tabular-nums; }
+    .stripe-admin .s-currency { text-transform: uppercase; color: #9ca3af; font-size: 12px; }
+    .stripe-admin .s-empty { padding: 24px 16px; color: #9ca3af; }
+
+    /* Links */
+    .stripe-admin a { color: #635bff; text-decoration: none; }
+    .stripe-admin a:hover { color: #4b45c6; text-decoration: underline; }
+    .stripe-admin .s-external-icon { vertical-align: middle; margin-left: 4px; opacity: .5; }
+
+    /* Forms */
+    .stripe-admin .s-form-group { margin-bottom: 12px; }
+    .stripe-admin .s-form-label { display: block; font-weight: 500; color: #374151; margin-bottom: 4px; }
+    .stripe-admin .s-form-input,
+    .stripe-admin .s-form-select {
+        width: 100%;
+        max-width: 400px;
+        padding: 6px 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 13px;
+        font-family: inherit;
+        color: #1a1a2e;
+        background: #fff;
+        box-sizing: border-box;
     }
-    FIELDSET.message STRONG {
-        display: block;
-        margin-bottom: 10px;
+    .stripe-admin .s-form-input:focus,
+    .stripe-admin .s-form-select:focus { border-color: #635bff; outline: none; box-shadow: 0 0 0 2px rgba(99,91,255,.15); }
+    .stripe-admin .s-form-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .stripe-admin .s-form-row .s-form-group { flex: 1; min-width: 200px; }
+
+    /* Buttons */
+    .stripe-admin .s-btn {
+        display: inline-block !important;
+        padding: 8px 16px !important;
+        border: none !important;
+        border-radius: 6px !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        font-family: inherit !important;
+        cursor: pointer !important;
+        text-decoration: none !important;
+        margin-top: 8px !important;
     }
+    .stripe-admin .s-btn-primary { background: #635bff !important; color: #fff !important; }
+    .stripe-admin .s-btn-primary:hover { background: #4b45c6 !important; }
+    .stripe-admin .s-btn-warning { background: #f59e0b !important; color: #fff !important; }
+    .stripe-admin .s-btn-warning:hover { background: #d97706 !important; }
+    .stripe-admin .s-btn-danger-outline { background: #fff !important; color: #dc2626 !important; border: 1px solid #fca5a5 !important; }
+    .stripe-admin .s-btn-danger-outline:hover { background: #fef2f2 !important; }
 </style>
 
 <form name="transfer" id="transfer" action="{{ oViewConf.getSelfLink() }}" method="post">
@@ -73,215 +183,281 @@
     <input type="hidden" name="cl" value="OrderRefund">
 </form>
 
+<div class="stripe-admin">
 {% if oView.isStripeOrder() == true %}
-    {# Capture Success Message #}
+
+    {# ===== Status Messages ===== #}
     {% if oView.wasCaptureSuccessful() == true %}
-        <fieldset class="captureSuccess message">
-            {{ translate({ ident: "STRIPE_CAPTURE_SUCCESSFUL" }) }}
-        </fieldset>
+        <div class="s-alert s-alert-success">
+            <strong>&#10003;</strong> {{ translate({ ident: "STRIPE_CAPTURE_SUCCESSFUL" }) }}
+        </div>
     {% endif %}
 
-    {# Cancel Authorization Success Message #}
     {% if oView.wasCancelSuccessful() == true %}
-        <fieldset class="captureSuccess message">
-            {{ translate({ ident: "STRIPE_CANCEL_SUCCESSFUL" }) }}
-        </fieldset>
+        <div class="s-alert s-alert-success">
+            <strong>&#10003;</strong> {{ translate({ ident: "STRIPE_CANCEL_SUCCESSFUL" }) }}
+        </div>
     {% endif %}
 
-    {# Refund Success Message #}
     {% if oView.wasRefundSuccessful() == true %}
-        <fieldset class="refundSuccess message">
-            {{ translate({ ident: "STRIPE_REFUND_SUCCESSFUL" }) }}
-        </fieldset>
+        <div class="s-alert s-alert-success">
+            <strong>&#10003;</strong> {{ translate({ ident: "STRIPE_REFUND_SUCCESSFUL" }) }}
+        </div>
     {% endif %}
 
-    {# Error Message #}
     {% if oView.getErrorMessage() != false %}
-        <fieldset class="refundError message">
-            <strong>Error</strong>
-            {{ oView.getErrorMessage() }}
-        </fieldset>
+        <div class="s-alert s-alert-danger">
+            <strong>Error</strong> &mdash; {{ oView.getErrorMessage() }}
+        </div>
     {% endif %}
 
     {% set blIsOrderRefundable = oView.isOrderRefundable() %}
     {% set blIsOrderCapturable = oView.isOrderCapturable() %}
 
-    {# Stripe API Error Notice (different from "already refunded") #}
     {% if oView.hasStripeApiError() %}
-        <fieldset class="refundError message">
-            <strong>{{ translate({ ident: "STRIPE_NOTICE" }) }}</strong>
+        <div class="s-alert s-alert-danger">
+            <strong>{{ translate({ ident: "STRIPE_NOTICE" }) }}</strong> &mdash;
             {{ translate({ ident: "STRIPE_API_ERROR" }) }}: {{ oView.getStripeApiError() }}
-        </fieldset>
+        </div>
     {% elseif blIsOrderRefundable == false and blIsOrderCapturable == false %}
-        {# Sprint 82: Only show "already refunded" when order is NOT capturable.
-           For uncaptured manual-capture orders, refund is hidden but the reason
-           is "not yet captured", not "already refunded". #}
-        <fieldset class="refundNotice message">
-            <strong>{{ translate({ ident: "STRIPE_NOTICE" }) }}</strong>
+        <div class="s-alert s-alert-warning">
+            <strong>{{ translate({ ident: "STRIPE_NOTICE" }) }}</strong> &mdash;
             {{ translate({ ident: "STRIPE_ORDER_NOT_REFUNDABLE" }) }}
-        </fieldset>
+        </div>
     {% endif %}
 
     {% set order = oView.getOrder() %}
     {% set edit = order %}
-    <fieldset>
-        <legend>{{ translate({ ident: "STRIPE_PAYMENT_DETAILS" }) }}</legend>
-        <table>
+
+    {# ===== Payment Details ===== #}
+    <div class="s-card">
+        <div class="s-card-header">{{ translate({ ident: "STRIPE_PAYMENT_DETAILS" }) }}</div>
+        <table class="s-details">
             <tr>
-                <td class="edittext">
-                    {{ translate({ ident: "STRIPE_CONTRACT_ID" }) }}:
-                </td>
-                <td class="edittext" data-testid="contract-id">
+                <td class="s-label">{{ translate({ ident: "STRIPE_CONTRACT_ID" }) }}</td>
+                <td class="s-value" data-testid="contract-id">
                     {% set contractId = oView.getContractId() %}
                     {% if contractId %}
-                        {{ contractId }}
+                        <span class="s-code">{{ contractId }}</span>
                     {% else %}
-                        <span style="color: #999;">-</span>
+                        <span class="s-muted">&ndash;</span>
                     {% endif %}
                 </td>
-                <td class="edittext"></td>
             </tr>
             <tr>
-                <td class="edittext">
-                    {{ translate({ ident: "STRIPE_ORDER_ID" }) }}:
-                </td>
-                <td class="edittext" data-testid="order-id">
+                <td class="s-label">{{ translate({ ident: "STRIPE_ORDER_ID" }) }}</td>
+                <td class="s-value" data-testid="order-id">
                     {% set orderId = oView.getOrderIdForDisplay() %}
                     {% if orderId %}
-                        {{ orderId }}
+                        <span class="s-code">{{ orderId }}</span>
                     {% else %}
-                        <span style="color: #999;">-</span>
+                        <span class="s-muted">&ndash;</span>
                     {% endif %}
                 </td>
-                <td class="edittext"></td>
             </tr>
             <tr>
-                <td class="edittext">
-                    {{ translate({ ident: "STRIPE_PAYMENT_TYPE" }) }}:
-                </td>
-                <td class="edittext">
-                    {{ order.getFieldData('oxpaymenttype') }}
-                </td>
-                <td class="edittext"></td>
+                <td class="s-label">{{ translate({ ident: "STRIPE_PAYMENT_TYPE" }) }}</td>
+                <td class="s-value">{{ order.getFieldData('oxpaymenttype') }}</td>
             </tr>
             <tr>
-                <td class="edittext">
-                    {{ translate({ ident: "STRIPE_TRANSACTION_ID" }) }}:
-                </td>
-                <td class="edittext">
+                <td class="s-label">{{ translate({ ident: "STRIPE_TRANSACTION_ID" }) }}</td>
+                <td class="s-value">
                     {% set transactionId = order.getFieldData('oxtransid') %}
                     {% if transactionId starts with 'pi_' %}
                         {% set dashboardPrefix = isTestMode ? '/test' : '' %}
-                        <a href="https://dashboard.stripe.com{{ dashboardPrefix }}/payments/{{ transactionId }}" target="_blank" title="Open in Stripe Dashboard">
+                        <a href="https://dashboard.stripe.com{{ dashboardPrefix }}/payments/{{ transactionId }}" target="_blank">
                             {{ transactionId }}
+                            <svg class="s-external-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0z"/></svg>
                         </a>
                     {% else %}
                         {{ transactionId }}
                     {% endif %}
                 </td>
-                <td class="edittext"></td>
             </tr>
             {% if order.getFieldData('stripeexternaltransid') %}
                 <tr>
-                    <td class="edittext">
-                        {{ translate({ ident: "STRIPE_EXTERNAL_TRANSACTION_ID" }) }}:
-                    </td>
-                    <td class="edittext">
-                        {{ order.getFieldData('stripeexternaltransid') }}
-                    </td>
-                    <td class="edittext"></td>
+                    <td class="s-label">{{ translate({ ident: "STRIPE_EXTERNAL_TRANSACTION_ID" }) }}</td>
+                    <td class="s-value">{{ order.getFieldData('stripeexternaltransid') }}</td>
+                </tr>
+            {% endif %}
+            {% if order.getStripeCapturedAmount() %}
+                <tr>
+                    <td class="s-label" style="padding-top: 16px; border-top: 1px solid #e5e7eb;">{{ translate({ ident: "STRIPE_FACTUAL_CAPTURED_AMOUNT" }) }}</td>
+                    <td class="s-value" style="padding-top: 16px; border-top: 1px solid #e5e7eb;"><strong>{{ order.getStripeCapturedAmount() }} {{ edit.getFieldData('oxcurrency') }}</strong></td>
+                </tr>
+            {% endif %}
+            {% if order.hasStripeRefunds() %}
+                <tr>
+                    <td class="s-label">{{ translate({ ident: "STRIPE_REFUNDED_AMOUNT" }) }}</td>
+                    <td class="s-value"><strong style="color: #dc2626;">{{ order.getStripeRefundedAmount() }} {{ edit.getFieldData('oxcurrency') }}</strong></td>
                 </tr>
             {% endif %}
         </table>
-    </fieldset>
+    </div>
 
-    {# Capture Section - only show if payment requires capture (manual capture mode) #}
+    {# ===== Transaction History ===== #}
+    {% set transactions = oView.getTransactions() %}
+    <div class="s-card">
+        <div class="s-card-header">{{ translate({ ident: "STRIPE_TRANSACTION_HISTORY" }) }}</div>
+        {% if transactions is not empty %}
+            <table class="s-table" data-testid="transaction-history-table">
+                <thead>
+                    <tr>
+                        <th>{{ translate({ ident: "STRIPE_TRANSACTION_TYPE" }) }}</th>
+                        <th>{{ translate({ ident: "STRIPE_TRANSACTION_STATUS" }) }}</th>
+                        <th class="text-right">{{ translate({ ident: "STRIPE_TRANSACTION_AMOUNT" }) }}</th>
+                        <th>{{ translate({ ident: "STRIPE_TRANSACTION_CURRENCY" }) }}</th>
+                        <th>{{ translate({ ident: "STRIPE_TRANSACTION_PROVIDER_ID" }) }}</th>
+                        <th>{{ translate({ ident: "STRIPE_TRANSACTION_DATE" }) }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tx in transactions %}
+                        <tr>
+                            <td>
+                                {% if tx.type == 'authorization' %}
+                                    <span class="s-badge s-badge-blue">{{ tx.type }}</span>
+                                {% elseif tx.type == 'capture' %}
+                                    <span class="s-badge s-badge-green">{{ tx.type }}</span>
+                                {% elseif tx.type == 'refund' %}
+                                    <span class="s-badge s-badge-orange">{{ tx.type }}</span>
+                                {% else %}
+                                    <span class="s-badge s-badge-gray">{{ tx.type }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if tx.status == 'completed' or tx.status == 'succeeded' %}
+                                    <span class="s-status-ok">{{ tx.status }}</span>
+                                {% elseif tx.status == 'pending' or tx.status == 'authorized' %}
+                                    <span class="s-status-warn">{{ tx.status }}</span>
+                                {% elseif tx.status == 'failed' or tx.status == 'cancelled' %}
+                                    <span class="s-status-fail">{{ tx.status }}</span>
+                                {% else %}
+                                    {{ tx.status }}
+                                {% endif %}
+                            </td>
+                            <td class="s-amount">{{ oView.getFormatedPrice(tx.amount) }}</td>
+                            <td><span class="s-currency">{{ tx.currency }}</span></td>
+                            <td><span class="s-code">{{ tx.transactionId ?: '-' }}</span></td>
+                            <td class="s-muted">{{ tx.createdAt }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="s-empty">{{ translate({ ident: "STRIPE_NO_TRANSACTIONS" }) }}</div>
+        {% endif %}
+    </div>
+
+    {# ===== Capture Section ===== #}
     {% if blIsOrderCapturable == true %}
-        <fieldset class="captureNotice message">
-            <strong>{{ translate({ ident: "STRIPE_CAPTURE_REQUIRED" }) }}</strong>
+        <div class="s-alert s-alert-info">
+            <strong>{{ translate({ ident: "STRIPE_CAPTURE_REQUIRED" }) }}</strong> &mdash;
             {{ translate({ ident: "STRIPE_CAPTURE_REQUIRED_TEXT" }) }}
-        </fieldset>
+        </div>
 
-        <fieldset class="capturePayment">
-            <legend>{{ translate({ ident: "STRIPE_CAPTURE_PAYMENT" }) }}</legend>
-            <form name="captureForm" id="captureForm" action="{{ oViewConf.getSelfLink() }}" method="post">
-                {{ oViewConf.getHiddenSid()|raw }}
-                <input type="hidden" name="cl" value="OrderRefund">
-                <input type="hidden" name="oxid" value="{{ oxid }}">
-                <input type="hidden" name="fnc" value="capturePayment">
-
-                <span>{{ translate({ ident: "STRIPE_CAPTURE_AMOUNT_TEXT" }) }}: {{ oView.getCaptureableAmount() }} <small>{{ edit.getFieldData('oxcurrency') }}</small></span><br><br>
-
-                <span><label for="capture_reason">{{ translate({ ident: "STRIPE_CAPTURE_REASON" }) }}:</label></span>
-                <input type="text" id="capture_reason" name="capture_reason" value="" placeholder="{{ translate({ ident: "STRIPE_CAPTURE_REASON_PLACEHOLDER" }) }}" maxlength="140" size="60"><br>
-
-                <input type="submit" value="{{ translate({ ident: "STRIPE_CAPTURE_SUBMIT" }) }}" class="captureSubmit">
-            </form>
-        </fieldset>
-
-        {# Cancel Authorization Section - option to cancel instead of capture #}
-        {% set blIsOrderCancellable = oView.isOrderCancellable() %}
-        {% if blIsOrderCancellable == true %}
-            <fieldset class="cancelAuthorization">
-                <legend>{{ translate({ ident: "STRIPE_CANCEL_AUTHORIZATION" }) }}</legend>
-                <form name="cancelForm" id="cancelForm" action="{{ oViewConf.getSelfLink() }}" method="post">
+        <div class="s-card">
+            <div class="s-card-header">{{ translate({ ident: "STRIPE_CAPTURE_PAYMENT" }) }}</div>
+            <div class="s-card-body">
+                <form name="captureForm" id="captureForm" action="{{ oViewConf.getSelfLink() }}" method="post">
                     {{ oViewConf.getHiddenSid()|raw }}
                     <input type="hidden" name="cl" value="OrderRefund">
                     <input type="hidden" name="oxid" value="{{ oxid }}">
-                    <input type="hidden" name="fnc" value="cancelAuthorization">
+                    <input type="hidden" name="fnc" value="capturePayment">
 
-                    <span>{{ translate({ ident: "STRIPE_CANCEL_AUTHORIZATION_TEXT" }) }}</span><br><br>
+                    <p>{{ translate({ ident: "STRIPE_CAPTURE_AMOUNT_TEXT" }) }}: <strong>{{ oView.getCaptureableAmount() }} {{ edit.getFieldData('oxcurrency') }}</strong></p>
+                    <p class="s-muted" style="font-size: 12px; margin-top: -4px;">{{ translate({ ident: "STRIPE_PARTIAL_CAPTURE_NOTE" }) }}</p>
 
-                    <span><label for="cancellation_reason">{{ translate({ ident: "STRIPE_CANCEL_REASON" }) }}:</label></span>
-                    <select id="cancellation_reason" name="cancellation_reason">
-                        <option value="">{{ translate({ ident: "STRIPE_PLEASE_SELECT" }) }}</option>
-                        <option value="duplicate">{{ translate({ ident: "STRIPE_CANCEL_DUPLICATE" }) }}</option>
-                        <option value="requested_by_customer">{{ translate({ ident: "STRIPE_CANCEL_CUSTOMER" }) }}</option>
-                        <option value="fraudulent">{{ translate({ ident: "STRIPE_CANCEL_FRAUD" }) }}</option>
-                        <option value="abandoned">{{ translate({ ident: "STRIPE_CANCEL_ABANDONED" }) }}</option>
-                    </select><br/>
+                    <div class="s-form-row">
+                        <div class="s-form-group">
+                            <label class="s-form-label" for="capture_amount">{{ translate({ ident: "STRIPE_AMOUNT" }) }} ({{ edit.getFieldData('oxcurrency') }})</label>
+                            <input type="number" class="s-form-input" id="capture_amount" name="capture_amount" value="{{ oView.getCaptureableAmount() }}" step="0.01" min="0.01" max="{{ oView.getCaptureableAmount() }}">
+                        </div>
+                        <div class="s-form-group">
+                            <label class="s-form-label" for="capture_reason">{{ translate({ ident: "STRIPE_CAPTURE_REASON" }) }}</label>
+                            <input type="text" class="s-form-input" id="capture_reason" name="capture_reason" value="" placeholder="{{ translate({ ident: "STRIPE_CAPTURE_REASON_PLACEHOLDER" }) }}" maxlength="140">
+                        </div>
+                    </div>
 
-                    <input type="submit" value="{{ translate({ ident: "STRIPE_CANCEL_SUBMIT" }) }}" class="cancelSubmit" onclick="return confirm('{{ translate({ ident: "STRIPE_CANCEL_CONFIRM" }) }}');">
+                    <input type="submit" class="s-btn s-btn-primary captureSubmit" value="{{ translate({ ident: "STRIPE_CAPTURE_SUBMIT" }) }}">
                 </form>
-            </fieldset>
+            </div>
+        </div>
+
+        {# Cancel Authorization #}
+        {% set blIsOrderCancellable = oView.isOrderCancellable() %}
+        {% if blIsOrderCancellable == true %}
+            <div class="s-card">
+                <div class="s-card-header">{{ translate({ ident: "STRIPE_CANCEL_AUTHORIZATION" }) }}</div>
+                <div class="s-card-body">
+                    <form name="cancelForm" id="cancelForm" action="{{ oViewConf.getSelfLink() }}" method="post">
+                        {{ oViewConf.getHiddenSid()|raw }}
+                        <input type="hidden" name="cl" value="OrderRefund">
+                        <input type="hidden" name="oxid" value="{{ oxid }}">
+                        <input type="hidden" name="fnc" value="cancelAuthorization">
+
+                        <p>{{ translate({ ident: "STRIPE_CANCEL_AUTHORIZATION_TEXT" }) }}</p>
+
+                        <div class="s-form-group">
+                            <label class="s-form-label" for="cancellation_reason">{{ translate({ ident: "STRIPE_CANCEL_REASON" }) }}</label>
+                            <select class="s-form-select" id="cancellation_reason" name="cancellation_reason">
+                                <option value="">{{ translate({ ident: "STRIPE_PLEASE_SELECT" }) }}</option>
+                                <option value="duplicate">{{ translate({ ident: "STRIPE_CANCEL_DUPLICATE" }) }}</option>
+                                <option value="requested_by_customer">{{ translate({ ident: "STRIPE_CANCEL_CUSTOMER" }) }}</option>
+                                <option value="fraudulent">{{ translate({ ident: "STRIPE_CANCEL_FRAUD" }) }}</option>
+                                <option value="abandoned">{{ translate({ ident: "STRIPE_CANCEL_ABANDONED" }) }}</option>
+                            </select>
+                        </div>
+
+                        <input type="submit" class="s-btn s-btn-danger-outline cancelSubmit" value="{{ translate({ ident: "STRIPE_CANCEL_SUBMIT" }) }}" onclick="return confirm('{{ translate({ ident: "STRIPE_CANCEL_CONFIRM" }) }}');">
+                    </form>
+                </div>
+            </div>
         {% endif %}
     {% endif %}
 
-    {# Full Refund Section - only show if order is refundable #}
+    {# ===== Refund Section ===== #}
     {% if blIsOrderRefundable == true %}
-        <fieldset class="fullRefund">
-            <legend>{{ translate({ ident: "STRIPE_FULL_REFUND" }) }}</legend>
-            <form name="search" id="search" action="{{ oViewConf.getSelfLink() }}" method="post">
-                {{ oViewConf.getHiddenSid()|raw }}
-                <input type="hidden" name="cl" value="OrderRefund">
-                <input type="hidden" name="oxid" value="{{ oxid }}">
-                <input type="hidden" name="fnc" value="fullRefund">
+        <div class="s-card">
+            <div class="s-card-header">{{ translate({ ident: "STRIPE_REFUND" }) }}</div>
+            <div class="s-card-body">
+                <form name="search" id="search" action="{{ oViewConf.getSelfLink() }}" method="post">
+                    {{ oViewConf.getHiddenSid()|raw }}
+                    <input type="hidden" name="cl" value="OrderRefund">
+                    <input type="hidden" name="oxid" value="{{ oxid }}">
+                    <input type="hidden" name="fnc" value="fullRefund">
 
-                {% set blIsFullRefundAvailable = oView.isFullRefundAvailable() %}
-                {% if blIsFullRefundAvailable == true %}
-                    {# Use Stripe captured amount, not order total - they may differ due to discounts/vouchers #}
-                    <span>{{ translate({ ident: "STRIPE_FULL_REFUND_TEXT" }) }}: {{ oView.getStripeCapturedAmount() }} <small>{{ edit.getFieldData('oxcurrency') }}</small></span><br><br>
-                {% else %}
-                    <input type="hidden" name="refundRemaining" value="1">
-                    <span>{{ translate({ ident: "STRIPE_REFUND_REMAINING" }) }}: {{ oView.getRemainingRefundableAmount() }} <small>{{ edit.getFieldData('oxcurrency') }}</small></span><br><br>
-                {% endif %}
+                    <p>{{ translate({ ident: "STRIPE_REFUNDABLE_AMOUNT" }) }}: <strong>{{ oView.getRemainingRefundableAmount() }} {{ edit.getFieldData('oxcurrency') }}</strong></p>
 
-                <span><label for="refund_reason">{{ translate({ ident: "STRIPE_REFUND_REASON" }) }}:</label></span>
-                <select id="refund_reason" name="refund_reason">
-                    <option value="">{{ translate({ ident: "STRIPE_PLEASE_SELECT" }) }}</option>
-                    <option value="duplicate">{{ translate({ ident: "STRIPE_REFUND_DUPLICATE" }) }}</option>
-                    <option value="requested_by_customer">{{ translate({ ident: "STRIPE_REFUND_CUSTOMER" }) }}</option>
-                    <option value="fraudulent">{{ translate({ ident: "STRIPE_REFUND_FRAUD" }) }}</option>
-                </select><br/>
+                    <div class="s-form-row">
+                        <div class="s-form-group">
+                            <label class="s-form-label" for="refund_amount">{{ translate({ ident: "STRIPE_AMOUNT" }) }} ({{ edit.getFieldData('oxcurrency') }})</label>
+                            <input type="number" class="s-form-input" id="refund_amount" name="refund_amount" value="{{ oView.getRemainingRefundableAmount() }}" step="0.01" min="0.01" max="{{ oView.getRemainingRefundableAmount() }}">
+                        </div>
+                        <div class="s-form-group">
+                            <label class="s-form-label" for="refund_reason">{{ translate({ ident: "STRIPE_REFUND_REASON" }) }}</label>
+                            <select class="s-form-select" id="refund_reason" name="refund_reason">
+                                <option value="">{{ translate({ ident: "STRIPE_PLEASE_SELECT" }) }}</option>
+                                <option value="duplicate">{{ translate({ ident: "STRIPE_REFUND_DUPLICATE" }) }}</option>
+                                <option value="requested_by_customer">{{ translate({ ident: "STRIPE_REFUND_CUSTOMER" }) }}</option>
+                                <option value="fraudulent">{{ translate({ ident: "STRIPE_REFUND_FRAUD" }) }}</option>
+                            </select>
+                        </div>
+                    </div>
 
-                <span><label for="refund_description">{{ translate({ ident: "STRIPE_REFUND_DESCRIPTION" }) }}:</label></span>
-                <input type="text" name="refund_description" value="" placeholder="{{ translate({ ident: "STRIPE_REFUND_DESCRIPTION_PLACEHOLDER" }) }}" maxlength="140" size="120"><br>
+                    <div class="s-form-group">
+                        <label class="s-form-label" for="refund_description">{{ translate({ ident: "STRIPE_REFUND_DESCRIPTION" }) }}</label>
+                        <input type="text" class="s-form-input" name="refund_description" id="refund_description" value="" placeholder="{{ translate({ ident: "STRIPE_REFUND_DESCRIPTION_PLACEHOLDER" }) }}" maxlength="140">
+                    </div>
 
-                <input type="submit" value="{{ translate({ ident: "STRIPE_REFUND_SUBMIT" }) }}" class="refundSubmit">
-            </form>
-        </fieldset>
+                    <input type="submit" class="s-btn s-btn-warning refundSubmit" value="{{ translate({ ident: "STRIPE_REFUND_SUBMIT" }) }}">
+                </form>
+            </div>
+        </div>
     {% endif %}
-{% endif %}
-{% include "bottomnaviitem.html.twig" %}
 
+{% endif %}
+</div>
+
+{% include "bottomnaviitem.html.twig" %}
 {% include "bottomitem.html.twig" %}

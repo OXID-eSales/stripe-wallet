@@ -217,7 +217,50 @@ StripeCheckoutReturnEvent
 
 ---
 
-## 6. Key Design Patterns
+## 6. Admin Operations (Capture / Refund / Transaction History)
+
+### Partial Capture and Refund
+
+Both capture and refund support partial amounts via `?float $amount` parameter:
+- `null` = full capture/refund (backward compatible)
+- `float > 0` = partial amount
+
+**Stripe constraints:**
+- Capture: `amount <= PaymentIntent.amount` (partial capture releases remainder — one-time, irreversible)
+- Refund: `total_refunded + amount <= Charge.amount_captured` (multiple partial refunds allowed)
+
+### Transaction Storage Strategy (B+)
+
+| Layer | Source | Purpose |
+|-------|--------|---------|
+| **Display** | Stripe API (`getStripeTransactionHistory()`) | Always fresh, covers Dashboard actions |
+| **Audit log** | `oe_payments_transaction` DB table | Records events from our code (auth, capture, refund) |
+| **Self-healing** | `reconcilePaymentState()` on admin view | Fixes OXPAID when Stripe says succeeded but DB says 0000 |
+
+**Why not DB-only display?** Actions on Stripe Dashboard (partial capture, refund) bypass our webhook chain. The Stripe API is the single source of truth for what actually happened.
+
+**Why keep DB recording?** Audit trail, multi-provider compatibility (`oe_payments_transaction` is provider-agnostic), offline reporting capability.
+
+### Admin Controller Architecture
+
+```
+OrderRefund (OXID admin controller — no constructor DI)
+├── getViewDataProvider() → OrderRefundViewDataProvider
+│   ├── getStripeTransactionHistory(Order) — Stripe API display
+│   ├── getPaymentIntent(Order) — cached PI fetch
+│   ├── getLastCharge(Order) — cached charge fetch
+│   ├── isOrderCapturable(Order) — PI status check
+│   └── getRemainingRefundableAmount(Order) — from charge data
+├── getActionDispatcher() → OrderActionDispatcher
+│   ├── dispatchCapture(Order, piId, reason, ?amount)
+│   ├── dispatchRefund(Order, reason, description, ?amount)
+│   └── dispatchCancel(Order, piId, reason)
+└── reconcilePaymentState(Order) — OXPAID self-healing
+```
+
+---
+
+## 7. Key Design Patterns
 
 ### Template Method (ContractCreationHandler)
 
@@ -256,7 +299,7 @@ All data access goes through repository interfaces defined in payment-component.
 
 ---
 
-## 7. File Layout Conventions
+## 8. File Layout Conventions
 
 | Convention | Example |
 |-----------|---------|

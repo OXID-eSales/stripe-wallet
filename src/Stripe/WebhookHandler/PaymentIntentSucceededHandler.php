@@ -9,7 +9,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\WebhookHandler;
 
+use OxidEsales\PaymentComponent\Contract\Transaction;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface;
 use OxidEsales\PaymentComponent\Webhook\WebhookEvent;
@@ -36,6 +38,7 @@ final class PaymentIntentSucceededHandler implements WebhookEventHandlerInterfac
         private readonly OrderPaymentStateServiceInterface $orderPaymentStateService,
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ContractFulfillmentServiceInterface $contractFulfillmentService,
+        private readonly TransactionRepositoryInterface $transactionRepository,
         private readonly LoggerInterface $logger
     ) {
     }
@@ -91,12 +94,41 @@ final class PaymentIntentSucceededHandler implements WebhookEventHandlerInterfac
             return WebhookResult::success('contract_not_fulfilled');
         }
 
+        $this->recordCaptureTransaction($contract, $event);
+
         $this->logger->info('payment_intent.succeeded handled successfully', [
             'payment_intent_id' => $paymentIntentId,
             'contract_fulfilled' => true,
         ]);
 
         return WebhookResult::success('contract_fulfilled');
+    }
+
+    private function recordCaptureTransaction(
+        \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract,
+        WebhookEvent $event
+    ): void {
+        $object = $event->getObject();
+        $rawAmount = $object['amount_received'] ?? 0;
+        $amount = is_numeric($rawAmount) ? (int) $rawAmount / 100 : 0;
+        $rawCurrency = $object['currency'] ?? 'EUR';
+        $currency = is_string($rawCurrency) ? $rawCurrency : 'EUR';
+
+        $transaction = new Transaction(
+            id: 'wh_cap_' . bin2hex(random_bytes(16)),
+            shopId: 1,
+            orderId: $contract->getOrderId() ?? '',
+            contractId: $contract->getId(),
+            provider: 'stripe',
+            type: 'capture',
+            status: 'completed',
+            amount: (float) $amount,
+            currency: $currency
+        );
+        $transaction->setTransactionId($event->getObjectId());
+        $transaction->setProviderOrderId($contract->getProviderOrderId());
+
+        $this->transactionRepository->save($transaction);
     }
 
     /**

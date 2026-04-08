@@ -14,6 +14,7 @@ use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
+use OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 
 /**
@@ -55,6 +56,7 @@ class OrderRefund extends AdminDetailsController
         $oOrder = $this->getOrder();
         if ($oOrder) {
             $this->_aViewData["edit"] = $oOrder;
+            $this->reconcilePaymentState($oOrder);
         }
 
         try {
@@ -62,6 +64,7 @@ class OrderRefund extends AdminDetailsController
             $configService = $container->get(
                 \OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface::class
             );
+            /** @phpstan-ignore-next-line OXID core: ContainerFactory::get() returns mixed */
             $this->_aViewData["isTestMode"] = $configService->isTestMode();
         } catch (\Throwable $e) {
             $this->_aViewData["isTestMode"] = false;
@@ -91,7 +94,8 @@ class OrderRefund extends AdminDetailsController
         $context = $this->getActionDispatcher()->dispatchRefund(
             $order,
             $this->getRequestParam('refund_reason'),
-            $this->getRequestParam('refund_description')
+            $this->getRequestParam('refund_description'),
+            $this->getRefundAmount()
         );
         $this->_oEventContext = $context;
         $this->processResult($context, 'refundSuccess', 'STRIPE_REFUND_FAILED', 'refund');
@@ -108,7 +112,7 @@ class OrderRefund extends AdminDetailsController
             'capture',
             'STRIPE_CAPTURE_NO_ORDER',
             'STRIPE_CAPTURE_NO_TRANSACTION',
-            fn($order, $piId) => $this->getActionDispatcher()->dispatchCapture($order, $piId, $this->getRequestParam('capture_reason')),
+            fn($order, $piId) => $this->getActionDispatcher()->dispatchCapture($order, $piId, $this->getRequestParam('capture_reason'), $this->getCaptureAmount()),
             'captureSuccess',
             'STRIPE_CAPTURE_FAILED'
         );
@@ -192,6 +196,23 @@ class OrderRefund extends AdminDetailsController
         return $order !== null
             ? $this->getViewDataProvider()->formatPrice((float) $dPrice, $order)
             : (string) $dPrice;
+    }
+
+    /**
+     * Get transaction history from Stripe API (source of truth).
+     *
+     * Shows all actions regardless of origin (admin, Stripe Dashboard, webhook).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getTransactions(): array
+    {
+        $order = $this->getOrder();
+        if ($order === null) {
+            return [];
+        }
+
+        return $this->getViewDataProvider()->getStripeTransactionHistory($order);
     }
 
     public function hasStripeApiError(): bool
@@ -351,10 +372,41 @@ class OrderRefund extends AdminDetailsController
         };
     }
 
-    private function getRequestParam(string $name): ?string
+    protected function getRequestParam(string $name): ?string
     {
         $value = Registry::getRequest()->getRequestEscapedParameter($name);
         return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /**
+     * Parse refund amount from request. Null = full refund.
+     */
+    public function getRefundAmount(): ?float
+    {
+        return $this->parseAmountParam('refund_amount');
+    }
+
+    /**
+     * Parse capture amount from request. Null = full capture.
+     */
+    public function getCaptureAmount(): ?float
+    {
+        return $this->parseAmountParam('capture_amount');
+    }
+
+    private function parseAmountParam(string $name): ?float
+    {
+        $raw = $this->getRequestParam($name);
+        if ($raw === null) {
+            return null;
+        }
+
+        $amount = (float) $raw;
+        if ($amount <= 0) {
+            return null;
+        }
+
+        return $amount;
     }
 
     /**
@@ -371,6 +423,48 @@ class OrderRefund extends AdminDetailsController
         }
 
         return true;
+    }
+
+    // =========================================================================
+    // Payment State Reconciliation
+    // =========================================================================
+
+    /**
+     * Reconcile OXPAID when Stripe shows payment succeeded but OXPAID is unset.
+     *
+     * Catches cases where capture was done from Stripe Dashboard or webhooks failed.
+     */
+    private function reconcilePaymentState(Order $order): void
+    {
+        /** @phpstan-ignore-next-line OXID core: magic property */
+        $oxpaid = $order->oxorder__oxpaid->value ?? '';
+        if ($oxpaid !== '0000-00-00 00:00:00' && $oxpaid !== '') {
+            return;
+        }
+
+        $paymentIntent = $this->getViewDataProvider()->getPaymentIntent($order);
+        if ($paymentIntent === null || ($paymentIntent->status ?? '') !== 'succeeded') {
+            return;
+        }
+
+        try {
+            /** @var OrderPaymentStateServiceInterface $stateService */
+            $stateService = ContainerFactory::getInstance()->getContainer()
+                ->get(OrderPaymentStateServiceInterface::class);
+            $stateService->markOrderAsPaid(
+                (string) $order->getId(),
+                (string) ($paymentIntent->id ?? '')
+            );
+
+            // Reload order so template shows updated OXPAID
+            $this->_oOrder = null;
+            $order = $this->getOrder();
+            if ($order) {
+                $this->_aViewData["edit"] = $order;
+            }
+        } catch (\Throwable $e) {
+            // Silently fail — reconciliation is best-effort
+        }
     }
 
     // =========================================================================

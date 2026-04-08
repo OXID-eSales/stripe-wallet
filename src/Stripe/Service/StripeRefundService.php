@@ -24,33 +24,15 @@ use OxidEsales\PaymentComponent\Service\Exception\RefundFailedException;
 class StripeRefundService extends AbstractPaymentRefundService
 {
     /**
-     * Override to reject partial refunds.
+     * Validate refund amount is within limits.
      *
-     * Stripe module only supports full refunds.
-     * For partial refunds, use Stripe Dashboard directly.
+     * Sprint 87: Allows partial refunds (amount <= available).
+     * Parent validates: amount > 0, amount is finite, amount <= available.
      *
-     * @throws RefundFailedException If partial refund requested
+     * @throws RefundFailedException If amount exceeds available
      */
     protected function validateRefundAmount(string $contractId, float $refundAmount, float $availableForRefund): void
     {
-        // Validate finite before partial refund check (parent has is_finite guard)
-        if (!is_finite($refundAmount)) {
-            parent::validateRefundAmount($contractId, $refundAmount, $availableForRefund);
-            return;
-        }
-
-        // Stripe module only supports full refund - reject partial amounts
-        if (abs($refundAmount - $availableForRefund) > 0.01) {
-            throw new RefundFailedException(
-                $contractId,
-                sprintf(
-                    'Stripe module only supports full refunds. Requested: %.2f, Available: %.2f. Use Stripe Dashboard for partial refunds.',
-                    $refundAmount,
-                    $availableForRefund
-                )
-            );
-        }
-
         parent::validateRefundAmount($contractId, $refundAmount, $availableForRefund);
     }
 }

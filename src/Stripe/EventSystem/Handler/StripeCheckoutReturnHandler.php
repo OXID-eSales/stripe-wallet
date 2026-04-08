@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
+use OxidEsales\PaymentComponent\Contract\Transaction;
 use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\Event\Payment\PaymentAuthorizedEvent;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface;
 use OxidEsales\PaymentComponent\Adapter\SessionAdapterInterface;
 use OxidEsales\PaymentComponent\Service\DeliveryAddressHashServiceInterface;
@@ -49,6 +51,7 @@ class StripeCheckoutReturnHandler implements HandlerInterface
         private readonly DeliveryAddressHashServiceInterface $deliveryAddressHashService,
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly SessionAdapterInterface $sessionAdapter,
+        private readonly TransactionRepositoryInterface $transactionRepository,
         ?LoggerInterface $logger = null,
         ?FileLoggerInterface $eventLogger = null
     ) {
@@ -296,6 +299,8 @@ class StripeCheckoutReturnHandler implements HandlerInterface
             'orderNumber' => $context->get('orderNumber'),
         ]);
 
+        $this->recordAuthorizationTransaction($context);
+
         if ($context->get('orderId') !== null) {
             $this->logEvent('dispatchPaymentEvent: Order created, setting redirectTarget=thankyou');
             $context->set('redirectTarget', 'thankyou');
@@ -371,12 +376,44 @@ class StripeCheckoutReturnHandler implements HandlerInterface
             'orderId' => $context->get('orderId'),
         ]);
 
+        $this->recordAuthorizationTransaction($context);
+
         // Set redirect target
         if ($context->get('orderId') !== null) {
             $context->set('redirectTarget', 'thankyou');
         } else {
             $this->logEvent('handleRequiresCaptureStatus: WARNING - orderId is NULL, order creation may have failed');
         }
+    }
+
+    private function recordAuthorizationTransaction(EventContext $context): void
+    {
+        $orderId = $context->get('orderId');
+        $contractId = $context->get('contractId');
+        $paymentIntentId = $context->get('paymentIntentId');
+        $amount = $context->get('amount');
+        $currency = $context->get('currency');
+
+        if (!is_string($orderId) || $orderId === '') {
+            return;
+        }
+
+        $transaction = new Transaction(
+            id: 'auth_' . bin2hex(random_bytes(16)),
+            shopId: 1,
+            orderId: $orderId,
+            contractId: is_string($contractId) ? $contractId : null,
+            provider: 'stripe',
+            type: 'authorization',
+            status: 'completed',
+            amount: is_numeric($amount) ? (float) $amount : 0,
+            currency: is_string($currency) ? $currency : 'EUR'
+        );
+        $transaction->setTransactionId(is_string($paymentIntentId) ? $paymentIntentId : null);
+        $transaction->setProviderOrderId(is_string($paymentIntentId) ? $paymentIntentId : null);
+
+        $this->transactionRepository->save($transaction);
+        $this->logEvent('Recorded authorization transaction', ['orderId' => $orderId]);
     }
 
     /**

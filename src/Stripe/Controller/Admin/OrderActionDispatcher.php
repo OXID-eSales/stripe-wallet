@@ -34,14 +34,18 @@ final class OrderActionDispatcher
     }
 
     /**
-     * Dispatch a full refund event. Returns the EventContext with results.
+     * Dispatch a refund event. Null amount = full refund.
      */
-    public function dispatchRefund(Order $order, ?string $reason, ?string $description): EventContext
-    {
+    public function dispatchRefund(
+        Order $order,
+        ?string $reason,
+        ?string $description,
+        ?float $amount = null
+    ): EventContext {
         $context = new EventContext([
             'orderId' => $order->getId(),
             'contractId' => $this->contractResolver->getContractIdFromOrder($order),
-            'amount' => null,
+            'amount' => $amount,
             'reason' => $reason,
             'description' => $description,
             'initiator' => 'admin',
@@ -52,15 +56,19 @@ final class OrderActionDispatcher
     }
 
     /**
-     * Dispatch a capture event. Returns the EventContext with results.
+     * Dispatch a capture event. Null amount = full capture.
      */
-    public function dispatchCapture(Order $order, string $paymentIntentId, ?string $reason): EventContext
-    {
+    public function dispatchCapture(
+        Order $order,
+        string $paymentIntentId,
+        ?string $reason,
+        ?float $amount = null
+    ): EventContext {
         $context = new EventContext([
             'orderId' => $order->getId(),
             'contractId' => $this->contractResolver->getContractIdFromOrder($order),
             'paymentIntentId' => $paymentIntentId,
-            'amount' => null,
+            'amount' => $amount,
             'initiator' => 'admin',
             'reason' => $reason,
         ]);

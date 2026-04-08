@@ -43,6 +43,7 @@ class StripeCheckoutReturnHandlerTest extends TestCase
     private SessionAdapterInterface&MockObject $sessionAdapter;
     private LoggerInterface&MockObject $logger;
     private EventDispatcherInterface&MockObject $eventDispatcher;
+    private \OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface&MockObject $transactionRepository;
 
     protected function setUp(): void
     {
@@ -53,6 +54,7 @@ class StripeCheckoutReturnHandlerTest extends TestCase
         $this->sessionAdapter = $this->createMock(SessionAdapterInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $this->transactionRepository = $this->createMock(\OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface::class);
 
         // Default: security validation passes
         $this->securityValidator->method('validateReturn')->willReturn(
@@ -86,6 +88,7 @@ class StripeCheckoutReturnHandlerTest extends TestCase
             $this->deliveryAddressHashService,
             $this->eventDispatcher,
             $this->sessionAdapter,
+            $this->transactionRepository,
             $this->logger
         );
     }

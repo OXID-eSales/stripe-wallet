@@ -72,7 +72,8 @@ class AddressHashRestorationTest extends TestCase
             $this->securityValidator,
             $this->deliveryAddressHashService,
             $this->eventDispatcher,
-            $this->sessionAdapter
+            $this->sessionAdapter,
+            $this->createMock(\OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface::class)
         );
     }
 

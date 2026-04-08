@@ -169,6 +169,82 @@ class OrderRefundViewDataProvider
     }
 
     /**
+     * Build transaction history from Stripe API (source of truth).
+     *
+     * Covers all actions regardless of origin (admin, Stripe Dashboard, webhook).
+     * Uses expanded PaymentIntent to include refunds (Stripe SDK v19+: Charge.refunds removed).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getStripeTransactionHistory(Order $order): array
+    {
+        // Fetch PI with expanded latest_charge.refunds
+        $paymentIntent = $this->apiService->getPaymentIntentWithRefunds($order);
+        if ($paymentIntent === null) {
+            return [];
+        }
+
+        $transactions = [];
+        $currency = (string) ($paymentIntent->currency ?? 'eur');
+        $piId = (string) ($paymentIntent->id ?? '');
+
+        // Authorization
+        $transactions[] = [
+            'type' => 'authorization',
+            'status' => $this->mapPiStatusToLabel($paymentIntent->status ?? ''),
+            'amount' => ((int) ($paymentIntent->amount ?? 0)) / 100,
+            'currency' => $currency,
+            'transactionId' => $piId,
+            'createdAt' => date('Y-m-d H:i:s', (int) ($paymentIntent->created ?? 0)),
+        ];
+
+        // Get charge from expanded latest_charge
+        $charge = $paymentIntent->latest_charge;
+        if (!$charge instanceof Charge) {
+            return $transactions;
+        }
+
+        // Capture
+        if ($charge->captured) {
+            $transactions[] = [
+                'type' => 'capture',
+                'status' => 'completed',
+                'amount' => ((int) ($charge->amount_captured ?? 0)) / 100,
+                'currency' => $currency,
+                'transactionId' => (string) ($charge->id ?? ''),
+                'createdAt' => date('Y-m-d H:i:s', (int) ($charge->created ?? 0)),
+            ];
+        }
+
+        // Refunds — available via expand: 'latest_charge.refunds'
+        $refundsData = $charge->refunds->data ?? [];
+
+        foreach ($refundsData as $refund) {
+            $transactions[] = [
+                'type' => 'refund',
+                'status' => (string) ($refund->status ?? 'unknown'),
+                'amount' => ((int) ($refund->amount ?? 0)) / 100,
+                'currency' => $currency,
+                'transactionId' => (string) ($refund->id ?? ''),
+                'createdAt' => date('Y-m-d H:i:s', (int) ($refund->created ?? 0)),
+            ];
+        }
+
+        return $transactions;
+    }
+
+    private function mapPiStatusToLabel(string $status): string
+    {
+        return match ($status) {
+            'requires_capture' => 'authorized',
+            'succeeded' => 'completed',
+            'canceled' => 'cancelled',
+            'requires_payment_method', 'requires_confirmation', 'requires_action' => 'pending',
+            default => $status,
+        };
+    }
+
+    /**
      * Reset cached API data (after capture/cancel/refund).
      */
     public function resetCache(): void

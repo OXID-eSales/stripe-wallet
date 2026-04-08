@@ -4,19 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Stripe Payment Module for OXID eShop 7.4+ implementing a **Smart-Contract Architecture** for payment lifecycle management. Uses Stripe SDK v18+ with Stimulus.js for frontend.
+Stripe Payment Module for OXID eShop 7.4+ implementing a **Smart-Contract Architecture** for payment lifecycle management. Uses Stripe SDK v19+ with Stimulus.js for frontend.
 
 **Module ID:** `oe_payments_stripe_wallet`
 **Namespace:** `OxidEsales\Payments\Stripe\`
+**Stripe SDK:** `stripe/stripe-php ^19.3`
 
 ## Core Development Principles
 
 **All code must follow:**
 - **TDD (Test-Driven Development)** - Write failing tests first, then implementation
+- **DevOps-first** - Pre-commit validation (PHPCS, PHPStan, PHPMD, PHPUnit) before every commit
 - **SOLID Principles** - Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion
 - **Clean Code** - Meaningful names, small functions (15-25 lines), no else expressions (use early returns), DRY
 - **Dependency Injection** - Depend on abstractions, not concretions
-- **PSR-12** code style, **PHPStan level 6** compliance
+- **No overengineering** - Implement exactly what's needed, no speculative abstractions
+- **PSR-12** code style, **PHPStan level max** compliance
 
 ## Development Commands
 
@@ -62,9 +65,12 @@ docker compose exec php php vendor/bin/phpunit -c extensions/stripe/tests/phpuni
 
 **E2E Tests (Playwright):**
 ```bash
-cd tests/e2e/playwright && npm install && npx playwright test
-npx playwright test tests/checkout/stripe-checkout.spec.ts  # Single spec
+cd tests/e2e/playwright/playwright
+npm install && npx playwright install chromium
+npx playwright test                                          # All tests
+npx playwright test tests/admin/stripe-tab-styles.spec.ts    # Single spec
 npx playwright test --headed                                 # With browser UI
+npx playwright test --project=admin-tests                    # Admin tests only
 ```
 
 ### Code Quality
@@ -79,17 +85,9 @@ npx playwright test --headed                                 # With browser UI
 **Individual checks:**
 ```bash
 composer phpcs              # PHP CodeSniffer (PSR-12)
-composer phpstan            # PHPStan static analysis (level 6)
+composer phpstan            # PHPStan static analysis (level max)
 composer phpmd              # PHP Mess Detector
 composer style              # All style checks
-```
-
-**Makefile shortcuts (from module root):**
-```bash
-make test-unit             # Run unit tests
-make test-integration      # Run integration tests
-make style                 # Run all style checks
-make pre-commit            # Full pre-commit validation
 ```
 
 ### OXID Module Commands
@@ -97,68 +95,70 @@ make pre-commit            # Full pre-commit validation
 bin/oe-console oe:module:install extensions/stripe
 bin/oe-console oe:module:activate oe_payments_stripe_wallet
 bin/oe-console oe:module:deactivate oe_payments_stripe_wallet
-bin/oe-console oe:module:uninstall oe_payments_stripe_wallet
+bin/oe-console oe:cache:clear
 ```
 
 ## Smart-Contract Architecture
 
-The module implements a **contract-first payment pattern** where clicking "Place Order" creates a contract, not an order. The order is created only when the contract is fulfilled.
+The module implements a **contract-first payment pattern** where clicking "Place Order" creates a contract, not an order. The order is created early (during draft completion) so an order number exists before Stripe redirect.
 
-**Contract Lifecycle:** `DRAFT → PENDING → READY_TO_COMMIT → COMMITTED → FULFILLED`
-(Alternative endings: `CANCELLED`, `EXPIRED`, `FAILED`)
+**Contract Lifecycle:**
+```
+DRAFT → NOT_FINISHED → PENDING → AUTHORIZED → READY_TO_COMMIT → COMMITTED → FULFILLED
+                                     ↓ (manual capture skips AUTHORIZED)
+                        PENDING → READY_TO_COMMIT → COMMITTED → FULFILLED
+```
+Alternative endings: `CANCELLED`, `EXPIRED`, `FAILED`
 
 **Key Innovation:**
 - Traditional: User clicks "Place Order" → Order created → Payment → Order updated
-- Smart-Contract: User clicks "Place Order" → Contract created → Conditions resolved → Order created
-
-### Architecture Layers
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  PRESENTATION LAYER - Controllers (thin, emit events only)  │
-└────────────────────────────┬────────────────────────────────┘
-                             │ emits events
-┌────────────────────────────▼────────────────────────────────┐
-│  EVENT LAYER - Domain Events, EventDispatcher (PSR-14)      │
-└────────────────────────────┬────────────────────────────────┘
-                             │ triggers
-┌────────────────────────────▼────────────────────────────────┐
-│  EVENT HANDLERS - Business Logic, Contract Lifecycle        │
-└────────────────────────────┬────────────────────────────────┘
-                             │ uses
-┌────────────────────────────▼────────────────────────────────┐
-│  CONTRACT DOMAIN - PaymentContract (Aggregate Root)         │
-└────────────────────────────┬────────────────────────────────┘
-                             │ uses
-┌────────────────────────────▼────────────────────────────────┐
-│  SERVICE LAYER - ContractService, PaymentService            │
-└────────────────────────────┬────────────────────────────────┘
-                             │ uses
-┌────────────────────────────▼────────────────────────────────┐
-│  SDK-ADAPTER LAYER - PaymentAdapterInterface (provider-agnostic) │
-└────────────────────────────┬────────────────────────────────┘
-                             │ persists
-┌────────────────────────────▼────────────────────────────────┐
-│  DATA ACCESS LAYER - Repositories (Doctrine DBAL)           │
-└─────────────────────────────────────────────────────────────┘
-```
+- Smart-Contract: User clicks "Place Order" → Contract(DRAFT) → Order(NOT_FINISHED) → Stripe session → User pays → Contract advances → Order finalized
 
 ### Source Structure
 
 ```
-src/Stripe/             # Stripe-specific implementation only
-├── Adapter/            # StripeAdapter implements PaymentAdapterInterface
-├── Controller/         # Stripe webhook/payment controllers
-├── Handler/            # Stripe webhook event handlers
-└── Service/            # StripePaymentService, StripeCheckoutService
+src/Stripe/
+├── Adapter/              # StripeAdapter, LazyStripeAdapter, OxidShopAdapter, Helper/
+│   └── Helper/           # PaymentIntentHelper, RefundHelper, CheckoutHelper
+├── Component/Widget/     # StripeCheckoutFooter
+├── Controller/
+│   ├── Admin/            # OrderRefund, OrderActionDispatcher, OrderRefundViewDataProvider,
+│   │                     #   StripeConnect, ModuleConfiguration
+│   ├── Webhook/          # WebhookController, Guards (HTTPS, IP, RateLimit, PayloadSize)
+│   ├── PaymentController.php
+│   └── StripeOrderController.php
+├── Core/                 # StripeDefinitions, ViewConfig, Events (activate/deactivate)
+├── EventSystem/
+│   ├── Event/            # 8 Stripe-specific events (Capture, Refund, Cancel, Checkout, etc.)
+│   └── Handler/          # 9 event handlers (ContractCreation, OrderCreation, Capture, Refund, etc.)
+├── Model/                # Order (extension), Payment (extension)
+├── Service/              # 33 service files — Capture, Refund, Checkout, Reconciliation, etc.
+│   ├── Factory/          # StripeAdapterFactory
+│   └── Result/           # CheckoutReturnResult
+└── WebhookHandler/       # PaymentIntentSucceededHandler, ChargeRefundedHandler
 ```
 
 **Note:** Provider-agnostic components (Contract, Repository, EventSystem, etc.) are in the separate `payment-component` package. Stripe uses them via dependency injection.
 
+### Admin Panel (Stripe Tab)
+
+The admin order detail page has a **Stripe tab** (`OrderRefund` controller) with:
+- **Payment Details** card — Contract ID, Order ID, Payment Type, Transaction ID (links to Stripe Dashboard), Factual Captured Amount, Refunded Amount
+- **Transaction History** table — fetched from Stripe API (source of truth), shows authorization/capture/refund with colored badges
+- **Capture form** — supports partial capture with amount input (releases remainder to customer)
+- **Refund form** — supports partial refund with amount input (validates against remaining refundable)
+- **Cancel Authorization** — for uncaptured manual-capture orders
+- **OXPAID Reconciliation** — auto-heals OXPAID when Stripe shows succeeded but OXPAID is 0000
+
+**Transaction Storage Strategy (B+):**
+- **Display**: Stripe API (`getStripeTransactionHistory()`) — always fresh, covers Dashboard actions
+- **Audit log**: DB (`oe_payments_transaction`) — recorded on auth/capture/refund events
+- **Self-healing**: `reconcilePaymentState()` on admin view
+
 ### Key Domain Models
 
 **PaymentContract (Aggregate Root):** (from payment-component)
-- States: `DRAFT`, `PENDING`, `READY_TO_COMMIT`, `COMMITTED`, `FULFILLED`, `CANCELLED`, `EXPIRED`
+- States: `DRAFT`, `NOT_FINISHED`, `PENDING`, `AUTHORIZED`, `READY_TO_COMMIT`, `COMMITTED`, `FULFILLED`, `CANCELLED`, `EXPIRED`, `FAILED`
 - Manages conditions: `payment_authorized`, `fraud_check`, `stock_reserved`
 - Links to oxorder only after commitment (OXORDERID NULL until committed)
 
@@ -172,31 +172,27 @@ src/Stripe/             # Stripe-specific implementation only
 
 Tables (created by payment-component):
 - `oe_payments_contract` - Contract lifecycle, basket snapshot, capture/refund tracking
-- `oe_payments_transaction` - Transaction tracking with OXCONTRACTID FK
+- `oe_payments_transaction` - Transaction audit log (authorization, capture, refund records)
 - `oe_payments_customer` - Customer payment data (vaulting)
 - `oe_payments_idempotency` - Duplicate charge prevention
 - `oe_payments_sessions` - Session state management
 - `oe_payments_webhooklogs` - Webhook event logs
 
-Run migrations from payment-component:
-```bash
-docker compose exec php php vendor/bin/doctrine-migrations migrate \
-  --configuration=extensions/payment-component/migration/migrations.yml \
-  --db-configuration=extensions/payment-component/migration/migrations-db.php \
-  --no-interaction
-```
-
 ## Documentation
 
-Key architecture documents in `docs/payment-component/`:
+Architecture documents in `docs/architecture/`:
 - `00-overview.md` - Smart-contract architecture overview
-- `01-architecture-layers.md` - Event-driven layer architecture
-- `02-database-and-models.md` - Contract-aware database schema
-- `03-building-payment-modules.md` - How to build provider modules
-- `04-sdk-adapter-layer.md` - Provider abstraction architecture
-- `05-webhooks.md` - Webhook processing with contract integration
+- `01-architecture-layers.md` - 7-layer event-driven architecture
+- `02-event-system.md` - PSR-14 event dispatcher, handler priorities
+- `03-provider-abstraction.md` - Adapter pattern, DTO contracts
+- `04-webhook-processing.md` - Webhook flow, idempotency, signature verification
 
-Development history in `docs/payment-component/dev_history/`
+Developer guides in `docs/for_developer/`:
+- `01-module-principles.md` - Contract-first model, boundary rules, extension hooks
+- `02-payment-component-dependency.md` - Interface mappings, DI wiring, database schema
+- `03-extending-the-stripe-module.md` - 6 extension patterns with code examples
+
+Development history in `docs/oe_payments_docs/daniil_dev_log/`
 
 ## Code Style Rules
 
@@ -204,42 +200,72 @@ Development history in `docs/payment-component/dev_history/`
 - **Explicit imports** - No inline `\Exception`, use `use` statements
 - **Null safety** - Check for null before using nullable values
 - **Small methods** - Target 15-25 lines, extract helpers for long methods
-- **PHPStan annotations** - Use `@phpstan-ignore-next-line` for safe database type casts
+- **PHPStan annotations** - Use `@phpstan-ignore-next-line` only for OXID core issues (oxNew, Registry, virtual parent classes)
+- **Never suppress static analysis** - Fix the underlying code; suppress only for OXID core patterns
 
 ## Testing Strategy
 
+**Test counts:** ~99 test files, 822+ unit tests, 18 integration tests
+
 **Test Structure (AAA):** Arrange-Act-Assert
 
-**Unit Tests:** Pure domain logic, no database required
+**Testable Subclass Pattern:** OXID admin controllers don't support constructor DI. Use testable subclasses:
 ```php
-$contract = new PaymentContract($shopId, $userId, $basketSnapshot);
-$contract->addCondition(new ContractCondition('payment_authorized'));
-$contract->fulfillCondition('payment_authorized');
-$this->assertTrue($contract->areAllConditionsFulfilled());
+class TestableOrderRefundForVisibility extends OrderRefund {
+    public function __construct(?Order $order = null, ?ViewDataProvider $vdp = null) {
+        // Skip OXID admin bootstrap
+    }
+    public function getOrder(): ?Order { return $this->testOrder; }
+    protected function getViewDataProvider(): ViewDataProvider { return $this->testVdp; }
+}
 ```
 
-**Integration Tests:** Use `e2e_` prefix for test data that persists for inspection.
+**Final class mocking:** `StripeOrderApiService`, `OrderActionDispatcher`, `CaptureService` are `final`. Use real instances with mocked dependencies, not `createMock()`.
+
+**PHPStan baseline:** `tests/PhpStan/phpstan-baseline.neon` — OXID virtual parent class errors only.
+**PHPMD baseline:** `tests/PhpMd/phpmd.baseline.xml` — interface-driven adapter complexity only.
 
 ## Configuration
 
-Module settings in `metadata.php`:
+Module settings in `metadata.php` / YAML:
 - `sStripeMode` - live/test mode toggle
 - `sStripeTestToken`/`sStripeLiveToken` - API secret keys
 - `sStripeTestPk`/`sStripeLivePk` - Publishable keys
 - `sStripeWebhookEndpointSecret` - Webhook signing secret
+- `sStripeCaptureMode` - automatic/manual capture mode
+- `blStripeRemoveByBillingCountry` - Filter by billing country
+- `blStripeRemoveByBasketCurrency` - Filter by basket currency
+
+**Webhook URL:** `https://{shopUrl}/index.php?cl=StripeWebhookController`
 
 ## Event System
 
-The module uses PSR-14 compatible events. Key event types:
+### Stripe-Specific Events (`src/Stripe/EventSystem/Event/`)
+- `StripeCheckoutSessionRequestEvent` - Initiates Stripe Checkout
+- `StripeCheckoutReturnEvent` - Customer returns from Stripe
+- `StripeCaptureRequestEvent` - Admin capture action (supports partial via `?float amount`)
+- `StripeRefundRequestEvent` - Admin refund action (supports partial via `?float amount`)
+- `StripeCancelAuthorizationRequestEvent` - Admin cancel authorization
+- `StripePaymentExecuteEvent` - Payment execution
+- `StripePaymentReturnEvent` - Payment return
+- `Stripe3DSRequiredEvent` - 3D Secure required
 
-**Contract Events** (in `Component/EventSystem/Event/Contract/`):
+### Contract Events (from payment-component)
 - `ContractCreatedEvent`, `ContractTransitionedToPendingEvent`
 - `ContractReadyToCommitEvent`, `ContractCommittedEvent`, `ContractFulfilledEvent`
 - `ContractConditionFulfilledEvent`, `ContractCancelledEvent`, `ContractExpiredEvent`
 
-**Payment Events** (in `Component/EventSystem/Event/Payment/`):
-- `PaymentInitiatedEvent`, `PaymentAuthorizedEvent`, `PaymentCapturedEvent`
+### Payment Events (from payment-component)
+- `PaymentAuthorizedEvent`, `PaymentCapturedEvent`
 - `PaymentRefundedEvent`, `PaymentFailedEvent`
-- `WebhookReceivedEvent`, `OrderCreatedEvent`, `OrderCompletedEvent`
+- `OrderCreatedEvent`, `OrderCompletedEvent`
 
-Handlers subscribe via `SubscriberInterface` and are registered in the `EventListenerProvider`.
+Handlers are registered via `payment.event_handler` tag in `services.yaml` and auto-collected by `EventListenerProvider`.
+
+## OXID 7.4 Specifics
+
+- **Admin template blocks** (`oxtplblocks`): Not confirmed working for admin Twig templates in this OXID version. Use module-owned templates (Stripe tab) for custom UI.
+- **Controller routing:** `?cl=ControllerKey` where key is from `metadata.php` `controllers` array.
+- **Class extensions:** Registered in `metadata.php` `extend` array, resolved via virtual parent classes (`Order_parent`).
+- **DI container:** `services.yaml` (1039 lines), cleared via `oe:cache:clear`.
+- **Twig template cache:** Must be cleared manually (`rm -rf source/tmp/*`) after template changes.

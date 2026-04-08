@@ -65,6 +65,25 @@ final class StripeOrderApiService
     }
 
     /**
+     * Retrieve PaymentIntent with expanded charge + refunds data.
+     *
+     * Stripe SDK v19+: Charge.refunds removed from default response.
+     * Must use expand to include refunds inline.
+     */
+    public function getPaymentIntentWithRefunds(Order $order): ?PaymentIntent
+    {
+        /** @phpstan-ignore-next-line OXID core: magic property oxorder__oxtransid->value */
+        $transId = $order->oxorder__oxtransid->value;
+        if (empty($transId) || !is_string($transId)) {
+            return null;
+        }
+
+        return $this->getAdapter()->retrievePaymentIntent($transId, [
+            'latest_charge.refunds',
+        ]);
+    }
+
+    /**
      * Get the Stripe adapter instance.
      */
     public function getAdapter(): StripeAdapterInterface

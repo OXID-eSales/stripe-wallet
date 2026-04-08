@@ -60,6 +60,7 @@ final class WebhookContractTransitionTest extends TestCase
             $this->orderPaymentStateService,
             $this->contractRepository,
             $this->contractFulfillmentService,
+            $this->createMock(\OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface::class),
             $this->logger
         );
 
