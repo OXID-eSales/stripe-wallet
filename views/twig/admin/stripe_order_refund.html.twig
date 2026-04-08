@@ -104,6 +104,7 @@
     {% endif %}
 
     {% set blIsOrderRefundable = oView.isOrderRefundable() %}
+    {% set blIsOrderCapturable = oView.isOrderCapturable() %}
 
     {# Stripe API Error Notice (different from "already refunded") #}
     {% if oView.hasStripeApiError() %}
@@ -111,8 +112,10 @@
             <strong>{{ translate({ ident: "STRIPE_NOTICE" }) }}</strong>
             {{ translate({ ident: "STRIPE_API_ERROR" }) }}: {{ oView.getStripeApiError() }}
         </fieldset>
-    {% elseif blIsOrderRefundable == false %}
-        {# Order Already Refunded Notice #}
+    {% elseif blIsOrderRefundable == false and blIsOrderCapturable == false %}
+        {# Sprint 82: Only show "already refunded" when order is NOT capturable.
+           For uncaptured manual-capture orders, refund is hidden but the reason
+           is "not yet captured", not "already refunded". #}
         <fieldset class="refundNotice message">
             <strong>{{ translate({ ident: "STRIPE_NOTICE" }) }}</strong>
             {{ translate({ ident: "STRIPE_ORDER_NOT_REFUNDABLE" }) }}
@@ -193,7 +196,6 @@
     </fieldset>
 
     {# Capture Section - only show if payment requires capture (manual capture mode) #}
-    {% set blIsOrderCapturable = oView.isOrderCapturable() %}
     {% if blIsOrderCapturable == true %}
         <fieldset class="captureNotice message">
             <strong>{{ translate({ ident: "STRIPE_CAPTURE_REQUIRED" }) }}</strong>

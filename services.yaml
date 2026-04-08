@@ -614,11 +614,13 @@ services:
   # SRP: Service handles capture execution and contract state transition.
 
   # Sprint 26: Changed $stripeAdapter to $adapterFactory for lazy adapter creation
+  # Sprint 82: Added ContractFulfillmentService for COMMITTED→FULFILLED event dispatch
   OxidEsales\Payments\Stripe\Service\CaptureServiceInterface:
     class: OxidEsales\Payments\Stripe\Service\CaptureService
     arguments:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
       $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $contractFulfillmentService: '@OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface'
       $logger: '@oxid_esales.monolog.logger'
     public: false
 

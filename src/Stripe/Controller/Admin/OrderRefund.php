@@ -157,6 +157,12 @@ class OrderRefund extends AdminDetailsController
 
     public function isOrderRefundable(): bool
     {
+        // Sprint 82 (STRP-118): Cannot refund what hasn't been captured.
+        // Hide refund section for uncaptured manual-capture orders.
+        if ($this->isOrderCapturable()) {
+            return false;
+        }
+
         $fnc = Registry::getRequest()->getRequestEscapedParameter('fnc');
         if ($this->_blSuccessfulRefund === true && $fnc == 'fullRefund') {
             return false;

@@ -8,6 +8,7 @@ use OxidEsales\PaymentComponent\Adapter\Request\CapturePaymentRequest;
 use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\CaptureService;
@@ -29,6 +30,7 @@ class CaptureServiceTest extends TestCase
     private StripeAdapterInterface&MockObject $adapter;
     private StripeAdapterFactoryInterface&MockObject $adapterFactory;
     private ContractRepositoryInterface&MockObject $repository;
+    private ContractFulfillmentServiceInterface&MockObject $fulfillmentService;
 
     protected function setUp(): void
     {
@@ -36,6 +38,7 @@ class CaptureServiceTest extends TestCase
         $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
         $this->adapterFactory->method('getStripeAdapter')->willReturn($this->adapter);
         $this->repository = $this->createMock(ContractRepositoryInterface::class);
+        $this->fulfillmentService = $this->createMock(ContractFulfillmentServiceInterface::class);
     }
 
     private function createService(): CaptureService
@@ -43,6 +46,7 @@ class CaptureServiceTest extends TestCase
         return new CaptureService(
             $this->adapterFactory,
             $this->repository,
+            $this->fulfillmentService,
             new NullLogger()
         );
     }
@@ -72,6 +76,10 @@ class CaptureServiceTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_123');
+        // Sprint 82: transitionContractState() now checks state before calling transition
+        $contract->method('getState')->willReturn(
+            \OxidEsales\PaymentComponent\Contract\ContractState::authorized()
+        );
         $contract->expects($this->once())->method('captureAuthorization');
 
         $this->repository->expects($this->once())->method('save')->with($contract);
@@ -101,6 +109,10 @@ class CaptureServiceTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_123');
+        // Sprint 82: transitionContractState() now checks state before calling transition
+        $contract->method('getState')->willReturn(
+            \OxidEsales\PaymentComponent\Contract\ContractState::authorized()
+        );
         $contract->expects($this->once())->method('captureAuthorization');
 
         $this->repository->expects($this->once())->method('save');
@@ -244,6 +256,86 @@ class CaptureServiceTest extends TestCase
 
         $this->assertFalse($result->isSuccessful());
         $this->assertSame('Direct capture failed', $result->errorMessage);
+    }
+
+    // --- Sprint 82: Manual capture fix — COMMITTED state support ---
+
+    /**
+     * Sprint 82: When contract is in COMMITTED state (manual capture order that
+     * skipped AUTHORIZED), capture should use ContractFulfillmentService to
+     * dispatch ContractFulfilledEvent (which triggers OXPAID update).
+     */
+    public function testProcessCaptureCallsFulfillmentServiceForCommittedContract(): void
+    {
+        $response = CaptureResponse::success(
+            providerPaymentId: 'pi_committed',
+            captureId: 'ch_committed',
+            amountCaptured: 130.39,
+            currency: 'eur',
+            status: 'succeeded',
+            capturedAt: new \DateTimeImmutable()
+        );
+
+        $this->adapter->method('capturePayment')->willReturn($response);
+
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getProviderOrderId')->willReturn('pi_committed');
+        $contract->method('getState')->willReturn(
+            \OxidEsales\PaymentComponent\Contract\ContractState::committed()
+        );
+
+        // Must use ContractFulfillmentService (dispatches event + updates OXPAID)
+        $this->fulfillmentService->expects($this->once())
+            ->method('fulfill')
+            ->with($contract)
+            ->willReturn(true);
+
+        // captureAuthorization must NOT be called for committed contracts
+        $contract->expects($this->never())->method('captureAuthorization');
+
+        // Repository save is handled by ContractFulfillmentService, not directly
+        $this->repository->expects($this->never())->method('save');
+
+        $service = $this->createService();
+
+        $result = $service->processCapture($contract, null, []);
+
+        $this->assertTrue($result->isSuccessful());
+    }
+
+    /**
+     * Sprint 82: Authorized contracts still use captureAuthorization() (unchanged behavior).
+     */
+    public function testProcessCaptureCallsCaptureAuthorizationForAuthorizedContract(): void
+    {
+        $response = CaptureResponse::success(
+            providerPaymentId: 'pi_authorized',
+            captureId: 'ch_authorized',
+            amountCaptured: 50.00,
+            currency: 'eur',
+            status: 'succeeded',
+            capturedAt: new \DateTimeImmutable()
+        );
+
+        $this->adapter->method('capturePayment')->willReturn($response);
+
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getProviderOrderId')->willReturn('pi_authorized');
+        $contract->method('getState')->willReturn(
+            \OxidEsales\PaymentComponent\Contract\ContractState::authorized()
+        );
+
+        // Must call captureAuthorization() for authorized contracts
+        $contract->expects($this->once())->method('captureAuthorization');
+        $contract->expects($this->never())->method('fulfill');
+
+        $this->repository->expects($this->once())->method('save');
+
+        $service = $this->createService();
+
+        $result = $service->processCapture($contract, null, []);
+
+        $this->assertTrue($result->isSuccessful());
     }
 
     public function testProcessCapturePassesMetadataToAdapter(): void

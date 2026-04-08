@@ -116,10 +116,13 @@ class StripeCaptureRequestHandler implements HandlerInterface
 
         $context->set('contract', $contract);
 
-        // Validate contract state - must be AUTHORIZED for delayed capture
-        if (!$contract->getState()->isAuthorized()) {
+        // Validate contract state for capture:
+        // - AUTHORIZED: Normal delayed capture flow (contract used authorize() transition)
+        // - COMMITTED: Manual capture order where checkout return skipped AUTHORIZED state
+        //   (Sprint 82: STRP-118 fix — contract goes PENDING→READY_TO_COMMIT→COMMITTED)
+        if (!$contract->getState()->isAuthorized() && !$contract->getState()->isCommitted()) {
             $context->set('error', sprintf(
-                'Cannot capture: contract not in AUTHORIZED state (current: %s)',
+                'Cannot capture: contract not in capturable state (current: %s)',
                 $contract->getState()->getValue()
             ));
             $context->set('captureSuccess', false);

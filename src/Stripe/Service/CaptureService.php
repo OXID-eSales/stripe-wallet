@@ -8,6 +8,7 @@ use OxidEsales\PaymentComponent\Adapter\Request\CapturePaymentRequest;
 use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
 use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -17,6 +18,7 @@ use Psr\Log\NullLogger;
  *
  * Sprint 9: Extracted from StripeCaptureRequestHandler.
  * Sprint 26: Changed to use factory for lazy adapter creation (module activation fix).
+ * Sprint 82: Added ContractFulfillmentService for COMMITTED→FULFILLED transition.
  *
  * Handles both contract-based and direct captures:
  * - processCapture(): With contract, handles state transition
@@ -33,6 +35,7 @@ final class CaptureService implements CaptureServiceInterface
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,
         private readonly ContractRepositoryInterface $contractRepository,
+        private readonly ContractFulfillmentServiceInterface $contractFulfillmentService,
         ?LoggerInterface $logger = null
     ) {
         $this->logger = $logger ?? new NullLogger();
@@ -102,8 +105,17 @@ final class CaptureService implements CaptureServiceInterface
 
     private function transitionContractState(PaymentContractInterface $contract): void
     {
-        $contract->captureAuthorization();
-        $this->contractRepository->save($contract);
+        // Sprint 82 (STRP-118): Handle two capture scenarios:
+        // - AUTHORIZED: Normal delayed capture → captureAuthorization() → READY_TO_COMMIT
+        // - COMMITTED: Manual capture order that skipped AUTHORIZED state.
+        //   Use ContractFulfillmentService to dispatch ContractFulfilledEvent,
+        //   which triggers OXPAID update via OrderPaymentCompletedHandler.
+        if ($contract->getState()->isAuthorized()) {
+            $contract->captureAuthorization();
+            $this->contractRepository->save($contract);
+        } elseif ($contract->getState()->isCommitted()) {
+            $this->contractFulfillmentService->fulfill($contract);
+        }
 
         $this->logger->info('Contract transitioned after capture', [
             'contract_id' => $contract->getId(),

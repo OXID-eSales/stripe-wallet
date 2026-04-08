@@ -168,7 +168,8 @@ class StripeCaptureRequestHandlerTest extends TestCase
         $this->handler->handle($event);
 
         $this->assertFalse($context->get('captureSuccess'));
-        $this->assertStringContainsString('not in AUTHORIZED state', $context->get('error'));
+        // Sprint 82: Error message updated from "not in AUTHORIZED state" to "not in capturable state"
+        $this->assertStringContainsString('not in capturable state', $context->get('error'));
     }
 
     public function testHandleSetsErrorWhenNoPaymentIntentFound(): void
@@ -702,6 +703,89 @@ class StripeCaptureRequestHandlerTest extends TestCase
         $this->handler->handle($event);
     }
 
+    // --- Sprint 82: Manual capture fix — capture on COMMITTED contracts ---
+
+    /**
+     * Sprint 82: Test that capture succeeds when contract is in COMMITTED state.
+     *
+     * When manual capture orders return from Stripe Checkout, the contract goes
+     * NOT_FINISHED -> PENDING -> READY_TO_COMMIT -> COMMITTED, skipping AUTHORIZED.
+     * The handler must accept COMMITTED state for capture.
+     */
+    public function testHandleSucceedsCaptureOnCommittedContract(): void
+    {
+        $context = new EventContext([
+            'contractId' => 'contract_committed',
+            'initiator' => 'admin',
+        ]);
+        $event = new StripeCaptureRequestEvent($context);
+
+        $contract = $this->createCommittedContractWithPaymentIntent('pi_committed_123');
+
+        $this->contractRepository
+            ->method('findById')
+            ->with('contract_committed')
+            ->willReturn($contract);
+
+        $this->captureService
+            ->expects($this->once())
+            ->method('processCapture')
+            ->with($contract)
+            ->willReturn(CaptureResponse::success(
+                providerPaymentId: 'pi_committed_123',
+                captureId: 'ch_committed_cap',
+                amountCaptured: 130.39,
+                currency: 'EUR',
+                status: 'succeeded',
+                capturedAt: new DateTimeImmutable()
+            ));
+
+        $this->handler->handle($event);
+
+        $this->assertTrue($context->get('captureSuccess'));
+        $this->assertEquals('ch_committed_cap', $context->get('captureId'));
+        $this->assertEquals(130.39, $context->get('capturedAmount'));
+    }
+
+    /**
+     * Sprint 82: Capture must still be rejected for non-capturable states (e.g. PENDING, FULFILLED).
+     */
+    public function testHandleRejectsCaptureOnPendingState(): void
+    {
+        $context = new EventContext([
+            'contractId' => 'contract_pending_reject',
+        ]);
+        $event = new StripeCaptureRequestEvent($context);
+
+        $contract = $this->createContractInState(ContractState::pending());
+        $this->contractRepository->method('findById')->willReturn($contract);
+
+        $this->captureService->expects($this->never())->method('processCapture');
+
+        $this->handler->handle($event);
+
+        $this->assertFalse($context->get('captureSuccess'));
+        $this->assertStringContainsString('Cannot capture', $context->get('error'));
+    }
+
+    public function testHandleRejectsCaptureOnFulfilledState(): void
+    {
+        $context = new EventContext([
+            'contractId' => 'contract_fulfilled_reject',
+        ]);
+        $event = new StripeCaptureRequestEvent($context);
+
+        $contract = $this->createContractInState(ContractState::fulfilled());
+        $this->contractRepository->method('findById')->willReturn($contract);
+
+        $this->captureService->expects($this->never())->method('processCapture');
+
+        $this->handler->handle($event);
+
+        $this->assertFalse($context->get('captureSuccess'));
+        $this->assertStringContainsString('Cannot capture', $context->get('error'));
+    }
+
     // --- Helper methods ---
 
     /**
@@ -724,6 +808,22 @@ class StripeCaptureRequestHandlerTest extends TestCase
         $contract->method('getProviderOrderId')->willReturn($paymentIntentId);
         $contract->method('getMetadata')->willReturnCallback(function (string $key) {
             return null; // No metadata values needed since providerOrderId is set
+        });
+        return $contract;
+    }
+
+    /**
+     * Sprint 82: Create a contract in COMMITTED state with PaymentIntent ID.
+     *
+     * @return PaymentContract&MockObject
+     */
+    private function createCommittedContractWithPaymentIntent(string $paymentIntentId): PaymentContract&MockObject
+    {
+        $contract = $this->createMock(PaymentContract::class);
+        $contract->method('getState')->willReturn(ContractState::committed());
+        $contract->method('getProviderOrderId')->willReturn($paymentIntentId);
+        $contract->method('getMetadata')->willReturnCallback(function (string $key) {
+            return null;
         });
         return $contract;
     }
