@@ -348,7 +348,18 @@ services:
     arguments:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
       $logger: '@oxid_esales.monolog.logger'
+      $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
     public: false
+
+  # OPC Buy Now modal: append opcModalId to Stripe success/cancel URLs so that
+  # both the success handler and the cancel handler can reopen the correct modal.
+  OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalSuccessUrlHandler:
+    tags:
+      - { name: payment.event_handler }
+
+  OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalCancelUrlHandler:
+    tags:
+      - { name: payment.event_handler }
 
   # ==========================================
   # Stripe Customer Service (Sprint 45)

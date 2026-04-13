@@ -226,7 +226,7 @@ class StripePaymentHandler implements PaymentHandlerInterface
             $contractToken,
             $sessionId
         );
-        $cancelUrl = $shopUrl . 'index.php?cl=payment';
+        $cancelUrl = $this->checkoutSessionService->buildCancelUrl($shopUrl . 'index.php?cl=payment');
 
         return $this->checkoutSessionService->createSession(
             contractId: $contractId,

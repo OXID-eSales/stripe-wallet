@@ -11,6 +11,9 @@ namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
+use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelUrlBuildEvent;
+use OxidEsales\Payments\Stripe\EventSystem\Event\StripeSuccessUrlBuildEvent;
 use OxidEsales\Payments\Stripe\Service\Result\CheckoutSessionResult;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
@@ -35,7 +38,8 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
 
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,
-        ?LoggerInterface $logger = null
+        ?LoggerInterface $logger = null,
+        private readonly ?EventDispatcherInterface $eventDispatcher = null,
     ) {
         $this->logger = $logger ?? new NullLogger();
     }
@@ -216,6 +220,26 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
             $url .= '&force_sid=' . urlencode($sessionId);
         }
 
+        if ($this->eventDispatcher !== null) {
+            $event = new StripeSuccessUrlBuildEvent($url, $contractId);
+            $this->eventDispatcher->dispatch($event);
+            $url = $event->getUrl();
+        }
+
         return $url;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function buildCancelUrl(string $cancelUrl): string
+    {
+        if ($this->eventDispatcher !== null) {
+            $event = new StripeCancelUrlBuildEvent($cancelUrl);
+            $this->eventDispatcher->dispatch($event);
+            $cancelUrl = $event->getUrl();
+        }
+
+        return $cancelUrl;
     }
 }

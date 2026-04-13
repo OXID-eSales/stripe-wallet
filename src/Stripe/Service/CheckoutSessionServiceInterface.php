@@ -70,4 +70,14 @@ interface CheckoutSessionServiceInterface
      * @param string $sessionId OXID session ID to preserve session across external redirect
      */
     public function buildSuccessUrl(string $shopUrl, string $contractId, string $contractToken, string $sessionId = ''): string;
+
+    /**
+     * Dispatch StripeCancelUrlBuildEvent and return the (possibly modified) cancel URL.
+     *
+     * The caller is responsible for providing the full base cancel URL.
+     * Listeners (e.g. OPC modal) may append additional parameters.
+     *
+     * @param string $cancelUrl Full base cancel URL, e.g. $shopUrl.'index.php?cl=payment'
+     */
+    public function buildCancelUrl(string $cancelUrl): string;
 }
