@@ -86,6 +86,9 @@ class StripeOrderController extends OrderController
         }
 
         $helper->clearStripeSessionVariables();
+
+        // Sprint 88: Generate new sess_challenge after storno cleanup
+        $helper->setSessionVariable('sess_challenge', $this->generateNewSessChallenge());
     }
 
     /**
@@ -337,6 +340,11 @@ class StripeOrderController extends OrderController
             }
             $helper->clearStripeSessionVariables();
         }
+
+        // Sprint 88: Generate new sess_challenge so the next finalizeOrder()
+        // creates a fresh order row instead of hitting checkOrderExist() for
+        // the storno'd order that remains in the database.
+        $helper->setSessionVariable('sess_challenge', $this->generateNewSessChallenge());
 
         return 'payment';
     }

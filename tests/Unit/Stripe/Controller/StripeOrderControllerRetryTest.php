@@ -129,8 +129,9 @@ class StripeOrderControllerRetryTest extends TestCase
         $result = $controller->checkoutCancel();
 
         $this->assertSame('payment', $result);
-        // Session variables should be cleared
-        $this->assertSame([], $helper->sessionVars);
+        // Sprint 88: Session cleared + new sess_challenge generated for retry
+        $this->assertArrayHasKey('sess_challenge', $helper->sessionVars);
+        $this->assertNotEmpty($helper->sessionVars['sess_challenge']);
     }
 
     public function testCheckoutCancelContinuesOnCleanupFailure(): void
@@ -149,7 +150,8 @@ class StripeOrderControllerRetryTest extends TestCase
         $result = $controller->checkoutCancel();
 
         $this->assertSame('payment', $result);
-        $this->assertSame([], $helper->sessionVars);
+        // Sprint 88: New sess_challenge always generated, even on cleanup failure
+        $this->assertArrayHasKey('sess_challenge', $helper->sessionVars);
     }
 
     public function testCheckoutCancelSkipsCleanupWhenNoContract(): void

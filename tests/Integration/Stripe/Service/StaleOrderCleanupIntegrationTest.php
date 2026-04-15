@@ -92,12 +92,14 @@ final class StaleOrderCleanupIntegrationTest extends IntegrationTestCase
         // Assert: At least one contract cleaned (may include pre-existing stale data)
         $this->assertGreaterThanOrEqual(1, $cleaned, 'Expected at least 1 stale contract to be cleaned');
 
-        // Assert: Order deleted from oxorder
+        // Sprint 88: Assert order is retained with OXSTORNO=1 and CANCELLED status (not deleted)
         $orderRow = $this->connection->fetchAssociative(
-            'SELECT OXID FROM oxorder WHERE OXID = :id',
+            'SELECT OXID, OXSTORNO, OXTRANSSTATUS FROM oxorder WHERE OXID = :id',
             ['id' => $orderId]
         );
-        $this->assertFalse($orderRow, 'Stale NOT_FINISHED order should be deleted');
+        $this->assertNotFalse($orderRow, 'Stale NOT_FINISHED order should be retained (not deleted)');
+        $this->assertEquals(1, $orderRow['OXSTORNO'], 'Order should be marked as storno');
+        $this->assertSame('CANCELLED', $orderRow['OXTRANSSTATUS'], 'Order status should be CANCELLED');
 
         // Assert: Contract state is cancelled
         $contractRow = $this->connection->fetchAssociative(

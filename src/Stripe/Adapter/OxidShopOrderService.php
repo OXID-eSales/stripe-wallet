@@ -201,6 +201,16 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
     }
 
     /**
+     * Cancel a NOT_FINISHED order and preserve it in the database.
+     *
+     * Sprint 88 (STRP-123): Orders are retained with OXSTORNO=1 and
+     * OXTRANSSTATUS='CANCELLED' to preserve order number sequence (no gaps).
+     * Vouchers are reset for reuse.
+     *
+     * Setting OXTRANSSTATUS to 'CANCELLED' (instead of keeping 'NOT_FINISHED')
+     * prevents OXID's checkOrderExist() from treating the cancelled order as
+     * a valid order for the same sess_challenge on retry.
+     *
      * @inheritDoc
      */
     public function deleteNotFinishedOrder(string $orderId): bool
@@ -218,7 +228,12 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
 
         $this->resetVouchersForOrder($orderId);
 
-        return (bool) $order->delete();
+        // Sprint 88: Mark as storno + cancelled instead of deleting
+        $order->oxorder__oxstorno = new \OxidEsales\Eshop\Core\Field(1, \OxidEsales\Eshop\Core\Field::T_RAW);
+        $order->oxorder__oxtransstatus = new \OxidEsales\Eshop\Core\Field('CANCELLED', \OxidEsales\Eshop\Core\Field::T_RAW);
+        $order->save();
+
+        return true;
     }
 
     /**
