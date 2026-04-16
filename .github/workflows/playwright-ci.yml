@@ -63,6 +63,12 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install dependencies
+        working-directory: ${{ env.PLAYWRIGHT_PATH }}
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
       - name: Create .env
         working-directory: ${{ env.PLAYWRIGHT_PATH }}
         run: |
