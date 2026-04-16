@@ -141,9 +141,13 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         $sessionId = $this->getContextString($context, 'sessionId', '');
         $shopId = $this->getContextString($context, 'shopId', '1');
 
+        $rawLangId = $context->get('languageId');
+        $languageId = is_numeric($rawLangId) ? (int) $rawLangId : 0;
+        $shopIdInt = is_numeric($shopId) ? (int) $shopId : 1;
+
         $contractToken = $this->tokenService->generateToken($contractId);
-        $successUrl = $this->checkoutSessionService->buildSuccessUrl($shopUrl, $contractId, $contractToken, $sessionId);
-        $cancelUrl = $this->checkoutSessionService->buildCancelUrl($shopUrl . 'index.php?cl=order&fnc=checkoutCancel');
+        $successUrl = $this->checkoutSessionService->buildSuccessUrl($shopUrl, $contractId, $contractToken, $sessionId, $languageId, $shopIdInt);
+        $cancelUrl = $shopUrl . 'index.php?cl=order&fnc=checkoutCancel&lang=' . $languageId . '&shp=' . $shopIdInt;
 
         $orderId = $contract->getOrderId();
         $orderNumber = $contract->getMetadata('order_number');

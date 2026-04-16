@@ -439,6 +439,37 @@ class CheckoutSessionServiceTest extends TestCase
         $this->assertStringContainsString('contract_token=token%2Bwith%2Bplus', $url);
     }
 
+    // --- Sprint 89: Language + Shop in return URL ---
+
+    public function testBuildSuccessUrlIncludesLanguageAndShopParameters(): void
+    {
+        $service = $this->createService();
+        $url = $service->buildSuccessUrl(
+            'https://shop.example.com/',
+            'contract_abc',
+            'token_xyz',
+            'session_123',
+            1,
+            2
+        );
+
+        $this->assertStringContainsString('&lang=1', $url);
+        $this->assertStringContainsString('&shp=2', $url);
+    }
+
+    public function testBuildSuccessUrlDefaultsToLangZeroShpOne(): void
+    {
+        $service = $this->createService();
+        $url = $service->buildSuccessUrl(
+            'https://shop.example.com/',
+            'contract_abc',
+            'token_xyz'
+        );
+
+        $this->assertStringContainsString('&lang=0', $url);
+        $this->assertStringContainsString('&shp=1', $url);
+    }
+
     // --- Sprint 45: Stripe Customer Tests ---
 
     public function testCreateSessionWithStripeCustomerId(): void

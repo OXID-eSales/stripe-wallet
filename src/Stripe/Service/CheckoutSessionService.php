@@ -208,9 +208,17 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
     /**
      * @inheritDoc
      */
-    public function buildSuccessUrl(string $shopUrl, string $contractId, string $contractToken, string $sessionId = ''): string
-    {
+    public function buildSuccessUrl(
+        string $shopUrl,
+        string $contractId,
+        string $contractToken,
+        string $sessionId = '',
+        int $languageId = 0,
+        int $shopId = 1
+    ): string {
         $url = $shopUrl . 'index.php?cl=order&fnc=checkoutSuccess'
+            . '&lang=' . $languageId
+            . '&shp=' . $shopId
             . '&session_id={CHECKOUT_SESSION_ID}'
             . '&contract_id=' . urlencode($contractId)
             . '&contract_token=' . urlencode($contractToken);

@@ -189,6 +189,7 @@ class StripeOrderController extends OrderController
                 'sessionId' => $helper->getSessionId(),
                 'shopId' => $helper->getShopId(),
                 'shopUrl' => $helper->getShopUrl(),
+                'languageId' => $helper->getActiveLanguageId(),
                 'captureMode' => $helper->getCaptureMode(),
                 'conditionTypes' => ['payment_authorized'],
             ]);

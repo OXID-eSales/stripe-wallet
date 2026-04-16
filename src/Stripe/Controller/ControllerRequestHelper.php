@@ -114,6 +114,11 @@ class ControllerRequestHelper
         return (int) Registry::getConfig()->getShopId();
     }
 
+    public function getActiveLanguageId(): int
+    {
+        return (int) Registry::getLang()->getBaseLanguage();
+    }
+
     public function getShopUrl(): string
     {
         return Registry::getConfig()->getShopUrl();
