@@ -366,11 +366,15 @@ services:
   # ==========================================
   # Resolves or creates Stripe Customer objects for email prefill and saved cards.
 
+  OxidEsales\Payments\Stripe\Service\CustomerDataSanitizer:
+    public: false
+
   OxidEsales\Payments\Stripe\Service\StripeCustomerServiceInterface:
     class: OxidEsales\Payments\Stripe\Service\StripeCustomerService
     arguments:
       $customerRepository: '@OxidEsales\PaymentComponent\Repository\PaymentCustomerRepositoryInterface'
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $sanitizer: '@OxidEsales\Payments\Stripe\Service\CustomerDataSanitizer'
       $logger: '@oxid_esales.monolog.logger'
     public: false
 

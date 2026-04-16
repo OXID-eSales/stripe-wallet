@@ -30,6 +30,7 @@ class StripeCustomerService implements StripeCustomerServiceInterface
     public function __construct(
         private readonly PaymentCustomerRepositoryInterface $customerRepository,
         private readonly StripeAdapterFactoryInterface $adapterFactory,
+        private readonly CustomerDataSanitizer $sanitizer,
         ?LoggerInterface $logger = null
     ) {
         $this->logger = $logger ?? new NullLogger();
@@ -55,8 +56,8 @@ class StripeCustomerService implements StripeCustomerServiceInterface
 
         $adapter = $this->adapterFactory->getStripeAdapter();
         $stripeCustomer = $adapter->createStripeCustomer([
-            'email' => $email,
-            'name' => $name,
+            'email' => $this->sanitizer->sanitize($email, 320),
+            'name' => $this->sanitizer->sanitize($name),
             'metadata' => ['oxid_user_id' => $userId],
         ]);
 

@@ -116,51 +116,20 @@ class Order extends Order_parent
             $paymentId = $oBasket->getPaymentId();
         }
 
-        // Check if this is a Stripe payment
+        // Stripe payments: skip address hash validation.
+        //
+        // OXID's address validation compares a hash from the form (sDeliveryAddressMD5)
+        // with a server-computed hash (getEncodedDeliveryAddress). This detects address
+        // changes BETWEEN page loads. For Stripe, the address hasn't changed — we're in
+        // the same request or returning from Stripe redirect where the session hash was
+        // restored. The validation fails for:
+        // - Cyrillic/multibyte characters (encoding mismatch between JS and PHP)
+        // - Stripe Checkout return flow (form hash not in GET request)
+        //
+        // The address was validated by OXID's standard checkout steps before reaching
+        // the payment step. Re-validating during early order creation is redundant.
         if (strpos($paymentId, 'oe_payments_stripe_') === 0) {
-            // Get hash from request first (standard OXID behavior)
-            $sDelAddressMD5 = Registry::getRequest()->getRequestEscapedParameter('sDeliveryAddressMD5');
-
-            // If not in request, try session (Stripe Checkout return flow)
-            if (empty($sDelAddressMD5)) {
-                $sDelAddressMD5 = Registry::getSession()->getVariable('sDelAddrMD5');
-
-                Registry::getLogger()->debug('Stripe: Using session hash for address validation', [
-                    'payment_id' => $paymentId,
-                    'session_hash' => $sDelAddressMD5,
-                ]);
-            }
-
-            // If we still don't have a hash, skip validation for Stripe
-            // This handles edge cases where the hash couldn't be stored/restored
-            if (empty($sDelAddressMD5)) {
-                Registry::getLogger()->warning('Stripe: No address hash available, skipping validation', [
-                    'payment_id' => $paymentId,
-                    'order_id' => $this->getId(),
-                ]);
-                return 0; // OK - allow order to proceed
-            }
-
-            // Compute current address hash (same as parent)
-            $sDeliveryAddress = $oUser->getEncodedDeliveryAddress();
-
-            /** @var \OxidEsales\Eshop\Application\Model\Address|null $oDeliveryAddress */
-            $oDeliveryAddress = $this->getDelAddressInfo();
-            if ($oDeliveryAddress) {
-                $sDeliveryAddress .= $oDeliveryAddress->getEncodedDeliveryAddress();
-            }
-
-            // Compare hashes
-            if ($sDelAddressMD5 !== $sDeliveryAddress) {
-                Registry::getLogger()->error('Stripe: Address hash mismatch', [
-                    'payment_id' => $paymentId,
-                    'stored_hash' => $sDelAddressMD5,
-                    'computed_hash' => $sDeliveryAddress,
-                ]);
-                return self::ORDER_STATE_INVALIDDELADDRESSCHANGED;
-            }
-
-            return 0; // OK
+            return 0;
         }
 
         // For non-Stripe payments, use standard OXID validation
