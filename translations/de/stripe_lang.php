@@ -82,6 +82,21 @@ $aLang = [
     'OSC_STRIPE_PAYMENT_DATE'                   => 'Zahlungsdatum',
     'OSC_STRIPE_PAYMENT_AMOUNT'                 => 'Zahlungsbetrag',
 
+    // Card Element Labels + Validation (Sprint 91)
+    'OSC_STRIPE_CARD_NUMBER'                    => 'Kartennummer',
+    'OSC_STRIPE_CARD_EXDATE'                    => 'Ablaufdatum',
+    'OSC_STRIPE_CARD_CVC'                       => 'CVC',
+    'OSC_STRIPE_CARD_NAME'                      => 'Name des Karteninhabers',
+    'OSC_STRIPE_ERROR_MISSING_NAME'             => 'Bitte geben Sie den Namen des Karteninhabers ein.',
+    'OSC_STRIPE_ERROR_MISSING_NUMBER'           => 'Bitte geben Sie eine gültige Kartennummer ein.',
+    'OSC_STRIPE_ERROR_MISSING_CVC'              => 'Bitte geben Sie den CVC-Code ein.',
+    'OSC_STRIPE_ERROR_MISSING_EXDATE'           => 'Bitte geben Sie das Ablaufdatum ein.',
+    'OSC_STRIPE_ERROR_INBOX'                    => 'Bitte überprüfen Sie Ihre Eingabe.',
+    'OSC_STRIPE_UNKNOWN_ERROR'                  => 'Ein unbekannter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.',
+    'OSC_STRIPE_AUTHORIZATION_DENIED_ERROR'     => 'Autorisierung abgelehnt. Bitte verwenden Sie eine andere Zahlungsmethode.',
+    'OSC_STRIPE_VAULTING_VAULTED_PAYMENTS'      => 'Gespeicherte Zahlungsmethoden',
+    'OSC_STRIPE_CONTINUE_TO_NEXT_STEP'          => 'Weiter',
+
     // JavaScript Controller Translations
     'STRIPE_JS_AGB_REQUIRED'                    => 'Bitte akzeptieren Sie die AGB',
     'STRIPE_JS_CONFIG_ERROR'                    => 'Stripe Konfigurationsfehler. Bitte kontaktieren Sie den Support.',

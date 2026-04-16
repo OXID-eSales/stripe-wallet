@@ -43,3 +43,26 @@ Create `CustomerDataSanitizer` — strip control chars, validate UTF-8, collapse
 | 90a | RED — 12 failing tests | done | ASCII, umlauts, Cyrillic, emoji, control chars, invalid UTF-8, max length |
 | 90b | GREEN — Sanitizer + DI wiring | done | 1 new file, 2 modified (customer service + services.yaml), 1 test updated |
 | 90c | REFACTOR — Pre-commit | done | 836 tests, all checks pass, COMMITABLE |
+
+---
+
+## Sprint 91: STRP-126 Security Hardening — Missing Translations + Stripe.js SRI
+
+### Problem
+
+1. **13 translation keys missing** in both EN and DE — card element labels and error messages render as raw key names
+2. **Stripe.js loaded without integrity** — SRI not possible (Stripe doesn't support it), CSP meta tag needed instead
+
+### Fix
+
+- Add 13 EN + 13 DE translation keys for card form labels, validation errors, and checkout flow
+- Add CSP `script-src` meta tag restricting scripts to `self` + `js.stripe.com` + `m.stripe.com`
+- Document SRI decision (Stripe doesn't support it, CSP is the alternative)
+
+### Sub-Sprint Progress
+
+| Sprint | Description | Status | Notes |
+|--------|-------------|--------|-------|
+| 91a | RED — Translation completeness test | done | 4 tests: EN keys, DE keys, EN values, DE values |
+| 91b | GREEN — 13 EN + 13 DE translations + CSP meta | done | Card labels, validation errors, checkout flow |
+| 91c | REFACTOR — Pre-commit | done | All checks pass, COMMITABLE |

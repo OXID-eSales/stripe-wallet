@@ -82,6 +82,21 @@ $aLang = [
     'OSC_STRIPE_PAYMENT_DATE'                   => 'Payment Date',
     'OSC_STRIPE_PAYMENT_AMOUNT'                 => 'Payment Amount',
 
+    // Card Element Labels + Validation (Sprint 91)
+    'OSC_STRIPE_CARD_NUMBER'                    => 'Card Number',
+    'OSC_STRIPE_CARD_EXDATE'                    => 'Expiry Date',
+    'OSC_STRIPE_CARD_CVC'                       => 'CVC',
+    'OSC_STRIPE_CARD_NAME'                      => 'Cardholder Name',
+    'OSC_STRIPE_ERROR_MISSING_NAME'             => 'Please enter the cardholder name.',
+    'OSC_STRIPE_ERROR_MISSING_NUMBER'           => 'Please enter a valid card number.',
+    'OSC_STRIPE_ERROR_MISSING_CVC'              => 'Please enter the CVC code.',
+    'OSC_STRIPE_ERROR_MISSING_EXDATE'           => 'Please enter the expiry date.',
+    'OSC_STRIPE_ERROR_INBOX'                    => 'Please check your input.',
+    'OSC_STRIPE_UNKNOWN_ERROR'                  => 'An unknown error occurred. Please try again.',
+    'OSC_STRIPE_AUTHORIZATION_DENIED_ERROR'     => 'Authorization denied. Please use a different payment method.',
+    'OSC_STRIPE_VAULTING_VAULTED_PAYMENTS'      => 'Saved Payment Methods',
+    'OSC_STRIPE_CONTINUE_TO_NEXT_STEP'          => 'Continue',
+
     // JavaScript Controller Translations
     'STRIPE_JS_AGB_REQUIRED'                    => 'Please accept the terms and conditions',
     'STRIPE_JS_CONFIG_ERROR'                    => 'Stripe configuration error. Please contact support.',
