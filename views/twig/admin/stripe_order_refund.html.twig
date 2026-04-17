@@ -219,11 +219,6 @@
             <strong>{{ translate({ ident: "STRIPE_NOTICE" }) }}</strong> &mdash;
             {{ translate({ ident: "STRIPE_API_ERROR" }) }}: {{ oView.getStripeApiError() }}
         </div>
-    {% elseif blIsOrderRefundable == false and blIsOrderCapturable == false %}
-        <div class="s-alert s-alert-warning">
-            <strong>{{ translate({ ident: "STRIPE_NOTICE" }) }}</strong> &mdash;
-            {{ translate({ ident: "STRIPE_ORDER_NOT_REFUNDABLE" }) }}
-        </div>
     {% endif %}
 
     {% set order = oView.getOrder() %}

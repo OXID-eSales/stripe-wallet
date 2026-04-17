@@ -75,7 +75,6 @@ $aLang = array(
     'STRIPE_FULL_REFUND_NOT_AVAILABLE'                  => 'A full refund is not available for this order anymore, there were partial refunds already.',
     'STRIPE_REFUND_DESCRIPTION'                         => 'Refund notice',
     'STRIPE_REFUND_DESCRIPTION_PLACEHOLDER'             => 'optional - max 140 characters',
-    'STRIPE_ORDER_NOT_REFUNDABLE'                       => 'This order has been refunded completely already.',
     'STRIPE_API_ERROR'                                  => 'Stripe API Error',
     'STRIPE_REFUND_REMAINING'                           => 'Refund remaining sum',
     'STRIPE_APPLE_PAY_BUTTON_ONLY_LIVE_MODE'            => 'Please note: Payment with the Apple Pay Button is only available in live-mode.',

@@ -75,7 +75,6 @@ $aLang = array(
     'STRIPE_FULL_REFUND_NOT_AVAILABLE'                  => 'Eine Vollständige Rückerstattung ist für diese Bestellung nicht mehr verfügbar, da Sie bereits Einzelpositionen zurückerstattet haben.',
     'STRIPE_REFUND_DESCRIPTION'                         => 'Erstattungs-Hinweis',
     'STRIPE_REFUND_DESCRIPTION_PLACEHOLDER'             => 'Optional - Max 140 Zeichen',
-    'STRIPE_ORDER_NOT_REFUNDABLE'                       => 'Diese Bestellung wurde bereits vollständig erstattet.',
     'STRIPE_API_ERROR'                                  => 'Stripe API Fehler',
     'STRIPE_REFUND_REMAINING'                           => 'Verbliebene Summe erstatten',
     'STRIPE_APPLE_PAY_BUTTON_ONLY_LIVE_MODE'            => 'Hinweis: Bezahlung mit Apple Pay Button ist nur im Live-Modus möglich',
