@@ -244,7 +244,7 @@ class RefundServiceTest extends TestCase
         $this->assertEquals('charge_already_refunded', $result->errorCode);
     }
 
-    // --- processFullRefund Tests ---
+    // --- processRefund Tests ---
 
     public function testProcessFullRefundSuccess(): void
     {
@@ -278,7 +278,7 @@ class RefundServiceTest extends TestCase
 
         // Act
         $service = $this->createService();
-        $result = $service->processFullRefund(
+        $result = $service->processRefund(
             'order_full',
             'pi_full_test',
             'requested_by_customer'
@@ -287,6 +287,52 @@ class RefundServiceTest extends TestCase
         // Assert - Full refund returns amount from Stripe response
         $this->assertTrue($result->isSuccessful());
         $this->assertEquals(100.00, $result->amountRefunded); // Amount in major units
+    }
+
+    public function testProcessPartialRefundPassesAmountInCents(): void
+    {
+        // Arrange
+        $paymentIntent = PaymentIntent::constructFrom([
+            'id' => 'pi_partial_test',
+            'latest_charge' => 'ch_partial_test',
+        ]);
+
+        $refund = Refund::constructFrom([
+            'id' => 're_partial',
+            'amount' => 550,
+            'currency' => 'eur',
+            'status' => 'succeeded',
+        ]);
+
+        $this->stripeAdapter
+            ->method('retrievePaymentIntent')
+            ->willReturn($paymentIntent);
+
+        $this->stripeAdapter
+            ->expects($this->once())
+            ->method('createRefundByCharge')
+            ->with(
+                'ch_partial_test',
+                550, // 5.50 EUR = 550 cents
+                'requested_by_customer',
+                $this->anything()
+            )
+            ->willReturn($refund);
+
+        // Act
+        $service = $this->createService();
+        $result = $service->processRefund(
+            'order_partial',
+            'pi_partial_test',
+            'requested_by_customer',
+            null,
+            'admin',
+            5.50
+        );
+
+        // Assert
+        $this->assertTrue($result->isSuccessful());
+        $this->assertEquals(5.50, $result->amountRefunded);
     }
 
     public function testProcessFullRefundHandlesChargeObjectInPaymentIntent(): void
@@ -319,7 +365,7 @@ class RefundServiceTest extends TestCase
 
         // Act
         $service = $this->createService();
-        $result = $service->processFullRefund('order_obj', 'pi_expanded');
+        $result = $service->processRefund('order_obj', 'pi_expanded');
 
         // Assert
         $this->assertTrue($result->isSuccessful());
@@ -339,7 +385,7 @@ class RefundServiceTest extends TestCase
 
         // Act
         $service = $this->createService();
-        $result = $service->processFullRefund('order_no_charge', 'pi_no_charge');
+        $result = $service->processRefund('order_no_charge', 'pi_no_charge');
 
         // Assert
         $this->assertFalse($result->isSuccessful());

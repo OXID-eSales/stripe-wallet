@@ -108,12 +108,19 @@ class OrderRefundViewDataProvider
      */
     public function getCaptureableAmount(Order $order): string
     {
+        return $this->formatPrice($this->getCaptureableRaw($order), $order);
+    }
+
+    /**
+     * Get capturable amount as raw float (for input fields).
+     */
+    public function getCaptureableRaw(Order $order): float
+    {
         $paymentIntent = $this->getPaymentIntent($order);
         if ($paymentIntent === null) {
-            return $this->formatPrice(0, $order);
+            return 0.0;
         }
-        $amount = (int) ($paymentIntent->amount ?? 0);
-        return $this->formatPrice($amount / 100, $order);
+        return (int) ($paymentIntent->amount ?? 0) / 100;
     }
 
     /**
@@ -137,12 +144,19 @@ class OrderRefundViewDataProvider
      */
     public function getRemainingRefundableAmount(Order $order): string
     {
+        return $this->formatPrice($this->getRemainingRefundableRaw($order), $order);
+    }
+
+    /**
+     * Get remaining refundable amount as raw float (for input fields).
+     */
+    public function getRemainingRefundableRaw(Order $order): float
+    {
         $charge = $this->getLastCharge($order, true);
-        $price = 0;
         if ($charge && !empty($charge->amount_captured)) {
-            $price = ($charge->amount_captured - ($charge->amount_refunded ?? 0)) / 100;
+            return ($charge->amount_captured - ($charge->amount_refunded ?? 0)) / 100;
         }
-        return $this->formatPrice($price, $order);
+        return 0.0;
     }
 
     /**

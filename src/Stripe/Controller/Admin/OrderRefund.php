@@ -154,6 +154,12 @@ class OrderRefund extends AdminDetailsController
         return $order !== null ? $this->getViewDataProvider()->getCaptureableAmount($order) : '0';
     }
 
+    public function getCaptureableRaw(): float
+    {
+        $order = $this->getOrder();
+        return $order !== null ? $this->getViewDataProvider()->getCaptureableRaw($order) : 0.0;
+    }
+
     public function isOrderCancellable(): bool
     {
         return $this->_blSuccessfulCancel !== true && $this->isOrderCapturable();
@@ -161,16 +167,12 @@ class OrderRefund extends AdminDetailsController
 
     public function isOrderRefundable(): bool
     {
-        // Sprint 82 (STRP-118): Cannot refund what hasn't been captured.
+        // Cannot refund what hasn't been captured.
         // Hide refund section for uncaptured manual-capture orders.
         if ($this->isOrderCapturable()) {
             return false;
         }
 
-        $fnc = Registry::getRequest()->getRequestEscapedParameter('fnc');
-        if ($this->_blSuccessfulRefund === true && $fnc == 'fullRefund') {
-            return false;
-        }
         $order = $this->getOrder();
         return $order !== null && $this->getViewDataProvider()->isOrderRefundable($order);
     }
@@ -179,6 +181,12 @@ class OrderRefund extends AdminDetailsController
     {
         $order = $this->getOrder();
         return $order !== null ? $this->getViewDataProvider()->getRemainingRefundableAmount($order) : '0';
+    }
+
+    public function getRemainingRefundableRaw(): float
+    {
+        $order = $this->getOrder();
+        return $order !== null ? $this->getViewDataProvider()->getRemainingRefundableRaw($order) : 0.0;
     }
 
     public function getStripeCapturedAmount(): string
@@ -227,11 +235,6 @@ class OrderRefund extends AdminDetailsController
     public function getStripeApiError(): ?string
     {
         return $this->getViewDataProvider()->getApiError();
-    }
-
-    public function isFullRefundAvailable(): bool
-    {
-        return $this->getOrder() !== null;
     }
 
     // =========================================================================

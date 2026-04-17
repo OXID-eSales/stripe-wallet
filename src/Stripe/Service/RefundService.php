@@ -19,16 +19,7 @@ use Psr\Log\NullLogger;
 use Stripe\Refund;
 
 /**
- * Service for processing Stripe refunds.
- *
- * Sprint 21: Extract business logic from StripeRefundRequestHandler.
- * Sprint 22: Removed partial refund - Stripe module only supports full refunds.
- * Sprint 24: Added stock restoration on successful refund.
- *
- * SOLID Principles:
- * - SRP: Only handles refund processing logic
- * - OCP: Can be extended for different refund strategies
- * - DIP: Depends on abstractions (interfaces)
+ * Service for processing Stripe refunds (full and partial).
  *
  * @since 2.0.0
  */
@@ -47,12 +38,13 @@ final class RefundService implements RefundServiceInterface
         $this->logger = $logger ?? new NullLogger();
     }
 
-    public function processFullRefund(
+    public function processRefund(
         string $orderId,
         ?string $paymentIntentId = null,
         ?string $reason = null,
         ?string $description = null,
-        string $initiator = 'admin'
+        string $initiator = 'admin',
+        ?float $amount = null
     ): RefundResponse {
         if ($paymentIntentId === null) {
             return RefundResponse::failure('Payment intent ID is required for refund');
@@ -65,8 +57,9 @@ final class RefundService implements RefundServiceInterface
 
         $metadata = $this->buildMetadata($orderId, $initiator, $description);
         $validReason = $this->validateReason($reason);
+        $amountInCents = $amount !== null ? (int) round($amount * 100) : null;
 
-        return $this->executeRefundByCharge($chargeId, $orderId, $paymentIntentId, $validReason, $metadata);
+        return $this->executeRefundByCharge($chargeId, $orderId, $paymentIntentId, $validReason, $metadata, $amountInCents);
     }
 
     public function processRefundByCharge(
@@ -84,19 +77,20 @@ final class RefundService implements RefundServiceInterface
      * Execute refund by charge ID with order context.
      *
      * @param array<string, string>|null $metadata
+     * @param int|null $amountInCents Refund amount in cents (null = full refund)
      */
     private function executeRefundByCharge(
         string $chargeId,
         ?string $orderId,
         ?string $paymentIntentId,
         ?string $reason,
-        ?array $metadata
+        ?array $metadata,
+        ?int $amountInCents = null
     ): RefundResponse {
         try {
-            // Always full refund (null amount)
             $refund = $this->adapterFactory
                 ->getStripeAdapter()
-                ->createRefundByCharge($chargeId, null, $reason, $metadata);
+                ->createRefundByCharge($chargeId, $amountInCents, $reason, $metadata);
 
             return $this->handleRefundResponse($refund, $chargeId, $orderId, $paymentIntentId);
         } catch (PaymentAdapterException $e) {

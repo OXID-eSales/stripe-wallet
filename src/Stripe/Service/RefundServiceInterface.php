@@ -14,34 +14,31 @@ use OxidEsales\PaymentComponent\Adapter\Response\RefundResponse;
 /**
  * Service interface for processing Stripe refunds.
  *
- * Sprint 21: Extract business logic from StripeRefundRequestHandler.
- * Sprint 22: Removed partial refund - Stripe module only supports full refunds.
- *
- * SOLID Principles:
- * - SRP: Handles refund processing only
- * - OCP: Can be extended for different refund strategies
- * - DIP: Handlers depend on this abstraction
- * - ISP: Focused interface for refund operations only
+ * Supports both full and partial refunds. When amount is null, the entire
+ * captured amount is refunded. When amount is provided, only that amount
+ * (in major currency units, e.g. 5.50 EUR) is refunded.
  *
  * @since 2.0.0
  */
 interface RefundServiceInterface
 {
     /**
-     * Process a full refund for an order.
+     * Process a refund for an order (full or partial).
      *
      * @param string $orderId OXID order ID
      * @param string|null $paymentIntentId Optional PaymentIntent ID (if known)
      * @param string|null $reason Optional refund reason (duplicate, fraudulent, requested_by_customer)
      * @param string|null $description Optional description for metadata
      * @param string $initiator Who triggered the refund (admin, webhook, api, mcp)
+     * @param float|null $amount Refund amount in major currency units (null = full refund)
      */
-    public function processFullRefund(
+    public function processRefund(
         string $orderId,
         ?string $paymentIntentId = null,
         ?string $reason = null,
         ?string $description = null,
-        string $initiator = 'admin'
+        string $initiator = 'admin',
+        ?float $amount = null
     ): RefundResponse;
 
     /**

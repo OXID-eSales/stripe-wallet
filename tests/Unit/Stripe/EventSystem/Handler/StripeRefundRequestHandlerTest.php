@@ -77,7 +77,7 @@ class StripeRefundRequestHandlerTest extends TestCase
         };
 
         // RefundService should never be called for non-matching events
-        $this->refundService->expects($this->never())->method('processFullRefund');
+        $this->refundService->expects($this->never())->method('processRefund');
         $this->refundService->expects($this->never())->method('processRefundByCharge');
 
         $handler->handle($otherEvent);
@@ -316,9 +316,27 @@ class StripeRefundRequestHandlerTest extends TestCase
         $handler->callUpdateContractState($event);
     }
 
-    public function testSkipsContractUpdateWhenNotFullRefund(): void
+    public function testPartialRefundUpdatesContractWithPartialAmount(): void
     {
-        $this->contractRepository->expects($this->never())->method('findById');
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getState')->willReturn(ContractState::fulfilled());
+        $contract->method('getAmount')->willReturn(99.99);
+
+        $contract->expects($this->once())
+            ->method('addRefundedAmount')
+            ->with(25.50);
+
+        $contract->expects($this->once())
+            ->method('setRefundedAt')
+            ->with($this->isInstanceOf(DateTimeInterface::class));
+
+        $this->contractRepository->method('findById')
+            ->with('contract_123')
+            ->willReturn($contract);
+
+        $this->contractRepository->expects($this->once())
+            ->method('save')
+            ->with($contract);
 
         $context = new EventContext([
             'orderId' => 'order_abc',
@@ -342,30 +360,6 @@ class StripeRefundRequestHandlerTest extends TestCase
         $context = new EventContext([
             'orderId' => 'order_abc',
             'contractId' => 'contract_missing',
-            'amount' => null,
-        ]);
-        $event = new StripeRefundRequestEvent($context);
-
-        $handler = $this->createTestableHandler();
-        $handler->callUpdateContractState($event);
-    }
-
-    public function testIdempotencyGuardSkipsAlreadyRefundedContract(): void
-    {
-        $contract = $this->createMock(PaymentContractInterface::class);
-        $contract->method('getRefundedAmount')->willReturn(99.99);
-
-        $contract->expects($this->never())->method('addRefundedAmount');
-
-        $this->contractRepository->method('findById')
-            ->with('contract_123')
-            ->willReturn($contract);
-
-        $this->contractRepository->expects($this->never())->method('save');
-
-        $context = new EventContext([
-            'orderId' => 'order_abc',
-            'contractId' => 'contract_123',
             'amount' => null,
         ]);
         $event = new StripeRefundRequestEvent($context);

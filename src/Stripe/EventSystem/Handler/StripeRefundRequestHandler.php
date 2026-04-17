@@ -18,14 +18,11 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
 /**
- * Handles refund requests via Stripe API.
- *
- * Sprint 21: Refactored to delegate to RefundService (SRP).
- * Sprint 22: Removed OrderRefundUpdateService (dead code), removed partial refund.
+ * Handles refund requests via Stripe API (full and partial).
  *
  * Handler responsibilities (ONLY):
  * 1. Receive event and extract parameters
- * 2. Delegate to RefundService (full refund only)
+ * 2. Delegate to RefundService
  * 3. Delegate logging to RequestLogService
  * 4. Set results in context
  *
@@ -136,11 +133,6 @@ class StripeRefundRequestHandler implements HandlerInterface
         return $transId;
     }
 
-    /**
-     * Execute refund via RefundService.
-     *
-     * Sprint 87: Supports both full (amount=null) and partial refunds.
-     */
     private function executeRefund(
         StripeRefundRequestEvent $event,
         string $orderId,
@@ -155,12 +147,13 @@ class StripeRefundRequestHandler implements HandlerInterface
             );
         }
 
-        return $this->refundService->processFullRefund(
+        return $this->refundService->processRefund(
             $orderId,
             $paymentIntentId,
             $event->getReason(),
             $event->getDescription(),
-            $event->getInitiator()
+            $event->getInitiator(),
+            $event->getAmount()
         );
     }
 
@@ -203,18 +196,12 @@ class StripeRefundRequestHandler implements HandlerInterface
     protected function updateContractState(StripeRefundRequestEvent $event): void
     {
         $contractId = $event->getContractId();
-        if ($contractId === null || !$event->isFullRefund()) {
+        if ($contractId === null) {
             return;
         }
 
         $contract = $this->contractRepository->findById($contractId);
         if ($contract === null) {
-            return;
-        }
-
-        // Idempotency guard: skip if webhook already recorded the refund
-        $currentRefund = $contract->getRefundedAmount();
-        if ($currentRefund !== null && $currentRefund >= 0.01) {
             return;
         }
 
@@ -230,7 +217,8 @@ class StripeRefundRequestHandler implements HandlerInterface
             return;
         }
 
-        $contract->addRefundedAmount($contract->getAmount());
+        $refundAmount = $event->getAmount() ?? $contract->getAmount();
+        $contract->addRefundedAmount($refundAmount);
         $contract->setRefundedAt(new \DateTimeImmutable());
         $this->contractRepository->save($contract);
     }
