@@ -12,7 +12,7 @@ use PHPUnit\Framework\TestCase;
  * Tests for StripePaymentReturnEvent.
  *
  * This event is dispatched when customer returns from Stripe after Payment Element confirmation.
- * Different from StripeCheckoutReturnEvent which handles Checkout Session returns.
+ * Different from CheckoutReturnCompletedEvent (shared) which handles Checkout Session returns.
  */
 class StripePaymentReturnEventTest extends TestCase
 {

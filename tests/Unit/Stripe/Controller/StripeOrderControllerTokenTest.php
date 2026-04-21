@@ -163,6 +163,80 @@ class TestableStripeOrderControllerForToken extends StripeOrderController
         };
     }
 
+    protected function getServiceFromContainer(string $serviceName): object
+    {
+        if ($serviceName === \OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface::class) {
+            return new class implements \OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface {
+                public function save(
+                    \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract
+                ): void {
+                }
+                public function findById(
+                    string $id
+                ): ?\OxidEsales\PaymentComponent\Contract\PaymentContractInterface {
+                    return new \OxidEsales\PaymentComponent\Contract\PaymentContract(
+                        1,
+                        'user_1',
+                        \OxidEsales\PaymentComponent\Contract\BasketSnapshot::fromArray([
+                            'items' => [],
+                            'totalGross' => 1.0,
+                            'totalNet' => 1.0,
+                            'totalVat' => 0.0,
+                            'currency' => 'EUR',
+                        ]),
+                        $id,
+                    );
+                }
+                public function findByUserId(string $userId): array
+                {
+                    return [];
+                }
+                public function findActiveByUserId(
+                    string $userId
+                ): ?\OxidEsales\PaymentComponent\Contract\PaymentContractInterface {
+                    return null;
+                }
+                public function findByOrderId(
+                    string $orderId
+                ): ?\OxidEsales\PaymentComponent\Contract\PaymentContractInterface {
+                    return null;
+                }
+                public function findByProviderOrderId(
+                    string $providerOrderId
+                ): ?\OxidEsales\PaymentComponent\Contract\PaymentContractInterface {
+                    return null;
+                }
+                public function findExpired(): array
+                {
+                    return [];
+                }
+                public function findStaleNotFinished(int $minutesOld): array
+                {
+                    return [];
+                }
+            };
+        }
+        if ($serviceName === \OxidEsales\Payments\Stripe\Service\Return\StripeReturnResolver::class) {
+            return new class extends \OxidEsales\Payments\Stripe\Service\Return\StripeReturnResolver {
+                public function __construct()
+                {
+                }
+                public function resolve(
+                    \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract,
+                    \OxidEsales\PaymentComponent\EventSystem\Event\EventContextInterface $context,
+                ): \OxidEsales\PaymentComponent\Return\ReturnResolution {
+                    return \OxidEsales\PaymentComponent\Return\ReturnResolution::readyToCommit(
+                        'pi_stub',
+                        'pi_stub',
+                        1.0,
+                        'EUR',
+                    );
+                }
+            };
+        }
+        throw new \RuntimeException("Unknown service: $serviceName");
+    }
+
     protected function processContextResults(EventContext $context): void
     {
         // No-op in tests

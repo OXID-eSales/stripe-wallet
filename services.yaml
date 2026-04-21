@@ -465,24 +465,20 @@ services:
   # These handlers process the return flow when user comes back from Stripe.
   # Event chain: StripeCheckoutReturnEvent → PaymentAuthorizedEvent → ContractReadyToCommitEvent
 
-  # Stripe Checkout Return Handler - Handles return from Stripe Checkout page
-  # Priority 100: Entry point for checkout return flow
-  # Sprint 21: Refactored to delegate validation to CheckoutReturnService (SRP)
-  # Sprint 22: EventDispatcher now injected via constructor (no ContainerFactory)
-  OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutReturnHandler:
+  # Stripe Return Resolver - wraps CheckoutReturnService for the shared chain
+  # (payment-component's ReturnResolverInterface).
+  # Sprint C: replaces StripeCheckoutReturnHandler.
+  OxidEsales\Payments\Stripe\Service\Return\StripeReturnResolver:
     arguments:
       $checkoutReturnService: '@OxidEsales\Payments\Stripe\Service\CheckoutReturnServiceInterface'
-      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
-      $securityValidator: '@OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface'
-      $deliveryAddressHashService: '@OxidEsales\PaymentComponent\Service\DeliveryAddressHashServiceInterface'
-      $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
-      $sessionAdapter: '@OxidEsales\PaymentComponent\Adapter\SessionAdapterInterface'
-      $transactionRepository: '@OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface'
-      $logger: '@oxid_esales.monolog.logger'
-      $eventLogger: '@stripe.events.file_logger'
+    public: true
+
+  # Stripe Event Translator - maps abstract request events onto Stripe's
+  # concrete event classes. Collected by payment-component's EventBroker.
+  OxidEsales\Payments\Stripe\EventSystem\Translator\StripeEventTranslator:
     tags:
-      - { name: payment.event_handler, priority: 100 }
-    public: false
+      - { name: oe.payment.event_translator }
+    public: true
 
   # Payment Authorized Event Handler - Processes PaymentAuthorizedEvent
   # Priority 90: Runs after StripeCheckoutReturnHandler
@@ -499,23 +495,44 @@ services:
       - { name: payment.event_handler, priority: 90 }
     public: false
 
-  # Stripe Order Creation Handler - Creates OXID order from contract
-  # Priority 80: Runs after PaymentAuthorizedEventHandler
-  # Uses OxidShopOrderService for proper OXID integration
-  # Sprint 16: Uses OrderPaymentStateService for OXPAID updates (DRY)
-  # Sprint 22: EventDispatcher now injected via constructor (no ContainerFactory)
-  OxidEsales\Payments\Stripe\EventSystem\Handler\StripeOrderCreationHandler:
+  # Shared ContractCommitmentHandler in payment-component now owns order commit
+  # + OXPAID stamping + ContractCommittedEvent. Stripe's old
+  # StripeOrderCreationHandler was deleted in Sprint C.
+  OxidEsales\PaymentComponent\EventSystem\Handler\ContractCommitmentHandler:
     arguments:
-      $contractRepository: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
-      $shopOrderService: '@OxidEsales\PaymentComponent\Adapter\ShopOrderServiceInterface'
-      $orderPaymentStateService: '@OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface'
-      $eventDispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
-      $sessionAdapter: '@OxidEsales\PaymentComponent\Adapter\SessionAdapterInterface'
-      $logger: '@oxid_esales.monolog.logger'
-      $eventLogger: '@stripe.events.file_logger'
+      $contracts: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+      $paymentState: '@OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface'
+      $dispatcher: '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
     tags:
       - { name: payment.event_handler, priority: 80 }
-    public: false
+    public: true
+
+  # Shared ContractPendingTransitioner (NOT_FINISHED → PENDING on return).
+  OxidEsales\PaymentComponent\EventSystem\Handler\ContractPendingTransitioner:
+    arguments:
+      $contracts: '@OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface'
+    tags:
+      - { name: payment.event_handler, priority: 100 }
+    public: true
+
+  # Shared TransactionRecordingHandler (authorization row on PaymentAuthorizedEvent).
+  OxidEsales\PaymentComponent\EventSystem\Handler\TransactionRecordingHandler:
+    arguments:
+      $transactions: '@OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface'
+    tags:
+      - { name: payment.event_handler, priority: 10 }
+    public: true
+
+  # Event Broker — routes abstract request events through registered translators.
+  OxidEsales\PaymentComponent\EventSystem\Broker\EventBroker:
+    arguments:
+      - '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
+      - !tagged_iterator oe.payment.event_translator
+    public: true
+
+  OxidEsales\PaymentComponent\EventSystem\Broker\EventBrokerInterface:
+    alias: OxidEsales\PaymentComponent\EventSystem\Broker\EventBroker
+    public: true
 
   # Stripe Capture Request Handler - Handles manual capture requests
   # Sprint 8: Added RequestLogService for centralized logging

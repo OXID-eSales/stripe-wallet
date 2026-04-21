@@ -10,7 +10,11 @@ use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Controller\StripeOrderController;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
-use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutReturnEvent;
+use OxidEsales\PaymentComponent\EventSystem\Event\Payment\PaymentAuthorizedEvent;
+use OxidEsales\PaymentComponent\EventSystem\Event\Return\CheckoutReturnCompletedEvent;
+use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentComponent\Return\ReturnResolution;
+use OxidEsales\Payments\Stripe\Service\Return\StripeReturnResolver;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
@@ -414,17 +418,19 @@ class StripeOrderControllerTest extends TestCase
     // checkoutSuccess — happy path + security validation (F4)
     // ==========================================
 
-    public function testCheckoutSuccessDispatchesEvent(): void
+    public function testCheckoutSuccessDispatchesReturnAndAuthorizedEvents(): void
     {
         $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
 
+        $dispatched = [];
         $eventDispatcher
-            ->expects($this->once())
+            ->expects($this->exactly(2))
             ->method('dispatch')
-            ->with($this->isInstanceOf(StripeCheckoutReturnEvent::class))
-            ->willReturnCallback(function ($event) {
-                $event->getContext()->set('redirectTarget', 'thankyou');
-                $event->getContext()->set('orderId', 'order_123');
+            ->willReturnCallback(function ($event) use (&$dispatched) {
+                $dispatched[] = $event;
+                if ($event instanceof PaymentAuthorizedEvent) {
+                    $event->getContext()->set('orderId', 'order_123');
+                }
                 return $event;
             });
 
@@ -437,6 +443,8 @@ class StripeOrderControllerTest extends TestCase
         $result = $controller->checkoutSuccess();
 
         $this->assertEquals('thankyou', $result);
+        $this->assertInstanceOf(CheckoutReturnCompletedEvent::class, $dispatched[0]);
+        $this->assertInstanceOf(PaymentAuthorizedEvent::class, $dispatched[1]);
     }
 
     public function testCheckoutSuccessReturnsPaymentOnMissingSessionId(): void
@@ -715,6 +723,71 @@ class StripeOrderControllerTest extends TestCase
                         public function cleanupForUser(string $userId): bool
                         {
                             return false;
+                        }
+                    };
+                }
+                if ($serviceName === ContractRepositoryInterface::class) {
+                    return new class implements ContractRepositoryInterface {
+                        public function save(
+                            \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract
+                        ): void {
+                        }
+                        public function findById(
+                            string $id
+                        ): ?\OxidEsales\PaymentComponent\Contract\PaymentContractInterface {
+                            $contract = new \OxidEsales\PaymentComponent\Contract\PaymentContract(
+                                1,
+                                'user_1',
+                                \OxidEsales\PaymentComponent\Contract\BasketSnapshot::fromArray([
+                                    'items' => [],
+                                    'totalGross' => 1.0,
+                                    'totalNet' => 1.0,
+                                    'totalVat' => 0.0,
+                                    'currency' => 'EUR',
+                                ]),
+                                $id,
+                            );
+                            return $contract;
+                        }
+                        public function findByUserId(string $userId): array
+                        {
+                            return [];
+                        }
+                        public function findActiveByUserId(
+                            string $userId
+                        ): ?\OxidEsales\PaymentComponent\Contract\PaymentContractInterface {
+                            return null;
+                        }
+                        public function findByOrderId(
+                            string $orderId
+                        ): ?\OxidEsales\PaymentComponent\Contract\PaymentContractInterface {
+                            return null;
+                        }
+                        public function findByProviderOrderId(
+                            string $providerOrderId
+                        ): ?\OxidEsales\PaymentComponent\Contract\PaymentContractInterface {
+                            return null;
+                        }
+                        public function findExpired(): array
+                        {
+                            return [];
+                        }
+                        public function findStaleNotFinished(int $minutesOld): array
+                        {
+                            return [];
+                        }
+                    };
+                }
+                if ($serviceName === StripeReturnResolver::class) {
+                    return new class extends StripeReturnResolver {
+                        public function __construct()
+                        {
+                        }
+                        public function resolve(
+                            \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract,
+                            \OxidEsales\PaymentComponent\EventSystem\Event\EventContextInterface $context,
+                        ): ReturnResolution {
+                            return ReturnResolution::readyToCommit('pi_stub', 'pi_stub', 1.0, 'EUR');
                         }
                     };
                 }
