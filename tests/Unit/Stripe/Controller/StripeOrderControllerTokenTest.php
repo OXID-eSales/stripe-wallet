@@ -234,6 +234,17 @@ class TestableStripeOrderControllerForToken extends StripeOrderController
                 }
             };
         }
+        if ($serviceName === \OxidEsales\PaymentComponent\Controller\CheckoutReturnResponder::class) {
+            // Reuse the overridden getEventDispatcher() so the test's
+            // eventDispatched flag still flips when the responder dispatches.
+            $writer = new class implements \OxidEsales\PaymentComponent\Controller\SessionWriterInterface {
+                public function writeSessChallenge(string $orderId): void {}
+            };
+            return new \OxidEsales\PaymentComponent\Controller\CheckoutReturnResponder(
+                $this->getEventDispatcher(),
+                $writer,
+            );
+        }
         throw new \RuntimeException("Unknown service: $serviceName");
     }
 

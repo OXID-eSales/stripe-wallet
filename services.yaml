@@ -534,6 +534,25 @@ services:
     alias: OxidEsales\PaymentComponent\EventSystem\Broker\EventBroker
     public: true
 
+  # Sprint E: OXID-backed session writer (writes `sess_challenge` so
+  # OXID's thankyou controller can load the order). Aliased to the
+  # framework-neutral interface consumed by CheckoutReturnResponder —
+  # payment-component stays decoupled from the OXID shop classes.
+  OxidEsales\Payments\Stripe\Controller\OxidSessionWriter:
+    public: false
+  OxidEsales\PaymentComponent\Controller\SessionWriterInterface:
+    alias: OxidEsales\Payments\Stripe\Controller\OxidSessionWriter
+    public: true
+
+  # Provider-neutral post-return responder. Dispatches the shared
+  # CheckoutReturnCompletedEvent + PaymentAuthorizedEvent, writes
+  # sess_challenge via SessionWriterInterface, returns the orderId.
+  OxidEsales\PaymentComponent\Controller\CheckoutReturnResponder:
+    arguments:
+      - '@OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'
+      - '@OxidEsales\PaymentComponent\Controller\SessionWriterInterface'
+    public: true
+
   # Stripe Capture Request Handler - Handles manual capture requests
   # Sprint 8: Added RequestLogService for centralized logging
   # Sprint 9: Now delegates to CaptureService for capture execution

@@ -791,6 +791,17 @@ class StripeOrderControllerTest extends TestCase
                         }
                     };
                 }
+                if ($serviceName === \OxidEsales\PaymentComponent\Controller\CheckoutReturnResponder::class) {
+                    // Use the test's dispatcher mock so the test's expectations
+                    // (dispatch count, captured events) flow through the responder.
+                    $writer = new class implements \OxidEsales\PaymentComponent\Controller\SessionWriterInterface {
+                        public function writeSessChallenge(string $orderId): void {}
+                    };
+                    return new \OxidEsales\PaymentComponent\Controller\CheckoutReturnResponder(
+                        $this->mockDispatcher,
+                        $writer,
+                    );
+                }
                 throw new \RuntimeException("Unknown service: $serviceName");
             }
         };

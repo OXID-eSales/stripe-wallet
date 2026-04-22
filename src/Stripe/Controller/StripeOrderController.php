@@ -6,12 +6,11 @@ namespace OxidEsales\Payments\Stripe\Controller;
 
 use OxidEsales\Eshop\Application\Controller\OrderController;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\PaymentComponent\Controller\CheckoutReturnResponder;
+use OxidEsales\PaymentComponent\Controller\HandlesCheckoutReturn;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
-use OxidEsales\PaymentComponent\EventSystem\Event\Payment\PaymentAuthorizedEvent;
-use OxidEsales\PaymentComponent\EventSystem\Event\Return\CheckoutReturnCompletedEvent;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Return\ReturnResolution;
 use OxidEsales\Payments\Stripe\Service\Return\StripeReturnResolver;
 use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
@@ -42,6 +41,12 @@ use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 class StripeOrderController extends OrderController
 {
     use ServiceContainer;
+    use HandlesCheckoutReturn;
+
+    protected function resolveCheckoutReturnResponder(): CheckoutReturnResponder
+    {
+        return $this->getServiceFromContainer(CheckoutReturnResponder::class);
+    }
 
     private ?ControllerRequestHelper $requestHelper = null;
 
@@ -242,15 +247,23 @@ class StripeOrderController extends OrderController
             return 'payment';
         }
 
-        $context = $this->buildReturnContext($inputs, $contract);
-        $resolution = $this->resolveReturn($contract, $context, $helper);
-        if ($resolution === null) {
+        /** @var \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract */
+        $orderId = $this->dispatchCheckoutReturn(
+            providerName: 'stripe',
+            contract: $contract,
+            resolver: $this->getServiceFromContainer(StripeReturnResolver::class),
+            extraContextKeys: [
+                'checkoutSessionId' => $inputs['sessionId'],
+                'contract_token' => $inputs['contractToken'],
+            ],
+        );
+
+        if ($orderId === null) {
+            $helper->addErrorToDisplay('Payment verification failed');
             return 'payment';
         }
 
-        $this->dispatchReturnChain($context, $resolution);
-        $this->commitSessionChallenge($context, $contract, $helper);
-
+        $helper->clearStripeSessionVariables();
         return 'thankyou';
     }
 
@@ -295,74 +308,6 @@ class StripeOrderController extends OrderController
             $helper->addErrorToDisplay('Payment verification failed');
         }
         return $contract;
-    }
-
-    /**
-     * @param array{sessionId: string, contractId: string, contractToken: string} $inputs
-     */
-    private function buildReturnContext(array $inputs, object $contract): EventContext
-    {
-        $context = new EventContext([
-            'checkoutSessionId' => $inputs['sessionId'],
-            'contract_id' => $inputs['contractId'],
-            'contract_token' => $inputs['contractToken'],
-            'contractId' => $inputs['contractId'],
-            'providerName' => 'stripe',
-        ]);
-        /** @var \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract */
-        $context->setContract($contract);
-        return $context;
-    }
-
-    private function resolveReturn(
-        object $contract,
-        EventContext $context,
-        ControllerRequestHelper $helper,
-    ): ?ReturnResolution {
-        /** @var StripeReturnResolver $resolver */
-        $resolver = $this->getServiceFromContainer(StripeReturnResolver::class);
-        /** @var \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract */
-        $resolution = $resolver->resolve($contract, $context);
-        if (!$resolution->isSuccessful()) {
-            $helper->addErrorToDisplay($resolution->errorMessage ?? 'Payment verification failed');
-            return null;
-        }
-        return $resolution;
-    }
-
-    /**
-     * Drive the shared handler chain:
-     *   CheckoutReturnCompletedEvent → ContractPendingTransitioner
-     *   PaymentAuthorizedEvent       → PaymentAuthorizedEventHandler
-     *                                → ContractReadyToCommitEvent
-     *                                → ContractCommitmentHandler (OXPAID, commit)
-     *                                → TransactionRecordingHandler
-     */
-    private function dispatchReturnChain(EventContext $context, ReturnResolution $resolution): void
-    {
-        $context->set('requiresCapture', $resolution->requiresCapture);
-        $dispatcher = $this->getEventDispatcher();
-        $dispatcher->dispatch(new CheckoutReturnCompletedEvent($context, $resolution));
-        $dispatcher->dispatch(new PaymentAuthorizedEvent(
-            $context,
-            (string) $resolution->authorizationId,
-            (string) $resolution->providerOrderId,
-            $resolution->amount,
-            $resolution->currency,
-        ));
-    }
-
-    private function commitSessionChallenge(
-        EventContext $context,
-        object $contract,
-        ControllerRequestHelper $helper,
-    ): void {
-        /** @var \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract */
-        $orderId = $context->get('orderId') ?? $contract->getOrderId();
-        if (is_string($orderId) && $orderId !== '') {
-            $helper->setSessionVariable('sess_challenge', $orderId);
-            $helper->clearStripeSessionVariables();
-        }
     }
 
     /**
