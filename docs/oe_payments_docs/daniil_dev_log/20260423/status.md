@@ -8,8 +8,9 @@ Stripe-side log was `../20260416/`._
 |---|---|---|---|---|
 | 1 | Remove loading spinner on the Stripe tab in admin order detail | `stripe` | ✅ Done | 2026-04-23 |
 | 2 | Stripe tab shows blank on non-Stripe orders — render friendly notice | `stripe` | ✅ Done | 2026-04-23 |
-| 3 | PayPal admin tab navigation is dead-end — missing `<form id="transfer">` and admin layout includes | `paypal` | 🟡 Fix shipped, awaiting user re-test | — |
-| 4 | Stripe checkout completes but OXPAID not stamped (captureMode=manual) | `stripe` | 🟡 Investigating | — |
+| 3 | PayPal admin tab navigation is dead-end — missing `<form id="transfer">` and admin layout includes | `paypal` | ✅ Done — fix landed, OPC+PayPal E2E spec green end-to-end (order 706 saved) | 2026-04-23 |
+| 4 | Stripe checkout completes but OXPAID not stamped (captureMode=manual) | `stripe` | ✅ Not a bug — manual-capture mode by design; Sprint-I spec covers visibility | 2026-04-23 |
+| 5 | Sprint I — unified Payment admin tab owned by payment-component | `payment-component`, `stripe`, `paypal` | ✅ Commits 1–6 shipped (PC module + Stripe panel + PayPal panel + old `OrderRefund` tabs/templates/tests deleted + `payment-admin-tab.spec.ts` regression guard behind `PAYMENT_ADMIN_TAB_E2E=1` gate). Follow-up: env-prep script that reinstalls all three modules from `extensions/` on every CI run so the spec can run unconditionally. | 2026-04-23 |
 
 ## Legend
 - ⬜ Not started

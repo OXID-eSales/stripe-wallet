@@ -929,6 +929,30 @@ services:
   OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider:
     public: true
 
+  # Sprint I — Stripe's panel provider for payment-component's shared
+  # "Payment" admin tab. Tagged service → auto-collected by the shared
+  # registry. Deps are wired explicitly to Stripe's concrete dispatcher —
+  # the shared `AdminActionDispatcherInterface` isn't aliased globally
+  # because PayPal implements it too and a global alias would conflict.
+  OxidEsales\Payments\Stripe\Admin\StripePaymentPanelProvider:
+    arguments:
+      $actionDispatcher: '@OxidEsales\Payments\Stripe\Controller\Admin\OrderActionDispatcher'
+      $viewDataBuilder: '@OxidEsales\Payments\Stripe\Admin\StripePanelViewDataBuilder'
+      $orderLoader: '@OxidEsales\Payments\Stripe\Admin\StripePanelOrderLoader'
+    tags:
+      - { name: 'oe.payment.admin_panel' }
+    public: true
+
+  OxidEsales\Payments\Stripe\Admin\StripePanelViewDataBuilder:
+    arguments:
+      $viewDataProvider: '@OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider'
+      $contractResolver: '@OxidEsales\Payments\Stripe\Service\OrderContractResolver'
+      $moduleConfig: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+    public: false
+
+  OxidEsales\Payments\Stripe\Admin\StripePanelOrderLoader:
+    public: false
+
   # Note: ModuleConfiguration is a class extension (extends ModuleConfiguration_parent)
   # and cannot use standard DI. It uses ContainerFactory for lazy service retrieval.
 

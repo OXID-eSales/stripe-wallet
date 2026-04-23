@@ -14,7 +14,6 @@ use OxidEsales\Eshop\Application\Model\Order as CoreOrder;
 use OxidEsales\Eshop\Application\Model\Payment as CorePayment;
 use OxidEsales\Eshop\Core\ViewConfig;
 use OxidEsales\Payments\Stripe\Controller\Admin\ModuleConfiguration as StripeModuleConfiguration;
-use OxidEsales\Payments\Stripe\Controller\Admin\OrderRefund;
 use OxidEsales\Payments\Stripe\Controller\Admin\StripeConnect;
 use OxidEsales\Payments\Stripe\Controller\StripeOrderController as StripeOrderController;
 use OxidEsales\Payments\Stripe\Controller\PaymentController as StripePaymentController;
@@ -62,8 +61,10 @@ $aModule = [
         // They should NOT be registered here to avoid namespace duplication errors.
         'StripeWebhookController' => StripeWebhookController::class,
         'StripeConnect' => StripeConnect::class,
-        'OrderRefund' => OrderRefund::class,
         'stripecheckoutfooter' => StripeCheckoutFooter::class,
+        // Sprint I (2026-04-23): `OrderRefund` removed. The admin Payment
+        // tab is now owned by `oe_payment_component`; Stripe contributes
+        // a `StripePaymentPanelProvider` tagged service.
     ],
     'events' => [
         'onActivate' => StripeEvents::class . '::onActivate',
@@ -71,7 +72,10 @@ $aModule = [
     ],
     'templates' => [
         '@oe_payments_stripe_wallet/admin/stripe_connect' => 'views/twig/admin/stripe_connect.html.twig',
-        '@oe_payments_stripe_wallet/admin/stripe_order' => 'views/twig/admin/stripe_order_refund.html.twig',
+        // Sprint I — Stripe panel body rendered inside payment-component's shared "Payment" admin tab.
+        // Both aliases registered so `{% include %}` works with or without the `.html.twig` suffix.
+        '@oe_payments_stripe_wallet/admin/panel/stripe_panel' => 'views/twig/admin/panel/stripe_panel.html.twig',
+        '@oe_payments_stripe_wallet/admin/panel/stripe_panel.html.twig' => 'views/twig/admin/panel/stripe_panel.html.twig',
     ],
     'settings'      => [
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeMode',                        'type' => 'select',     'value' => 'test',      'position' => 10, 'constraints' => 'live|test'],

@@ -1,21 +1,19 @@
-{% include "headitem.html.twig" with {title: "GENERAL_ADMIN_TITLE"|translate} %}
-
 {# ============================================================================
-   Stripe Order Refund Admin Template
+   Sprint I — Stripe panel body for payment-component's shared "Payment" tab.
 
-   Controller: OxidEsales\Payments\Stripe\Controller\Admin\OrderRefund
-   Controller Key: OrderRefund
+   Body-only: the PC wrapper (`payment_admin_tab.html.twig`) owns the head,
+   transfer form, and admin-layout closes. The visual styling is the
+   original Stripe admin-tab CSS, restored verbatim from the pre-Sprint-I
+   template so the UX is identical to what the team had before the
+   unification. The outer `.stripe-admin` class scopes all rules so no
+   rule bleeds into other PSP panels rendered in the same shared wrapper.
 
-   Available oView methods:
-   - isStripeOrder(): bool - true if order paid with Stripe
-   - wasRefundSuccessful(): ?bool - true after successful refund
-   - getErrorMessage(): string|false - error message or false
-   - isOrderRefundable(): bool - true if can be refunded (has remaining refundable amount)
-   - getRemainingRefundableAmount(): string - formatted remaining amount
-   - getFormatedPrice(float): string - formats price with currency
-   - getOrder(): ?Order - the order object
-   - hasStripeApiError(): bool - true if Stripe API call failed
-   - getStripeApiError(): ?string - Stripe API error message
+   View-data keys (see `StripePanelViewDataBuilder`): contractId, orderId,
+   orderNumber, paymentType, transactionId, externalTransId, currency,
+   amount, capturedAmount, refundedAmount, hasRefunds, capturableAmount,
+   capturableRaw, remainingRefundable, remainingRefundableRaw,
+   isCapturable, isRefundable, isCancellable, dashboardPrefix, isTestMode,
+   hasApiError, apiError, transactions[].
    ============================================================================ #}
 
 <style>
@@ -174,55 +172,15 @@
     .stripe-admin .s-btn-warning:hover { background: #d97706 !important; }
     .stripe-admin .s-btn-danger-outline { background: #fff !important; color: #dc2626 !important; border: 1px solid #fca5a5 !important; }
     .stripe-admin .s-btn-danger-outline:hover { background: #fef2f2 !important; }
-
 </style>
 
-<form name="transfer" id="transfer" action="{{ oViewConf.getSelfLink() }}" method="post">
-    {{ oViewConf.getHiddenSid()|raw }}
-    <input type="hidden" name="oxid" value="{{ oxid }}">
-    <input type="hidden" name="cl" value="OrderRefund">
-</form>
-
-<div class="stripe-admin" id="stripeContent">
-{% if oView.isStripeOrder() == true %}
-
-    {# ===== Status Messages ===== #}
-    {% if oView.wasCaptureSuccessful() == true %}
-        <div class="s-alert s-alert-success">
-            <strong>&#10003;</strong> {{ translate({ ident: "STRIPE_CAPTURE_SUCCESSFUL" }) }}
-        </div>
-    {% endif %}
-
-    {% if oView.wasCancelSuccessful() == true %}
-        <div class="s-alert s-alert-success">
-            <strong>&#10003;</strong> {{ translate({ ident: "STRIPE_CANCEL_SUCCESSFUL" }) }}
-        </div>
-    {% endif %}
-
-    {% if oView.wasRefundSuccessful() == true %}
-        <div class="s-alert s-alert-success">
-            <strong>&#10003;</strong> {{ translate({ ident: "STRIPE_REFUND_SUCCESSFUL" }) }}
-        </div>
-    {% endif %}
-
-    {% if oView.getErrorMessage() != false %}
-        <div class="s-alert s-alert-danger">
-            <strong>Error</strong> &mdash; {{ oView.getErrorMessage() }}
-        </div>
-    {% endif %}
-
-    {% set blIsOrderRefundable = oView.isOrderRefundable() %}
-    {% set blIsOrderCapturable = oView.isOrderCapturable() %}
-
-    {% if oView.hasStripeApiError() %}
-        <div class="s-alert s-alert-danger">
+<div class="stripe-admin" id="stripeContent" data-testid="stripe-panel-card">
+    {% if hasApiError is defined and hasApiError %}
+        <div class="s-alert s-alert-danger" data-testid="stripe-panel-api-error">
             <strong>{{ translate({ ident: "STRIPE_NOTICE" }) }}</strong> &mdash;
-            {{ translate({ ident: "STRIPE_API_ERROR" }) }}: {{ oView.getStripeApiError() }}
+            {{ translate({ ident: "STRIPE_API_ERROR" }) }}: {{ apiError }}
         </div>
     {% endif %}
-
-    {% set order = oView.getOrder() %}
-    {% set edit = order %}
 
     {# ===== Payment Details ===== #}
     <div class="s-card">
@@ -231,8 +189,7 @@
             <tr>
                 <td class="s-label">{{ translate({ ident: "STRIPE_CONTRACT_ID" }) }}</td>
                 <td class="s-value" data-testid="contract-id">
-                    {% set contractId = oView.getContractId() %}
-                    {% if contractId %}
+                    {% if contractId is defined and contractId %}
                         <span class="s-code">{{ contractId }}</span>
                     {% else %}
                         <span class="s-muted">&ndash;</span>
@@ -242,8 +199,7 @@
             <tr>
                 <td class="s-label">{{ translate({ ident: "STRIPE_ORDER_ID" }) }}</td>
                 <td class="s-value" data-testid="order-id">
-                    {% set orderId = oView.getOrderIdForDisplay() %}
-                    {% if orderId %}
+                    {% if orderId is defined and orderId %}
                         <span class="s-code">{{ orderId }}</span>
                     {% else %}
                         <span class="s-muted">&ndash;</span>
@@ -252,49 +208,51 @@
             </tr>
             <tr>
                 <td class="s-label">{{ translate({ ident: "STRIPE_PAYMENT_TYPE" }) }}</td>
-                <td class="s-value">{{ order.getFieldData('oxpaymenttype') }}</td>
+                <td class="s-value">{{ paymentType|default('') }}</td>
             </tr>
             <tr>
                 <td class="s-label">{{ translate({ ident: "STRIPE_TRANSACTION_ID" }) }}</td>
                 <td class="s-value">
-                    {% set transactionId = order.getFieldData('oxtransid') %}
-                    {% if transactionId starts with 'pi_' %}
-                        {% set dashboardPrefix = isTestMode ? '/test' : '' %}
-                        <a href="https://dashboard.stripe.com{{ dashboardPrefix }}/payments/{{ transactionId }}" target="_blank">
+                    {% if transactionId is defined and transactionId starts with 'pi_' %}
+                        <a href="https://dashboard.stripe.com{{ dashboardPrefix|default('') }}/payments/{{ transactionId }}"
+                           target="_blank" rel="noopener" data-testid="stripe-dashboard-link">
                             {{ transactionId }}
                             <svg class="s-external-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0z"/></svg>
                         </a>
                     {% else %}
-                        {{ transactionId }}
+                        {{ transactionId|default('') }}
                     {% endif %}
                 </td>
             </tr>
-            {% if order.getFieldData('stripeexternaltransid') %}
+            {% if externalTransId is defined and externalTransId %}
                 <tr>
                     <td class="s-label">{{ translate({ ident: "STRIPE_EXTERNAL_TRANSACTION_ID" }) }}</td>
-                    <td class="s-value">{{ order.getFieldData('stripeexternaltransid') }}</td>
+                    <td class="s-value">{{ externalTransId }}</td>
                 </tr>
             {% endif %}
-            {% if order.getStripeCapturedAmount() %}
+            {% if capturedAmount is defined and capturedAmount %}
                 <tr>
                     <td class="s-label" style="padding-top: 16px; border-top: 1px solid #e5e7eb;">{{ translate({ ident: "STRIPE_FACTUAL_CAPTURED_AMOUNT" }) }}</td>
-                    <td class="s-value" style="padding-top: 16px; border-top: 1px solid #e5e7eb;"><strong>{{ order.getStripeCapturedAmount() }} {{ edit.getFieldData('oxcurrency') }}</strong></td>
+                    <td class="s-value" style="padding-top: 16px; border-top: 1px solid #e5e7eb;" data-testid="captured-amount">
+                        <strong>{{ capturedAmount }} {{ currency|default('') }}</strong>
+                    </td>
                 </tr>
             {% endif %}
-            {% if order.hasStripeRefunds() %}
+            {% if hasRefunds is defined and hasRefunds %}
                 <tr>
                     <td class="s-label">{{ translate({ ident: "STRIPE_REFUNDED_AMOUNT" }) }}</td>
-                    <td class="s-value"><strong style="color: #dc2626;">{{ order.getStripeRefundedAmount() }} {{ edit.getFieldData('oxcurrency') }}</strong></td>
+                    <td class="s-value" data-testid="refunded-amount">
+                        <strong style="color: #dc2626;">{{ refundedAmount }} {{ currency|default('') }}</strong>
+                    </td>
                 </tr>
             {% endif %}
         </table>
     </div>
 
     {# ===== Transaction History ===== #}
-    {% set transactions = oView.getTransactions() %}
     <div class="s-card">
         <div class="s-card-header">{{ translate({ ident: "STRIPE_TRANSACTION_HISTORY" }) }}</div>
-        {% if transactions is not empty %}
+        {% if transactions is defined and transactions is not empty %}
             <table class="s-table" data-testid="transaction-history-table">
                 <thead>
                     <tr>
@@ -331,7 +289,7 @@
                                     {{ tx.status }}
                                 {% endif %}
                             </td>
-                            <td class="s-amount">{{ oView.getFormatedPrice(tx.amount) }}</td>
+                            <td class="s-amount">{{ tx.amount }}</td>
                             <td><span class="s-currency">{{ tx.currency }}</span></td>
                             <td><span class="s-code">{{ tx.transactionId ?: '-' }}</span></td>
                             <td class="s-muted">{{ tx.createdAt }}</td>
@@ -345,7 +303,7 @@
     </div>
 
     {# ===== Capture Section ===== #}
-    {% if blIsOrderCapturable == true %}
+    {% if isCapturable is defined and isCapturable %}
         <div class="s-alert s-alert-info">
             <strong>{{ translate({ ident: "STRIPE_CAPTURE_REQUIRED" }) }}</strong> &mdash;
             {{ translate({ ident: "STRIPE_CAPTURE_REQUIRED_TEXT" }) }}
@@ -356,46 +314,51 @@
             <div class="s-card-body">
                 <form name="captureForm" id="captureForm" action="{{ oViewConf.getSelfLink() }}" method="post">
                     {{ oViewConf.getHiddenSid()|raw }}
-                    <input type="hidden" name="cl" value="OrderRefund">
-                    <input type="hidden" name="oxid" value="{{ oxid }}">
-                    <input type="hidden" name="fnc" value="capturePayment">
+                    <input type="hidden" name="cl" value="PaymentAdmin">
+                    <input type="hidden" name="oxid" value="{{ orderId }}">
+                    <input type="hidden" name="fnc" value="dispatchAction">
+                    <input type="hidden" name="payment_admin_action" value="capture">
 
-                    <p>{{ translate({ ident: "STRIPE_CAPTURE_AMOUNT_TEXT" }) }}: <strong>{{ oView.getCaptureableAmount() }} {{ edit.getFieldData('oxcurrency') }}</strong></p>
+                    <p>{{ translate({ ident: "STRIPE_CAPTURE_AMOUNT_TEXT" }) }}: <strong>{{ capturableAmount }} {{ currency }}</strong></p>
                     <p class="s-muted" style="font-size: 12px; margin-top: -4px;">{{ translate({ ident: "STRIPE_PARTIAL_CAPTURE_NOTE" }) }}</p>
 
                     <div class="s-form-row">
                         <div class="s-form-group">
-                            <label class="s-form-label" for="capture_amount">{{ translate({ ident: "STRIPE_AMOUNT" }) }} ({{ edit.getFieldData('oxcurrency') }})</label>
-                            <input type="number" class="s-form-input" id="capture_amount" name="capture_amount" value="{{ oView.getCaptureableRaw() }}" step="0.01" min="0.01" max="{{ oView.getCaptureableRaw() }}">
+                            <label class="s-form-label" for="capture_amount">{{ translate({ ident: "STRIPE_AMOUNT" }) }} ({{ currency }})</label>
+                            <input type="number" class="s-form-input" id="capture_amount" name="capture_amount"
+                                   value="{{ capturableRaw }}" step="0.01" min="0.01" max="{{ capturableRaw }}">
                         </div>
                         <div class="s-form-group">
                             <label class="s-form-label" for="capture_reason">{{ translate({ ident: "STRIPE_CAPTURE_REASON" }) }}</label>
-                            <input type="text" class="s-form-input" id="capture_reason" name="capture_reason" value="" placeholder="{{ translate({ ident: "STRIPE_CAPTURE_REASON_PLACEHOLDER" }) }}" maxlength="140">
+                            <input type="text" class="s-form-input" id="capture_reason" name="capture_reason" maxlength="140"
+                                   placeholder="{{ translate({ ident: "STRIPE_CAPTURE_REASON_PLACEHOLDER" }) }}">
                         </div>
                     </div>
 
-                    <input type="submit" class="s-btn s-btn-primary captureSubmit" value="{{ translate({ ident: "STRIPE_CAPTURE_SUBMIT" }) }}" onclick="return confirm('{{ translate({ ident: "STRIPE_CAPTURE_CONFIRM" }) }}');">
+                    <input type="submit" class="s-btn s-btn-primary captureSubmit"
+                           value="{{ translate({ ident: "STRIPE_CAPTURE_SUBMIT" }) }}"
+                           onclick="return confirm('{{ translate({ ident: "STRIPE_CAPTURE_CONFIRM" }) }}');">
                 </form>
             </div>
         </div>
 
         {# Cancel Authorization #}
-        {% set blIsOrderCancellable = oView.isOrderCancellable() %}
-        {% if blIsOrderCancellable == true %}
+        {% if isCancellable is defined and isCancellable %}
             <div class="s-card">
                 <div class="s-card-header">{{ translate({ ident: "STRIPE_CANCEL_AUTHORIZATION" }) }}</div>
                 <div class="s-card-body">
                     <form name="cancelForm" id="cancelForm" action="{{ oViewConf.getSelfLink() }}" method="post">
                         {{ oViewConf.getHiddenSid()|raw }}
-                        <input type="hidden" name="cl" value="OrderRefund">
-                        <input type="hidden" name="oxid" value="{{ oxid }}">
-                        <input type="hidden" name="fnc" value="cancelAuthorization">
+                        <input type="hidden" name="cl" value="PaymentAdmin">
+                        <input type="hidden" name="oxid" value="{{ orderId }}">
+                        <input type="hidden" name="fnc" value="dispatchAction">
+                        <input type="hidden" name="payment_admin_action" value="cancel">
 
                         <p>{{ translate({ ident: "STRIPE_CANCEL_AUTHORIZATION_TEXT" }) }}</p>
 
                         <div class="s-form-group">
-                            <label class="s-form-label" for="cancellation_reason">{{ translate({ ident: "STRIPE_CANCEL_REASON" }) }}</label>
-                            <select class="s-form-select" id="cancellation_reason" name="cancellation_reason">
+                            <label class="s-form-label" for="cancel_reason">{{ translate({ ident: "STRIPE_CANCEL_REASON" }) }}</label>
+                            <select class="s-form-select" id="cancel_reason" name="cancel_reason">
                                 <option value="">{{ translate({ ident: "STRIPE_PLEASE_SELECT" }) }}</option>
                                 <option value="duplicate">{{ translate({ ident: "STRIPE_CANCEL_DUPLICATE" }) }}</option>
                                 <option value="requested_by_customer">{{ translate({ ident: "STRIPE_CANCEL_CUSTOMER" }) }}</option>
@@ -404,7 +367,9 @@
                             </select>
                         </div>
 
-                        <input type="submit" class="s-btn s-btn-danger-outline cancelSubmit" value="{{ translate({ ident: "STRIPE_CANCEL_SUBMIT" }) }}" onclick="return confirm('{{ translate({ ident: "STRIPE_CANCEL_CONFIRM" }) }}');">
+                        <input type="submit" class="s-btn s-btn-danger-outline cancelSubmit"
+                               value="{{ translate({ ident: "STRIPE_CANCEL_SUBMIT" }) }}"
+                               onclick="return confirm('{{ translate({ ident: "STRIPE_CANCEL_CONFIRM" }) }}');">
                     </form>
                 </div>
             </div>
@@ -412,22 +377,24 @@
     {% endif %}
 
     {# ===== Refund Section ===== #}
-    {% if blIsOrderRefundable == true %}
+    {% if isRefundable is defined and isRefundable %}
         <div class="s-card">
             <div class="s-card-header">{{ translate({ ident: "STRIPE_REFUND" }) }}</div>
             <div class="s-card-body">
-                <form name="search" id="search" action="{{ oViewConf.getSelfLink() }}" method="post">
+                <form name="refundForm" id="refundForm" action="{{ oViewConf.getSelfLink() }}" method="post">
                     {{ oViewConf.getHiddenSid()|raw }}
-                    <input type="hidden" name="cl" value="OrderRefund">
-                    <input type="hidden" name="oxid" value="{{ oxid }}">
-                    <input type="hidden" name="fnc" value="fullRefund">
+                    <input type="hidden" name="cl" value="PaymentAdmin">
+                    <input type="hidden" name="oxid" value="{{ orderId }}">
+                    <input type="hidden" name="fnc" value="dispatchAction">
+                    <input type="hidden" name="payment_admin_action" value="refund">
 
-                    <p>{{ translate({ ident: "STRIPE_REFUNDABLE_AMOUNT" }) }}: <strong>{{ oView.getRemainingRefundableAmount() }} {{ edit.getFieldData('oxcurrency') }}</strong></p>
+                    <p>{{ translate({ ident: "STRIPE_REFUNDABLE_AMOUNT" }) }}: <strong>{{ remainingRefundable }} {{ currency }}</strong></p>
 
                     <div class="s-form-row">
                         <div class="s-form-group">
-                            <label class="s-form-label" for="refund_amount">{{ translate({ ident: "STRIPE_AMOUNT" }) }} ({{ edit.getFieldData('oxcurrency') }})</label>
-                            <input type="number" class="s-form-input" id="refund_amount" name="refund_amount" value="{{ oView.getRemainingRefundableRaw() }}" step="0.01" min="0.01" max="{{ oView.getRemainingRefundableRaw() }}">
+                            <label class="s-form-label" for="refund_amount">{{ translate({ ident: "STRIPE_AMOUNT" }) }} ({{ currency }})</label>
+                            <input type="number" class="s-form-input" id="refund_amount" name="refund_amount"
+                                   value="{{ remainingRefundableRaw }}" step="0.01" min="0.01" max="{{ remainingRefundableRaw }}">
                         </div>
                         <div class="s-form-group">
                             <label class="s-form-label" for="refund_reason">{{ translate({ ident: "STRIPE_REFUND_REASON" }) }}</label>
@@ -440,18 +407,11 @@
                         </div>
                     </div>
 
-                    <input type="submit" class="s-btn s-btn-warning refundSubmit" value="{{ translate({ ident: "STRIPE_REFUND_SUBMIT" }) }}" onclick="return confirm('{{ translate({ ident: "STRIPE_REFUND_CONFIRM" }) }}');">
+                    <input type="submit" class="s-btn s-btn-warning refundSubmit"
+                           value="{{ translate({ ident: "STRIPE_REFUND_SUBMIT" }) }}"
+                           onclick="return confirm('{{ translate({ ident: "STRIPE_REFUND_CONFIRM" }) }}');">
                 </form>
             </div>
         </div>
     {% endif %}
-
-{% else %}
-    <div class="s-alert s-alert-info" data-testid="stripe-not-a-stripe-order">
-        {{ translate({ ident: "STRIPE_NOT_A_STRIPE_ORDER" }) }}
-    </div>
-{% endif %}
 </div>
-
-{% include "bottomnaviitem.html.twig" %}
-{% include "bottomitem.html.twig" %}

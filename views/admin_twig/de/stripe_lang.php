@@ -71,7 +71,6 @@ $aLang = array(
     'STRIPE_DISCOUNT'                                   => 'Rabatt',
     'STRIPE_REFUND_SUBMIT'                              => 'Erstattung durchführen',
     'STRIPE_API_ERROR'                                  => 'Stripe API Fehler',
-    'STRIPE_NOT_A_STRIPE_ORDER'                         => 'Diese Bestellung wurde nicht mit Stripe bezahlt.',
     'STRIPE_APPLE_PAY_BUTTON_ONLY_LIVE_MODE'            => 'Hinweis: Bezahlung mit Apple Pay Button ist nur im Live-Modus möglich',
     'STRIPE_APIKEY_CONNECTED'                           => 'Verbindung erfolgreich',
     'STRIPE_APIKEY_DISCONNECTED'                        => 'Verbindung nicht erfolgreich',

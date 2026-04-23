@@ -11,6 +11,7 @@ namespace OxidEsales\Payments\Stripe\Controller\Admin;
 
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\PaymentComponent\Admin\Contract\AdminActionDispatcherInterface;
 use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
 use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
@@ -25,7 +26,7 @@ use OxidEsales\Payments\Stripe\Service\OrderContractResolver;
  *
  * @since 2.0.0
  */
-final class OrderActionDispatcher
+final class OrderActionDispatcher implements AdminActionDispatcherInterface
 {
     public function __construct(
         private readonly EventDispatcherInterface $eventDispatcher,
@@ -110,5 +111,44 @@ final class OrderActionDispatcher
     public function getContractIdFromOrder(Order $order): ?string
     {
         return $this->contractResolver->getContractIdFromOrder($order);
+    }
+
+    // =========================================================================
+    // Sprint I — unified admin-action interface (AdminActionDispatcherInterface).
+    // Wraps the PSP-specific dispatchers above. Extras carry Stripe-specific
+    // bits: `paymentIntentId`, `description`.
+    // =========================================================================
+
+    /** @param array<string, mixed> $extras */
+    public function refund(Order $order, ?float $amount, ?string $reason, array $extras = []): void
+    {
+        $description = isset($extras['description']) && is_string($extras['description'])
+            ? $extras['description']
+            : null;
+        $this->dispatchRefund($order, $reason, $description, $amount);
+    }
+
+    /** @param array<string, mixed> $extras */
+    public function capture(Order $order, ?float $amount, ?string $reason, array $extras = []): void
+    {
+        $paymentIntentId = isset($extras['paymentIntentId']) && is_string($extras['paymentIntentId']) && $extras['paymentIntentId'] !== ''
+            ? $extras['paymentIntentId']
+            : (string) $this->getPaymentIntentId($order);
+        if ($paymentIntentId === '') {
+            return;
+        }
+        $this->dispatchCapture($order, $paymentIntentId, $reason, $amount);
+    }
+
+    /** @param array<string, mixed> $extras */
+    public function cancel(Order $order, ?string $reason, array $extras = []): void
+    {
+        $paymentIntentId = isset($extras['paymentIntentId']) && is_string($extras['paymentIntentId']) && $extras['paymentIntentId'] !== ''
+            ? $extras['paymentIntentId']
+            : (string) $this->getPaymentIntentId($order);
+        if ($paymentIntentId === '') {
+            return;
+        }
+        $this->dispatchCancel($order, $paymentIntentId, $reason);
     }
 }

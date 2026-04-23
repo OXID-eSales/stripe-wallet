@@ -71,7 +71,6 @@ $aLang = array(
     'STRIPE_DISCOUNT'                                   => 'Discount',
     'STRIPE_REFUND_SUBMIT'                              => 'Execute refund',
     'STRIPE_API_ERROR'                                  => 'Stripe API Error',
-    'STRIPE_NOT_A_STRIPE_ORDER'                         => 'This order was not paid with Stripe.',
     'STRIPE_APPLE_PAY_BUTTON_ONLY_LIVE_MODE'            => 'Please note: Payment with the Apple Pay Button is only available in live-mode.',
     'STRIPE_APIKEY_CONNECTED'                           => 'Connection successful',
     'STRIPE_APIKEY_DISCONNECTED'                        => 'Connection not successful',

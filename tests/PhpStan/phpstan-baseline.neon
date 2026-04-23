@@ -103,18 +103,6 @@ parameters:
 			path: ../../src/Stripe/Controller/Admin/ModuleConfiguration.php
 
 		-
-			message: '#^Parameter \#1 \$paymentId of static method OxidEsales\\Payments\\Stripe\\Core\\StripeDefinitions\:\:isStripePayment\(\) expects string, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: ../../src/Stripe/Controller/Admin/OrderRefund.php
-
-		-
-			message: '#^Parameter \#1 \$sError of method OxidEsales\\Payments\\Stripe\\Controller\\Admin\\OrderRefund\:\:setErrorMessage\(\) expects string, array\|string given\.$#'
-			identifier: argument.type
-			count: 3
-			path: ../../src/Stripe/Controller/Admin/OrderRefund.php
-
-		-
 			message: '#^Property OxidEsales\\Payments\\Stripe\\Controller\\Admin\\StripeConnect\:\:\$moduleSettingService \(OxidEsales\\EshopCommunity\\Internal\\Framework\\Module\\Configuration\\Bridge\\ModuleSettingBridge\) does not accept mixed\.$#'
 			identifier: assign.propertyType
 			count: 1

@@ -23,7 +23,6 @@ classExtensions:
 controllers:
   StripeWebhookController: OxidEsales\Payments\Stripe\Controller\Webhook\WebhookController
   StripeConnect: OxidEsales\Payments\Stripe\Controller\Admin\StripeConnect
-  OrderRefund: OxidEsales\Payments\Stripe\Controller\Admin\OrderRefund
 events:
   onActivate: 'OxidEsales\Payments\Stripe\Core\Events::onActivate'
   onDeactivate: 'OxidEsales\Payments\Stripe\Core\Events::onDeactivate'
