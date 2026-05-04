@@ -6,7 +6,9 @@ namespace OxidEsales\Payments\Stripe\Controller;
 
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentComponent\Service\TokenServiceInterface;
+use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
+use OxidEsales\Payments\Stripe\Service\OxidLanguageResolver;
 
 /**
  * Helper for controller request/session/config access.
@@ -20,10 +22,14 @@ use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
  */
 class ControllerRequestHelper
 {
+    private readonly LanguageResolverInterface $languageResolver;
+
     public function __construct(
         private readonly TokenServiceInterface $tokenService,
-        private readonly ModuleConfigurationServiceInterface $moduleConfig
+        private readonly ModuleConfigurationServiceInterface $moduleConfig,
+        ?LanguageResolverInterface $languageResolver = null
     ) {
+        $this->languageResolver = $languageResolver ?? new OxidLanguageResolver();
     }
 
     // ==========================================
@@ -116,7 +122,7 @@ class ControllerRequestHelper
 
     public function getActiveLanguageId(): int
     {
-        return (int) Registry::getLang()->getBaseLanguage();
+        return $this->languageResolver->getActiveLanguageId();
     }
 
     public function getShopUrl(): string

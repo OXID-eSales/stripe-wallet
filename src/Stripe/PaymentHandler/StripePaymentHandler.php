@@ -21,7 +21,9 @@ use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentComponent\Service\ContractServiceInterface;
 use OxidEsales\PaymentComponent\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
+use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
+use OxidEsales\Payments\Stripe\Service\OxidLanguageResolver;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -42,6 +44,8 @@ class StripePaymentHandler implements PaymentHandlerInterface
 {
     private const STRIPE_PAYMENT_PREFIX = 'oe_payments_stripe_';
 
+    private readonly LanguageResolverInterface $languageResolver;
+
     public function __construct(
         private readonly ContractServiceInterface $contractService,
         private readonly CheckoutSessionServiceInterface $checkoutSessionService,
@@ -50,8 +54,10 @@ class StripePaymentHandler implements PaymentHandlerInterface
         private readonly ShopOrderServiceInterface $shopOrderService,
         private readonly ModuleConfigurationServiceInterface $config,
         private readonly TokenServiceInterface $tokenService,
-        private readonly ?LoggerInterface $logger = null
+        private readonly ?LoggerInterface $logger = null,
+        ?LanguageResolverInterface $languageResolver = null
     ) {
+        $this->languageResolver = $languageResolver ?? new OxidLanguageResolver();
     }
 
     public function getId(): string
@@ -161,7 +167,7 @@ class StripePaymentHandler implements PaymentHandlerInterface
      * Mirrors the standard flow's EarlyOrderCreationHandler:
      * DRAFT → NOT_FINISHED (with orderId) → PENDING
      */
-    private function createEarlyOrderAndTransition(
+    protected function createEarlyOrderAndTransition(
         PaymentContractInterface $contract,
         PaymentContextInterface $context
     ): void {
@@ -215,6 +221,8 @@ class StripePaymentHandler implements PaymentHandlerInterface
         $shopId = $this->shopAdapter->getShopId();
         $captureMode = $this->config->getCaptureMode();
         $sessionId = Registry::getSession()->getId();
+        $languageId = $this->languageResolver->getActiveLanguageId();
+        $shopIdInt = is_numeric($shopId) ? (int) $shopId : 1;
 
         $orderId = $contract->getOrderId();
         $orderNumber = $contract->getMetadata('order_number');
@@ -224,9 +232,13 @@ class StripePaymentHandler implements PaymentHandlerInterface
             $shopUrl,
             $contractId,
             $contractToken,
-            $sessionId
+            $sessionId,
+            $languageId,
+            $shopIdInt
         );
-        $cancelUrl = $this->checkoutSessionService->buildCancelUrl($shopUrl . 'index.php?cl=payment');
+        $cancelUrl = $this->checkoutSessionService->buildCancelUrl(
+            $shopUrl . 'index.php?cl=payment&lang=' . $languageId . '&shp=' . $shopIdInt
+        );
 
         return $this->checkoutSessionService->createSession(
             contractId: $contractId,

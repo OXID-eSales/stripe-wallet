@@ -27,6 +27,7 @@ class StubControllerRequestHelper extends ControllerRequestHelper
     public int $shopId = 1;
     public string $shopUrl = 'https://shop.test/';
     public string $sessionId = 'test_session';
+    public int $languageId = 0;
     /** @var array<string, mixed> */
     public array $sessionVars = [];
     public ?\OxidEsales\Eshop\Application\Model\Basket $basket = null;
@@ -97,6 +98,11 @@ class StubControllerRequestHelper extends ControllerRequestHelper
     public function getCaptureMode(): string
     {
         return $this->captureMode;
+    }
+
+    public function getActiveLanguageId(): int
+    {
+        return $this->languageId;
     }
 
     public function validateSessionChallenge(): bool

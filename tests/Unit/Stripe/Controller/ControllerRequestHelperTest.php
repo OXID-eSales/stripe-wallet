@@ -6,6 +6,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller;
 
 use OxidEsales\PaymentComponent\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
+use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -23,13 +24,37 @@ final class ControllerRequestHelperTest extends TestCase
 {
     private TokenServiceInterface&MockObject $tokenService;
     private ModuleConfigurationServiceInterface&MockObject $moduleConfig;
+    private LanguageResolverInterface&MockObject $languageResolver;
     private ControllerRequestHelper $helper;
 
     protected function setUp(): void
     {
         $this->tokenService = $this->createMock(TokenServiceInterface::class);
         $this->moduleConfig = $this->createMock(ModuleConfigurationServiceInterface::class);
-        $this->helper = new ControllerRequestHelper($this->tokenService, $this->moduleConfig);
+        $this->languageResolver = $this->createMock(LanguageResolverInterface::class);
+        $this->helper = new ControllerRequestHelper(
+            $this->tokenService,
+            $this->moduleConfig,
+            $this->languageResolver
+        );
+    }
+
+    // ==========================================
+    // getActiveLanguageId
+    // ==========================================
+
+    public function testGetActiveLanguageIdDelegatesToResolver(): void
+    {
+        $this->languageResolver->method('getActiveLanguageId')->willReturn(2);
+
+        $this->assertSame(2, $this->helper->getActiveLanguageId());
+    }
+
+    public function testGetActiveLanguageIdReturnsZeroForDefaultLanguage(): void
+    {
+        $this->languageResolver->method('getActiveLanguageId')->willReturn(0);
+
+        $this->assertSame(0, $this->helper->getActiveLanguageId());
     }
 
     // ==========================================

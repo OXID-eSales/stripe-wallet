@@ -19,6 +19,7 @@ use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\ContractTokenService;
+use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 
@@ -475,7 +476,8 @@ class StripeOrderController extends OrderController
         if ($this->requestHelper === null) {
             $this->requestHelper = new ControllerRequestHelper(
                 $this->getServiceFromContainer(ContractTokenService::class),
-                $this->getServiceFromContainer(ModuleConfigurationServiceInterface::class)
+                $this->getServiceFromContainer(ModuleConfigurationServiceInterface::class),
+                $this->getServiceFromContainer(LanguageResolverInterface::class)
             );
         }
         return $this->requestHelper;

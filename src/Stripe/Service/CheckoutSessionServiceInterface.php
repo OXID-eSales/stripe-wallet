@@ -77,4 +77,14 @@ interface CheckoutSessionServiceInterface
         int $languageId = 0,
         int $shopId = 1
     ): string;
+
+    /**
+     * Allow event handlers to mutate the cancel URL before it is sent to Stripe.
+     *
+     * The caller is responsible for assembling a language-aware base URL; this
+     * method only dispatches StripeCancelUrlBuildEvent and returns the result.
+     *
+     * @since Sprint 92 — promoted to interface so it is part of the ISP contract.
+     */
+    public function buildCancelUrl(string $cancelUrl): string;
 }
