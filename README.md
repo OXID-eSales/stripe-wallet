@@ -25,6 +25,7 @@ make up
 
 ## Activation
 
+
 OXID 7.x Module Commands:
 
 | Action     | Command                                               |
