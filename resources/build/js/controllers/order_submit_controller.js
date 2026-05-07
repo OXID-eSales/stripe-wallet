@@ -115,7 +115,7 @@ export default class extends Controller {
     this.setStatus(window.oStripe?.i18n?.CREATING_SESSION || 'Creating checkout session...')
 
     // Create Checkout Session (include stoken for CSRF protection)
-    const response = await fetch(this.buildUrlWithCsrfToken(this.urlValue), {
+    const response = await fetch(this.appendAgbState(this.buildUrlWithCsrfToken(this.urlValue)), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -213,7 +213,7 @@ export default class extends Controller {
 
     console.log('Creating payment intent via URL:', this.urlValue)
 
-    const response = await fetch(this.buildUrlWithCsrfToken(this.urlValue), {
+    const response = await fetch(this.appendAgbState(this.buildUrlWithCsrfToken(this.urlValue)), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -252,6 +252,25 @@ export default class extends Controller {
     }
     const separator = url.includes('?') ? '&' : '?'
     return url + separator + 'stoken=' + encodeURIComponent(stoken)
+  }
+
+  /**
+   * Append the AGB acceptance flag (ord_agb=1) when the customer has ticked
+   * the apex Terms-and-Conditions checkbox (#checkAgbTop). The Stripe order
+   * fetch posts a JSON body, which OXID's Registry::getRequest() does not
+   * parse — placing ord_agb in the query string is the simplest way to make
+   * StripeOrderController::createCheckoutSession() see it.
+   *
+   * @param {string} url
+   * @returns {string}
+   */
+  appendAgbState(url) {
+    const checkbox = document.getElementById('checkAgbTop')
+    if (!checkbox || !checkbox.checked) {
+      return url
+    }
+    const separator = url.includes('?') ? '&' : '?'
+    return url + separator + 'ord_agb=1'
   }
 
   /**
