@@ -69,22 +69,28 @@
             {% set createCheckoutSessionUrl = oViewConf.getSslSelfLink() ~ "cl=order&fnc=createCheckoutSession" %}
             {# CSRF token for AJAX requests (Sprint 64f: H8 frontend CSRF protection) #}
             <input type="hidden" name="stoken" value="{{ oViewConf.getSessionChallengeToken() }}" />
-            <button id="stripe-checkout-btn"
-                    type="button"
-                    class="btn btn-highlight btn-lg w-100"
-                    data-controller="order-submit"
-                    data-action="click->order-submit#handleSubmit"
-                    data-order-submit-url-value="{{ createCheckoutSessionUrl | raw }}"
-                    data-order-submit-payment-type-value="wallet"
-                    data-order-submit-publishable-key-value="{{ oViewConf.getStripePublishableKey() | raw }}"
-                    data-order-submit-target="button"
-                    {% if oView.isLowOrderPrice() and displayBasketOrderButton == 'disabled' %}
-                        disabled="disabled"
-                    {% endif %}
-            >
-                {{ translate({ ident: "SUBMIT_ORDER" }) }}
-            </button>
-            <div data-order-submit-target="status" class="mt-2 text-center"></div>
+            {# Sprint 101: AGB validation Stimulus controller — resolves #checkAgbTop from apex
+               via connect(); disabled if blConfirmAGB is off. #}
+            <div data-controller="agb-validation"
+                 data-agb-validation-enabled-value="{{ oView.isConfirmAGBActive() ? 'true' : 'false' }}">
+                <button id="stripe-checkout-btn"
+                        type="button"
+                        class="btn btn-highlight btn-lg w-100"
+                        data-controller="order-submit"
+                        data-action="click->order-submit#handleSubmit"
+                        data-order-submit-url-value="{{ createCheckoutSessionUrl | raw }}"
+                        data-order-submit-payment-type-value="wallet"
+                        data-order-submit-publishable-key-value="{{ oViewConf.getStripePublishableKey() | raw }}"
+                        data-order-submit-target="button"
+                        data-agb-validation-target="submitButton"
+                        {% if oView.isLowOrderPrice() and displayBasketOrderButton == 'disabled' %}
+                            disabled="disabled"
+                        {% endif %}
+                >
+                    {{ translate({ ident: "SUBMIT_ORDER" }) }}
+                </button>
+                <div data-order-submit-target="status" class="mt-2 text-center"></div>
+            </div>
         {% endif %}
     {% endif %}
 {% endblock %}
