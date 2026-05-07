@@ -136,6 +136,24 @@ class ControllerRequestHelper
     }
 
     // ==========================================
+    // AGB CONFIRMATION
+    // ==========================================
+
+    public const AGB_REQUEST_KEY = 'ord_agb';
+    public const AGB_ACCEPTED_VALUE = '1';
+
+    public function getAgbAcceptedFromRequest(): bool
+    {
+        $raw = Registry::getRequest()->getRequestEscapedParameter(self::AGB_REQUEST_KEY);
+        return is_string($raw) && $raw === self::AGB_ACCEPTED_VALUE;
+    }
+
+    public function isAgbConfirmationRequired(): bool
+    {
+        return (bool) Registry::getConfig()->getConfigParam('blConfirmAGB');
+    }
+
+    // ==========================================
     // VALIDATION
     // ==========================================
 
