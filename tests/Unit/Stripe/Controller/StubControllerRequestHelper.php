@@ -31,6 +31,8 @@ class StubControllerRequestHelper extends ControllerRequestHelper
     /** @var array<string, mixed> */
     public array $sessionVars = [];
     public ?\OxidEsales\Eshop\Application\Model\Basket $basket = null;
+    public bool $agbAcceptedFromRequest = false;
+    public bool $agbConfirmationRequired = false;
 
     public function __construct()
     {
@@ -141,5 +143,15 @@ class StubControllerRequestHelper extends ControllerRequestHelper
     public function clearStripeSessionVariables(): void
     {
         $this->sessionVars = [];
+    }
+
+    public function getAgbAcceptedFromRequest(): bool
+    {
+        return $this->agbAcceptedFromRequest;
+    }
+
+    public function isAgbConfirmationRequired(): bool
+    {
+        return $this->agbConfirmationRequired;
     }
 }

@@ -162,9 +162,13 @@ class StripeOrderController extends OrderController
         header('Content-Type: application/json');
 
         if (!$helper->validateSessionChallenge()) {
-            http_response_code(403);
+            $this->setHttpResponseCode(403);
             echo json_encode(['error' => 'Session expired. Please reload the page.']);
             $this->exitWithJson();
+            return;
+        }
+
+        if (!$this->ensureAgbAccepted($helper)) {
             return;
         }
 
@@ -222,12 +226,37 @@ class StripeOrderController extends OrderController
                 'contract_id' => $context->get('contractId'),
             ]);
         } catch (\Throwable $e) {
-            http_response_code(500);
+            $this->setHttpResponseCode(500);
             $helper->logError('createCheckoutSession failed', $e);
             echo json_encode(['error' => 'Payment processing failed. Please try again.']);
         }
 
         $this->exitWithJson();
+    }
+
+    /**
+     * Guard: reject the request when blConfirmAGB is active but the customer
+     * has not submitted ord_agb=1. Must be called after session validation and
+     * before cleanupPreviousCheckoutAttempt() to avoid side effects on
+     * invalid requests.
+     *
+     * Returns true when the request may proceed; false when rejected (HTTP 400
+     * already written and exitWithJson() called).
+     */
+    private function ensureAgbAccepted(ControllerRequestHelper $helper): bool
+    {
+        if (!$helper->isAgbConfirmationRequired()) {
+            return true;
+        }
+
+        if ($helper->getAgbAcceptedFromRequest()) {
+            return true;
+        }
+
+        $this->setHttpResponseCode(400);
+        echo json_encode(['error' => 'You must accept the Terms and Conditions to continue.']);
+        $this->exitWithJson();
+        return false;
     }
 
     /**
@@ -464,6 +493,11 @@ class StripeOrderController extends OrderController
     protected function exitWithJson(): void
     {
         exit;
+    }
+
+    protected function setHttpResponseCode(int $code): void
+    {
+        http_response_code($code);
     }
 
     protected function generateNewSessChallenge(): string

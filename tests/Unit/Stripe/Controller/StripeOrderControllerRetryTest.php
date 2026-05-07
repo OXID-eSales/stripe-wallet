@@ -36,6 +36,7 @@ class StripeOrderControllerRetryTest extends TestCase
         $helper = new StubControllerRequestHelper();
         $helper->contractIdFromSession = 'contract_previous_123';
         $helper->sessionChallengeResult = true;
+        $helper->agbAcceptedFromRequest = true; // Sprint 101: AGB gate must be satisfied
         $helper->basket = $this->createBasketMock();
 
         $this->cleanupService
@@ -64,6 +65,7 @@ class StripeOrderControllerRetryTest extends TestCase
         $helper = new StubControllerRequestHelper();
         $helper->contractIdFromSession = 'contract_old';
         $helper->sessionChallengeResult = true;
+        $helper->agbAcceptedFromRequest = true; // Sprint 101: AGB gate must be satisfied
         $helper->basket = $this->createBasketMock();
 
         $this->cleanupService->method('cleanupPreviousAttempt')->willReturn(true);
@@ -92,6 +94,7 @@ class StripeOrderControllerRetryTest extends TestCase
         $helper = new StubControllerRequestHelper();
         $helper->contractIdFromSession = null;
         $helper->sessionChallengeResult = true;
+        $helper->agbAcceptedFromRequest = true; // Sprint 101: AGB gate must be satisfied
         $helper->basket = $this->createBasketMock();
 
         $this->cleanupService
@@ -232,6 +235,11 @@ class StripeOrderControllerRetryTest extends TestCase
             protected function exitWithJson(): void
             {
                 // Don't exit in tests
+            }
+
+            protected function setHttpResponseCode(int $code): void
+            {
+                // No-op in tests
             }
 
             protected function generateNewSessChallenge(): string
