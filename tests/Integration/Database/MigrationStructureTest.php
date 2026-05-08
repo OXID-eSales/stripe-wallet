@@ -67,37 +67,37 @@ class MigrationStructureTest extends TestCase
 
     public function testCustomerTableExists(): void
     {
-        // Customer table is provider-agnostic, in payment-component
+        // Customer table is provider-agnostic, in payment-base
         $this->assertTrue(
             $this->tableExists('oe_payments_customer'),
-            'Table oe_payments_customer should exist (from payment-component)'
+            'Table oe_payments_customer should exist (from payment-base)'
         );
     }
 
     public function testIdempotencyTableExists(): void
     {
-        // Idempotency table is provider-agnostic, in payment-component
+        // Idempotency table is provider-agnostic, in payment-base
         $this->assertTrue(
             $this->tableExists('oe_payments_idempotency'),
-            'Table oe_payments_idempotency should exist (from payment-component)'
+            'Table oe_payments_idempotency should exist (from payment-base)'
         );
     }
 
     public function testSessionsTableExists(): void
     {
-        // Sessions table is provider-agnostic, in payment-component
+        // Sessions table is provider-agnostic, in payment-base
         $this->assertTrue(
             $this->tableExists('oe_payments_sessions'),
-            'Table oe_payments_sessions should exist (from payment-component)'
+            'Table oe_payments_sessions should exist (from payment-base)'
         );
     }
 
     public function testWebhookLogsTableExists(): void
     {
-        // Webhooklogs table is provider-agnostic, in payment-component
+        // Webhooklogs table is provider-agnostic, in payment-base
         $this->assertTrue(
             $this->tableExists('oe_payments_webhooklogs'),
-            'Table oe_payments_webhooklogs should exist (from payment-component)'
+            'Table oe_payments_webhooklogs should exist (from payment-base)'
         );
     }
 
@@ -238,7 +238,7 @@ class MigrationStructureTest extends TestCase
     }
 
     // ==================== CUSTOMER TABLE STRUCTURE ====================
-    // Note: Customer, Idempotency, Sessions tables are provider-agnostic (from payment-component)
+    // Note: Customer, Idempotency, Sessions tables are provider-agnostic (from payment-base)
 
     public function testCustomerTableHasRequiredColumns(): void
     {

@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
 use OxidEsales\Eshop\Application\Model\Order;
-use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
-use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
-use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
+use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
+use OxidEsales\PaymentBase\EventSystem\Handler\HandlerInterface;
+use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
-use OxidEsales\PaymentComponent\Adapter\Response\RefundResponse;
+use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
 use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
-use OxidEsales\PaymentComponent\Service\RequestLogServiceInterface;
+use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 

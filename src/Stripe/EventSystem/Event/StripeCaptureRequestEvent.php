@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Event;
 
-use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
-use OxidEsales\PaymentComponent\EventSystem\Event\EventInterface;
+use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\EventSystem\Event\EventInterface;
 
 /**
  * Event dispatched when a payment capture is requested.

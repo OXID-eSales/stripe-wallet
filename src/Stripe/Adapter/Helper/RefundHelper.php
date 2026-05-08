@@ -10,9 +10,9 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Adapter\Helper;
 
 use DateTimeImmutable;
-use OxidEsales\PaymentComponent\Adapter\Request\RefundPaymentRequest;
-use OxidEsales\PaymentComponent\Adapter\Response\RefundResponse;
-use OxidEsales\PaymentComponent\Repository\IdempotencyRepositoryInterface;
+use OxidEsales\PaymentBase\Adapter\Request\RefundPaymentRequest;
+use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
+use OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface;
 use Stripe\Charge;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Refund;

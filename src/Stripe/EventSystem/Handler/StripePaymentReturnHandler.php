@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
-use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
-use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
-use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
+use OxidEsales\PaymentBase\EventSystem\Handler\HandlerInterface;
+use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
+use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
 

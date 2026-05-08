@@ -13,7 +13,7 @@ use DateTimeImmutable;
 use OxidEsales\Eshop\Application\Controller\FrontendController;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
-use OxidEsales\PaymentComponent\Webhook\WebhookRequest;
+use OxidEsales\PaymentBase\Webhook\WebhookRequest;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use OxidEsales\Payments\Stripe\Service\WebhookLogServiceInterface;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;

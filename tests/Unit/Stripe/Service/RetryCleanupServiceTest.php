@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Adapter\ShopOrderServiceInterface;
-use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
-use OxidEsales\PaymentComponent\Contract\ContractCondition;
-use OxidEsales\PaymentComponent\Contract\PaymentContract;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
+use OxidEsales\PaymentBase\Contract\BasketSnapshot;
+use OxidEsales\PaymentBase\Contract\ContractCondition;
+use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Event;
 
-use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
 use PHPUnit\Framework\TestCase;
 

@@ -5,7 +5,7 @@
   "repositories": [
     {
       "type": "path",
-      "url": "../payment-component",
+      "url": "../payment-base",
       "options": {
         "symlink": true
       }
@@ -27,7 +27,7 @@
   "prefer-stable": true,
   "require": {
     "php": "^8.2",
-    "oxid-esales/payment-component": "*",
+    "oxid-esales/payment-base": "*",
     "stripe/stripe-php": "^19.3",
     "doctrine/dbal": "^2.13"
   },

@@ -9,16 +9,16 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Controller\Admin;
 
-use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
-use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
-use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
-use OxidEsales\PaymentComponent\Contract\ContractCondition;
-use OxidEsales\PaymentComponent\Contract\ContractState;
-use OxidEsales\PaymentComponent\Contract\PaymentContract;
-use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
-use OxidEsales\PaymentComponent\Service\RequestLogServiceInterface;
+use OxidEsales\PaymentBase\Adapter\Response\CaptureResponse;
+use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
+use OxidEsales\PaymentBase\Contract\BasketSnapshot;
+use OxidEsales\PaymentBase\Contract\ContractCondition;
+use OxidEsales\PaymentBase\Contract\ContractState;
+use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
+use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCaptureRequestHandler;
 use OxidEsales\Payments\Stripe\Service\CaptureService;
@@ -123,7 +123,7 @@ final class ManualCaptureIntegrationTest extends TestCase
             $adapterFactory,
             $this->contractRepository,
             $this->fulfillmentService,
-            $this->createMock(\OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface::class),
+            $this->createMock(\OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface::class),
             new NullLogger()
         );
 
@@ -198,7 +198,7 @@ final class ManualCaptureIntegrationTest extends TestCase
             $adapterFactory,
             $this->contractRepository,
             $this->fulfillmentService,
-            $this->createMock(\OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface::class),
+            $this->createMock(\OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface::class),
             new NullLogger()
         );
 
@@ -248,7 +248,7 @@ final class ManualCaptureIntegrationTest extends TestCase
             $adapterFactory,
             $this->contractRepository,
             $this->fulfillmentService,
-            $this->createMock(\OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface::class),
+            $this->createMock(\OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface::class),
             new NullLogger()
         );
 

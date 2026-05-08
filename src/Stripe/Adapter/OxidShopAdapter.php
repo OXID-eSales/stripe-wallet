@@ -10,7 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Adapter;
 
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
+use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 
 /**
  * OXID eShop specific implementation of ShopAdapterInterface.

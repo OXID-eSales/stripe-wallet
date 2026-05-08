@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Service\TokenServiceInterface;
+use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 
 /**
  * Service for generating and validating secure tokens for contract identification in URLs.

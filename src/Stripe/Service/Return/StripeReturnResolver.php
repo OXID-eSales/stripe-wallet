@@ -9,10 +9,10 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service\Return;
 
-use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
-use OxidEsales\PaymentComponent\EventSystem\Event\EventContextInterface;
-use OxidEsales\PaymentComponent\Return\ReturnResolution;
-use OxidEsales\PaymentComponent\Return\ReturnResolverInterface;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\EventSystem\Event\EventContextInterface;
+use OxidEsales\PaymentBase\Return\ReturnResolution;
+use OxidEsales\PaymentBase\Return\ReturnResolverInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutReturnServiceInterface;
 use OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult;
 use Throwable;

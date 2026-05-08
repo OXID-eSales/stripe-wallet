@@ -10,9 +10,9 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Adapter\Helper;
 
 use DateTimeImmutable;
-use OxidEsales\PaymentComponent\Adapter\Request\RefundPaymentRequest;
-use OxidEsales\PaymentComponent\Contract\IdempotencyRecord;
-use OxidEsales\PaymentComponent\Repository\IdempotencyRepositoryInterface;
+use OxidEsales\PaymentBase\Adapter\Request\RefundPaymentRequest;
+use OxidEsales\PaymentBase\Contract\IdempotencyRecord;
+use OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\Helper\RefundHelper;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;

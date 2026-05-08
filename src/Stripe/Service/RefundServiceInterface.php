@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Adapter\Response\RefundResponse;
+use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
 
 /**
  * Service interface for processing Stripe refunds.

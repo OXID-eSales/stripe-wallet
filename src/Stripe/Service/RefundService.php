@@ -10,9 +10,9 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use DateTimeImmutable;
-use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
-use OxidEsales\PaymentComponent\Adapter\Response\RefundResponse;
-use OxidEsales\PaymentComponent\Service\StockRestorationServiceInterface;
+use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
+use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
+use OxidEsales\PaymentBase\Service\StockRestorationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;

@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Handler;
 
-use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
-use OxidEsales\PaymentComponent\Contract\ContractCondition;
-use OxidEsales\PaymentComponent\Contract\ContractState;
-use OxidEsales\PaymentComponent\Contract\PaymentContract;
-use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
+use OxidEsales\PaymentBase\Contract\BasketSnapshot;
+use OxidEsales\PaymentBase\Contract\ContractCondition;
+use OxidEsales\PaymentBase\Contract\ContractState;
+use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler;
 use PHPUnit\Framework\TestCase;
 

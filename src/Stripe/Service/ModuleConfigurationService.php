@@ -13,7 +13,7 @@ use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Dao\ModuleConfigurationDaoInterface;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\DataObject\ModuleConfiguration;
 use OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface;
-use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
+use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\Payments\Stripe\Module;
 use Throwable;
 

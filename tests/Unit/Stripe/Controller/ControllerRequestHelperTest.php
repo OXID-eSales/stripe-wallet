@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller;
 
-use OxidEsales\PaymentComponent\Service\TokenServiceInterface;
+use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;

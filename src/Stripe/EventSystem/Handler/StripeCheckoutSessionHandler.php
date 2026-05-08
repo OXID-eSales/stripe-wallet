@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
-use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
-use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
-use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
-use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
-use OxidEsales\PaymentComponent\Service\TokenServiceInterface;
+use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\EventSystem\Handler\HandlerInterface;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Service\FileLoggerInterface;
+use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\StripeCustomerServiceInterface;

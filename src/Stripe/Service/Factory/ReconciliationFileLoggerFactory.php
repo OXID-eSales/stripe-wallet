@@ -10,7 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service\Factory;
 
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\PaymentComponent\Service\Factory\AbstractFileLoggerFactory;
+use OxidEsales\PaymentBase\Service\Factory\AbstractFileLoggerFactory;
 
 /**
  * Factory for creating the reconciliation file logger.

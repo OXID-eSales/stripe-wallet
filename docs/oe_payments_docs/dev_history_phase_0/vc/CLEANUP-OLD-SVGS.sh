@@ -3,11 +3,11 @@
 
 echo "🧹 Cleaning up old SVG files with errors..."
 
-cd /home/dtkachev/osc/strpwt7-oct21/stripe-wallet/docs/payment-component/vc/_generated
+cd /home/dtkachev/osc/strpwt7-oct21/stripe-wallet/docs/payment-base/vc/_generated
 
 # Remove old complex diagrams that have errors
 sudo rm -f m1-marketplace-structure.svg
-sudo rm -f m3-payment-component-structure.svg
+sudo rm -f m3-payment-base-structure.svg
 sudo rm -f p1-cloud-structure.svg
 sudo rm -f revenue-flow-diagram.svg
 sudo rm -f wealth-creation-model.svg
@@ -21,6 +21,6 @@ ls -lh *.svg
 echo ""
 echo "These 4 diagrams are working perfectly:"
 echo "  01-wealth-creation-flow.svg (19K)"
-echo "  02-m3-payment-component.svg (21K)"
+echo "  02-m3-payment-base.svg (21K)"
 echo "  03-m1-marketplace-network.svg (22K)"
 echo "  04-p1-cloud-paas.svg (26K)"

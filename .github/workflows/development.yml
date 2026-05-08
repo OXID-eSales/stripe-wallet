@@ -10,7 +10,7 @@ env:
   PHP_VERSION: '8.2'
   MYSQL_VERSION: '5.7'
   TEMPLATE_ENGINE: 'twig'
-  PAYMENT_COMPONENT_BRANCH: 'dev-b-7.4.x' # dev-b-7.x...
+  PAYMENT_BASE_BRANCH: 'dev-b-7.4.x-payment-base-STRP-135'
 
 jobs:
   install_shop_with_module:
@@ -91,24 +91,24 @@ jobs:
         with:
           path: source/test-module
 
-      - name: Configure private payment-component repository
+      - name: Configure private payment-base repository
         env:
           # Use GH_PAT secret for cross-repository access (GITHUB_TOKEN only has access to current repo)
           GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
         run: |
           docker compose exec -T \
-            php composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component
+            php composer config repositories.payment-base vcs https://github.com/OXID-eSales/payment-base
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
             php composer config github-oauth.github.com "${GH_TOKEN}"
 
-      - name: Install payment-component at shop level
+      - name: Install payment-base at shop level
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || secrets.GH_TOKEN }}
         run: |
           docker compose exec -T \
-            php composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component
+            php composer config repositories.payment-base vcs https://github.com/OXID-eSales/payment-base
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
-            php composer require oxid-esales/payment-component:${{ env.PAYMENT_COMPONENT_BRANCH }} --no-interaction --no-update
+            php composer require oxid-esales/payment-base:${{ env.PAYMENT_BASE_BRANCH }} --no-interaction --no-update
 
       - name: Install module
         run: |
@@ -189,20 +189,20 @@ jobs:
         run: |
           docker compose exec -T php bin/oe-console oe:theme:activate apex
 
-      # Sprint 93 / Sprint I §86–95 — payment-component is now an
+      # Sprint 93 / Sprint I §86–95 — payment-base is now an
       # oxideshop-module and must be installed and activated before
       # any PSP module activates. Otherwise the
       # `oe.payment.admin_panel` tagged-iterator that powers the
       # shared admin tab is empty at runtime.
-      - name: Install + activate payment-component module
+      - name: Install + activate payment-base module
         run: |
           docker compose exec -T php bin/oe-console oe:module:install \
-            /var/www/vendor/oxid-esales/payment-component
+            /var/www/vendor/oxid-esales/payment-base
           docker compose exec -T php bin/oe-console oe:module:activate \
-            oe_payment_component
+            oe_payment_base
 
       # Sprint 93 — install + activate the Stripe module the same way
-      # we just installed payment-component, so OXID's module registry
+      # we just installed payment-base, so OXID's module registry
       # has a complete picture before the put-module-settings step.
       - name: Install + activate stripe-wallet module
         run: |
@@ -266,22 +266,22 @@ jobs:
           coverage: xdebug
           extensions: gd, zip
 
-      - name: Configure private payment-component repository
+      - name: Configure private payment-base repository
         working-directory: source/test-module
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || secrets.GH_TOKEN }}
         run: |
           # Remove all repositories and add only VCS for CI
           composer config repositories --unset
-          composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component
+          composer config repositories.payment-base vcs https://github.com/OXID-eSales/payment-base
           # Configure GitHub authentication for private repo
           composer config github-oauth.github.com $GH_TOKEN
 
-      - name: Pin payment-component branch
+      - name: Pin payment-base branch
         working-directory: source/test-module
         env:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.GH_PAT || secrets.GH_TOKEN }}"}}'
-        run: composer require oxid-esales/payment-component:${{ env.PAYMENT_COMPONENT_BRANCH }} --no-update --no-interaction
+        run: composer require oxid-esales/payment-base:${{ env.PAYMENT_BASE_BRANCH }} --no-update --no-interaction
 
       - name: Install module dependencies
         id: dependencies
@@ -332,23 +332,23 @@ jobs:
           make up
           sleep 2
 
-      - name: Configure private payment-component repository
+      - name: Configure private payment-base repository
         env:
           # Use GH_PAT secret for cross-repository access (GITHUB_TOKEN only has access to current repo)
           GH_TOKEN: ${{ secrets.GH_PAT || secrets.GH_TOKEN }}
         run: |
           # Remove all repositories and add only VCS for CI
           docker compose exec -T php bash -c "cd /var/www/test-module && composer config repositories --unset"
-          docker compose exec -T php bash -c "cd /var/www/test-module && composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component"
+          docker compose exec -T php bash -c "cd /var/www/test-module && composer config repositories.payment-base vcs https://github.com/OXID-eSales/payment-base"
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
             php bash -c "cd /var/www/test-module && composer config github-oauth.github.com '${GH_TOKEN}'"
 
-      - name: Pin payment-component branch
+      - name: Pin payment-base branch
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || secrets.GH_TOKEN }}
         run: |
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
-            php bash -c "cd /var/www/test-module && composer require oxid-esales/payment-component:${{ env.PAYMENT_COMPONENT_BRANCH }} --no-update --no-interaction"
+            php bash -c "cd /var/www/test-module && composer require oxid-esales/payment-base:${{ env.PAYMENT_BASE_BRANCH }} --no-update --no-interaction"
 
       - name: Install module dependencies
         env:
@@ -390,24 +390,24 @@ jobs:
           make up
           sleep 2
 
-      - name: Configure private payment-component repository
+      - name: Configure private payment-base repository
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || secrets.GH_TOKEN }}
         run: |
           # Remove all repositories and add only VCS for CI in module's composer.json
           docker compose exec -T php bash -c "cd /var/www/test-module && composer config repositories --unset"
-          docker compose exec -T php bash -c "cd /var/www/test-module && composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component"
+          docker compose exec -T php bash -c "cd /var/www/test-module && composer config repositories.payment-base vcs https://github.com/OXID-eSales/payment-base"
           # Also add to shop's composer.json for resolution
-          docker compose exec -T php composer config repositories.payment-component vcs https://github.com/OXID-eSales/payment-component
+          docker compose exec -T php composer config repositories.payment-base vcs https://github.com/OXID-eSales/payment-base
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
             php composer config github-oauth.github.com "${GH_TOKEN}"
 
-      - name: Install payment-component at shop level
+      - name: Install payment-base at shop level
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || secrets.GH_TOKEN }}
         run: |
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
-            php composer require oxid-esales/payment-component:${{ env.PAYMENT_COMPONENT_BRANCH }} --no-interaction --no-update
+            php composer require oxid-esales/payment-base:${{ env.PAYMENT_BASE_BRANCH }} --no-interaction --no-update
 
       - name: Install testing dependencies
         env:
@@ -420,9 +420,9 @@ jobs:
         run: |
           docker compose exec -T php bin/oe-console oe:module:install ./test-module
 
-      - name: Run payment-component database migrations
+      - name: Run payment-base database migrations
         run: |
-          docker compose exec -T php php vendor/bin/doctrine-migrations migrate --configuration=vendor/oxid-esales/payment-component/migration/migrations.yml --db-configuration=vendor/oxid-esales/oxideshop-doctrine-migration-wrapper/src/migrations-db.php --no-interaction --allow-no-migration
+          docker compose exec -T php php vendor/bin/doctrine-migrations migrate --configuration=vendor/oxid-esales/payment-base/migration/migrations.yml --db-configuration=vendor/oxid-esales/oxideshop-doctrine-migration-wrapper/src/migrations-db.php --no-interaction --allow-no-migration
 
       - name: Create .env
         run: |          

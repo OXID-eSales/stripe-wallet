@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
-use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
-use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
-use OxidEsales\PaymentComponent\Adapter\Response\CancellationResponse;
-use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
-use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
+use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
+use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\Adapter\Response\CancellationResponse;
+use OxidEsales\PaymentBase\EventSystem\Handler\HandlerInterface;
+use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
 use OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface;
-use OxidEsales\PaymentComponent\Service\RequestLogServiceInterface;
+use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 

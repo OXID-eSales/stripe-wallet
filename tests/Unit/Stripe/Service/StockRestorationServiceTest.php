@@ -11,7 +11,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use Doctrine\DBAL\Connection;
 use OxidEsales\Payments\Stripe\Service\OxidStockRestorationService;
-use OxidEsales\PaymentComponent\Service\StockRestorationServiceInterface;
+use OxidEsales\PaymentBase\Service\StockRestorationServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;

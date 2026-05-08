@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
+use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\Payments\Stripe\Service\Result\CheckoutSessionResult;
 
 /**

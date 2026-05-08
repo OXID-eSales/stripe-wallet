@@ -11,7 +11,7 @@ use OxidEsales\Payments\Stripe\Controller\StripeOrderController;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
-use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
+use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 

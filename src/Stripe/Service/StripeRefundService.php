@@ -9,8 +9,8 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Service\AbstractPaymentRefundService;
-use OxidEsales\PaymentComponent\Service\Exception\RefundFailedException;
+use OxidEsales\PaymentBase\Service\AbstractPaymentRefundService;
+use OxidEsales\PaymentBase\Service\Exception\RefundFailedException;
 
 /**
  * Stripe-specific implementation of payment refund service.

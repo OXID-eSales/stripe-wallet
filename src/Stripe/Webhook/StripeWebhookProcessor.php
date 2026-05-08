@@ -9,13 +9,13 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Webhook;
 
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Repository\WebhookLogRepositoryInterface;
-use OxidEsales\PaymentComponent\Webhook\AbstractWebhookProcessor;
-use OxidEsales\PaymentComponent\Webhook\Exception\WebhookSignatureException;
-use OxidEsales\PaymentComponent\Webhook\WebhookEvent;
-use OxidEsales\PaymentComponent\Webhook\WebhookRequest;
-use OxidEsales\PaymentComponent\Webhook\WebhookResult;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Repository\WebhookLogRepositoryInterface;
+use OxidEsales\PaymentBase\Webhook\AbstractWebhookProcessor;
+use OxidEsales\PaymentBase\Webhook\Exception\WebhookSignatureException;
+use OxidEsales\PaymentBase\Webhook\WebhookEvent;
+use OxidEsales\PaymentBase\Webhook\WebhookRequest;
+use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface;
 use Psr\Log\LoggerInterface;
@@ -30,7 +30,7 @@ use Stripe\Webhook;
  * - Event routing to contract fulfillment handler
  * - Support for payment_intent, charge, and checkout.session events
  *
- * Inherits from AbstractWebhookProcessor (payment-component) which contributes ~10 ECC.
+ * Inherits from AbstractWebhookProcessor (payment-base) which contributes ~10 ECC.
  * Each webhook event type requires a dedicated handler method. Data extraction delegated to StripeWebhookEventParser.
  *
  * @since Sprint 5

@@ -9,8 +9,8 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Adapter;
 
-use OxidEsales\PaymentComponent\Adapter\Request\CreatePaymentRequest;
-use OxidEsales\PaymentComponent\Adapter\Request\ThreeDSecureRequest;
+use OxidEsales\PaymentBase\Adapter\Request\CreatePaymentRequest;
+use OxidEsales\PaymentBase\Adapter\Request\ThreeDSecureRequest;
 use OxidEsales\Payments\Stripe\Tests\Integration\Stripe\StripeIntegrationTestCase;
 
 /**

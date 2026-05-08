@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Service\Exception\RefundFailedException;
+use OxidEsales\PaymentBase\Service\Exception\RefundFailedException;
 use OxidEsales\Payments\Stripe\Service\StripeRefundService;
 use PHPUnit\Framework\TestCase;
 

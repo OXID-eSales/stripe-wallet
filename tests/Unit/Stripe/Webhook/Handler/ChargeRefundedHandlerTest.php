@@ -9,10 +9,10 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Webhook\Handler;
 
-use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Webhook\WebhookEvent;
-use OxidEsales\PaymentComponent\Webhook\WebhookEventHandlerInterface;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Webhook\WebhookEvent;
+use OxidEsales\PaymentBase\Webhook\WebhookEventHandlerInterface;
 use OxidEsales\Payments\Stripe\WebhookHandler\ChargeRefundedHandler;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;

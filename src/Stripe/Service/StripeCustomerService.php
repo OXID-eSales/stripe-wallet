@@ -10,8 +10,8 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use DateTimeImmutable;
-use OxidEsales\PaymentComponent\Contract\PaymentCustomer;
-use OxidEsales\PaymentComponent\Repository\PaymentCustomerRepositoryInterface;
+use OxidEsales\PaymentBase\Contract\PaymentCustomer;
+use OxidEsales\PaymentBase\Repository\PaymentCustomerRepositoryInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;

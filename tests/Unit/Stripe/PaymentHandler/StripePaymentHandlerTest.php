@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\PaymentHandler;
 
-use OxidEsales\PaymentComponent\Adapter\PaymentHandlerInterface;
-use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
-use OxidEsales\PaymentComponent\Adapter\ShopOrderServiceInterface;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Service\ContractServiceInterface;
-use OxidEsales\PaymentComponent\Service\TokenServiceInterface;
+use OxidEsales\PaymentBase\Adapter\PaymentHandlerInterface;
+use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
+use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Service\ContractServiceInterface;
+use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\PaymentHandler\StripePaymentHandler;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
@@ -151,9 +151,9 @@ class StripePaymentHandlerTest extends TestCase
 
     // ── Helpers ──
 
-    private function createPaymentContext(): \OxidEsales\PaymentComponent\Adapter\PaymentContextInterface
+    private function createPaymentContext(): \OxidEsales\PaymentBase\Adapter\PaymentContextInterface
     {
-        $context = $this->createMock(\OxidEsales\PaymentComponent\Adapter\PaymentContextInterface::class);
+        $context = $this->createMock(\OxidEsales\PaymentBase\Adapter\PaymentContextInterface::class);
         $context->method('getPaymentMethodId')->willReturn(StripeDefinitions::STRIPE_WALLET_PAYMENT_ID);
         $context->method('getBasket')->willReturn(new \stdClass());
         $context->method('getUser')->willReturn(new class () {

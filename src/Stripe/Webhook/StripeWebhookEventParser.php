@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Webhook;
 
-use OxidEsales\PaymentComponent\Webhook\WebhookEvent;
+use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 
 /**
  * Extracts typed data from Stripe webhook events.

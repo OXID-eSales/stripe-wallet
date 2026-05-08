@@ -10,8 +10,8 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Adapter\Helper;
 
 use DateTimeImmutable;
-use OxidEsales\PaymentComponent\Adapter\Request\CreatePaymentMethodRequest;
-use OxidEsales\PaymentComponent\Adapter\Response\PaymentMethodResponse;
+use OxidEsales\PaymentBase\Adapter\Request\CreatePaymentMethodRequest;
+use OxidEsales\PaymentBase\Adapter\Response\PaymentMethodResponse;
 use Stripe\Exception\ApiErrorException;
 use Stripe\PaymentMethod;
 use Stripe\StripeClient;

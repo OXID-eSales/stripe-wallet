@@ -10,16 +10,16 @@ use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Controller\StripeOrderController;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
-use OxidEsales\PaymentComponent\EventSystem\Event\Payment\PaymentAuthorizedEvent;
-use OxidEsales\PaymentComponent\EventSystem\Event\Return\CheckoutReturnCompletedEvent;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Return\ReturnResolution;
+use OxidEsales\PaymentBase\EventSystem\Event\Payment\PaymentAuthorizedEvent;
+use OxidEsales\PaymentBase\EventSystem\Event\Return\CheckoutReturnCompletedEvent;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Return\ReturnResolution;
 use OxidEsales\Payments\Stripe\Service\Return\StripeReturnResolver;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
-use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
-use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
+use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -729,16 +729,16 @@ class StripeOrderControllerTest extends TestCase
                 if ($serviceName === ContractRepositoryInterface::class) {
                     return new class implements ContractRepositoryInterface {
                         public function save(
-                            \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract
+                            \OxidEsales\PaymentBase\Contract\PaymentContractInterface $contract
                         ): void {
                         }
                         public function findById(
                             string $id
-                        ): ?\OxidEsales\PaymentComponent\Contract\PaymentContractInterface {
-                            $contract = new \OxidEsales\PaymentComponent\Contract\PaymentContract(
+                        ): ?\OxidEsales\PaymentBase\Contract\PaymentContractInterface {
+                            $contract = new \OxidEsales\PaymentBase\Contract\PaymentContract(
                                 1,
                                 'user_1',
-                                \OxidEsales\PaymentComponent\Contract\BasketSnapshot::fromArray([
+                                \OxidEsales\PaymentBase\Contract\BasketSnapshot::fromArray([
                                     'items' => [],
                                     'totalGross' => 1.0,
                                     'totalNet' => 1.0,
@@ -755,17 +755,17 @@ class StripeOrderControllerTest extends TestCase
                         }
                         public function findActiveByUserId(
                             string $userId
-                        ): ?\OxidEsales\PaymentComponent\Contract\PaymentContractInterface {
+                        ): ?\OxidEsales\PaymentBase\Contract\PaymentContractInterface {
                             return null;
                         }
                         public function findByOrderId(
                             string $orderId
-                        ): ?\OxidEsales\PaymentComponent\Contract\PaymentContractInterface {
+                        ): ?\OxidEsales\PaymentBase\Contract\PaymentContractInterface {
                             return null;
                         }
                         public function findByProviderOrderId(
                             string $providerOrderId
-                        ): ?\OxidEsales\PaymentComponent\Contract\PaymentContractInterface {
+                        ): ?\OxidEsales\PaymentBase\Contract\PaymentContractInterface {
                             return null;
                         }
                         public function findExpired(): array
@@ -784,20 +784,20 @@ class StripeOrderControllerTest extends TestCase
                         {
                         }
                         public function resolve(
-                            \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract,
-                            \OxidEsales\PaymentComponent\EventSystem\Event\EventContextInterface $context,
+                            \OxidEsales\PaymentBase\Contract\PaymentContractInterface $contract,
+                            \OxidEsales\PaymentBase\EventSystem\Event\EventContextInterface $context,
                         ): ReturnResolution {
                             return ReturnResolution::readyToCommit('pi_stub', 'pi_stub', 1.0, 'EUR');
                         }
                     };
                 }
-                if ($serviceName === \OxidEsales\PaymentComponent\Controller\CheckoutReturnResponder::class) {
+                if ($serviceName === \OxidEsales\PaymentBase\Controller\CheckoutReturnResponder::class) {
                     // Use the test's dispatcher mock so the test's expectations
                     // (dispatch count, captured events) flow through the responder.
-                    $writer = new class implements \OxidEsales\PaymentComponent\Controller\SessionWriterInterface {
+                    $writer = new class implements \OxidEsales\PaymentBase\Controller\SessionWriterInterface {
                         public function writeSessChallenge(string $orderId): void {}
                     };
-                    return new \OxidEsales\PaymentComponent\Controller\CheckoutReturnResponder(
+                    return new \OxidEsales\PaymentBase\Controller\CheckoutReturnResponder(
                         $this->mockDispatcher,
                         $writer,
                     );

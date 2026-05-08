@@ -10,8 +10,8 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Adapter;
 
 use OxidEsales\Eshop\Application\Model\Order;
-use OxidEsales\PaymentComponent\Adapter\Request\CreateOrderRequest;
-use OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface;
+use OxidEsales\PaymentBase\Adapter\Request\CreateOrderRequest;
+use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService;
 use PHPUnit\Framework\TestCase;
 

@@ -6,11 +6,11 @@ namespace OxidEsales\Payments\Stripe\Controller;
 
 use OxidEsales\Eshop\Application\Controller\OrderController;
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\PaymentComponent\Controller\CheckoutReturnResponder;
-use OxidEsales\PaymentComponent\Controller\HandlesCheckoutReturn;
-use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
-use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Controller\CheckoutReturnResponder;
+use OxidEsales\PaymentBase\Controller\HandlesCheckoutReturn;
+use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\Payments\Stripe\Service\Return\StripeReturnResolver;
 use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
@@ -277,7 +277,7 @@ class StripeOrderController extends OrderController
             return 'payment';
         }
 
-        /** @var \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract */
+        /** @var \OxidEsales\PaymentBase\Contract\PaymentContractInterface $contract */
         $orderId = $this->dispatchCheckoutReturn(
             providerName: 'stripe',
             contract: $contract,

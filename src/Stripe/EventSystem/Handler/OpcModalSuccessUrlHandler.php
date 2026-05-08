@@ -10,7 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
+use OxidEsales\PaymentBase\EventSystem\Handler\HandlerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeSuccessUrlBuildEvent;
 
 /**

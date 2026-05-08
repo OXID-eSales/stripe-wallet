@@ -9,9 +9,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Adapter;
 
-use OxidEsales\PaymentComponent\Adapter\Request\CreatePaymentRequest;
-use OxidEsales\PaymentComponent\Adapter\Request\AuthorizePaymentRequest;
-use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
+use OxidEsales\PaymentBase\Adapter\Request\CreatePaymentRequest;
+use OxidEsales\PaymentBase\Adapter\Request\AuthorizePaymentRequest;
+use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapter;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;

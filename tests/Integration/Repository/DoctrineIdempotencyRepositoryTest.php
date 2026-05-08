@@ -13,8 +13,8 @@ use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionProviderInterface;
-use OxidEsales\PaymentComponent\Contract\IdempotencyRecord;
-use OxidEsales\PaymentComponent\Repository\DoctrineIdempotencyRepository;
+use OxidEsales\PaymentBase\Contract\IdempotencyRecord;
+use OxidEsales\PaymentBase\Repository\DoctrineIdempotencyRepository;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -22,7 +22,7 @@ use PHPUnit\Framework\TestCase;
  *
  * Sprint 42: Idempotency implementation.
  *
- * @covers \OxidEsales\PaymentComponent\Repository\DoctrineIdempotencyRepository
+ * @covers \OxidEsales\PaymentBase\Repository\DoctrineIdempotencyRepository
  * @group sprint-42
  * @group idempotency
  * @group database

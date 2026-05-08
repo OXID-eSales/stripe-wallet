@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
-use OxidEsales\PaymentComponent\EventSystem\Handler\HandlerInterface;
-use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
-use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
-use OxidEsales\PaymentComponent\EventSystem\Event\Payment\PaymentAuthorizedEvent;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
+use OxidEsales\PaymentBase\EventSystem\Handler\HandlerInterface;
+use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
+use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\EventSystem\Event\Payment\PaymentAuthorizedEvent;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\Stripe3DSRequiredEvent;
@@ -114,7 +114,7 @@ class StripePaymentStatusHandler implements HandlerInterface
 
     private function handleSuccess(
         EventContext $context,
-        \OxidEsales\PaymentComponent\Adapter\Response\PaymentDetailsResponse $paymentDetails,
+        \OxidEsales\PaymentBase\Adapter\Response\PaymentDetailsResponse $paymentDetails,
         string $paymentIntentId
     ): void {
         // Dispatch PaymentAuthorizedEvent to trigger condition fulfillment
@@ -136,7 +136,7 @@ class StripePaymentStatusHandler implements HandlerInterface
 
     private function handlePending(
         EventContext $context,
-        \OxidEsales\PaymentComponent\Adapter\Response\PaymentDetailsResponse $paymentDetails,
+        \OxidEsales\PaymentBase\Adapter\Response\PaymentDetailsResponse $paymentDetails,
         string $paymentIntentId
     ): void {
         $stripeStatus = $paymentDetails->providerData['status'] ?? '';
@@ -161,7 +161,7 @@ class StripePaymentStatusHandler implements HandlerInterface
 
     private function handleFailure(
         EventContext $context,
-        \OxidEsales\PaymentComponent\Adapter\Response\PaymentDetailsResponse $paymentDetails
+        \OxidEsales\PaymentBase\Adapter\Response\PaymentDetailsResponse $paymentDetails
     ): void {
         $this->logEvent('StripePaymentStatusHandler: handleFailure', [
             'status' => $paymentDetails->status,

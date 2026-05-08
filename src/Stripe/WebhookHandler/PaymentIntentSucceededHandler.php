@@ -9,14 +9,14 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\WebhookHandler;
 
-use OxidEsales\PaymentComponent\Contract\Transaction;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface;
-use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
-use OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface;
-use OxidEsales\PaymentComponent\Webhook\WebhookEvent;
-use OxidEsales\PaymentComponent\Webhook\WebhookEventHandlerInterface;
-use OxidEsales\PaymentComponent\Webhook\WebhookResult;
+use OxidEsales\PaymentBase\Contract\Transaction;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
+use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
+use OxidEsales\PaymentBase\Service\OrderPaymentStateServiceInterface;
+use OxidEsales\PaymentBase\Webhook\WebhookEvent;
+use OxidEsales\PaymentBase\Webhook\WebhookEventHandlerInterface;
+use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -105,7 +105,7 @@ final class PaymentIntentSucceededHandler implements WebhookEventHandlerInterfac
     }
 
     private function recordCaptureTransaction(
-        \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract,
+        \OxidEsales\PaymentBase\Contract\PaymentContractInterface $contract,
         WebhookEvent $event
     ): void {
         $object = $event->getObject();

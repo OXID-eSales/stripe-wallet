@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\StripeRadarFraudCheckService;

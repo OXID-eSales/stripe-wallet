@@ -14,10 +14,10 @@ use OxidEsales\Eshop\Application\Model\Basket;
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Application\Model\User;
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\PaymentComponent\Adapter\ShopOrderServiceInterface;
-use OxidEsales\PaymentComponent\Adapter\Request\CreateOrderRequest;
-use OxidEsales\PaymentComponent\Adapter\Response\OrderResponse;
-use OxidEsales\PaymentComponent\Adapter\Exception\ShopOrderException;
+use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
+use OxidEsales\PaymentBase\Adapter\Request\CreateOrderRequest;
+use OxidEsales\PaymentBase\Adapter\Response\OrderResponse;
+use OxidEsales\PaymentBase\Adapter\Exception\ShopOrderException;
 
 /**
  * OXID eShop implementation of ShopOrderServiceInterface.

@@ -9,9 +9,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
-use OxidEsales\PaymentComponent\Contract\SecurityValidationResultInterface;
-use OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Contract\SecurityValidationResultInterface;
+use OxidEsales\PaymentBase\Service\ReturnSecurityValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\Result\SecurityValidationResult;
 
 /**

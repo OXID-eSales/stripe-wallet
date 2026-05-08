@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller;
 
-use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
-use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
+use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
 use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Controller\StripeOrderController;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
@@ -75,7 +75,7 @@ class StripeOrderControllerSecurityTest extends TestCase
         $moduleConfig = $this->createMock(ModuleConfigurationServiceInterface::class);
         $moduleConfig->method('getCaptureMode')->willReturn('automatic');
 
-        $tokenService = $this->createMock(\OxidEsales\PaymentComponent\Service\TokenServiceInterface::class);
+        $tokenService = $this->createMock(\OxidEsales\PaymentBase\Service\TokenServiceInterface::class);
 
         $helper = new ControllerRequestHelper($tokenService, $moduleConfig);
 

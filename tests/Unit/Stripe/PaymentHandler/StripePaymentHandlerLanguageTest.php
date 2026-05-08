@@ -6,13 +6,13 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\PaymentHandler;
 
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Eshop\Core\Session;
-use OxidEsales\PaymentComponent\Adapter\PaymentContextInterface;
-use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
-use OxidEsales\PaymentComponent\Adapter\ShopOrderServiceInterface;
-use OxidEsales\PaymentComponent\Contract\PaymentContract;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Service\ContractServiceInterface;
-use OxidEsales\PaymentComponent\Service\TokenServiceInterface;
+use OxidEsales\PaymentBase\Adapter\PaymentContextInterface;
+use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
+use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
+use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Service\ContractServiceInterface;
+use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\PaymentHandler\StripePaymentHandler;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
@@ -167,7 +167,7 @@ final class StripePaymentHandlerLanguageTest extends TestCase
             }
 
             protected function createEarlyOrderAndTransition(
-                \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract,
+                \OxidEsales\PaymentBase\Contract\PaymentContractInterface $contract,
                 PaymentContextInterface $context
             ): void {
                 // No-op: bypass session-bound order creation for unit isolation.

@@ -6,12 +6,12 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use DateTimeImmutable;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
-use OxidEsales\PaymentComponent\Adapter\Response\RefundResponse;
+use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\RefundService;
 use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
-use OxidEsales\PaymentComponent\Service\StockRestorationServiceInterface;
-use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
+use OxidEsales\PaymentBase\Service\StockRestorationServiceInterface;
+use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;

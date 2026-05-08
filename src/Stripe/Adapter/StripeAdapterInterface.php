@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Adapter;
 
-use OxidEsales\PaymentComponent\Adapter\PaymentAdapterInterface;
+use OxidEsales\PaymentBase\Adapter\PaymentAdapterInterface;
 
 /**
  * Composite Stripe adapter interface.

@@ -10,8 +10,8 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use OxidEsales\Payments\Stripe\Service\ReturnSessionSecurityService;
-use OxidEsales\PaymentComponent\Contract\SecurityValidationResultInterface;
-use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Contract\SecurityValidationResultInterface;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -376,7 +376,7 @@ class ReturnSessionSecurityServiceTest extends TestCase
     public function testImplementsReturnSecurityValidatorInterface(): void
     {
         $this->assertInstanceOf(
-            \OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface::class,
+            \OxidEsales\PaymentBase\Service\ReturnSecurityValidatorInterface::class,
             $this->service
         );
     }

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\EventFlow;
 
-use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
-use OxidEsales\PaymentComponent\Contract\PaymentContract;
-use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Service\ReturnSecurityValidatorInterface;
-use OxidEsales\PaymentComponent\Service\TokenServiceInterface;
+use OxidEsales\PaymentBase\Contract\BasketSnapshot;
+use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Service\ReturnSecurityValidatorInterface;
+use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Service\ContractTokenService;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\ReturnSessionSecurityService;
@@ -495,7 +495,7 @@ class SessionRestorationIntegrationTest extends TestCase
 
         // Should still produce a result (with warnings for missing data)
         $this->assertInstanceOf(
-            \OxidEsales\PaymentComponent\Contract\SecurityValidationResultInterface::class,
+            \OxidEsales\PaymentBase\Contract\SecurityValidationResultInterface::class,
             $result
         );
     }

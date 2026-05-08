@@ -9,9 +9,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller;
 
-use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
-use OxidEsales\PaymentComponent\EventSystem\Event\EventInterface;
-use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
+use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\EventSystem\Event\EventInterface;
+use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
 use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Controller\StripeOrderController;
 use PHPUnit\Framework\TestCase;
@@ -165,19 +165,19 @@ class TestableStripeOrderControllerForToken extends StripeOrderController
 
     protected function getServiceFromContainer(string $serviceName): object
     {
-        if ($serviceName === \OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface::class) {
-            return new class implements \OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface {
+        if ($serviceName === \OxidEsales\PaymentBase\Repository\ContractRepositoryInterface::class) {
+            return new class implements \OxidEsales\PaymentBase\Repository\ContractRepositoryInterface {
                 public function save(
-                    \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract
+                    \OxidEsales\PaymentBase\Contract\PaymentContractInterface $contract
                 ): void {
                 }
                 public function findById(
                     string $id
-                ): ?\OxidEsales\PaymentComponent\Contract\PaymentContractInterface {
-                    return new \OxidEsales\PaymentComponent\Contract\PaymentContract(
+                ): ?\OxidEsales\PaymentBase\Contract\PaymentContractInterface {
+                    return new \OxidEsales\PaymentBase\Contract\PaymentContract(
                         1,
                         'user_1',
-                        \OxidEsales\PaymentComponent\Contract\BasketSnapshot::fromArray([
+                        \OxidEsales\PaymentBase\Contract\BasketSnapshot::fromArray([
                             'items' => [],
                             'totalGross' => 1.0,
                             'totalNet' => 1.0,
@@ -193,17 +193,17 @@ class TestableStripeOrderControllerForToken extends StripeOrderController
                 }
                 public function findActiveByUserId(
                     string $userId
-                ): ?\OxidEsales\PaymentComponent\Contract\PaymentContractInterface {
+                ): ?\OxidEsales\PaymentBase\Contract\PaymentContractInterface {
                     return null;
                 }
                 public function findByOrderId(
                     string $orderId
-                ): ?\OxidEsales\PaymentComponent\Contract\PaymentContractInterface {
+                ): ?\OxidEsales\PaymentBase\Contract\PaymentContractInterface {
                     return null;
                 }
                 public function findByProviderOrderId(
                     string $providerOrderId
-                ): ?\OxidEsales\PaymentComponent\Contract\PaymentContractInterface {
+                ): ?\OxidEsales\PaymentBase\Contract\PaymentContractInterface {
                     return null;
                 }
                 public function findExpired(): array
@@ -222,10 +222,10 @@ class TestableStripeOrderControllerForToken extends StripeOrderController
                 {
                 }
                 public function resolve(
-                    \OxidEsales\PaymentComponent\Contract\PaymentContractInterface $contract,
-                    \OxidEsales\PaymentComponent\EventSystem\Event\EventContextInterface $context,
-                ): \OxidEsales\PaymentComponent\Return\ReturnResolution {
-                    return \OxidEsales\PaymentComponent\Return\ReturnResolution::readyToCommit(
+                    \OxidEsales\PaymentBase\Contract\PaymentContractInterface $contract,
+                    \OxidEsales\PaymentBase\EventSystem\Event\EventContextInterface $context,
+                ): \OxidEsales\PaymentBase\Return\ReturnResolution {
+                    return \OxidEsales\PaymentBase\Return\ReturnResolution::readyToCommit(
                         'pi_stub',
                         'pi_stub',
                         1.0,
@@ -234,13 +234,13 @@ class TestableStripeOrderControllerForToken extends StripeOrderController
                 }
             };
         }
-        if ($serviceName === \OxidEsales\PaymentComponent\Controller\CheckoutReturnResponder::class) {
+        if ($serviceName === \OxidEsales\PaymentBase\Controller\CheckoutReturnResponder::class) {
             // Reuse the overridden getEventDispatcher() so the test's
             // eventDispatched flag still flips when the responder dispatches.
-            $writer = new class implements \OxidEsales\PaymentComponent\Controller\SessionWriterInterface {
+            $writer = new class implements \OxidEsales\PaymentBase\Controller\SessionWriterInterface {
                 public function writeSessChallenge(string $orderId): void {}
             };
-            return new \OxidEsales\PaymentComponent\Controller\CheckoutReturnResponder(
+            return new \OxidEsales\PaymentBase\Controller\CheckoutReturnResponder(
                 $this->getEventDispatcher(),
                 $writer,
             );

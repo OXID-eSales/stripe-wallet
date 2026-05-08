@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller\Webhook;
 
-use OxidEsales\PaymentComponent\Mcp\Http\RateLimiterInterface;
+use OxidEsales\PaymentBase\Mcp\Http\RateLimiterInterface;
 use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRateLimitGuard;
 use PHPUnit\Framework\TestCase;
 

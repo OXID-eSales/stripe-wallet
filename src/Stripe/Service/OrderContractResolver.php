@@ -11,8 +11,8 @@ namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 
 /**
  * Resolves payment contracts for admin order views.

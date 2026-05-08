@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Tests\Unit\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Adapter\Request\CapturePaymentRequest;
-use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
-use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
-use OxidEsales\PaymentComponent\Contract\Transaction;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface;
-use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
+use OxidEsales\PaymentBase\Adapter\Request\CapturePaymentRequest;
+use OxidEsales\PaymentBase\Adapter\Response\CaptureResponse;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Contract\Transaction;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
+use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\CaptureService;
@@ -83,7 +83,7 @@ class CaptureServiceTest extends TestCase
         $contract->method('getProviderOrderId')->willReturn('pi_123');
         // Sprint 82: transitionContractState() now checks state before calling transition
         $contract->method('getState')->willReturn(
-            \OxidEsales\PaymentComponent\Contract\ContractState::authorized()
+            \OxidEsales\PaymentBase\Contract\ContractState::authorized()
         );
         $contract->expects($this->once())->method('captureAuthorization');
 
@@ -116,7 +116,7 @@ class CaptureServiceTest extends TestCase
         $contract->method('getProviderOrderId')->willReturn('pi_123');
         // Sprint 82: transitionContractState() now checks state before calling transition
         $contract->method('getState')->willReturn(
-            \OxidEsales\PaymentComponent\Contract\ContractState::authorized()
+            \OxidEsales\PaymentBase\Contract\ContractState::authorized()
         );
         $contract->expects($this->once())->method('captureAuthorization');
 
@@ -286,7 +286,7 @@ class CaptureServiceTest extends TestCase
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_committed');
         $contract->method('getState')->willReturn(
-            \OxidEsales\PaymentComponent\Contract\ContractState::committed()
+            \OxidEsales\PaymentBase\Contract\ContractState::committed()
         );
 
         // Must use ContractFulfillmentService (dispatches event + updates OXPAID)
@@ -327,7 +327,7 @@ class CaptureServiceTest extends TestCase
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_authorized');
         $contract->method('getState')->willReturn(
-            \OxidEsales\PaymentComponent\Contract\ContractState::authorized()
+            \OxidEsales\PaymentBase\Contract\ContractState::authorized()
         );
 
         // Must call captureAuthorization() for authorized contracts
@@ -366,7 +366,7 @@ class CaptureServiceTest extends TestCase
         $contract->method('getId')->willReturn('contract_rec');
         $contract->method('getOrderId')->willReturn('order_rec');
         $contract->method('getState')->willReturn(
-            \OxidEsales\PaymentComponent\Contract\ContractState::committed()
+            \OxidEsales\PaymentBase\Contract\ContractState::committed()
         );
 
         $this->transactionRepository->expects($this->once())

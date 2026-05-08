@@ -10,14 +10,14 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Admin;
 
 use OxidEsales\Eshop\Application\Model\Order;
-use OxidEsales\PaymentComponent\Admin\Contract\AdminActionDispatcherInterface;
-use OxidEsales\PaymentComponent\Admin\Contract\PaymentPanelProviderInterface;
-use OxidEsales\PaymentComponent\Admin\Panel\PaymentPanelContext;
-use OxidEsales\PaymentComponent\Admin\Panel\PaymentPanelRenderable;
+use OxidEsales\PaymentBase\Admin\Contract\AdminActionDispatcherInterface;
+use OxidEsales\PaymentBase\Admin\Contract\PaymentPanelProviderInterface;
+use OxidEsales\PaymentBase\Admin\Panel\PaymentPanelContext;
+use OxidEsales\PaymentBase\Admin\Panel\PaymentPanelRenderable;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 
 /**
- * Sprint I — Stripe's panel for payment-component's shared "Payment" tab.
+ * Sprint I — Stripe's panel for payment-base's shared "Payment" tab.
  *
  * Thin shim: delegates view-data assembly to the existing
  * {@see \OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider}
@@ -27,7 +27,7 @@ use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
  * no duplicated refund/capture logic.
  *
  * The panel body template (`@oe_payments_stripe_wallet/admin/panel/stripe_panel`)
- * is body-only — the shared wrapper in payment-component owns head / transfer
+ * is body-only — the shared wrapper in payment-base owns head / transfer
  * form / admin layout closes.
  */
 final class StripePaymentPanelProvider implements PaymentPanelProviderInterface

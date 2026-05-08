@@ -9,15 +9,15 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Webhook;
 
-use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
-use OxidEsales\PaymentComponent\Contract\ContractCondition;
-use OxidEsales\PaymentComponent\Contract\ContractState;
-use OxidEsales\PaymentComponent\Contract\PaymentContract;
-use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Service\ContractFulfillmentServiceInterface;
-use OxidEsales\PaymentComponent\Service\OrderPaymentStateServiceInterface;
-use OxidEsales\PaymentComponent\Webhook\WebhookEvent;
+use OxidEsales\PaymentBase\Contract\BasketSnapshot;
+use OxidEsales\PaymentBase\Contract\ContractCondition;
+use OxidEsales\PaymentBase\Contract\ContractState;
+use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
+use OxidEsales\PaymentBase\Service\OrderPaymentStateServiceInterface;
+use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\Payments\Stripe\WebhookHandler\PaymentIntentSucceededHandler;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -60,7 +60,7 @@ final class WebhookContractTransitionTest extends TestCase
             $this->orderPaymentStateService,
             $this->contractRepository,
             $this->contractFulfillmentService,
-            $this->createMock(\OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface::class),
+            $this->createMock(\OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface::class),
             $this->logger
         );
 

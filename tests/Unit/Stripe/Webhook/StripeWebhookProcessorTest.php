@@ -10,12 +10,12 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Webhook;
 
 use DateTimeImmutable;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Repository\WebhookLogRepositoryInterface;
-use OxidEsales\PaymentComponent\Webhook\Exception\WebhookSignatureException;
-use OxidEsales\PaymentComponent\Webhook\WebhookEvent;
-use OxidEsales\PaymentComponent\Webhook\WebhookRequest;
-use OxidEsales\PaymentComponent\Webhook\WebhookResult;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Repository\WebhookLogRepositoryInterface;
+use OxidEsales\PaymentBase\Webhook\Exception\WebhookSignatureException;
+use OxidEsales\PaymentBase\Webhook\WebhookEvent;
+use OxidEsales\PaymentBase\Webhook\WebhookRequest;
+use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;
 use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface;

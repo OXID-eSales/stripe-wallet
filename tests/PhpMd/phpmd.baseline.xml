@@ -5,7 +5,7 @@
   <violation rule="PHPMD\Rule\Design\TooManyPublicMethods" file="src/Stripe/Adapter/StripeAdapter.php"/>
   <!-- StripeOrderController class complexity (57) — OXID admin controller pattern requires many
        public methods for Twig template access. Sprint C added 5 small private helpers to shrink
-       checkoutSuccess(). Sprint E will lift the shared pieces into payment-component's
+       checkoutSuccess(). Sprint E will lift the shared pieces into payment-base's
        HandlesCheckoutReturn trait, dropping class complexity below 50. -->
   <violation rule="PHPMD\Rule\Design\WeightedMethodCount" file="src/Stripe/Controller/StripeOrderController.php"/>
 </phpmd-baseline>

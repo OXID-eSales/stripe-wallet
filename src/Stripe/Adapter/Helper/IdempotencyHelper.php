@@ -10,7 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Adapter\Helper;
 
 use DateTimeImmutable;
-use OxidEsales\PaymentComponent\Contract\IdempotencyRecord;
+use OxidEsales\PaymentBase\Contract\IdempotencyRecord;
 
 /**
  * Shared idempotency record management.

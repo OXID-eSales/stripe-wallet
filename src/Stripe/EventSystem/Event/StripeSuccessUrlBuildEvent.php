@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Event;
 
-use OxidEsales\PaymentComponent\EventSystem\Event\EventInterface;
+use OxidEsales\PaymentBase\EventSystem\Event\EventInterface;
 
 /**
  * Fired by CheckoutSessionService::buildSuccessUrl() after the base URL is assembled.

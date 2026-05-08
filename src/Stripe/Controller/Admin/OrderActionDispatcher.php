@@ -11,9 +11,9 @@ namespace OxidEsales\Payments\Stripe\Controller\Admin;
 
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\PaymentComponent\Admin\Contract\AdminActionDispatcherInterface;
-use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
-use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
+use OxidEsales\PaymentBase\Admin\Contract\AdminActionDispatcherInterface;
+use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;

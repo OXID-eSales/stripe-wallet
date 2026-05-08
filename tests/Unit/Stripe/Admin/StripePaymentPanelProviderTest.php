@@ -10,12 +10,12 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Admin;
 
 use OxidEsales\Eshop\Application\Model\Order;
-use OxidEsales\PaymentComponent\Admin\Panel\PaymentPanelContext;
-use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Admin\Panel\PaymentPanelContext;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\Payments\Stripe\Admin\StripePanelOrderLoader;
 use OxidEsales\Payments\Stripe\Admin\StripePanelViewDataBuilder;
 use OxidEsales\Payments\Stripe\Admin\StripePaymentPanelProvider;
-use OxidEsales\PaymentComponent\Admin\Contract\AdminActionDispatcherInterface;
+use OxidEsales\PaymentBase\Admin\Contract\AdminActionDispatcherInterface;
 use OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use PHPUnit\Framework\TestCase;
@@ -24,7 +24,7 @@ use PHPUnit\Framework\TestCase;
  * Sprint I — Stripe panel provider contract tests.
  *
  * The provider is the thin shim that injects Stripe's existing view-data +
- * action services into payment-component's shared admin tab. Tests here
+ * action services into payment-base's shared admin tab. Tests here
  * validate the Sprint-I contract (supports / build / handleAction); the
  * underlying view-data + dispatcher behaviours are covered by their own
  * existing test suites and reused unchanged.

@@ -9,9 +9,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Adapter\Response\FraudCheckResponse;
-use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
-use OxidEsales\PaymentComponent\Service\FraudCheckServiceInterface;
+use OxidEsales\PaymentBase\Adapter\Response\FraudCheckResponse;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Service\FraudCheckServiceInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 
 /**

@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Adapter\Helper;
 
-use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
+use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use Stripe\Exception\ApiErrorException;
 
 /**

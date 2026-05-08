@@ -9,9 +9,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service\Factory;
 
-use OxidEsales\PaymentComponent\Adapter\PaymentAdapterInterface;
-use OxidEsales\PaymentComponent\Repository\IdempotencyRepositoryInterface;
-use OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactory;
+use OxidEsales\PaymentBase\Adapter\PaymentAdapterInterface;
+use OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface;
+use OxidEsales\PaymentBase\Service\Factory\PaymentAdapterFactory;
 use OxidEsales\Payments\Stripe\Adapter\Helper\PaymentIntentHelper;
 use OxidEsales\Payments\Stripe\Adapter\Helper\RefundHelper;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapter;

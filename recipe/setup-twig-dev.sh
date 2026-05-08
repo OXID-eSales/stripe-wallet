@@ -58,16 +58,16 @@ $MODULE_ROOT/recipe/parts/shared/require_demodata_package.sh -e"${edition}" -b"$
 mkdir -p "$PROJECT_ROOT"/source/extensions || exit 1
 cp -r "$MODULE_ROOT" "$PROJECT_ROOT"/source/extensions/stripe || exit 1
 
-# Register the payment-component private repository
+# Register the payment-base private repository
 docker compose exec -T \
-  php composer config repositories.oxid-esales/payment-component \
-  --json '{"type":"vcs", "url":"https://github.com/OXID-eSales/payment-component"}' || exit 1
+  php composer config repositories.oxid-esales/payment-base \
+  --json '{"type":"vcs", "url":"https://github.com/OXID-eSales/payment-base"}' || exit 1
 
 docker compose exec -T \
-  php composer config --no-plugins allow-plugins.oxid-esales/payment-component true
+  php composer config --no-plugins allow-plugins.oxid-esales/payment-base true
 
 docker compose exec -T \
-  php composer require oxid-esales/payment-component:dev-b-7.4.x --no-update || exit 1
+  php composer require oxid-esales/payment-base:dev-b-7.4.x --no-update || exit 1
 
 docker compose exec -T \
   php composer config repositories.oxid-esales/stripe-wallet \
@@ -91,8 +91,8 @@ docker compose exec php bin/oe-console oe:setup:shop --db-host=mysql --db-port=3
 
 docker compose exec -T php bin/oe-console oe:setup:demodata
 
-# Run payment-component migrations (triggers plugin now that DB exists)
-docker compose exec -T php composer update oxid-esales/payment-component --no-interaction
+# Run payment-base migrations (triggers plugin now that DB exists)
+docker compose exec -T php composer update oxid-esales/payment-base --no-interaction
 
 docker compose exec -T php bin/oe-console oe:theme:activate apex
 docker compose exec -T php bin/oe-console oe:module:install extensions/stripe

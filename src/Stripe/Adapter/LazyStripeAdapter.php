@@ -9,27 +9,27 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Adapter;
 
-use OxidEsales\PaymentComponent\Adapter\PaymentAdapterInterface;
-use OxidEsales\PaymentComponent\Adapter\WebhookEvent;
-use OxidEsales\PaymentComponent\Adapter\Request\AuthorizePaymentRequest;
-use OxidEsales\PaymentComponent\Adapter\Request\CaptureAuthorizationRequest;
-use OxidEsales\PaymentComponent\Adapter\Request\CapturePaymentRequest;
-use OxidEsales\PaymentComponent\Adapter\Request\CreatePaymentMethodRequest;
-use OxidEsales\PaymentComponent\Adapter\Request\CreatePaymentRequest;
-use OxidEsales\PaymentComponent\Adapter\Request\ReauthorizePaymentRequest;
-use OxidEsales\PaymentComponent\Adapter\Request\RefundPaymentRequest;
-use OxidEsales\PaymentComponent\Adapter\Request\ThreeDSecureRequest;
-use OxidEsales\PaymentComponent\Adapter\Request\VoidAuthorizationRequest;
-use OxidEsales\PaymentComponent\Adapter\Request\VoidPaymentRequest;
-use OxidEsales\PaymentComponent\Adapter\Response\AuthorizationResponse;
-use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
-use OxidEsales\PaymentComponent\Adapter\Response\CreatePaymentResponse;
-use OxidEsales\PaymentComponent\Adapter\Response\PaymentDetailsResponse;
-use OxidEsales\PaymentComponent\Adapter\Response\PaymentMethodResponse;
-use OxidEsales\PaymentComponent\Adapter\Response\PaymentResponse;
-use OxidEsales\PaymentComponent\Adapter\Response\RefundResponse;
-use OxidEsales\PaymentComponent\Adapter\Response\ThreeDSecureResponse;
-use OxidEsales\PaymentComponent\Adapter\Response\CancellationResponse;
+use OxidEsales\PaymentBase\Adapter\PaymentAdapterInterface;
+use OxidEsales\PaymentBase\Adapter\WebhookEvent;
+use OxidEsales\PaymentBase\Adapter\Request\AuthorizePaymentRequest;
+use OxidEsales\PaymentBase\Adapter\Request\CaptureAuthorizationRequest;
+use OxidEsales\PaymentBase\Adapter\Request\CapturePaymentRequest;
+use OxidEsales\PaymentBase\Adapter\Request\CreatePaymentMethodRequest;
+use OxidEsales\PaymentBase\Adapter\Request\CreatePaymentRequest;
+use OxidEsales\PaymentBase\Adapter\Request\ReauthorizePaymentRequest;
+use OxidEsales\PaymentBase\Adapter\Request\RefundPaymentRequest;
+use OxidEsales\PaymentBase\Adapter\Request\ThreeDSecureRequest;
+use OxidEsales\PaymentBase\Adapter\Request\VoidAuthorizationRequest;
+use OxidEsales\PaymentBase\Adapter\Request\VoidPaymentRequest;
+use OxidEsales\PaymentBase\Adapter\Response\AuthorizationResponse;
+use OxidEsales\PaymentBase\Adapter\Response\CaptureResponse;
+use OxidEsales\PaymentBase\Adapter\Response\CreatePaymentResponse;
+use OxidEsales\PaymentBase\Adapter\Response\PaymentDetailsResponse;
+use OxidEsales\PaymentBase\Adapter\Response\PaymentMethodResponse;
+use OxidEsales\PaymentBase\Adapter\Response\PaymentResponse;
+use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
+use OxidEsales\PaymentBase\Adapter\Response\ThreeDSecureResponse;
+use OxidEsales\PaymentBase\Adapter\Response\CancellationResponse;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 
 /**
@@ -39,7 +39,7 @@ use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
  * The factory throws when keys are missing, but this adapter delays that check
  * until actual payment operations are performed.
  *
- * Proxy pattern: mirrors PaymentAdapterInterface from payment-component.
+ * Proxy pattern: mirrors PaymentAdapterInterface from payment-base.
  * Each method is a thin delegation to the lazily-created adapter instance.
  *
  * @since 2.0.0

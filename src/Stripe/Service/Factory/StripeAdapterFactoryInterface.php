@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service\Factory;
 
-use OxidEsales\PaymentComponent\Service\Factory\PaymentAdapterFactoryInterface;
+use OxidEsales\PaymentBase\Service\Factory\PaymentAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use Stripe\StripeClient;
 

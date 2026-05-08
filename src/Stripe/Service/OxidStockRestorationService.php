@@ -12,7 +12,7 @@ namespace OxidEsales\Payments\Stripe\Service;
 use Doctrine\DBAL\Connection;
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Application\Model\OrderArticle;
-use OxidEsales\PaymentComponent\Service\StockRestorationServiceInterface;
+use OxidEsales\PaymentBase\Service\StockRestorationServiceInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 

@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
-use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
-use OxidEsales\PaymentComponent\EventSystem\Event\Contract\ContractDraftCompletedEvent;
-use OxidEsales\PaymentComponent\EventSystem\Event\EventContextInterface;
-use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
-use OxidEsales\PaymentComponent\EventSystem\Handler\ContractCreationHandler;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Service\ContractServiceInterface;
-use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\EventSystem\Event\Contract\ContractDraftCompletedEvent;
+use OxidEsales\PaymentBase\EventSystem\Event\EventContextInterface;
+use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
+use OxidEsales\PaymentBase\EventSystem\Handler\ContractCreationHandler;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Service\ContractServiceInterface;
+use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
-use OxidEsales\PaymentComponent\Service\ContractMetadataServiceInterface;
+use OxidEsales\PaymentBase\Service\ContractMetadataServiceInterface;
 
 /**
  * Creates payment contract for Stripe Checkout Session flow.

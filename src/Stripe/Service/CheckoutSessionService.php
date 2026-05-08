@@ -9,9 +9,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Adapter\Exception\PaymentAdapterException;
-use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
-use OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface;
+use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
+use OxidEsales\PaymentBase\Contract\BasketSnapshot;
+use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelUrlBuildEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeSuccessUrlBuildEvent;
 use OxidEsales\Payments\Stripe\Service\Result\CheckoutSessionResult;

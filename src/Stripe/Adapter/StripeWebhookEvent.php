@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Adapter;
 
-use OxidEsales\PaymentComponent\Adapter\WebhookEvent;
+use OxidEsales\PaymentBase\Adapter\WebhookEvent;
 use Stripe\Event;
 
 /**

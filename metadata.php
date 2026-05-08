@@ -63,7 +63,7 @@ $aModule = [
         'StripeConnect' => StripeConnect::class,
         'stripecheckoutfooter' => StripeCheckoutFooter::class,
         // Sprint I (2026-04-23): `OrderRefund` removed. The admin Payment
-        // tab is now owned by `oe_payment_component`; Stripe contributes
+        // tab is now owned by `oe_payment_base`; Stripe contributes
         // a `StripePaymentPanelProvider` tagged service.
     ],
     'events' => [
@@ -72,7 +72,7 @@ $aModule = [
     ],
     'templates' => [
         '@oe_payments_stripe_wallet/admin/stripe_connect' => 'views/twig/admin/stripe_connect.html.twig',
-        // Sprint I — Stripe panel body rendered inside payment-component's shared "Payment" admin tab.
+        // Sprint I — Stripe panel body rendered inside payment-base's shared "Payment" admin tab.
         // Both aliases registered so `{% include %}` works with or without the `.html.twig` suffix.
         '@oe_payments_stripe_wallet/admin/panel/stripe_panel' => 'views/twig/admin/panel/stripe_panel.html.twig',
         '@oe_payments_stripe_wallet/admin/panel/stripe_panel.html.twig' => 'views/twig/admin/panel/stripe_panel.html.twig',

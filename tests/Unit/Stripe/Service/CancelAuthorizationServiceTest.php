@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Tests\Unit\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Adapter\Response\CancellationResponse;
+use OxidEsales\PaymentBase\Adapter\Response\CancellationResponse;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\CancelAuthorizationService;

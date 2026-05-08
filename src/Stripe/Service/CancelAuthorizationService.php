@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use DateTimeImmutable;
-use OxidEsales\PaymentComponent\Adapter\Response\CancellationResponse;
+use OxidEsales\PaymentBase\Adapter\Response\CancellationResponse;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;

@@ -10,7 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Adapter\Helper;
 
 use DateTimeImmutable;
-use OxidEsales\PaymentComponent\Contract\IdempotencyRecord;
+use OxidEsales\PaymentBase\Contract\IdempotencyRecord;
 use OxidEsales\Payments\Stripe\Adapter\Helper\IdempotencyHelper;
 use PHPUnit\Framework\TestCase;
 

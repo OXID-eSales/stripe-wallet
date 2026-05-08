@@ -175,7 +175,7 @@ class ModuleLifecycleTest extends TestCase
         );
 
         $this->assertTrue(
-            $container->has('OxidEsales\PaymentComponent\EventSystem\EventDispatcherInterface'),
+            $container->has('OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'),
             'EventDispatcherInterface should be available after module activation'
         );
     }

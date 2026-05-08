@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Controller\Webhook;
 
-use OxidEsales\PaymentComponent\Mcp\Http\RateLimiterInterface;
+use OxidEsales\PaymentBase\Mcp\Http\RateLimiterInterface;
 
 /**
  * Rejects webhook requests from IPs exceeding the rate limit.

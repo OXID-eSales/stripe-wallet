@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Adapter\Response\CaptureResponse;
-use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Adapter\Response\CaptureResponse;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 
 /**
  * Service interface for capturing Stripe payments.

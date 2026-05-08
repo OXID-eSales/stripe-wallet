@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
 use DateTimeImmutable;
-use OxidEsales\PaymentComponent\Adapter\Response\CancellationResponse;
-use OxidEsales\PaymentComponent\Adapter\ShopAdapterInterface;
+use OxidEsales\PaymentBase\Adapter\Response\CancellationResponse;
+use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCancelAuthorizationRequestHandler;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
 use OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface;
-use OxidEsales\PaymentComponent\Service\RequestLogServiceInterface;
-use OxidEsales\PaymentComponent\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
+use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Tests\Unit\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Service\FileLoggerInterface;
+use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\Service\RequestLogService;
-use OxidEsales\PaymentComponent\Service\RequestLogServiceInterface;
+use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;

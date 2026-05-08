@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use DateTimeImmutable;
-use OxidEsales\PaymentComponent\Adapter\PaymentAdapterInterface;
-use OxidEsales\PaymentComponent\Adapter\Response\RefundResponse;
-use OxidEsales\PaymentComponent\Contract\BasketSnapshot;
-use OxidEsales\PaymentComponent\Contract\ContractState;
-use OxidEsales\PaymentComponent\Contract\PaymentContractInterface;
-use OxidEsales\PaymentComponent\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentComponent\Repository\TransactionRepositoryInterface;
-use OxidEsales\PaymentComponent\Service\Exception\RefundFailedException;
+use OxidEsales\PaymentBase\Adapter\PaymentAdapterInterface;
+use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
+use OxidEsales\PaymentBase\Contract\BasketSnapshot;
+use OxidEsales\PaymentBase\Contract\ContractState;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
+use OxidEsales\PaymentBase\Service\Exception\RefundFailedException;
 use OxidEsales\Payments\Stripe\Service\StripeRefundService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -84,7 +84,7 @@ class StripeRefundServiceTest extends TestCase
         $this->transactionRepository->method('getTotalRefundedForContract')->willReturn(0.00);
 
         $this->stripeAdapter->method('refundPayment')->willReturn(
-            \OxidEsales\PaymentComponent\Adapter\Response\RefundResponse::success(
+            \OxidEsales\PaymentBase\Adapter\Response\RefundResponse::success(
                 providerPaymentId: $providerOrderId,
                 refundId: 're_partial',
                 amountRefunded: $partialAmount,

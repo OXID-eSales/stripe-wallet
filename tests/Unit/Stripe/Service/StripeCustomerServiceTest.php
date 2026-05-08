@@ -9,8 +9,8 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
-use OxidEsales\PaymentComponent\Contract\PaymentCustomer;
-use OxidEsales\PaymentComponent\Repository\PaymentCustomerRepositoryInterface;
+use OxidEsales\PaymentBase\Contract\PaymentCustomer;
+use OxidEsales\PaymentBase\Repository\PaymentCustomerRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\StripeCustomerService;
