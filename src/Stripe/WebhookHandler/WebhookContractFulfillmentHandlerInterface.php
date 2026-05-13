@@ -23,10 +23,18 @@ interface WebhookContractFulfillmentHandlerInterface
      * Finds contract by providerOrderId, validates it's COMMITTED,
      * transitions to FULFILLED, and dispatches ContractFulfilledEvent.
      *
+     * Records the captured amount on the contract when supplied (>0). The
+     * `oe_payments_contract.OXCAPTUREDAMOUNT` field is the source of truth
+     * downstream (opalreturns refund broker, admin views, reporting) — it
+     * MUST be set whenever a successful capture event reaches the shop,
+     * regardless of whether capture was triggered by `charge.captured`
+     * (manual) or `payment_intent.succeeded` (automatic).
+     *
      * @param string $providerOrderId Stripe PaymentIntent ID (pi_xxx)
+     * @param float $capturedAmount Amount captured in currency units. Pass 0.0 if unknown.
      * @return bool|null true if fulfilled, false if skipped (idempotent), null if not found
      */
-    public function handlePaymentSucceeded(string $providerOrderId): ?bool;
+    public function handlePaymentSucceeded(string $providerOrderId, float $capturedAmount = 0.0): ?bool;
 
     /**
      * Handle charge.captured webhook event.
