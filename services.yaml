@@ -657,11 +657,17 @@ services:
     autowire: false
     arguments:
       $fileLogger: '@stripe.webhook_file_logger'
-    public: false
+    # STRP-AUTOCAP-REFUND: WebhookController fetches this directly from the
+    # container in init() (FrontendController has no constructor DI). Must be
+    # public; otherwise Symfony optimises it away and webhook processing fails
+    # mid-chain — silently breaks OXCAPTUREDAMOUNT propagation on incoming
+    # payment_intent.succeeded events.
+    public: true
 
   # Alias class name to interface for direct class type-hints
   OxidEsales\Payments\Stripe\Service\WebhookLogService:
     alias: OxidEsales\Payments\Stripe\Service\WebhookLogServiceInterface
+    public: true
 
   # ==========================================
   # Capture Service (Sprint 9)
