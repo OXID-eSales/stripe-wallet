@@ -3,80 +3,70 @@
           <div class="deck">TDD-first &middot; the same gates every Payment-Base module ships under</div>
         </div>
 
-        <h2 class="h-2">822+ unit. 18 integration. Playwright on every commit.<br/><em class="acc">Tests are the spec.</em></h2>
+        <h2 class="h-2">Tests are the spec.<br/><em class="acc">TDD-first. DevOps-first. Coverage cannot shrink.</em></h2>
 
-        <div class="cols cols-3" style="gap: 14px; flex: 1 1 0;">
-
-          <div class="col" style="background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 8px; padding: 16px; justify-content: flex-start;">
-            <div class="eyebrow" style="color: #047857; margin-bottom: 10px;">Test pyramid</div>
-            <ul class="small" style="margin: 0 0 14px;">
-              <li><strong>Unit</strong> &mdash; ~99 files, 822+ assertions. Service logic, helpers, adapters, validators. Mock interfaces, never final classes.</li>
-              <li><strong>Integration</strong> &mdash; 18 specs. DI wiring, event chains, Doctrine writes, OXID admin tab rendering.</li>
-              <li><strong>Playwright</strong> &mdash; 1 spec per user-facing feature crossing a frame boundary. Stripe Checkout round-trip, admin capture/refund flow, AGB gate.</li>
-              <li><strong>Coverage</strong> doesn&rsquo;t shrink between sprints. Enforced in CI.</li>
-            </ul>
-
-            <div class="eyebrow" style="color: #047857; margin-bottom: 10px;">Final-class seam</div>
-            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.4; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
-// CaptureService is final. Test
-// with a REAL instance + mocked deps.
-$adapter = $this-&gt;createMock(
-    PaymentAdapterInterface::class
-);
-$svc = new CaptureService(
-    $adapter, $this-&gt;dispatcher
-);
-$svc-&gt;capture($contract, 42.00);
-</pre>
+        <div class="stats cols-3" style="margin: 18px 0 22px;">
+          <div class="stat acc">
+            <div class="num">822+</div>
+            <div class="label" style="font-size: var(--t-14); font-weight: 600; color: var(--ink-700); margin-bottom: 6px;">Unit assertions</div>
+            <div class="small" style="margin: 0; color: var(--ink-500);">
+              ~99 files. Service logic, helpers, adapters, validators. Mock interfaces, never final classes.
+            </div>
           </div>
+          <div class="stat acc">
+            <div class="num">18</div>
+            <div class="label" style="font-size: var(--t-14); font-weight: 600; color: var(--ink-700); margin-bottom: 6px;">Integration specs</div>
+            <div class="small" style="margin: 0; color: var(--ink-500);">
+              DI wiring, event chains, Doctrine writes, OXID admin-tab rendering.
+            </div>
+          </div>
+          <div class="stat acc">
+            <div class="num">1&times;</div>
+            <div class="label" style="font-size: var(--t-14); font-weight: 600; color: var(--ink-700); margin-bottom: 6px;">Playwright per feature</div>
+            <div class="small" style="margin: 0; color: var(--ink-500);">
+              One regression spec per user-facing flow that crosses a frame boundary.
+            </div>
+          </div>
+        </div>
 
-          <div class="col" style="background: rgba(245, 158, 11, 0.06); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; padding: 16px; justify-content: flex-start;">
-            <div class="eyebrow" style="color: #b45309; margin-bottom: 10px;">Pre-commit &middot; <code>./bin/pre-commit-check.sh</code></div>
-            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.45; margin: 0 0 14px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
-[1/6] PHPCS  (PSR-12) &hellip; OK
-[2/6] PHPStan (level max) &hellip; OK
-[3/6] PHPMD &hellip; OK
-[4/6] Unit tests &hellip; OK
+        <div class="cols split-6-6" style="gap: 18px; flex: 1 1 0;">
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 8px;">Pre-commit gates &middot; <code>./bin/pre-commit-check.sh</code></div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(67, 56, 202, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.5; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-12);">
+[1/6] PHPCS (PSR-12) .............. OK
+[2/6] PHPStan (level max) ......... OK
+[3/6] PHPMD ....................... OK
+[4/6] Unit tests .................. OK
 [5/6] Architecture grep guards
-      &mdash; no PSP imports &hellip; OK
-      &mdash; no direct config reads &hellip; OK
-      &mdash; no direct contract mutations
-        in controllers &hellip; OK
-[6/6] Module activation smoke
-      deactivate &rarr; activate &rarr; clear &hellip; OK
+        no PSP imports ............ OK
+        no direct config reads .... OK
+        no contract mutations ..... OK
+[6/6] Activation smoke ............ OK
 </pre>
-
-            <div class="eyebrow" style="color: #b45309; margin-bottom: 10px;">Baselines (small, justified)</div>
-            <ul class="small" style="margin: 0;">
-              <li><code>phpstan-baseline.neon</code> &mdash; OXID virtual-parent-class errors only</li>
-              <li><code>phpmd.baseline.xml</code> &mdash; interface-driven adapter complexity only</li>
-            </ul>
           </div>
 
-          <div class="col" style="background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 8px; padding: 16px; justify-content: flex-start;">
-            <div class="eyebrow" style="color: #4338ca; margin-bottom: 10px;">Testable subclass pattern</div>
-            <p class="small" style="margin: 0 0 10px;">
-              OXID admin controllers don&rsquo;t support constructor DI &mdash; <code>OrderRefund extends Order_parent</code>. To unit-test them
-              we extend with a constructor that <em>skips</em> OXID bootstrap and accepts dependencies directly.
-            </p>
-            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.45; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
-class TestableOrderRefund extends OrderRefund {
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 8px;">Testable subclass &middot; OXID admin DI seam</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(67, 56, 202, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.5; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-12);">
+class TestableOrderRefund
+    extends OrderRefund
+{
     public function __construct(
         ?Order $o = null,
         ?ViewDataProvider $v = null
-    ) { /* no parent::__construct */ }
-
-    public function getOrder(): ?Order
-    { return $this-&gt;testOrder; }
+    ) {
+        /* skip OXID admin bootstrap */
+        $this-&gt;testOrder = $o;
+        $this-&gt;testVdp   = $v;
+    }
 }
 </pre>
           </div>
-
         </div>
 
-        <div class="callout" style="margin-top: 14px;">
-          <strong>TDD on bug fixes is not optional.</strong> Every bug fix begins with a failing test that reproduces the bug.
-          <em>The compounding payoff:</em> the same test guards the fix against regression for the lifetime of the module.
+        <div class="callout" style="margin-top: 16px;">
+          <strong>TDD on bug fixes is not optional.</strong> Every fix begins with a failing reproduction test &mdash;
+          which then guards the fix against regression for the lifetime of the module. <em class="acc">The compounding payoff.</em>
         </div>
 
         <div class="s-foot">

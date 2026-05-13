@@ -1,86 +1,78 @@
         <div class="s-head">
           <div class="badge"><span class="dot"></span><span class="step-label">Features &middot; 4 of 7 &middot; Refund</span></div>
-          <div class="deck">Partial refunds &middot; refundable validation &middot; audit trail</div>
+          <div class="deck">Partial refunds &middot; validation &middot; audit trail</div>
         </div>
 
         <h2 class="h-2">Refund: validated, audited, idempotent.<br/><em class="acc">Money never leaves twice.</em></h2>
 
-        <p class="lede" style="margin-bottom: 14px;">
-          Refunds are easy to get wrong. Stripe Wallet validates against the captured amount minus prior refunds
-          in <em>cents</em> &mdash; never floats. Each refund records a transaction row, dispatches
-          <code>PaymentRefundedEvent</code>, and triggers OpalReturns and any other PSP-agnostic subscriber.
+        <p class="lede" style="margin-bottom: 12px; font-size: var(--t-14);">
+          Validated against captured minus prior refunds in <em>cents</em> &mdash; never floats. Each refund writes a
+          transaction row, dispatches <code>PaymentRefundedEvent</code>, fans out to OpalReturns &amp; subscribers.
         </p>
 
-        <div class="cols cols-2" style="gap: 18px; flex: 1 1 0;">
+        <div class="cols split-6-6" style="gap: 16px; flex: 1 1 0;">
           <div class="col" style="justify-content: flex-start;">
-            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">RefundService &middot; the path</div>
-            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0 0 16px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 8px;">RefundService &middot; the path</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.4; margin: 0 0 12px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
 public function refund(
-    PaymentContract $contract,
+    PaymentContract $c,
     ?float $amount = null,
     ?string $reason = null
 ): RefundResult {
-    $intent = $this-&gt;adapter-&gt;retrievePaymentIntent(
-        $contract-&gt;getProviderIntentId()
+    $i = $this-&gt;adapter-&gt;retrievePaymentIntent(
+        $c-&gt;getProviderIntentId()
     );
 
-    $refundCents = $amount === null
-        ? $this-&gt;refundHelper-&gt;remainingRefundable($intent)
+    $cents = $amount === null
+        ? $this-&gt;helper-&gt;remainingRefundable($i)
         : (int) round($amount * 100);
 
-    $this-&gt;refundHelper-&gt;assertRefundable(
-        $intent, $refundCents
-    );
+    $this-&gt;helper-&gt;assertRefundable($i, $cents);
 
-    $refund = $this-&gt;adapter-&gt;refundCharge(
-        $intent-&gt;latest_charge,
-        amount: $refundCents,
-        reason: $reason
+    $r = $this-&gt;adapter-&gt;refundCharge(
+        $i-&gt;latest_charge, $cents, $reason
     );
-
     $this-&gt;dispatcher-&gt;dispatch(
-        new PaymentRefundedEvent($contract, $refund)
+        new PaymentRefundedEvent($c, $r)
     );
-
-    return RefundResult::fromRefund($refund);
+    return RefundResult::fromRefund($r);
 }
 </pre>
 
-            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">RefundHelper&rsquo;s job</div>
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 8px;">RefundHelper</div>
             <ul class="small" style="margin: 0;">
-              <li><code>remainingRefundable()</code> = <code>amountCaptured - sum(priorRefunds)</code></li>
-              <li><code>assertRefundable()</code> throws if requested &gt; remaining, or &le; 0</li>
-              <li>Both methods are pure, integer-only, fully unit-tested</li>
+              <li><code>remainingRefundable()</code> = <code>captured - &Sigma; priorRefunds</code></li>
+              <li><code>assertRefundable()</code> throws if &gt; remaining or &le; 0</li>
+              <li>Pure, integer-only, fully unit-tested</li>
             </ul>
           </div>
 
           <div class="col" style="justify-content: flex-start;">
-            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Idempotency &middot; double-clicks can&rsquo;t double-refund</div>
-            <ul class="small" style="margin: 0 0 14px;">
-              <li>Admin form posts with a CSRF token &amp; a unique <code>request_id</code>.</li>
-              <li><code>oe_payments_idempotency</code> row keyed by <code>(contract_id, request_id)</code> &mdash; replay hits the existing row, returns the prior result.</li>
-              <li>The Stripe SDK call also carries <code>Idempotency-Key: {request_id}</code> &mdash; Stripe itself rejects the duplicate.</li>
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 8px;">Idempotency &middot; no double-refunds</div>
+            <ul class="small" style="margin: 0 0 12px;">
+              <li>Admin form posts CSRF + unique <code>request_id</code></li>
+              <li><code>oe_payments_idempotency</code> keyed <code>(contract_id, request_id)</code> &mdash; replay returns prior result</li>
+              <li>SDK call also carries <code>Idempotency-Key</code> &mdash; Stripe rejects duplicates</li>
             </ul>
 
-            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Where downstream modules listen</div>
-            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0 0 14px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
-# opalreturns/src/EventSystem/ReturnHandler.php
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 8px;">Where downstream modules listen</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.4; margin: 0 0 8px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+# opalreturns/.../ReturnHandler.php
 class ReturnHandler implements HandlerInterface
 {
     public function handle(
         PaymentRefundedEvent $e,
         EventContext $ctx
     ): void {
-        $this-&gt;returnRepo-&gt;markRefunded(
+        $this-&gt;repo-&gt;markRefunded(
             $e-&gt;getContract(),
             $e-&gt;getAmountCents()
         );
     }
 }
 </pre>
-
             <div class="small" style="font-size: var(--t-11); color: var(--ink-500);">
-              <em>No Stripe import in opalreturns/ &mdash; the event payload is PSP-agnostic.</em>
+              <em>No Stripe import in opalreturns/ &mdash; payload is PSP-agnostic.</em>
             </div>
           </div>
         </div>

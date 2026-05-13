@@ -1,3 +1,41 @@
+        <style>
+          .slide[data-anchor="module-setup"] .setup-step {
+            display: grid;
+            grid-template-columns: 5fr 7fr;
+            gap: 18px;
+            align-items: center;
+            padding: 14px 16px;
+            border-radius: 8px;
+            border: 1px solid;
+            margin-bottom: 10px;
+          }
+          .slide[data-anchor="module-setup"] .setup-step.s-composer { background: rgba(99,102,241,0.06);  border-color: rgba(99,102,241,0.35); }
+          .slide[data-anchor="module-setup"] .setup-step.s-console  { background: rgba(16,185,129,0.06);  border-color: rgba(16,185,129,0.40); }
+          .slide[data-anchor="module-setup"] .setup-step.s-keys     { background: rgba(245,158,11,0.06);  border-color: rgba(245,158,11,0.40); }
+          .slide[data-anchor="module-setup"] .setup-step .num {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 28px; height: 28px; border-radius: 50%;
+            font-weight: 700; color: white; font-size: var(--t-14);
+            margin-right: 8px; vertical-align: middle;
+          }
+          .slide[data-anchor="module-setup"] .setup-step.s-composer .num { background: #4338ca; }
+          .slide[data-anchor="module-setup"] .setup-step.s-console  .num { background: #047857; }
+          .slide[data-anchor="module-setup"] .setup-step.s-keys     .num { background: #b45309; }
+          .slide[data-anchor="module-setup"] .setup-step h4 {
+            margin: 0 0 6px; font-size: var(--t-16); font-weight: 700;
+          }
+          .slide[data-anchor="module-setup"] .setup-step pre {
+            background: rgba(11, 20, 36, 0.06);
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 4px;
+            padding: 10px 12px;
+            line-height: 1.5;
+            margin: 0;
+            font-family: ui-monospace, Menlo, Consolas, monospace;
+            font-size: var(--t-12);
+          }
+        </style>
+
         <div class="s-head">
           <div class="badge"><span class="dot"></span><span class="step-label">Developer-Docs &middot; 1 von 5 &middot; Setup</span></div>
           <div class="deck">Vom sauberen Checkout zur ersten Testzahlung in unter f&uuml;nf Minuten</div>
@@ -5,61 +43,54 @@
 
         <h2 class="h-2">Installation in drei Befehls-Bl&ouml;cken.<br/><em class="acc">Composer, OXID-Konsole, Stripe-Keys.</em></h2>
 
-        <div class="cols cols-3" style="gap: 14px; flex: 1 1 0;">
-          <div class="col" style="background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 8px; padding: 16px; justify-content: flex-start;">
-            <div class="eyebrow" style="color: #4338ca; margin-bottom: 10px;">1 &middot; Composer</div>
-            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.45; margin: 0 0 12px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
-$ composer require \
-    oxid-esales/payment-component \
-    oxid-esales/stripe-wallet
-</pre>
-            <ul class="small" style="margin: 0;">
-              <li>payment-component wird zuerst installiert &mdash; es besitzt die Datenbanktabellen</li>
-              <li>stripe-wallet wird als <code>oxid-esales/stripe-wallet</code> ausgeliefert</li>
-              <li>Dev-Abh&auml;ngigkeit: <code>stripe/stripe-php ^19.3</code></li>
-            </ul>
+        <div style="flex: 1 1 0; display: flex; flex-direction: column; gap: 4px;">
+
+          <div class="setup-step s-composer">
+            <div>
+              <h4><span class="num">1</span>Composer</h4>
+              <ul class="small" style="margin: 0; padding-left: 18px;">
+                <li>Payment Base zuerst &mdash; es besitzt die Tabellen</li>
+                <li>Dev-Abh&auml;ngigkeit: <code>stripe/stripe-php ^19.3</code></li>
+              </ul>
+            </div>
+            <pre>$ composer require \
+    oxid-esales/payment-base \
+    oxid-esales/stripe-wallet</pre>
           </div>
 
-          <div class="col" style="background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 8px; padding: 16px; justify-content: flex-start;">
-            <div class="eyebrow" style="color: #047857; margin-bottom: 10px;">2 &middot; OXID-Konsole</div>
-            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.45; margin: 0 0 12px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
-$ bin/oe-console oe:module:install \
-    extensions/stripe
-$ bin/oe-console oe:module:activate \
-    oe_payments_stripe_wallet
-$ bin/oe-console oe:cache:clear
-</pre>
-            <ul class="small" style="margin: 0;">
-              <li>Die Aktivierung erstellt den Admin-Stripe-Tab via metadata.php-Extensions</li>
-              <li>Cache-Clear baut DI-Container &amp; Twig-Templates neu</li>
-              <li>Keine Doctrine-Migrationen &mdash; payment-component besitzt alle Tabellen</li>
-            </ul>
+          <div class="setup-step s-console">
+            <div>
+              <h4><span class="num">2</span>OXID-Konsole</h4>
+              <ul class="small" style="margin: 0; padding-left: 18px;">
+                <li>Aktivierung registriert den Stripe-Tab via <code>metadata.php</code></li>
+                <li>Cache-Clear baut DI-Container &amp; Twig-Templates neu</li>
+                <li>Keine Doctrine-Migrationen &mdash; Tabellen aus Payment Base</li>
+              </ul>
+            </div>
+            <pre>$ bin/oe-console oe:module:install extensions/stripe
+$ bin/oe-console oe:module:activate oe_payments_stripe_wallet
+$ bin/oe-console oe:cache:clear</pre>
           </div>
 
-          <div class="col" style="background: rgba(245, 158, 11, 0.06); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; padding: 16px; justify-content: flex-start;">
-            <div class="eyebrow" style="color: #b45309; margin-bottom: 10px;">3 &middot; Stripe-Keys + Webhook</div>
-            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.45; margin: 0 0 12px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
-Admin &rarr; Extensions
-  &rarr; OE Payments &middot; Stripe
-
-  Modus:                test
-  Test Secret Key:      sk_test_…
-  Test Publishable Key: pk_test_…
-  Webhook-Secret:       whsec_…
-  Capture-Modus:        automatic
-</pre>
-            <p class="small" style="margin: 0;">
-              Webhook-URL:
-              <code>https://{shopUrl}/index.php?cl=StripeWebhookController</code>
-              <br/><em>Im Stripe-Dashboard unter Developers &rarr; Webhooks eintragen.</em>
-            </p>
+          <div class="setup-step s-keys">
+            <div>
+              <h4><span class="num">3</span>Stripe-Keys + Webhook</h4>
+              <p class="small" style="margin: 0 0 4px;">
+                Admin &rarr; Extensions &rarr; <strong>OE Payments &middot; Stripe</strong>. Webhook-URL:
+              </p>
+              <code style="font-size: var(--t-11); word-break: break-all;">https://{shopUrl}/index.php?cl=StripeWebhookController</code>
+            </div>
+            <pre>Modus:                test
+Test Secret Key:      sk_test_…
+Test Publishable Key: pk_test_…
+Webhook-Secret:       whsec_…
+Capture-Modus:        automatic</pre>
           </div>
+
         </div>
 
-        <div class="callout" style="margin-top: 14px;">
-          <strong>Smoke-Test in 30 Sekunden.</strong> Mit Karte <code>4242 4242 4242 4242</code> eine Bestellung aufgeben &mdash; die Dankesseite muss erscheinen,
-          der Admin-Stripe-Tab muss eine <em>capture</em>-Transaktion zeigen, und <code>oe_payments_contract.OXSTATE</code> muss auf <code>FULFILLED</code> stehen.
-          Fehlt eines davon, sagt der &bdquo;Diagnose&ldquo;-Button oben im Tab, welcher Guard, Handler oder Webhook ausgefallen ist.
+        <div class="callout" style="margin-top: 10px;">
+          <strong>Smoke-Test in 30 s.</strong> Bestellung mit <code>4242 4242 4242 4242</code> &rarr; Dankesseite, <em>capture</em>-Transaktion im Stripe-Tab, Vertrag <code>FULFILLED</code>. Fehlt eines davon? Der <em>Diagnose</em>-Button zeigt, welcher Guard, Handler oder Webhook ausgefallen ist.
         </div>
 
         <div class="s-foot">

@@ -5,25 +5,15 @@
 
         <h2 class="h-2">Ein neuer Handler in drei Schritten.<br/><em class="acc">Klasse schreiben. Taggen. Testen.</em></h2>
 
-        <p class="lede" style="margin-bottom: 14px;">
-          Die h&auml;ufigste Erweiterung ist eine Nebenwirkung auf eine Stripe-Aktion &mdash; eine Slack-Nachricht bei Refund,
-          ein Refund-Sync ins Drittsystem-ERP, das Sperren einer Loyalty-Buchung bei Capture. Keine davon muss das Stripe-Modul anfassen.
+        <p class="lede" style="margin-bottom: 12px; font-size: var(--t-14);">
+          Slack bei Refund, ERP-Sync, Loyalty-Buchung bei Capture &mdash; keine davon muss das Stripe-Modul anfassen.
           Sie h&auml;ngen an einem Payment-Base-Event und laufen daneben.
         </p>
 
-        <div class="cols cols-2" style="gap: 18px; flex: 1 1 0;">
+        <div class="cols split-6-6" style="gap: 16px; flex: 1 1 0;">
           <div class="col" style="justify-content: flex-start;">
-            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 10px;">Schritt 1 &middot; HandlerInterface implementieren</div>
-            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(67, 56, 202, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0 0 14px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
-namespace Acme\StripeNotifier;
-
-use OxidEsales\Payments\Component\
-    EventSystem\Event\PaymentRefundedEvent;
-use OxidEsales\Payments\Component\
-    EventSystem\HandlerInterface;
-use OxidEsales\Payments\Component\
-    EventSystem\EventContext;
-
+            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 8px;">Schritt 1 &middot; HandlerInterface</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(67, 56, 202, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.4; margin: 0 0 12px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
 final class SlackRefundNotifier
     implements HandlerInterface
 {
@@ -32,14 +22,13 @@ final class SlackRefundNotifier
     ) {}
 
     public function handle(
-        object $event,
-        EventContext $ctx
+        object $event, EventContext $ctx
     ): void {
-        if (!$event instanceof PaymentRefundedEvent) {
-            return;
-        }
+        if (!$event instanceof
+            PaymentRefundedEvent) return;
+
         $this-&gt;slack-&gt;post(sprintf(
-            'Refund &euro;%.2f auf Bestellung %s',
+            'Refund &euro;%.2f auf %s',
             $event-&gt;getAmountCents() / 100,
             $event-&gt;getContract()-&gt;getOrderNumber()
         ));
@@ -47,8 +36,8 @@ final class SlackRefundNotifier
 }
 </pre>
 
-            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 10px;">Schritt 2 &middot; in services.yaml taggen</div>
-            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(67, 56, 202, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 8px;">Schritt 2 &middot; services.yaml</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(67, 56, 202, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.4; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
 Acme\StripeNotifier\SlackRefundNotifier:
     arguments: ['@Acme\Slack\SlackClient']
     tags:
@@ -59,30 +48,31 @@ Acme\StripeNotifier\SlackRefundNotifier:
           </div>
 
           <div class="col" style="justify-content: flex-start;">
-            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 10px;">Schritt 3 &middot; Unit-Test in Isolation</div>
-            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(67, 56, 202, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0 0 14px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 8px;">Schritt 3 &middot; Unit-Test</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(67, 56, 202, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.4; margin: 0 0 12px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
 public function testPostsToSlack(): void
 {
-    $slack = $this-&gt;createMock(SlackClient::class);
+    $slack = $this-&gt;createMock(
+        SlackClient::class
+    );
     $slack-&gt;expects($this-&gt;once())
         -&gt;method('post')
         -&gt;with($this-&gt;stringContains('&euro;42.00'));
 
-    $h = new SlackRefundNotifier($slack);
-    $h-&gt;handle(
+    (new SlackRefundNotifier($slack))-&gt;handle(
         new PaymentRefundedEvent(
-            $contract, $refund = $this-&gt;refund(4200)
+            $contract, $this-&gt;refund(4200)
         ),
         new EventContext()
     );
 }
 </pre>
 
-            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 10px;">Was Sie <em>nicht</em> tun sollten</div>
+            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 8px;">Was Sie <em>nicht</em> tun sollten</div>
             <ul class="small" style="margin: 0;">
-              <li><strong>Nicht <code>oe_payments_stripe_wallet</code> bearbeiten.</strong> Dort Code zu erg&auml;nzen koppelt ein Feature an einen PSP &mdash; die Grenz-Regel verbietet es.</li>
-              <li><strong>Nicht an Stripe-spezifische Events binden,</strong> wenn ein PSP-unabh&auml;ngiges Equivalent existiert. <code>PaymentRefundedEvent</code> bevorzugen vor <code>StripeRefundRequestEvent</code> &mdash; der Handler funktioniert dann auch f&uuml;r PayPal &amp; zuk&uuml;nftige PSPs.</li>
-              <li><strong>Nicht das Stripe-SDK aus dem Handler aufrufen.</strong> Falls n&ouml;tig: <code>PaymentAdapterInterface</code> injizieren &mdash; niemals <code>new \Stripe\StripeClient()</code>.</li>
+              <li><strong>Nicht <code>oe_payments_stripe_wallet</code> bearbeiten</strong> &mdash; koppelt das Feature an einen PSP.</li>
+              <li><strong>PSP-unabh&auml;ngige Events bevorzugen</strong> (<code>PaymentRefundedEvent</code>) statt Stripe-spezifischer &mdash; funktioniert dann auch f&uuml;r PayPal.</li>
+              <li><strong>Stripe-SDK nicht direkt aufrufen</strong> &mdash; <code>PaymentAdapterInterface</code> injizieren.</li>
             </ul>
           </div>
         </div>
