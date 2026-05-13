@@ -1,0 +1,20 @@
+id: oe_payment_base
+moduleSource: vendor/oxid-esales/payment-base
+version: 1.0.0
+activated: false
+title:
+  de: 'OXID Payment Component'
+  en: 'OXID Payment Component'
+description:
+  de: 'Provider-agnostische Payment-Infrastruktur (Smart-Contract-Architektur, geteilter Admin-Tab "Zahlung"). Wird von den PSP-Modulen (Stripe, PayPal) genutzt.'
+  en: 'Provider-agnostic payment infrastructure (smart-contract architecture, shared admin "Payment" tab). Consumed by the PSP modules (Stripe, PayPal).'
+lang: ''
+thumbnail: ''
+author: 'OXID eSales AG'
+url: 'https://www.oxid-esales.com'
+email: info@oxid-esales.com
+controllers:
+  PaymentAdmin: OxidEsales\PaymentBase\Admin\PaymentAdminController
+events:
+  onActivate: 'OxidEsales\PaymentBase\Core\Events\ModuleLifecycle::onActivate'
+  onDeactivate: 'OxidEsales\PaymentBase\Core\Events\ModuleLifecycle::onDeactivate'

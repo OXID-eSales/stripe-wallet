@@ -1,0 +1,72 @@
+        <div class="s-head">
+          <div class="badge"><span class="dot"></span><span class="step-label">Features &middot; 5 von 7 &middot; Webhooks</span></div>
+          <div class="deck">Sechs Guards, bevor ein Byte Payload geparst wird</div>
+        </div>
+
+        <h2 class="h-2">Der Webhook-Endpoint ist die meistangegriffene URL.<br/><em class="acc">Wir h&auml;rten ihn mit Guards, nicht mit Gebeten.</em></h2>
+
+        <p class="lede" style="margin-bottom: 14px;">
+          <code>StripeWebhookController</code> stellt eine URL bereit: <code>?cl=StripeWebhookController</code>.
+          Jede Anfrage durchl&auml;uft eine geordnete Kette von Guards, bevor Gesch&auml;ftslogik startet. Guards sind einzeln
+          unit-getestet, &uuml;ber den Service-Container austauschbar und brechen beim ersten Fehlschlag ab.
+        </p>
+
+        <div class="cols cols-2" style="gap: 18px; flex: 1 1 0;">
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Guard-Kette (Reihenfolge z&auml;hlt)</div>
+            <ol class="small" style="margin: 0 0 16px;">
+              <li><code>HttpsGuard</code> &mdash; Klartext-HTTP abweisen. Immer.</li>
+              <li><code>PayloadSizeGuard</code> &mdash; Rohbody auf 1&nbsp;MB begrenzen, vor dem Parsen.</li>
+              <li><code>RateLimitGuard</code> &mdash; Token-Bucket pro IP via APCu/Redis (konfigurierbar).</li>
+              <li><code>IpAllowlistGuard</code> &mdash; optionale Pr&uuml;fung der Stripe-Egress-Ranges.</li>
+              <li><code>SignatureGuard</code> &mdash; <code>Stripe-Signature</code> mit Endpoint-Secret pr&uuml;fen.</li>
+              <li><code>IdempotencyGuard</code> &mdash; <code>event.id</code> bekannt? Loggen + 200, nicht erneut verarbeiten.</li>
+            </ol>
+
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Pro Anfrage geloggt</div>
+            <ul class="small" style="margin: 0;">
+              <li>Rohpayload + Headers in <code>oe_payments_webhooklogs</code></li>
+              <li>Welcher Guard (falls einer) abgelehnt hat, mit Grund</li>
+              <li>Der dispatchte Event-Klasse und die Handler-Latenz</li>
+            </ul>
+          </div>
+
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Handler-Dispatch &middot; ein Switch je Event-Typ</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0 0 14px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+match ($event-&gt;type) {
+    'payment_intent.succeeded' =&gt;
+        $this-&gt;piSucceededHandler-&gt;handle($event),
+    'payment_intent.payment_failed' =&gt;
+        $this-&gt;piFailedHandler-&gt;handle($event),
+    'charge.refunded' =&gt;
+        $this-&gt;chargeRefundedHandler-&gt;handle($event),
+    'charge.dispute.created' =&gt;
+        $this-&gt;disputeOpenedHandler-&gt;handle($event),
+    default =&gt;
+        $this-&gt;logger-&gt;info(
+            'Stripe-Event ignoriert',
+            ['type' =&gt; $event-&gt;type]
+        ),
+};
+</pre>
+
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Warum Webhooks wichtig bleiben &mdash; auch bei funktionierendem Redirect</div>
+            <ul class="small" style="margin: 0;">
+              <li>Der Browser des Kunden kann zwischen Stripes Erfolgsseite und unserer Return-URL sterben &mdash; der Webhook schlie&szlig;t die Bestellung trotzdem.</li>
+              <li>Dashboard-initiierte Refunds umgehen unseren Admin-Tab &mdash; der Webhook protokolliert sie in <code>oe_payments_transaction</code>.</li>
+              <li>Disputes und Chargebacks haben keinen anderen Eintrittspunkt.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout" style="margin-top: 14px;">
+          <strong>Nach dem Parsen immer 200 OK zur&uuml;ckgeben.</strong> Stripe versucht bei Nicht-2xx <strong>72 Stunden</strong> erneut.
+          Eine Handler-Exception wird am Controller-Rand gefangen und geloggt &mdash; die Antwort bleibt 200,
+          das Event ist aber in <code>oe_payments_webhooklogs</code> markiert.
+        </div>
+
+        <div class="s-foot">
+          <div>OXID Stripe Wallet &middot; Webhook-Verarbeitung</div>
+          <div class="page-num">10 / 18</div>
+        </div>

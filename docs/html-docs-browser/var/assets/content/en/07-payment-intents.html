@@ -1,0 +1,71 @@
+        <div class="s-head">
+          <div class="badge"><span class="dot"></span><span class="step-label">Features &middot; 2 of 7 &middot; Payment Intents</span></div>
+          <div class="deck">The currency Stripe speaks &mdash; mapped onto our contract</div>
+        </div>
+
+        <h2 class="h-2">PaymentIntent states.<br/><em class="acc">Mapped to contract transitions, 1-to-1.</em></h2>
+
+        <p class="lede" style="margin-bottom: 14px;">
+          Stripe represents every payment as a <code>PaymentIntent</code> with its own state machine.
+          <code>PaymentIntentHelper</code> is the only class that knows how to translate Stripe state
+          &rarr; contract transition. Adding a state means changing one switch &mdash; nowhere else.
+        </p>
+
+        <div class="cols cols-2" style="gap: 18px; flex: 1 1 0;">
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Stripe PaymentIntent &rarr; contract</div>
+            <table class="small" style="width: 100%; border-collapse: collapse; margin: 0 0 16px;">
+              <thead><tr style="background: rgba(139, 92, 246, 0.08);"><th style="text-align: left; padding: 6px 10px; border-bottom: 1px solid rgba(139, 92, 246, 0.3);">Stripe state</th><th style="text-align: left; padding: 6px 10px; border-bottom: 1px solid rgba(139, 92, 246, 0.3);">Contract transition</th></tr></thead>
+              <tbody>
+                <tr><td style="padding: 6px 10px;"><code>requires_payment_method</code></td><td style="padding: 6px 10px;">remain <code>NOT_FINISHED</code></td></tr>
+                <tr><td style="padding: 6px 10px;"><code>requires_action</code></td><td style="padding: 6px 10px;">dispatch <code>Stripe3DSRequiredEvent</code></td></tr>
+                <tr><td style="padding: 6px 10px;"><code>requires_capture</code></td><td style="padding: 6px 10px;">&rarr; <code>AUTHORIZED</code> (manual capture)</td></tr>
+                <tr><td style="padding: 6px 10px;"><code>succeeded</code></td><td style="padding: 6px 10px;">&rarr; <code>READY_TO_COMMIT</code> &rarr; <code>FULFILLED</code></td></tr>
+                <tr><td style="padding: 6px 10px;"><code>canceled</code></td><td style="padding: 6px 10px;">&rarr; <code>CANCELLED</code></td></tr>
+                <tr><td style="padding: 6px 10px;"><code>processing</code></td><td style="padding: 6px 10px;">remain <code>PENDING</code> &mdash; webhook will resolve</td></tr>
+              </tbody>
+            </table>
+
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Capture mode &middot; metadata.php</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.4; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+sStripeCaptureMode = "automatic"
+  &rarr; intent.capture_method = "automatic"
+  &rarr; succeeded directly
+
+sStripeCaptureMode = "manual"
+  &rarr; intent.capture_method = "manual"
+  &rarr; requires_capture &middot; admin captures later
+</pre>
+          </div>
+
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">PaymentIntentHelper API</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0 0 16px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+final class PaymentIntentHelper
+{
+    public function isCaptured(PaymentIntent $pi): bool;
+    public function amountCaptured(PaymentIntent $pi): int;
+    public function amountRefunded(PaymentIntent $pi): int;
+    public function isAuthorizedOnly(PaymentIntent $pi): bool;
+    public function isCanceled(PaymentIntent $pi): bool;
+
+    public function deriveContractTransition(
+        PaymentIntent $pi,
+        PaymentContract $contract
+    ): ?ContractState;
+}
+</pre>
+
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Why minor units everywhere</div>
+            <ul class="small" style="margin: 0;">
+              <li>Stripe amounts are always integer minor units (cents) &mdash; <strong>no floats on the wire</strong>.</li>
+              <li>OXID basket totals come as floats &mdash; converted once in <code>CheckoutHelper</code> via <code>round($eur * 100)</code>.</li>
+              <li>Refund math (<code>amountRefunded() &lt;= amountCaptured() - sumPriorRefunds</code>) lives in <code>RefundHelper</code>, in cents.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="s-foot">
+          <div>OXID Stripe Wallet &middot; Payment intents</div>
+          <div class="page-num">07 / 18</div>
+        </div>

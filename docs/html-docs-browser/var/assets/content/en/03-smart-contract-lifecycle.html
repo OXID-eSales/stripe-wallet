@@ -1,0 +1,74 @@
+        <div class="s-head">
+          <div class="badge"><span class="dot"></span><span class="step-label">Architecture &middot; the contract state machine</span></div>
+          <div class="deck">Place Order creates a contract, not an order</div>
+        </div>
+
+        <h2 class="h-2">The Smart-Contract lifecycle.<br/><em class="acc">Eight states. Three terminal endings. Zero ambiguity.</em></h2>
+
+        <p class="lede" style="margin-bottom: 14px;">
+          Traditional checkout: <em>click Place Order &rarr; order created &rarr; pay &rarr; update order.</em>
+          Smart-Contract: <em>click Place Order &rarr; contract <code>DRAFT</code> &rarr; order <code>NOT_FINISHED</code>
+          &rarr; Stripe session &rarr; customer pays &rarr; contract advances &rarr; order finalised.</em>
+          An order number exists <strong>before</strong> the Stripe redirect &mdash; refunds and audits never race the customer.
+        </p>
+
+        <div class="cols split-7-5" style="gap: 18px; flex: 1 1 0;">
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s1-accent); margin-bottom: 10px;">State transitions</div>
+            <div class="diagram-host" style="min-height: 360px;">
+              <div class="mermaid">
+flowchart LR
+    DRAFT --> NOT_FINISHED
+    NOT_FINISHED --> PENDING
+    PENDING -->|automatic capture| READY_TO_COMMIT
+    PENDING -->|manual capture| AUTHORIZED
+    AUTHORIZED -->|admin captures| READY_TO_COMMIT
+    READY_TO_COMMIT --> COMMITTED
+    COMMITTED --> FULFILLED
+    PENDING -.->|customer abandons| EXPIRED
+    PENDING -.->|payment fails| FAILED
+    AUTHORIZED -.->|admin cancels| CANCELLED
+
+    style DRAFT fill:#e0e7ff,stroke:#4338ca,color:#0b1424
+    style NOT_FINISHED fill:#e0e7ff,stroke:#4338ca,color:#0b1424
+    style PENDING fill:#fef3c7,stroke:#b45309,color:#0b1424
+    style AUTHORIZED fill:#fef3c7,stroke:#b45309,color:#0b1424
+    style READY_TO_COMMIT fill:#dcfce7,stroke:#047857,color:#0b1424
+    style COMMITTED fill:#dcfce7,stroke:#047857,color:#0b1424
+    style FULFILLED fill:#dcfce7,stroke:#047857,color:#0b1424
+    style EXPIRED fill:#fee2e2,stroke:#b91c1c,color:#0b1424
+    style FAILED fill:#fee2e2,stroke:#b91c1c,color:#0b1424
+    style CANCELLED fill:#fee2e2,stroke:#b91c1c,color:#0b1424
+              </div>
+            </div>
+          </div>
+
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s1-accent); margin-bottom: 10px;">Conditions on the contract</div>
+            <ul class="small" style="margin: 0 0 16px;">
+              <li><code>payment_authorized</code> &mdash; flips when Stripe confirms the PaymentIntent</li>
+              <li><code>stock_reserved</code> &mdash; reservation handler hooks <code>ContractCreatedEvent</code></li>
+              <li><code>fraud_check</code> &mdash; optional, third-party hook point</li>
+            </ul>
+
+            <div class="eyebrow" style="color: var(--s1-accent); margin-bottom: 10px;">Why this matters for Stripe</div>
+            <ul class="small" style="margin: 0;">
+              <li><strong>Order ID exists pre-redirect</strong> &mdash; passed to Stripe as <code>metadata.order_id</code></li>
+              <li><strong>BasketSnapshot</strong> immutably stored as JSON in <code>OXBASKETDATA</code></li>
+              <li><strong>OXORDERID stays NULL</strong> until <code>COMMITTED</code> &mdash; no orphan rows</li>
+              <li>Recovery flows attach to the <em>contract</em>, not the order &mdash; same vocabulary for every PSP</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout" style="margin-top: 14px;">
+          <strong>The Stripe module mutates nothing directly.</strong> It <em>dispatches events</em> &mdash;
+          <code>StripeCaptureRequestEvent</code>, <code>StripeRefundRequestEvent</code> &mdash; and Payment-Base handlers
+          advance the contract state. A pre-commit grep guard fails the build if any Stripe controller calls
+          <code>$contract-&gt;transitionTo()</code> directly.
+        </div>
+
+        <div class="s-foot">
+          <div>OXID Stripe Wallet &middot; Smart-Contract lifecycle</div>
+          <div class="page-num">03 / 18</div>
+        </div>

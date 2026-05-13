@@ -1,0 +1,91 @@
+        <div class="s-head">
+          <div class="badge"><span class="dot"></span><span class="step-label">Features &middot; 4 von 7 &middot; R&uuml;ckerstattung</span></div>
+          <div class="deck">Teilerstattungen &middot; Pr&uuml;fung &middot; Audit-Trail</div>
+        </div>
+
+        <h2 class="h-2">Refund: validiert, geloggt, idempotent.<br/><em class="acc">Geld geht nie zweimal raus.</em></h2>
+
+        <p class="lede" style="margin-bottom: 14px;">
+          R&uuml;ckerstattungen sind leicht falsch zu machen. Stripe Wallet validiert gegen den gebuchten Betrag abz&uuml;glich vorheriger
+          Erstattungen in <em>Cent</em> &mdash; niemals in Floats. Jede Erstattung schreibt eine Transaktionszeile, dispatcht
+          <code>PaymentRefundedEvent</code> und triggert OpalReturns sowie jeden weiteren PSP-unabh&auml;ngigen Subscriber.
+        </p>
+
+        <div class="cols cols-2" style="gap: 18px; flex: 1 1 0;">
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">RefundService &middot; der Pfad</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0 0 16px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+public function refund(
+    PaymentContract $contract,
+    ?float $amount = null,
+    ?string $reason = null
+): RefundResult {
+    $intent = $this-&gt;adapter-&gt;retrievePaymentIntent(
+        $contract-&gt;getProviderIntentId()
+    );
+
+    $refundCents = $amount === null
+        ? $this-&gt;refundHelper-&gt;remainingRefundable($intent)
+        : (int) round($amount * 100);
+
+    $this-&gt;refundHelper-&gt;assertRefundable(
+        $intent, $refundCents
+    );
+
+    $refund = $this-&gt;adapter-&gt;refundCharge(
+        $intent-&gt;latest_charge,
+        amount: $refundCents,
+        reason: $reason
+    );
+
+    $this-&gt;dispatcher-&gt;dispatch(
+        new PaymentRefundedEvent($contract, $refund)
+    );
+
+    return RefundResult::fromRefund($refund);
+}
+</pre>
+
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Aufgabe des RefundHelper</div>
+            <ul class="small" style="margin: 0;">
+              <li><code>remainingRefundable()</code> = <code>amountCaptured - sum(priorRefunds)</code></li>
+              <li><code>assertRefundable()</code> wirft, wenn angefordert &gt; verbleibend oder &le; 0</li>
+              <li>Beide Methoden rein, nur Integer, vollst&auml;ndig unit-getestet</li>
+            </ul>
+          </div>
+
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Idempotenz &middot; Doppelklick erstattet nicht doppelt</div>
+            <ul class="small" style="margin: 0 0 14px;">
+              <li>Das Admin-Formular postet mit CSRF-Token und eindeutiger <code>request_id</code>.</li>
+              <li>Eine Zeile in <code>oe_payments_idempotency</code> mit Schl&uuml;ssel <code>(contract_id, request_id)</code> &mdash; Replay trifft die bestehende Zeile und gibt das vorherige Ergebnis zur&uuml;ck.</li>
+              <li>Der Stripe-SDK-Aufruf tr&auml;gt zus&auml;tzlich <code>Idempotency-Key: {request_id}</code> &mdash; Stripe selbst weist Duplikate zur&uuml;ck.</li>
+            </ul>
+
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Wo andere Module zuh&ouml;ren</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0 0 14px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+# opalreturns/src/EventSystem/ReturnHandler.php
+class ReturnHandler implements HandlerInterface
+{
+    public function handle(
+        PaymentRefundedEvent $e,
+        EventContext $ctx
+    ): void {
+        $this-&gt;returnRepo-&gt;markRefunded(
+            $e-&gt;getContract(),
+            $e-&gt;getAmountCents()
+        );
+    }
+}
+</pre>
+
+            <div class="small" style="font-size: var(--t-11); color: var(--ink-500);">
+              <em>Kein Stripe-Import in opalreturns/ &mdash; die Event-Payload ist PSP-unabh&auml;ngig.</em>
+            </div>
+          </div>
+        </div>
+
+        <div class="s-foot">
+          <div>OXID Stripe Wallet &middot; R&uuml;ckerstattungs-Ablauf</div>
+          <div class="page-num">09 / 18</div>
+        </div>

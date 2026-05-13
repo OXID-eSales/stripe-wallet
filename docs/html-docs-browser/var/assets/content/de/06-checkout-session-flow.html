@@ -1,0 +1,66 @@
+        <div class="s-head">
+          <div class="badge"><span class="dot"></span><span class="step-label">Features &middot; 1 von 7 &middot; Stripe Checkout</span></div>
+          <div class="deck">End-to-End &mdash; vom Bestell-Klick bis zur Dankesseite</div>
+        </div>
+
+        <h2 class="h-2">Ein Klick &rarr; Stripe Checkout &rarr; zur&uuml;ck zu OXID.<br/><em class="acc">Bestellnummer steht vor dem Redirect.</em></h2>
+
+        <div class="cols split-7-5" style="gap: 18px; flex: 1 1 0;">
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Der komplette Ablauf</div>
+            <div class="diagram-host" style="min-height: 380px;">
+              <div class="mermaid">
+sequenceDiagram
+    participant U as Kunde
+    participant S as OXID (cl=order)
+    participant SC as StripeOrderController
+    participant E as EventDispatcher
+    participant CS as CheckoutSessionService
+    participant SK as Stripe API
+    U-&gt;&gt;S: Klick "Mit Stripe bezahlen"
+    S-&gt;&gt;SC: createCheckoutSession()
+    SC-&gt;&gt;E: dispatch(StripeCheckoutSessionRequestEvent)
+    E-&gt;&gt;CS: handle()  (contract=DRAFT)
+    CS-&gt;&gt;CS: BasketSnapshot bauen
+    CS-&gt;&gt;CS: contract.transitionTo(NOT_FINISHED)
+    CS-&gt;&gt;CS: order = createOrder(NOT_FINISHED)
+    CS-&gt;&gt;SK: checkout.sessions.create(metadata={order_id})
+    SK--&gt;&gt;CS: session.url
+    CS--&gt;&gt;U: 303 Redirect &rarr; checkout.stripe.com
+    U-&gt;&gt;SK: bezahlen (Karte / SCA / Wallet)
+    SK--&gt;&gt;U: 303 Redirect &rarr; success_url
+    U-&gt;&gt;S: GET /cl=stripeorder?fnc=return&amp;session_id=…
+    S-&gt;&gt;E: dispatch(StripeCheckoutReturnEvent)
+    E-&gt;&gt;CS: Vertrag &rarr; READY_TO_COMMIT
+    E-&gt;&gt;S: Bestellung finalisieren &rarr; FULFILLED
+    S--&gt;&gt;U: Redirect &rarr; cl=thankyou
+              </div>
+            </div>
+          </div>
+
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Garantien des Ablaufs</div>
+            <ul class="small" style="margin: 0 0 14px;">
+              <li><strong>Bestellnummer zuerst.</strong> Eine OXID-Bestellung in <code>NOT_FINISHED</code> existiert, bevor Stripe den Kunden sieht &mdash; R&uuml;ckerstattungen laufen nicht ins Leere.</li>
+              <li><strong>Idempotenter Return.</strong> Erfolgsseite neu laden &mdash; der Handler ist ein No-Op, wenn der Vertrag bereits <code>FULFILLED</code> ist.</li>
+              <li><strong>Webhook als Sicherheitsnetz.</strong> Schlie&szlig;t der Kunde den Tab vor dem Return, schlie&szlig;t der Webhook (Folie 10) die Bestellung trotzdem ab.</li>
+              <li><strong>Sprache bleibt erhalten.</strong> Die <code>success_url</code> wird mit dem aktiven OXID-<code>lang</code> gerendert &mdash; keine falschen Locale-Spr&uuml;nge.</li>
+              <li><strong>3DS inline geregelt.</strong> Verlangt Stripe SCA, ist der Redirect bereits die SCA-Challenge-URL &mdash; wir m&uuml;ssen nichts extra verkabeln.</li>
+            </ul>
+
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Aufbau von success_url</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.4; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+{shopUrl}/index.php
+  ?cl=stripeorder
+  &amp;fnc=return
+  &amp;session_id={CHECKOUT_SESSION_ID}
+  &amp;lang={langId}
+  &amp;contract_id={contractId}
+</pre>
+          </div>
+        </div>
+
+        <div class="s-foot">
+          <div>OXID Stripe Wallet &middot; Stripe-Checkout-Ablauf</div>
+          <div class="page-num">06 / 18</div>
+        </div>

@@ -1,0 +1,61 @@
+        <div class="s-head">
+          <div class="badge"><span class="dot"></span><span class="step-label">Features &middot; 6 von 7 &middot; 3D Secure / SCA</span></div>
+          <div class="deck">PSD2-Konformit&auml;t &mdash; ohne Code auf unserer Seite</div>
+        </div>
+
+        <h2 class="h-2">3D Secure ist Stripes Problem.<br/><em class="acc">Wir halten nur den Vertrag synchron.</em></h2>
+
+        <p class="lede" style="margin-bottom: 14px;">
+          PSD2 verlangt f&uuml;r die meisten EU-Zahlungen Strong Customer Authentication. Stripe Checkout l&ouml;st die SCA-Challenge inline &mdash;
+          der Kunde ist ohnehin schon weitergeleitet, und die 3DS-Seite der Bank rendert in Stripes Dom&auml;ne. Unsere Aufgabe ist nur,
+          auf die wenigen Resultate zu reagieren, die den Vertrag betreffen.
+        </p>
+
+        <div class="cols cols-2" style="gap: 18px; flex: 1 1 0;">
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Die vier Ausg&auml;nge, die wir modellieren</div>
+            <table class="small" style="width: 100%; border-collapse: collapse; margin: 0 0 16px;">
+              <thead><tr style="background: rgba(139, 92, 246, 0.08);"><th style="text-align: left; padding: 6px 10px; border-bottom: 1px solid rgba(139, 92, 246, 0.3);">Stripe-Ausgang</th><th style="text-align: left; padding: 6px 10px; border-bottom: 1px solid rgba(139, 92, 246, 0.3);">Was wir tun</th></tr></thead>
+              <tbody>
+                <tr><td style="padding: 6px 10px;">SCA bestanden &middot; <code>succeeded</code></td><td style="padding: 6px 10px;">Vertrag &rarr; <code>READY_TO_COMMIT</code></td></tr>
+                <tr><td style="padding: 6px 10px;">SCA n&ouml;tig beim Return &middot; <code>requires_action</code></td><td style="padding: 6px 10px;">Redirect auf <code>next_action.redirect_to_url</code></td></tr>
+                <tr><td style="padding: 6px 10px;">SCA fehlgeschlagen &middot; <code>payment_failed</code></td><td style="padding: 6px 10px;">Vertrag &rarr; <code>FAILED</code>; Bestellung bleibt <code>NOT_FINISHED</code></td></tr>
+                <tr><td style="padding: 6px 10px;">SCA Timeout &middot; <code>requires_payment_method</code></td><td style="padding: 6px 10px;">Kunde zur&uuml;ck zu <code>cl=order</code> mit Toast</td></tr>
+              </tbody>
+            </table>
+
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Testkarten in Playwright</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.4; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+4000 0025 0000 3155  &mdash; 3DS-Authentifizierung n&ouml;tig
+4000 0027 6000 3184  &mdash; 3DS, abgelehnt nach Auth
+4242 4242 4242 4242  &mdash; Happy Path, kein SCA
+</pre>
+          </div>
+
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Stripe3DSRequiredEvent</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0 0 16px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+final class Stripe3DSRequiredEvent
+{
+    public function __construct(
+        public readonly PaymentContract $contract,
+        public readonly string $redirectUrl,
+        public readonly string $intentId
+    ) {}
+}
+</pre>
+
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Was im Vertrag bleibt</div>
+            <ul class="small" style="margin: 0;">
+              <li>Der Vertrag <strong>bleibt in <code>PENDING</code></strong>, w&auml;hrend SCA l&auml;uft. <em>Nicht <code>AUTHORIZED</code></em> &mdash; die Bank hat noch nicht zugestimmt.</li>
+              <li>Der <code>BasketSnapshot</code> garantiert: Der vom Kunden gesehene Preis ist derselbe, dem er zustimmen soll &mdash; keine &Auml;nderungen im Flug.</li>
+              <li>Schl&auml;gt SCA dauerhaft fehl, bleibt die Bestellung <code>NOT_FINISHED</code> und wird nach 24&nbsp;h vom Housekeeping-Job aufger&auml;umt.</li>
+              <li>Eine Recovery-E-Mail verlinkt den Kunden auf <em>denselben</em> Vertrag &mdash; keine Duplikatbestellungen.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="s-foot">
+          <div>OXID Stripe Wallet &middot; 3D Secure &amp; SCA</div>
+          <div class="page-num">11 / 18</div>
+        </div>

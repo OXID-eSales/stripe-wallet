@@ -1,0 +1,49 @@
+        <div class="s-head">
+          <div class="badge"><span class="dot"></span><span class="step-label">What Stripe Wallet provides</span></div>
+          <div class="deck">Four pillars &middot; one PSP module on Payment Base</div>
+        </div>
+
+        <div class="eyebrow">The Stripe reference implementation</div>
+        <h1 class="h-1">Stripe Wallet =<br/><em class="acc">Stripe Checkout, the Payment-Base way.</em></h1>
+
+        <p class="lede" style="margin-bottom: 18px;">
+          <code>oe_payments_stripe_wallet</code> is a thin adapter between Stripe's APIs and the Payment-Base spine.
+          It owns <strong>no domain model</strong>, owns <strong>no database tables</strong>, and never imports
+          another PSP. Everything PSP-agnostic stays in Payment Base; everything Stripe-specific lives here.
+        </p>
+
+        <div class="pillars cols-4" style="margin-bottom: 0;">
+          <div class="pillar">
+            <div class="icon">1</div><h4>Stripe Checkout flow</h4>
+            <p>Hosted Checkout Sessions with automatic 3D Secure. Customer redirects to Stripe, returns to an OXID order already created in <code>NOT_FINISHED</code> state.</p>
+          </div>
+          <div class="pillar">
+            <div class="icon">2</div><h4>Capture &amp; Refund</h4>
+            <p>Automatic or <strong>manual</strong> capture. Full and <strong>partial</strong> refunds. Authorization release on partial capture. All driven by admin-tab actions.</p>
+          </div>
+          <div class="pillar">
+            <div class="icon">3</div><h4>Webhook processor</h4>
+            <p>HTTPS / IP / rate-limit / payload-size <strong>guards</strong>, signature verification, idempotency &mdash; 6 surfaces hardened by default.</p>
+          </div>
+          <div class="pillar">
+            <div class="icon">4</div><h4>Admin Stripe tab</h4>
+            <p>Order Details &rarr; <em>Stripe</em>: live transaction history from Stripe API, capture / refund / cancel forms, OXPAID reconciliation.</p>
+          </div>
+        </div>
+
+        <div class="cols cols-3" style="gap: 14px; margin-top: 22px;">
+          <div class="callout" style="margin: 0; padding: 14px 16px; font-size: var(--t-13);">
+            <strong>~33 service files.</strong> <code>Capture/</code>, <code>Refund/</code>, <code>Checkout/</code>, <code>Reconciliation/</code>, factories &amp; result objects. Every one has a single responsibility.
+          </div>
+          <div class="callout" style="margin: 0; padding: 14px 16px; font-size: var(--t-13);">
+            <strong>8 Stripe-specific events &middot; 9 handlers.</strong> <code>StripeCheckoutSessionRequestEvent</code>, <code>StripeCaptureRequestEvent</code>, <code>StripeRefundRequestEvent</code>, &hellip; &mdash; PSR-14 throughout.
+          </div>
+          <div class="callout" style="margin: 0; padding: 14px 16px; font-size: var(--t-13);">
+            <strong>822+ unit tests &middot; 18 integration tests.</strong> Test pyramid, AAA structure, testable subclass pattern for OXID admin controllers, final-class seam pattern.
+          </div>
+        </div>
+
+        <div class="s-foot">
+          <div>OXID Stripe Wallet &middot; Module overview</div>
+          <div class="page-num">02 / 18</div>
+        </div>

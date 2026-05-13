@@ -1,0 +1,68 @@
+        <div class="s-head">
+          <div class="badge"><span class="dot"></span><span class="step-label">Architektur &middot; Adapter</span></div>
+          <div class="deck">Die Naht zwischen OXID, Stripe-SDK und Vertragskern</div>
+        </div>
+
+        <h2 class="h-2">Drei Adapter erledigen die schmutzige Arbeit.<br/><em class="acc">Alles testbar. Nichts global.</em></h2>
+
+        <p class="lede" style="margin-bottom: 14px;">
+          Stripes PHP-SDK arbeitet mit <code>final</code>-Klassen und statischer Konfiguration. OXID nutzt virtuelle Parent-Klassen
+          und <code>Registry::get()</code>. Payment Base sitzt dazwischen &mdash; konsequent Constructor-Injection. Die Adapter-Schicht
+          ist der einzige Ort, an dem diese drei Welten zusammentreffen.
+        </p>
+
+        <div class="cols cols-3" style="gap: 14px; flex: 1 1 0;">
+          <div class="col" style="background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 8px; padding: 16px; justify-content: flex-start;">
+            <div class="eyebrow" style="color: #4338ca; margin-bottom: 10px;">StripeAdapter / LazyStripeAdapter</div>
+            <p class="small" style="margin: 0 0 10px;">
+              Kapselt die statische Konfiguration des Stripe-SDK (API-Key, Version) hinter <code>PaymentAdapterInterface</code>.
+              Die Lazy-Variante baut den SDK-Client erst beim ersten Aufruf &mdash; sicher in langlebigen Services injizierbar.
+            </p>
+            <ul class="small" style="margin: 0;">
+              <li><code>createCheckoutSession()</code></li>
+              <li><code>capturePaymentIntent()</code></li>
+              <li><code>refundCharge()</code></li>
+              <li><code>cancelPaymentIntent()</code></li>
+              <li><code>retrievePaymentIntent()</code></li>
+            </ul>
+          </div>
+
+          <div class="col" style="background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 8px; padding: 16px; justify-content: flex-start;">
+            <div class="eyebrow" style="color: #047857; margin-bottom: 10px;">OxidShopAdapter</div>
+            <p class="small" style="margin: 0 0 10px;">
+              Implementiert <code>ShopAdapterInterface</code>. Der einzige Ort, an dem Stripe-Code <code>oxNew()</code>,
+              <code>Registry::getConfig()</code> oder andere OXID-Globals anfassen darf. &Uuml;berall sonst gilt diese Naht.
+            </p>
+            <ul class="small" style="margin: 0;">
+              <li><code>getOrderById($oxid): ?Order</code></li>
+              <li><code>getActiveBasket(): Basket</code></li>
+              <li><code>getActiveUser(): ?User</code></li>
+              <li><code>getViewConfig()</code></li>
+              <li><code>getShopUrl(): string</code></li>
+            </ul>
+          </div>
+
+          <div class="col" style="background: rgba(245, 158, 11, 0.06); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; padding: 16px; justify-content: flex-start;">
+            <div class="eyebrow" style="color: #b45309; margin-bottom: 10px;">Helper-Trio</div>
+            <p class="small" style="margin: 0 0 10px;">
+              <code>Adapter/Helper/</code> &mdash; kleine, rein funktionale Klassen, die zwischen Stripe-Datenformen und
+              OXID-Betr&auml;gen &uuml;bersetzen. Zustandslos, voll testbar.
+            </p>
+            <ul class="small" style="margin: 0;">
+              <li><code>PaymentIntentHelper</code> &mdash; Mapping Intent &harr; Vertragszustand</li>
+              <li><code>RefundHelper</code> &mdash; R&uuml;ckerstattungspr&uuml;fung, Teilbetrags-Buchhaltung</li>
+              <li><code>CheckoutHelper</code> &mdash; Success-/Cancel-URLs, Locale, Line-Items</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout" style="margin-top: 14px;">
+          <strong>Finale Klassen sind keine Feinde.</strong> Wo das Stripe-SDK finale Klassen ausliefert
+          (z.&nbsp;B. <code>\Stripe\Service\PaymentIntentService</code>), wrappt das Helper-Trio nur die tats&auml;chlich verwendeten Methoden.
+          Tests injizieren echte Instanzen mit gemockten Abh&auml;ngigkeiten (das &bdquo;Final-Class-Seam&ldquo;-Pattern) &mdash; niemals <code>createMock(FinalClass::class)</code>.
+        </div>
+
+        <div class="s-foot">
+          <div>OXID Stripe Wallet &middot; Adapter-Architektur</div>
+          <div class="page-num">05 / 18</div>
+        </div>
