@@ -9,7 +9,6 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\WebhookHandler;
 
-use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Contract\Transaction;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
@@ -84,13 +83,6 @@ final class PaymentIntentSucceededHandler implements WebhookEventHandlerInterfac
         $capturedAt = $this->extractCapturedAt($event);
         $this->updateOrderPaidTimestamp($paymentIntentId, $capturedAt);
 
-        // STRP-AUTOCAP-REFUND: extract captured amount BEFORE fulfilling. The
-        // opalreturns refund broker uses OXCAPTUREDAMOUNT as source of truth;
-        // every successful capture webhook must populate it on the contract.
-        $object = $event->getObject();
-        $rawAmount = $object['amount_received'] ?? 0;
-        $capturedAmount = is_numeric($rawAmount) ? ((int) $rawAmount) / 100 : 0.0;
-
         // Sprint 18: Use ContractFulfillmentService for DRY fulfillment
         $fulfilled = $this->contractFulfillmentService->fulfill($contract);
 
@@ -100,14 +92,6 @@ final class PaymentIntentSucceededHandler implements WebhookEventHandlerInterfac
                 'contract_state' => $contract->getState()->getValue(),
             ]);
             return WebhookResult::success('contract_not_fulfilled');
-        }
-
-        // STRP-AUTOCAP-REFUND: write the captured amount onto the contract
-        // so the opalreturns refund broker can dispatch refunds against it.
-        if ($capturedAmount > 0.0 && $contract instanceof PaymentContract) {
-            $contract->setCapturedAmount($capturedAmount);
-            $contract->setCapturedAt(new \DateTimeImmutable());
-            $this->contractRepository->save($contract);
         }
 
         $this->recordCaptureTransaction($contract, $event);

@@ -3,58 +3,72 @@
           <div class="deck">Order Details &rarr; Stripe tab</div>
         </div>
 
-        <h2 class="h-2">One tab. Five cards. Zero DB snapshots.<br/><em class="acc">The Stripe API is the source of truth.</em></h2>
+        <h2 class="h-2">One tab. Five cards. Zero database snapshots.<br/><em class="acc">The Stripe API is the source of truth.</em></h2>
 
-        <p class="lede" style="margin-bottom: 12px; font-size: var(--t-14);">
-          The admin&rsquo;s <em>Stripe</em> tab is rendered by <code>OrderRefund</code>: capture, refund, cancel-auth, reconcile.
-          Display pulls live data from Stripe; the local DB is the audit log, not the cache.
+        <p class="lede" style="margin-bottom: 14px;">
+          The admin&rsquo;s <em>Stripe</em> tab on the Order Details page is rendered by <code>OrderRefund</code> &mdash;
+          the controller responsible for capture, refund, cancel-authorisation, and reconciliation. Display fetches
+          live data from Stripe on each load; the local DB is the <strong>audit log</strong>, not the cache.
         </p>
 
-        <div class="cols split-6-6" style="gap: 16px; flex: 1 1 0;">
+        <div class="cols cols-2" style="gap: 18px; flex: 1 1 0;">
           <div class="col" style="justify-content: flex-start;">
-            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 8px;">What renders on the tab</div>
-            <ul class="small" style="margin: 0 0 14px;">
-              <li><strong>Payment Details</strong> &mdash; contract id, order id, transaction id link, captured / refunded</li>
-              <li><strong>Transaction History</strong> &mdash; live from Stripe with coloured badges</li>
-              <li><strong>Capture form</strong> &mdash; partial supported</li>
-              <li><strong>Refund form</strong> &mdash; validates remaining refundable</li>
-              <li><strong>Cancel authorization</strong> &mdash; releases uncaptured auth</li>
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">What renders on the tab</div>
+            <ul class="small" style="margin: 0 0 16px;">
+              <li><strong>Payment Details</strong> &mdash; Contract ID, Order ID, Payment Type, Transaction ID linking to Stripe Dashboard, Captured amount, Refunded amount</li>
+              <li><strong>Transaction History</strong> &mdash; from <code>getStripeTransactionHistory()</code> &mdash; coloured badges (auth / capture / refund / dispute)</li>
+              <li><strong>Capture form</strong> &mdash; for manual-capture contracts in <code>AUTHORIZED</code>; supports partial</li>
+              <li><strong>Refund form</strong> &mdash; for <code>FULFILLED</code> contracts with capture &gt; 0; supports partial; validates remaining refundable</li>
+              <li><strong>Cancel authorization</strong> &mdash; releases an uncaptured manual-capture auth</li>
             </ul>
 
-            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 8px;">Storage strategy &middot; B+</div>
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Storage strategy &middot; B+</div>
             <ul class="small" style="margin: 0;">
-              <li><strong>Display</strong>: Stripe API &mdash; always fresh, covers Dashboard actions</li>
-              <li><strong>Audit log</strong>: <code>oe_payments_transaction</code></li>
-              <li><strong>Self-healing</strong>: <code>reconcilePaymentState()</code> on view fixes drifted OXPAID</li>
+              <li><strong>Display</strong>: Stripe API &mdash; always fresh, covers Dashboard actions outside our UI</li>
+              <li><strong>Audit log</strong>: <code>oe_payments_transaction</code> &mdash; one row per action taken via OXID</li>
+              <li><strong>Self-healing</strong>: <code>reconcilePaymentState()</code> runs on view &mdash; auto-fixes OXPAID when Stripe shows succeeded but OXPAID is blank</li>
             </ul>
           </div>
 
           <div class="col" style="justify-content: flex-start;">
-            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 8px;">Controller dispatch &middot; one action per submit</div>
-            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.4; margin: 0 0 12px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
-public function dispatch(
-    Order $o, string $action, array $req
-): void {
-    match ($action) {
-        'capture' =&gt; $this-&gt;d-&gt;dispatch(
-            new StripeCaptureRequestEvent(
-                $o, $this-&gt;amount($req))),
-        'refund'  =&gt; $this-&gt;d-&gt;dispatch(
-            new StripeRefundRequestEvent(
-                $o, $this-&gt;amount($req))),
-        'cancel'  =&gt; $this-&gt;d-&gt;dispatch(
-            new StripeCancelAuthorizationRequestEvent($o)),
-    };
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Controller dispatch &middot; one action per submit</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0 0 16px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+class OrderActionDispatcher
+{
+    public function dispatch(
+        Order $order, string $action, array $req
+    ): void {
+        match ($action) {
+            'capture' =&gt; $this-&gt;dispatcher-&gt;dispatch(
+                new StripeCaptureRequestEvent(
+                    $order, $this-&gt;amount($req)
+                )
+            ),
+            'refund' =&gt; $this-&gt;dispatcher-&gt;dispatch(
+                new StripeRefundRequestEvent(
+                    $order, $this-&gt;amount($req)
+                )
+            ),
+            'cancel' =&gt; $this-&gt;dispatcher-&gt;dispatch(
+                new StripeCancelAuthorizationRequestEvent(
+                    $order
+                )
+            ),
+        };
+    }
 }
 </pre>
 
-            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 8px;">Testable-subclass pattern</div>
-            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.4; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Testable subclass pattern</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
 class TestableOrderRefund extends OrderRefund {
     public function __construct(
         ?Order $o = null,
         ?ViewDataProvider $v = null
-    ) { /* skip admin bootstrap */ }
+    ) { /* skip OXID admin bootstrap */ }
+
+    public function getOrder(): ?Order
+    { return $this-&gt;testOrder; }
 }
 </pre>
           </div>

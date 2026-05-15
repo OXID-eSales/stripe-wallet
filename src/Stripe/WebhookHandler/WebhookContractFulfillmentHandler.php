@@ -33,25 +33,10 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
     /**
      * @inheritDoc
      */
-    public function handlePaymentSucceeded(string $providerOrderId, float $capturedAmount = 0.0): ?bool
+    public function handlePaymentSucceeded(string $providerOrderId): ?bool
     {
         // Sprint 18: Delegate to ContractFulfillmentService (DRY)
-        $result = $this->contractFulfillmentService->fulfillByProviderOrderId($providerOrderId);
-
-        // STRP-AUTOCAP-REFUND: write OXCAPTUREDAMOUNT on the contract whenever the
-        // webhook payload carries a positive amount. The opalreturns refund broker
-        // uses this field as the source of truth — without it, auto-capture orders
-        // cannot be refunded (broker falls through to a silent skip). Symmetric
-        // with handleChargeCaptured() which records the amount for manual capture.
-        if ($capturedAmount > 0.0) {
-            $contract = $this->findContractByProviderOrderId($providerOrderId);
-            if ($contract !== null) {
-                $this->recordCapturedAmount($contract, $capturedAmount);
-                $this->saveIfAmountPositive($contract, $capturedAmount);
-            }
-        }
-
-        return $result;
+        return $this->contractFulfillmentService->fulfillByProviderOrderId($providerOrderId);
     }
 
     /**

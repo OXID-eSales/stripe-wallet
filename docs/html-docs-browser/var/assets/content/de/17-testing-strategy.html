@@ -3,70 +3,80 @@
           <div class="deck">TDD-first &middot; dieselben Gates wie f&uuml;r jedes Payment-Base-Modul</div>
         </div>
 
-        <h2 class="h-2">Tests sind die Spezifikation.<br/><em class="acc">TDD-first. DevOps-first. Coverage darf nie sinken.</em></h2>
+        <h2 class="h-2">822+ Unit. 18 Integration. Playwright bei jedem Commit.<br/><em class="acc">Tests sind die Spezifikation.</em></h2>
 
-        <div class="stats cols-3" style="margin: 18px 0 22px;">
-          <div class="stat acc">
-            <div class="num">822+</div>
-            <div class="label" style="font-size: var(--t-14); font-weight: 600; color: var(--ink-700); margin-bottom: 6px;">Unit-Assertions</div>
-            <div class="small" style="margin: 0; color: var(--ink-500);">
-              ~99 Dateien. Service-Logik, Helper, Adapter, Validator. Interfaces mocken, niemals finale Klassen.
-            </div>
-          </div>
-          <div class="stat acc">
-            <div class="num">18</div>
-            <div class="label" style="font-size: var(--t-14); font-weight: 600; color: var(--ink-700); margin-bottom: 6px;">Integrations-Specs</div>
-            <div class="small" style="margin: 0; color: var(--ink-500);">
-              DI-Verkabelung, Event-Ketten, Doctrine-Writes, OXID-Admin-Tab-Rendering.
-            </div>
-          </div>
-          <div class="stat acc">
-            <div class="num">1&times;</div>
-            <div class="label" style="font-size: var(--t-14); font-weight: 600; color: var(--ink-700); margin-bottom: 6px;">Playwright je Feature</div>
-            <div class="small" style="margin: 0; color: var(--ink-500);">
-              Ein Regressions-Spec pro Nutzer-Flow, der eine Frame-Grenze &uuml;berschreitet.
-            </div>
-          </div>
-        </div>
+        <div class="cols cols-3" style="gap: 14px; flex: 1 1 0;">
 
-        <div class="cols split-6-6" style="gap: 18px; flex: 1 1 0;">
-          <div class="col" style="justify-content: flex-start;">
-            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 8px;">Pre-Commit-Gates &middot; <code>./bin/pre-commit-check.sh</code></div>
-            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(67, 56, 202, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.5; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-12);">
-[1/6] PHPCS (PSR-12) .............. OK
-[2/6] PHPStan (Level max) ......... OK
-[3/6] PHPMD ....................... OK
-[4/6] Unit-Tests .................. OK
-[5/6] Architektur-Grep-Guards
-        keine PSP-Imports ......... OK
-        keine direkten Configs .... OK
-        keine Contract-Mutationen . OK
-[6/6] Aktivierungs-Smoke .......... OK
+          <div class="col" style="background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 8px; padding: 16px; justify-content: flex-start;">
+            <div class="eyebrow" style="color: #047857; margin-bottom: 10px;">Testpyramide</div>
+            <ul class="small" style="margin: 0 0 14px;">
+              <li><strong>Unit</strong> &mdash; ~99 Dateien, 822+ Assertions. Service-Logik, Helper, Adapter, Validator. Interfaces mocken, niemals finale Klassen.</li>
+              <li><strong>Integration</strong> &mdash; 18 Specs. DI-Verkabelung, Event-Ketten, Doctrine-Writes, OXID-Admin-Tab-Rendering.</li>
+              <li><strong>Playwright</strong> &mdash; 1 Spec pro Nutzer-Feature, das eine Frame-Grenze &uuml;berschreitet. Stripe-Checkout-Roundtrip, Admin-Capture/Refund-Flow, AGB-Gate.</li>
+              <li><strong>Coverage</strong> sinkt nicht zwischen Sprints. CI-erzwungen.</li>
+            </ul>
+
+            <div class="eyebrow" style="color: #047857; margin-bottom: 10px;">Final-Class-Seam</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.4; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+// CaptureService ist final. Test mit
+// echter Instanz + gemockten Deps.
+$adapter = $this-&gt;createMock(
+    PaymentAdapterInterface::class
+);
+$svc = new CaptureService(
+    $adapter, $this-&gt;dispatcher
+);
+$svc-&gt;capture($contract, 42.00);
 </pre>
           </div>
 
-          <div class="col" style="justify-content: flex-start;">
-            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 8px;">Testable-Subclass &middot; OXID-Admin-DI-Naht</div>
-            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(67, 56, 202, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.5; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-12);">
-class TestableOrderRefund
-    extends OrderRefund
-{
+          <div class="col" style="background: rgba(245, 158, 11, 0.06); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; padding: 16px; justify-content: flex-start;">
+            <div class="eyebrow" style="color: #b45309; margin-bottom: 10px;">Pre-Commit &middot; <code>./bin/pre-commit-check.sh</code></div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.45; margin: 0 0 14px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+[1/6] PHPCS  (PSR-12) &hellip; OK
+[2/6] PHPStan (Level max) &hellip; OK
+[3/6] PHPMD &hellip; OK
+[4/6] Unit-Tests &hellip; OK
+[5/6] Architektur-Grep-Guards
+      &mdash; keine PSP-Imports &hellip; OK
+      &mdash; keine direkten Config-Reads &hellip; OK
+      &mdash; keine direkten Contract-Mutationen
+        in Controllern &hellip; OK
+[6/6] Modul-Aktivierungs-Smoke
+      deactivate &rarr; activate &rarr; clear &hellip; OK
+</pre>
+
+            <div class="eyebrow" style="color: #b45309; margin-bottom: 10px;">Baselines (klein, begr&uuml;ndet)</div>
+            <ul class="small" style="margin: 0;">
+              <li><code>phpstan-baseline.neon</code> &mdash; nur OXID-Virtual-Parent-Class-Meldungen</li>
+              <li><code>phpmd.baseline.xml</code> &mdash; nur interface-getriebene Adapter-Komplexit&auml;t</li>
+            </ul>
+          </div>
+
+          <div class="col" style="background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 8px; padding: 16px; justify-content: flex-start;">
+            <div class="eyebrow" style="color: #4338ca; margin-bottom: 10px;">Testable-Subclass-Pattern</div>
+            <p class="small" style="margin: 0 0 10px;">
+              OXID-Admin-Controller unterst&uuml;tzen keine Constructor-DI &mdash; <code>OrderRefund extends Order_parent</code>. Um sie unit-zu-testen,
+              erweitern wir sie mit einem Konstruktor, der den OXID-Bootstrap <em>&uuml;berspringt</em> und Abh&auml;ngigkeiten direkt entgegennimmt.
+            </p>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.45; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+class TestableOrderRefund extends OrderRefund {
     public function __construct(
         ?Order $o = null,
         ?ViewDataProvider $v = null
-    ) {
-        /* OXID-Admin-Bootstrap &uuml;berspringen */
-        $this-&gt;testOrder = $o;
-        $this-&gt;testVdp   = $v;
-    }
+    ) { /* kein parent::__construct */ }
+
+    public function getOrder(): ?Order
+    { return $this-&gt;testOrder; }
 }
 </pre>
           </div>
+
         </div>
 
-        <div class="callout" style="margin-top: 16px;">
-          <strong>TDD bei Bugfixes ist nicht optional.</strong> Jeder Fix beginnt mit einem fehlschlagenden Reproduktions-Test &mdash;
-          der den Fix &uuml;ber die gesamte Lebenszeit des Moduls gegen Regressionen sichert. <em class="acc">Der Compounding-Effekt.</em>
+        <div class="callout" style="margin-top: 14px;">
+          <strong>TDD bei Bugfixes ist nicht optional.</strong> Jeder Bugfix beginnt mit einem fehlschlagenden Test, der den Bug reproduziert.
+          <em>Compounding-Effekt:</em> Derselbe Test sichert den Fix gegen Regressionen f&uuml;r die Lebenszeit des Moduls.
         </div>
 
         <div class="s-foot">

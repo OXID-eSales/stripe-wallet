@@ -1,86 +1,24 @@
-        <style>
-          .slide[data-anchor="checkout-session-flow"] .zoom-trigger {
-            display: inline-flex; align-items: center; gap: 6px;
-            padding: 6px 12px; margin: 8px 0 0; border-radius: 4px;
-            background: var(--s2-accent); color: white; font-size: var(--t-12);
-            font-weight: 600; cursor: pointer; user-select: none;
-            border: 1px solid var(--s2-accent);
-          }
-          .slide[data-anchor="checkout-session-flow"] .zoom-trigger:hover { opacity: 0.9; }
-
-          /* Popup styles -- the popup is moved to document.body by JS so
-             these rules target an element OUTSIDE the slide-frame's
-             transform context, which lets position: fixed work properly. */
-          .stripe-zoom-modal {
-            position: fixed; inset: 0; z-index: 100000;
-            display: flex; flex-direction: column;
-            background: rgba(11, 20, 36, 0.94);
-            padding: 24px 32px 32px;
-            box-sizing: border-box;
-            font-family: var(--font-sans, system-ui, sans-serif);
-          }
-          .stripe-zoom-modal .toolbar {
-            display: flex; gap: 8px; align-items: center;
-            margin-bottom: 12px;
-            color: white; font-size: 14px;
-          }
-          .stripe-zoom-modal .toolbar .title {
-            font-weight: 600; margin-right: auto;
-          }
-          .stripe-zoom-modal .toolbar button {
-            display: inline-flex; align-items: center; justify-content: center;
-            min-width: 40px; height: 36px; padding: 0 12px;
-            background: rgba(255, 255, 255, 0.12);
-            color: white; border: 1px solid rgba(255, 255, 255, 0.25);
-            border-radius: 6px; cursor: pointer;
-            font-size: 16px; font-weight: 600;
-            transition: background 0.15s;
-          }
-          .stripe-zoom-modal .toolbar button:hover { background: rgba(255, 255, 255, 0.22); }
-          .stripe-zoom-modal .toolbar button.close-btn {
-            background: rgba(220, 38, 38, 0.55);
-            border-color: rgba(220, 38, 38, 0.8);
-          }
-          .stripe-zoom-modal .toolbar button.close-btn:hover { background: rgba(220, 38, 38, 0.75); }
-          .stripe-zoom-modal .stage {
-            flex: 1 1 0; min-height: 0;
-            background: white; border-radius: 8px;
-            overflow: hidden; position: relative;
-            cursor: grab;
-          }
-          .stripe-zoom-modal .stage.grabbing { cursor: grabbing; }
-          .stripe-zoom-modal .pan-layer {
-            position: absolute;
-            left: 0; top: 0;
-            transform-origin: 0 0;
-            will-change: transform;
-          }
-          .stripe-zoom-modal .pan-layer svg {
-            display: block;
-            max-width: none !important;
-            max-height: none !important;
-          }
-        </style>
-
         <div class="s-head">
           <div class="badge"><span class="dot"></span><span class="step-label">Features &middot; 1 of 7 &middot; Stripe Checkout</span></div>
           <div class="deck">End-to-end &mdash; Place Order to Thank You</div>
         </div>
 
-        <h2 class="h-2">One click &rarr; Stripe &rarr; back to OXID.<br/><em class="acc">Order number minted before the redirect.</em></h2>
+        <h2 class="h-2">One click &rarr; Stripe Checkout &rarr; back to OXID.<br/><em class="acc">Order number minted before the redirect.</em></h2>
 
-        <div class="cols split-7-5" style="gap: 16px; flex: 1 1 0;">
+        <div class="cols split-7-5" style="gap: 18px; flex: 1 1 0;">
           <div class="col" style="justify-content: flex-start;">
-            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 6px;">The full flow</div>
-            <div class="diagram-host stripe-flow-diagram" style="min-height: 360px;">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">The full flow</div>
+            <div class="diagram-host" style="min-height: 380px;">
               <div class="mermaid">
 sequenceDiagram
     participant U as Customer
+    participant S as OXID (cl=order)
     participant SC as StripeOrderController
     participant E as EventDispatcher
     participant CS as CheckoutSessionService
     participant SK as Stripe API
-    U-&gt;&gt;SC: Click "Pay with Stripe"
+    U-&gt;&gt;S: Click "Pay with Stripe"
+    S-&gt;&gt;SC: createCheckoutSession()
     SC-&gt;&gt;E: dispatch(StripeCheckoutSessionRequestEvent)
     E-&gt;&gt;CS: handle()  (contract=DRAFT)
     CS-&gt;&gt;CS: build BasketSnapshot
@@ -91,28 +29,27 @@ sequenceDiagram
     CS--&gt;&gt;U: 303 redirect &rarr; checkout.stripe.com
     U-&gt;&gt;SK: pay (card / SCA / wallet)
     SK--&gt;&gt;U: 303 redirect &rarr; success_url
-    U-&gt;&gt;SC: GET /cl=stripeorder?fnc=return
-    SC-&gt;&gt;E: dispatch(StripeCheckoutReturnEvent)
+    U-&gt;&gt;S: GET /cl=stripeorder?fnc=return&amp;session_id=…
+    S-&gt;&gt;E: dispatch(StripeCheckoutReturnEvent)
     E-&gt;&gt;CS: advance contract &rarr; READY_TO_COMMIT
-    E-&gt;&gt;SC: finalize order &rarr; FULFILLED
-    SC--&gt;&gt;U: redirect &rarr; cl=thankyou
+    E-&gt;&gt;S: finalize order &rarr; FULFILLED
+    S--&gt;&gt;U: redirect &rarr; cl=thankyou
               </div>
             </div>
-            <button type="button" class="zoom-trigger" data-stripe-zoom-open>&#128269; Enlarge diagram</button>
           </div>
 
           <div class="col" style="justify-content: flex-start;">
-            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 8px;">Guarantees</div>
-            <ul class="small" style="margin: 0 0 12px;">
-              <li><strong>Order ID first.</strong> OXID row exists in <code>NOT_FINISHED</code> before Stripe sees the customer.</li>
-              <li><strong>Idempotent return.</strong> No-op when contract is already <code>FULFILLED</code>.</li>
-              <li><strong>Webhook safety net</strong> closes the order if the browser dies.</li>
-              <li><strong>Language preserved</strong> via <code>lang</code> in <code>success_url</code>.</li>
-              <li><strong>3DS inline</strong> &mdash; Stripe owns the SCA challenge.</li>
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Guarantees of the flow</div>
+            <ul class="small" style="margin: 0 0 14px;">
+              <li><strong>Order ID first.</strong> An OXID order row exists in <code>NOT_FINISHED</code> before Stripe sees the customer &mdash; refunds can&rsquo;t race the redirect.</li>
+              <li><strong>Idempotent return.</strong> Refresh the success page &mdash; the handler is a no-op when the contract is already <code>FULFILLED</code>.</li>
+              <li><strong>Webhook safety net.</strong> If the customer closes the tab before the return, the webhook (slide 10) completes the order regardless.</li>
+              <li><strong>Language preserved.</strong> <code>success_url</code> is rendered with the active OXID <code>lang</code> &mdash; customers don&rsquo;t land on the wrong locale.</li>
+              <li><strong>3DS handled inline.</strong> When Stripe requires SCA, the redirect is the SCA challenge URL &mdash; no extra plumbing on our side.</li>
             </ul>
 
-            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 8px;">success_url shape</div>
-            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 8px 10px; line-height: 1.35; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">success_url shape</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.4; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
 {shopUrl}/index.php
   ?cl=stripeorder
   &amp;fnc=return
@@ -127,230 +64,3 @@ sequenceDiagram
           <div>OXID Stripe Wallet &middot; Stripe Checkout flow</div>
           <div class="page-num">06 / 18</div>
         </div>
-
-        <script>
-        /* Zoom + pan popup for the Stripe Checkout sequence diagram.
-           Mounts on first use; re-binds open buttons after language switch.
-           Also injects deck-wide dark-theme readability fixes. */
-        (function () {
-          if (window.__stripeZoomBound) return;
-          window.__stripeZoomBound = true;
-
-          /* ---- Dark-theme readability fixes (deck-wide) ----
-             These rules counteract hard-coded inline styles that don't
-             play well with the midnight (dark) theme. Injected into
-             <head> once so they survive language/slide changes. */
-          (function injectThemeFix() {
-            const css = `
-:root[data-theme="midnight"] .slide pre.small,
-:root[data-theme="midnight"] .slide .setup-step pre {
-  background: rgba(255, 255, 255, 0.06) !important;
-  border-color: rgba(255, 255, 255, 0.18) !important;
-  color: var(--ink-900) !important;
-}
-:root[data-theme="midnight"] .slide .callout {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border-color: rgba(255, 255, 255, 0.25) !important;
-  color: var(--ink-700) !important;
-}
-:root[data-theme="midnight"] .slide .callout strong,
-:root[data-theme="midnight"] .slide .callout em {
-  color: var(--ink-900) !important;
-}
-:root[data-theme="midnight"] .slide .stat.acc,
-:root[data-theme="midnight"] .slide .stat.acc * {
-  color: #0b1424 !important;
-}
-:root[data-theme="midnight"] .slide .stat.acc .num {
-  color: var(--s3-accent) !important;
-}
-:root[data-theme="midnight"] .slide[data-step="1"] .stat.acc .num { color: var(--s1-accent) !important; }
-:root[data-theme="midnight"] .slide[data-step="2"] .stat.acc .num { color: var(--s2-accent) !important; }
-:root[data-theme="midnight"] .slide table.small th,
-:root[data-theme="midnight"] .slide table.small td {
-  border-color: rgba(255, 255, 255, 0.15) !important;
-  color: var(--ink-700) !important;
-}
-:root[data-theme="midnight"] .slide table.small thead tr {
-  background: rgba(255, 255, 255, 0.06) !important;
-}
-:root[data-theme="midnight"] .slide table.small th {
-  color: var(--ink-900) !important;
-}
-
-/* Step-row cards on slide 13 — replace pale tints with darker tints */
-:root[data-theme="midnight"] .slide[data-anchor="module-setup"] .setup-step.s-composer {
-  background: rgba(125, 132, 255, 0.10) !important;
-  border-color: rgba(125, 132, 255, 0.35) !important;
-}
-:root[data-theme="midnight"] .slide[data-anchor="module-setup"] .setup-step.s-console {
-  background: rgba(74, 222, 128, 0.08) !important;
-  border-color: rgba(74, 222, 128, 0.30) !important;
-}
-:root[data-theme="midnight"] .slide[data-anchor="module-setup"] .setup-step.s-keys {
-  background: rgba(255, 194, 102, 0.08) !important;
-  border-color: rgba(255, 194, 102, 0.35) !important;
-}
-
-/* Inline cards built with hard-coded rgba backgrounds in slide content */
-:root[data-theme="midnight"] .slide .col[style*="rgba(16, 185, 129"] {
-  background: rgba(74, 222, 128, 0.08) !important;
-  border-color: rgba(74, 222, 128, 0.30) !important;
-}
-:root[data-theme="midnight"] .slide .col[style*="rgba(245, 158, 11"] {
-  background: rgba(255, 194, 102, 0.08) !important;
-  border-color: rgba(255, 194, 102, 0.35) !important;
-}
-:root[data-theme="midnight"] .slide .col[style*="rgba(99, 102, 241"] {
-  background: rgba(179, 165, 255, 0.08) !important;
-  border-color: rgba(179, 165, 255, 0.30) !important;
-}
-
-/* Hard-coded eyebrow colors (#047857 / #b45309 / #4338ca) need to brighten on dark */
-:root[data-theme="midnight"] .slide .eyebrow[style*="#047857"] { color: #4ade80 !important; }
-:root[data-theme="midnight"] .slide .eyebrow[style*="#b45309"] { color: #fbbf24 !important; }
-:root[data-theme="midnight"] .slide .eyebrow[style*="#4338ca"] { color: #b3a5ff !important; }
-:root[data-theme="midnight"] .slide .eyebrow[style*="#7e22ce"] { color: #d8b4fe !important; }
-
-/* Stat numbers explicit recolor */
-:root[data-theme="midnight"] .slide .stat .num { color: var(--ink-900) !important; }
-
-/* Small/secondary text inside .col that uses var(--ink-500) reads as dim purple-grey;
-   nudge to ink-700 in dark for legibility. */
-:root[data-theme="midnight"] .slide .small[style*="color: var(--ink-500)"],
-:root[data-theme="midnight"] .slide [style*="color: var(--ink-500)"] {
-  color: var(--ink-700) !important;
-}
-
-/* Bottom-row callouts inside .cols (slide 02) with hardcoded class="callout" override */
-:root[data-theme="midnight"] .slide .cols > .callout,
-:root[data-theme="midnight"] .slide .cols.cols-3 > .callout,
-:root[data-theme="midnight"] .slide .callout[style*="rgba(11"] {
-  background: rgba(255, 255, 255, 0.05) !important;
-  color: var(--ink-700) !important;
-}
-            `;
-            const style = document.createElement('style');
-            style.id = 'stripe-deck-theme-fix';
-            style.textContent = css;
-            document.head.appendChild(style);
-          })();
-
-          function buildModal(svgClone, labels) {
-            const modal = document.createElement('div');
-            modal.className = 'stripe-zoom-modal';
-            modal.innerHTML = ''
-              + '<div class="toolbar">'
-              +   '<span class="title">' + labels.title + '</span>'
-              +   '<button type="button" data-act="out" title="' + labels.out + '">&minus;</button>'
-              +   '<button type="button" data-act="reset" title="' + labels.reset + '">100%</button>'
-              +   '<button type="button" data-act="in" title="' + labels.in + '">+</button>'
-              +   '<button type="button" class="close-btn" data-act="close" title="' + labels.close + '">' + labels.close + '</button>'
-              + '</div>'
-              + '<div class="stage"><div class="pan-layer"></div></div>';
-            const stage = modal.querySelector('.stage');
-            const panLayer = modal.querySelector('.pan-layer');
-            panLayer.appendChild(svgClone);
-
-            let scale = 1, tx = 0, ty = 0;
-            let dragging = false, lastX = 0, lastY = 0;
-
-            function apply() {
-              panLayer.style.transform = 'translate(' + tx + 'px, ' + ty + 'px) scale(' + scale + ')';
-            }
-            function fit() {
-              const stageRect = stage.getBoundingClientRect();
-              const svgRect = svgClone.getBoundingClientRect();
-              if (svgRect.width === 0) return;
-              scale = Math.min(
-                stageRect.width / svgRect.width,
-                stageRect.height / svgRect.height
-              );
-              tx = (stageRect.width - svgRect.width * scale) / 2;
-              ty = (stageRect.height - svgRect.height * scale) / 2;
-              apply();
-            }
-            requestAnimationFrame(fit);
-
-            modal.querySelector('[data-act="in"]').onclick = function () { scale *= 1.25; apply(); };
-            modal.querySelector('[data-act="out"]').onclick = function () { scale /= 1.25; apply(); };
-            modal.querySelector('[data-act="reset"]').onclick = fit;
-            modal.querySelector('[data-act="close"]').onclick = function () { modal.remove(); };
-
-            stage.addEventListener('mousedown', function (e) {
-              dragging = true; lastX = e.clientX; lastY = e.clientY;
-              stage.classList.add('grabbing');
-              e.preventDefault();
-            });
-            window.addEventListener('mousemove', function (e) {
-              if (!dragging) return;
-              tx += e.clientX - lastX; ty += e.clientY - lastY;
-              lastX = e.clientX; lastY = e.clientY;
-              apply();
-            });
-            window.addEventListener('mouseup', function () {
-              dragging = false; stage.classList.remove('grabbing');
-            });
-            stage.addEventListener('wheel', function (e) {
-              e.preventDefault();
-              const rect = stage.getBoundingClientRect();
-              const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-              const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-              // zoom around the cursor
-              tx = mx - (mx - tx) * factor;
-              ty = my - (my - ty) * factor;
-              scale *= factor;
-              apply();
-            }, { passive: false });
-
-            modal.addEventListener('keydown', function (e) {
-              if (e.key === 'Escape') modal.remove();
-            });
-
-            return modal;
-          }
-
-          function detectLabels() {
-            const isDe = (document.documentElement.lang || '').toLowerCase().startsWith('de')
-              || document.body.classList.contains('lang-de')
-              || /[?&]lang=de/.test(location.search);
-            return isDe
-              ? { title: 'Stripe-Checkout-Ablauf', in: 'Vergr&ouml;&szlig;ern', out: 'Verkleinern', reset: 'Zur&uuml;cksetzen', close: 'Schlie&szlig;en' }
-              : { title: 'Stripe Checkout flow', in: 'Zoom in', out: 'Zoom out', reset: 'Reset', close: 'Close' };
-          }
-
-          function bind() {
-            document.querySelectorAll('[data-stripe-zoom-open]').forEach(function (btn) {
-              if (btn.__bound) return;
-              btn.__bound = true;
-              btn.addEventListener('click', function () {
-                const slide = btn.closest('.slide');
-                if (!slide) return;
-                const svg = slide.querySelector('.stripe-flow-diagram svg');
-                if (!svg) {
-                  console.warn('[stripe-zoom] SVG not ready yet');
-                  return;
-                }
-                const clone = svg.cloneNode(true);
-                clone.removeAttribute('style');
-                // Derive intrinsic size from viewBox so the SVG actually
-                // takes up space inside the pan-layer (mermaid sets
-                // width="100%" which collapses to 0 in an absolutely-
-                // positioned host without explicit sizing).
-                const vb = (svg.getAttribute('viewBox') || '0 0 1200 600').split(/\s+/);
-                const vbW = parseFloat(vb[2]) || 1200;
-                const vbH = parseFloat(vb[3]) || 600;
-                clone.setAttribute('width', vbW);
-                clone.setAttribute('height', vbH);
-                document.body.appendChild(buildModal(clone, detectLabels()));
-              });
-            });
-          }
-
-          // Bind now and re-bind whenever the deck re-renders a slide
-          // (language switch swaps the slide HTML).
-          bind();
-          const obs = new MutationObserver(bind);
-          obs.observe(document.body, { childList: true, subtree: true });
-        })();
-        </script>

@@ -1,81 +1,24 @@
-        <style>
-          .slide[data-anchor="checkout-session-flow"] .zoom-trigger {
-            display: inline-flex; align-items: center; gap: 6px;
-            padding: 6px 12px; margin: 8px 0 0; border-radius: 4px;
-            background: var(--s2-accent); color: white; font-size: var(--t-12);
-            font-weight: 600; cursor: pointer; user-select: none;
-            border: 1px solid var(--s2-accent);
-          }
-          .slide[data-anchor="checkout-session-flow"] .zoom-trigger:hover { opacity: 0.9; }
-
-          .stripe-zoom-modal {
-            position: fixed; inset: 0; z-index: 100000;
-            display: flex; flex-direction: column;
-            background: rgba(11, 20, 36, 0.94);
-            padding: 24px 32px 32px;
-            box-sizing: border-box;
-            font-family: var(--font-sans, system-ui, sans-serif);
-          }
-          .stripe-zoom-modal .toolbar {
-            display: flex; gap: 8px; align-items: center;
-            margin-bottom: 12px;
-            color: white; font-size: 14px;
-          }
-          .stripe-zoom-modal .toolbar .title { font-weight: 600; margin-right: auto; }
-          .stripe-zoom-modal .toolbar button {
-            display: inline-flex; align-items: center; justify-content: center;
-            min-width: 40px; height: 36px; padding: 0 12px;
-            background: rgba(255, 255, 255, 0.12);
-            color: white; border: 1px solid rgba(255, 255, 255, 0.25);
-            border-radius: 6px; cursor: pointer;
-            font-size: 16px; font-weight: 600;
-            transition: background 0.15s;
-          }
-          .stripe-zoom-modal .toolbar button:hover { background: rgba(255, 255, 255, 0.22); }
-          .stripe-zoom-modal .toolbar button.close-btn {
-            background: rgba(220, 38, 38, 0.55);
-            border-color: rgba(220, 38, 38, 0.8);
-          }
-          .stripe-zoom-modal .toolbar button.close-btn:hover { background: rgba(220, 38, 38, 0.75); }
-          .stripe-zoom-modal .stage {
-            flex: 1 1 0; min-height: 0;
-            background: white; border-radius: 8px;
-            overflow: hidden; position: relative;
-            cursor: grab;
-          }
-          .stripe-zoom-modal .stage.grabbing { cursor: grabbing; }
-          .stripe-zoom-modal .pan-layer {
-            position: absolute;
-            left: 0; top: 0;
-            transform-origin: 0 0;
-            will-change: transform;
-          }
-          .stripe-zoom-modal .pan-layer svg {
-            display: block;
-            max-width: none !important;
-            max-height: none !important;
-          }
-        </style>
-
         <div class="s-head">
           <div class="badge"><span class="dot"></span><span class="step-label">Features &middot; 1 von 7 &middot; Stripe Checkout</span></div>
           <div class="deck">End-to-End &mdash; vom Bestell-Klick bis zur Dankesseite</div>
         </div>
 
-        <h2 class="h-2">Ein Klick &rarr; Stripe &rarr; zur&uuml;ck zu OXID.<br/><em class="acc">Bestellnummer steht vor dem Redirect.</em></h2>
+        <h2 class="h-2">Ein Klick &rarr; Stripe Checkout &rarr; zur&uuml;ck zu OXID.<br/><em class="acc">Bestellnummer steht vor dem Redirect.</em></h2>
 
-        <div class="cols split-7-5" style="gap: 16px; flex: 1 1 0;">
+        <div class="cols split-7-5" style="gap: 18px; flex: 1 1 0;">
           <div class="col" style="justify-content: flex-start;">
-            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 6px;">Der komplette Ablauf</div>
-            <div class="diagram-host stripe-flow-diagram" style="min-height: 360px;">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Der komplette Ablauf</div>
+            <div class="diagram-host" style="min-height: 380px;">
               <div class="mermaid">
 sequenceDiagram
     participant U as Kunde
+    participant S as OXID (cl=order)
     participant SC as StripeOrderController
     participant E as EventDispatcher
     participant CS as CheckoutSessionService
     participant SK as Stripe API
-    U-&gt;&gt;SC: Klick "Mit Stripe bezahlen"
+    U-&gt;&gt;S: Klick "Mit Stripe bezahlen"
+    S-&gt;&gt;SC: createCheckoutSession()
     SC-&gt;&gt;E: dispatch(StripeCheckoutSessionRequestEvent)
     E-&gt;&gt;CS: handle()  (contract=DRAFT)
     CS-&gt;&gt;CS: BasketSnapshot bauen
@@ -86,28 +29,27 @@ sequenceDiagram
     CS--&gt;&gt;U: 303 Redirect &rarr; checkout.stripe.com
     U-&gt;&gt;SK: bezahlen (Karte / SCA / Wallet)
     SK--&gt;&gt;U: 303 Redirect &rarr; success_url
-    U-&gt;&gt;SC: GET /cl=stripeorder?fnc=return
-    SC-&gt;&gt;E: dispatch(StripeCheckoutReturnEvent)
+    U-&gt;&gt;S: GET /cl=stripeorder?fnc=return&amp;session_id=…
+    S-&gt;&gt;E: dispatch(StripeCheckoutReturnEvent)
     E-&gt;&gt;CS: Vertrag &rarr; READY_TO_COMMIT
-    E-&gt;&gt;SC: Bestellung finalisieren &rarr; FULFILLED
-    SC--&gt;&gt;U: Redirect &rarr; cl=thankyou
+    E-&gt;&gt;S: Bestellung finalisieren &rarr; FULFILLED
+    S--&gt;&gt;U: Redirect &rarr; cl=thankyou
               </div>
             </div>
-            <button type="button" class="zoom-trigger" data-stripe-zoom-open>&#128269; Diagramm vergr&ouml;&szlig;ern</button>
           </div>
 
           <div class="col" style="justify-content: flex-start;">
-            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 8px;">Garantien</div>
-            <ul class="small" style="margin: 0 0 12px;">
-              <li><strong>Bestellnummer zuerst.</strong> OXID-Zeile in <code>NOT_FINISHED</code>, bevor Stripe den Kunden sieht.</li>
-              <li><strong>Idempotenter Return.</strong> No-Op, wenn der Vertrag schon <code>FULFILLED</code> ist.</li>
-              <li><strong>Webhook-Netz</strong> schlie&szlig;t die Bestellung, falls der Browser stirbt.</li>
-              <li><strong>Sprache erhalten</strong> via <code>lang</code> in <code>success_url</code>.</li>
-              <li><strong>3DS inline</strong> &mdash; Stripe behandelt die SCA-Challenge.</li>
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Garantien des Ablaufs</div>
+            <ul class="small" style="margin: 0 0 14px;">
+              <li><strong>Bestellnummer zuerst.</strong> Eine OXID-Bestellung in <code>NOT_FINISHED</code> existiert, bevor Stripe den Kunden sieht &mdash; R&uuml;ckerstattungen laufen nicht ins Leere.</li>
+              <li><strong>Idempotenter Return.</strong> Erfolgsseite neu laden &mdash; der Handler ist ein No-Op, wenn der Vertrag bereits <code>FULFILLED</code> ist.</li>
+              <li><strong>Webhook als Sicherheitsnetz.</strong> Schlie&szlig;t der Kunde den Tab vor dem Return, schlie&szlig;t der Webhook (Folie 10) die Bestellung trotzdem ab.</li>
+              <li><strong>Sprache bleibt erhalten.</strong> Die <code>success_url</code> wird mit dem aktiven OXID-<code>lang</code> gerendert &mdash; keine falschen Locale-Spr&uuml;nge.</li>
+              <li><strong>3DS inline geregelt.</strong> Verlangt Stripe SCA, ist der Redirect bereits die SCA-Challenge-URL &mdash; wir m&uuml;ssen nichts extra verkabeln.</li>
             </ul>
 
-            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 8px;">Aufbau success_url</div>
-            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 8px 10px; line-height: 1.35; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Aufbau von success_url</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.4; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
 {shopUrl}/index.php
   ?cl=stripeorder
   &amp;fnc=return

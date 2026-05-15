@@ -113,21 +113,14 @@ class StripeWebhookProcessor extends AbstractWebhookProcessor
             return WebhookResult::failure('invalid_event', 'Missing payment intent ID');
         }
 
-        // STRP-AUTOCAP-REFUND: extract amount_received so the fulfillment handler
-        // can persist OXCAPTUREDAMOUNT. Required for opalreturns refunds on
-        // auto-captured orders (Stripe sends payment_intent.succeeded only,
-        // not a separate charge.captured event, so this is our one chance).
-        $capturedAmount = $this->parser->extractAmountInCurrencyUnits($event, 'amount_received');
-
         $this->logger->info('Processing payment_intent.succeeded', [
             'payment_intent_id' => $paymentIntentId,
-            'amount_received'   => $capturedAmount,
         ]);
 
-        $result = $this->fulfillmentHandler->handlePaymentSucceeded($paymentIntentId, $capturedAmount);
+        $result = $this->fulfillmentHandler->handlePaymentSucceeded($paymentIntentId);
 
         if ($result === null) {
-            return $this->tryMetadataLookupOrLegacy($event, $paymentIntentId, $capturedAmount);
+            return $this->tryMetadataLookupOrLegacy($event, $paymentIntentId);
         }
 
         return $this->mapHandlerResult($result, $paymentIntentId, 'contract_fulfilled', 'Contract already fulfilled or not in COMMITTED state');
@@ -258,10 +251,7 @@ class StripeWebhookProcessor extends AbstractWebhookProcessor
 
                 // Attempt fulfillment if in correct state
                 if ($contract->getState()->isCommitted()) {
-                    // STRP-AUTOCAP-REFUND: propagate amount_received so OXCAPTUREDAMOUNT
-                    // is persisted on the contract for downstream refund dispatch.
-                    $sessionAmount = $this->parser->extractAmountInCurrencyUnits($event, 'amount_total');
-                    $result = $this->fulfillmentHandler->handlePaymentSucceeded($paymentIntentId, $sessionAmount);
+                    $result = $this->fulfillmentHandler->handlePaymentSucceeded($paymentIntentId);
                     if ($result === true) {
                         return WebhookResult::success('contract_fulfilled');
                     }
@@ -315,7 +305,7 @@ class StripeWebhookProcessor extends AbstractWebhookProcessor
     /**
      * Try metadata lookup or legacy fallback for orders without contracts.
      */
-    private function tryMetadataLookupOrLegacy(WebhookEvent $event, string $paymentIntentId, float $capturedAmount = 0.0): WebhookResult
+    private function tryMetadataLookupOrLegacy(WebhookEvent $event, string $paymentIntentId): WebhookResult
     {
         $contractId = $this->parser->extractContractIdFromMetadata($event);
         $contract = $contractId !== null ? $this->contractRepository->findById($contractId) : null;
@@ -336,7 +326,7 @@ class StripeWebhookProcessor extends AbstractWebhookProcessor
         }
 
         if ($contract->getState()->isCommitted()) {
-            $result = $this->fulfillmentHandler->handlePaymentSucceeded($paymentIntentId, $capturedAmount);
+            $result = $this->fulfillmentHandler->handlePaymentSucceeded($paymentIntentId);
             return $result === true
                 ? WebhookResult::success('contract_fulfilled')
                 : WebhookResult::skipped('Fulfillment skipped');

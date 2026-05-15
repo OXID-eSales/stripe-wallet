@@ -5,68 +5,81 @@
 
         <h2 class="h-2">Capture: full, partial, or never.<br/><em class="acc">The contract reflects reality, not intent.</em></h2>
 
-        <p class="lede" style="margin-bottom: 12px; font-size: var(--t-14);">
-          In <strong>automatic</strong> mode capture is immediate. In <strong>manual</strong> the contract waits in
-          <code>AUTHORIZED</code> until an admin captures &mdash; partially, fully, or not at all.
+        <p class="lede" style="margin-bottom: 14px;">
+          Stripe authorises the customer&rsquo;s card during Checkout; <em>capture</em> moves the money.
+          In <strong>automatic</strong> mode capture is immediate. In <strong>manual</strong> mode the contract
+          waits in <code>AUTHORIZED</code> until an admin captures &mdash; partially, in full, or not at all.
         </p>
 
-        <div class="cols split-6-6" style="gap: 16px; flex: 1 1 0;">
+        <div class="cols cols-2" style="gap: 18px; flex: 1 1 0;">
           <div class="col" style="justify-content: flex-start;">
-            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 8px;">CaptureService &middot; the path</div>
-            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.4; margin: 0 0 12px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">CaptureService &middot; the path</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0 0 16px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
 public function capture(
-    PaymentContract $c,
+    PaymentContract $contract,
     ?float $amount = null
 ): CaptureResult {
-    $i = $this-&gt;adapter-&gt;retrievePaymentIntent(
-        $c-&gt;getProviderIntentId()
+    $intent = $this-&gt;adapter-&gt;retrievePaymentIntent(
+        $contract-&gt;getProviderIntentId()
     );
 
-    $cents = $amount === null
-        ? $i-&gt;amount
+    $captureAmount = $amount === null
+        ? $intent-&gt;amount
         : (int) round($amount * 100);
 
-    $this-&gt;validator-&gt;assertCanCapture($i, $cents);
+    $this-&gt;validator-&gt;assertCanCapture(
+        $intent, $captureAmount
+    );
 
-    $r = $this-&gt;adapter-&gt;capturePaymentIntent(
-        $i-&gt;id, amount_to_capture: $cents
+    $captured = $this-&gt;adapter-&gt;capturePaymentIntent(
+        $intent-&gt;id,
+        amount_to_capture: $captureAmount
     );
+
     $this-&gt;dispatcher-&gt;dispatch(
-        new PaymentCapturedEvent($c, $r)
+        new PaymentCapturedEvent($contract, $captured)
     );
-    return CaptureResult::fromIntent($r);
+
+    return CaptureResult::fromIntent($captured);
 }
 </pre>
 
-            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 8px;">Validator gates</div>
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Validator gates</div>
             <ul class="small" style="margin: 0;">
-              <li>Intent is <code>requires_capture</code> or <code>succeeded</code></li>
-              <li>Amount &le; <code>intent.amount_capturable</code> and &gt; 0</li>
-              <li>Contract owns this <code>provider_intent_id</code></li>
+              <li>Intent must be <code>requires_capture</code> (manual) or <code>succeeded</code> (automatic)</li>
+              <li>Capture amount &le; <code>intent.amount_capturable</code></li>
+              <li>Capture amount &gt; 0 (Stripe rejects zero captures)</li>
+              <li>Contract must own this <code>provider_intent_id</code> (no cross-contract drift)</li>
             </ul>
           </div>
 
           <div class="col" style="justify-content: flex-start;">
-            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 8px;">Partial capture &mdash; side effects</div>
-            <ul class="small" style="margin: 0 0 12px;">
-              <li><strong>Authorization release.</strong> Stripe returns the uncaptured remainder to the customer.</li>
-              <li><strong>Contract <code>captured_amount</code></strong> updated by <code>PaymentCapturedHandler</code>.</li>
-              <li><strong>OXPAID</strong> set on the linked order; reconciliation auto-heals drift.</li>
-              <li><strong>Transaction row</strong> in <code>oe_payments_transaction</code>.</li>
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Partial capture &mdash; the side effects</div>
+            <ul class="small" style="margin: 0 0 16px;">
+              <li><strong>Authorization release.</strong> Stripe releases the unauthorised remainder back to the customer the moment a partial capture lands.</li>
+              <li><strong>Contract field <code>captured_amount</code></strong> is updated by <code>PaymentCapturedHandler</code> &mdash; the source of truth for the admin tab.</li>
+              <li><strong>OXPAID column</strong> is set on the linked order. Reconciliation later auto-heals if it drifted from <code>0000-00-00</code>.</li>
+              <li><strong>Transaction row</strong> is inserted into <code>oe_payments_transaction</code> with type <code>capture</code>, intent id, amount, and admin user id.</li>
             </ul>
 
-            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 8px;">Admin UI</div>
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Admin UI</div>
             <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.4; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
 [Stripe tab]
-Authorized:    &euro; 262.00
-Captured:      &euro;   0.00
-Refunded:      &euro;   0.00
+
+Authorized:    € 262.00
+Captured:      €   0.00
+Refunded:      €   0.00
 
   &lt;input name="amount" placeholder="262.00"&gt;
   &lt;button name="capture"&gt;Capture&lt;/button&gt;
-  &lt;button name="cancel"&gt;Cancel auth&lt;/button&gt;
+  &lt;button name="cancel"&gt;Cancel authorization&lt;/button&gt;
 </pre>
           </div>
+        </div>
+
+        <div class="callout" style="margin-top: 14px;">
+          <strong>Empty amount input = capture in full.</strong> An admin who wants the simple behaviour types nothing.
+          A partial-capture mistake is impossible to make silently &mdash; the &ldquo;authorised remainder will be released&rdquo; warning renders inline before submit.
         </div>
 
         <div class="s-foot">
