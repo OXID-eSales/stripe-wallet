@@ -11,6 +11,7 @@ use OxidEsales\PaymentBase\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\StripeCustomerServiceInterface;
@@ -115,7 +116,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         ]);
 
         // Store session ID in contract via setProvider
-        $contract->setProvider('stripe', $result->getSessionId() ?? '', $params['successUrl']);
+        $contract->setProvider(StripeDefinitions::PROVIDER, $result->getSessionId() ?? '', $params['successUrl']);
 
         $this->contractRepository->save($contract);
 

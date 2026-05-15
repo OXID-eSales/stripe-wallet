@@ -17,6 +17,7 @@ use OxidEsales\Payments\Stripe\Adapter\Helper\RefundHelper;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapter;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeClientFactory;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use Stripe\StripeClient;
 
@@ -32,8 +33,6 @@ use Stripe\StripeClient;
  */
 class StripeAdapterFactory extends PaymentAdapterFactory implements StripeAdapterFactoryInterface
 {
-    private const PROVIDER_NAME = 'stripe';
-
     public function __construct(
         private readonly ModuleConfigurationServiceInterface $configurationService,
         private readonly StripeClientFactory $clientFactory,
@@ -46,10 +45,10 @@ class StripeAdapterFactory extends PaymentAdapterFactory implements StripeAdapte
      */
     public function createAdapter(string $providerName): PaymentAdapterInterface
     {
-        if ($providerName !== self::PROVIDER_NAME) {
+        if ($providerName !== StripeDefinitions::PROVIDER) {
             throw new \InvalidArgumentException(
                 "Unsupported payment provider: {$providerName}. " .
-                "This factory only supports: " . self::PROVIDER_NAME
+                "This factory only supports: " . StripeDefinitions::PROVIDER
             );
         }
 
@@ -63,7 +62,7 @@ class StripeAdapterFactory extends PaymentAdapterFactory implements StripeAdapte
 
     public function isProviderSupported(string $providerName): bool
     {
-        return $providerName === self::PROVIDER_NAME;
+        return $providerName === StripeDefinitions::PROVIDER;
     }
 
     /**
@@ -71,7 +70,7 @@ class StripeAdapterFactory extends PaymentAdapterFactory implements StripeAdapte
      */
     public function getSupportedProviders(): array
     {
-        return [self::PROVIDER_NAME];
+        return [StripeDefinitions::PROVIDER];
     }
 
     /**

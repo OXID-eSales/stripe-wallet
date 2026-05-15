@@ -8,6 +8,7 @@ use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use OxidEsales\PaymentBase\Adapter\Response\CancellationResponse;
 use OxidEsales\PaymentBase\EventSystem\Handler\HandlerInterface;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
 use OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface;
@@ -36,6 +37,7 @@ class StripeCancelAuthorizationRequestHandler implements HandlerInterface
         private readonly CancelAuthorizationServiceInterface $cancelService,
         private readonly RequestLogServiceInterface $requestLogService,
         private readonly ShopAdapterInterface $shopAdapter,
+        private readonly ContractRepositoryInterface $contractRepository,
         ?LoggerInterface $logger = null,
         private readonly ?FileLoggerInterface $eventLogger = null
     ) {
@@ -77,11 +79,8 @@ class StripeCancelAuthorizationRequestHandler implements HandlerInterface
         StripeCancelAuthorizationRequestEvent $event,
         EventContext $context
     ): void {
-        $paymentIntentId = $event->getPaymentIntentId();
-
-        if ($paymentIntentId === null || $paymentIntentId === '') {
-            $context->set('error', 'PaymentIntent ID is missing');
-            $context->set('cancelSuccess', false);
+        $paymentIntentId = $this->resolvePaymentIntentId($event, $context);
+        if ($paymentIntentId === null) {
             return;
         }
 
@@ -91,6 +90,48 @@ class StripeCancelAuthorizationRequestHandler implements HandlerInterface
         );
 
         $this->handleCancellationResult($result, $event, $context);
+    }
+
+    /**
+     * Resolve the PaymentIntent ID for this cancel request.
+     *
+     * Mirrors StripeCaptureRequestHandler::getPaymentIntentId() —
+     * admin Stripe-tab path sets `paymentIntentId` explicitly in the
+     * event context (via OrderActionDispatcher), opalreturns dispatches
+     * with only `contractId` (provider-agnostic) and the handler must
+     * resolve the PI ID from the contract's getProviderOrderId().
+     */
+    private function resolvePaymentIntentId(
+        StripeCancelAuthorizationRequestEvent $event,
+        EventContext $context
+    ): ?string {
+        $paymentIntentId = $event->getPaymentIntentId();
+        if ($paymentIntentId !== null && $paymentIntentId !== '') {
+            return $paymentIntentId;
+        }
+
+        $contractId = $event->getContractId();
+        if ($contractId === null || $contractId === '') {
+            $context->set('error', 'PaymentIntent ID is missing');
+            $context->set('cancelSuccess', false);
+            return null;
+        }
+
+        $contract = $this->contractRepository->findById($contractId);
+        if ($contract === null) {
+            $context->set('error', 'Contract not found: ' . $contractId);
+            $context->set('cancelSuccess', false);
+            return null;
+        }
+
+        $providerOrderId = $contract->getProviderOrderId();
+        if (is_string($providerOrderId) && $providerOrderId !== '') {
+            return $providerOrderId;
+        }
+
+        $context->set('error', 'No PaymentIntent ID found for this contract');
+        $context->set('cancelSuccess', false);
+        return null;
     }
 
     private function handleCancellationResult(

@@ -279,7 +279,7 @@ class StripeOrderController extends OrderController
 
         /** @var \OxidEsales\PaymentBase\Contract\PaymentContractInterface $contract */
         $orderId = $this->dispatchCheckoutReturn(
-            providerName: 'stripe',
+            providerName: StripeDefinitions::PROVIDER,
             contract: $contract,
             resolver: $this->getServiceFromContainer(StripeReturnResolver::class),
             extraContextKeys: [

@@ -16,6 +16,7 @@ use OxidEsales\PaymentBase\Webhook\Exception\WebhookSignatureException;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\PaymentBase\Webhook\WebhookRequest;
 use OxidEsales\PaymentBase\Webhook\WebhookResult;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface;
 use Psr\Log\LoggerInterface;
@@ -55,7 +56,7 @@ class StripeWebhookProcessor extends AbstractWebhookProcessor
 
     protected function getProviderName(): string
     {
-        return 'stripe';
+        return StripeDefinitions::PROVIDER;
     }
 
     /**
@@ -245,7 +246,7 @@ class StripeWebhookProcessor extends AbstractWebhookProcessor
             $contract = $this->contractRepository->findById($contractId);
             if ($contract !== null) {
                 // Update provider order ID from session ID to payment intent ID
-                $contract->setProvider('stripe', $paymentIntentId);
+                $contract->setProvider(StripeDefinitions::PROVIDER, $paymentIntentId);
                 $this->contractRepository->save($contract);
                 $this->lastContractId = $contractId;
 
@@ -317,7 +318,7 @@ class StripeWebhookProcessor extends AbstractWebhookProcessor
             return WebhookResult::skipped('Contract not found');
         }
 
-        $contract->setProvider('stripe', $paymentIntentId);
+        $contract->setProvider(StripeDefinitions::PROVIDER, $paymentIntentId);
         $this->lastContractId = $contractId;
 
         if ($contract->getState()->isFulfilled()) {

@@ -20,6 +20,15 @@ final class StripeDefinitions
     // Payment method ID
     public const STRIPE_WALLET_PAYMENT_ID = 'oe_payments_stripe_wallet';
 
+    /**
+     * Canonical provider name for `PaymentContract::getProvider()` and any
+     * `provider === 'stripe'` comparison. Single source of truth; new code
+     * should reference this constant rather than hardcoding the literal.
+     * (Existing call sites still contain the literal — sweep as separate
+     * tech-debt cleanup.)
+     */
+    public const PROVIDER = 'stripe';
+
     // Payment constraints
     private const PAYMENT_CONSTRAINTS_DEFAULT = [
         'oxfromamount' => 0.50,

@@ -17,9 +17,10 @@ use OxidEsales\PaymentBase\EventSystem\Event\EventInterface;
  * Context data:
  * INPUT (set by trigger):
  * - orderId: ?string - OXID order ID
- * - paymentIntentId: string - Stripe PaymentIntent ID to cancel
+ * - paymentIntentId: ?string - Stripe PaymentIntent ID to cancel (admin Stripe-tab path sets it explicitly)
+ * - contractId: ?string - Payment contract ID; handler falls back to contract->getProviderOrderId() when paymentIntentId is absent (opalreturns provider-agnostic path)
  * - cancellationReason: ?string - Stripe reason (requested_by_customer, duplicate, fraudulent, abandoned)
- * - initiator: string - Who triggered the cancel (admin, webhook, api)
+ * - initiator: string - Who triggered the cancel (admin, webhook, api, return_credit)
  *
  * OUTPUT (set by handler):
  * - cancelSuccess: bool - Whether cancel succeeded
@@ -67,6 +68,20 @@ readonly class StripeCancelAuthorizationRequestEvent implements EventInterface
     {
         $orderId = $this->context->get('orderId');
         return is_string($orderId) ? $orderId : null;
+    }
+
+    /**
+     * Get the payment contract ID (if available).
+     *
+     * Used by the handler to resolve the PaymentIntent ID from
+     * `$contract->getProviderOrderId()` when the event context does
+     * not carry an explicit `paymentIntentId` — the provider-agnostic
+     * opalreturns dispatch path.
+     */
+    public function getContractId(): ?string
+    {
+        $contractId = $this->context->get('contractId');
+        return is_string($contractId) ? $contractId : null;
     }
 
     /**

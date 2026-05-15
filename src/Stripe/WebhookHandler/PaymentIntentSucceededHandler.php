@@ -17,6 +17,7 @@ use OxidEsales\PaymentBase\Service\OrderPaymentStateServiceInterface;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\PaymentBase\Webhook\WebhookEventHandlerInterface;
 use OxidEsales\PaymentBase\Webhook\WebhookResult;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -119,7 +120,7 @@ final class PaymentIntentSucceededHandler implements WebhookEventHandlerInterfac
             shopId: 1,
             orderId: $contract->getOrderId() ?? '',
             contractId: $contract->getId(),
-            provider: 'stripe',
+            provider: StripeDefinitions::PROVIDER,
             type: 'capture',
             status: 'completed',
             amount: (float) $amount,

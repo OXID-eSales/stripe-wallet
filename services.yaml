@@ -583,6 +583,9 @@ services:
       $cancelService: '@OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface'
       $requestLogService: '@OxidEsales\PaymentBase\Service\RequestLogServiceInterface'
       $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
+      # STRP-AUTOCAP-REFUND Sprint 05: contract fallback for opalreturns
+      # provider-agnostic dispatch (contractId in context, no paymentIntentId).
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
     tags:
@@ -701,6 +704,21 @@ services:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
       $logger: '@oxid_esales.monolog.logger'
     public: false
+
+  # ==========================================
+  # Payment Capture Status Query (Sprint 06, STRP-AUTOCAP-REFUND)
+  # ==========================================
+  # On-demand "is the PaymentIntent captured at Stripe?" lookup for the
+  # opalreturns listener. Disambiguates the `committed` contract state,
+  # which collapses auto-capture (PSP `succeeded`) and manual-capture-
+  # uncaptured (PSP `requires_capture`) into one. Public so opalreturns
+  # autowires it via the payment-base interface.
+  OxidEsales\PaymentBase\Service\PaymentCaptureStatusQueryInterface:
+    class: OxidEsales\Payments\Stripe\Service\StripePaymentCaptureStatusQuery
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: true
 
   # ==========================================
   # Stock Restoration Service (Sprint 24)

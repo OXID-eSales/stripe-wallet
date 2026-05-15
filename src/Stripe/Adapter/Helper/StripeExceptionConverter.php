@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Adapter\Helper;
 
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use Stripe\Exception\ApiErrorException;
 
 /**
@@ -27,7 +28,7 @@ final class StripeExceptionConverter
         $message = $e->getError()->message ?? $e->getMessage();
 
         return new PaymentAdapterException(
-            providerName: 'stripe',
+            providerName: StripeDefinitions::PROVIDER,
             errorCode: $errorCode,
             message: $message,
             code: $e->getCode(),

@@ -35,6 +35,7 @@ use OxidEsales\Payments\Stripe\Adapter\Helper\RefundHelper;
 use OxidEsales\Payments\Stripe\Adapter\Helper\CheckoutSessionHelper;
 use OxidEsales\Payments\Stripe\Adapter\Helper\PaymentMethodHelper;
 use OxidEsales\Payments\Stripe\Adapter\Helper\StripeExceptionConverter;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use Stripe\Checkout\Session;
 use Stripe\Exception\ApiErrorException;
 use Stripe\PaymentIntent;
@@ -159,7 +160,7 @@ final class StripeAdapter implements StripeAdapterInterface
     public function reauthorizePayment(ReauthorizePaymentRequest $request): AuthorizationResponse
     {
         throw new PaymentAdapterException(
-            providerName: 'stripe',
+            providerName: StripeDefinitions::PROVIDER,
             errorCode: 'reauthorize_not_supported',
             message: 'Stripe does not support reauthorization. Create a new authorization instead.',
             context: ['authorization_id' => $request->authorizationId]
@@ -238,7 +239,7 @@ final class StripeAdapter implements StripeAdapterInterface
 
     public function getProviderName(): string
     {
-        return 'stripe';
+        return StripeDefinitions::PROVIDER;
     }
 
     public function supportsFeature(string $feature): bool
@@ -260,14 +261,14 @@ final class StripeAdapter implements StripeAdapterInterface
             return new StripeWebhookEvent($event, $payload, verified: true);
         } catch (\UnexpectedValueException $e) {
             throw new PaymentAdapterException(
-                providerName: 'stripe',
+                providerName: StripeDefinitions::PROVIDER,
                 errorCode: 'invalid_payload',
                 message: 'Invalid webhook payload',
                 previous: $e
             );
         } catch (\Stripe\Exception\SignatureVerificationException $e) {
             throw new PaymentAdapterException(
-                providerName: 'stripe',
+                providerName: StripeDefinitions::PROVIDER,
                 errorCode: 'invalid_signature',
                 message: 'Invalid webhook signature',
                 previous: $e

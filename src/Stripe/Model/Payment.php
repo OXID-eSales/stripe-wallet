@@ -120,7 +120,7 @@ class Payment extends CorePayment
      */
     public function getPaymentProvider(): string
     {
-        return $this->isStripePaymentMethod() ? 'stripe' : 'other';
+        return $this->isStripePaymentMethod() ? StripeDefinitions::PROVIDER : 'other';
     }
 
     /**

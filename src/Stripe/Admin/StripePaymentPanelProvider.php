@@ -32,7 +32,11 @@ use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
  */
 final class StripePaymentPanelProvider implements PaymentPanelProviderInterface
 {
-    public const PROVIDER_KEY = 'stripe';
+    /**
+     * Backwards-compat alias. New code should reference
+     * {@see StripeDefinitions::PROVIDER} directly.
+     */
+    public const PROVIDER_KEY = StripeDefinitions::PROVIDER;
 
     private const PANEL_TEMPLATE = '@oe_payments_stripe_wallet/admin/panel/stripe_panel.html.twig';
 

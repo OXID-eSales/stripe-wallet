@@ -11,6 +11,7 @@ use OxidEsales\PaymentBase\Contract\Transaction;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -116,7 +117,7 @@ final class CaptureService implements CaptureServiceInterface
             shopId: 1,
             orderId: $contract->getOrderId() ?? '',
             contractId: $contract->getId(),
-            provider: 'stripe',
+            provider: StripeDefinitions::PROVIDER,
             type: 'capture',
             status: 'completed',
             amount: $result->amountCaptured ?? 0,

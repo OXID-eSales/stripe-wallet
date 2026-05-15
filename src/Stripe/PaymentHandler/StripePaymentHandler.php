@@ -16,10 +16,12 @@ use OxidEsales\PaymentBase\Adapter\PaymentHandlerResult;
 use OxidEsales\PaymentBase\Adapter\Request\CreateOrderRequest;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
+use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractServiceInterface;
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
 use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
@@ -62,7 +64,7 @@ class StripePaymentHandler implements PaymentHandlerInterface
 
     public function getId(): string
     {
-        return 'stripe';
+        return StripeDefinitions::PROVIDER;
     }
 
     public function getName(): string
@@ -96,7 +98,7 @@ class StripePaymentHandler implements PaymentHandlerInterface
             }
 
             // 4. Store session ID on contract
-            $contract->setProvider('stripe', $sessionResult->getSessionId());
+            $contract->setProvider(StripeDefinitions::PROVIDER, $sessionResult->getSessionId() ?? '');
             $this->contractRepository->save($contract);
 
             $this->logger?->info('[StripePaymentHandler] Checkout session created', [
@@ -109,7 +111,7 @@ class StripePaymentHandler implements PaymentHandlerInterface
                 contractId: $contractId,
                 clientSecret: null,
                 metadata: [
-                    'handler' => 'stripe',
+                    'handler' => StripeDefinitions::PROVIDER,
                     'requiresRedirect' => true,
                     'redirectUrl' => $sessionResult->getCheckoutUrl(),
                     'sessionId' => $sessionResult->getSessionId(),
@@ -138,7 +140,7 @@ class StripePaymentHandler implements PaymentHandlerInterface
     public function getFrontendConfig(): array
     {
         return [
-            'type' => 'stripe',
+            'type' => StripeDefinitions::PROVIDER,
             'publishableKey' => $this->config->getPublishableKey(),
             'requiresRedirect' => true,
             'footerWidget' => 'stripecheckoutfooter',
@@ -156,7 +158,7 @@ class StripePaymentHandler implements PaymentHandlerInterface
         );
 
         $contract->setMetadata('payment_method_id', $context->getPaymentMethodId());
-        $contract->setMetadata('handler', 'stripe');
+        $contract->setMetadata('handler', StripeDefinitions::PROVIDER);
 
         return $contract;
     }
@@ -196,6 +198,16 @@ class StripePaymentHandler implements PaymentHandlerInterface
 
         $contract->setMetadata('order_number', (string) $orderResponse->orderNumber);
 
+        // State-machine transitions are declared on the concrete PaymentContract,
+        // not the interface (intentional: payment-base keeps the abstract surface
+        // narrow). Narrow the type here so the calls are statically checkable.
+        if (!$contract instanceof PaymentContract) {
+            throw new \LogicException(
+                'createEarlyOrderAndTransition requires a concrete PaymentContract; got '
+                . $contract::class
+            );
+        }
+
         // DRAFT → NOT_FINISHED
         $contract->transitionToNotFinished($orderId);
         $this->contractRepository->save($contract);
@@ -225,7 +237,8 @@ class StripePaymentHandler implements PaymentHandlerInterface
         $shopIdInt = is_numeric($shopId) ? (int) $shopId : 1;
 
         $orderId = $contract->getOrderId();
-        $orderNumber = $contract->getMetadata('order_number');
+        $rawOrderNumber = $contract->getMetadata('order_number');
+        $orderNumber = is_string($rawOrderNumber) ? $rawOrderNumber : null;
 
         $contractToken = $this->tokenService->generateToken($contractId);
         $successUrl = $this->checkoutSessionService->buildSuccessUrl(

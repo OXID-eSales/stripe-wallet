@@ -21,6 +21,7 @@ use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Contract\IdempotencyRecord;
 use OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use Stripe\Exception\ApiErrorException;
 use Stripe\PaymentIntent;
 use Stripe\StripeClient;
@@ -240,7 +241,7 @@ final class PaymentIntentHelper
 
             if ($request->returnUrl === null) {
                 throw new PaymentAdapterException(
-                    providerName: 'stripe',
+                    providerName: StripeDefinitions::PROVIDER,
                     errorCode: 'missing_return_url',
                     message: 'return_url is required when confirming a PaymentIntent with a saved payment method',
                     context: [
