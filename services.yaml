@@ -956,6 +956,19 @@ services:
     public: true
 
   OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider:
+    arguments:
+      $chargeAmountResolver: '@OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface'
+    public: true
+
+  # Sprint 103: Resolver for derived charge amounts (customer-refunded,
+  # available-for-refund). Owns the partial-capture math — the formula
+  # `R_customer = max(0, amount_refunded − max(0, amount − amount_captured))`
+  # exists nowhere else in src/Stripe/{Controller,Model}/.
+  OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface:
+    alias: OxidEsales\Payments\Stripe\Service\StripeChargeAmountResolver
+    public: true
+
+  OxidEsales\Payments\Stripe\Service\StripeChargeAmountResolver:
     public: true
 
   # Sprint I — Stripe's panel provider for payment-base's shared

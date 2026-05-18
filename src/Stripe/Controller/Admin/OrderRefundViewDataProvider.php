@@ -11,6 +11,7 @@ namespace OxidEsales\Payments\Stripe\Controller\Admin;
 
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface;
 use OxidEsales\Payments\Stripe\Service\StripeOrderApiService;
 use Stripe\Charge;
 use Stripe\PaymentIntent;
@@ -29,7 +30,8 @@ class OrderRefundViewDataProvider
     private ?string $apiError = null;
 
     public function __construct(
-        private readonly StripeOrderApiService $apiService
+        private readonly StripeOrderApiService $apiService,
+        private readonly ChargeAmountResolverInterface $chargeAmountResolver,
     ) {
     }
 
@@ -125,6 +127,10 @@ class OrderRefundViewDataProvider
 
     /**
      * Check if order is refundable based on Stripe charge data.
+     *
+     * Sprint 103: delegates to the resolver so partial-capture orders where
+     * Stripe's auth-release is encoded as a refund are not incorrectly treated
+     * as fully-refunded when the customer has not yet been refunded.
      */
     public function isOrderRefundable(Order $order): bool
     {
@@ -133,10 +139,7 @@ class OrderRefundViewDataProvider
             return false;
         }
 
-        $amountRefunded = $charge->amount_refunded ?? 0;
-        $amount = $charge->amount ?? 0;
-
-        return empty($amountRefunded) || $amountRefunded != $amount;
+        return $this->chargeAmountResolver->availableForRefund($charge) > 0.0;
     }
 
     /**
@@ -149,14 +152,19 @@ class OrderRefundViewDataProvider
 
     /**
      * Get remaining refundable amount as raw float (for input fields).
+     *
+     * Sprint 103: delegates to the resolver so partial-capture orders
+     * return the correct available-for-refund value — the auth-release
+     * encoded by Stripe on partial capture is excluded from the customer total.
      */
     public function getRemainingRefundableRaw(Order $order): float
     {
         $charge = $this->getLastCharge($order, true);
-        if ($charge && !empty($charge->amount_captured)) {
-            return ($charge->amount_captured - ($charge->amount_refunded ?? 0)) / 100;
+        if ($charge === null) {
+            return 0.0;
         }
-        return 0.0;
+
+        return $this->chargeAmountResolver->availableForRefund($charge);
     }
 
     /**

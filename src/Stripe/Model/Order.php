@@ -13,6 +13,7 @@ use OxidEsales\Eshop\Core\Counter as EshopCoreCounter;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface;
 use OxidEsales\Payments\Stripe\Service\StripeOrderApiService;
 
 /**
@@ -157,7 +158,11 @@ class Order extends Order_parent
 
     /**
      * Get refunded amount from Stripe, formatted.
-     * Returns empty string for non-Stripe orders or no refunds.
+     *
+     * Sprint 103: uses the resolver so partial-capture orders where Stripe's
+     * auth-release is encoded as a refund show the customer-refunded amount
+     * only, not the raw Stripe charge field value.
+     * Returns empty string for non-Stripe orders or no customer refunds.
      */
     public function getStripeRefundedAmount(): string
     {
@@ -166,16 +171,23 @@ class Order extends Order_parent
             return '';
         }
 
-        $refunded = (int) ($charge->amount_refunded ?? 0);
-        if ($refunded <= 0) {
+        $resolver = $this->getChargeAmountResolver();
+        if ($resolver === null) {
             return '';
         }
 
-        return $this->formatStripeAmount($refunded / 100);
+        if (!$resolver->hasCustomerRefund($charge)) {
+            return '';
+        }
+
+        return $this->formatStripeAmount($resolver->customerRefundedAmount($charge));
     }
 
     /**
-     * Check if order has any Stripe refunds.
+     * Check if order has any Stripe customer refunds.
+     *
+     * Sprint 103: delegates to the resolver so auth-releases on partial
+     * captures are not counted as customer refunds.
      */
     public function hasStripeRefunds(): bool
     {
@@ -184,10 +196,15 @@ class Order extends Order_parent
             return false;
         }
 
-        return ((int) ($charge->amount_refunded ?? 0)) > 0;
+        $resolver = $this->getChargeAmountResolver();
+        if ($resolver === null) {
+            return false;
+        }
+
+        return $resolver->hasCustomerRefund($charge);
     }
 
-    private function getStripeCharge(): ?\Stripe\Charge
+    protected function getStripeCharge(): ?\Stripe\Charge
     {
         /** @phpstan-ignore-next-line OXID core: magic property */
         $paymentType = (string) ($this->oxorder__oxpaymenttype->value ?? '');
@@ -204,6 +221,29 @@ class Order extends Order_parent
                 return null;
             }
             return $apiService->getLastCharge($paymentIntent);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Retrieve the charge amount resolver from the DI container (lazy, cached).
+     *
+     * Sprint 103: Same ContainerFactory locator pattern as getStripeCharge().
+     * Class extensions cannot use constructor DI; the try/catch provides the
+     * same fail-soft behaviour — if the resolver is unavailable at boot,
+     * the amount methods return empty string / false rather than throwing.
+     * The protected visibility is the testability seam (testable subclasses
+     * override this method to inject a stub resolver).
+     */
+    protected function getChargeAmountResolver(): ?ChargeAmountResolverInterface
+    {
+        try {
+            /** @var ChargeAmountResolverInterface $resolver */
+            $resolver = ContainerFactory::getInstance()->getContainer()->get(
+                ChargeAmountResolverInterface::class
+            );
+            return $resolver;
         } catch (\Throwable $e) {
             return null;
         }
