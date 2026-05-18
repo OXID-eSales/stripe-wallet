@@ -142,6 +142,15 @@ class Order extends Order_parent
     // =========================================================================
 
     /**
+     * Sprint 104: instance-level memoisation for the Stripe charge.
+     * $chargeCacheLoaded is required because null is a valid cached value
+     * (non-Stripe orders, missing transaction ID). Without the flag, every
+     * null result would trigger a re-fetch on the next call.
+     */
+    private ?\Stripe\Charge $cachedCharge      = null;
+    private bool            $chargeCacheLoaded = false;
+
+    /**
      * Get factual captured amount from Stripe, formatted.
      * Returns empty string for non-Stripe orders.
      */
@@ -205,6 +214,24 @@ class Order extends Order_parent
     }
 
     protected function getStripeCharge(): ?\Stripe\Charge
+    {
+        if ($this->chargeCacheLoaded) {
+            return $this->cachedCharge;
+        }
+        $this->chargeCacheLoaded = true;
+        $this->cachedCharge      = $this->fetchStripeCharge();
+        return $this->cachedCharge;
+    }
+
+    /**
+     * Sprint 104: testability seam — performs the actual Stripe API fetch.
+     *
+     * Separated from getStripeCharge() so testable subclasses can override
+     * this method to inject a fixture charge while the memoisation in
+     * getStripeCharge() remains active. This preserves the protected seam
+     * that Sprint 103 tests rely on (they override getStripeCharge() directly).
+     */
+    protected function fetchStripeCharge(): ?\Stripe\Charge
     {
         /** @phpstan-ignore-next-line OXID core: magic property */
         $paymentType = (string) ($this->oxorder__oxpaymenttype->value ?? '');

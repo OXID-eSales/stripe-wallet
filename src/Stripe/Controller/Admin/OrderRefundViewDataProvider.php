@@ -53,12 +53,18 @@ class OrderRefundViewDataProvider
 
     /**
      * Retrieve PaymentIntent for order, with caching.
+     *
+     * Sprint 104: uses the expanded PI (latest_charge + refunds) as the canonical
+     * source so all render-path reads share one HTTP round-trip.
+     * Mutation-path callers (CaptureService, RefundService, etc.) still pass
+     * refresh=true to get a fresh post-mutation state.
      */
     public function getPaymentIntent(Order $order, bool $refresh = false): ?PaymentIntent
     {
         try {
             if ($this->apiOrder === null || $refresh) {
-                $this->apiOrder = $this->apiService->getPaymentIntent($order);
+                $this->apiOrder  = $this->fetchExpandedPaymentIntent($order);
+                $this->apiCharge = null; // derive charge from new PI on next read
                 if ($this->apiOrder === null) {
                     $this->apiError = 'Order has no Stripe transaction ID';
                 }
@@ -72,16 +78,21 @@ class OrderRefundViewDataProvider
 
     /**
      * Retrieve last Charge for order, with caching.
+     *
+     * Sprint 104: derives the Charge from the expanded PI's latest_charge field
+     * instead of making a separate API call. The expanded PI already contains the
+     * full Charge object (including refunds) when fetched via fetchExpandedPaymentIntent.
      */
     public function getLastCharge(Order $order, bool $refresh = false): ?Charge
     {
         try {
+            $paymentIntent = $this->getPaymentIntent($order, $refresh);
+            if ($paymentIntent === null) {
+                return null;
+            }
             if ($this->apiCharge === null || $refresh) {
-                $paymentIntent = $this->getPaymentIntent($order, $refresh);
-                if ($paymentIntent === null) {
-                    return null;
-                }
-                $this->apiCharge = $this->apiService->getLastCharge($paymentIntent);
+                $latestCharge    = $paymentIntent->latest_charge ?? null;
+                $this->apiCharge = $latestCharge instanceof Charge ? $latestCharge : null;
                 if ($this->apiCharge === null) {
                     $this->apiError = 'PaymentIntent has no charge';
                 }
@@ -131,10 +142,11 @@ class OrderRefundViewDataProvider
      * Sprint 103: delegates to the resolver so partial-capture orders where
      * Stripe's auth-release is encoded as a refund are not incorrectly treated
      * as fully-refunded when the customer has not yet been refunded.
+     * Sprint 104: removed refresh=true — render-path reads the cached charge.
      */
     public function isOrderRefundable(Order $order): bool
     {
-        $charge = $this->getLastCharge($order, true);
+        $charge = $this->getLastCharge($order);
         if ($charge === null) {
             return false;
         }
@@ -156,10 +168,11 @@ class OrderRefundViewDataProvider
      * Sprint 103: delegates to the resolver so partial-capture orders
      * return the correct available-for-refund value — the auth-release
      * encoded by Stripe on partial capture is excluded from the customer total.
+     * Sprint 104: removed refresh=true — render-path reads the cached charge.
      */
     public function getRemainingRefundableRaw(Order $order): float
     {
-        $charge = $this->getLastCharge($order, true);
+        $charge = $this->getLastCharge($order);
         if ($charge === null) {
             return 0.0;
         }
@@ -195,13 +208,14 @@ class OrderRefundViewDataProvider
      *
      * Covers all actions regardless of origin (admin, Stripe Dashboard, webhook).
      * Uses expanded PaymentIntent to include refunds (Stripe SDK v19+: Charge.refunds removed).
+     * Sprint 104: reads from the shared expanded-PI cache (populated by getPaymentIntent).
      *
      * @return array<int, array<string, mixed>>
      */
     public function getStripeTransactionHistory(Order $order): array
     {
-        // Fetch PI with expanded latest_charge.refunds
-        $paymentIntent = $this->apiService->getPaymentIntentWithRefunds($order);
+        // Read from the shared expanded-PI cache; populates it on first call.
+        $paymentIntent = $this->getPaymentIntent($order);
         if ($paymentIntent === null) {
             return [];
         }
@@ -271,8 +285,20 @@ class OrderRefundViewDataProvider
      */
     public function resetCache(): void
     {
-        $this->apiOrder = null;
+        $this->apiOrder  = null;
         $this->apiCharge = null;
-        $this->apiError = null;
+        $this->apiError  = null;
+    }
+
+    /**
+     * Sprint 104: testability seam — fetches the expanded PaymentIntent.
+     *
+     * Separated from getPaymentIntent() so tests can override this single
+     * method to count HTTP calls without mocking the final StripeOrderApiService.
+     * All render-path reads flow through this one entry point.
+     */
+    protected function fetchExpandedPaymentIntent(Order $order): ?PaymentIntent
+    {
+        return $this->apiService->getPaymentIntentWithRefunds($order);
     }
 }
