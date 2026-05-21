@@ -58,16 +58,25 @@ $MODULE_ROOT/recipe/parts/shared/require_demodata_package.sh -e"${edition}" -b"$
 mkdir -p "$PROJECT_ROOT"/source/extensions || exit 1
 cp -r "$MODULE_ROOT" "$PROJECT_ROOT"/source/extensions/stripe || exit 1
 
-# Register the payment-base private repository
+# Provide payment-base as a sibling extension under source/extensions/, same
+# pattern as stripe itself. Avoids the cross-repo private-repo VCS checkout
+# which is fragile (PAT expiry, repo re-creation re-issues fresh IDs, etc.).
+PAYMENT_BASE_DIR="$PROJECT_ROOT/source/extensions/payment-base"
+if [ ! -d "$PAYMENT_BASE_DIR/.git" ]; then
+  echo "Cloning payment-base into $PAYMENT_BASE_DIR"
+  git clone --branch "$branch" --single-branch \
+    https://github.com/OXID-eSales/payment-base.git "$PAYMENT_BASE_DIR" || exit 1
+else
+  echo "payment-base already present at $PAYMENT_BASE_DIR — skipping clone"
+fi
+
+# Register payment-base as a composer path repository (symlinked, same as stripe)
 docker compose exec -T \
   php composer config repositories.oxid-esales/payment-base \
-  --json '{"type":"vcs", "url":"https://github.com/OXID-eSales/payment-base"}' || exit 1
+  --json '{"type":"path", "url":"./extensions/payment-base", "options": {"symlink": true}}' || exit 1
 
 docker compose exec -T \
-  php composer config --no-plugins allow-plugins.oxid-esales/payment-base true
-
-docker compose exec -T \
-  php composer require oxid-esales/payment-base:dev-b-7.4.x --no-update || exit 1
+  php composer require oxid-esales/payment-base:* --no-update || exit 1
 
 docker compose exec -T \
   php composer config repositories.oxid-esales/stripe-wallet \
@@ -95,6 +104,14 @@ docker compose exec -T php bin/oe-console oe:setup:demodata
 docker compose exec -T php composer update oxid-esales/payment-base --no-interaction
 
 docker compose exec -T php bin/oe-console oe:theme:activate apex
+
+# payment-base provides contract/event infrastructure stripe depends on —
+# install + activate it BEFORE stripe so the DI container resolves correctly
+# when stripe's services.yaml is loaded.
+docker compose exec -T php bin/oe-console oe:module:install extensions/payment-base
+docker compose exec -T php bin/oe-console oe:module:activate oe_payment_base
+
+# stripe last
 docker compose exec -T php bin/oe-console oe:module:install extensions/stripe
 docker compose exec -T php bin/oe-console oe:module:activate oe_payments_stripe_wallet
 
