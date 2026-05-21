@@ -103,6 +103,61 @@ The workflow file `.github/workflows/development.yml` was last touched in `2644f
 
    This is a structural cleanup, not an emergency fix.
 
+## Update — fix attempt `de39856` "fixing ci" did not work
+
+**Follow-up run:** [Development #540 — install_shop_with_module](https://github.com/OXID-eSales/stripe-wallet/actions/runs/26215958954/job/77138251774)
+**Commit:** `de39856` "fixing ci"
+**Status:** failure — same error, same step:
+
+```
+remote: Repository not found.
+Error: fatal: repository 'https://github.com/OXID-eSales/payment-base/' not found
+```
+
+### What the fix changed
+
+Five `||` fallbacks in `development.yml` were swapped from `secrets.GITHUB_TOKEN` to `secrets.GH_TOKEN`:
+
+```diff
+-          token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
++          token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
+```
+
+at lines 100, 130 (env), 273, 290 (env COMPOSER_AUTH), 341, and 395.
+
+### Why this did not help
+
+The diagnosis in this report is that `ENTERPRISE_GITHUB_TOKEN` is unset or invalid and the workflow is falling through to the second branch of the `||`. Changing **which** secondary secret the fallback points at doesn't address that — it just picks a different empty/wrong value:
+
+- The previous fallback `secrets.GITHUB_TOKEN` is **auto-provisioned** by GitHub Actions on every run. It's never empty, but it's scoped to the current repo (`stripe-wallet`) and physically cannot read `OXID-eSales/payment-base`. Outcome: 404.
+- The new fallback `secrets.GH_TOKEN` is a **user-defined custom secret**. If it isn't set on the `stripe-wallet` repo (or it is set but lacks `repo:read` on `payment-base`), the expression resolves to an empty string or an unprivileged token. Outcome: identical 404.
+
+Either way, when GitHub sees an unauthenticated (or under-privileged) fetch against a private repo, it returns "Repository not found." The visible error is the same; the underlying problem — `ENTERPRISE_GITHUB_TOKEN` is the only credential here that can read payment-base, and it's not doing its job — is unchanged.
+
+### The fix has to be on `ENTERPRISE_GITHUB_TOKEN`
+
+There is **no valid fallback** for cross-repo private-repo access. `GITHUB_TOKEN` can't do it (per-repo scope, by design). `GH_TOKEN` can't do it unless it's a separately-issued PAT with explicit `repo:read` on `payment-base` — at which point it's just another `ENTERPRISE_GITHUB_TOKEN` with a different name. The whole `|| secrets.X` chain is misleading because it makes "missing token" look like "missing repo."
+
+Steps to actually fix:
+
+1. **In the `stripe-wallet` repo:** Settings → Secrets and variables → Actions → check `ENTERPRISE_GITHUB_TOKEN`. Note its "Updated" timestamp. If it predates ~2026-05-18 (when the failures started), regenerate.
+2. **Generate a new fine-grained PAT** (or use a GitHub App installation token) with these scopes:
+   - **Repository access:** `OXID-eSales/payment-base` (and any other private OXID repos the workflows depend on).
+   - **Permissions:** `Contents: Read`, `Metadata: Read`.
+3. **Update the secret** with the new value.
+4. **Re-run the workflow** (or push a no-op commit). It should go green without touching code.
+5. **Then delete the misleading fallback.** Replace
+   ```yaml
+   token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
+   ```
+   with
+   ```yaml
+   token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN }}
+   ```
+   so any future expiry surfaces immediately as `Input required and not supplied: token` instead of a misleading 404. The fallback in this position is not protecting against any realistic failure mode — it's only hiding the one failure mode that actually happens.
+
+The current failure is the same bug as run #539, observed again. The token still needs replacing.
+
 ## Run metadata snapshot
 
 - Commit: `8a5085d48c9b1f49ecf39049fd68d0cad2358105`

@@ -147,8 +147,8 @@ class Order extends Order_parent
      * (non-Stripe orders, missing transaction ID). Without the flag, every
      * null result would trigger a re-fetch on the next call.
      */
-    private ?\Stripe\Charge $cachedCharge      = null;
-    private bool            $chargeCacheLoaded = false;
+    private ?\Stripe\Charge $cachedCharge = null;
+    private bool $chargeCacheLoaded = false;
 
     /**
      * Get factual captured amount from Stripe, formatted.
