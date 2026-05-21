@@ -97,7 +97,7 @@ jobs:
           repository: OXID-eSales/payment-base
           ref: b-7.4.x
           path: source/payment-base
-          token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
 
       - name: Configure path repository for payment-base
         run: |
@@ -127,7 +127,7 @@ jobs:
 
       - name: Install dependencies, reset shop, activate theme
         env:
-          GH_TOKEN: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
         run: |
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
             php composer update --with-all-dependencies --no-interaction
@@ -270,7 +270,7 @@ jobs:
           repository: OXID-eSales/payment-base
           ref: b-7.4.x
           path: source/payment-base
-          token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
 
       - name: Configure path repository for payment-base
         working-directory: source/test-module
@@ -287,7 +287,7 @@ jobs:
         id: dependencies
         working-directory: source/test-module
         env:
-          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}"}}'
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}"}}'
         run: composer update --no-interaction
 
       - name: Run style check
@@ -338,7 +338,7 @@ jobs:
           repository: OXID-eSales/payment-base
           ref: b-7.4.x
           path: source/payment-base
-          token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
 
       - name: Configure path repository for payment-base
         run: |
@@ -392,7 +392,7 @@ jobs:
           repository: OXID-eSales/payment-base
           ref: b-7.4.x
           path: source/payment-base
-          token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
 
       - name: Configure path repository for payment-base
         run: |
