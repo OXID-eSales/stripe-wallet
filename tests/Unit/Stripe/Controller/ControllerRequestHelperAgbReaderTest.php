@@ -42,6 +42,16 @@ final class ControllerRequestHelperAgbReaderTest extends TestCase
         );
     }
 
+    protected function tearDown(): void
+    {
+        // Mocks injected via Registry::set() in test bodies must be cleared, otherwise
+        // later integration tests pick them up and Config::isAdmin() returns null
+        // (mocks have no return stub) → Context::isAdmin() TypeErrors.
+        Registry::set(Request::class, null);
+        Registry::set(Config::class, null);
+        parent::tearDown();
+    }
+
     // ==========================================
     // H1 — getAgbAcceptedFromRequest: empty params
     // ==========================================

@@ -93,7 +93,6 @@ class StripeWebhookProcessor extends AbstractWebhookProcessor
             'payment_intent.succeeded' => $this->handlePaymentIntentSucceeded($event),
             'payment_intent.payment_failed' => $this->handlePaymentIntentFailed($event),
             'payment_intent.canceled' => $this->handlePaymentIntentCanceled($event),
-            'charge.captured' => $this->handleChargeCaptured($event),
             'charge.refunded' => $this->handleChargeRefunded($event),
             'charge.dispute.created' => $this->handleDisputeCreated($event),
             'checkout.session.completed' => $this->handleCheckoutSessionCompleted($event),
@@ -161,21 +160,6 @@ class StripeWebhookProcessor extends AbstractWebhookProcessor
         return $this->mapHandlerResult($result, $paymentIntentId, 'contract_cancelled', 'Contract already in terminal state');
     }
 
-    private function handleChargeCaptured(WebhookEvent $event): WebhookResult
-    {
-        $paymentIntentId = $this->parser->extractPaymentIntentIdFromCharge($event);
-        if ($paymentIntentId === null) {
-            return WebhookResult::failure('invalid_event', 'Missing payment intent ID in charge');
-        }
-
-        $amount = $this->parser->extractAmountInCurrencyUnits($event, 'amount');
-        $this->logger->info('Processing charge.captured', ['payment_intent_id' => $paymentIntentId, 'amount' => $amount]);
-
-        $result = $this->fulfillmentHandler->handleChargeCaptured($paymentIntentId, $amount);
-
-        return $this->mapHandlerResult($result, $paymentIntentId, 'charge_captured', 'Contract already fulfilled');
-    }
-
     private function handleChargeRefunded(WebhookEvent $event): WebhookResult
     {
         $paymentIntentId = $this->parser->extractPaymentIntentIdFromCharge($event);
@@ -193,11 +177,18 @@ class StripeWebhookProcessor extends AbstractWebhookProcessor
 
     /**
      * Map tri-state handler result (true/false/null) to WebhookResult.
+     *
+     * A non-null result means the handler ran against a real contract — link it
+     * for the webhook log row regardless of whether the action ultimately ran or
+     * was state-guard skipped.
      */
     private function mapHandlerResult(?bool $result, string $paymentIntentId, string $successAction, string $skipReason): WebhookResult
     {
-        if ($result === true) {
+        if ($result !== null) {
             $this->setContractIdFromProviderOrderId($paymentIntentId);
+        }
+
+        if ($result === true) {
             return WebhookResult::success($successAction);
         }
 

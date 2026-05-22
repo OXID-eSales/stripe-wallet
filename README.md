@@ -89,7 +89,3 @@ To run migrations the package oxid-esales/oxideshop-doctrine-migration-wrapper s
 ```bash
  composer require oxid-esales/oxideshop-doctrine-migration-wrapper
 ```
-
-```bash
-vendor/bin/doctrine-migrations migrate --configuration=vendor/oxid-esales/payment-component/migration/migrations.yml --db-configuration=vendor/oxid-esales/oxideshop-doctrine-migration-wrapper/src/migrations-db.php --no-interaction   
-```

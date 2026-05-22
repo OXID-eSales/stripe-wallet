@@ -20,6 +20,8 @@ trait ServiceContainer
      */
     protected function getServiceFromContainer(string $serviceClass): object
     {
-        return ContainerFactory::getInstance()->getContainer()->get($serviceClass);
+        /** @var T $service */
+        $service = ContainerFactory::getInstance()->getContainer()->get($serviceClass);
+        return $service;
     }
 }

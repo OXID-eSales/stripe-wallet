@@ -26,6 +26,7 @@ $aLang = array(
     'SHOP_MODULE_blStripeRemoveByBasketCurrency'        => 'Remove not supported payment types by basket currency',
     'SHOP_MODULE_GROUP_STRIPE_WEBHOOKS'                 => 'Webhooks',
     'SHOP_MODULE_sStripeWebhookEndpoint'                => 'Webhook Endpoint',
+    'HELP_SHOP_MODULE_sStripeWebhookEndpoint'           => 'Paste your Stripe Webhook Endpoint URL here, or use the button below to create and register it automatically using your platform secret key.',
     'SHOP_MODULE_sStripeWebhookEndpointSecret'          => 'Webhook Endpoint secret',
     'SHOP_MODULE_blStripeProvideCustomerEmailAddress'   => 'Send customer email address to Stripe',
     'HELP_SHOP_MODULE_blStripeLogTransactionInfo'       => 'Log file to be found here: SHOPROOT/log/StripeTransactions.log',
@@ -111,12 +112,7 @@ $aLang = array(
     'STRIPE_CONNECT_SUCCESS'                            => 'Stripe Onboarding successful.',
     'STRIPE_CONNECT_ERROR'                              => 'An error occurred during Stripe Onboarding.',
     'STRIPE_BTN_TO_ADMIN'                               => 'To Admin Area',
-    'STRIPE_CONFIG_WEBHOOK_CREATE'                      => 'Create webhooks',
-    'STRIPE_CONFIG_WEBHOOK_FORCE'                       => 'Force refreshing the webhooks',
-    'STRIPE_WEBHOOK_SET'                                => 'Webhook Endpoint is configured.',
-    'STRIPE_WEBHOOK_MISSING'                            => 'Webhook Endpoint is missing or invalid.',
     'STRIPE_WEBHOOK_CREATE_ERROR'                       => 'The Webhook Endpoint could not be created.',
-    'STRIPE_WEBHOOK_CREATE_ERROR_DELETE_FAILED'         => 'The Webhook Endpoint could not be created. Deletion of existing WH Endpoint failed.',
     'STRIPE_REFUND_REASON'                              => 'Refund reason (optional)',
     'STRIPE_PLEASE_SELECT'                              => '-- Please select --',
     'STRIPE_REFUND_DUPLICATE'                           => 'Duplicate',
@@ -128,6 +124,21 @@ $aLang = array(
     'STRIPE_CONNECT_WITH'                               => 'Connect with',
     'STRIPE_WEBHOOK_CONFIGURED'                         => 'Configured',
     'STRIPE_WEBHOOK_NOT_SET'                            => 'Not set - copy from Stripe Dashboard',
+
+    // Webhook setup (Create / Clear buttons in module_config)
+    'STRIPE_WEBHOOK_CREATE_BUTTON'                      => 'Create webhooks',
+    'STRIPE_WEBHOOK_PLATFORM_KEY_MISSING'               => 'Paste your platform secret key in Module Configuration first (sStripeTestKey / sStripeLiveKey).',
+    'STRIPE_WEBHOOK_NOT_CONFIGURED'                     => 'Not configured',
+    'STRIPE_WEBHOOK_CLEAR_ALL_BUTTON'                   => 'Clear all webhooks',
+    'STRIPE_WEBHOOK_CLEAR_ALL_CONFIRM'                  => 'This will delete the webhook endpoints registered for this shop on your Stripe platform account. Continue?',
+    'STRIPE_WEBHOOK_CLEAR_ALL_ERROR'                    => 'Failed to clear webhooks.',
+    'STRIPE_WEBHOOK_SESSION_EXPIRED'                    => 'Session expired. Please reload the page and try again.',
+
+    // Platform key setting labels (used in Module Configuration)
+    'SHOP_MODULE_sStripeTestKey'                        => 'Test Platform Secret Key (for webhook management)',
+    'SHOP_MODULE_sStripeLiveKey'                        => 'Live Platform Secret Key (for webhook management)',
+    'HELP_SHOP_MODULE_sStripeTestKey'                   => 'Paste your Stripe platform standard secret key (sk_test_…) from Stripe Dashboard → Developers → API keys. Used only for registering Connect webhooks — distinct from the connected-account access token. Ensure test and live mode keys match the correct environment.',
+    'HELP_SHOP_MODULE_sStripeLiveKey'                   => 'Paste your Stripe platform standard secret key (sk_live_…) from Stripe Dashboard → Developers → API keys. Used only for registering Connect webhooks — distinct from the connected-account access token. Ensure test and live mode keys match the correct environment.',
 
     // Capture (Manual Capture Mode)
     'STRIPE_CAPTURE_PAYMENT'                            => 'Capture Payment',

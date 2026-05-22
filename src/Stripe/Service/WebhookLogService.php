@@ -85,12 +85,14 @@ final class WebhookLogService implements WebhookLogServiceInterface
         $result['eventId'] = is_string($data['id'] ?? null) ? $data['id'] : 'unknown';
         $result['eventType'] = is_string($data['type'] ?? null) ? $data['type'] : 'unknown';
 
-        // Extract payment intent ID from nested structure
+        // Prefer the explicit payment_intent field (present on charge.* and
+        // checkout.session.* events) over the object's own id (which is the
+        // charge / session id, not a PI).
         $dataObj = $data['data'] ?? null;
         if (is_array($dataObj)) {
             $object = $dataObj['object'] ?? null;
             if (is_array($object)) {
-                $id = $object['id'] ?? $object['payment_intent'] ?? null;
+                $id = $object['payment_intent'] ?? $object['id'] ?? null;
                 $result['paymentIntentId'] = is_string($id) ? $id : 'unknown';
             }
         }

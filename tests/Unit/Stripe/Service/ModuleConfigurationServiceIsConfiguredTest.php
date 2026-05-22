@@ -73,20 +73,79 @@ class ModuleConfigurationServiceIsConfiguredTest extends TestCase
     }
 
     /**
+     * Sprint 109/Sprint 111 fix: per-mode secret is stored in oxconfig (not module settings)
+     * so it does NOT surface in the module_config form as an editable field.
+     * The per-mode oxconfig value is preferred; legacy single-valued module setting is the fallback.
+     */
+    public function testGetWebhookSecretPrefersPerModeOxConfigValueOverLegacy(): void
+    {
+        $service = $this->createServiceWithSettingsAndOxConfig(
+            ['sStripeMode' => 'test', 'sStripeWebhookEndpointSecret' => 'whsec_legacy'],
+            ['sStripeWebhookEndpointSecretTest' => 'whsec_mode_specific']
+        );
+
+        $this->assertSame('whsec_mode_specific', $service->getWebhookSecret());
+    }
+
+    public function testGetWebhookSecretFallsBackToLegacyWhenOxConfigEmpty(): void
+    {
+        $service = $this->createServiceWithSettingsAndOxConfig(
+            ['sStripeMode' => 'test', 'sStripeWebhookEndpointSecret' => 'whsec_legacy_pasted'],
+            [] // no per-mode oxconfig entry
+        );
+
+        $this->assertSame('whsec_legacy_pasted', $service->getWebhookSecret());
+    }
+
+    public function testGetWebhookSecretPicksLiveOxConfigValueInLiveMode(): void
+    {
+        $service = $this->createServiceWithSettingsAndOxConfig(
+            ['sStripeMode' => 'live', 'sStripeWebhookEndpointSecret' => 'whsec_legacy'],
+            [
+                'sStripeWebhookEndpointSecretLive' => 'whsec_live_specific',
+                'sStripeWebhookEndpointSecretTest' => 'whsec_test_specific',
+            ]
+        );
+
+        $this->assertSame('whsec_live_specific', $service->getWebhookSecret());
+    }
+
+    /**
      * @param array<string, mixed> $settings
      */
     private function createServiceWithSettings(array $settings): ModuleConfigurationService
     {
-        return new class ($settings) extends ModuleConfigurationService {
-            /** @param array<string, mixed> $testSettings */
-            public function __construct(private readonly array $testSettings)
-            {
+        return $this->createServiceWithSettingsAndOxConfig($settings, []);
+    }
+
+    /**
+     * @param array<string, mixed>  $settings  Module settings (read by get())
+     * @param array<string, string> $oxConfig  Oxconfig values (read by readOxConfigVar())
+     */
+    private function createServiceWithSettingsAndOxConfig(
+        array $settings,
+        array $oxConfig
+    ): ModuleConfigurationService {
+        return new class ($settings, $oxConfig) extends ModuleConfigurationService {
+            /**
+             * @param array<string, mixed>  $testSettings
+             * @param array<string, string> $testOxConfig
+             */
+            public function __construct(
+                private readonly array $testSettings,
+                private readonly array $testOxConfig,
+            ) {
                 // Skip parent constructor — avoids OXID framework dependencies
             }
 
             public function get(string $name): mixed
             {
                 return $this->testSettings[$name] ?? '';
+            }
+
+            protected function readOxConfigVar(string $key): string
+            {
+                return $this->testOxConfig[$key] ?? '';
             }
         };
     }

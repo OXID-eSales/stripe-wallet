@@ -67,6 +67,14 @@ final class StripePaymentHandlerLanguageTest extends TestCase
         Registry::set(Session::class, $session);
     }
 
+    protected function tearDown(): void
+    {
+        // Clear the Session mock so subsequent integration tests get the real
+        // Registry-resolved Session, not our stub (which lacks isAdmin()/etc).
+        Registry::set(Session::class, null);
+        parent::tearDown();
+    }
+
     public function testSuccessUrlIsBuiltWithActiveLanguageIdFromResolver(): void
     {
         $this->checkoutSessionService->expects($this->once())

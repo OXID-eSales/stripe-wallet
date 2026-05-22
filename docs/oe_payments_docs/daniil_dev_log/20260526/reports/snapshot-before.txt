@@ -1,0 +1,27 @@
+=== oxorder 89 ===
+*************************** 1. row ***************************
+           OXID: 4c7fcaaf1e336fec065abbf33d27bbb0
+      OXORDERNR: 89
+  OXPAYMENTTYPE: oe_payments_stripe_wallet
+  OXTRANSSTATUS: OK
+         OXPAID: 2026-05-22 16:32:25
+OXTOTALORDERSUM: 338
+      OXTRANSID: pi_3TZu7TRKy8lrhVfC0x3q9EbG
+
+=== oe_payments_contract for order 89 ===
+*************************** 1. row ***************************
+             OXID: 2ca2fa0d3aa4cfbaf1d3b3b08c9b3ad3
+        OXORDERID: 4c7fcaaf1e336fec065abbf33d27bbb0
+          OXSTATE: committed
+       OXPROVIDER: stripe
+OXPROVIDERORDERID: pi_3TZu7TRKy8lrhVfC0x3q9EbG
+ OXCAPTUREDAMOUNT: NULL
+ OXREFUNDEDAMOUNT: NULL
+     OXCAPTUREDAT: NULL
+    OXCOMMITTEDAT: 2026-05-22 16:32:25
+    OXFULFILLEDAT: NULL
+        OXUPDATED: 2026-05-22 16:32:25
+
+=== oe_payments_transaction for order 89 ===
+
+=== oe_payments_webhooklogs (recent) ===

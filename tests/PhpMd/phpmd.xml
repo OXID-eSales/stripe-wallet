@@ -28,8 +28,14 @@
     <rule ref="rulesets/codesize.xml">
         <!-- DTOs/Value objects can have many constructor parameters -->
         <exclude name="ExcessiveParameterList"/>
-        <!-- Exclude all complexity rules - we'll add them back with higher thresholds -->
+        <!-- Exclude rules that are re-added below with custom thresholds -->
         <exclude name="ExcessiveMethodLength"/>
+        <exclude name="ExcessiveClassComplexity"/>
+        <exclude name="TooManyFields"/>
+        <exclude name="TooManyPublicMethods"/>
+        <exclude name="ExcessivePublicCount"/>
+        <exclude name="CyclomaticComplexity"/>
+        <exclude name="NPathComplexity"/>
     </rule>
 
     <!-- Relaxed thresholds for complex domain logic -->

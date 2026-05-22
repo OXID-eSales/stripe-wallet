@@ -149,6 +149,11 @@ final class OrderStripeAmountsTest extends TestCase
             {
                 return $this->stubResolver;
             }
+
+            protected function formatStripeAmount(float $amount): string
+            {
+                return (string) $amount;
+            }
         };
     }
 

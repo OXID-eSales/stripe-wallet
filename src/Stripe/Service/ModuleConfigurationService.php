@@ -78,8 +78,20 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
      */
     public function isTestMode(): bool
     {
+        return $this->getMode() === 'test';
+    }
+
+    /**
+     * Returns the current mode string: 'test' or 'live'.
+     * Defaults to 'test' when not configured.
+     */
+    public function getMode(): string
+    {
         $mode = $this->get('sStripeMode');
-        return is_string($mode) && $mode === 'test';
+        if (is_string($mode) && $mode === 'live') {
+            return 'live';
+        }
+        return 'test';
     }
 
     /**
@@ -125,12 +137,53 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     }
 
     /**
-     * Get the webhook secret based on current mode (test/live)
+     * Get the webhook secret based on current mode (test/live).
+     *
+     * Per-mode secrets are stored in oxconfig (not module settings) so they do not
+     * surface as editable form fields in the module_config admin form. The legacy
+     * single-valued module setting is kept as a fallback for existing installs that
+     * pasted a secret manually before auto-registration was available.
      */
     public function getWebhookSecret(): string
     {
-        $secret = $this->get('sStripeWebhookEndpointSecret');
-        return is_string($secret) ? $secret : '';
+        $modeSpecific = $this->readOxConfigVar($this->getWebhookSecretKey());
+        if ($modeSpecific !== '') {
+            return $modeSpecific;
+        }
+
+        $legacy = $this->get('sStripeWebhookEndpointSecret');
+        return is_string($legacy) ? $legacy : '';
+    }
+
+    private function getWebhookSecretKey(): string
+    {
+        return $this->isTestMode()
+            ? 'sStripeWebhookEndpointSecretTest'
+            : 'sStripeWebhookEndpointSecretLive';
+    }
+
+    /**
+     * Reads an internal value from oxconfig (module-namespaced).
+     *
+     * Internal state that must NOT appear in the module_config form (e.g. per-mode
+     * webhook endpoint ID and signing secret) is stored here rather than in the
+     * module settings YAML.
+     *
+     * Overridable in test subclasses for unit testing without touching Registry.
+     */
+    protected function readOxConfigVar(string $key): string
+    {
+        // OXID's getShopConfVar() PHPDoc says @return object but the actual return
+        // value is mixed (string, bool, array, or null depending on oxvartype).
+        // Cast to mixed so PHPStan accepts the is_string() guard below.
+        /** @var mixed $value */
+        $value = Registry::getConfig()->getShopConfVar(
+            $key,
+            null,
+            'module:' . Module::MODULE_ID,
+        );
+
+        return is_string($value) ? $value : '';
     }
 
     /**
@@ -175,31 +228,76 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     }
 
     /**
-     * Get the webhook URL for Stripe configuration
+     * Get the webhook URL for Stripe configuration.
      *
-     * Uses ShopAdapterInterface if injected (LSP), falls back to Registry for backward compatibility.
+     * Always emits an https:// URL. Stripe rejects http endpoints at
+     * WebhookEndpoint::create time, and getCurrentShopUrl()/getShopUrl() will
+     * return whatever scheme the current request used — unreliable for an
+     * outbound URL stripe will dial back into.
      */
     public function getWebhookUrl(): string
     {
-        $shopUrl = $this->getShopBaseUrl();
+        $shopUrl = $this->getSslShopBaseUrl();
         return rtrim($shopUrl, '/') . '/index.php?cl=StripeWebhookController';
     }
 
     /**
-     * Get shop base URL using adapter or fallback to Registry
+     * Get shop base URL using adapter or fallback to Registry.
      *
-     * Follows Dependency Inversion Principle:
-     * - Prefers injected ShopAdapterInterface (testable, LSP-compliant)
-     * - Falls back to Registry for backward compatibility
+     * Returns whatever scheme the current request uses; for places that need
+     * a guaranteed-https URL (e.g. {@see getWebhookUrl()}), use
+     * {@see getSslShopBaseUrl()} instead.
      */
-    private function getShopBaseUrl(): string
+    protected function getShopBaseUrl(): string
     {
         if ($this->shopAdapter !== null) {
             return $this->shopAdapter->getShopUrl();
         }
 
-        // Fallback for backward compatibility when adapter not injected
         return Registry::getConfig()->getShopUrl();
+    }
+
+    /**
+     * Get the SSL form of the shop URL. Used for outbound URLs that third
+     * parties dial back into (Stripe webhooks, Connect callbacks).
+     */
+    protected function getSslShopBaseUrl(): string
+    {
+        return Registry::getConfig()->getSslShopUrl();
+    }
+
+    /**
+     * Get the platform secret key for the current mode.
+     *
+     * This is distinct from the connected-account access_token (sStripeTestToken /
+     * sStripeLiveToken). The platform key is pasted manually from the Stripe Dashboard
+     * and is required to register Connect webhooks on the platform account.
+     */
+    public function getPlatformKey(): string
+    {
+        $settingName = $this->isTestMode() ? 'sStripeTestKey' : 'sStripeLiveKey';
+        $key = $this->get($settingName);
+        return is_string($key) ? $key : '';
+    }
+
+    /**
+     * Returns metadata.php's `description.en` for this module.
+     *
+     * Falls back to the first available translation, then to an empty string when
+     * the module is not yet activated (so the registrar can pass an empty string
+     * to Stripe rather than crashing).
+     */
+    public function getModuleDescription(): string
+    {
+        if ($this->moduleConfig === null) {
+            return '';
+        }
+        $descriptions = $this->moduleConfig->getDescription();
+        if (isset($descriptions['en']) && is_string($descriptions['en'])) {
+            return $descriptions['en'];
+        }
+        $first = reset($descriptions);
+        return is_string($first) ? $first : '';
     }
 
     /**

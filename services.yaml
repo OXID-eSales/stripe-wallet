@@ -8,10 +8,12 @@ services:
     resource: 'src/Stripe/Service/*'
     exclude:
       - 'src/Stripe/Service/Result/*'
+      - 'src/Stripe/Service/Exception/*'
       - 'src/Stripe/Service/ReconciliationResult.php'
       - 'src/Stripe/Service/RequestLogService.php'
       - 'src/Stripe/Service/WebhookLogService.php'
       - 'src/Stripe/Service/OxidStockRestorationService.php'
+      - 'src/Stripe/Service/WebhookEndpointRegistrationResult.php'
     public: true
 
   # Sprint 43: Service Interface Aliases (LSP Compliance)
@@ -26,6 +28,21 @@ services:
   OxidEsales\Payments\Stripe\Service\OxpaidReconciliationServiceInterface:
     alias: OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService
     public: true
+
+  # Sprint 109: Webhook auto-registration during Connect onboarding.
+  OxidEsales\Payments\Stripe\Service\WebhookEndpointRegistrarInterface:
+    alias: OxidEsales\Payments\Stripe\Service\WebhookEndpointRegistrar
+    public: true
+
+  OxidEsales\Payments\Stripe\Adapter\StripeWebhookEndpointApiInterface:
+    alias: OxidEsales\Payments\Stripe\Adapter\StripeWebhookEndpointApi
+    public: false
+
+  OxidEsales\Payments\Stripe\Adapter\StripeWebhookEndpointApi:
+    public: false
+
+  OxidEsales\Payments\Stripe\Service\WebhookEventCatalog:
+    public: false
 
   OxidEsales\Payments\Stripe\Service\StaticContentInterface:
     alias: OxidEsales\Payments\Stripe\Service\StaticContent
@@ -816,7 +833,17 @@ services:
     arguments:
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $contractFulfillmentService: '@OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface'
+      $orderUpdater: '@OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface'
+      $transactionRepository: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
     public: false
+
+  # Sprint 112 / G1: mirrors contract cancel/fail transitions onto linked oxorder.
+  OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface:
+    class: OxidEsales\Payments\Stripe\Service\OxidContractLinkedOrderUpdater
+    public: false
+
+  OxidEsales\Payments\Stripe\Service\OxidContractLinkedOrderUpdater:
+    alias: OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface
 
   # Concrete implementation alias
   OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler:

@@ -15,6 +15,14 @@ use PHPUnit\Framework\TestCase;
  */
 final class OxidLanguageResolverTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        // Clear the Language mock so integration tests starting after this suite
+        // get the real Registry-resolved Language, not our stub.
+        Registry::set(Language::class, null);
+        parent::tearDown();
+    }
+
     public function testImplementsInterface(): void
     {
         $this->assertInstanceOf(LanguageResolverInterface::class, new OxidLanguageResolver());

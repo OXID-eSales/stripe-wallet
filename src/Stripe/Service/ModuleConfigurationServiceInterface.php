@@ -22,6 +22,11 @@ interface ModuleConfigurationServiceInterface
 
     public function isTestMode(): bool;
 
+    /**
+     * Returns the current mode string: 'test' or 'live'.
+     */
+    public function getMode(): string;
+
     public function getPublishableKey(): string;
 
     public function getSecretKey(): string;
@@ -43,6 +48,20 @@ interface ModuleConfigurationServiceInterface
     public function getWebhookUrl(): string;
 
     public function isConfigured(): bool;
+
+    /**
+     * Returns the platform secret key for the current mode (sStripeTestKey / sStripeLiveKey).
+     * Used to register Connect webhooks on the platform Stripe account.
+     */
+    public function getPlatformKey(): string;
+
+    /**
+     * Returns the module's human-readable description from metadata.php.
+     *
+     * Used as the `description` field when registering a webhook endpoint on
+     * Stripe; the merchant sees it as the endpoint's label in the Stripe Dashboard.
+     */
+    public function getModuleDescription(): string;
 
     public function getCaptureMode(): string;
 

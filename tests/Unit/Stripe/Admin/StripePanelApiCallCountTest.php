@@ -131,6 +131,11 @@ final class StripePanelApiCallCountTest extends TestCase
             {
                 return $this->stubResolver;
             }
+
+            protected function formatStripeAmount(float $amount): string
+            {
+                return (string) $amount;
+            }
         };
 
         // Act — three accessors, each internally calls getStripeCharge()

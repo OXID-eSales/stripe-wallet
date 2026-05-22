@@ -26,6 +26,7 @@ $aLang = array(
     'SHOP_MODULE_blStripeRemoveByBasketCurrency'        => 'Für Währung nicht unterstützte Zahlarten entfernen',
     'SHOP_MODULE_GROUP_STRIPE_WEBHOOKS'                 => 'Webhooks',
     'SHOP_MODULE_sStripeWebhookEndpoint'                => 'Webhook Endpoint',
+    'HELP_SHOP_MODULE_sStripeWebhookEndpoint'           => 'Fügen Sie hier Ihre Stripe-Webhook-Endpoint-URL ein, oder nutzen Sie den Button unten, um den Endpunkt automatisch mit Ihrem Platform-Secret-Key zu erstellen und zu registrieren.',
     'SHOP_MODULE_sStripeWebhookEndpointSecret'          => 'Webhook Sicherheits-Schlüssel',
     'SHOP_MODULE_blStripeProvideCustomerEmailAddress'   => 'Kunden-E-Mail-Adresse an Stripe senden',
 
@@ -111,12 +112,7 @@ $aLang = array(
     'STRIPE_CONNECT_SUCCESS'                            => 'Stripe-Onboarding erfolgreich.',
     'STRIPE_CONNECT_ERROR'                              => 'Während des Stripe-Onboardings ist ein Fehler aufgetreten.',
     'STRIPE_BTN_TO_ADMIN'                               => 'Zum Admin-Bereich',
-    'STRIPE_CONFIG_WEBHOOK_CREATE'                      => 'Webhooks erstellen',
-    'STRIPE_CONFIG_WEBHOOK_FORCE'                       => 'Aktualisierung der Webhooks erzwingen',
-    'STRIPE_WEBHOOK_SET'                                => 'Webhook-Endpunkt ist konfiguriert.',
-    'STRIPE_WEBHOOK_MISSING'                            => 'Webhook-Endpunkt fehlt oder ist ungültig.',
     'STRIPE_WEBHOOK_CREATE_ERROR'                       => 'Der Webhook-Endpunkt konnte nicht erstellt werden.',
-    'STRIPE_WEBHOOK_CREATE_ERROR_DELETE_FAILED'         => 'Der Webhook-Endpunkt konnte nicht erstellt werden. Das Löschen des vorhandenen WH-Endpunkts ist fehlgeschlagen.',
     'STRIPE_REFUND_REASON'                              => 'Rückerstattungsgrund (optional)',
     'STRIPE_PLEASE_SELECT'                              => '-- Bitte wählen Sie --',
     'STRIPE_REFUND_DUPLICATE'                           => 'Duplikat',
@@ -128,6 +124,21 @@ $aLang = array(
     'STRIPE_CONNECT_WITH'                               => 'Verbinden mit',
     'STRIPE_WEBHOOK_CONFIGURED'                         => 'Konfiguriert',
     'STRIPE_WEBHOOK_NOT_SET'                            => 'Nicht gesetzt - aus Stripe Dashboard kopieren',
+
+    // Webhook-Einrichtung (Buttons "Erstellen" / "Löschen" in der Modulkonfiguration)
+    'STRIPE_WEBHOOK_CREATE_BUTTON'                      => 'Webhooks erstellen',
+    'STRIPE_WEBHOOK_PLATFORM_KEY_MISSING'               => 'Bitte fügen Sie zuerst Ihren Platform-Secret-Key in der Modulkonfiguration ein (sStripeTestKey / sStripeLiveKey).',
+    'STRIPE_WEBHOOK_NOT_CONFIGURED'                     => 'Nicht konfiguriert',
+    'STRIPE_WEBHOOK_CLEAR_ALL_BUTTON'                   => 'Alle Webhooks löschen',
+    'STRIPE_WEBHOOK_CLEAR_ALL_CONFIRM'                  => 'Dies löscht die für diesen Shop registrierten Webhook-Endpoints in Ihrem Stripe-Plattform-Account. Fortfahren?',
+    'STRIPE_WEBHOOK_CLEAR_ALL_ERROR'                    => 'Webhooks konnten nicht gelöscht werden.',
+    'STRIPE_WEBHOOK_SESSION_EXPIRED'                    => 'Sitzung abgelaufen. Bitte laden Sie die Seite neu und versuchen Sie es erneut.',
+
+    // Platform-Key-Einstellungsbeschriftungen (in der Modulkonfiguration)
+    'SHOP_MODULE_sStripeTestKey'                        => 'Test Platform-Secret-Key (für Webhook-Verwaltung)',
+    'SHOP_MODULE_sStripeLiveKey'                        => 'Live Platform-Secret-Key (für Webhook-Verwaltung)',
+    'HELP_SHOP_MODULE_sStripeTestKey'                   => 'Fügen Sie Ihren Stripe-Platform-Standard-Secret-Key (sk_test_…) aus Stripe Dashboard → Entwickler → API-Schlüssel ein. Wird nur für die Registrierung von Connect-Webhooks verwendet — unterscheidet sich vom Connected-Account-Zugriffstoken. Test- und Live-Schlüssel müssen der richtigen Umgebung entsprechen.',
+    'HELP_SHOP_MODULE_sStripeLiveKey'                   => 'Fügen Sie Ihren Stripe-Platform-Standard-Secret-Key (sk_live_…) aus Stripe Dashboard → Entwickler → API-Schlüssel ein. Wird nur für die Registrierung von Connect-Webhooks verwendet — unterscheidet sich vom Connected-Account-Zugriffstoken. Test- und Live-Schlüssel müssen der richtigen Umgebung entsprechen.',
 
     // Erfassung (Manueller Erfassungsmodus)
     'STRIPE_CAPTURE_PAYMENT'                            => 'Zahlung erfassen',

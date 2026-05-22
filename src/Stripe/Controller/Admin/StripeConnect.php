@@ -11,28 +11,52 @@ namespace OxidEsales\Payments\Stripe\Controller\Admin;
 
 use OxidEsales\Eshop\Application\Controller\Admin\AdminController;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
-use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Bridge\ModuleSettingBridge;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Bridge\ModuleSettingBridgeInterface;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Module;
 
+/**
+ * Admin controller for Stripe Connect OAuth onboarding.
+ *
+ * This controller handles only the post-OAuth landing page: it receives the
+ * access_token + publishable_key returned by the Stripe Connect flow and
+ * persists them into module settings.
+ *
+ * Webhook registration (the "Create webhooks" button) lives in
+ * ModuleConfiguration because its trigger is a button on the module_config
+ * admin form next to the Webhook Endpoint field.
+ */
 class StripeConnect extends AdminController
 {
     /** @var string */
     protected $_sThisTemplate = '@oe_payments_stripe_wallet/admin/stripe_connect.html.twig';
 
-    /** @var ModuleSettingBridge */
-    private ModuleSettingBridge $moduleSettingService;
+    private ModuleSettingBridgeInterface $moduleSettingService;
 
     public function __construct()
     {
         parent::__construct();
 
-        $this->moduleSettingService = ContainerFactory::getInstance()->getContainer()->get(ModuleSettingBridgeInterface::class);
+        $container = ContainerFactory::getInstance()->getContainer();
+
+        /** @var ModuleSettingBridgeInterface $moduleSettings */
+        $moduleSettings = $container->get(ModuleSettingBridgeInterface::class);
+
+        $this->initializeCollaborators($moduleSettings);
     }
 
     /**
-     * Landing point when returning from Stripe OnBoarding process
+     * Constructor seam — test subclasses bypass parent::__construct() and call
+     * this directly with mocked collaborators.
+     */
+    protected function initializeCollaborators(
+        ModuleSettingBridgeInterface $moduleSettingService
+    ): void {
+        $this->moduleSettingService = $moduleSettingService;
+    }
+
+    /**
+     * Landing point when returning from Stripe OnBoarding process.
      *
      * @return false|void
      */
@@ -41,26 +65,51 @@ class StripeConnect extends AdminController
         if (!Registry::getSession()->checkSessionChallenge()) {
             return false;
         }
-        $sAccessToken = Registry::getRequest()->getRequestEscapedParameter('access_token');
-        $sPublishableKey = Registry::getRequest()->getRequestEscapedParameter('publishable_key');
-        $sMode = Registry::getRequest()->getRequestEscapedParameter('shop_param');
 
-        $blSuccess = true;
-        if (empty($sAccessToken) || empty($sMode) || ($sMode != 'test' && $sMode != 'live')) {
-            $blSuccess = false;
-        } else {
-            if ($sMode == 'live') {
-                $this->moduleSettingService->save('sStripeLiveToken', $sAccessToken, Module::MODULE_ID);
-                $this->moduleSettingService->save('sStripeLivePk', $sPublishableKey, Module::MODULE_ID);
-            } else {
-                $this->moduleSettingService->save('sStripeTestToken', $sAccessToken, Module::MODULE_ID);
-                $this->moduleSettingService->save('sStripeTestPk', $sPublishableKey, Module::MODULE_ID);
-            }
+        $accessToken    = $this->readRequestString('access_token');
+        $publishableKey = $this->readRequestString('publishable_key');
+        $mode           = $this->readRequestString('shop_param');
+
+        $blSuccess = false;
+
+        if ($this->isValidOnboardingPayload($accessToken, $mode)) {
+            $this->persistCredentials($mode, $accessToken, $publishableKey);
+            $blSuccess = true;
         }
 
-        $aViewData = $this->getViewData();
-        $aViewData['blIsSuccess'] = $blSuccess;
-        $aViewData['backToAdminUrl'] = $this->getViewConfig()->getSslSelfLink();
-        $this->setViewData($aViewData);
+        $viewData = $this->getViewData();
+        $viewData['blIsSuccess']    = $blSuccess;
+        $viewData['backToAdminUrl'] = $this->getViewConfig()->getSslSelfLink();
+        $this->setViewData($viewData);
+    }
+
+    private function readRequestString(string $parameter): string
+    {
+        $value = Registry::getRequest()->getRequestEscapedParameter($parameter);
+        return is_string($value) ? $value : '';
+    }
+
+    private function isValidOnboardingPayload(string $accessToken, string $mode): bool
+    {
+        if ($accessToken === '') {
+            return false;
+        }
+        return $mode === 'test' || $mode === 'live';
+    }
+
+    private function persistCredentials(string $mode, string $accessToken, string $publishableKey): void
+    {
+        $this->moduleSettingService->save($this->tokenKey($mode), $accessToken, Module::MODULE_ID);
+        $this->moduleSettingService->save($this->publishableKeyKey($mode), $publishableKey, Module::MODULE_ID);
+    }
+
+    private function tokenKey(string $mode): string
+    {
+        return $mode === 'live' ? 'sStripeLiveToken' : 'sStripeTestToken';
+    }
+
+    private function publishableKeyKey(string $mode): string
+    {
+        return $mode === 'live' ? 'sStripeLivePk' : 'sStripeTestPk';
     }
 }

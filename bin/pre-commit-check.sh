@@ -6,14 +6,26 @@
 #
 # Usage: ./bin/pre-commit-check.sh [OPTIONS]
 # Options:
-#   --no-phpunit    Skip PHPUnit tests
-#   --full          Run all tests including Integration tests (slower, requires MySQL)
+#   --no-phpunit    Skip PHPUnit tests entirely
+#   --full          Run Unit + Integration tests (the local default — kept for back-compat)
+#   --unit-only     Run only Unit tests (faster; skip Integration)
+#   --changed-only  Scope PHPStan + PHPMD to git-changed files only (faster; default is all of src/)
+#
+# Default scope (no flags):
+#   PHPUnit  — Unit + Integration   (full coverage before a commit)
+#   PHPStan  — all of src/          (matches CI's `composer phpstan`)
+#   PHPMD    — all of src/          (matches CI's `composer phpmd`)
+#
+# GitHub Actions: PHPUnit step is a no-op (CI runs its own suite); PHPStan/PHPMD
+# delegate to composer scripts which already scope to all of src/.
 
 set +e  # Don't exit on error, we want to collect all results
 
-# Parse command line arguments
+# Parse command line arguments. TEST_MODE = "default" | "full" | "unit"; "default"
+# is resolved per environment below (local → full, CI → unit).
 SKIP_PHPUNIT=false
-FULL_TESTS=false
+TEST_MODE="default"
+SCAN_MODE="all"   # "all" | "changed"
 for arg in "$@"; do
     case $arg in
         --no-phpunit)
@@ -21,8 +33,19 @@ for arg in "$@"; do
             shift
             ;;
         --full)
-            FULL_TESTS=true
+            TEST_MODE="full"
             shift
+            ;;
+        --unit-only)
+            TEST_MODE="unit"
+            shift
+            ;;
+        --changed-only)
+            SCAN_MODE="changed"
+            shift
+            ;;
+        *)
+            echo "Warning: unknown flag '$arg' (known: --no-phpunit, --full, --unit-only, --changed-only)" >&2
             ;;
     esac
 done
@@ -85,26 +108,36 @@ run_phpcs_docker() {
         /var/www/vendor/bin/phpcs --standard=tests/phpcs.xml --warning-severity=0 src/
 }
 
-# Helper function to run phpstan in Docker using module's vendor
+# Helper function to run phpstan in Docker using module's vendor.
+# $1 = "all" (scope to src/) or a space-separated list of files (changed-only mode).
 run_phpstan_docker() {
-    local files="$1"
-    if [ -n "$files" ]; then
-        echo "Running PHPStan on changed files: $files"
+    local scope="$1"
+    if [ "$scope" = "all" ]; then
+        echo "Running PHPStan over all of src/"
         docker compose exec -w /var/www/extensions/stripe -T php \
-            vendor/bin/phpstan analyse -c tests/PhpStan/phpstan.neon --level=max $files --memory-limit=1G
+            vendor/bin/phpstan analyse -c tests/PhpStan/phpstan.neon --level=max --memory-limit=1G src/
+    elif [ -n "$scope" ]; then
+        echo "Running PHPStan on changed files: $scope"
+        docker compose exec -w /var/www/extensions/stripe -T php \
+            vendor/bin/phpstan analyse -c tests/PhpStan/phpstan.neon --level=max --memory-limit=1G $scope
     else
         echo "No PHP files to check with PHPStan"
         return 0
     fi
 }
 
-# Helper function to run phpmd in Docker using module's vendor
+# Helper function to run phpmd in Docker using module's vendor.
+# $1 = "all" (scope to src/) or a space-separated list of files (changed-only mode).
 run_phpmd_docker() {
-    local files="$1"
-    if [ -n "$files" ]; then
-        echo "Running PHPMD on changed files: $files"
+    local scope="$1"
+    if [ "$scope" = "all" ]; then
+        echo "Running PHPMD over all of src/"
         docker compose exec -w /var/www/extensions/stripe -T php \
-            vendor/bin/phpmd $files text tests/PhpMd/phpmd.xml --baseline-file tests/PhpMd/phpmd.baseline.xml --exclude tests/,migration/data/ --suffixes php --strict
+            vendor/bin/phpmd src/ text tests/PhpMd/phpmd.xml --baseline-file tests/PhpMd/phpmd.baseline.xml --exclude tests/,migration/data/ --suffixes php --strict
+    elif [ -n "$scope" ]; then
+        echo "Running PHPMD on changed files: $scope"
+        docker compose exec -w /var/www/extensions/stripe -T php \
+            vendor/bin/phpmd $scope text tests/PhpMd/phpmd.xml --baseline-file tests/PhpMd/phpmd.baseline.xml --exclude tests/,migration/data/ --suffixes php --strict
     else
         echo "No PHP files to check with PHPMD"
         return 0
@@ -147,11 +180,20 @@ if [ "$SKIP_PHPUNIT" = true ]; then
     echo -e "${YELLOW}⊘ PHPUnit tests skipped${NC}"
     echo ""
 else
-    if [ "$FULL_TESTS" = true ]; then
+    # Resolve "default" → local=full, CI=unit (CI's PHPUnit step is skipped below anyway).
+    if [ "$TEST_MODE" = "default" ]; then
+        if [ "$ENVIRONMENT" = "github" ]; then
+            TEST_MODE="unit"
+        else
+            TEST_MODE="full"
+        fi
+    fi
+
+    if [ "$TEST_MODE" = "full" ]; then
         echo ">>> Running PHPUnit Tests (Full: Unit + Integration, requires MySQL)..."
         TESTSUITE_ARG=""
     else
-        echo ">>> Running PHPUnit Tests (Unit only, use --full for all)..."
+        echo ">>> Running PHPUnit Tests (Unit only, pass --full to include Integration)..."
         TESTSUITE_ARG="--testsuite Unit"
     fi
 
@@ -182,9 +224,13 @@ if [ "$ENVIRONMENT" = "github" ]; then
     run_command "composer phpstan"
     PHPSTAN_STATUS=$?
 else
-    # Get changed PHP files for local analysis
-    CHANGED_FILES=$(get_changed_files_local)
-    run_phpstan_docker "$CHANGED_FILES"
+    # Default to whole-src scan; --changed-only opts into the fast feedback path.
+    if [ "$SCAN_MODE" = "changed" ]; then
+        CHANGED_FILES=$(get_changed_files_local)
+        run_phpstan_docker "$CHANGED_FILES"
+    else
+        run_phpstan_docker "all"
+    fi
     PHPSTAN_STATUS=$?
 fi
 if [ $PHPSTAN_STATUS -ne 0 ]; then
@@ -202,11 +248,14 @@ if [ "$ENVIRONMENT" = "github" ]; then
     run_command "composer phpmd"
     PHPMD_STATUS=$?
 else
-    # Use same changed files for PHPMD
-    if [ -z "$CHANGED_FILES" ]; then
-        CHANGED_FILES=$(get_changed_files_local)
+    if [ "$SCAN_MODE" = "changed" ]; then
+        if [ -z "$CHANGED_FILES" ]; then
+            CHANGED_FILES=$(get_changed_files_local)
+        fi
+        run_phpmd_docker "$CHANGED_FILES"
+    else
+        run_phpmd_docker "all"
     fi
-    run_phpmd_docker "$CHANGED_FILES"
     PHPMD_STATUS=$?
 fi
 if [ $PHPMD_STATUS -ne 0 ]; then

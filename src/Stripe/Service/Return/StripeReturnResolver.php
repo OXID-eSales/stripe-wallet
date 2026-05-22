@@ -49,8 +49,13 @@ class StripeReturnResolver implements ReturnResolverInterface
             return ReturnResolution::failed('missing_contract_token', 'Contract token missing on return');
         }
 
+        $contractId = $contract->getId();
+        if ($contractId === null || $contractId === '') {
+            return ReturnResolution::failed('missing_contract_id', 'Contract id missing on return');
+        }
+
         try {
-            $result = $this->checkoutReturnService->validateReturn($sessionId, $contract->getId(), $contractToken);
+            $result = $this->checkoutReturnService->validateReturn($sessionId, $contractId, $contractToken);
         } catch (Throwable $e) {
             return ReturnResolution::failed('validate_return_threw', $e->getMessage());
         }

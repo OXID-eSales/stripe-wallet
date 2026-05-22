@@ -10,7 +10,9 @@ use OxidEsales\PaymentBase\Contract\ContractState;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
+use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
 use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler;
 use PHPUnit\Framework\TestCase;
 
@@ -33,11 +35,15 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 {
     private ContractRepositoryInterface $contractRepository;
     private ContractFulfillmentServiceInterface $contractFulfillmentService;
+    private ContractLinkedOrderUpdaterInterface $orderUpdater;
+    private TransactionRepositoryInterface $transactionRepository;
 
     protected function setUp(): void
     {
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->contractFulfillmentService = $this->createMock(ContractFulfillmentServiceInterface::class);
+        $this->orderUpdater = $this->createMock(ContractLinkedOrderUpdaterInterface::class);
+        $this->transactionRepository = $this->createMock(TransactionRepositoryInterface::class);
     }
 
     // =========================================================================
@@ -63,7 +69,9 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->contractFulfillmentService
+            $this->contractFulfillmentService,
+            $this->orderUpdater,
+            $this->transactionRepository
         );
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
@@ -94,7 +102,9 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->contractFulfillmentService
+            $this->contractFulfillmentService,
+            $this->orderUpdater,
+            $this->transactionRepository
         );
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
@@ -125,7 +135,9 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->contractFulfillmentService
+            $this->contractFulfillmentService,
+            $this->orderUpdater,
+            $this->transactionRepository
         );
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
@@ -156,7 +168,9 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->contractFulfillmentService
+            $this->contractFulfillmentService,
+            $this->orderUpdater,
+            $this->transactionRepository
         );
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
@@ -187,7 +201,9 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->contractFulfillmentService
+            $this->contractFulfillmentService,
+            $this->orderUpdater,
+            $this->transactionRepository
         );
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
@@ -218,7 +234,9 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->contractFulfillmentService
+            $this->contractFulfillmentService,
+            $this->orderUpdater,
+            $this->transactionRepository
         );
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
@@ -249,7 +267,9 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->contractFulfillmentService
+            $this->contractFulfillmentService,
+            $this->orderUpdater,
+            $this->transactionRepository
         );
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
@@ -258,229 +278,10 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     }
 
     // =========================================================================
-    // Test 8: Handler handles charge.captured event
+    // Sprint 112 / G5: charge.captured handler removed — payment_intent.succeeded
+    // always wins the race. Tests for it were dead-pinning behavior that the
+    // production code path no longer reaches.
     // =========================================================================
-
-    /**
-     * @test
-     * @group sprint-6
-     * @group sprint-18
-     * @group contract-aware
-     */
-    public function handlerHandlesChargeCapturedEvent(): void
-    {
-        $providerOrderId = 'pi_charge_captured';
-
-        $contract = $this->createCommittedContractMock($providerOrderId, 'order_captured');
-
-        $this->contractRepository
-            ->method('findByProviderOrderId')
-            ->willReturn($contract);
-
-        // Sprint 18: Uses fulfill() method which delegates to service
-        $this->contractFulfillmentService
-            ->expects($this->once())
-            ->method('fulfill')
-            ->with($contract)
-            ->willReturn(true);
-
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService
-        );
-
-        $result = $handler->handleChargeCaptured($providerOrderId);
-
-        $this->assertTrue($result);
-    }
-
-    // =========================================================================
-    // Test 9: Handler transitions AUTHORIZED contract to READY_TO_COMMIT on capture
-    // Sprint 7: Manual capture mode webhook handling
-    // =========================================================================
-
-    /**
-     * @test
-     * @group sprint-7
-     * @group contract-aware
-     * @group manual-capture
-     */
-    public function handlerTransitionsAuthorizedContractOnCapture(): void
-    {
-        $providerOrderId = 'pi_authorized_capture';
-        $capturedAmount = 99.99;
-
-        // Create contract in AUTHORIZED state
-        $snapshot = BasketSnapshot::fromArray([
-            'items' => [],
-            'discounts' => [],
-            'totalGross' => 99.99,
-            'totalNet' => 84.03,
-            'totalVat' => 15.97,
-            'currency' => 'EUR',
-            'capturedAt' => date('Y-m-d H:i:s'),
-        ]);
-
-        $contract = new PaymentContract(1, 'user123', $snapshot);
-        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
-        $contract->transitionToNotFinished('order_123');
-        $contract->transitionToPending();
-        $contract->setProvider('stripe', $providerOrderId);
-        // Transition to AUTHORIZED state (simulating manual capture mode)
-        $contract->authorize();
-
-        $this->contractRepository
-            ->method('findByProviderOrderId')
-            ->with($providerOrderId)
-            ->willReturn($contract);
-
-        $this->contractRepository
-            ->expects($this->once())
-            ->method('save')
-            ->with($contract);
-
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService
-        );
-
-        $result = $handler->handleChargeCaptured($providerOrderId, $capturedAmount);
-
-        // Should return true (capture successful)
-        $this->assertTrue($result);
-        // Contract should now be in READY_TO_COMMIT state
-        $this->assertTrue($contract->getState()->isReadyToCommit());
-    }
-
-    /**
-     * @test
-     * @group sprint-7
-     * @group contract-aware
-     * @group manual-capture
-     */
-    public function handlerReturnsNullWhenContractNotFoundOnCapture(): void
-    {
-        $providerOrderId = 'pi_no_contract_capture';
-
-        $this->contractRepository
-            ->method('findByProviderOrderId')
-            ->with($providerOrderId)
-            ->willReturn(null);
-
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService
-        );
-
-        $result = $handler->handleChargeCaptured($providerOrderId, 50.00);
-
-        $this->assertNull($result);
-    }
-
-    /**
-     * @test
-     * @group sprint-7
-     * @group contract-aware
-     * @group manual-capture
-     */
-    public function handlerReturnsFalseForAlreadyFulfilledContractOnCapture(): void
-    {
-        $providerOrderId = 'pi_already_fulfilled_capture';
-        $capturedAmount = 99.99;
-
-        // Create already fulfilled contract
-        $snapshot = BasketSnapshot::fromArray([
-            'items' => [],
-            'discounts' => [],
-            'totalGross' => 99.99,
-            'totalNet' => 84.03,
-            'totalVat' => 15.97,
-            'currency' => 'EUR',
-            'capturedAt' => date('Y-m-d H:i:s'),
-        ]);
-
-        $contract = new PaymentContract(1, 'user123', $snapshot);
-        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
-        $contract->transitionToNotFinished('order_123');
-        $contract->transitionToPending();
-        $contract->setProvider('stripe', $providerOrderId);
-        $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED, ['authId' => 'auth_123']);
-        $contract->commitToOrder('order_123');
-        $contract->fulfill();
-
-        $this->contractRepository
-            ->method('findByProviderOrderId')
-            ->with($providerOrderId)
-            ->willReturn($contract);
-
-        // Save should be called to update captured amount
-        $this->contractRepository
-            ->expects($this->once())
-            ->method('save')
-            ->with($contract);
-
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService
-        );
-
-        $result = $handler->handleChargeCaptured($providerOrderId, $capturedAmount);
-
-        // Should return false (already fulfilled - idempotent)
-        $this->assertFalse($result);
-        // But captured amount should still be recorded
-        $this->assertEquals($capturedAmount, $contract->getCapturedAmount());
-    }
-
-    /**
-     * @test
-     * @group sprint-7
-     * @group contract-aware
-     * @group manual-capture
-     */
-    public function handlerReturnsFalseForPendingContractOnCapture(): void
-    {
-        $providerOrderId = 'pi_pending_capture';
-        $capturedAmount = 50.00;
-
-        // Create contract in PENDING state (not AUTHORIZED, not COMMITTED)
-        $snapshot = BasketSnapshot::fromArray([
-            'items' => [],
-            'discounts' => [],
-            'totalGross' => 50.00,
-            'totalNet' => 42.02,
-            'totalVat' => 7.98,
-            'currency' => 'EUR',
-            'capturedAt' => date('Y-m-d H:i:s'),
-        ]);
-
-        $contract = new PaymentContract(1, 'user123', $snapshot);
-        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
-        $contract->transitionToNotFinished('order_123');
-        $contract->transitionToPending();
-        $contract->setProvider('stripe', $providerOrderId);
-        // Contract stays in PENDING - not AUTHORIZED, not COMMITTED
-
-        $this->contractRepository
-            ->method('findByProviderOrderId')
-            ->with($providerOrderId)
-            ->willReturn($contract);
-
-        // Save should NOT be called - PENDING state cannot record captured amount
-        $this->contractRepository
-            ->expects($this->never())
-            ->method('save');
-
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService
-        );
-
-        $result = $handler->handleChargeCaptured($providerOrderId, $capturedAmount);
-
-        // Should return false (not in correct state to fulfill)
-        $this->assertFalse($result);
-    }
 
     // =========================================================================
     // Test 10: Handler handles charge.refunded event
@@ -509,7 +310,9 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->contractFulfillmentService
+            $this->contractFulfillmentService,
+            $this->orderUpdater,
+            $this->transactionRepository
         );
 
         $result = $handler->handleChargeRefunded($providerOrderId, $refundAmount);
@@ -562,7 +365,9 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->contractFulfillmentService
+            $this->contractFulfillmentService,
+            $this->orderUpdater,
+            $this->transactionRepository
         );
 
         $result = $handler->handlePaymentFailed($providerOrderId, $failureReason);
@@ -616,7 +421,9 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->contractFulfillmentService
+            $this->contractFulfillmentService,
+            $this->orderUpdater,
+            $this->transactionRepository
         );
 
         $result = $handler->handlePaymentCanceled($providerOrderId, $cancellationReason);
@@ -643,7 +450,9 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->contractFulfillmentService
+            $this->contractFulfillmentService,
+            $this->orderUpdater,
+            $this->transactionRepository
         );
 
         $result = $handler->handlePaymentCanceled($providerOrderId, 'user_requested');
@@ -687,7 +496,9 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->contractFulfillmentService
+            $this->contractFulfillmentService,
+            $this->orderUpdater,
+            $this->transactionRepository
         );
 
         $result = $handler->handlePaymentCanceled($providerOrderId, $cancellationReason);
@@ -739,7 +550,9 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->contractFulfillmentService
+            $this->contractFulfillmentService,
+            $this->orderUpdater,
+            $this->transactionRepository
         );
 
         $result = $handler->handleSessionExpired($contractId);
@@ -766,7 +579,9 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->contractFulfillmentService
+            $this->contractFulfillmentService,
+            $this->orderUpdater,
+            $this->transactionRepository
         );
 
         $result = $handler->handleSessionExpired($contractId);
@@ -811,7 +626,9 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
 
         $handler = new WebhookContractFulfillmentHandler(
             $this->contractRepository,
-            $this->contractFulfillmentService
+            $this->contractFulfillmentService,
+            $this->orderUpdater,
+            $this->transactionRepository
         );
 
         $result = $handler->handleSessionExpired($contractId);

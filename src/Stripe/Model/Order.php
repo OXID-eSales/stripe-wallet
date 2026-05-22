@@ -276,7 +276,7 @@ class Order extends Order_parent
         }
     }
 
-    private function formatStripeAmount(float $amount): string
+    protected function formatStripeAmount(float $amount): string
     {
         /** @phpstan-ignore-next-line OXID core: magic property */
         $currencyName = (string) ($this->oxorder__oxcurrency->value ?? '');

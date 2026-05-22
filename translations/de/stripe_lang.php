@@ -37,7 +37,6 @@ $aLang = [
     'STRIPE_SECOND_CHANCE_MAIL_SUBJECT'         => 'Abschluss Ihrer Bestellung bei',
     'STRIPE_ERROR_ORDER_CONFIG_PUBKEY'          => 'Bitte konfigurieren Sie den veröffentlichbaren Stripe-Schlüssel, um diese Zahlungsmethode zu verwenden.',
     'STRIPE_WEBHOOK_CREATE_ERROR'               => 'Der Webhook-Endpunkt konnte nicht erstellt werden.',
-    'STRIPE_WEBHOOK_CREATE_ERROR_DELETE_FAILED' => 'Der Webhook-Endpunkt konnte nicht erstellt werden. Das Löschen des vorhandenen WH-Endpunkts ist fehlgeschlagen.',
     'STRIPE_CREDIT_CARD'                        => 'Kreditkarte',
 
     // Buy Now feature

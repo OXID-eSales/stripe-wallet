@@ -12,7 +12,9 @@
         {% endif %}
     </div>
 
-    <p><input type="submit" class="btn btn-primary" value="{{ translate({ ident: "STRIPE_BTN_TO_ADMIN" }) }}" /></p>
+    <p style="margin-top: 1em;">
+        <input type="submit" class="btn btn-default" value="{{ translate({ ident: "STRIPE_BTN_TO_ADMIN" }) }}" />
+    </p>
 </form>
 
 {{ script({ include: "js/libs/jquery.min.js", dynamic: __oxid_include_dynamic }) }}

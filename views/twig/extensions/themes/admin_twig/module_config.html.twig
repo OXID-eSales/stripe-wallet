@@ -53,7 +53,136 @@
             </dl>
         {% endif %}
     {% elseif module_var == 'sStripeWebhookEndpoint' %}
-        {# Skip - URL is auto-generated, not needed in UI #}
+        <dl>
+            <dt>
+                <input type="text" id="stripe-webhook-endpoint-input" class="txt" style="width: 350px;" name="confstrs[{{ module_var }}]" value="{{ confstrs[module_var] }}" readonly placeholder="https://…">
+                {% include "inputhelp.html.twig" with {'sHelpId': help_id("HELP_SHOP_MODULE_" ~ module_var), 'sHelpText': help_text("HELP_SHOP_MODULE_" ~ module_var)} %}
+                <br/>
+                <span id="stripe-webhook-status" style="margin-top: 4px; display: inline-block;">
+                    {% if oView.stripeIsWebhookConfigured() %}
+                        <span style="color: green;">&#10003; {{ translate({ ident: "STRIPE_WEBHOOK_CONFIGURED" }) }}</span>
+                    {% else %}
+                        <span style="color: orange;">&#9888; {{ translate({ ident: "STRIPE_WEBHOOK_NOT_CONFIGURED" }) }}</span>
+                    {% endif %}
+                </span>
+                <br/>
+                {% if not oView.stripeIsPlatformKeyConfigured() %}
+                    <span class="help-block" style="color: #888; font-size: 12px;">
+                        {{ translate({ ident: "STRIPE_WEBHOOK_PLATFORM_KEY_MISSING" }) }}
+                    </span>
+                {% endif %}
+                <button
+                    type="button"
+                    id="stripe-create-webhook-button"
+                    class="btn btn-default"
+                    style="margin-top: 6px;"
+                    {{ not oView.stripeIsPlatformKeyConfigured() ? 'disabled' : '' }}
+                >{{ translate({ ident: "STRIPE_WEBHOOK_CREATE_BUTTON" }) }}</button>
+                <button
+                    type="button"
+                    id="stripe-clear-webhooks-button"
+                    class="btn btn-default"
+                    style="margin-top: 6px; margin-left: 4px;"
+                    {{ not oView.stripeIsPlatformKeyConfigured() ? 'disabled' : '' }}
+                >{{ translate({ ident: "STRIPE_WEBHOOK_CLEAR_ALL_BUTTON" }) }}</button>
+                <span id="stripe-webhook-msg" style="margin-left: 1em;"></span>
+
+                <script>
+                (function () {
+                    var btn = document.getElementById('stripe-create-webhook-button');
+                    var msg = document.getElementById('stripe-webhook-msg');
+                    var statusEl = document.getElementById('stripe-webhook-status');
+                    if (!btn) { return; }
+
+                    btn.addEventListener('click', function () {
+                        btn.disabled = true;
+                        msg.textContent = '…';
+
+                        var xhr = new XMLHttpRequest();
+                        var url = '{{ oView.stripeGetCreateWebhookUrl()|raw }}';
+                        xhr.open('POST', url, true);
+                        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                        xhr.onload = function () {
+                            btn.disabled = false;
+                            var data = null;
+                            try { data = JSON.parse(xhr.responseText); } catch (e) { /* non-JSON response */ }
+                            if (data && data.success) {
+                                msg.style.color = 'green';
+                                msg.textContent = '✓ ' + (data.endpointId || '');
+                                statusEl.innerHTML = '<span style="color: green;">&#10003; {{ translate({ ident: "STRIPE_WEBHOOK_CONFIGURED" }) }}</span>';
+                                var urlInput = document.getElementById('stripe-webhook-endpoint-input');
+                                if (urlInput && data.webhookUrl) { urlInput.value = data.webhookUrl; }
+                                var secretInput = document.querySelector('input[name="confstrs[sStripeWebhookEndpointSecret]"]');
+                                if (secretInput && data.endpointSecret) { secretInput.value = data.endpointSecret; }
+                                return;
+                            }
+                            msg.style.color = 'red';
+                            if (data && data.message) {
+                                msg.textContent = '✗ ' + data.message;
+                                return;
+                            }
+                            // Non-JSON response (server fatal, 404, offline page, etc.) — keep the UI clean,
+                            // surface details only to the developer via console.
+                            console.error('Stripe Create-webhook: unexpected response', xhr.status, xhr.responseText);
+                            msg.textContent = '✗ {{ translate({ ident: "STRIPE_WEBHOOK_CREATE_ERROR" }) }} (HTTP ' + xhr.status + ')';
+                        };
+                        xhr.onerror = function () {
+                            msg.style.color = 'red';
+                            msg.textContent = '✗ {{ translate({ ident: "STRIPE_WEBHOOK_CREATE_ERROR" }) }}';
+                            btn.disabled = false;
+                        };
+                        xhr.send();
+                    });
+
+                    var clearBtn = document.getElementById('stripe-clear-webhooks-button');
+                    if (!clearBtn) { return; }
+
+                    clearBtn.addEventListener('click', function () {
+                        if (!confirm('{{ translate({ ident: "STRIPE_WEBHOOK_CLEAR_ALL_CONFIRM" }) }}')) { return; }
+                        clearBtn.disabled = true;
+                        btn.disabled = true;
+                        msg.style.color = '';
+                        msg.textContent = '…';
+
+                        var xhr = new XMLHttpRequest();
+                        xhr.open('POST', '{{ oView.stripeGetClearWebhooksUrl()|raw }}', true);
+                        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                        xhr.onload = function () {
+                            clearBtn.disabled = false;
+                            btn.disabled = false;
+                            var data = null;
+                            try { data = JSON.parse(xhr.responseText); } catch (e) { /* non-JSON */ }
+                            if (data && data.success) {
+                                msg.style.color = 'green';
+                                msg.textContent = '✓ ' + (data.deleted || 0) + ' deleted';
+                                statusEl.innerHTML = '<span style="color: orange;">&#9888; {{ translate({ ident: "STRIPE_WEBHOOK_NOT_CONFIGURED" }) }}</span>';
+                                var urlInput = document.getElementById('stripe-webhook-endpoint-input');
+                                if (urlInput) { urlInput.value = ''; }
+                                var secretInput = document.querySelector('input[name="confstrs[sStripeWebhookEndpointSecret]"]');
+                                if (secretInput) { secretInput.value = ''; }
+                                return;
+                            }
+                            msg.style.color = 'red';
+                            if (data && data.message) { msg.textContent = '✗ ' + data.message; return; }
+                            console.error('Stripe Clear-webhooks: unexpected response', xhr.status, xhr.responseText);
+                            msg.textContent = '✗ {{ translate({ ident: "STRIPE_WEBHOOK_CLEAR_ALL_ERROR" }) }} (HTTP ' + xhr.status + ')';
+                        };
+                        xhr.onerror = function () {
+                            msg.style.color = 'red';
+                            msg.textContent = '✗ {{ translate({ ident: "STRIPE_WEBHOOK_CLEAR_ALL_ERROR" }) }}';
+                            clearBtn.disabled = false;
+                            btn.disabled = false;
+                        };
+                        xhr.send();
+                    });
+                }());
+                </script>
+            </dt>
+            <dd style="white-space: nowrap;">
+                <span style="float:left;">{{ translate({ ident: "SHOP_MODULE_" ~ module_var }) }}</span>
+            </dd>
+            <div class="spacer"></div>
+        </dl>
     {% elseif module_var == 'sStripeWebhookEndpointSecret' %}
         <dl>
             <dt>
