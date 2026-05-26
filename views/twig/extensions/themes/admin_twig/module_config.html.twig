@@ -1,15 +1,17 @@
 {% extends "module_config.html.twig" %}
 
 {% block admin_module_config_var %}
-    {% if module_var == 'sStripeTestToken' or module_var == 'sStripeLiveToken' or module_var == 'sStripeTestPk' or module_var == 'sStripeLivePk' %}
+    {% if module_var == 'sStripeTestToken' or module_var == 'sStripeLiveToken' or module_var == 'sStripeTestPk' or module_var == 'sStripeLivePk' or module_var == 'sStripeTestKey' or module_var == 'sStripeLiveKey' %}
         {# Sprint 39: Show warning banner if API keys are from different Stripe accounts #}
         {% if module_var == 'sStripeTestToken' %}
             {% if attribute(oView, 'stripeGetKeyValidationError') is defined %}
                 {% set keyValidationError = oView.stripeGetKeyValidationError() %}
                 {% if keyValidationError %}
-                    <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 12px 15px; margin-bottom: 15px; border-radius: 4px;">
-                        <strong style="color: #856404;">&#9888; {{ translate({ ident: "STRIPE_KEY_MISMATCH_WARNING" }) }}</strong>
-                        <p style="color: #856404; margin: 8px 0 0 0; font-size: 12px;">{{ keyValidationError }}</p>
+                    <div class="smc-alert smc-alert-warning" role="alert">
+                        <span>
+                            <strong>&#9888; {{ translate({ ident: "STRIPE_KEY_MISMATCH_WARNING" }) }}</strong>
+                            <p>{{ keyValidationError }}</p>
+                        </span>
                     </div>
                 {% endif %}
             {% endif %}
@@ -18,11 +20,19 @@
             <dl>
                 <dt>
                     <div>
-                        <input type="text" readonly disabled class="txt" style="width: 250px;" name="confstrs[{{ module_var }}]" value="{{ confstrs[module_var] }}" {{ readonly }}>
+                        {# Sprint 113: type=password by default + eye-toggle for shoulder-surfing mitigation. #}
+                        <span class="stripe-key-field">
+                            <input type="password" readonly disabled class="txt" style="width: 250px;" name="confstrs[{{ module_var }}]" value="{{ confstrs[module_var] }}" {{ readonly }} data-stripe-secret autocomplete="off">
+                            <button type="button" class="stripe-key-toggle"
+                                    aria-label="{{ translate({ ident: 'STRIPE_REVEAL_API_KEY' }) }}"
+                                    data-label-reveal="{{ translate({ ident: 'STRIPE_REVEAL_API_KEY' }) }}"
+                                    data-label-hide="{{ translate({ ident: 'STRIPE_HIDE_API_KEY' }) }}"
+                                    aria-pressed="false">&#128065;</button>
+                        </span>
                         {% include "inputhelp.html.twig" with {'sHelpId': help_id("HELP_SHOP_MODULE_" ~ module_var), 'sHelpText': help_text("HELP_SHOP_MODULE_" ~ module_var)} %}
                         <br/>
                         {% if confstrs[module_var] %}
-                            <span id="{{ module_var }}_status" style="color: green">{{ translate({ ident: "STRIPE_APIKEY_CONNECTED" }) }}</span>
+                            <span id="{{ module_var }}_status" class="smc-status-ok">&#10003; {{ translate({ ident: "STRIPE_APIKEY_CONNECTED" }) }}</span>
                         {% endif %}
                     </div>
                 </dt>
@@ -33,10 +43,18 @@
                 <div class="spacer"></div>
             </dl>
         {% else %}
-            {# Publishable key fields - editable to allow manual correction of mismatched keys #}
+            {# Publishable key / platform-secret-key fields — editable to allow manual correction. #}
+            {# Sprint 113: type=password by default + eye-toggle. #}
             <dl>
                 <dt>
-                    <input type="text" class="txt" style="width: 250px;" name="confstrs[{{ module_var }}]" value="{{ confstrs[module_var] }}" {{ readonly }}>
+                    <span class="stripe-key-field">
+                        <input type="password" class="txt" style="width: 250px;" name="confstrs[{{ module_var }}]" value="{{ confstrs[module_var] }}" {{ readonly }} data-stripe-secret autocomplete="off">
+                        <button type="button" class="stripe-key-toggle"
+                                aria-label="{{ translate({ ident: 'STRIPE_REVEAL_API_KEY' }) }}"
+                                data-label-reveal="{{ translate({ ident: 'STRIPE_REVEAL_API_KEY' }) }}"
+                                data-label-hide="{{ translate({ ident: 'STRIPE_HIDE_API_KEY' }) }}"
+                                aria-pressed="false">&#128065;</button>
+                    </span>
                     {% include "inputhelp.html.twig" with {'sHelpId': help_id("HELP_SHOP_MODULE_" ~ module_var), 'sHelpText': help_text("HELP_SHOP_MODULE_" ~ module_var)} %}
                 </dt>
                 <dd style="white-space: nowrap;">
@@ -48,7 +66,12 @@
         {% if module_var == 'sStripeLivePk' %}
             <dl>
                 <dt></dt>
-                <dd>{{ translate({ ident: "STRIPE_CONNECTION_DATA" }) }} <a href="https://dashboard.stripe.com" target="_blank">https://dashboard.stripe.com</a></dd>
+                <dd>
+                    <div class="smc-alert-muted">
+                        {{ translate({ ident: "STRIPE_CONNECTION_DATA" }) }}
+                        <a href="https://dashboard.stripe.com" target="_blank" rel="noopener">https://dashboard.stripe.com</a>
+                    </div>
+                </dd>
                 <div class="spacer"></div>
             </dl>
         {% endif %}
@@ -58,34 +81,32 @@
                 <input type="text" id="stripe-webhook-endpoint-input" class="txt" style="width: 350px;" name="confstrs[{{ module_var }}]" value="{{ confstrs[module_var] }}" readonly placeholder="https://…">
                 {% include "inputhelp.html.twig" with {'sHelpId': help_id("HELP_SHOP_MODULE_" ~ module_var), 'sHelpText': help_text("HELP_SHOP_MODULE_" ~ module_var)} %}
                 <br/>
-                <span id="stripe-webhook-status" style="margin-top: 4px; display: inline-block;">
+                <span id="stripe-webhook-status" style="margin-top: 6px; display: inline-block;">
                     {% if oView.stripeIsWebhookConfigured() %}
-                        <span style="color: green;">&#10003; {{ translate({ ident: "STRIPE_WEBHOOK_CONFIGURED" }) }}</span>
+                        <span class="smc-status-ok">&#10003; {{ translate({ ident: "STRIPE_WEBHOOK_CONFIGURED" }) }}</span>
                     {% else %}
-                        <span style="color: orange;">&#9888; {{ translate({ ident: "STRIPE_WEBHOOK_NOT_CONFIGURED" }) }}</span>
+                        <span class="smc-status-warn">&#9888; {{ translate({ ident: "STRIPE_WEBHOOK_NOT_CONFIGURED" }) }}</span>
                     {% endif %}
                 </span>
                 <br/>
                 {% if not oView.stripeIsPlatformKeyConfigured() %}
-                    <span class="help-block" style="color: #888; font-size: 12px;">
-                        {{ translate({ ident: "STRIPE_WEBHOOK_PLATFORM_KEY_MISSING" }) }}
-                    </span>
+                    <span class="smc-status-muted">{{ translate({ ident: "STRIPE_WEBHOOK_PLATFORM_KEY_MISSING" }) }}</span>
+                    <br/>
                 {% endif %}
                 <button
                     type="button"
                     id="stripe-create-webhook-button"
-                    class="btn btn-default"
-                    style="margin-top: 6px;"
+                    class="smc-btn smc-btn-primary"
                     {{ not oView.stripeIsPlatformKeyConfigured() ? 'disabled' : '' }}
                 >{{ translate({ ident: "STRIPE_WEBHOOK_CREATE_BUTTON" }) }}</button>
                 <button
                     type="button"
                     id="stripe-clear-webhooks-button"
-                    class="btn btn-default"
-                    style="margin-top: 6px; margin-left: 4px;"
+                    class="smc-btn smc-btn-danger-outline"
+                    style="margin-left: 6px;"
                     {{ not oView.stripeIsPlatformKeyConfigured() ? 'disabled' : '' }}
                 >{{ translate({ ident: "STRIPE_WEBHOOK_CLEAR_ALL_BUTTON" }) }}</button>
-                <span id="stripe-webhook-msg" style="margin-left: 1em;"></span>
+                <span id="stripe-webhook-msg" class="smc-msg"></span>
 
                 <script>
                 (function () {
@@ -109,7 +130,7 @@
                             if (data && data.success) {
                                 msg.style.color = 'green';
                                 msg.textContent = '✓ ' + (data.endpointId || '');
-                                statusEl.innerHTML = '<span style="color: green;">&#10003; {{ translate({ ident: "STRIPE_WEBHOOK_CONFIGURED" }) }}</span>';
+                                statusEl.innerHTML = '<span class="smc-status-ok">&#10003; {{ translate({ ident: "STRIPE_WEBHOOK_CONFIGURED" }) }}</span>';
                                 var urlInput = document.getElementById('stripe-webhook-endpoint-input');
                                 if (urlInput && data.webhookUrl) { urlInput.value = data.webhookUrl; }
                                 var secretInput = document.querySelector('input[name="confstrs[sStripeWebhookEndpointSecret]"]');
@@ -155,7 +176,7 @@
                             if (data && data.success) {
                                 msg.style.color = 'green';
                                 msg.textContent = '✓ ' + (data.deleted || 0) + ' deleted';
-                                statusEl.innerHTML = '<span style="color: orange;">&#9888; {{ translate({ ident: "STRIPE_WEBHOOK_NOT_CONFIGURED" }) }}</span>';
+                                statusEl.innerHTML = '<span class="smc-status-warn">&#9888; {{ translate({ ident: "STRIPE_WEBHOOK_NOT_CONFIGURED" }) }}</span>';
                                 var urlInput = document.getElementById('stripe-webhook-endpoint-input');
                                 if (urlInput) { urlInput.value = ''; }
                                 var secretInput = document.querySelector('input[name="confstrs[sStripeWebhookEndpointSecret]"]');
@@ -186,15 +207,23 @@
     {% elseif module_var == 'sStripeWebhookEndpointSecret' %}
         <dl>
             <dt>
-                <input type="text" class="txt" style="width: 350px;" name="confstrs[{{ module_var }}]" value="{{ confstrs[module_var] }}" {{ readonly }} placeholder="whsec_...">
+                {# Sprint 113: type=password by default + eye-toggle. #}
+                <span class="stripe-key-field">
+                    <input type="password" class="txt" style="width: 350px;" name="confstrs[{{ module_var }}]" value="{{ confstrs[module_var] }}" {{ readonly }} placeholder="whsec_..." data-stripe-secret autocomplete="off">
+                    <button type="button" class="stripe-key-toggle"
+                            aria-label="{{ translate({ ident: 'STRIPE_REVEAL_API_KEY' }) }}"
+                            data-label-reveal="{{ translate({ ident: 'STRIPE_REVEAL_API_KEY' }) }}"
+                            data-label-hide="{{ translate({ ident: 'STRIPE_HIDE_API_KEY' }) }}"
+                            aria-pressed="false">&#128065;</button>
+                </span>
                 {% include "inputhelp.html.twig" with {'sHelpId': help_id("HELP_SHOP_MODULE_" ~ module_var), 'sHelpText': help_text("HELP_SHOP_MODULE_" ~ module_var)} %}
             </dt>
             <dd style="white-space: nowrap;">
                 <span style="float:left;">{{ translate({ ident: "SHOP_MODULE_" ~ module_var }) }}</span>
                 {% if confstrs[module_var] %}
-                    <span style="margin-left: 1em; color: green;">&#10003; {{ translate({ ident: "STRIPE_WEBHOOK_CONFIGURED" }) }}</span>
+                    <span style="margin-left: 1em;" class="smc-status-ok">&#10003; {{ translate({ ident: "STRIPE_WEBHOOK_CONFIGURED" }) }}</span>
                 {% else %}
-                    <span style="margin-left: 1em; color: orange;">&#9888; {{ translate({ ident: "STRIPE_WEBHOOK_NOT_SET" }) }}</span>
+                    <span style="margin-left: 1em;" class="smc-status-warn">&#9888; {{ translate({ ident: "STRIPE_WEBHOOK_NOT_SET" }) }}</span>
                 {% endif %}
             </dd>
             <div class="spacer"></div>
@@ -284,6 +313,190 @@
             .stripe-connect.white span::after {
                 background-image: url("data:image/svg+xml,%3C%3Fxml version='1.0' encoding='utf-8'%3F%3E%3C!-- Generator: Adobe Illustrator 24.0.3, SVG Export Plug-In . SVG Version: 6.00 Build 0) --%3E%3Csvg version='1.1' id='Layer_1' xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' x='0px' y='0px' viewBox='0 0 468 222.5' style='enable-background:new 0 0 468 222.5;' xml:space='preserve'%3E%3Cstyle type='text/css'%3E .st0%7Bfill-rule:evenodd;clip-rule:evenodd;fill:%230A2540;%7D%0A%3C/style%3E%3Cg%3E%3Cpath class='st0' d='M414,113.4c0-25.6-12.4-45.8-36.1-45.8c-23.8,0-38.2,20.2-38.2,45.6c0,30.1,17,45.3,41.4,45.3 c11.9,0,20.9-2.7,27.7-6.5v-20c-6.8,3.4-14.6,5.5-24.5,5.5c-9.7,0-18.3-3.4-19.4-15.2h48.9C413.8,121,414,115.8,414,113.4z M364.6,103.9c0-11.3,6.9-16,13.2-16c6.1,0,12.6,4.7,12.6,16H364.6z'/%3E%3Cpath class='st0' d='M301.1,67.6c-9.8,0-16.1,4.6-19.6,7.8l-1.3-6.2h-22v116.6l25-5.3l0.1-28.3c3.6,2.6,8.9,6.3,17.7,6.3 c17.9,0,34.2-14.4,34.2-46.1C335.1,83.4,318.6,67.6,301.1,67.6z M295.1,136.5c-5.9,0-9.4-2.1-11.8-4.7l-0.1-37.1 c2.6-2.9,6.2-4.9,11.9-4.9c9.1,0,15.4,10.2,15.4,23.3C310.5,126.5,304.3,136.5,295.1,136.5z'/%3E%3Cpolygon class='st0' points='223.8,61.7 248.9,56.3 248.9,36 223.8,41.3 '/%3E%3Crect x='223.8' y='69.3' class='st0' width='25.1' height='87.5'/%3E%3Cpath class='st0' d='M196.9,76.7l-1.6-7.4h-21.6v87.5h25V97.5c5.9-7.7,15.9-6.3,19-5.2v-23C214.5,68.1,202.8,65.9,196.9,76.7z'/%3E%3Cpath class='st0' d='M146.9,47.6l-24.4,5.2l-0.1,80.1c0,14.8,11.1,25.7,25.9,25.7c8.2,0,14.2-1.5,17.5-3.3V135 c-3.2,1.3-19,5.9-19-8.9V90.6h19V69.3h-19L146.9,47.6z'/%3E%3Cpath class='st0' d='M79.3,94.7c0-3.9,3.2-5.4,8.5-5.4c7.6,0,17.2,2.3,24.8,6.4V72.2c-8.3-3.3-16.5-4.6-24.8-4.6 C67.5,67.6,54,78.2,54,95.9c0,27.6,38,23.2,38,35.1c0,4.6-4,6.1-9.6,6.1c-8.3,0-18.9-3.4-27.3-8v23.8c9.3,4,18.7,5.7,27.3,5.7 c20.8,0,35.1-10.3,35.1-28.2C117.4,100.6,79.3,105.9,79.3,94.7z'/%3E%3C/g%3E%3C/svg%3E");
             }
+
+            /* ============================================================
+               Sprint 114 — Stripe module config: lift the payment-tab look
+               (cards, soft borders, Stripe-purple accents, modern inputs).
+               Scoped to .module_config so we don't bleed into other admin pages.
+               ============================================================ */
+            body.module_config {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                font-size: 13px;
+                color: #1a1a2e;
+            }
+
+            /* Inputs + selects */
+            body.module_config input[type="text"],
+            body.module_config input[type="password"],
+            body.module_config select.editinput,
+            body.module_config select {
+                padding: 6px 10px;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                font-size: 13px;
+                font-family: inherit;
+                color: #1a1a2e;
+                background: #fff;
+                line-height: 1.4;
+                transition: border-color .15s, box-shadow .15s;
+            }
+            body.module_config input[type="text"]:focus,
+            body.module_config input[type="password"]:focus,
+            body.module_config select:focus {
+                border-color: #635bff;
+                outline: none;
+                box-shadow: 0 0 0 3px rgba(99,91,255,.15);
+            }
+            body.module_config input[readonly][disabled],
+            body.module_config input[disabled] {
+                background: #f9fafb;
+                color: #6b7280;
+            }
+
+            /* Setting rows */
+            body.module_config .groupExp + dl,
+            body.module_config dl {
+                padding: 4px 0;
+            }
+            body.module_config dl dt { padding-bottom: 4px; }
+            body.module_config dl dd { color: #4b5563; font-size: 12.5px; }
+
+            /* Group headers (collapsible "Basic configuration", "Webhooks") */
+            body.module_config .groupExp {
+                background: #f9fafb;
+                border: 1px solid #e5e7eb;
+                border-radius: 8px;
+                padding: 10px 14px;
+                font-weight: 600;
+                font-size: 14px;
+                color: #1a1a2e;
+                margin: 16px 0 8px;
+                cursor: pointer;
+            }
+            body.module_config .groupExp:hover { background: #f3f4f6; }
+
+            /* Bottom "Save" / "Reset" button bar */
+            body.module_config input[type="submit"],
+            body.module_config input.edittext {
+                background: #635bff;
+                color: #fff;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 18px;
+                font-weight: 500;
+                font-size: 13px;
+                cursor: pointer;
+                transition: background .15s;
+            }
+            body.module_config input[type="submit"]:hover,
+            body.module_config input.edittext:hover {
+                background: #4b45c6;
+            }
+
+            /* Sprint 113: sensitive-key fields render with type=password + eye toggle. */
+            .stripe-key-field {
+                display: inline-block;
+                white-space: nowrap;
+            }
+            .stripe-key-toggle {
+                background: transparent;
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+                padding: 0 6px;
+                cursor: pointer;
+                font-size: 11px;
+                line-height: 1;
+                margin-left: 6px;
+                vertical-align: middle;
+                height: 22px;
+                color: #6b7280;
+                transition: border-color .15s, color .15s, background .15s;
+            }
+            .stripe-key-toggle:hover {
+                background: #f9fafb;
+                border-color: #635bff;
+                color: #635bff;
+            }
+            .stripe-key-toggle:focus {
+                outline: none;
+                border-color: #635bff;
+                box-shadow: 0 0 0 3px rgba(99,91,255,.15);
+            }
+            .stripe-key-toggle[aria-pressed="true"] {
+                background: #eef0ff;
+                border-color: #635bff;
+                color: #4b45c6;
+            }
+
+            /* Stripe-tab-style alerts, badges, status hints */
+            .smc-alert {
+                padding: 12px 16px;
+                border-radius: 8px;
+                margin-bottom: 12px;
+                font-size: 13px;
+                display: flex;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            .smc-alert-warning { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+            .smc-alert-warning strong { color: #78350f; font-weight: 600; }
+            .smc-alert-warning p { margin: 4px 0 0; font-size: 12px; color: #78350f; }
+            .smc-alert-info    { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
+            .smc-alert-muted   { background: #f9fafb; border: 1px solid #e5e7eb; color: #6b7280; padding: 8px 12px; border-radius: 6px; font-size: 12px; }
+
+            .smc-status-ok   { color: #059669; font-weight: 500; }
+            .smc-status-warn { color: #d97706; font-weight: 500; }
+            .smc-status-muted { color: #9ca3af; font-size: 12px; }
+
+            /* Stripe-tab-style buttons for the webhook section */
+            .smc-btn {
+                display: inline-block;
+                padding: 7px 14px;
+                border: none;
+                border-radius: 6px;
+                font-size: 13px;
+                font-weight: 500;
+                font-family: inherit;
+                cursor: pointer;
+                text-decoration: none;
+                margin-top: 6px;
+                transition: background .15s, color .15s, border-color .15s;
+            }
+            .smc-btn-primary { background: #635bff; color: #fff; }
+            .smc-btn-primary:hover { background: #4b45c6; }
+            .smc-btn-primary:disabled { background: #c7c5ef; cursor: not-allowed; }
+            .smc-btn-danger-outline { background: #fff; color: #dc2626; border: 1px solid #fca5a5; }
+            .smc-btn-danger-outline:hover { background: #fef2f2; }
+            .smc-btn-danger-outline:disabled { color: #fca5a5; cursor: not-allowed; }
+
+            .smc-msg { margin-left: 10px; font-size: 12px; vertical-align: middle; }
         </style>
+
+        <script>
+        (function () {
+            function attach(button) {
+                var wrapper = button.parentElement;
+                var input = wrapper && wrapper.querySelector('input[data-stripe-secret]');
+                if (!input) { return; }
+                button.addEventListener('click', function () {
+                    var revealing = input.type === 'password';
+                    input.type = revealing ? 'text' : 'password';
+                    button.setAttribute('aria-pressed', revealing ? 'true' : 'false');
+                    var newLabel = revealing
+                        ? button.getAttribute('data-label-hide')
+                        : button.getAttribute('data-label-reveal');
+                    if (newLabel) { button.setAttribute('aria-label', newLabel); }
+                });
+            }
+            function init() {
+                document.querySelectorAll('button.stripe-key-toggle').forEach(attach);
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+        }());
+        </script>
     {% endif %}
 {% endblock %}

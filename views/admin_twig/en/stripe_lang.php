@@ -169,4 +169,8 @@ $aLang = array(
     'STRIPE_CANCEL_FAILED'                              => 'Authorization cancellation failed.',
     'STRIPE_CANCEL_NO_ORDER'                            => 'Order not found.',
     'STRIPE_CANCEL_NO_TRANSACTION'                      => 'No transaction ID found for this order.',
+
+    // Sprint 113 — masked API-key fields with eye-toggle
+    'STRIPE_REVEAL_API_KEY'                             => 'Reveal API key',
+    'STRIPE_HIDE_API_KEY'                               => 'Hide API key',
 );

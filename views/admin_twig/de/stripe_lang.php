@@ -169,4 +169,8 @@ $aLang = array(
     'STRIPE_CANCEL_FAILED'                              => 'Stornierung der Autorisierung fehlgeschlagen.',
     'STRIPE_CANCEL_NO_ORDER'                            => 'Bestellung nicht gefunden.',
     'STRIPE_CANCEL_NO_TRANSACTION'                      => 'Keine Transaktions-ID für diese Bestellung gefunden.',
+
+    // Sprint 113 — maskierte API-Schlüssel-Felder mit Augen-Umschalter
+    'STRIPE_REVEAL_API_KEY'                             => 'API-Schlüssel anzeigen',
+    'STRIPE_HIDE_API_KEY'                               => 'API-Schlüssel verbergen',
 );
