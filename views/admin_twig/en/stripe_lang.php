@@ -13,6 +13,8 @@ $aLang = array(
 
     /* SETTINGS */
     'SHOP_MODULE_GROUP_STRIPE_GENERAL'                  => 'Basic configuration',
+    'SHOP_MODULE_GROUP_STRIPE_TEST_CONFIG'              => 'Test Configuration',
+    'SHOP_MODULE_GROUP_STRIPE_LIVE_CONFIG'              => 'Live Configuration',
     'SHOP_MODULE_sStripeMode'                           => 'Live or Test API',
     'SHOP_MODULE_sStripeMode_live'                      => 'Live',
     'SHOP_MODULE_sStripeMode_test'                      => 'Test',
@@ -169,4 +171,8 @@ $aLang = array(
     'STRIPE_CANCEL_FAILED'                              => 'Authorization cancellation failed.',
     'STRIPE_CANCEL_NO_ORDER'                            => 'Order not found.',
     'STRIPE_CANCEL_NO_TRANSACTION'                      => 'No transaction ID found for this order.',
+
+    // Sprint 113 — masked API-key fields with eye-toggle
+    'STRIPE_REVEAL_API_KEY'                             => 'Reveal API key',
+    'STRIPE_HIDE_API_KEY'                               => 'Hide API key',
 );

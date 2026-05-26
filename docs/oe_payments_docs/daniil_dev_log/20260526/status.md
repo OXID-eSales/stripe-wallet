@@ -12,6 +12,7 @@ _Continues from `../20260522/`._
 | 6 | Test `payment_intent.canceled` webhook path. Order 91 (262.00 EUR, manual capture), `POST /v1/payment_intents/pi_…SSpkuD1/cancel` → 1 webhook: `payment_intent.canceled` (SUCCESS: contract_cancelled). Contract row: state `committed → cancelled` (terminal). **Surfaced bug** — oxorder row not reverted on cancel (OXTRANSSTATUS stays OK, OXTRANSID still set). | `stripe` | ✅ Passed (with finding) | 2026-05-26 |
 | 7 | [Observations & inconsistencies report](reports/webhook-processing-observations.md) — 8 items: transaction audit log gap, `charge.captured` dead code, mis-labelled `payment_intent_id` log field, `OXCONTRACTID` NULL on skipped events, empty `OXPAYLOAD`, compressed state machine (`authorized` never persisted), order-row not reverted on cancel, untested `OXSTATEREASON`. Plus what-we-didn't-test list. | `stripe` (docs) | ✅ Filed | 2026-05-26 |
 | 8 | [Sprint 112 plan](done/sprint-112-webhook-processing-hardening.md) + [completion report](done/sprint-112-completion-report.md) — webhook processing hardening. All 5 goals landed (G1 cancelled-order revert, G2 skipped-event contract linkage, G3 transaction audit log writes, G4 correct PI in receipt log, G5 remove `charge.captured` dead code). 4 new test files (15 new unit tests) + 2 new production classes; 1 dead integration-test file + 5 dead unit tests deleted; 3 dead private helpers deleted. `./bin/pre-commit-check.sh --full` ✓. Net: unit tests 881 → 896, combined 1029 → 1034. PHPStan max + PHPMD strict + PHPCS all clean, baselines unchanged. Live browser smoke pending. | `stripe` | ✅ Done | 2026-05-26 |
+| 9 | [Sprint 113 plan](done/sprint-113-mask-api-keys-with-eye-toggle.md) + [completion report](done/sprint-113-completion-report.md) — mask API keys with `type="password"` + eye-toggle. All 6 goals landed: 7 sensitive fields now render as `<input type="password">` with adjacent eye button toggling reveal, keyboard-operable (Enter+Space), aria-label/aria-pressed flip with state, value preserved across toggles. Playwright spec 6/6 green. Pre-commit `--full` ✓. Pure frontend (Twig template + inline JS + 2 lang keys per locale + Playwright spec) — no PHP touched, PHPUnit/PHPStan/PHPMD/PHPCS baselines unchanged. Deviated: inlined JS instead of separate file (matches existing webhook-button pattern); Unicode 👁 instead of SVG icon. | `stripe` | ✅ Done | 2026-05-26 |
 
 ## Legend
 - ⬜ Not started
@@ -105,6 +106,14 @@ A  source/extensions/stripe/tests/Unit/Stripe/Handler/WebhookContractFulfillment
 M  source/extensions/stripe/tests/Unit/Stripe/Webhook/StripeWebhookProcessorTest.php
 M  source/extensions/stripe/tests/Unit/Stripe/Handler/WebhookContractFulfillmentHandlerTest.php
 D  source/extensions/stripe/tests/Integration/Stripe/Webhook/DelayedCaptureIntegrationTest.php
+
+# Sprint 113 production
+M  source/extensions/stripe/views/twig/extensions/themes/admin_twig/module_config.html.twig
+M  source/extensions/stripe/views/admin_twig/en/stripe_lang.php
+M  source/extensions/stripe/views/admin_twig/de/stripe_lang.php
+
+# Sprint 113 tests
+A  source/extensions/stripe/tests/e2e/playwright/playwright/tests/admin/stripe-api-key-mask.spec.ts
 
 # Dev log
 A  source/extensions/stripe/docs/oe_payments_docs/daniil_dev_log/20260526/

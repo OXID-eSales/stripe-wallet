@@ -79,16 +79,19 @@ $aModule = [
     ],
     'settings'      => [
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeMode',                        'type' => 'select',     'value' => 'test',      'position' => 10, 'constraints' => 'live|test'],
-        ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeTestToken',                   'type' => 'str',        'value' => '',          'position' => 20],
-        ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeTestPk',                      'type' => 'str',        'value' => '',          'position' => 21],
+        // Sprint 114: test credentials moved into their own group for visual separation from
+        // general checkboxes / capture mode.
+        ['group' => 'STRIPE_TEST_CONFIG',       'name' => 'sStripeTestToken',                   'type' => 'str',        'value' => '',          'position' => 20],
+        ['group' => 'STRIPE_TEST_CONFIG',       'name' => 'sStripeTestPk',                      'type' => 'str',        'value' => '',          'position' => 21],
         // Sprint 110: platform secret key for registering Connect webhooks (paste from Stripe Dashboard → Developers → API keys).
         // Distinct from sStripeTestToken (connected-account access_token from OAuth).
-        ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeTestKey',                     'type' => 'str',        'value' => '',          'position' => 22],
-        ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeLiveToken',                   'type' => 'str',        'value' => '',          'position' => 30],
-        ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeLivePk',                      'type' => 'str',        'value' => '',          'position' => 31],
+        ['group' => 'STRIPE_TEST_CONFIG',       'name' => 'sStripeTestKey',                     'type' => 'str',        'value' => '',          'position' => 22],
+        // Sprint 114: live credentials in their own group.
+        ['group' => 'STRIPE_LIVE_CONFIG',       'name' => 'sStripeLiveToken',                   'type' => 'str',        'value' => '',          'position' => 30],
+        ['group' => 'STRIPE_LIVE_CONFIG',       'name' => 'sStripeLivePk',                      'type' => 'str',        'value' => '',          'position' => 31],
         // Sprint 110: platform secret key for registering Connect webhooks (paste from Stripe Dashboard → Developers → API keys).
         // Distinct from sStripeLiveToken (connected-account access_token from OAuth).
-        ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeLiveKey',                     'type' => 'str',        'value' => '',          'position' => 32],
+        ['group' => 'STRIPE_LIVE_CONFIG',       'name' => 'sStripeLiveKey',                     'type' => 'str',        'value' => '',          'position' => 32],
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeLogTransactionInfo',         'type' => 'bool',       'value' => '1',         'position' => 34],
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeRemoveByBillingCountry',     'type' => 'bool',       'value' => '1',         'position' => 35],
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeRemoveByBasketCurrency',     'type' => 'bool',       'value' => '1',         'position' => 36],

@@ -13,6 +13,8 @@ $aLang = array(
 
     /* SETTINGS */
     'SHOP_MODULE_GROUP_STRIPE_GENERAL'                  => 'Grundkonfiguration',
+    'SHOP_MODULE_GROUP_STRIPE_TEST_CONFIG'              => 'Testkonfiguration',
+    'SHOP_MODULE_GROUP_STRIPE_LIVE_CONFIG'              => 'Live-Konfiguration',
     'SHOP_MODULE_sStripeMode'                           => 'Live oder Test API',
     'SHOP_MODULE_sStripeMode_live'                      => 'Live',
     'SHOP_MODULE_sStripeMode_test'                      => 'Test',
@@ -169,4 +171,8 @@ $aLang = array(
     'STRIPE_CANCEL_FAILED'                              => 'Stornierung der Autorisierung fehlgeschlagen.',
     'STRIPE_CANCEL_NO_ORDER'                            => 'Bestellung nicht gefunden.',
     'STRIPE_CANCEL_NO_TRANSACTION'                      => 'Keine Transaktions-ID für diese Bestellung gefunden.',
+
+    // Sprint 113 — maskierte API-Schlüssel-Felder mit Augen-Umschalter
+    'STRIPE_REVEAL_API_KEY'                             => 'API-Schlüssel anzeigen',
+    'STRIPE_HIDE_API_KEY'                               => 'API-Schlüssel verbergen',
 );
