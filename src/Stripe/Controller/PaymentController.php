@@ -12,13 +12,17 @@ namespace OxidEsales\Payments\Stripe\Controller;
 use OxidEsales\Eshop\Application\Controller\PaymentController as CorePaymentController;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\Payments\Stripe\Service\ContractTokenService;
+use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
 
 /**
- * Extended payment controller for Stripe integration
- * Adds Stripe-specific logic to payment method selection page
+ * Extended payment controller for Stripe integration.
+ *
+ * Adds Stripe-specific logic to payment method selection page.
+ * Session access is fully delegated to ControllerRequestHelper (D6).
  */
 class PaymentController extends CorePaymentController
 {
@@ -27,6 +31,20 @@ class PaymentController extends CorePaymentController
     private function getStripeConfig(): ModuleConfigurationServiceInterface
     {
         return $this->getServiceFromContainer(ModuleConfigurationServiceInterface::class);
+    }
+
+    /**
+     * Testability seam: returns the ControllerRequestHelper for session/request access.
+     *
+     * Overridden in test subclasses to inject a stub without Registry.
+     */
+    protected function getRequestHelper(): ControllerRequestHelper
+    {
+        return new ControllerRequestHelper(
+            $this->getServiceFromContainer(ContractTokenService::class),
+            $this->getServiceFromContainer(ModuleConfigurationServiceInterface::class),
+            $this->getServiceFromContainer(LanguageResolverInterface::class),
+        );
     }
 
     /**
@@ -49,18 +67,20 @@ class PaymentController extends CorePaymentController
     /**
      * Clean up a stale Stripe checkout attempt if one exists in the session.
      *
-     * When a user navigates back from Stripe Checkout without completing
-     * payment, the early-created NOT_FINISHED order still holds vouchers
-     * as "used". This method detects that state and runs the cleanup,
-     * releasing the vouchers so they can be reused.
+     * Delegates all session reads and clears to ControllerRequestHelper so that
+     * the full key set (stripe_payment_intent_id, stripe_client_secret,
+     * stripe_checkout_session_id, stripe_contract_id, stripe_skip_addr_check)
+     * is always cleared — not a partial subset (D6).
+     *
+     * Protected so testable subclasses can call this directly without triggering
+     * OXID's __call dispatch.
      *
      * @since 2.0.0 STRP-105
      */
-    private function cleanupStaleCheckoutAttempt(): void
+    protected function cleanupStaleCheckoutAttempt(): void
     {
-        $session = Registry::getSession();
-        /** @var string|null $contractId */
-        $contractId = $session->getVariable('stripe_contract_id');
+        $helper = $this->getRequestHelper();
+        $contractId = $helper->getContractIdFromSession();
 
         if ($contractId === null) {
             return;
@@ -75,8 +95,7 @@ class PaymentController extends CorePaymentController
             ]);
         }
 
-        $session->deleteVariable('stripe_contract_id');
-        $session->deleteVariable('stripe_checkout_session_id');
+        $helper->clearStripeSessionVariables();
     }
 
     /**
