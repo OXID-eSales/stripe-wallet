@@ -16,6 +16,14 @@ use OxidEsales\PaymentBase\Repository\WebhookLogRepositoryInterface;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
+use OxidEsales\Payments\Stripe\Webhook\Handler\ChargeDisputeCreatedWebhookHandler;
+use OxidEsales\Payments\Stripe\Webhook\Handler\ChargeRefundedWebhookHandler;
+use OxidEsales\Payments\Stripe\Webhook\Handler\CheckoutSessionCompletedWebhookHandler;
+use OxidEsales\Payments\Stripe\Webhook\Handler\CheckoutSessionExpiredWebhookHandler;
+use OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentCanceledWebhookHandler;
+use OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentFailedWebhookHandler;
+use OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededWebhookHandler;
+use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;
 use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -29,6 +37,9 @@ use ReflectionClass;
  * Sprint 114.4a — safety net capturing the exact WebhookResult (success/skip/failure + action)
  * and the contract ID from getContractIdFromResult() for ALL 7 handled event types and their
  * significant sub-branches. These tests MUST remain green through the entire refactor.
+ *
+ * After Sprint 114.4b the processor uses a tagged handler registry; createProcessor() wires the
+ * actual handler instances so behavior parity is verified against the real implementation.
  *
  * Event types covered:
  *   1. payment_intent.succeeded  (5 sub-branches)
@@ -638,12 +649,58 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
 
     private function createProcessor(): StripeWebhookProcessor
     {
+        $parser = new StripeWebhookEventParser();
+
+        $handlers = [
+            new PaymentIntentSucceededWebhookHandler(
+                $parser,
+                $this->fulfillmentHandler,
+                $this->contractRepository,
+                $this->logger
+            ),
+            new PaymentIntentFailedWebhookHandler(
+                $parser,
+                $this->fulfillmentHandler,
+                $this->contractRepository,
+                $this->logger
+            ),
+            new PaymentIntentCanceledWebhookHandler(
+                $parser,
+                $this->fulfillmentHandler,
+                $this->contractRepository,
+                $this->logger
+            ),
+            new ChargeRefundedWebhookHandler(
+                $parser,
+                $this->fulfillmentHandler,
+                $this->contractRepository,
+                $this->logger
+            ),
+            new ChargeDisputeCreatedWebhookHandler(
+                $parser,
+                $this->fulfillmentHandler,
+                $this->contractRepository,
+                $this->logger
+            ),
+            new CheckoutSessionCompletedWebhookHandler(
+                $parser,
+                $this->fulfillmentHandler,
+                $this->contractRepository,
+                $this->logger
+            ),
+            new CheckoutSessionExpiredWebhookHandler(
+                $parser,
+                $this->fulfillmentHandler,
+                $this->contractRepository,
+                $this->logger
+            ),
+        ];
+
         return new StripeWebhookProcessor(
             $this->logRepository,
             $this->logger,
             $this->config,
-            $this->fulfillmentHandler,
-            $this->contractRepository
+            $handlers
         );
     }
 

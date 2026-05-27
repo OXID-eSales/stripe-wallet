@@ -856,15 +856,88 @@ services:
   # ==========================================
   # New webhook processor using Template Method pattern from payment-base.
   # Consolidates: signature verification, idempotency, logging, event routing.
+  #
+  # Sprint 114.4: Event routing is now open-for-extension (OCP) via tagged handler
+  # registry — new event types are handled by registering a new
+  # StripeWebhookEventHandlerInterface tagged 'stripe.webhook_handler', without
+  # editing this class.
+
+  OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser:
+    public: false
 
   OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor:
     arguments:
       $logRepository: '@OxidEsales\PaymentBase\Repository\WebhookLogRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
       $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+      $handlers: !tagged_iterator stripe.webhook_handler
+    public: true
+
+  # Sprint 114.4: Tagged stripe.webhook_handler services — one per event type.
+  # Registered here; injected into StripeWebhookProcessor via !tagged_iterator.
+
+  OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededWebhookHandler:
+    arguments:
+      $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
       $fulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
-    public: true
+      $logger: '@oxid_esales.monolog.logger'
+    tags: [ { name: stripe.webhook_handler } ]
+    public: false
+
+  OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentFailedWebhookHandler:
+    arguments:
+      $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    tags: [ { name: stripe.webhook_handler } ]
+    public: false
+
+  OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentCanceledWebhookHandler:
+    arguments:
+      $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    tags: [ { name: stripe.webhook_handler } ]
+    public: false
+
+  OxidEsales\Payments\Stripe\Webhook\Handler\ChargeRefundedWebhookHandler:
+    arguments:
+      $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    tags: [ { name: stripe.webhook_handler } ]
+    public: false
+
+  OxidEsales\Payments\Stripe\Webhook\Handler\ChargeDisputeCreatedWebhookHandler:
+    arguments:
+      $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    tags: [ { name: stripe.webhook_handler } ]
+    public: false
+
+  OxidEsales\Payments\Stripe\Webhook\Handler\CheckoutSessionCompletedWebhookHandler:
+    arguments:
+      $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    tags: [ { name: stripe.webhook_handler } ]
+    public: false
+
+  OxidEsales\Payments\Stripe\Webhook\Handler\CheckoutSessionExpiredWebhookHandler:
+    arguments:
+      $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    tags: [ { name: stripe.webhook_handler } ]
+    public: false
 
   # ==========================================
   # Repositories (Data Access Layer)
@@ -1030,19 +1103,9 @@ services:
   # ==========================================
   # Webhook Handlers (Sprint 13)
   # ==========================================
-
-  # PaymentIntentSucceededHandler - Handles payment_intent.succeeded webhooks
-  # Sprint 16: Uses OrderPaymentStateService for OXPAID updates (DRY)
-  # Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
-  OxidEsales\Payments\Stripe\WebhookHandler\PaymentIntentSucceededHandler:
-    arguments:
-      $orderPaymentStateService: '@OxidEsales\PaymentBase\Service\OrderPaymentStateServiceInterface'
-      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
-      $contractFulfillmentService: '@OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface'
-      $transactionRepository: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
-      $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
-      $logger: '@oxid_esales.monolog.logger'
-    public: false
+  # Sprint 114.4: Dead webhook handlers removed (PaymentIntentSucceededHandler,
+  # ChargeRefundedHandler). Their functionality is now implemented as tagged
+  # stripe.webhook_handler services registered above (near StripeWebhookProcessor).
 
   # ==========================================
   # OXPAID Reconciliation (Sprint 10)

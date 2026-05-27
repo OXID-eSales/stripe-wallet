@@ -10,22 +10,24 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Webhook;
 
 use DateTimeImmutable;
-use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
-use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\WebhookLogRepositoryInterface;
 use OxidEsales\PaymentBase\Webhook\Exception\WebhookSignatureException;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\PaymentBase\Webhook\WebhookRequest;
 use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
+use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventHandlerInterface;
+use OxidEsales\Payments\Stripe\Webhook\StripeWebhookOutcome;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;
-use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 /**
- * Tests for StripeWebhookProcessor.
+ * Tests for StripeWebhookProcessor infrastructure (non-routing concerns).
+ *
+ * Event-type routing behavior is covered exhaustively by
+ * StripeWebhookProcessorCharacterizationTest.
  *
  * @covers \OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor
  */
@@ -34,23 +36,18 @@ class StripeWebhookProcessorTest extends TestCase
     private WebhookLogRepositoryInterface&MockObject $logRepository;
     private LoggerInterface&MockObject $logger;
     private ModuleConfigurationServiceInterface&MockObject $config;
-    private WebhookContractFulfillmentHandlerInterface&MockObject $fulfillmentHandler;
-    private ContractRepositoryInterface&MockObject $contractRepository;
 
     protected function setUp(): void
     {
         $this->logRepository = $this->createMock(WebhookLogRepositoryInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->config = $this->createMock(ModuleConfigurationServiceInterface::class);
-        $this->fulfillmentHandler = $this->createMock(WebhookContractFulfillmentHandlerInterface::class);
-        $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
     }
 
     public function testGetProviderNameReturnsStripe(): void
     {
         $processor = $this->createProcessor();
 
-        // Use reflection to test protected method
         $reflection = new \ReflectionClass($processor);
         $method = $reflection->getMethod('getProviderName');
 
@@ -72,7 +69,6 @@ class StripeWebhookProcessorTest extends TestCase
 
         $processor = $this->createProcessor();
 
-        // Use reflection to test protected method
         $reflection = new \ReflectionClass($processor);
         $method = $reflection->getMethod('parseAndValidateRequest');
 
@@ -80,97 +76,129 @@ class StripeWebhookProcessorTest extends TestCase
         $method->invoke($processor, $request);
     }
 
-    public function testProcessEventHandlesPaymentIntentSucceeded(): void
+    public function testProcessEventDispatchesToSupportingHandler(): void
     {
         $event = new WebhookEvent(
-            id: 'evt_123',
-            type: 'payment_intent.succeeded',
-            data: ['object' => ['id' => 'pi_test123', 'amount' => 1000]],
+            id: 'evt_dispatch',
+            type: 'charge.refunded',
+            data: ['object' => ['id' => 'ch_x']],
             created: time()
         );
 
-        $this->fulfillmentHandler->expects($this->once())
-            ->method('handlePaymentSucceeded')
-            ->with('pi_test123')
-            ->willReturn(true);
+        $expectedResult = WebhookResult::success('charge_refunded');
 
-        $processor = $this->createProcessor();
+        $handler = $this->createMock(StripeWebhookEventHandlerInterface::class);
+        $handler->method('supports')->with('charge.refunded')->willReturn(true);
+        $handler->expects($this->once())
+            ->method('handle')
+            ->with($event)
+            ->willReturn(StripeWebhookOutcome::of($expectedResult, 'ctr-dispatch'));
 
-        // Use reflection to test protected method
-        $reflection = new \ReflectionClass($processor);
-        $method = $reflection->getMethod('processEvent');
+        $processor = $this->createProcessor([$handler]);
 
-        $result = $method->invoke($processor, $event);
+        $result = $this->invokeProtected($processor, 'processEvent', $event);
 
-        $this->assertTrue($result->isSuccess());
+        $this->assertSame('charge_refunded', $result->action);
+        $this->assertSame(
+            'ctr-dispatch',
+            $this->invokeProtected($processor, 'getContractIdFromResult', $result)
+        );
+    }
+
+    public function testProcessEventSkipsNonSupportingHandlerAndDispatchesToSupporting(): void
+    {
+        $event = new WebhookEvent(
+            id: 'evt_order',
+            type: 'payment_intent.succeeded',
+            data: ['object' => ['id' => 'pi_x']],
+            created: time()
+        );
+
+        $nonSupporting = $this->createMock(StripeWebhookEventHandlerInterface::class);
+        $nonSupporting->method('supports')->willReturn(false);
+        $nonSupporting->expects($this->never())->method('handle');
+
+        $supporting = $this->createMock(StripeWebhookEventHandlerInterface::class);
+        $supporting->method('supports')->with('payment_intent.succeeded')->willReturn(true);
+        $supporting->expects($this->once())
+            ->method('handle')
+            ->willReturn(StripeWebhookOutcome::of(WebhookResult::success('contract_fulfilled'), 'ctr-1'));
+
+        $processor = $this->createProcessor([$nonSupporting, $supporting]);
+
+        $result = $this->invokeProtected($processor, 'processEvent', $event);
+
         $this->assertSame('contract_fulfilled', $result->action);
     }
 
-    public function testProcessEventHandlesPaymentIntentFailed(): void
+    public function testProcessEventReturnsSkippedWhenNoHandlerSupports(): void
     {
         $event = new WebhookEvent(
-            id: 'evt_123',
-            type: 'payment_intent.payment_failed',
-            data: [
-                'object' => [
-                    'id' => 'pi_test123',
-                    'last_payment_error' => ['message' => 'Card declined'],
-                ],
-            ],
+            id: 'evt_unknown',
+            type: 'customer.created',
+            data: ['object' => ['id' => 'cus_x']],
             created: time()
         );
 
-        $this->fulfillmentHandler->expects($this->once())
-            ->method('handlePaymentFailed')
-            ->with('pi_test123', 'Card declined')
-            ->willReturn(true);
-
         $processor = $this->createProcessor();
 
-        $reflection = new \ReflectionClass($processor);
-        $method = $reflection->getMethod('processEvent');
-
-        $result = $method->invoke($processor, $event);
+        $result = $this->invokeProtected($processor, 'processEvent', $event);
 
         $this->assertTrue($result->isSuccess());
-        $this->assertSame('contract_failed', $result->action);
+        $this->assertSame('skipped', $result->action);
+        $this->assertSame('Unhandled event type: customer.created', $result->error);
     }
 
-    public function testProcessEventHandlesPaymentIntentCanceled(): void
+    public function testProcessEventPropagatesContractIdFromOutcome(): void
     {
         $event = new WebhookEvent(
-            id: 'evt_123',
-            type: 'payment_intent.canceled',
-            data: [
-                'object' => [
-                    'id' => 'pi_test123',
-                    'cancellation_reason' => 'requested_by_customer',
-                ],
-            ],
+            id: 'evt_cid',
+            type: 'charge.dispute.created',
+            data: ['object' => ['id' => 'dp_1']],
             created: time()
         );
 
-        $this->fulfillmentHandler->expects($this->once())
-            ->method('handlePaymentCanceled')
-            ->with('pi_test123', 'requested_by_customer')
-            ->willReturn(true);
+        $handler = $this->createMock(StripeWebhookEventHandlerInterface::class);
+        $handler->method('supports')->willReturn(true);
+        $handler->method('handle')->willReturn(
+            StripeWebhookOutcome::of(WebhookResult::success('dispute_logged'), 'ctr-linked')
+        );
 
-        $processor = $this->createProcessor();
+        $processor = $this->createProcessor([$handler]);
 
-        $reflection = new \ReflectionClass($processor);
-        $method = $reflection->getMethod('processEvent');
+        $result = $this->invokeProtected($processor, 'processEvent', $event);
 
-        $result = $method->invoke($processor, $event);
+        $this->assertSame(
+            'ctr-linked',
+            $this->invokeProtected($processor, 'getContractIdFromResult', $result)
+        );
+    }
 
-        $this->assertTrue($result->isSuccess());
-        $this->assertSame('contract_cancelled', $result->action);
+    public function testProcessEventSetsNullContractIdWhenHandlerReturnsNullContractId(): void
+    {
+        $event = new WebhookEvent(
+            id: 'evt_nocontract',
+            type: 'charge.dispute.created',
+            data: ['object' => ['id' => 'dp_2']],
+            created: time()
+        );
+
+        $handler = $this->createMock(StripeWebhookEventHandlerInterface::class);
+        $handler->method('supports')->willReturn(true);
+        $handler->method('handle')->willReturn(
+            StripeWebhookOutcome::of(WebhookResult::success('dispute_logged'))
+        );
+
+        $processor = $this->createProcessor([$handler]);
+
+        $result = $this->invokeProtected($processor, 'processEvent', $event);
+
+        $this->assertNull($this->invokeProtected($processor, 'getContractIdFromResult', $result));
     }
 
     public function testProcessEventFallsThroughForChargeCaptured(): void
     {
-        // Sprint 112 / G5: charge.captured is dead code in production
-        // (payment_intent.succeeded always wins the race). Removed from
-        // the processor match arms and from the registered event list.
+        // charge.captured is not handled — it was dead code removed in Sprint 112.
         $event = new WebhookEvent(
             id: 'evt_123',
             type: 'charge.captured',
@@ -180,188 +208,22 @@ class StripeWebhookProcessorTest extends TestCase
 
         $processor = $this->createProcessor();
 
-        $reflection = new \ReflectionClass($processor);
-        $method = $reflection->getMethod('processEvent');
-
-        $result = $method->invoke($processor, $event);
+        $result = $this->invokeProtected($processor, 'processEvent', $event);
 
         $this->assertSame('skipped', $result->action);
         $this->assertSame('Unhandled event type: charge.captured', $result->error);
     }
 
-    public function testProcessEventHandlesChargeRefunded(): void
-    {
-        $event = new WebhookEvent(
-            id: 'evt_123',
-            type: 'charge.refunded',
-            data: [
-                'object' => [
-                    'id' => 'ch_test123',
-                    'payment_intent' => 'pi_test456',
-                    'amount_refunded' => 2500,
-                ],
-            ],
-            created: time()
-        );
-
-        $this->fulfillmentHandler->expects($this->once())
-            ->method('handleChargeRefunded')
-            ->with('pi_test456', 25.0) // Amount in currency units
-            ->willReturn(true);
-
-        $processor = $this->createProcessor();
-
-        $reflection = new \ReflectionClass($processor);
-        $method = $reflection->getMethod('processEvent');
-
-        $result = $method->invoke($processor, $event);
-
-        $this->assertTrue($result->isSuccess());
-        $this->assertSame('charge_refunded', $result->action);
-    }
-
-    public function testProcessEventHandlesCheckoutSessionExpired(): void
-    {
-        $event = new WebhookEvent(
-            id: 'evt_123',
-            type: 'checkout.session.expired',
-            data: [
-                'object' => [
-                    'id' => 'cs_test123',
-                    'metadata' => ['contract_id' => 'contract_abc'],
-                ],
-            ],
-            created: time()
-        );
-
-        $this->fulfillmentHandler->expects($this->once())
-            ->method('handleSessionExpired')
-            ->with('contract_abc')
-            ->willReturn(true);
-
-        $processor = $this->createProcessor();
-
-        $reflection = new \ReflectionClass($processor);
-        $method = $reflection->getMethod('processEvent');
-
-        $result = $method->invoke($processor, $event);
-
-        $this->assertTrue($result->isSuccess());
-        $this->assertSame('session_expired', $result->action);
-    }
-
-    public function testProcessEventReturnsSkippedForUnhandledEventType(): void
-    {
-        $event = new WebhookEvent(
-            id: 'evt_123',
-            type: 'customer.created',
-            data: ['object' => ['id' => 'cus_test123']],
-            created: time()
-        );
-
-        $processor = $this->createProcessor();
-
-        $reflection = new \ReflectionClass($processor);
-        $method = $reflection->getMethod('processEvent');
-
-        $result = $method->invoke($processor, $event);
-
-        $this->assertTrue($result->isSuccess());
-        $this->assertSame('skipped', $result->action);
-        $this->assertSame('Unhandled event type: customer.created', $result->error);
-    }
-
-    public function testProcessEventReturnsSkippedWhenContractNotFound(): void
-    {
-        $event = new WebhookEvent(
-            id: 'evt_123',
-            type: 'payment_intent.succeeded',
-            data: ['object' => ['id' => 'pi_unknown']],
-            created: time()
-        );
-
-        $this->fulfillmentHandler->expects($this->once())
-            ->method('handlePaymentSucceeded')
-            ->with('pi_unknown')
-            ->willReturn(null); // Contract not found
-
-        $processor = $this->createProcessor();
-
-        $reflection = new \ReflectionClass($processor);
-        $method = $reflection->getMethod('processEvent');
-
-        $result = $method->invoke($processor, $event);
-
-        $this->assertTrue($result->isSuccess());
-        $this->assertSame('skipped', $result->action);
-    }
-
-    public function testProcessEventLinksContractIdWhenHandlerSkipsByStateGuard(): void
-    {
-        $event = new WebhookEvent(
-            id: 'evt_skip_with_contract',
-            type: 'charge.refunded',
-            data: ['object' => ['id' => 'ch_xyz', 'payment_intent' => 'pi_known', 'amount_refunded' => 1000]],
-            created: time()
-        );
-
-        $this->fulfillmentHandler->expects($this->once())
-            ->method('handleChargeRefunded')
-            ->with('pi_known', 10.0)
-            ->willReturn(false);
-
-        $contract = $this->createMock(PaymentContractInterface::class);
-        $contract->method('getId')->willReturn('contract-uuid-42');
-        $this->contractRepository->expects($this->once())
-            ->method('findByProviderOrderId')
-            ->with('pi_known')
-            ->willReturn($contract);
-
-        $processor = $this->createProcessor();
-
-        $result = $this->invokeProtected($processor, 'processEvent', $event);
-
-        $this->assertSame('skipped', $result->action);
-        $this->assertSame(
-            'contract-uuid-42',
-            $this->invokeProtected($processor, 'getContractIdFromResult', $result),
-            'OXCONTRACTID must be linked even when the action was skipped'
-        );
-    }
-
-    public function testProcessEventDoesNotLinkContractIdWhenLookupReturnsNull(): void
-    {
-        $event = new WebhookEvent(
-            id: 'evt_skip_no_contract',
-            type: 'charge.refunded',
-            data: ['object' => ['id' => 'ch_xyz', 'payment_intent' => 'pi_unknown', 'amount_refunded' => 1000]],
-            created: time()
-        );
-
-        $this->fulfillmentHandler->expects($this->once())
-            ->method('handleChargeRefunded')
-            ->with('pi_unknown', 10.0)
-            ->willReturn(null);
-
-        $this->contractRepository->expects($this->never())
-            ->method('findByProviderOrderId');
-
-        $processor = $this->createProcessor();
-
-        $result = $this->invokeProtected($processor, 'processEvent', $event);
-
-        $this->assertSame('skipped', $result->action);
-        $this->assertNull($this->invokeProtected($processor, 'getContractIdFromResult', $result));
-    }
-
-    private function createProcessor(): StripeWebhookProcessor
+    /**
+     * @param list<StripeWebhookEventHandlerInterface> $handlers
+     */
+    private function createProcessor(array $handlers = []): StripeWebhookProcessor
     {
         return new StripeWebhookProcessor(
             $this->logRepository,
             $this->logger,
             $this->config,
-            $this->fulfillmentHandler,
-            $this->contractRepository
+            $handlers
         );
     }
 
