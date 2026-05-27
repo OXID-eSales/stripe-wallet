@@ -12,6 +12,7 @@ namespace OxidEsales\Payments\Stripe\Service;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult;
+use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -97,7 +98,7 @@ final class CheckoutReturnService implements CheckoutReturnServiceInterface
             'contract_id' => $contractId,
             'payment_intent_id' => $paymentIntentId,
             'payment_intent_status' => $paymentIntentStatus,
-            'amount' => $amountTotal / 100,
+            'amount' => AmountConverter::toMajorUnits($amountTotal, strtoupper($currency)),
             'currency' => $currency,
         ]);
 

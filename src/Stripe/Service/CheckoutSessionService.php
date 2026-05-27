@@ -14,6 +14,7 @@ use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelUrlBuildEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeSuccessUrlBuildEvent;
+use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\Service\Result\CheckoutSessionResult;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
@@ -166,7 +167,7 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
             $lineItems[] = [
                 'price_data' => [
                     'currency' => $currency,
-                    'unit_amount' => (int) round($unitPrice * 100),
+                    'unit_amount' => AmountConverter::toMinorUnits($unitPrice, $currency),
                     'product_data' => [
                         'name' => $title,
                     ],
@@ -189,7 +190,7 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
      */
     private function buildTotalLineItem(BasketSnapshot $snapshot, string $currency): array
     {
-        $totalCents = (int) round($snapshot->getTotalGross() * 100);
+        $totalCents = AmountConverter::toMinorUnits($snapshot->getTotalGross(), $currency);
 
         return [
             [

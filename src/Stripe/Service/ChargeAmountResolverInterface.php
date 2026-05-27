@@ -31,18 +31,18 @@ use Stripe\Charge;
 interface ChargeAmountResolverInterface
 {
     /**
-     * Amount actually refunded to the customer, in shop currency units (not cents).
+     * Amount actually refunded to the customer, in shop currency major units.
      *
-     * Computed as max(0, amount_refunded − max(0, amount − amount_captured)).
-     * Never negative. Never exceeds amount_captured / 100.
+     * Computed as AmountConverter::toMajorUnits(max(0, amount_refunded − max(0, amount − amount_captured)), currency).
+     * Never negative. Never exceeds AmountConverter::toMajorUnits(amount_captured, currency).
      */
     public function customerRefundedAmount(Charge $charge): float;
 
     /**
-     * Amount still available to refund through the admin form, in shop currency units.
+     * Amount still available to refund through the admin form, in shop currency major units.
      *
-     * Computed as max(0, amount_captured − customerRefundedAmount * 100) / 100.
-     * Never negative. customerRefundedAmount + availableForRefund == amount_captured / 100.
+     * Computed via AmountConverter: max(0, toMajorUnits(amount_captured − toMinorUnits(customerRefundedAmount))).
+     * Never negative. customerRefundedAmount + availableForRefund == toMajorUnits(amount_captured, currency).
      */
     public function availableForRefund(Charge $charge): float;
 

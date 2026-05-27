@@ -9,15 +9,16 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use Stripe\Charge;
 
 /**
  * Resolves customer-refund and available-for-refund amounts from a Stripe Charge.
  *
- * Owns the partial-capture formula:
+ * Owns the partial-capture formula (all inputs are Stripe minor units from the Charge object):
  *   R_release  = max(0, amount − amount_captured)   (auth-released uncaptured remainder)
  *   R_customer = max(0, amount_refunded − R_release) (real customer refunds only)
- *   available  = max(0, amount_captured − R_customer * CENTS_PER_UNIT) / CENTS_PER_UNIT
+ *   available  = max(0, toMajorUnits(amount_captured − toMinorUnits(toMajorUnits(R_customer))))
  *
  * On a full capture (amount_captured == amount), R_release = 0 and the formula
  * collapses to the pre-fix values, so the regression path is preserved (G4).
@@ -30,10 +31,9 @@ use Stripe\Charge;
  */
 final class StripeChargeAmountResolver implements ChargeAmountResolverInterface
 {
-    private const CENTS_PER_UNIT = 100;
-
     public function customerRefundedAmount(Charge $charge): float
     {
+        $currency       = strtoupper($charge->currency ?? '');
         $amountCents    = (int) ($charge->amount ?? 0);
         $capturedCents  = (int) ($charge->amount_captured ?? 0);
         $refundedCents  = (int) ($charge->amount_refunded ?? 0);
@@ -41,15 +41,16 @@ final class StripeChargeAmountResolver implements ChargeAmountResolverInterface
         $releaseCents   = max(0, $amountCents - $capturedCents);
         $customerCents  = max(0, $refundedCents - $releaseCents);
 
-        return $customerCents / self::CENTS_PER_UNIT;
+        return AmountConverter::toMajorUnits($customerCents, $currency);
     }
 
     public function availableForRefund(Charge $charge): float
     {
-        $capturedCents  = (int) ($charge->amount_captured ?? 0);
-        $customerCents  = $this->customerRefundedAmount($charge) * self::CENTS_PER_UNIT;
+        $currency      = strtoupper($charge->currency ?? '');
+        $capturedCents = (int) ($charge->amount_captured ?? 0);
+        $customerCents = AmountConverter::toMinorUnits($this->customerRefundedAmount($charge), $currency);
 
-        return max(0.0, ($capturedCents - $customerCents)) / self::CENTS_PER_UNIT;
+        return max(0.0, AmountConverter::toMajorUnits($capturedCents - $customerCents, $currency));
     }
 
     public function hasCustomerRefund(Charge $charge): bool

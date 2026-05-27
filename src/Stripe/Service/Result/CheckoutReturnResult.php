@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service\Result;
 
+use OxidEsales\Payments\Stripe\Core\AmountConverter;
+
 /**
  * Result object for checkout return validation.
  *
@@ -130,14 +132,16 @@ final readonly class CheckoutReturnResult
     }
 
     /**
-     * Get the amount in decimal (e.g., 25.50 for 2550 cents).
+     * Get the amount in decimal (e.g., 25.50 for 2550 EUR cents; 1000.0 for 1000 JPY).
+     *
+     * Sprint 114.7: uses AmountConverter so zero-decimal currencies are handled correctly.
      */
     public function getAmount(): ?float
     {
         if ($this->amountCents === null) {
             return null;
         }
-        return $this->amountCents / 100;
+        return AmountConverter::toMajorUnits($this->amountCents, $this->currency ?? '');
     }
 
     public function getCurrency(): ?string

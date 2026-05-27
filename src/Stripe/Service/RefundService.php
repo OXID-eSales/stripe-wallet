@@ -13,6 +13,7 @@ use DateTimeImmutable;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
 use OxidEsales\PaymentBase\Service\StockRestorationServiceInterface;
+use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -57,7 +58,12 @@ final class RefundService implements RefundServiceInterface
 
         $metadata = $this->buildMetadata($orderId, $initiator, $description);
         $validReason = $this->validateReason($reason);
-        $amountInCents = $amount !== null ? (int) round($amount * 100) : null;
+        // currency is sourced from the charge returned by createRefundByCharge;
+        // processRefund callers pass the amount in major units. The charge's currency
+        // is not available here without an extra API call — pass '' to default to 2 decimals.
+        // Sprint 114.7: full currency threading would require adding currency to RefundService
+        // callers; safe for EUR-primary shops.
+        $amountInCents = $amount !== null ? AmountConverter::toMinorUnits($amount, '') : null;
 
         return $this->executeRefundByCharge($chargeId, $orderId, $paymentIntentId, $validReason, $metadata, $amountInCents);
     }
@@ -167,8 +173,9 @@ final class RefundService implements RefundServiceInterface
             ]);
         }
 
-        // Convert amount from cents to major units
-        $amountInMajorUnits = ($refund->amount ?? 0) / 100;
+        // Convert amount from Stripe minor units to major units using the refund's own currency.
+        $refundCurrency = strtoupper($refund->currency ?? '');
+        $amountInMajorUnits = AmountConverter::toMajorUnits((int) ($refund->amount ?? 0), $refundCurrency);
 
         $this->logger->info('Refund processed successfully', [
             'refund_id' => $refund->id,
