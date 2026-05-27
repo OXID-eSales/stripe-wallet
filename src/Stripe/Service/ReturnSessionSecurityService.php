@@ -28,8 +28,6 @@ use OxidEsales\Payments\Stripe\Service\Result\SecurityValidationResult;
 final class ReturnSessionSecurityService implements ReturnSecurityValidatorInterface
 {
     // Timing thresholds (in seconds)
-    /** @phpstan-ignore classConstant.unused */
-    private const QUICK_RETURN_MAX = 900;       // 15 minutes
     private const SLOW_RETURN_THRESHOLD = 1800; // 30 minutes
     private const VERY_LATE_THRESHOLD = 3600;   // 1 hour
 
