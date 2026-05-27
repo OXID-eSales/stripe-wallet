@@ -11,6 +11,7 @@ namespace OxidEsales\Payments\Stripe\Controller\Admin;
 
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface;
 use OxidEsales\Payments\Stripe\Service\StripeOrderApiService;
 use Stripe\Charge;
@@ -133,7 +134,8 @@ class OrderRefundViewDataProvider
         if ($paymentIntent === null) {
             return 0.0;
         }
-        return (int) ($paymentIntent->amount ?? 0) / 100;
+        $currency = strtoupper($paymentIntent->currency ?? '');
+        return AmountConverter::toMajorUnits((int) ($paymentIntent->amount ?? 0), $currency);
     }
 
     /**
@@ -188,7 +190,8 @@ class OrderRefundViewDataProvider
         $charge = $this->getLastCharge($order, false);
         $price = 0;
         if ($charge && !empty($charge->amount_captured)) {
-            $price = $charge->amount_captured / 100;
+            $chargeCurrency = strtoupper($charge->currency ?? '');
+            $price = AmountConverter::toMajorUnits((int) $charge->amount_captured, $chargeCurrency);
         }
         return $this->formatPrice($price, $order);
     }
@@ -228,7 +231,7 @@ class OrderRefundViewDataProvider
         $transactions[] = [
             'type' => 'authorization',
             'status' => $this->mapPiStatusToLabel($paymentIntent->status ?? ''),
-            'amount' => ((int) ($paymentIntent->amount ?? 0)) / 100,
+            'amount' => AmountConverter::toMajorUnits((int) ($paymentIntent->amount ?? 0), $currency),
             'currency' => $currency,
             'transactionId' => $piId,
             'createdAt' => date('Y-m-d H:i:s', (int) ($paymentIntent->created ?? 0)),
@@ -245,7 +248,7 @@ class OrderRefundViewDataProvider
             $transactions[] = [
                 'type' => 'capture',
                 'status' => 'completed',
-                'amount' => ((int) ($charge->amount_captured ?? 0)) / 100,
+                'amount' => AmountConverter::toMajorUnits((int) ($charge->amount_captured ?? 0), $currency),
                 'currency' => $currency,
                 'transactionId' => (string) ($charge->id ?? ''),
                 'createdAt' => date('Y-m-d H:i:s', (int) ($charge->created ?? 0)),
@@ -259,7 +262,7 @@ class OrderRefundViewDataProvider
             $transactions[] = [
                 'type' => 'refund',
                 'status' => (string) ($refund->status ?? 'unknown'),
-                'amount' => ((int) ($refund->amount ?? 0)) / 100,
+                'amount' => AmountConverter::toMajorUnits((int) ($refund->amount ?? 0), $currency),
                 'currency' => $currency,
                 'transactionId' => (string) ($refund->id ?? ''),
                 'createdAt' => date('Y-m-d H:i:s', (int) ($refund->created ?? 0)),

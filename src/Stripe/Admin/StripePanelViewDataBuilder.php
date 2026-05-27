@@ -11,6 +11,7 @@ namespace OxidEsales\Payments\Stripe\Admin;
 
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider;
+use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\OrderContractResolver;
 
@@ -53,7 +54,15 @@ class StripePanelViewDataBuilder
 
             // Amounts
             'amount'              => $paymentIntent !== null
-                ? number_format(($paymentIntent->amount ?? 0) / 100, 2, '.', '')
+                ? number_format(
+                    AmountConverter::toMajorUnits(
+                        (int) ($paymentIntent->amount ?? 0),
+                        strtoupper($paymentIntent->currency ?? '')
+                    ),
+                    2,
+                    '.',
+                    ''
+                )
                 : '',
             'capturedAmount'      => $this->orderCapturedAmount($order),
             'refundedAmount'      => $this->orderRefundedAmount($order),

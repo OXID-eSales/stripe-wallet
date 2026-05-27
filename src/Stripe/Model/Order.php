@@ -13,6 +13,7 @@ use OxidEsales\Eshop\Core\Counter as EshopCoreCounter;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
+use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface;
 use OxidEsales\Payments\Stripe\Service\StripeOrderApiService;
@@ -190,7 +191,8 @@ class Order extends Order_parent
             return '';
         }
 
-        $amount = ((int) ($charge->amount_captured ?? 0)) / 100;
+        $chargeCurrency = strtoupper($charge->currency ?? '');
+        $amount = AmountConverter::toMajorUnits((int) ($charge->amount_captured ?? 0), $chargeCurrency);
         return $this->formatStripeAmount($amount);
     }
 
