@@ -75,7 +75,12 @@ class OpcModalSessionReader
             return null;
         }
 
-        return is_array($data) && !empty($data) ? $data : null;
+        if (!is_array($data) || empty($data)) {
+            return null;
+        }
+
+        /** @var array<string, mixed> $data */
+        return $data;
     }
 
     /**

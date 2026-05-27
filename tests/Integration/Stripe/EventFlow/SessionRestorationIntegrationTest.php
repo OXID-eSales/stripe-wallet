@@ -133,7 +133,8 @@ class SessionRestorationIntegrationTest extends TestCase
     private function createConfigServiceMock(): ModuleConfigurationServiceInterface
     {
         $configService = $this->createMock(ModuleConfigurationServiceInterface::class);
-        $configService->method('getSecretKey')->willReturn($this->testSecret);
+        // D2: ContractTokenService calls getToken() (canonical accessor).
+        $configService->method('getToken')->willReturn($this->testSecret);
         $configService->method('getWebhookSecret')->willReturn('');
         return $configService;
     }
