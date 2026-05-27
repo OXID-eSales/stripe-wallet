@@ -70,46 +70,6 @@ final class StripeStatusMapper
     }
 
     /**
-     * Determine normalized status from Stripe PaymentIntent.
-     *
-     * This considers both the status field and additional flags like
-     * amount_capturable and amount_received.
-     *
-     * @param string $status Stripe status
-     * @param int $amountCapturable Amount available to capture (in cents)
-     * @param int $amountReceived Amount captured (in cents)
-     * @return string Normalized status
-     */
-    public static function fromPaymentIntent(
-        string $status,
-        int $amountCapturable = 0,
-        int $amountReceived = 0
-    ): string {
-        // Check for refunded state
-        if ($status === self::STRIPE_SUCCEEDED && $amountReceived === 0) {
-            return self::STATUS_REFUNDED;
-        }
-
-        // Authorized but not captured
-        if ($status === self::STRIPE_REQUIRES_CAPTURE || $amountCapturable > 0) {
-            return self::STATUS_AUTHORIZED;
-        }
-
-        // Captured/succeeded
-        if ($status === self::STRIPE_SUCCEEDED) {
-            return self::STATUS_CAPTURED;
-        }
-
-        // Cancelled
-        if ($status === self::STRIPE_CANCELED) {
-            return self::STATUS_CANCELLED;
-        }
-
-        // Default mapping
-        return self::toNormalized($status);
-    }
-
-    /**
      * Check if Stripe status indicates payment requires action (e.g., 3DS).
      *
      * @param string $stripeStatus Stripe PaymentIntent status
@@ -118,17 +78,6 @@ final class StripeStatusMapper
     public static function requiresAction(string $stripeStatus): bool
     {
         return $stripeStatus === self::STRIPE_REQUIRES_ACTION;
-    }
-
-    /**
-     * Check if Stripe status indicates payment is authorized but not captured.
-     *
-     * @param string $stripeStatus Stripe PaymentIntent status
-     * @return bool True if authorized
-     */
-    public static function isAuthorized(string $stripeStatus): bool
-    {
-        return $stripeStatus === self::STRIPE_REQUIRES_CAPTURE;
     }
 
     /**
@@ -151,21 +100,5 @@ final class StripeStatusMapper
     public static function isCancelled(string $stripeStatus): bool
     {
         return $stripeStatus === self::STRIPE_CANCELED;
-    }
-
-    /**
-     * Check if Stripe status indicates payment is in progress.
-     *
-     * @param string $stripeStatus Stripe PaymentIntent status
-     * @return bool True if processing
-     */
-    public static function isProcessing(string $stripeStatus): bool
-    {
-        return in_array($stripeStatus, [
-            self::STRIPE_REQUIRES_PAYMENT_METHOD,
-            self::STRIPE_REQUIRES_CONFIRMATION,
-            self::STRIPE_REQUIRES_ACTION,
-            self::STRIPE_PROCESSING,
-        ], true);
     }
 }

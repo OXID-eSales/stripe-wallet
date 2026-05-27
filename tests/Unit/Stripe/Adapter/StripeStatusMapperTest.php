@@ -73,50 +73,6 @@ final class StripeStatusMapperTest extends TestCase
         $this->assertSame('pending', $normalized);
     }
 
-    public function testFromPaymentIntentWithSucceeded(): void
-    {
-        $status = StripeStatusMapper::fromPaymentIntent(
-            status: 'succeeded',
-            amountCapturable: 0,
-            amountReceived: 9999
-        );
-
-        $this->assertSame('captured', $status);
-    }
-
-    public function testFromPaymentIntentWithRequiresCapture(): void
-    {
-        $status = StripeStatusMapper::fromPaymentIntent(
-            status: 'requires_capture',
-            amountCapturable: 9999,
-            amountReceived: 0
-        );
-
-        $this->assertSame('authorized', $status);
-    }
-
-    public function testFromPaymentIntentWithFullyRefunded(): void
-    {
-        $status = StripeStatusMapper::fromPaymentIntent(
-            status: 'succeeded',
-            amountCapturable: 0,
-            amountReceived: 0  // Fully refunded
-        );
-
-        $this->assertSame('refunded', $status);
-    }
-
-    public function testFromPaymentIntentWithCanceled(): void
-    {
-        $status = StripeStatusMapper::fromPaymentIntent(
-            status: 'canceled',
-            amountCapturable: 0,
-            amountReceived: 0
-        );
-
-        $this->assertSame('cancelled', $status);
-    }
-
     public function testRequiresActionReturnsTrueForRequiresAction(): void
     {
         $this->assertTrue(StripeStatusMapper::requiresAction('requires_action'));
@@ -127,18 +83,6 @@ final class StripeStatusMapperTest extends TestCase
         $this->assertFalse(StripeStatusMapper::requiresAction('succeeded'));
         $this->assertFalse(StripeStatusMapper::requiresAction('requires_capture'));
         $this->assertFalse(StripeStatusMapper::requiresAction('processing'));
-    }
-
-    public function testIsAuthorizedReturnsTrueForRequiresCapture(): void
-    {
-        $this->assertTrue(StripeStatusMapper::isAuthorized('requires_capture'));
-    }
-
-    public function testIsAuthorizedReturnsFalseForOtherStatuses(): void
-    {
-        $this->assertFalse(StripeStatusMapper::isAuthorized('succeeded'));
-        $this->assertFalse(StripeStatusMapper::isAuthorized('processing'));
-        $this->assertFalse(StripeStatusMapper::isAuthorized('canceled'));
     }
 
     public function testIsCapturedReturnsTrueForSucceeded(): void
@@ -163,21 +107,6 @@ final class StripeStatusMapperTest extends TestCase
         $this->assertFalse(StripeStatusMapper::isCancelled('succeeded'));
         $this->assertFalse(StripeStatusMapper::isCancelled('requires_capture'));
         $this->assertFalse(StripeStatusMapper::isCancelled('processing'));
-    }
-
-    public function testIsProcessingReturnsTrueForProcessingStatuses(): void
-    {
-        $this->assertTrue(StripeStatusMapper::isProcessing('requires_payment_method'));
-        $this->assertTrue(StripeStatusMapper::isProcessing('requires_confirmation'));
-        $this->assertTrue(StripeStatusMapper::isProcessing('requires_action'));
-        $this->assertTrue(StripeStatusMapper::isProcessing('processing'));
-    }
-
-    public function testIsProcessingReturnsFalseForFinalStatuses(): void
-    {
-        $this->assertFalse(StripeStatusMapper::isProcessing('succeeded'));
-        $this->assertFalse(StripeStatusMapper::isProcessing('requires_capture'));
-        $this->assertFalse(StripeStatusMapper::isProcessing('canceled'));
     }
 
     public function testAllStripeStatusesMapToNormalizedStatuses(): void
