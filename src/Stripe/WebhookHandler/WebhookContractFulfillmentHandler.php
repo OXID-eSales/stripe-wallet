@@ -13,6 +13,7 @@ use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
+use OxidEsales\Payments\Stripe\Service\ContractRefundRecorder;
 
 /**
  * Handles webhook events with contract-awareness.
@@ -34,7 +35,8 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
         private readonly ContractFulfillmentServiceInterface $contractFulfillmentService,
         private readonly ContractLinkedOrderUpdaterInterface $orderUpdater,
         private readonly TransactionRepositoryInterface $transactionRepository,
-        private readonly ShopAdapterInterface $shopAdapter
+        private readonly ShopAdapterInterface $shopAdapter,
+        private readonly ?ContractRefundRecorder $refundRecorder = null
     ) {
     }
 
@@ -71,11 +73,11 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
             return false;
         }
 
-        // Sprint 8: Record refund amount on contract (accumulates for partial refunds)
+        // Sprint 8 / 114.8: Record refund amount on contract (accumulates for partial refunds).
+        // Delegates to ContractRefundRecorder which enforces the FULFILLED guard uniformly.
         if ($refundAmount > 0.0 && $contract instanceof PaymentContract) {
-            $contract->addRefundedAmount($refundAmount);
-            $contract->setRefundedAt(new \DateTimeImmutable());
-            $this->contractRepository->save($contract);
+            $recorder = $this->refundRecorder ?? new ContractRefundRecorder($this->contractRepository);
+            $recorder->record($contract, $refundAmount);
             $this->recordAudit($contract, 'refund', $refundAmount);
         }
 

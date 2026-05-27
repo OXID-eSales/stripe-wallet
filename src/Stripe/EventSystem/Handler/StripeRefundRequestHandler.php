@@ -12,6 +12,7 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
 use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
+use OxidEsales\Payments\Stripe\Service\ContractRefundRecorder;
 use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
 use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
@@ -38,7 +39,8 @@ class StripeRefundRequestHandler implements HandlerInterface
         private readonly RequestLogServiceInterface $requestLogService,
         private readonly ShopAdapterInterface $shopAdapter,
         ?LoggerInterface $logger = null,
-        private readonly ?FileLoggerInterface $eventLogger = null
+        private readonly ?FileLoggerInterface $eventLogger = null,
+        private readonly ?ContractRefundRecorder $refundRecorder = null
     ) {
         $this->logger = $logger ?? new NullLogger();
     }
@@ -205,22 +207,9 @@ class StripeRefundRequestHandler implements HandlerInterface
             return;
         }
 
-        // addRefundedAmount() requires FULFILLED state. Skip recording the refund amount
-        // on the contract if it hasn't been fulfilled yet (e.g. still COMMITTED).
-        // The Stripe refund already succeeded at this point — we must not throw here
-        // as that would report an error to the admin despite the refund being processed.
-        if (!$contract->getState()->isFulfilled()) {
-            $this->logger->warning('Cannot record refund on contract: not in FULFILLED state', [
-                'contractId' => $contractId,
-                'state' => $contract->getState()->getValue(),
-            ]);
-            return;
-        }
-
         $refundAmount = $event->getAmount() ?? $contract->getAmount();
-        $contract->addRefundedAmount($refundAmount);
-        $contract->setRefundedAt(new \DateTimeImmutable());
-        $this->contractRepository->save($contract);
+        $recorder = $this->refundRecorder ?? new ContractRefundRecorder($this->contractRepository, $this->logger);
+        $recorder->record($contract, $refundAmount, $contractId);
     }
 
     /**

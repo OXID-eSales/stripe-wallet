@@ -760,6 +760,18 @@ services:
 
 
   # ==========================================
+  # Contract Refund Recorder (Sprint 114.8)
+  # ==========================================
+  # Extracted from D3 duplication: StripeRefundRequestHandler + WebhookContractFulfillmentHandler.
+  # Centralizes the FULFILLED guard + addRefundedAmount + setRefundedAt + save sequence.
+
+  OxidEsales\Payments\Stripe\Service\ContractRefundRecorder:
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: false
+
+  # ==========================================
   # Stripe Refund Handler (Sprint 4, Refactored Sprint 21)
   # ==========================================
   # Handles StripeRefundRequestEvent from admin panel, webhook, or API.
@@ -767,6 +779,7 @@ services:
   # Sprint 21: Delegates to RefundService for business logic (SRP).
   # Sprint 22: Removed OrderRefundUpdateService (dead code), full refund only.
   # Sprint 25: Added event logger for debugging
+  # Sprint 114.8: Delegates refund recording to ContractRefundRecorder (D3).
 
   OxidEsales\Payments\Stripe\EventSystem\Handler\StripeRefundRequestHandler:
     arguments:
@@ -776,6 +789,7 @@ services:
       $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
+      $refundRecorder: '@OxidEsales\Payments\Stripe\Service\ContractRefundRecorder'
     tags:
       - { name: payment.event_handler }
     public: false
@@ -796,6 +810,7 @@ services:
       $orderUpdater: '@OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface'
       $transactionRepository: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
       $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
+      $refundRecorder: '@OxidEsales\Payments\Stripe\Service\ContractRefundRecorder'
     public: false
 
   # Sprint 112 / G1: mirrors contract cancel/fail transitions onto linked oxorder.
