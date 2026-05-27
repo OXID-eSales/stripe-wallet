@@ -6,7 +6,6 @@ namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
-use OxidEsales\PaymentBase\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\FileLoggerInterface;
@@ -29,7 +28,7 @@ use Psr\Log\NullLogger;
  *
  * @since 2.0.0
  */
-class StripeRefundRequestHandler implements HandlerInterface
+class StripeRefundRequestHandler extends AbstractStripeRequestHandler
 {
     private LoggerInterface $logger;
 
@@ -39,10 +38,11 @@ class StripeRefundRequestHandler implements HandlerInterface
         private readonly RequestLogServiceInterface $requestLogService,
         private readonly ShopAdapterInterface $shopAdapter,
         ?LoggerInterface $logger = null,
-        private readonly ?FileLoggerInterface $eventLogger = null,
+        ?FileLoggerInterface $eventLogger = null,
         private readonly ?ContractRefundRecorder $refundRecorder = null
     ) {
         $this->logger = $logger ?? new NullLogger();
+        $this->eventLogger = $eventLogger;
     }
 
     public static function getHandledEventClass(): string
@@ -283,16 +283,4 @@ class StripeRefundRequestHandler implements HandlerInterface
         );
     }
 
-    /**
-     * Log event to file logger for debugging.
-     *
-     * @param string $message
-     * @param array<string, mixed> $context
-     */
-    private function logEvent(string $message, array $context = []): void
-    {
-        if ($this->eventLogger !== null) {
-            $this->eventLogger->log($message, $context);
-        }
-    }
 }

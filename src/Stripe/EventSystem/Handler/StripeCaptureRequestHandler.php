@@ -8,7 +8,6 @@ use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use OxidEsales\PaymentBase\Adapter\Response\CaptureResponse;
-use OxidEsales\PaymentBase\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
@@ -35,7 +34,7 @@ use RuntimeException;
  *
  * @since 2.0.0
  */
-class StripeCaptureRequestHandler implements HandlerInterface
+class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
 {
     private LoggerInterface $logger;
 
@@ -45,10 +44,11 @@ class StripeCaptureRequestHandler implements HandlerInterface
         private readonly RequestLogServiceInterface $requestLogService,
         private readonly ShopAdapterInterface $shopAdapter,
         ?LoggerInterface $logger = null,
-        private readonly ?FileLoggerInterface $eventLogger = null,
+        ?FileLoggerInterface $eventLogger = null,
         private readonly ?PaymentIntentResolver $paymentIntentResolver = null
     ) {
         $this->logger = $logger ?? new NullLogger();
+        $this->eventLogger = $eventLogger;
     }
 
     public static function getHandledEventClass(): string
@@ -346,16 +346,4 @@ class StripeCaptureRequestHandler implements HandlerInterface
         );
     }
 
-    /**
-     * Log event to file logger for debugging.
-     *
-     * @param string $message
-     * @param array<string, mixed> $context
-     */
-    private function logEvent(string $message, array $context = []): void
-    {
-        if ($this->eventLogger !== null) {
-            $this->eventLogger->log($message, $context);
-        }
-    }
 }
