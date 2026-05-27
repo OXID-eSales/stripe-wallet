@@ -769,36 +769,6 @@ services:
       $logger: '@oxid_esales.monolog.logger'
     public: false
 
-  # ==========================================
-  # Contract-Based Capture/Refund Services (Sprint 3)
-  # ==========================================
-  # These services extend AbstractPaymentCaptureService and AbstractPaymentRefundService
-  # from payment-base, providing Stripe-specific behavior via Template Method pattern.
-  #
-  # StripeCaptureService:
-  # - Validates AUTHORIZED state (not COMMITTED)
-  # - Calls captureAuthorization() after capture
-  #
-  # StripeRefundService:
-  # - Uses contract-based refund approach (per Q&A decision Q6)
-  # - Validates FULFILLED state before refund
-
-  # Sprint 26: Uses LazyStripeAdapter for lazy adapter creation (module activation fix)
-  OxidEsales\Payments\Stripe\Service\StripeCaptureService:
-    arguments:
-      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
-      $paymentAdapter: '@OxidEsales\Payments\Stripe\Adapter\LazyStripeAdapter'
-      $logger: '@oxid_esales.monolog.logger'
-    public: true
-
-  # Sprint 26: Uses LazyStripeAdapter for lazy adapter creation (module activation fix)
-  OxidEsales\Payments\Stripe\Service\StripeRefundService:
-    arguments:
-      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
-      $transactionRepository: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
-      $paymentAdapter: '@OxidEsales\Payments\Stripe\Adapter\LazyStripeAdapter'
-      $logger: '@oxid_esales.monolog.logger'
-    public: true
 
   # ==========================================
   # Stripe Refund Handler (Sprint 4, Refactored Sprint 21)
