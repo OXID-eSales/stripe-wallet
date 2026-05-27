@@ -6,7 +6,6 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripePaymentStatusHandler;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
-use OxidEsales\Payments\Stripe\EventSystem\Event\Stripe3DSRequiredEvent;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use OxidEsales\PaymentBase\EventSystem\Event\Payment\PaymentAuthorizedEvent;
 use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
@@ -181,7 +180,7 @@ class StripePaymentStatusHandlerTest extends TestCase
         $handler->handle($event);
     }
 
-    public function testDispatches3DSRequiredOnRequiresAction(): void
+    public function testSets3DSContextOnRequiresAction(): void
     {
         $paymentDetails = $this->createPaymentDetailsResponse(
             StripeStatusMapper::STATUS_PENDING,
@@ -207,11 +206,8 @@ class StripePaymentStatusHandlerTest extends TestCase
             ->method('findById')
             ->willReturn($contract);
 
-        $this->eventDispatcher
-            ->expects($this->once())
-            ->method('dispatch')
-            ->with($this->isInstanceOf(Stripe3DSRequiredEvent::class))
-            ->willReturnCallback(fn($e) => $e);
+        // No event dispatched — 3DS data is set directly on the context
+        $this->eventDispatcher->expects($this->never())->method('dispatch');
 
         $context = new EventContext([
             'paymentIntentId' => 'pi_test_3ds',
@@ -229,6 +225,7 @@ class StripePaymentStatusHandlerTest extends TestCase
 
         $this->assertTrue($context->get('requires3DS'));
         $this->assertEquals('pi_test_3ds_secret_xyz', $context->get('clientSecret'));
+        $this->assertEquals('order', $context->get('redirectTarget'));
     }
 
     public function testSetsErrorOnDecline(): void

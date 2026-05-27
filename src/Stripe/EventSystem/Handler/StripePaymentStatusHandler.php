@@ -12,7 +12,6 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
-use OxidEsales\Payments\Stripe\EventSystem\Event\Stripe3DSRequiredEvent;
 use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 
 /**
@@ -22,7 +21,7 @@ use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
  * 1. Retrieves PaymentIntent status via adapter
  * 2. Routes to appropriate handler based on status:
  *    - CAPTURED/AUTHORIZED → PaymentAuthorizedEvent
- *    - REQUIRES_ACTION → Stripe3DSRequiredEvent
+ *    - REQUIRES_ACTION → sets 3DS context (requires3DS, clientSecret, redirectTarget)
  *    - FAILED/CANCELLED → Error handling
  *
  * Key difference from Checkout Session flow:
@@ -147,12 +146,10 @@ class StripePaymentStatusHandler implements HandlerInterface
                 StripeStatusMapper::STRIPE_REQUIRES_CONFIRMATION
             ], true)
         ) {
-            // 3D Secure required
+            // 3D Secure required — set context data for the frontend directly
             $context->set('requires3DS', true);
             $context->set('clientSecret', $paymentDetails->providerData['client_secret'] ?? null);
             $context->set('redirectTarget', 'order');
-
-            $this->eventDispatcher->dispatch(new Stripe3DSRequiredEvent($context));
         } else {
             // Other pending state - treat as failure
             $this->handleFailure($context, $paymentDetails);
