@@ -124,6 +124,7 @@ final class ManualCaptureIntegrationTest extends TestCase
             $this->contractRepository,
             $this->fulfillmentService,
             $this->createMock(\OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface::class),
+            $this->shopAdapter,
             new NullLogger()
         );
 
@@ -199,6 +200,7 @@ final class ManualCaptureIntegrationTest extends TestCase
             $this->contractRepository,
             $this->fulfillmentService,
             $this->createMock(\OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface::class),
+            $this->shopAdapter,
             new NullLogger()
         );
 
@@ -249,6 +251,7 @@ final class ManualCaptureIntegrationTest extends TestCase
             $this->contractRepository,
             $this->fulfillmentService,
             $this->createMock(\OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface::class),
+            $this->shopAdapter,
             new NullLogger()
         );
 

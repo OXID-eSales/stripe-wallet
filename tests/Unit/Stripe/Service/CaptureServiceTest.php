@@ -6,6 +6,7 @@ namespace OxidEsales\Payments\Tests\Unit\Stripe\Service;
 
 use OxidEsales\PaymentBase\Adapter\Request\CapturePaymentRequest;
 use OxidEsales\PaymentBase\Adapter\Response\CaptureResponse;
+use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Contract\Transaction;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
@@ -34,6 +35,7 @@ class CaptureServiceTest extends TestCase
     private ContractRepositoryInterface&MockObject $repository;
     private ContractFulfillmentServiceInterface&MockObject $fulfillmentService;
     private TransactionRepositoryInterface&MockObject $transactionRepository;
+    private ShopAdapterInterface&MockObject $shopAdapter;
 
     protected function setUp(): void
     {
@@ -43,6 +45,8 @@ class CaptureServiceTest extends TestCase
         $this->repository = $this->createMock(ContractRepositoryInterface::class);
         $this->fulfillmentService = $this->createMock(ContractFulfillmentServiceInterface::class);
         $this->transactionRepository = $this->createMock(TransactionRepositoryInterface::class);
+        $this->shopAdapter = $this->createMock(ShopAdapterInterface::class);
+        $this->shopAdapter->method('getShopId')->willReturn('1');
     }
 
     private function createService(): CaptureService
@@ -52,6 +56,7 @@ class CaptureServiceTest extends TestCase
             $this->repository,
             $this->fulfillmentService,
             $this->transactionRepository,
+            $this->shopAdapter,
             new NullLogger()
         );
     }
@@ -429,5 +434,56 @@ class CaptureServiceTest extends TestCase
         $service = $this->createService();
 
         $service->processCapture($contract, 10.00, $expectedMetadata);
+    }
+
+    // --- Sprint 114.1: Shop ID injection ---
+
+    /**
+     * Sprint 114.1: recordCaptureTransaction uses the injected shop id, not a hardcoded 1.
+     */
+    public function testCaptureTransactionUsesInjectedShopId(): void
+    {
+        $shopAdapterWithShopId5 = $this->createMock(ShopAdapterInterface::class);
+        $shopAdapterWithShopId5->method('getShopId')->willReturn('5');
+
+        $response = CaptureResponse::success(
+            providerPaymentId: 'pi_shop5',
+            captureId: 'ch_shop5',
+            amountCaptured: 20.00,
+            currency: 'eur',
+            status: 'succeeded',
+            capturedAt: new \DateTimeImmutable()
+        );
+
+        $this->adapter->method('capturePayment')->willReturn($response);
+
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getProviderOrderId')->willReturn('pi_shop5');
+        $contract->method('getId')->willReturn('contract_s5');
+        $contract->method('getOrderId')->willReturn('order_s5');
+        $contract->method('getState')->willReturn(
+            \OxidEsales\PaymentBase\Contract\ContractState::committed()
+        );
+
+        $capturedTransaction = null;
+        $this->transactionRepository
+            ->expects($this->once())
+            ->method('save')
+            ->willReturnCallback(function (Transaction $tx) use (&$capturedTransaction): void {
+                $capturedTransaction = $tx;
+            });
+
+        $service = new CaptureService(
+            $this->adapterFactory,
+            $this->repository,
+            $this->fulfillmentService,
+            $this->transactionRepository,
+            $shopAdapterWithShopId5,
+            new NullLogger()
+        );
+        $service->processCapture($contract, null, []);
+
+        $this->assertNotNull($capturedTransaction);
+        $this->assertSame(5, $capturedTransaction->getShopId());
     }
 }

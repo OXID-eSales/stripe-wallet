@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\WebhookHandler;
 
+use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\Transaction;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
@@ -40,6 +41,7 @@ final class PaymentIntentSucceededHandler implements WebhookEventHandlerInterfac
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ContractFulfillmentServiceInterface $contractFulfillmentService,
         private readonly TransactionRepositoryInterface $transactionRepository,
+        private readonly ShopAdapterInterface $shopAdapter,
         private readonly LoggerInterface $logger
     ) {
     }
@@ -117,7 +119,7 @@ final class PaymentIntentSucceededHandler implements WebhookEventHandlerInterfac
 
         $transaction = new Transaction(
             id: 'wh_cap_' . bin2hex(random_bytes(16)),
-            shopId: 1,
+            shopId: (int) $this->shopAdapter->getShopId(),
             orderId: $contract->getOrderId() ?? '',
             contractId: $contract->getId(),
             provider: StripeDefinitions::PROVIDER,

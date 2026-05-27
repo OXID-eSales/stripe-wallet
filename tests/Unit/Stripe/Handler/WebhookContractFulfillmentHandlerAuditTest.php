@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Handler;
 
+use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
@@ -34,6 +35,7 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
     private ContractFulfillmentServiceInterface $contractFulfillmentService;
     private ContractLinkedOrderUpdaterInterface $orderUpdater;
     private RecordingTransactionRepository $transactionRepository;
+    private ShopAdapterInterface $shopAdapter;
 
     protected function setUp(): void
     {
@@ -41,6 +43,8 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
         $this->contractFulfillmentService = $this->createMock(ContractFulfillmentServiceInterface::class);
         $this->orderUpdater = $this->createMock(ContractLinkedOrderUpdaterInterface::class);
         $this->transactionRepository = new RecordingTransactionRepository();
+        $this->shopAdapter = $this->createMock(ShopAdapterInterface::class);
+        $this->shopAdapter->method('getShopId')->willReturn('1');
     }
 
     public function testHandleChargeRefundedWritesRefundAuditRow(): void
@@ -139,7 +143,8 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
             $this->contractRepository,
             $this->contractFulfillmentService,
             $this->orderUpdater,
-            $this->transactionRepository
+            $this->transactionRepository,
+            $this->shopAdapter
         );
     }
 

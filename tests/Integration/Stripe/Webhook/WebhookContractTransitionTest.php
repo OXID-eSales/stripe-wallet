@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\Webhook;
 
+use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\ContractState;
@@ -42,6 +43,7 @@ final class WebhookContractTransitionTest extends TestCase
     private OrderPaymentStateServiceInterface&MockObject $orderPaymentStateService;
     private ContractRepositoryInterface&MockObject $contractRepository;
     private ContractFulfillmentServiceInterface&MockObject $contractFulfillmentService;
+    private ShopAdapterInterface&MockObject $shopAdapter;
     private LoggerInterface&MockObject $logger;
     private PaymentIntentSucceededHandler $handler;
     private BasketSnapshot $basketSnapshot;
@@ -53,6 +55,8 @@ final class WebhookContractTransitionTest extends TestCase
         $this->orderPaymentStateService = $this->createMock(OrderPaymentStateServiceInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->contractFulfillmentService = $this->createMock(ContractFulfillmentServiceInterface::class);
+        $this->shopAdapter = $this->createMock(ShopAdapterInterface::class);
+        $this->shopAdapter->method('getShopId')->willReturn('1');
         $this->logger = $this->createMock(LoggerInterface::class);
 
         // Sprint 18: Added ContractFulfillmentService dependency
@@ -61,6 +65,7 @@ final class WebhookContractTransitionTest extends TestCase
             $this->contractRepository,
             $this->contractFulfillmentService,
             $this->createMock(\OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface::class),
+            $this->shopAdapter,
             $this->logger
         );
 

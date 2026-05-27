@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Handler;
 
+use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
@@ -32,6 +33,7 @@ class WebhookContractFulfillmentHandlerCancelOrderTest extends TestCase
     private ContractFulfillmentServiceInterface $contractFulfillmentService;
     private RecordingOrderUpdater $orderUpdater;
     private TransactionRepositoryInterface $transactionRepository;
+    private ShopAdapterInterface $shopAdapter;
 
     protected function setUp(): void
     {
@@ -39,6 +41,8 @@ class WebhookContractFulfillmentHandlerCancelOrderTest extends TestCase
         $this->contractFulfillmentService = $this->createMock(ContractFulfillmentServiceInterface::class);
         $this->orderUpdater = new RecordingOrderUpdater();
         $this->transactionRepository = $this->createMock(TransactionRepositoryInterface::class);
+        $this->shopAdapter = $this->createMock(ShopAdapterInterface::class);
+        $this->shopAdapter->method('getShopId')->willReturn('1');
     }
 
     public function testHandlePaymentCanceledMarksLinkedOrderAsCancelled(): void
@@ -107,7 +111,8 @@ class WebhookContractFulfillmentHandlerCancelOrderTest extends TestCase
             $this->contractRepository,
             $this->contractFulfillmentService,
             $this->orderUpdater,
-            $this->transactionRepository
+            $this->transactionRepository,
+            $this->shopAdapter
         );
     }
 

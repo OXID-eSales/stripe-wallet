@@ -705,6 +705,7 @@ services:
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $contractFulfillmentService: '@OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface'
       $transactionRepository: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
+      $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
       $logger: '@oxid_esales.monolog.logger'
     public: false
 
@@ -835,6 +836,7 @@ services:
       $contractFulfillmentService: '@OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface'
       $orderUpdater: '@OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface'
       $transactionRepository: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
+      $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
     public: false
 
   # Sprint 112 / G1: mirrors contract cancel/fail transitions onto linked oxorder.
@@ -1038,6 +1040,7 @@ services:
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $contractFulfillmentService: '@OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface'
       $transactionRepository: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
+      $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
       $logger: '@oxid_esales.monolog.logger'
     public: false
 

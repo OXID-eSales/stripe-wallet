@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Handler;
 
+use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\ContractState;
@@ -37,6 +38,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     private ContractFulfillmentServiceInterface $contractFulfillmentService;
     private ContractLinkedOrderUpdaterInterface $orderUpdater;
     private TransactionRepositoryInterface $transactionRepository;
+    private ShopAdapterInterface $shopAdapter;
 
     protected function setUp(): void
     {
@@ -44,6 +46,19 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
         $this->contractFulfillmentService = $this->createMock(ContractFulfillmentServiceInterface::class);
         $this->orderUpdater = $this->createMock(ContractLinkedOrderUpdaterInterface::class);
         $this->transactionRepository = $this->createMock(TransactionRepositoryInterface::class);
+        $this->shopAdapter = $this->createMock(ShopAdapterInterface::class);
+        $this->shopAdapter->method('getShopId')->willReturn('1');
+    }
+
+    private function makeHandler(): WebhookContractFulfillmentHandler
+    {
+        return new WebhookContractFulfillmentHandler(
+            $this->contractRepository,
+            $this->contractFulfillmentService,
+            $this->orderUpdater,
+            $this->transactionRepository,
+            $this->shopAdapter
+        );
     }
 
     // =========================================================================
@@ -67,12 +82,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->with($providerOrderId)
             ->willReturn(true);
 
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService,
-            $this->orderUpdater,
-            $this->transactionRepository
-        );
+        $handler = $this->makeHandler();
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
 
@@ -100,12 +110,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->with($providerOrderId)
             ->willReturn(false);
 
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService,
-            $this->orderUpdater,
-            $this->transactionRepository
-        );
+        $handler = $this->makeHandler();
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
 
@@ -133,12 +138,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->with($providerOrderId)
             ->willReturn(false);
 
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService,
-            $this->orderUpdater,
-            $this->transactionRepository
-        );
+        $handler = $this->makeHandler();
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
 
@@ -166,12 +166,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->with($providerOrderId)
             ->willReturn(true);
 
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService,
-            $this->orderUpdater,
-            $this->transactionRepository
-        );
+        $handler = $this->makeHandler();
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
 
@@ -199,12 +194,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->with($providerOrderId)
             ->willReturn(true);
 
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService,
-            $this->orderUpdater,
-            $this->transactionRepository
-        );
+        $handler = $this->makeHandler();
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
 
@@ -232,12 +222,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->with($providerOrderId)
             ->willReturn(true);
 
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService,
-            $this->orderUpdater,
-            $this->transactionRepository
-        );
+        $handler = $this->makeHandler();
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
 
@@ -265,12 +250,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->with($providerOrderId)
             ->willReturn(null);
 
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService,
-            $this->orderUpdater,
-            $this->transactionRepository
-        );
+        $handler = $this->makeHandler();
 
         $result = $handler->handlePaymentSucceeded($providerOrderId);
 
@@ -308,12 +288,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->method('findByProviderOrderId')
             ->willReturn($contract);
 
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService,
-            $this->orderUpdater,
-            $this->transactionRepository
-        );
+        $handler = $this->makeHandler();
 
         $result = $handler->handleChargeRefunded($providerOrderId, $refundAmount);
 
@@ -363,12 +338,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->expects($this->once())
             ->method('save');
 
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService,
-            $this->orderUpdater,
-            $this->transactionRepository
-        );
+        $handler = $this->makeHandler();
 
         $result = $handler->handlePaymentFailed($providerOrderId, $failureReason);
 
@@ -419,12 +389,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->expects($this->once())
             ->method('save');
 
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService,
-            $this->orderUpdater,
-            $this->transactionRepository
-        );
+        $handler = $this->makeHandler();
 
         $result = $handler->handlePaymentCanceled($providerOrderId, $cancellationReason);
 
@@ -448,12 +413,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->with($providerOrderId)
             ->willReturn(null);
 
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService,
-            $this->orderUpdater,
-            $this->transactionRepository
-        );
+        $handler = $this->makeHandler();
 
         $result = $handler->handlePaymentCanceled($providerOrderId, 'user_requested');
 
@@ -494,12 +454,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->with($providerOrderId)
             ->willReturn($contract);
 
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService,
-            $this->orderUpdater,
-            $this->transactionRepository
-        );
+        $handler = $this->makeHandler();
 
         $result = $handler->handlePaymentCanceled($providerOrderId, $cancellationReason);
 
@@ -548,12 +503,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->expects($this->once())
             ->method('save');
 
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService,
-            $this->orderUpdater,
-            $this->transactionRepository
-        );
+        $handler = $this->makeHandler();
 
         $result = $handler->handleSessionExpired($contractId);
 
@@ -577,12 +527,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->with($contractId)
             ->willReturn(null);
 
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService,
-            $this->orderUpdater,
-            $this->transactionRepository
-        );
+        $handler = $this->makeHandler();
 
         $result = $handler->handleSessionExpired($contractId);
 
@@ -624,12 +569,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->with($contractId)
             ->willReturn($contract);
 
-        $handler = new WebhookContractFulfillmentHandler(
-            $this->contractRepository,
-            $this->contractFulfillmentService,
-            $this->orderUpdater,
-            $this->transactionRepository
-        );
+        $handler = $this->makeHandler();
 
         $result = $handler->handleSessionExpired($contractId);
 

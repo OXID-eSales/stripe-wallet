@@ -6,6 +6,7 @@ namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentBase\Adapter\Request\CapturePaymentRequest;
 use OxidEsales\PaymentBase\Adapter\Response\CaptureResponse;
+use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Contract\Transaction;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
@@ -40,6 +41,7 @@ final class CaptureService implements CaptureServiceInterface
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ContractFulfillmentServiceInterface $contractFulfillmentService,
         private readonly TransactionRepositoryInterface $transactionRepository,
+        private readonly ShopAdapterInterface $shopAdapter,
         ?LoggerInterface $logger = null
     ) {
         $this->logger = $logger ?? new NullLogger();
@@ -114,7 +116,7 @@ final class CaptureService implements CaptureServiceInterface
     ): void {
         $transaction = new Transaction(
             id: 'cap_' . bin2hex(random_bytes(16)),
-            shopId: 1,
+            shopId: (int) $this->shopAdapter->getShopId(),
             orderId: $contract->getOrderId() ?? '',
             contractId: $contract->getId(),
             provider: StripeDefinitions::PROVIDER,
