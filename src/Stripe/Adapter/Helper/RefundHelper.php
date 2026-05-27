@@ -13,6 +13,7 @@ use DateTimeImmutable;
 use OxidEsales\PaymentBase\Adapter\Request\RefundPaymentRequest;
 use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
 use OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface;
+use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use Stripe\Charge;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Refund;
@@ -80,7 +81,10 @@ final class RefundHelper
             $params = ['payment_intent' => $request->providerPaymentId];
 
             if ($request->amount !== null) {
-                $params['amount'] = (int) ($request->amount * 100);
+                // RefundPaymentRequest carries no currency; AmountConverter defaults to 2 decimals
+                // when currency is empty — correct for EUR. Currency threading requires a schema change
+                // in payment-base (out of scope for Sprint 114.7).
+                $params['amount'] = AmountConverter::toMinorUnits($request->amount, '');
             }
 
             if ($request->reason !== null) {
@@ -99,7 +103,7 @@ final class RefundHelper
             return RefundResponse::success(
                 providerPaymentId: $request->providerPaymentId,
                 refundId: $refund->id,
-                amountRefunded: $refund->amount / 100,
+                amountRefunded: AmountConverter::toMajorUnits($refund->amount, strtoupper($refund->currency)),
                 currency: strtoupper($refund->currency),
                 status: $refund->status ?? 'pending',
                 refundedAt: new DateTimeImmutable('@' . $refund->created),

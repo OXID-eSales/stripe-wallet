@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Webhook;
 
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
+use OxidEsales\Payments\Stripe\Core\AmountConverter;
 
 /**
  * Extracts typed data from Stripe webhook events.
@@ -72,14 +73,26 @@ final class StripeWebhookEventParser
     }
 
     /**
-     * Extract amount and convert from cents to currency units.
+     * Extract amount and convert from Stripe minor units to major currency units.
+     *
+     * Sprint 114.7: uses AmountConverter so zero-decimal currencies (JPY, KRW, …)
+     * are handled correctly. The currency field must be present in the event object
+     * alongside the amount field; defaults to 2 decimals if absent (safe for EUR).
      */
     public function extractAmountInCurrencyUnits(WebhookEvent $event, string $field): float
     {
         $object = $event->getObject();
         $amount = $object[$field] ?? 0;
 
-        return is_int($amount) ? $amount / 100 : 0.0;
+        if (!is_int($amount)) {
+            return 0.0;
+        }
+
+        $currency = isset($object['currency']) && is_string($object['currency'])
+            ? strtoupper($object['currency'])
+            : '';
+
+        return AmountConverter::toMajorUnits($amount, $currency);
     }
 
     /**

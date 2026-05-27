@@ -21,6 +21,7 @@ use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Contract\IdempotencyRecord;
 use OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
+use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use Stripe\Exception\ApiErrorException;
 use Stripe\PaymentIntent;
@@ -50,7 +51,7 @@ final class PaymentIntentHelper
     public function createPaymentIntent(StripeClient $client, CreatePaymentRequest $request): PaymentResponse
     {
         try {
-            $amountInCents = (int) ($request->amount * 100);
+            $amountInCents = AmountConverter::toMinorUnits($request->amount, $request->currency);
             $captureMethod = $request->directCapture ? 'automatic' : 'manual';
 
             $params = $this->buildPaymentIntentParams($amountInCents, $request->currency, $captureMethod, $request);
@@ -94,12 +95,16 @@ final class PaymentIntentHelper
                 ['expand' => ['latest_charge']]
             );
 
-            $amount = $paymentIntent->amount / 100;
-            $amountCaptured = $paymentIntent->amount_received / 100;
+            $piCurrency = strtoupper($paymentIntent->currency);
+            $amount = AmountConverter::toMajorUnits($paymentIntent->amount, $piCurrency);
+            $amountCaptured = AmountConverter::toMajorUnits($paymentIntent->amount_received, $piCurrency);
 
             $amountRefunded = 0.0;
             if ($paymentIntent->latest_charge) {
-                $amountRefunded = ($paymentIntent->latest_charge->amount_refunded ?? 0) / 100;
+                $amountRefunded = AmountConverter::toMajorUnits(
+                    (int) ($paymentIntent->latest_charge->amount_refunded ?? 0),
+                    $piCurrency
+                );
             }
 
             $capturedAt = null;
@@ -114,7 +119,7 @@ final class PaymentIntentHelper
                 providerPaymentId: $paymentIntent->id,
                 status: StripeStatusMapper::toNormalized($paymentIntent->status),
                 amount: $amount,
-                currency: strtoupper($paymentIntent->currency),
+                currency: $piCurrency,
                 amountCaptured: $amountCaptured,
                 amountRefunded: $amountRefunded,
                 isCaptured: StripeStatusMapper::isCaptured($paymentIntent->status),
@@ -132,7 +137,7 @@ final class PaymentIntentHelper
     public function authorizePayment(StripeClient $client, AuthorizePaymentRequest $request): AuthorizationResponse
     {
         try {
-            $amountInCents = (int) ($request->amount * 100);
+            $amountInCents = AmountConverter::toMinorUnits($request->amount, $request->currency);
 
             $params = $this->buildPaymentIntentParams($amountInCents, $request->currency, 'manual', $request);
 
@@ -301,7 +306,11 @@ final class PaymentIntentHelper
         try {
             $params = [];
             if ($request->amount !== null) {
-                $params['amount_to_capture'] = (int) ($request->amount * 100);
+                // CapturePaymentRequest carries no currency; AmountConverter defaults to
+                // 2 decimals when currency is empty — correct for EUR (the module's primary currency).
+                // Sprint 114.7: currency threading requires a CapturePaymentRequest schema change (payment-base)
+                // which is out of scope; the fallback is documented and safe for the current shop scope.
+                $params['amount_to_capture'] = AmountConverter::toMinorUnits($request->amount, '');
             }
             if (!empty($request->metadata)) {
                 $params['metadata'] = $request->metadata;
@@ -315,7 +324,8 @@ final class PaymentIntentHelper
                 ['expand' => ['latest_charge']]
             );
 
-            $amountCaptured = $paymentIntent->amount_received / 100;
+            $capturedCurrency = strtoupper($paymentIntent->currency);
+            $amountCaptured = AmountConverter::toMajorUnits($paymentIntent->amount_received, $capturedCurrency);
             /** @phpstan-ignore-next-line nullsafe.neverNull */
             $capturedAtTimestamp = $paymentIntent->latest_charge?->created ?? time();
 
@@ -327,7 +337,7 @@ final class PaymentIntentHelper
                 /** @phpstan-ignore-next-line nullsafe.neverNull */
                 captureId: $paymentIntent->latest_charge?->id ?? $paymentIntent->id,
                 amountCaptured: $amountCaptured,
-                currency: strtoupper($paymentIntent->currency),
+                currency: $capturedCurrency,
                 status: StripeStatusMapper::STATUS_CAPTURED,
                 capturedAt: new DateTimeImmutable('@' . $capturedAtTimestamp),
                 providerData: $providerData,
