@@ -4,34 +4,64 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller;
 
-use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
+use OxidEsales\Eshop\Application\Model\Basket;
+use OxidEsales\Eshop\Application\Model\User;
+use OxidEsales\PaymentBase\Contract\BasketSnapshot;
+use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Controller\CheckoutReturnResponder;
+use OxidEsales\PaymentBase\Controller\SessionWriterInterface;
 use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Return\ReturnResolution;
 use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Controller\StripeOrderController;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
+use OxidEsales\Payments\Stripe\Service\Return\StripeReturnResolver;
+use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @covers \OxidEsales\Payments\Stripe\Controller\StripeOrderController
+ * Security tests for StripeOrderController.
  *
  * Sprint 47: Security tests for controller hardening (STRP-99).
+ * Sprint 114.3 (R-1.5): Replaced re-implemented method doubles with a seam-only
+ * testable subclass. The REAL createCheckoutSession() and checkoutSuccess() are
+ * exercised in every test below.
+ *
  * Tests Fix 1 (no debug output), Fix 2 (no capture_mode_override),
  * Fix 10 (contract token validation), Fix 11 (error sanitization).
+ *
+ * checkoutSuccess() branch coverage (all via readReturnInputs / loadReturnContract):
+ *   B1: session_id missing → "Payment information missing" (readReturnInputs line ~312)
+ *   B2: contractId or contractToken not string → "Payment verification failed" (line ~319)
+ *   B3: validateContractToken() fails → "Payment verification failed" (line ~324)
+ *   B4: session contract id mismatches request contract id → "Payment verification failed" (line ~330)
+ *   B5: repo->findById() returns null → "Payment verification failed" (loadReturnContract)
+ *   B6: dispatchCheckoutReturn returns null → "Payment verification failed" (line ~297)
+ *   B7: happy path → 'thankyou'
+ *
+ * @covers \OxidEsales\Payments\Stripe\Controller\StripeOrderController
  */
 class StripeOrderControllerSecurityTest extends TestCase
 {
     // ==========================================
-    // Fix 1: No debug/secret exposure
+    // Fix 1: No debug/secret exposure — createCheckoutSession()
     // ==========================================
 
     public function testCreateCheckoutSessionOutputContainsNoDebugInfo(): void
     {
-        $controller = $this->createTestableController(
-            checkoutSessionId: 'cs_test_123',
-            checkoutUrl: 'https://checkout.stripe.com/test',
-            contractId: 'contract_abc'
-        );
+        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $eventDispatcher->method('dispatch')->willReturnCallback(function ($event) {
+            $ctx = $event->getContext();
+            $ctx->set('checkoutSessionId', 'cs_test_123');
+            $ctx->set('checkoutUrl', 'https://checkout.stripe.com/test');
+            $ctx->set('contractId', 'contract_abc');
+            return $event;
+        });
+
+        $controller = $this->createCheckoutSessionController($eventDispatcher);
 
         ob_start();
         $controller->createCheckoutSession();
@@ -50,11 +80,16 @@ class StripeOrderControllerSecurityTest extends TestCase
 
     public function testCreateCheckoutSessionOutputContainsNoSecretKey(): void
     {
-        $controller = $this->createTestableController(
-            checkoutSessionId: 'cs_test_456',
-            checkoutUrl: 'https://checkout.stripe.com/test2',
-            contractId: 'contract_def'
-        );
+        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $eventDispatcher->method('dispatch')->willReturnCallback(function ($event) {
+            $ctx = $event->getContext();
+            $ctx->set('checkoutSessionId', 'cs_test_456');
+            $ctx->set('checkoutUrl', 'https://checkout.stripe.com/test2');
+            $ctx->set('contractId', 'contract_def');
+            return $event;
+        });
+
+        $controller = $this->createCheckoutSessionController($eventDispatcher);
 
         ob_start();
         $controller->createCheckoutSession();
@@ -84,45 +119,15 @@ class StripeOrderControllerSecurityTest extends TestCase
     }
 
     // ==========================================
-    // Fix 10: Contract token validation
-    // ==========================================
-
-    public function testCheckoutSuccessRejectsMismatchedContractId(): void
-    {
-        $controller = new TestableStripeOrderControllerForCheckout();
-        $controller->setCheckoutSessionIdFromRequest('sess_123');
-        $controller->setRequestContractId('contract_from_url');
-        $controller->setRequestContractToken('token_abc');
-        $controller->setSessionContractId('contract_from_session');
-
-        $result = $controller->checkoutSuccess();
-
-        $this->assertEquals('payment', $result);
-        $this->assertContains('Payment verification failed', $controller->getDisplayedErrors());
-    }
-
-    public function testCheckoutSuccessAllowsMatchingContractId(): void
-    {
-        $controller = new TestableStripeOrderControllerForCheckout();
-        $controller->setCheckoutSessionIdFromRequest('sess_123');
-        $controller->setRequestContractId('contract_same');
-        $controller->setRequestContractToken('token_abc');
-        $controller->setSessionContractId('contract_same');
-
-        $result = $controller->checkoutSuccess();
-
-        // Should NOT return 'payment' due to mismatch - it proceeds to dispatch
-        $this->assertNotContains('Payment verification failed', $controller->getDisplayedErrors());
-    }
-
-    // ==========================================
-    // Fix 11: Error message sanitization
+    // Fix 11: Error message sanitization — createCheckoutSession()
     // ==========================================
 
     public function testCreateCheckoutSessionReturnsGenericErrorOnException(): void
     {
-        $controller = $this->createTestableControllerThatThrows(
-            new \RuntimeException('Stripe API key sk_test_abc123 is invalid')
+        // Validator throws with a message containing a secret key
+        $controller = $this->createCheckoutSessionController(
+            $this->createMock(EventDispatcherInterface::class),
+            keyValidationError: 'Stripe API key sk_test_abc123 is invalid'
         );
 
         ob_start();
@@ -138,175 +143,488 @@ class StripeOrderControllerSecurityTest extends TestCase
     }
 
     // ==========================================
-    // Helper: Testable controller for checkout session
+    // Fix 10 / B1: Session ID missing
     // ==========================================
 
-    private function createTestableController(
-        string $checkoutSessionId,
-        string $checkoutUrl,
-        string $contractId
-    ): TestableStripeOrderControllerForSession {
-        $controller = new TestableStripeOrderControllerForSession();
-        $controller->setContextData([
-            'checkoutSessionId' => $checkoutSessionId,
-            'checkoutUrl' => $checkoutUrl,
-            'contractId' => $contractId,
-        ]);
-        return $controller;
-    }
-
-    private function createTestableControllerThatThrows(\Throwable $exception): TestableStripeOrderControllerForSession
+    /**
+     * Branch B1: session_id not present in request → "Payment information missing".
+     */
+    public function testCheckoutSuccessB1RejectsOnMissingSessionId(): void
     {
-        $controller = new TestableStripeOrderControllerForSession();
-        $controller->setExceptionToThrow($exception);
-        return $controller;
-    }
-}
+        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $eventDispatcher->expects($this->never())->method('dispatch');
 
-/**
- * Testable subclass for createCheckoutSession() tests.
- */
-class TestableStripeOrderControllerForSession extends StripeOrderController
-{
-    /** @var array<string, mixed> */
-    private array $contextData = [];
-    private ?\Throwable $exception = null;
-    /** @var array<string, mixed> */
-    private array $sessionVars = [];
+        [$controller, $helper] = $this->createCheckoutSuccessController($eventDispatcher, [
+            'sessionId' => null,
+        ]);
+
+        $result = $controller->checkoutSuccess();
+
+        $this->assertEquals('payment', $result);
+        $this->assertEquals('Payment information missing', $helper->lastError);
+    }
+
+    // ==========================================
+    // B2: contractId or contractToken not a string
+    // ==========================================
 
     /**
-     * @param array<string, mixed> $data
+     * Branch B2: contractId missing from request → "Payment verification failed".
      */
-    public function setContextData(array $data): void
+    public function testCheckoutSuccessB2RejectsOnMissingContractId(): void
     {
-        $this->contextData = $data;
+        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $eventDispatcher->expects($this->never())->method('dispatch');
+
+        [$controller, $helper] = $this->createCheckoutSuccessController($eventDispatcher, [
+            'sessionId' => 'cs_test_b2',
+            'contractIdFromRequest' => null,
+            'contractToken' => 'some_token',
+        ]);
+
+        $result = $controller->checkoutSuccess();
+
+        $this->assertEquals('payment', $result);
+        $this->assertEquals('Payment verification failed', $helper->lastError);
     }
 
-    public function setExceptionToThrow(\Throwable $e): void
+    /**
+     * Branch B2 (token missing): contractToken missing → "Payment verification failed".
+     */
+    public function testCheckoutSuccessB2RejectsOnMissingContractToken(): void
     {
-        $this->exception = $e;
+        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $eventDispatcher->expects($this->never())->method('dispatch');
+
+        [$controller, $helper] = $this->createCheckoutSuccessController($eventDispatcher, [
+            'sessionId' => 'cs_test_b2token',
+            'contractIdFromRequest' => 'contract_123',
+            'contractToken' => null,
+        ]);
+
+        $result = $controller->checkoutSuccess();
+
+        $this->assertEquals('payment', $result);
+        $this->assertEquals('Payment verification failed', $helper->lastError);
     }
 
-    public function createCheckoutSession(): void
+    // ==========================================
+    // B3: validateContractToken() returns false
+    // ==========================================
+
+    /**
+     * Branch B3: HMAC token verification fails → "Payment verification failed".
+     * No secret is leaked into the error output.
+     */
+    public function testCheckoutSuccessB3RejectsOnInvalidToken(): void
     {
-        // Minimal version that tests the output format
-        try {
-            if ($this->exception !== null) {
-                throw $this->exception;
+        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $eventDispatcher->expects($this->never())->method('dispatch');
+
+        [$controller, $helper] = $this->createCheckoutSuccessController($eventDispatcher, [
+            'sessionId' => 'cs_test_b3',
+            'contractIdFromRequest' => 'contract_b3',
+            'contractToken' => 'tampered_token_sk_test_secret',
+            'tokenValidationResult' => false,
+        ]);
+
+        $result = $controller->checkoutSuccess();
+
+        $this->assertEquals('payment', $result);
+        $this->assertEquals('Payment verification failed', $helper->lastError);
+        // Ensure no secret leaks into the error text
+        $this->assertStringNotContainsString('sk_test', $helper->lastError ?? '');
+    }
+
+    // ==========================================
+    // B4: session contract id mismatches request contract id
+    // ==========================================
+
+    /**
+     * Branch B4: contract_id in URL differs from the one stored in the session.
+     */
+    public function testCheckoutSuccessB4RejectsMismatchedContractId(): void
+    {
+        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $eventDispatcher->expects($this->never())->method('dispatch');
+
+        [$controller, $helper] = $this->createCheckoutSuccessController($eventDispatcher, [
+            'sessionId' => 'cs_test_b4',
+            'contractIdFromRequest' => 'contract_from_url',
+            'contractIdFromSession' => 'contract_from_session',
+            'contractToken' => 'valid_token',
+            'tokenValidationResult' => true,
+        ]);
+
+        $result = $controller->checkoutSuccess();
+
+        $this->assertEquals('payment', $result);
+        $this->assertEquals('Payment verification failed', $helper->lastError);
+    }
+
+    // ==========================================
+    // B5: repo->findById() returns null (contract not found)
+    // ==========================================
+
+    /**
+     * Branch B5: contract not found in repository → "Payment verification failed".
+     */
+    public function testCheckoutSuccessB5RejectsWhenContractNotFound(): void
+    {
+        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $eventDispatcher->expects($this->never())->method('dispatch');
+
+        [$controller, $helper] = $this->createCheckoutSuccessController($eventDispatcher, [
+            'sessionId' => 'cs_test_b5',
+            'contractIdFromRequest' => 'contract_b5',
+            'contractIdFromSession' => 'contract_b5',
+            'contractToken' => 'valid_token',
+            'tokenValidationResult' => true,
+            'contractExistsInRepo' => false,
+        ]);
+
+        $result = $controller->checkoutSuccess();
+
+        $this->assertEquals('payment', $result);
+        $this->assertEquals('Payment verification failed', $helper->lastError);
+    }
+
+    // ==========================================
+    // B6: dispatchCheckoutReturn returns null
+    // ==========================================
+
+    /**
+     * Branch B6: checkout return responder returns null → "Payment verification failed".
+     */
+    public function testCheckoutSuccessB6RejectsWhenDispatchReturnsFailed(): void
+    {
+        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        // The responder dispatches events but returns no orderId (null)
+        $eventDispatcher->method('dispatch')->willReturnArgument(0);
+
+        [$controller, $helper] = $this->createCheckoutSuccessController($eventDispatcher, [
+            'sessionId' => 'cs_test_b6',
+            'contractIdFromRequest' => 'contract_b6',
+            'contractIdFromSession' => 'contract_b6',
+            'contractToken' => 'valid_token',
+            'tokenValidationResult' => true,
+            'contractExistsInRepo' => true,
+            'dispatchOrderId' => null,
+        ]);
+
+        $result = $controller->checkoutSuccess();
+
+        $this->assertEquals('payment', $result);
+        $this->assertEquals('Payment verification failed', $helper->lastError);
+    }
+
+    // ==========================================
+    // B7: Happy path
+    // ==========================================
+
+    /**
+     * Branch B7: all checks pass → 'thankyou' returned, no errors displayed.
+     */
+    public function testCheckoutSuccessB7HappyPathReturnsThankyou(): void
+    {
+        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $eventDispatcher->method('dispatch')->willReturnCallback(function ($event) {
+            // Simulate responder setting orderId on success
+            $event->getContext()->set('orderId', 'order_success_123');
+            return $event;
+        });
+
+        [$controller, $helper] = $this->createCheckoutSuccessController($eventDispatcher, [
+            'sessionId' => 'cs_test_b7',
+            'contractIdFromRequest' => 'contract_b7',
+            'contractIdFromSession' => 'contract_b7',
+            'contractToken' => 'valid_token',
+            'tokenValidationResult' => true,
+            'contractExistsInRepo' => true,
+            'dispatchOrderId' => 'order_success_123',
+        ]);
+
+        $result = $controller->checkoutSuccess();
+
+        $this->assertEquals('thankyou', $result);
+        $this->assertNull($helper->lastError);
+    }
+
+    // ==========================================
+    // Factory methods
+    // ==========================================
+
+    /**
+     * Create a controller for createCheckoutSession() tests.
+     *
+     * @param array<string, mixed> $options
+     * @return StripeOrderController
+     */
+    private function createCheckoutSessionController(
+        EventDispatcherInterface $eventDispatcher,
+        ?string $keyValidationError = null,
+        array $options = []
+    ): StripeOrderController {
+        $helper = new StubControllerRequestHelper();
+        $helper->sessionChallengeResult = true;
+        $helper->agbConfirmationRequired = false;
+        $helper->basket = $this->createBasketWithUser($options['userId'] ?? 'user_test_1');
+
+        return new class (
+            $eventDispatcher,
+            $helper,
+            $keyValidationError
+        ) extends StripeOrderController {
+            private EventDispatcherInterface $mockDispatcher;
+            private StubControllerRequestHelper $stubHelper;
+            private ?string $keyValidationError;
+
+            public function __construct(
+                EventDispatcherInterface $dispatcher,
+                StubControllerRequestHelper $helper,
+                ?string $keyValidationError
+            ) {
+                $this->mockDispatcher = $dispatcher;
+                $this->stubHelper = $helper;
+                $this->keyValidationError = $keyValidationError;
             }
 
-            echo json_encode([
-                'id' => $this->contextData['checkoutSessionId'] ?? null,
-                'url' => $this->contextData['checkoutUrl'] ?? null,
-                'contract_id' => $this->contextData['contractId'] ?? null,
-            ]);
-        } catch (\Throwable $e) {
-            $this->logError('createCheckoutSession failed', $e);
-            echo json_encode(['error' => 'Payment processing failed. Please try again.']);
-        }
-    }
+            protected function getRequestHelper(): ControllerRequestHelper
+            {
+                return $this->stubHelper;
+            }
 
-    protected function logError(string $message, \Throwable $e): void
-    {
-        // No-op in tests
-    }
+            protected function getEventDispatcher(): EventDispatcherInterface
+            {
+                return $this->mockDispatcher;
+            }
 
-    protected function setSessionVariable(string $key, mixed $value): void
-    {
-        $this->sessionVars[$key] = $value;
-    }
+            public function getUser(): ?User
+            {
+                $basketUser = $this->stubHelper->basket?->getBasketUser();
+                return $basketUser instanceof User ? $basketUser : null;
+            }
 
-    protected function exitWithJson(): void
-    {
-        // Don't exit in tests
-    }
-}
+            protected function exitWithJson(): void
+            {
+                // No-op in tests
+            }
 
-/**
- * Testable subclass for checkoutSuccess() tests.
- */
-class TestableStripeOrderControllerForCheckout extends StripeOrderController
-{
-    private ?string $checkoutSessionId = null;
-    private ?string $requestContractId = null;
-    private ?string $requestContractToken = null;
-    private ?string $sessionContractId = null;
-    /** @var string[] */
-    private array $displayedErrors = [];
-    /** @var array<string, mixed> */
-    private array $sessionVars = [];
+            protected function setHttpResponseCode(int $code): void
+            {
+                // No-op in tests
+            }
 
-    public function setCheckoutSessionIdFromRequest(?string $id): void
-    {
-        $this->checkoutSessionId = $id;
-    }
+            protected function getServiceFromContainer(string $serviceName): object
+            {
+                if ($serviceName === ConfigurationValidatorInterface::class) {
+                    $error = $this->keyValidationError;
+                    return new class ($error) implements ConfigurationValidatorInterface {
+                        public function __construct(private readonly ?string $error)
+                        {
+                        }
 
-    public function setRequestContractId(?string $id): void
-    {
-        $this->requestContractId = $id;
-    }
+                        /**
+                         * @return array<string, string>
+                         */
+                        public function validateConfiguration(
+                            bool $isTestMode,
+                            string $secretKey,
+                            string $webhookSecret
+                        ): array {
+                            return $this->error === null ? [] : ['key' => $this->error ?? ''];
+                        }
 
-    public function setRequestContractToken(?string $token): void
-    {
-        $this->requestContractToken = $token;
-    }
+                        public function validateApiKeyFormat(string $apiKey, bool $isTestMode): bool
+                        {
+                            return $this->error === null;
+                        }
 
-    public function setSessionContractId(?string $id): void
-    {
-        $this->sessionContractId = $id;
+                        public function testConnection(): bool
+                        {
+                            return $this->error === null;
+                        }
+
+                        public function validateKeyPair(): bool
+                        {
+                            return $this->error === null;
+                        }
+
+                        public function getKeyValidationError(): ?string
+                        {
+                            return $this->error;
+                        }
+                    };
+                }
+                if ($serviceName === RetryCleanupService::class) {
+                    return new class {
+                        public function cleanupPreviousAttempt(?string $contractId): bool
+                        {
+                            return false;
+                        }
+
+                        public function cleanupForUser(string $userId): bool
+                        {
+                            return false;
+                        }
+                    };
+                }
+                throw new \RuntimeException("Unknown service in createCheckoutSession test: $serviceName");
+            }
+        };
     }
 
     /**
-     * @return string[]
+     * Create a controller for checkoutSuccess() tests.
+     *
+     * @param array<string, mixed> $options
+     * @return array{0: StripeOrderController, 1: StubControllerRequestHelper}
      */
-    public function getDisplayedErrors(): array
-    {
-        return $this->displayedErrors;
+    private function createCheckoutSuccessController(
+        EventDispatcherInterface $eventDispatcher,
+        array $options = []
+    ): array {
+        $helper = new StubControllerRequestHelper();
+        $helper->checkoutSessionId = $options['sessionId'] ?? null;
+        $helper->contractIdFromRequest = array_key_exists('contractIdFromRequest', $options)
+            ? $options['contractIdFromRequest']
+            : ($options['contractId'] ?? 'contract_default');
+        $helper->contractTokenFromRequest = array_key_exists('contractToken', $options)
+            ? $options['contractToken']
+            : null;
+        $helper->contractIdFromSession = array_key_exists('contractIdFromSession', $options)
+            ? $options['contractIdFromSession']
+            : ($options['contractId'] ?? 'contract_default');
+        $helper->tokenValidationResult = $options['tokenValidationResult'] ?? true;
+
+        $contractExistsInRepo = $options['contractExistsInRepo'] ?? true;
+        $dispatchOrderId = $options['dispatchOrderId'] ?? 'order_123';
+
+        $controller = new class (
+            $eventDispatcher,
+            $helper,
+            $contractExistsInRepo,
+            $dispatchOrderId
+        ) extends StripeOrderController {
+            private EventDispatcherInterface $mockDispatcher;
+            private StubControllerRequestHelper $stubHelper;
+            private bool $contractExistsInRepo;
+            private ?string $dispatchOrderId;
+
+            public function __construct(
+                EventDispatcherInterface $dispatcher,
+                StubControllerRequestHelper $helper,
+                bool $contractExistsInRepo,
+                ?string $dispatchOrderId
+            ) {
+                $this->mockDispatcher = $dispatcher;
+                $this->stubHelper = $helper;
+                $this->contractExistsInRepo = $contractExistsInRepo;
+                $this->dispatchOrderId = $dispatchOrderId;
+            }
+
+            protected function getRequestHelper(): ControllerRequestHelper
+            {
+                return $this->stubHelper;
+            }
+
+            protected function getEventDispatcher(): EventDispatcherInterface
+            {
+                return $this->mockDispatcher;
+            }
+
+            protected function resolveCheckoutReturnResponder(): CheckoutReturnResponder
+            {
+                $orderId = $this->dispatchOrderId;
+                $writer = new class implements SessionWriterInterface {
+                    public function writeSessChallenge(string $orderId): void {}
+                };
+                return new CheckoutReturnResponder($this->mockDispatcher, $writer);
+            }
+
+            protected function getServiceFromContainer(string $serviceName): object
+            {
+                if ($serviceName === ContractRepositoryInterface::class) {
+                    $exists = $this->contractExistsInRepo;
+                    return new class ($exists) implements ContractRepositoryInterface {
+                        public function __construct(private readonly bool $exists)
+                        {
+                        }
+
+                        public function save(PaymentContractInterface $contract): void {}
+
+                        public function findById(string $id): ?PaymentContractInterface
+                        {
+                            if (!$this->exists) {
+                                return null;
+                            }
+                            return new PaymentContract(
+                                1,
+                                'user_1',
+                                BasketSnapshot::fromArray([
+                                    'items' => [],
+                                    'totalGross' => 1.0,
+                                    'totalNet' => 1.0,
+                                    'totalVat' => 0.0,
+                                    'currency' => 'EUR',
+                                ]),
+                                $id,
+                            );
+                        }
+
+                        public function findByUserId(string $userId): array { return []; }
+
+                        public function findActiveByUserId(string $userId): ?PaymentContractInterface
+                        {
+                            return null;
+                        }
+
+                        public function findByOrderId(string $orderId): ?PaymentContractInterface
+                        {
+                            return null;
+                        }
+
+                        public function findByProviderOrderId(string $providerOrderId): ?PaymentContractInterface
+                        {
+                            return null;
+                        }
+
+                        public function findExpired(): array { return []; }
+
+                        public function findStaleNotFinished(int $minutesOld): array { return []; }
+                    };
+                }
+                if ($serviceName === StripeReturnResolver::class) {
+                    return new class extends StripeReturnResolver {
+                        public function __construct()
+                        {
+                        }
+
+                        public function resolve(
+                            PaymentContractInterface $contract,
+                            \OxidEsales\PaymentBase\EventSystem\Event\EventContextInterface $context,
+                        ): ReturnResolution {
+                            return ReturnResolution::readyToCommit('pi_stub', 'pi_stub', 1.0, 'EUR');
+                        }
+                    };
+                }
+                throw new \RuntimeException("Unknown service in checkoutSuccess test: $serviceName");
+            }
+        };
+
+        return [$controller, $helper];
     }
 
-    public function checkoutSuccess(): string
+    private function createBasketWithUser(string $userId): Basket
     {
-        $sessionId = $this->checkoutSessionId;
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn($userId);
 
-        if ($sessionId === null) {
-            $this->displayedErrors[] = 'Payment information missing';
-            return 'payment';
-        }
+        $basket = $this->createMock(Basket::class);
+        $basket->method('getProductsCount')->willReturn(1);
+        $basket->method('getBasketUser')->willReturn($user);
+        $basket->method('getPaymentId')->willReturn('oe_payments_stripe_wallet');
 
-        $contractId = $this->requestContractId;
-        $contractToken = $this->requestContractToken;
-
-        $sessionContractId = $this->sessionContractId;
-        if (
-            is_string($contractId)
-            && is_string($sessionContractId)
-            && $contractId !== $sessionContractId
-        ) {
-            $this->displayedErrors[] = 'Payment verification failed';
-            return 'payment';
-        }
-
-        // Would normally dispatch event - just return success for test
-        return 'thankyou';
-    }
-
-    protected function getCheckoutSessionIdFromRequest(): ?string
-    {
-        return $this->checkoutSessionId;
-    }
-
-    protected function getContractIdFromSession(): ?string
-    {
-        return $this->sessionContractId;
-    }
-
-    protected function setSessionVariable(string $key, mixed $value): void
-    {
-        $this->sessionVars[$key] = $value;
-    }
-
-    protected function deleteSessionVariable(string $key): void
-    {
-        unset($this->sessionVars[$key]);
+        return $basket;
     }
 }

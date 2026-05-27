@@ -33,8 +33,8 @@ class WebhookController extends FrontendController
 {
     protected int $staleThresholdMinutes = 30;
 
-    private ?StripeWebhookProcessor $processor = null;
-    private ?WebhookLogServiceInterface $webhookLogger = null;
+    protected ?StripeWebhookProcessor $processor = null;
+    protected ?WebhookLogServiceInterface $webhookLogger = null;
     private ?WebhookRequestGuardInterface $guard = null;
 
     /**
@@ -72,7 +72,7 @@ class WebhookController extends FrontendController
      */
     public function render(): string
     {
-        Registry::getUtils()->setHeader('Content-Type: application/json');
+        $this->setResponseContentType();
 
         [$payload, $signature, $remoteIp] = $this->extractWebhookInput();
 
@@ -123,6 +123,18 @@ class WebhookController extends FrontendController
 
         // @phpstan-ignore-next-line - unreachable but required for return type
         return '';
+    }
+
+    /**
+     * Set the HTTP response Content-Type header.
+     *
+     * Protected for testable subclass override (avoids Registry::getUtils() in tests).
+     *
+     * R-1.5 seam — Sprint 114.3
+     */
+    protected function setResponseContentType(): void
+    {
+        Registry::getUtils()->setHeader('Content-Type: application/json');
     }
 
     /**

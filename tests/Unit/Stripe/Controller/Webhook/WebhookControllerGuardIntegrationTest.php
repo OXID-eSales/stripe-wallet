@@ -15,10 +15,15 @@ use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRequestGuardInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Tests guard chain integration into WebhookController.
+ * Tests guard chain integration into the REAL WebhookController::render().
  *
- * Uses testable subclass pattern: overrides the full render() to avoid
- * OXID Registry bootstrap, but preserves the guard check logic.
+ * Uses testable subclass pattern (R-1.5): overrides ONLY IO seams and
+ * init() — the real render() is exercised unchanged.
+ *
+ * Seams added to WebhookController (Sprint 114.3):
+ *   - processor/webhookLogger promoted to protected (subclass init sets them)
+ *   - setResponseContentType() — avoids Registry::getUtils() in tests
+ *   - sendErrorResponse() — overridden to throw WebhookTestResponseSent (never contract honoured)
  *
  * @covers \OxidEsales\Payments\Stripe\Controller\Webhook\WebhookController
  * @group sprint-64d
@@ -37,10 +42,13 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
         $controller->setTestGuard($guard);
         $controller->setWebhookInput('{"test":true}', 'sig_test', '1.2.3.4');
 
-        $controller->render();
-
-        $this->assertSame(429, $controller->getLastHttpStatusCode());
-        $this->assertStringContainsString('Too many requests', $controller->getLastOutput());
+        try {
+            $controller->render();
+            $this->fail('Expected render() to terminate via sendErrorResponse()');
+        } catch (WebhookTestResponseSent $response) {
+            $this->assertSame(429, $response->statusCode);
+            $this->assertStringContainsString('Too many requests', $response->body);
+        }
     }
 
     /** @test */
@@ -51,12 +59,16 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
 
         $controller = new TestableWebhookControllerForGuard();
         $controller->setTestGuard($guard);
+        // Empty payload so render() fails at payload check (not guard) — proves guard allowed
         $controller->setWebhookInput('', 'sig_test', '1.2.3.4');
 
-        $controller->render();
-
-        // Guard passed, but empty payload check triggered (400, not 429)
-        $this->assertSame(400, $controller->getLastHttpStatusCode());
+        try {
+            $controller->render();
+            $this->fail('Expected render() to terminate via sendErrorResponse()');
+        } catch (WebhookTestResponseSent $response) {
+            // Guard passed, but empty payload check triggered (400, not 429)
+            $this->assertSame(400, $response->statusCode);
+        }
     }
 
     /** @test */
@@ -72,20 +84,30 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
         $controller->setTestGuard($guard);
         $controller->setWebhookInput('{"test":true}', 'sig_test', '1.2.3.4');
 
-        $controller->render();
+        try {
+            $controller->render();
+            $this->fail('Expected render() to terminate via sendErrorResponse()');
+        } catch (WebhookTestResponseSent $response) {
+            // Assertion on check() is done via the mock expectation above.
+            // render() terminated at processor-unavailable check (processor=null).
+            $this->assertSame(500, $response->statusCode);
+        }
     }
 
     /** @test */
     public function controllerWorksWithoutGuard(): void
     {
         $controller = new TestableWebhookControllerForGuard();
-        // No guard set — should proceed normally
+        // No guard set — getGuard() returns null; render() must not hard-fail on this
         $controller->setWebhookInput('', 'sig_test', '1.2.3.4');
 
-        $controller->render();
-
-        // No guard → proceeds to empty payload check → 400
-        $this->assertSame(400, $controller->getLastHttpStatusCode());
+        try {
+            $controller->render();
+            $this->fail('Expected render() to terminate via sendErrorResponse()');
+        } catch (WebhookTestResponseSent $response) {
+            // No guard → proceeds to empty payload check → 400 (not a guard-related code)
+            $this->assertSame(400, $response->statusCode);
+        }
     }
 
     /** @test */
@@ -99,20 +121,101 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
         $controller->setTestGuard($guard);
         $controller->setWebhookInput('{"id":"evt_1"}', 'valid_sig', '1.2.3.4');
 
-        $controller->render();
+        try {
+            $controller->render();
+            $this->fail('Expected render() to terminate via sendErrorResponse()');
+        } catch (WebhookTestResponseSent $response) {
+            $this->assertSame(413, $response->statusCode);
+            $this->assertStringContainsString('Payload too large', $response->body);
+        }
 
-        $this->assertSame(413, $controller->getLastHttpStatusCode());
-        $this->assertStringContainsString('Payload too large', $controller->getLastOutput());
-        // Verify processor was NOT called
+        // Guard rejection threw before reaching processor
+        $this->assertFalse($controller->wasProcessorCalled());
+    }
+
+    /**
+     * Guard chain unavailable (init() sets guard=null via exception path in production).
+     *
+     * Production init() catches the container exception and logs a warning, leaving guard=null.
+     * render() must then CONTINUE without the guard (warn-and-continue), not return HTTP 500.
+     *
+     * @test
+     */
+    public function guardChainUnavailableRendersWarnsAndContinues(): void
+    {
+        // Guard is null (simulates the production case where container throws on guard resolution)
+        $controller = new TestableWebhookControllerForGuard();
+        // testGuard not set → getGuard() returns null
+        $controller->setWebhookInput('{"event":"test"}', 'sig_header', '5.6.7.8');
+
+        try {
+            $controller->render();
+            $this->fail('Expected render() to terminate via sendErrorResponse()');
+        } catch (WebhookTestResponseSent $response) {
+            // render() continued past the null guard and hit PROCESSOR_UNAVAILABLE (500),
+            // not a guard-specific rejection — proving warn-and-continue behaviour.
+            // (Empty guard → no guard check → payload non-empty → sig non-empty →
+            // processor=null → 500 PROCESSOR_UNAVAILABLE)
+            $this->assertSame(500, $response->statusCode);
+            $this->assertStringContainsString('processor unavailable', strtolower($response->body));
+        }
+    }
+
+    /**
+     * Payload-too-large path: guard rejects with 413 before any signature work.
+     *
+     * @test
+     */
+    public function payloadTooLargeIsRejectedByGuardBeforeSignatureValidation(): void
+    {
+        $rejection = new WebhookGuardResult('payload_too_large', 413, 'Payload too large');
+        $guard = $this->createMock(WebhookRequestGuardInterface::class);
+        $guard->method('check')->willReturn($rejection);
+
+        $controller = new TestableWebhookControllerForGuard();
+        $controller->setTestGuard($guard);
+        $controller->setWebhookInput(str_repeat('x', 1024), 'sig_check', '9.9.9.9');
+
+        try {
+            $controller->render();
+            $this->fail('Expected render() to terminate via sendErrorResponse()');
+        } catch (WebhookTestResponseSent $response) {
+            $this->assertSame(413, $response->statusCode);
+        }
+
+        // Guard threw before reaching the processor
         $this->assertFalse($controller->wasProcessorCalled());
     }
 }
 
 /**
- * Testable subclass that reimplements render() without OXID Registry.
+ * Exception thrown by TestableWebhookControllerForGuard::sendErrorResponse().
  *
- * Reproduces the exact guard check logic from WebhookController::render()
- * lines 72-76, then continues with payload/signature validation.
+ * Satisfies the `never` return-type contract (throwing is `never`).
+ * Tests catch this to inspect the captured status code and body.
+ */
+class WebhookTestResponseSent extends \RuntimeException
+{
+    public function __construct(
+        public readonly int $statusCode,
+        public readonly string $body,
+    ) {
+        parent::__construct("HTTP {$statusCode}: {$body}");
+    }
+}
+
+/**
+ * Testable subclass — overrides ONLY seams, never re-implements render().
+ *
+ * Seams overridden:
+ *   - init()                    — skips OXID container bootstrap
+ *   - getGuard()                — injects test guard (already protected in production)
+ *   - extractWebhookInput()     — injects test payload/signature/IP (already protected)
+ *   - setResponseContentType()  — no-op (avoids Registry::getUtils(); seam added Sprint 114.3)
+ *   - sendErrorResponse()       — throws WebhookTestResponseSent instead of exit (never contract)
+ *   - cleanupStaleNotFinishedOrders() — no-op (avoids ContainerFactory in tests)
+ *
+ * processor is promoted to protected in Sprint 114.3 so init() can set it.
  */
 class TestableWebhookControllerForGuard extends WebhookController
 {
@@ -120,8 +223,6 @@ class TestableWebhookControllerForGuard extends WebhookController
     private string $testPayload = '';
     private string $testSignature = '';
     private string $testRemoteIp = 'unknown';
-    private ?int $lastHttpStatusCode = null;
-    private string $lastOutput = '';
     private bool $processorCalled = false;
 
     public function setTestGuard(WebhookRequestGuardInterface $guard): void
@@ -136,66 +237,54 @@ class TestableWebhookControllerForGuard extends WebhookController
         $this->testRemoteIp = $remoteIp;
     }
 
-    public function getLastHttpStatusCode(): ?int
-    {
-        return $this->lastHttpStatusCode;
-    }
-
-    public function getLastOutput(): string
-    {
-        return $this->lastOutput;
-    }
-
     public function wasProcessorCalled(): bool
     {
         return $this->processorCalled;
     }
 
-    /** Override: skip OXID bootstrap */
+    /** Override: skip OXID container bootstrap; leave processor=null, webhookLogger=null */
     public function init(): void
     {
-    }
-
-    /**
-     * Reimplements render() without OXID Registry calls.
-     *
-     * Preserves the exact guard check logic: extract input → guard check → payload
-     * validation → processor call. Avoids Registry::getUtils() and exit calls.
-     */
-    public function render(): string
-    {
-        [$payload, $signature, $remoteIp] = [$this->testPayload, $this->testSignature, $this->testRemoteIp];
-
-        // Guard chain check — same as production code
-        $guardResult = $this->getGuard()?->check($payload, $signature, $remoteIp);
-        if ($guardResult !== null) {
-            $this->lastHttpStatusCode = $guardResult->httpStatusCode;
-            $this->lastOutput = json_encode(['error' => $guardResult->message]);
-            return '';
-        }
-
-        // Payload validation — same as production code
-        if ($payload === '') {
-            $this->lastHttpStatusCode = 400;
-            $this->lastOutput = json_encode(['error' => 'Empty payload']);
-            return '';
-        }
-
-        if ($signature === '') {
-            $this->lastHttpStatusCode = 400;
-            $this->lastOutput = json_encode(['error' => 'Missing signature header']);
-            return '';
-        }
-
-        // Would call processor here
-        $this->processorCalled = true;
-        $this->lastHttpStatusCode = 500;
-        $this->lastOutput = json_encode(['error' => 'Webhook processor unavailable']);
-        return '';
+        // Intentionally empty — avoids ContainerFactory::getInstance() in unit tests.
+        // processor stays null → render() will hit PROCESSOR_UNAVAILABLE if reached.
+        // webhookLogger stays null → optional-chaining calls are no-ops.
     }
 
     protected function getGuard(): ?WebhookRequestGuardInterface
     {
         return $this->testGuard;
+    }
+
+    /** @return array{string, string, string} */
+    protected function extractWebhookInput(): array
+    {
+        return [$this->testPayload, $this->testSignature, $this->testRemoteIp];
+    }
+
+    /** Override: avoid Registry::getUtils() (seam added Sprint 114.3) */
+    protected function setResponseContentType(): void
+    {
+        // No-op in tests
+    }
+
+    /**
+     * Override: capture response data and throw to stop render() execution.
+     *
+     * Throwing satisfies the `never` return-type contract. Tests catch
+     * WebhookTestResponseSent to inspect status code and body.
+     */
+    protected function sendErrorResponse(
+        string $payload,
+        string $message,
+        int $statusCode,
+        ?string $logAction = null
+    ): never {
+        throw new WebhookTestResponseSent($statusCode, json_encode(['error' => $message]));
+    }
+
+    /** Override: avoid ContainerFactory::getInstance() */
+    protected function cleanupStaleNotFinishedOrders(): void
+    {
+        // No-op in tests
     }
 }
