@@ -83,7 +83,7 @@ class Order extends Order_parent
         // Check if this is a Stripe payment
         $paymentId = $oBasket->getPaymentId();
 
-        if (strpos($paymentId, 'oe_payments_stripe_') === 0) {
+        if (StripeDefinitions::isStripePaymentMethod($paymentId)) {
             // Stripe payment - skip standard OXID payment execution
             // Payment is handled separately via Stripe SDK in OrderController
             Registry::getLogger()->debug('Stripe payment detected, skipping standard payment execution', [
@@ -114,9 +114,6 @@ class Order extends Order_parent
      * - Outside the checkout-session flow (e.g. direct order manipulation), the flag is
      *   absent and OXID's tamper-detection runs normally.
      *
-     * TODO 114.9: replace the strpos prefix check with the shared StripeDefinitions
-     * prefix helper once that sprint lands.
-     *
      * @param \OxidEsales\Eshop\Application\Model\User $oUser User object
      * @return int Validation state (0 = OK, 7 = address changed)
      */
@@ -125,7 +122,7 @@ class Order extends Order_parent
         $paymentId = $this->getBasketPaymentId();
 
         if (
-            strpos($paymentId, 'oe_payments_stripe_') === 0
+            StripeDefinitions::isStripePaymentMethod($paymentId)
             && $this->isStripeSkipAddressCheck()
         ) {
             return 0;

@@ -23,19 +23,10 @@ use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 class Payment extends CorePayment
 {
     /**
-     * List of Stripe payment method IDs.
-     *
-     * @var array<string>
-     */
-    private const STRIPE_PAYMENT_METHODS = [
-        StripeDefinitions::STRIPE_WALLET_PAYMENT_ID
-    ];
-
-    /**
      * Check if this payment method is Stripe-powered.
      *
-     * Returns true if the payment method ID is in the list of known Stripe
-     * payment methods or starts with the `oe_payments_stripe_` prefix.
+     * Delegates to StripeDefinitions::isStripePaymentMethod() — single source of
+     * truth for the `oe_payments_stripe_` prefix check (D7).
      *
      * @return bool True if this is a Stripe payment method, false otherwise
      */
@@ -43,14 +34,6 @@ class Payment extends CorePayment
     {
         $paymentId = $this->getId();
 
-        if (empty($paymentId)) {
-            return false;
-        }
-
-        if (in_array($paymentId, self::STRIPE_PAYMENT_METHODS, true)) {
-            return true;
-        }
-
-        return str_starts_with($paymentId, 'oe_payments_stripe_');
+        return StripeDefinitions::isStripePaymentMethod($paymentId);
     }
 }

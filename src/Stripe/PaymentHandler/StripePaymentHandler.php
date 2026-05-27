@@ -44,8 +44,6 @@ use Psr\Log\LoggerInterface;
  */
 class StripePaymentHandler implements PaymentHandlerInterface
 {
-    private const STRIPE_PAYMENT_PREFIX = 'oe_payments_stripe_';
-
     private readonly LanguageResolverInterface $languageResolver;
 
     public function __construct(
@@ -74,7 +72,7 @@ class StripePaymentHandler implements PaymentHandlerInterface
 
     public function supports(string $paymentMethodId): bool
     {
-        return str_starts_with($paymentMethodId, self::STRIPE_PAYMENT_PREFIX);
+        return StripeDefinitions::isStripePaymentMethod($paymentMethodId);
     }
 
     public function processPayment(PaymentContextInterface $context): PaymentHandlerResult

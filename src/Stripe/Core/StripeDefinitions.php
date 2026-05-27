@@ -21,6 +21,15 @@ final class StripeDefinitions
     public const STRIPE_WALLET_PAYMENT_ID = 'oe_payments_stripe_wallet';
 
     /**
+     * Common prefix shared by all Stripe payment method IDs.
+     *
+     * Single source of truth for the `oe_payments_stripe_` prefix.
+     * All prefix checks across the codebase must use either this constant
+     * or the isStripePaymentMethod() helper below — never a hardcoded literal.
+     */
+    public const PAYMENT_PREFIX = 'oe_payments_stripe_';
+
+    /**
      * Canonical provider name for `PaymentContract::getProvider()` and any
      * `provider === 'stripe'` comparison. Single source of truth; new code
      * should reference this constant rather than hardcoding the literal.
@@ -85,7 +94,22 @@ final class StripeDefinitions
     }
 
     /**
-     * Check if a payment method is a Stripe payment
+     * Check if a payment method ID belongs to the Stripe module.
+     *
+     * Returns true when the ID starts with the PAYMENT_PREFIX (`oe_payments_stripe_`).
+     * This covers all known Stripe payment method IDs (STRIPE_WALLET_PAYMENT_ID and any
+     * future extension IDs) with a single, consistent predicate.
+     *
+     * Single source of truth for the prefix check — replace all inline
+     * `str_starts_with($id, 'oe_payments_stripe_')` and `strpos(...)` checks with this.
+     */
+    public static function isStripePaymentMethod(string $paymentId): bool
+    {
+        return $paymentId !== '' && str_starts_with($paymentId, self::PAYMENT_PREFIX);
+    }
+
+    /**
+     * Check if a payment method is a known exact-match Stripe payment (definition-based).
      *
      * @param string $paymentId
      * @return bool
