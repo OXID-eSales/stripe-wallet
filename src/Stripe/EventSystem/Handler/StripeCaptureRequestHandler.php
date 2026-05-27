@@ -13,9 +13,11 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
 use OxidEsales\Payments\Stripe\Service\CaptureServiceInterface;
+use OxidEsales\Payments\Stripe\Service\PaymentIntentResolver;
 use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use RuntimeException;
 
 /**
  * Handles capture requests for Stripe authorized payments.
@@ -43,7 +45,8 @@ class StripeCaptureRequestHandler implements HandlerInterface
         private readonly RequestLogServiceInterface $requestLogService,
         private readonly ShopAdapterInterface $shopAdapter,
         ?LoggerInterface $logger = null,
-        private readonly ?FileLoggerInterface $eventLogger = null
+        private readonly ?FileLoggerInterface $eventLogger = null,
+        private readonly ?PaymentIntentResolver $paymentIntentResolver = null
     ) {
         $this->logger = $logger ?? new NullLogger();
     }
@@ -140,39 +143,21 @@ class StripeCaptureRequestHandler implements HandlerInterface
     }
 
     /**
-     * Get PaymentIntent ID from event or contract.
-     *
-     * @param StripeCaptureRequestEvent $event
-     * @param PaymentContractInterface $contract
-     * @param EventContext $context
-     * @return string|null
+     * Get PaymentIntent ID from event or contract via PaymentIntentResolver.
      */
     private function getPaymentIntentId(
         StripeCaptureRequestEvent $event,
         PaymentContractInterface $contract,
         EventContext $context
     ): ?string {
-        // First try from event
-        $paymentIntentId = $event->getPaymentIntentId();
-        if ($paymentIntentId !== null) {
-            return $paymentIntentId;
+        $resolver = $this->paymentIntentResolver ?? new PaymentIntentResolver($this->contractRepository);
+        try {
+            return $resolver->resolve($event->getPaymentIntentId(), $event->getContractId());
+        } catch (RuntimeException $e) {
+            $context->set('error', $e->getMessage());
+            $context->set('captureSuccess', false);
+            return null;
         }
-
-        // Then try from contract's provider order ID
-        $providerOrderId = $contract->getProviderOrderId();
-        if (is_string($providerOrderId) && $providerOrderId !== '') {
-            return $providerOrderId;
-        }
-
-        // Try from contract metadata
-        $paymentIntentFromMetadata = $contract->getMetadata('payment_intent_id');
-        if (is_string($paymentIntentFromMetadata) && $paymentIntentFromMetadata !== '') {
-            return $paymentIntentFromMetadata;
-        }
-
-        $context->set('error', 'No PaymentIntent ID found for this contract');
-        $context->set('captureSuccess', false);
-        return null;
     }
 
     /**
