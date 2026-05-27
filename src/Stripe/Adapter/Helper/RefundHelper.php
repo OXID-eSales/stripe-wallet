@@ -151,15 +151,18 @@ final class RefundHelper
     {
         /** @var IdempotentExecutor $executor */
         $executor = $this->idempotentExecutor;
-        /** @var RefundResponse $result */
         $result = $executor->execute(
             key: 'refund:' . $request->providerPaymentId,
             referenceId: $request->providerPaymentId,
             operation: 'refund',
             callable: fn () => $this->executeRefundPayment($client, $request),
-            serialize: fn (RefundResponse $r) => $this->serializeRefundResponse($r),
+            serialize: function (mixed $r): string {
+                assert($r instanceof RefundResponse);
+                return $this->serializeRefundResponse($r);
+            },
             deserialize: fn (string $j) => $this->deserializeRefundResponse($j)
         );
+        /** @var RefundResponse $result */
         return $result;
     }
 

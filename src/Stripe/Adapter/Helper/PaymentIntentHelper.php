@@ -42,7 +42,7 @@ final class PaymentIntentHelper
 
     public function __construct(
         private readonly ?IdempotencyRepositoryInterface $idempotencyRepository = null,
-        private readonly int $ttlSeconds = self::DEFAULT_TTL_SECONDS
+        int $ttlSeconds = self::DEFAULT_TTL_SECONDS
     ) {
         $this->idempotentExecutor = $idempotencyRepository !== null
             ? new IdempotentExecutor($idempotencyRepository, $ttlSeconds)
@@ -273,15 +273,18 @@ final class PaymentIntentHelper
     {
         /** @var IdempotentExecutor $executor */
         $executor = $this->idempotentExecutor;
-        /** @var CaptureResponse $result */
         $result = $executor->execute(
             key: 'capture:' . $request->providerPaymentId,
             referenceId: $request->providerPaymentId,
             operation: 'capture',
             callable: fn () => $this->executeCapturePaymentIntent($client, $request),
-            serialize: fn (CaptureResponse $r) => $this->serializeCaptureResponse($r),
+            serialize: function (mixed $r): string {
+                assert($r instanceof CaptureResponse);
+                return $this->serializeCaptureResponse($r);
+            },
             deserialize: fn (string $j) => $this->deserializeCaptureResponse($j)
         );
+        /** @var CaptureResponse $result */
         return $result;
     }
 

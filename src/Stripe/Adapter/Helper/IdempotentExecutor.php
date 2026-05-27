@@ -25,11 +25,10 @@ use RuntimeException;
  * - key: idempotency key (e.g. 'capture:pi_xxx')
  * - referenceId: order/payment id stored in the record
  * - operation: operation name string (e.g. 'capture')
- * - callable: the actual operation; must return T
- * - serialize: T → string (JSON)
- * - deserialize: string → T
+ * - callable: the actual operation; returns the result
+ * - serialize: result → JSON string
+ * - deserialize: JSON string → result
  *
- * @template T
  * @since 2.0.0
  */
 final class IdempotentExecutor
@@ -49,14 +48,10 @@ final class IdempotentExecutor
     /**
      * Execute an operation with idempotency protection.
      *
-     * @template T
-     * @param string $key Idempotency key
-     * @param string $referenceId Reference ID stored on the record
-     * @param string $operation Operation name
-     * @param callable(): T $callable The operation to execute
-     * @param callable(T): string $serialize Serialize result to JSON string
-     * @param callable(string): T $deserialize Deserialize JSON string to result
-     * @return T
+     * @param callable $callable The operation to execute; returns the result value
+     * @param callable $serialize Convert the result to a JSON string for storage
+     * @param callable $deserialize Convert the stored JSON string back to the result
+     * @return mixed The result (same type as what $callable returns)
      */
     public function execute(
         string $key,
@@ -84,8 +79,9 @@ final class IdempotentExecutor
 
         try {
             $result = $callable();
+            $serialized = $serialize($result);
             $record->setStatus(self::STATUS_COMPLETED);
-            $record->setResult($serialize($result));
+            $record->setResult(is_string($serialized) ? $serialized : null);
             $this->repository->save($record);
             return $result;
         } catch (\Throwable $e) {
