@@ -28,12 +28,14 @@ class ContractTokenServiceTest extends TestCase
     }
 
     /**
-     * Create a mock ModuleConfigurationServiceInterface with specified secret key
+     * Create a mock ModuleConfigurationServiceInterface with specified secret key.
+     *
+     * D2: ContractTokenService calls getToken() (canonical accessor).
      */
     private function createConfigServiceMock(string $secretKey, string $webhookSecret = ''): ModuleConfigurationServiceInterface
     {
         $configService = $this->createMock(ModuleConfigurationServiceInterface::class);
-        $configService->method('getSecretKey')->willReturn($secretKey);
+        $configService->method('getToken')->willReturn($secretKey);
         $configService->method('getWebhookSecret')->willReturn($webhookSecret);
         return $configService;
     }

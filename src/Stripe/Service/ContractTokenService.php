@@ -39,7 +39,7 @@ final class ContractTokenService implements TokenServiceInterface
             return $this->secret;
         }
 
-        $apiSecret = $this->configService->getSecretKey();
+        $apiSecret = $this->configService->getToken();
         if (empty($apiSecret)) {
             $apiSecret = $this->configService->getWebhookSecret();
         }

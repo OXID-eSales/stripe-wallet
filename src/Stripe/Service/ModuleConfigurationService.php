@@ -107,21 +107,10 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     }
 
     /**
-     * Get the secret key based on current mode (test/live)
-     */
-    public function getSecretKey(): string
-    {
-        if ($this->isTestMode()) {
-            $key = $this->get('sStripeTestToken');
-            return is_string($key) ? $key : '';
-        }
-
-        $key = $this->get('sStripeLiveToken');
-        return is_string($key) ? $key : '';
-    }
-
-    /**
-     * Get the token (API token) based on current mode (test/live)
+     * Get the secret API token based on current mode (test/live).
+     *
+     * This is the single source-of-truth accessor for the Stripe secret key.
+     * All callers should use getToken(); getSecretKey() is a backward-compat alias.
      */
     public function getToken(): string
     {
@@ -132,6 +121,16 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
 
         $token = $this->get('sStripeLiveToken');
         return is_string($token) ? $token : '';
+    }
+
+    /**
+     * Alias for getToken() — kept for backward compatibility.
+     *
+     * @see getToken()
+     */
+    public function getSecretKey(): string
+    {
+        return $this->getToken();
     }
 
     /**

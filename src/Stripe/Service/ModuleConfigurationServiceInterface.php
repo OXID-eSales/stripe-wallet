@@ -29,9 +29,18 @@ interface ModuleConfigurationServiceInterface
 
     public function getPublishableKey(): string;
 
-    public function getSecretKey(): string;
-
+    /**
+     * Get the secret API token based on current mode (test/live).
+     * Single source-of-truth accessor; getSecretKey() is a backward-compat alias.
+     */
     public function getToken(): string;
+
+    /**
+     * Alias for getToken() — kept for backward compatibility.
+     *
+     * @see getToken()
+     */
+    public function getSecretKey(): string;
 
     public function getWebhookSecret(): string;
 
