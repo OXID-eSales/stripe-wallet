@@ -219,17 +219,6 @@ services:
     alias: OxidEsales\PaymentBase\Service\Factory\PaymentAdapterFactoryInterface
     public: true
 
-  # Sprint 26: Removed StripeAdapterInterface factory service definition.
-  # It was causing module activation to fail when API keys are not configured.
-  # Services now use LazyStripeAdapter which defers adapter creation until first use.
-
-  # Lazy Stripe Adapter - Defers adapter creation until first use
-  # Allows module activation without API keys configured
-  OxidEsales\Payments\Stripe\Adapter\LazyStripeAdapter:
-    arguments:
-      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
-    public: false
-
   # ==========================================
   # Shop Adapter Layer (Platform-Agnostic)
   # ==========================================
