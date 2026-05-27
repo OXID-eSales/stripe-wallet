@@ -29,15 +29,17 @@ use Stripe\StripeClient;
  */
 final class RefundHelper
 {
-    private const STATUS_PROCESSING = 'processing';
-    private const STATUS_COMPLETED = 'completed';
-    private const STATUS_FAILED = 'failed';
     private const DEFAULT_TTL_SECONDS = 86400;
+
+    private readonly ?IdempotentExecutor $idempotentExecutor;
 
     public function __construct(
         private readonly ?IdempotencyRepositoryInterface $idempotencyRepository = null,
         private readonly int $ttlSeconds = self::DEFAULT_TTL_SECONDS
     ) {
+        $this->idempotentExecutor = $idempotencyRepository !== null
+            ? new IdempotentExecutor($idempotencyRepository, $ttlSeconds)
+            : null;
     }
 
     public function refundPayment(StripeClient $client, RefundPaymentRequest $request): RefundResponse
@@ -147,35 +149,18 @@ final class RefundHelper
 
     private function refundWithIdempotency(StripeClient $client, RefundPaymentRequest $request): RefundResponse
     {
-        $key = 'refund:' . $request->providerPaymentId;
-        /** @var IdempotencyRepositoryInterface $repository */
-        $repository = $this->idempotencyRepository;
-        $existing = $repository->findByKey($key);
-
-        if ($existing !== null && !$existing->isExpired()) {
-            if ($existing->getStatus() === self::STATUS_COMPLETED && $existing->getResult() !== null) {
-                return $this->deserializeRefundResponse($existing->getResult());
-            }
-            if ($existing->getStatus() === self::STATUS_PROCESSING) {
-                throw new \RuntimeException('Refund operation already in progress for: ' . $request->providerPaymentId);
-            }
-        }
-
-        $record = IdempotencyHelper::reuseOrCreate($existing, $key, $request->providerPaymentId, 'refund', $this->ttlSeconds);
-        $repository->save($record);
-
-        try {
-            $result = $this->executeRefundPayment($client, $request);
-            $record->setStatus(self::STATUS_COMPLETED);
-            $record->setResult($this->serializeRefundResponse($result));
-            $repository->save($record);
-            return $result;
-        } catch (\Throwable $e) {
-            $record->setStatus(self::STATUS_FAILED);
-            $record->setResult(json_encode(['error' => $e->getMessage()]) ?: null);
-            $repository->save($record);
-            throw $e;
-        }
+        /** @var IdempotentExecutor $executor */
+        $executor = $this->idempotentExecutor;
+        /** @var RefundResponse $result */
+        $result = $executor->execute(
+            key: 'refund:' . $request->providerPaymentId,
+            referenceId: $request->providerPaymentId,
+            operation: 'refund',
+            callable: fn () => $this->executeRefundPayment($client, $request),
+            serialize: fn (RefundResponse $r) => $this->serializeRefundResponse($r),
+            deserialize: fn (string $j) => $this->deserializeRefundResponse($j)
+        );
+        return $result;
     }
 
     /**
@@ -194,7 +179,7 @@ final class RefundHelper
         $existing = $repository->findByKey($key);
 
         if ($existing !== null && !$existing->isExpired()) {
-            if ($existing->getStatus() === self::STATUS_PROCESSING) {
+            if ($existing->getStatus() === IdempotentExecutor::STATUS_PROCESSING) {
                 throw new \RuntimeException('Refund by charge operation already in progress for: ' . $chargeId);
             }
         }
@@ -204,11 +189,11 @@ final class RefundHelper
 
         try {
             $result = $this->executeCreateRefundByCharge($client, $chargeId, $amount, $reason, $metadata);
-            $record->setStatus(self::STATUS_COMPLETED);
+            $record->setStatus(IdempotentExecutor::STATUS_COMPLETED);
             $repository->save($record);
             return $result;
         } catch (\Throwable $e) {
-            $record->setStatus(self::STATUS_FAILED);
+            $record->setStatus(IdempotentExecutor::STATUS_FAILED);
             $record->setResult(json_encode(['error' => $e->getMessage()]) ?: null);
             $repository->save($record);
             throw $e;

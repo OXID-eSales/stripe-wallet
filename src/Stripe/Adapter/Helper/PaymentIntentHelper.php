@@ -18,7 +18,6 @@ use OxidEsales\PaymentBase\Adapter\Response\CaptureResponse;
 use OxidEsales\PaymentBase\Adapter\Response\PaymentDetailsResponse;
 use OxidEsales\PaymentBase\Adapter\Response\AuthorizationResponse;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
-use OxidEsales\PaymentBase\Contract\IdempotencyRecord;
 use OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
@@ -37,15 +36,17 @@ use Stripe\StripeClient;
  */
 final class PaymentIntentHelper
 {
-    private const STATUS_PROCESSING = 'processing';
-    private const STATUS_COMPLETED = 'completed';
-    private const STATUS_FAILED = 'failed';
     private const DEFAULT_TTL_SECONDS = 86400;
+
+    private readonly ?IdempotentExecutor $idempotentExecutor;
 
     public function __construct(
         private readonly ?IdempotencyRepositoryInterface $idempotencyRepository = null,
         private readonly int $ttlSeconds = self::DEFAULT_TTL_SECONDS
     ) {
+        $this->idempotentExecutor = $idempotencyRepository !== null
+            ? new IdempotentExecutor($idempotencyRepository, $ttlSeconds)
+            : null;
     }
 
     public function createPaymentIntent(StripeClient $client, CreatePaymentRequest $request): PaymentResponse
@@ -270,35 +271,18 @@ final class PaymentIntentHelper
 
     private function captureWithIdempotency(StripeClient $client, CapturePaymentRequest $request): CaptureResponse
     {
-        $key = 'capture:' . $request->providerPaymentId;
-        /** @var IdempotencyRepositoryInterface $repository */
-        $repository = $this->idempotencyRepository;
-        $existing = $repository->findByKey($key);
-
-        if ($existing !== null && !$existing->isExpired()) {
-            if ($existing->getStatus() === self::STATUS_COMPLETED && $existing->getResult() !== null) {
-                return $this->deserializeCaptureResponse($existing->getResult());
-            }
-            if ($existing->getStatus() === self::STATUS_PROCESSING) {
-                throw new \RuntimeException('Capture operation already in progress for: ' . $request->providerPaymentId);
-            }
-        }
-
-        $record = IdempotencyHelper::reuseOrCreate($existing, $key, $request->providerPaymentId, 'capture', $this->ttlSeconds);
-        $repository->save($record);
-
-        try {
-            $result = $this->executeCapturePaymentIntent($client, $request);
-            $record->setStatus(self::STATUS_COMPLETED);
-            $record->setResult($this->serializeCaptureResponse($result));
-            $repository->save($record);
-            return $result;
-        } catch (\Throwable $e) {
-            $record->setStatus(self::STATUS_FAILED);
-            $record->setResult(json_encode(['error' => $e->getMessage()]) ?: null);
-            $repository->save($record);
-            throw $e;
-        }
+        /** @var IdempotentExecutor $executor */
+        $executor = $this->idempotentExecutor;
+        /** @var CaptureResponse $result */
+        $result = $executor->execute(
+            key: 'capture:' . $request->providerPaymentId,
+            referenceId: $request->providerPaymentId,
+            operation: 'capture',
+            callable: fn () => $this->executeCapturePaymentIntent($client, $request),
+            serialize: fn (CaptureResponse $r) => $this->serializeCaptureResponse($r),
+            deserialize: fn (string $j) => $this->deserializeCaptureResponse($j)
+        );
+        return $result;
     }
 
     private function executeCapturePaymentIntent(StripeClient $client, CapturePaymentRequest $request): CaptureResponse
