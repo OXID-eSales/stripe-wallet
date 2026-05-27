@@ -109,6 +109,7 @@ class ControllerRequestHelper
         $this->deleteSessionVariable('stripe_client_secret');
         $this->deleteSessionVariable('stripe_checkout_session_id');
         $this->deleteSessionVariable('stripe_contract_id');
+        $this->deleteSessionVariable(self::SESSION_SKIP_ADDR_CHECK);
     }
 
     // ==========================================
@@ -138,6 +139,15 @@ class ControllerRequestHelper
     // ==========================================
     // AGB CONFIRMATION
     // ==========================================
+
+    /**
+     * Session flag set immediately before the Stripe Checkout session dispatch
+     * and cleared by clearStripeSessionVariables().
+     *
+     * Gates Order::validateDeliveryAddress() so the Stripe bypass fires only
+     * during the legitimate return flow (R-3, R-8).
+     */
+    public const SESSION_SKIP_ADDR_CHECK = 'stripe_skip_addr_check';
 
     public const AGB_REQUEST_KEY = 'ord_agb';
     public const AGB_ACCEPTED_VALUE = '1';

@@ -4,80 +4,131 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Model;
 
-use OxidEsales\Eshop\Application\Model\User;
-use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\Eshop\Core\Request;
-use OxidEsales\Eshop\Core\Session;
+use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
+use OxidEsales\Payments\Stripe\Model\Order;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Tests for address validation bypass in Stripe Order model.
+ * Tests for Order::validateDeliveryAddress() Stripe bypass gate.
  *
- * The issue: OXID's Order::validateDeliveryAddress() reads the hash from
- * REQUEST parameter 'sDeliveryAddressMD5', but when returning from Stripe
- * Checkout, there's no form submission - just a GET redirect.
+ * The bypass is legitimate only during the Stripe Checkout return flow.
+ * It must NOT fire unconditionally for every Stripe payment — that would
+ * disable OXID's address-tamper detection outside the return flow.
  *
- * Solution: Override validateDeliveryAddress() in Stripe Order model to
- * read the hash from SESSION when the request parameter is missing AND
- * this is a Stripe payment.
+ * Gate logic (R-3, R-8):
+ *   if (isStripePaymentId($paymentId) && isStripeSkipAddressCheck()) → return 0
+ *   otherwise → parent::validateDeliveryAddress($oUser)
+ *
+ * The skip flag (SESSION_SKIP_ADDR_CHECK) is set by StripeOrderController
+ * immediately before the checkout-session dispatch and cleared by
+ * clearStripeSessionVariables() on completion or cancellation.
+ *
+ * @covers \OxidEsales\Payments\Stripe\Model\Order::validateDeliveryAddress
  */
-class OrderAddressValidationTest extends TestCase
+final class OrderAddressValidationTest extends TestCase
 {
+    // ==========================================
+    // Testable subclass — seams only (R-1.5)
+    // ==========================================
+
     /**
-     * Test that address validation passes when hash is in session for Stripe payments.
+     * Testable subclass overriding ONLY the framework seams:
+     *   - getBasketPaymentId()     → controllable payment-id string
+     *   - isStripeSkipAddressCheck() → controllable flag
+     *   - parentValidateDeliveryAddress() → spy / stub return value
      *
-     * Scenario:
-     * 1. User initiates Stripe Checkout
-     * 2. Address hash is stored in contract metadata (and session)
-     * 3. User completes payment on Stripe
-     * 4. User redirects back to shop (GET request, no form data)
-     * 5. Address hash is restored from contract to session
-     * 6. Order::validateDeliveryAddress() should read from session for Stripe
+     * The real validateDeliveryAddress() body is NOT re-implemented here;
+     * all three overrides are pure seams that remove the Registry/session
+     * dependency so the real body can be unit-tested without a live container.
      */
-    public function testValidateDeliveryAddressUsesSessionHashForStripePayments(): void
-    {
-        $this->markTestIncomplete(
-            'This test requires OXID framework to be fully initialized. ' .
-            'The fix is to override validateDeliveryAddress() in Stripe/Model/Order.php ' .
-            'to read hash from session when request parameter is missing for Stripe payments.'
-        );
+    private function buildOrder(
+        string $paymentId,
+        bool $skipFlag,
+        int $parentReturnValue
+    ): Order {
+        return new class ($paymentId, $skipFlag, $parentReturnValue) extends Order {
+            private string $stubPaymentId;
+            private bool $stubSkipFlag;
+            private int $stubParentReturn;
+            public bool $parentWasCalled = false;
+
+            public function __construct(string $paymentId, bool $skipFlag, int $parentReturn)
+            {
+                // Skip OXID model bootstrap
+                $this->stubPaymentId    = $paymentId;
+                $this->stubSkipFlag     = $skipFlag;
+                $this->stubParentReturn = $parentReturn;
+            }
+
+            protected function getBasketPaymentId(): string
+            {
+                return $this->stubPaymentId;
+            }
+
+            protected function isStripeSkipAddressCheck(): bool
+            {
+                return $this->stubSkipFlag;
+            }
+
+            protected function parentValidateDeliveryAddress(object $oUser): int
+            {
+                $this->parentWasCalled = true;
+                return $this->stubParentReturn;
+            }
+        };
     }
 
-    /**
-     * Test documents the expected behavior for the fix.
-     *
-     * When:
-     * - Request parameter 'sDeliveryAddressMD5' is empty/missing
-     * - Session variable 'sDelAddrMD5' contains the hash
-     * - Payment method starts with 'oe_payments_stripe_'
-     *
-     * Then:
-     * - validateDeliveryAddress() should use session hash
-     * - Order should be created successfully (state 0 or 1)
-     */
-    public function testExpectedBehaviorForStripeFix(): void
+    // ==========================================
+    // Test 1: Stripe + skip-flag set → bypass (return 0, parent NOT called)
+    // ==========================================
+
+    public function testStripeWithSkipFlagBypassesValidation(): void
     {
-        // This test documents the expected fix behavior
+        // Arrange
+        $order = $this->buildOrder('oe_payments_stripe_wallet', true, 7);
+        $user  = $this->createStub(\OxidEsales\Eshop\Application\Model\User::class);
 
-        // Given: Hash stored in session (restored from contract)
-        $expectedHash = 'e09dae058fb2488180c26a2a0497bf03';
+        // Act
+        $result = $order->validateDeliveryAddress($user);
 
-        // Given: No request parameter (GET redirect from Stripe)
-        $requestHash = null; // Not in request
+        // Assert
+        $this->assertSame(0, $result, 'Bypass must return 0 (address OK) during the return flow');
+        $this->assertFalse($order->parentWasCalled, 'Parent must NOT be called during the bypass');
+    }
 
-        // Given: Stripe payment method
-        $paymentId = 'oe_payments_stripe_wallet';
+    // ==========================================
+    // Test 2: Stripe + NO skip-flag → delegates to parent (security gate)
+    // ==========================================
 
-        // Expected: For Stripe payments, when request param is missing,
-        // the system should fall back to session variable
+    public function testStripeWithoutSkipFlagDelegatesToParent(): void
+    {
+        // Arrange — the SECURITY case: Stripe payment but NOT in return flow
+        $order = $this->buildOrder('oe_payments_stripe_wallet', false, 7);
+        $user  = $this->createStub(\OxidEsales\Eshop\Application\Model\User::class);
 
-        // This is what needs to be implemented in Stripe\Model\Order::validateDeliveryAddress()
-        $this->assertTrue(
-            $paymentId !== null && strpos($paymentId, 'oe_payments_stripe_') === 0,
-            'This is a Stripe payment'
-        );
+        // Act
+        $result = $order->validateDeliveryAddress($user);
 
-        $this->assertNull($requestHash, 'Request parameter is not available (GET redirect)');
-        $this->assertNotNull($expectedHash, 'Hash should be available from session');
+        // Assert
+        $this->assertSame(7, $result, 'Parent result must be returned when flag is absent');
+        $this->assertTrue($order->parentWasCalled, 'Parent MUST be called when skip-flag is absent');
+    }
+
+    // ==========================================
+    // Test 3: Non-Stripe payment → always delegates to parent
+    // ==========================================
+
+    public function testNonStripePaymentAlwaysDelegatesToParent(): void
+    {
+        // Arrange — non-Stripe payment, flag irrelevant
+        $order = $this->buildOrder('oxidcashondel', true, 5);
+        $user  = $this->createStub(\OxidEsales\Eshop\Application\Model\User::class);
+
+        // Act
+        $result = $order->validateDeliveryAddress($user);
+
+        // Assert
+        $this->assertSame(5, $result, 'Parent result must be returned for non-Stripe payments');
+        $this->assertTrue($order->parentWasCalled, 'Parent MUST be called for non-Stripe payments');
     }
 }

@@ -272,6 +272,44 @@ class StripeOrderControllerTest extends TestCase
         $this->assertEquals('contract_xyz', $decoded['contract_id'] ?? null);
     }
 
+    public function testCreateCheckoutSessionSetsSkipAddrCheckFlagBeforeDispatch(): void
+    {
+        // Arrange: snapshot the helper's session state at the moment dispatch fires
+        $capturedFlagAtDispatch = null;
+
+        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        [$controller, $helper] = $this->createControllerWithMocks($eventDispatcher, [
+            'basketNotEmpty' => true,
+            'hasUser' => true,
+        ]);
+
+        $helperRef = $helper;
+        $eventDispatcher
+            ->expects($this->once())
+            ->method('dispatch')
+            ->willReturnCallback(
+                function ($event) use ($helperRef, &$capturedFlagAtDispatch) {
+                    // Runs synchronously — flag must already be present
+                    $capturedFlagAtDispatch =
+                        $helperRef->sessionVars[ControllerRequestHelper::SESSION_SKIP_ADDR_CHECK] ?? null;
+                    $event->getContext()->set('checkoutSessionId', 'cs_flag_test');
+                    $event->getContext()->set('contractId', 'contract_flag_test');
+                    return $event;
+                }
+            );
+
+        // Act
+        ob_start();
+        @$controller->createCheckoutSession();
+        ob_get_clean();
+
+        // Assert: the flag was set BEFORE the dispatch ran
+        $this->assertTrue(
+            $capturedFlagAtDispatch,
+            'SESSION_SKIP_ADDR_CHECK must be set to true BEFORE the checkout-session dispatch'
+        );
+    }
+
     public function testCheckoutSessionContextContainsCaptureModeFromConfig(): void
     {
         $eventDispatcher = $this->createMock(EventDispatcherInterface::class);

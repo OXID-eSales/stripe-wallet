@@ -209,6 +209,11 @@ class StripeOrderController extends OrderController
             ]);
 
             // 3. Dispatch event - HANDLERS DO THE WORK
+            // Set the skip-addr-check flag BEFORE dispatch so that
+            // Order::validateDeliveryAddress() (called during finalizeOrder inside
+            // the event handlers) recognises this as the legitimate return flow.
+            // Cleared by clearStripeSessionVariables() on completion or cancellation.
+            $helper->setSessionVariable(ControllerRequestHelper::SESSION_SKIP_ADDR_CHECK, true);
             $event = new StripeCheckoutSessionRequestEvent($context);
             $this->getEventDispatcher()->dispatch($event);
 

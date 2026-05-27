@@ -150,6 +150,7 @@ final class ControllerRequestHelperTest extends TestCase
         $this->assertContains('stripe_client_secret', $deletedKeys);
         $this->assertContains('stripe_checkout_session_id', $deletedKeys);
         $this->assertContains('stripe_contract_id', $deletedKeys);
-        $this->assertCount(4, $deletedKeys);
+        $this->assertContains(ControllerRequestHelper::SESSION_SKIP_ADDR_CHECK, $deletedKeys);
+        $this->assertCount(5, $deletedKeys);
     }
 }

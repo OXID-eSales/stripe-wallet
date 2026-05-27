@@ -12,6 +12,7 @@ namespace OxidEsales\Payments\Stripe\Model;
 use OxidEsales\Eshop\Core\Counter as EshopCoreCounter;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
+use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface;
 use OxidEsales\Payments\Stripe\Service\StripeOrderApiService;
@@ -97,43 +98,71 @@ class Order extends Order_parent
     }
 
     /**
-     * Validate delivery address for Stripe Checkout return flow.
+     * Validate delivery address, gating the Stripe bypass on the return-flow flag.
      *
-     * When returning from Stripe Checkout (GET redirect), the standard
-     * 'sDeliveryAddressMD5' request parameter is not available because
-     * there's no form submission. For Stripe payments, we fall back to
-     * the session variable 'sDelAddrMD5' which was restored from the
-     * contract metadata by StripeCheckoutReturnHandler.
+     * OXID's address validation compares the form hash (sDeliveryAddressMD5) with a
+     * server-computed hash. This detects address changes between page loads. During the
+     * Stripe Checkout session creation the order is finalised inside the event dispatch
+     * (no form hash is present in the AJAX request), so validation would always fail.
+     *
+     * The bypass is intentionally narrow (R-3, R-8):
+     * - It fires ONLY when the stripe_skip_addr_check session flag is present, which
+     *   StripeOrderController sets immediately before the checkout-session dispatch and
+     *   ControllerRequestHelper::clearStripeSessionVariables() removes on completion or
+     *   cancellation.
+     * - Outside the checkout-session flow (e.g. direct order manipulation), the flag is
+     *   absent and OXID's tamper-detection runs normally.
+     *
+     * TODO 114.9: replace the strpos prefix check with the shared StripeDefinitions
+     * prefix helper once that sprint lands.
      *
      * @param \OxidEsales\Eshop\Application\Model\User $oUser User object
      * @return int Validation state (0 = OK, 7 = address changed)
      */
     public function validateDeliveryAddress($oUser): int
     {
-        // Get basket to check payment type
-        $oBasket = Registry::getSession()->getBasket();
-        $paymentId = '';
-        if ($oBasket !== null) {
-            $paymentId = $oBasket->getPaymentId();
-        }
+        $paymentId = $this->getBasketPaymentId();
 
-        // Stripe payments: skip address hash validation.
-        //
-        // OXID's address validation compares a hash from the form (sDeliveryAddressMD5)
-        // with a server-computed hash (getEncodedDeliveryAddress). This detects address
-        // changes BETWEEN page loads. For Stripe, the address hasn't changed — we're in
-        // the same request or returning from Stripe redirect where the session hash was
-        // restored. The validation fails for:
-        // - Cyrillic/multibyte characters (encoding mismatch between JS and PHP)
-        // - Stripe Checkout return flow (form hash not in GET request)
-        //
-        // The address was validated by OXID's standard checkout steps before reaching
-        // the payment step. Re-validating during early order creation is redundant.
-        if (strpos($paymentId, 'oe_payments_stripe_') === 0) {
+        if (
+            strpos($paymentId, 'oe_payments_stripe_') === 0
+            && $this->isStripeSkipAddressCheck()
+        ) {
             return 0;
         }
 
-        // For non-Stripe payments, use standard OXID validation
+        return $this->parentValidateDeliveryAddress($oUser);
+    }
+
+    /**
+     * Testability seam: read the basket payment ID from the session.
+     */
+    protected function getBasketPaymentId(): string
+    {
+        return (string) Registry::getSession()->getBasket()->getPaymentId();
+    }
+
+    /**
+     * Testability seam: check whether the skip-addr-check flag is set in session.
+     *
+     * The flag is set by StripeOrderController::createCheckoutSession() immediately
+     * before the checkout-session event dispatch and cleared by
+     * ControllerRequestHelper::clearStripeSessionVariables().
+     */
+    protected function isStripeSkipAddressCheck(): bool
+    {
+        return (bool) Registry::getSession()->getVariable(
+            ControllerRequestHelper::SESSION_SKIP_ADDR_CHECK
+        );
+    }
+
+    /**
+     * Testability seam: delegate to the OXID virtual parent.
+     *
+     * @phpstan-ignore-next-line OXID core: virtual parent class
+     */
+    protected function parentValidateDeliveryAddress(object $oUser): int
+    {
+        /** @phpstan-ignore-next-line OXID core: virtual parent class */
         return parent::validateDeliveryAddress($oUser);
     }
 
