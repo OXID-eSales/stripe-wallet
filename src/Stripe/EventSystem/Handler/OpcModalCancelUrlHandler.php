@@ -9,7 +9,6 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
-use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentBase\EventSystem\Handler\HandlerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelUrlBuildEvent;
 
@@ -22,9 +21,15 @@ use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelUrlBuildEvent;
  * payment method without losing context.
  *
  * This handler is a no-op when OPC is not active or no modal session exists.
+ * Modal-ID resolution is centralised in OpcModalSessionReader (D8).
  */
 class OpcModalCancelUrlHandler implements HandlerInterface
 {
+    public function __construct(
+        private readonly OpcModalSessionReader $sessionReader,
+    ) {
+    }
+
     public static function getHandledEventClass(): string
     {
         return StripeCancelUrlBuildEvent::class;
@@ -36,62 +41,20 @@ class OpcModalCancelUrlHandler implements HandlerInterface
             return;
         }
 
-        $modalId = $this->getOpcModalId();
+        $modalId = $this->sessionReader->getModalId();
         if ($modalId === null) {
             return;
         }
 
         // Prefer redirecting to the originating page so the OPC modal can re-open there.
-        // The originUrl is the page where the Buy Now modal was first opened.
-        $originUrl = $this->getOpcOriginUrl();
+        $originUrl = $this->sessionReader->getOriginUrl();
         if ($originUrl !== null) {
             $separator = str_contains($originUrl, '?') ? '&' : '?';
             $event->setUrl($originUrl . $separator . 'opcModalId=' . urlencode($modalId));
             return;
         }
 
-        // Fallback: just append opcModalId to the base cancel URL.
+        // Fallback: append opcModalId to the base cancel URL.
         $event->setUrl($event->getUrl() . '&opcModalId=' . urlencode($modalId));
-    }
-
-    private function getOpcModalId(): ?string
-    {
-        // Primary: passed explicitly in the processCheckout request body.
-        $fromRequest = Registry::getRequest()->getRequestParameter('opcModalId');
-        if (is_string($fromRequest) && $fromRequest !== '') {
-            return $fromRequest;
-        }
-
-        // Fallback: read from PHP session (set by registerModalOpen).
-        try {
-            $modalSession = Registry::getSession()->getVariable('oe_opc_modal_session');
-        } catch (\Throwable) {
-            return null;
-        }
-
-        if (!is_array($modalSession) || empty($modalSession['modalId'])) {
-            return null;
-        }
-
-        $modalId = $modalSession['modalId'];
-
-        return is_string($modalId) ? $modalId : null;
-    }
-
-    private function getOpcOriginUrl(): ?string
-    {
-        try {
-            $modalSession = Registry::getSession()->getVariable('oe_opc_modal_session');
-        } catch (\Throwable) {
-            return null;
-        }
-
-        if (!is_array($modalSession) || empty($modalSession['originUrl'])) {
-            return null;
-        }
-
-        $url = $modalSession['originUrl'];
-
-        return is_string($url) ? $url : null;
     }
 }

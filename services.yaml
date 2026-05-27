@@ -364,11 +364,18 @@ services:
 
   # OPC Buy Now modal: append opcModalId to Stripe success/cancel URLs so that
   # both the success handler and the cancel handler can reopen the correct modal.
+  # Modal-ID resolution is centralised in OpcModalSessionReader (D8).
+  OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalSessionReader: ~
+
   OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalSuccessUrlHandler:
+    arguments:
+      $sessionReader: '@OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalSessionReader'
     tags:
       - { name: payment.event_handler }
 
   OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalCancelUrlHandler:
+    arguments:
+      $sessionReader: '@OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalSessionReader'
     tags:
       - { name: payment.event_handler }
 
