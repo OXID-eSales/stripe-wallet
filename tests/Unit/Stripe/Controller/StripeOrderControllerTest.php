@@ -744,11 +744,6 @@ class StripeOrderControllerTest extends TestCase
                         {
                             return $this->error;
                         }
-
-                        public function validateKeyPair(): bool
-                        {
-                            return $this->error === null;
-                        }
                     };
                 }
                 if ($serviceName === RetryCleanupService::class) {

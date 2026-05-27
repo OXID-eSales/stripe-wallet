@@ -424,32 +424,6 @@ class StripeOrderControllerSecurityTest extends TestCase
                         {
                         }
 
-                        /**
-                         * @return array<string, string>
-                         */
-                        public function validateConfiguration(
-                            bool $isTestMode,
-                            string $secretKey,
-                            string $webhookSecret
-                        ): array {
-                            return $this->error === null ? [] : ['key' => $this->error ?? ''];
-                        }
-
-                        public function validateApiKeyFormat(string $apiKey, bool $isTestMode): bool
-                        {
-                            return $this->error === null;
-                        }
-
-                        public function testConnection(): bool
-                        {
-                            return $this->error === null;
-                        }
-
-                        public function validateKeyPair(): bool
-                        {
-                            return $this->error === null;
-                        }
-
                         public function getKeyValidationError(): ?string
                         {
                             return $this->error;
