@@ -108,11 +108,15 @@ class ModuleConfiguration extends ModuleConfiguration_parent
     }
 
     /**
-     * Check if test- or api-key is configured
+     * Check if the module is fully configured (API key + webhook secret).
+     *
+     * Delegates to the service's isConfigured() — the single canonical definition
+     * (D9). Using the full check ensures the admin UI reflects the same state that
+     * PaymentController uses when deciding whether to offer Stripe as a payment method.
      */
     public function stripeHasApiKeys(): bool
     {
-        return !empty($this->getModuleConfig()->getToken());
+        return $this->getModuleConfig()->isConfigured();
     }
 
     /**
