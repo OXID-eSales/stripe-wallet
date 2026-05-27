@@ -16,12 +16,6 @@ use OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult;
  *
  * Sprint 21: Extract business logic from StripeCheckoutReturnHandler.
  *
- * SOLID Principles:
- * - SRP: Handles checkout return validation only
- * - OCP: Can be extended for different checkout flows
- * - DIP: Handlers depend on this abstraction
- * - ISP: Focused interface for checkout return operations only
- *
  * @since 2.0.0
  */
 interface CheckoutReturnServiceInterface
@@ -44,18 +38,4 @@ interface CheckoutReturnServiceInterface
         string $contractId,
         string $contractToken
     ): CheckoutReturnResult;
-
-    /**
-     * Retrieve checkout session details from Stripe.
-     *
-     * @param string $checkoutSessionId Stripe Checkout Session ID
-     * @return array{
-     *     payment_status: string,
-     *     payment_intent_id: string|null,
-     *     amount_total: int,
-     *     currency: string,
-     *     contract_id: string|null
-     * }|null Session details or null if not found
-     */
-    public function getSessionDetails(string $checkoutSessionId): ?array;
 }

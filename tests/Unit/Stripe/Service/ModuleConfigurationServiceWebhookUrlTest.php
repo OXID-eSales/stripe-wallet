@@ -43,12 +43,9 @@ final class ModuleConfigurationServiceWebhookUrlTest extends TestCase
     }
 
     /**
-     * The seam: production code must read from the SSL base URL, not the
-     * request-scheme-dependent base URL. If a future refactor accidentally
-     * routes getWebhookUrl() through getShopBaseUrl() (the http-capable one),
-     * this test fails — the http URL would survive the round-trip.
+     * The seam: production code must read from the SSL base URL unconditionally.
      */
-    public function testWebhookUrlIgnoresHttpBaseUrlWhenSslBaseAvailable(): void
+    public function testWebhookUrlUsesSslSchemeUnconditionally(): void
     {
         $service = new class extends ModuleConfigurationService {
             public function __construct()
@@ -59,11 +56,6 @@ final class ModuleConfigurationServiceWebhookUrlTest extends TestCase
             protected function getSslShopBaseUrl(): string
             {
                 return 'https://shop.example.com/';
-            }
-
-            protected function getShopBaseUrl(): string
-            {
-                return 'http://shop.example.com/'; // should NOT be used by getWebhookUrl
             }
         };
 

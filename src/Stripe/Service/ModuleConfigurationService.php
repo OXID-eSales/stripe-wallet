@@ -13,7 +13,6 @@ use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Dao\ModuleConfigurationDaoInterface;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\DataObject\ModuleConfiguration;
 use OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface;
-use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\Payments\Stripe\Module;
 use Throwable;
 
@@ -50,7 +49,6 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     public function __construct(
         private ContextInterface $context,
         private ModuleConfigurationDaoInterface $moduleConfigurationDao,
-        private ?ShopAdapterInterface $shopAdapter = null,
     ) {
         try {
             $this->moduleConfig = $this->moduleConfigurationDao->get(Module::MODULE_ID, $this->context->getCurrentShopId());
@@ -239,22 +237,6 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     {
         $shopUrl = $this->getSslShopBaseUrl();
         return rtrim($shopUrl, '/') . '/index.php?cl=StripeWebhookController';
-    }
-
-    /**
-     * Get shop base URL using adapter or fallback to Registry.
-     *
-     * Returns whatever scheme the current request uses; for places that need
-     * a guaranteed-https URL (e.g. {@see getWebhookUrl()}), use
-     * {@see getSslShopBaseUrl()} instead.
-     */
-    protected function getShopBaseUrl(): string
-    {
-        if ($this->shopAdapter !== null) {
-            return $this->shopAdapter->getShopUrl();
-        }
-
-        return Registry::getConfig()->getShopUrl();
     }
 
     /**

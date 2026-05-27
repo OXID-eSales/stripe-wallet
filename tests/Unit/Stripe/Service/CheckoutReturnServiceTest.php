@@ -329,52 +329,6 @@ class CheckoutReturnServiceTest extends TestCase
         $this->assertEquals('pi_from_object', $result->getPaymentIntentId());
     }
 
-    // --- getSessionDetails Tests ---
-
-    public function testGetSessionDetailsSuccess(): void
-    {
-        // Arrange
-        $session = Session::constructFrom([
-            'id' => 'cs_details',
-            'payment_status' => 'paid',
-            'payment_intent' => 'pi_details',
-            'amount_total' => 15000,
-            'currency' => 'gbp',
-            'metadata' => ['contract_id' => 'contract_details'],
-        ]);
-
-        $this->stripeAdapter
-            ->method('retrieveCheckoutSession')
-            ->willReturn($session);
-
-        // Act
-        $service = $this->createService();
-        $details = $service->getSessionDetails('cs_details');
-
-        // Assert
-        $this->assertNotNull($details);
-        $this->assertEquals('paid', $details['payment_status']);
-        $this->assertEquals('pi_details', $details['payment_intent_id']);
-        $this->assertEquals(15000, $details['amount_total']);
-        $this->assertEquals('gbp', $details['currency']);
-        $this->assertEquals('contract_details', $details['contract_id']);
-    }
-
-    public function testGetSessionDetailsReturnsNullOnError(): void
-    {
-        // Arrange
-        $this->stripeAdapter
-            ->method('retrieveCheckoutSession')
-            ->willThrowException(new PaymentAdapterException('stripe', 'error', 'Failed'));
-
-        // Act
-        $service = $this->createService();
-        $details = $service->getSessionDetails('cs_invalid');
-
-        // Assert
-        $this->assertNull($details);
-    }
-
     // --- Logging Tests ---
 
     public function testSuccessfulValidationIsLogged(): void

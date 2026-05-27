@@ -111,24 +111,6 @@ final class CheckoutReturnService implements CheckoutReturnServiceInterface
         );
     }
 
-    public function getSessionDetails(string $checkoutSessionId): ?array
-    {
-        $session = $this->retrieveSession($checkoutSessionId);
-        if ($session === null) {
-            return null;
-        }
-
-        $contractId = $session->metadata->contract_id ?? null;
-
-        return [
-            'payment_status' => $session->payment_status ?? 'unknown',
-            'payment_intent_id' => $this->extractPaymentIntentId($session),
-            'amount_total' => (int) ($session->amount_total ?? 0),
-            'currency' => $session->currency ?? 'eur',
-            'contract_id' => is_string($contractId) ? $contractId : null,
-        ];
-    }
-
     private function retrieveSession(string $checkoutSessionId): ?Session
     {
         try {
