@@ -153,6 +153,11 @@ class StripeCaptureRequestHandlerTest extends TestCase
         $this->assertStringContainsString('nonexistent_contract', $error);
     }
 
+    /**
+     * Sprint 114.11b (S3): State-policy check moved to CaptureService.
+     * The handler now delegates to the service, which returns a failure response
+     * for non-capturable states. The handler propagates the failure via handleCaptureResult().
+     */
     public function testHandleSetsErrorWhenContractNotInAuthorizedState(): void
     {
         $context = new EventContext([
@@ -161,14 +166,19 @@ class StripeCaptureRequestHandlerTest extends TestCase
         $event = new StripeCaptureRequestEvent($context);
 
         $contract = $this->createContractInState(ContractState::pending());
+        $contract->method('getProviderOrderId')->willReturn('pi_pending');
         $this->contractRepository
             ->method('findById')
             ->willReturn($contract);
 
+        // Service rejects non-capturable state — handler propagates failure
+        $this->captureService
+            ->method('processCapture')
+            ->willReturn(CaptureResponse::failure('Cannot capture: contract not in capturable state (current: pending)'));
+
         $this->handler->handle($event);
 
         $this->assertFalse($context->get('captureSuccess'));
-        // Sprint 82: Error message updated from "not in AUTHORIZED state" to "not in capturable state"
         $this->assertStringContainsString('not in capturable state', $context->get('error'));
     }
 
@@ -748,7 +758,8 @@ class StripeCaptureRequestHandlerTest extends TestCase
     }
 
     /**
-     * Sprint 82: Capture must still be rejected for non-capturable states (e.g. PENDING, FULFILLED).
+     * Sprint 82 / Sprint 114.11b (S3): Capture is rejected for non-capturable states.
+     * State policy now lives in CaptureService; handler propagates the failure response.
      */
     public function testHandleRejectsCaptureOnPendingState(): void
     {
@@ -758,9 +769,14 @@ class StripeCaptureRequestHandlerTest extends TestCase
         $event = new StripeCaptureRequestEvent($context);
 
         $contract = $this->createContractInState(ContractState::pending());
+        $contract->method('getProviderOrderId')->willReturn('pi_pending_reject');
         $this->contractRepository->method('findById')->willReturn($contract);
 
-        $this->captureService->expects($this->never())->method('processCapture');
+        // Service owns the state policy — returns failure for PENDING
+        $this->captureService
+            ->expects($this->once())
+            ->method('processCapture')
+            ->willReturn(CaptureResponse::failure('Cannot capture: contract not in capturable state (current: pending)'));
 
         $this->handler->handle($event);
 
@@ -776,9 +792,14 @@ class StripeCaptureRequestHandlerTest extends TestCase
         $event = new StripeCaptureRequestEvent($context);
 
         $contract = $this->createContractInState(ContractState::fulfilled());
+        $contract->method('getProviderOrderId')->willReturn('pi_fulfilled_reject');
         $this->contractRepository->method('findById')->willReturn($contract);
 
-        $this->captureService->expects($this->never())->method('processCapture');
+        // Service owns the state policy — returns failure for FULFILLED
+        $this->captureService
+            ->expects($this->once())
+            ->method('processCapture')
+            ->willReturn(CaptureResponse::failure('Cannot capture: contract not in capturable state (current: fulfilled)'));
 
         $this->handler->handle($event);
 

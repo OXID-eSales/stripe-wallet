@@ -52,6 +52,15 @@ final class CaptureService implements CaptureServiceInterface
         ?float $amount,
         array $metadata
     ): CaptureResponse {
+        // Sprint 114.11b (S3): capturable-state policy lives in the service, not the handler.
+        // Only AUTHORIZED and COMMITTED contracts may be captured.
+        if (!$contract->getState()->isAuthorized() && !$contract->getState()->isCommitted()) {
+            return CaptureResponse::failure(sprintf(
+                'Cannot capture: contract not in capturable state (current: %s)',
+                $contract->getStateValue()
+            ));
+        }
+
         $paymentIntentId = $contract->getProviderOrderId();
         if (!is_string($paymentIntentId) || $paymentIntentId === '') {
             return CaptureResponse::failure('Contract has no PaymentIntent ID');

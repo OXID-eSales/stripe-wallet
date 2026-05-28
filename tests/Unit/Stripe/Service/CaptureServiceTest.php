@@ -150,6 +150,7 @@ class CaptureServiceTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_123');
+        $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::authorized());
 
         $service = $this->createService();
 
@@ -174,6 +175,7 @@ class CaptureServiceTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_123');
+        $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::authorized());
 
         $service = $this->createService();
 
@@ -189,6 +191,7 @@ class CaptureServiceTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_123');
+        $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::authorized());
 
         $this->repository->expects($this->never())->method('save');
 
@@ -204,6 +207,7 @@ class CaptureServiceTest extends TestCase
     {
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn(null);
+        $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::authorized());
 
         $this->adapter->expects($this->never())->method('capturePayment');
         $this->repository->expects($this->never())->method('save');
@@ -220,6 +224,7 @@ class CaptureServiceTest extends TestCase
     {
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('');
+        $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::authorized());
 
         $this->adapter->expects($this->never())->method('capturePayment');
 
@@ -430,6 +435,7 @@ class CaptureServiceTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_123');
+        $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::authorized());
 
         $service = $this->createService();
 
@@ -485,5 +491,107 @@ class CaptureServiceTest extends TestCase
 
         $this->assertNotNull($capturedTransaction);
         $this->assertSame(5, $capturedTransaction->getShopId());
+    }
+
+    // --- Sprint 114.11b (S3): Capturable-state policy moved from handler to service ---
+
+    /**
+     * S3: processCapture() must reject a PENDING contract — state policy lives in the service.
+     */
+    public function testProcessCaptureReturnsFailureWhenContractIsPending(): void
+    {
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getProviderOrderId')->willReturn('pi_123');
+        $contract->method('getState')->willReturn(
+            \OxidEsales\PaymentBase\Contract\ContractState::pending()
+        );
+        $contract->method('getStateValue')->willReturn('pending');
+
+        $this->adapter->expects($this->never())->method('capturePayment');
+
+        $service = $this->createService();
+        $result = $service->processCapture($contract, null, []);
+
+        $this->assertFalse($result->isSuccessful());
+        $this->assertStringContainsString('not in capturable state', $result->errorMessage ?? '');
+        $this->assertStringContainsString('pending', $result->errorMessage ?? '');
+    }
+
+    /**
+     * S3: processCapture() must reject a FULFILLED contract.
+     */
+    public function testProcessCaptureReturnsFailureWhenContractIsFulfilled(): void
+    {
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getProviderOrderId')->willReturn('pi_123');
+        $contract->method('getState')->willReturn(
+            \OxidEsales\PaymentBase\Contract\ContractState::fulfilled()
+        );
+        $contract->method('getStateValue')->willReturn('fulfilled');
+
+        $this->adapter->expects($this->never())->method('capturePayment');
+
+        $service = $this->createService();
+        $result = $service->processCapture($contract, null, []);
+
+        $this->assertFalse($result->isSuccessful());
+        $this->assertStringContainsString('not in capturable state', $result->errorMessage ?? '');
+    }
+
+    /**
+     * S3: processCapture() must accept an AUTHORIZED contract (unchanged behavior).
+     */
+    public function testProcessCaptureSucceedsForAuthorizedContract(): void
+    {
+        $response = CaptureResponse::success(
+            providerPaymentId: 'pi_auth',
+            captureId: 'ch_auth',
+            amountCaptured: 50.0,
+            currency: 'eur',
+            status: 'succeeded',
+            capturedAt: new \DateTimeImmutable(),
+        );
+        $this->adapter->method('capturePayment')->willReturn($response);
+
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getProviderOrderId')->willReturn('pi_auth');
+        $contract->method('getState')->willReturn(
+            \OxidEsales\PaymentBase\Contract\ContractState::authorized()
+        );
+        $contract->expects($this->once())->method('captureAuthorization');
+        $this->repository->expects($this->once())->method('save');
+
+        $service = $this->createService();
+        $result = $service->processCapture($contract, null, []);
+
+        $this->assertTrue($result->isSuccessful());
+    }
+
+    /**
+     * S3: processCapture() must accept a COMMITTED contract (unchanged behavior).
+     */
+    public function testProcessCaptureSucceedsForCommittedContract(): void
+    {
+        $response = CaptureResponse::success(
+            providerPaymentId: 'pi_committed',
+            captureId: 'ch_committed',
+            amountCaptured: 130.39,
+            currency: 'eur',
+            status: 'succeeded',
+            capturedAt: new \DateTimeImmutable(),
+        );
+        $this->adapter->method('capturePayment')->willReturn($response);
+
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getProviderOrderId')->willReturn('pi_committed');
+        $contract->method('getState')->willReturn(
+            \OxidEsales\PaymentBase\Contract\ContractState::committed()
+        );
+        $this->fulfillmentService->expects($this->once())->method('fulfill')->willReturn(true);
+
+        $service = $this->createService();
+        $result = $service->processCapture($contract, null, []);
+
+        $this->assertTrue($result->isSuccessful());
     }
 }

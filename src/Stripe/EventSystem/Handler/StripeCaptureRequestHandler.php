@@ -114,18 +114,9 @@ class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
 
         $context->set('contract', $contract);
 
-        // Validate contract state for capture:
-        // - AUTHORIZED: Normal delayed capture flow (contract used authorize() transition)
-        // - COMMITTED: Manual capture order where checkout return skipped AUTHORIZED state
-        //   (Sprint 82: STRP-118 fix — contract goes PENDING→READY_TO_COMMIT→COMMITTED)
-        if (!$contract->getState()->isAuthorized() && !$contract->getState()->isCommitted()) {
-            $context->set('error', sprintf(
-                'Cannot capture: contract not in capturable state (current: %s)',
-                $contract->getState()->getValue()
-            ));
-            $context->set('captureSuccess', false);
-            return;
-        }
+        // Sprint 114.11b (S3): capturable-state policy moved to CaptureService::processCapture().
+        // The handler no longer validates state here; the service returns CaptureResponse::failure()
+        // for non-capturable contracts, which handleCaptureResult() converts to an exception.
 
         // Get PaymentIntent ID from contract
         $paymentIntentId = $this->getPaymentIntentId($event, $contract, $context);
