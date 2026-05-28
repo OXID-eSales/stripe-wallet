@@ -38,7 +38,13 @@ services:
     alias: OxidEsales\Payments\Stripe\Adapter\StripeWebhookEndpointApi
     public: false
 
+  OxidEsales\Payments\Stripe\Adapter\StripeClientProviderInterface:
+    alias: OxidEsales\Payments\Stripe\Adapter\StripeClientFactory
+    public: false
+
   OxidEsales\Payments\Stripe\Adapter\StripeWebhookEndpointApi:
+    arguments:
+      $clientProvider: '@OxidEsales\Payments\Stripe\Adapter\StripeClientProviderInterface'
     public: false
 
   OxidEsales\Payments\Stripe\Service\WebhookEventCatalog:

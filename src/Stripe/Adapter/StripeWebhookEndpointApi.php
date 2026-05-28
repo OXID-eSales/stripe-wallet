@@ -19,9 +19,19 @@ use Stripe\StripeClient;
  *
  * Translates SDK exceptions into our domain {@see WebhookRegistrationException}
  * so callers can catch a single type without coupling to the SDK.
+ *
+ * WHY inject StripeClientProviderInterface instead of calling new StripeClient():
+ * The platform key used here may differ from the shop's default secret key (it is
+ * read from config per request), so we cannot use the pre-configured client from
+ * StripeClientFactory::create(). StripeClientProviderInterface::forKey() pins the
+ * same stripe_version as the rest of the module, ensuring consistent API behaviour.
  */
 final class StripeWebhookEndpointApi implements StripeWebhookEndpointApiInterface
 {
+    public function __construct(
+        private readonly StripeClientProviderInterface $clientProvider
+    ) {
+    }
     /**
      * @param list<string> $events
      */
@@ -128,6 +138,6 @@ final class StripeWebhookEndpointApi implements StripeWebhookEndpointApiInterfac
 
     private function client(string $apiKey): StripeClient
     {
-        return new StripeClient($apiKey);
+        return $this->clientProvider->forKey($apiKey);
     }
 }

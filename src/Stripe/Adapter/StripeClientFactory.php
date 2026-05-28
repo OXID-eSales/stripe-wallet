@@ -17,9 +17,13 @@ use Stripe\StripeClient;
  *
  * Handles Stripe SDK initialization with proper API keys and configuration.
  *
+ * Implements StripeClientProviderInterface so it can be injected into
+ * StripeWebhookEndpointApi, which needs to construct a versioned client
+ * from a platform API key that differs from the shop's default secret key.
+ *
  * @since 1.0.0
  */
-final class StripeClientFactory
+final class StripeClientFactory implements StripeClientProviderInterface
 {
     private string $secretKey;
     private bool $testMode;
@@ -55,6 +59,23 @@ final class StripeClientFactory
     public function isTestMode(): bool
     {
         return $this->testMode;
+    }
+
+    /**
+     * Create a versioned Stripe SDK client for the given API key.
+     *
+     * Pins the same stripe_version as create() so webhook-registration
+     * API calls use the same API contract as the rest of the module.
+     *
+     * Used by StripeWebhookEndpointApi which receives a platform secret
+     * key that may differ from the shop's default key.
+     */
+    public function forKey(string $apiKey): StripeClient
+    {
+        return new StripeClient([
+            'api_key'        => $apiKey,
+            'stripe_version' => '2024-11-20.acacia',
+        ]);
     }
 
     /**
