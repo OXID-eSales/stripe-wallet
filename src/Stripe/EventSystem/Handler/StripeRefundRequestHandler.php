@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
-use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
@@ -12,19 +11,25 @@ use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
 use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
 use OxidEsales\Payments\Stripe\Service\ContractRefundRecorder;
+use OxidEsales\Payments\Stripe\Service\PaymentIntentResolver;
 use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
 use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use RuntimeException;
 
 /**
  * Handles refund requests via Stripe API (full and partial).
  *
  * Handler responsibilities (ONLY):
  * 1. Receive event and extract parameters
- * 2. Delegate to RefundService
- * 3. Delegate logging to RequestLogService
- * 4. Set results in context
+ * 2. Resolve PaymentIntent ID via agnostic PaymentIntentResolver (A3: no oxNew(Order))
+ * 3. Delegate to RefundService
+ * 4. Delegate logging to RequestLogService
+ * 5. Set results in context
+ *
+ * Sprint 114.10a (A3): Replaced oxNew(Order) + oxorder__oxtransid lookup with
+ * PaymentIntentResolver to mirror the agnostic PI resolution in capture/cancel handlers.
  *
  * @since 2.0.0
  */
@@ -39,7 +44,8 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
         private readonly ShopAdapterInterface $shopAdapter,
         ?LoggerInterface $logger = null,
         ?FileLoggerInterface $eventLogger = null,
-        private readonly ?ContractRefundRecorder $refundRecorder = null
+        private readonly ?ContractRefundRecorder $refundRecorder = null,
+        private readonly ?PaymentIntentResolver $paymentIntentResolver = null
     ) {
         $this->logger = $logger ?? new NullLogger();
         $this->eventLogger = $eventLogger;
@@ -86,53 +92,34 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
             return;
         }
 
-        $order = $this->loadOrder($orderId, $context);
-        if ($order === null) {
-            return;
-        }
-
-        $paymentIntentId = $this->getPaymentIntentId($event, $order, $context);
+        $paymentIntentId = $this->resolvePaymentIntentId($event, $context);
         if ($paymentIntentId === null) {
             return;
         }
 
         $result = $this->executeRefund($event, $orderId, $paymentIntentId);
-        $this->handleRefundResult($result, $event, $order, $context);
+        $this->handleRefundResult($result, $event, $orderId, $context);
     }
 
-    private function loadOrder(string $orderId, EventContext $context): ?Order
-    {
-        /** @var Order $order */
-        $order = oxNew(Order::class);
-        if (!$order->load($orderId)) {
-            $context->set('error', 'Order not found: ' . $orderId);
-            $context->set('refundSuccess', false);
-            return null;
-        }
-
-        $context->set('order', $order);
-        return $order;
-    }
-
-    private function getPaymentIntentId(
+    /**
+     * Resolve PaymentIntent ID via agnostic resolver.
+     *
+     * Mirrors StripeCaptureRequestHandler::getPaymentIntentId and
+     * StripeCancelAuthorizationRequestHandler::resolvePaymentIntentId.
+     * Priority: explicit event id → contract providerOrderId → contract metadata.
+     */
+    private function resolvePaymentIntentId(
         StripeRefundRequestEvent $event,
-        Order $order,
         EventContext $context
     ): ?string {
-        $paymentIntentId = $event->getPaymentIntentId();
-        if ($paymentIntentId !== null) {
-            return $paymentIntentId;
-        }
-
-        /** @phpstan-ignore-next-line OXID core: magic property oxorder__oxtransid->value */
-        $transId = $order->oxorder__oxtransid->value ?? null;
-        if (!is_string($transId) || $transId === '') {
-            $context->set('error', 'Order has no payment transaction ID');
+        $resolver = $this->paymentIntentResolver ?? new PaymentIntentResolver($this->contractRepository);
+        try {
+            return $resolver->resolve($event->getPaymentIntentId(), $event->getContractId());
+        } catch (RuntimeException $e) {
+            $context->set('error', $e->getMessage());
             $context->set('refundSuccess', false);
             return null;
         }
-
-        return $transId;
     }
 
     private function executeRefund(
@@ -180,7 +167,7 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
     private function handleRefundResult(
         RefundResponse $result,
         StripeRefundRequestEvent $event,
-        Order $order,
+        string $orderId,
         EventContext $context
     ): void {
         if (!$result->isSuccessful()) {
@@ -191,8 +178,8 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
         }
 
         $this->updateContractState($event);
-        $this->logRefundRequest($result, $order);
-        $this->setSuccessResults($context, $result, $order);
+        $this->logRefundRequest($result, $orderId);
+        $this->setSuccessResults($context, $result, $orderId);
     }
 
     protected function updateContractState(StripeRefundRequestEvent $event): void
@@ -216,8 +203,9 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
      * Log refund request to request log.
      *
      * Sprint 8: Now delegates to RequestLogService (Facade pattern).
+     * Sprint 114.10a (A3): Uses orderId string directly; no longer requires Order object.
      */
-    private function logRefundRequest(RefundResponse $result, Order $order): void
+    private function logRefundRequest(RefundResponse $result, string $orderId): void
     {
         $this->requestLogService->logRequest(
             action: 'refund',
@@ -227,12 +215,12 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
                 'amount' => $result->amountRefunded,
                 'currency' => $result->currency,
             ],
-            referenceId: (string) $order->getId(),
+            referenceId: $orderId,
             shopId: (int) $this->shopAdapter->getShopId()
         );
     }
 
-    private function setSuccessResults(EventContext $context, RefundResponse $result, Order $order): void
+    private function setSuccessResults(EventContext $context, RefundResponse $result, string $orderId): void
     {
         $context->set('refundSuccess', true);
         $context->set('refundId', $result->refundId);
@@ -243,7 +231,7 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
         $this->logger->info('Refund processed successfully', [
             'refund_id' => $result->refundId,
             'amount' => $result->amountRefunded,
-            'order_id' => $order->getId(),
+            'order_id' => $orderId,
         ]);
     }
 
@@ -282,5 +270,4 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
             shopId: (int) $this->shopAdapter->getShopId()
         );
     }
-
 }

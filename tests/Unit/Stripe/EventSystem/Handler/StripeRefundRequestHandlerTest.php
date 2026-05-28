@@ -96,6 +96,119 @@ class StripeRefundRequestHandlerTest extends TestCase
         $this->assertEquals('Order ID is missing', $context->get('error'));
     }
 
+    // =========================================================================
+    // Sprint 114.10a (A3): PI resolution via agnostic resolver — RED tests
+    // These assert the handler resolves the PI id via ContractRepository, not oxNew(Order).
+    // =========================================================================
+
+    /**
+     * @test
+     * @group sprint-114-10a
+     * @group a3-agnostic-pi
+     */
+    public function processRefundResolvesPaymentIntentIdViaContractRepository(): void
+    {
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getProviderOrderId')->willReturn('pi_from_contract');
+        $contract->method('getMetadata')->willReturn(null);
+
+        $this->contractRepository
+            ->method('findById')
+            ->with('contract_abc')
+            ->willReturn($contract);
+
+        $this->refundService
+            ->expects($this->once())
+            ->method('processRefund')
+            ->with(
+                'order_xyz',
+                'pi_from_contract',
+                $this->anything(),
+                $this->anything(),
+                $this->anything(),
+                $this->anything()
+            )
+            ->willReturn($this->createSuccessfulRefundResponse());
+
+        $context = new EventContext([
+            'orderId' => 'order_xyz',
+            'contractId' => 'contract_abc',
+            'reason' => 'requested_by_customer',
+            'initiator' => 'admin',
+        ]);
+        $event = new StripeRefundRequestEvent($context);
+
+        $this->createHandler()->handle($event);
+
+        $this->assertTrue($context->get('refundSuccess'));
+    }
+
+    /**
+     * @test
+     * @group sprint-114-10a
+     * @group a3-agnostic-pi
+     */
+    public function processRefundUsesExplicitPaymentIntentIdWhenProvided(): void
+    {
+        $this->refundService
+            ->expects($this->once())
+            ->method('processRefund')
+            ->with(
+                'order_xyz',
+                'pi_explicit_123',
+                $this->anything(),
+                $this->anything(),
+                $this->anything(),
+                $this->anything()
+            )
+            ->willReturn($this->createSuccessfulRefundResponse());
+
+        $context = new EventContext([
+            'orderId' => 'order_xyz',
+            'paymentIntentId' => 'pi_explicit_123',
+            'reason' => 'duplicate',
+            'initiator' => 'admin',
+        ]);
+        $event = new StripeRefundRequestEvent($context);
+
+        $this->createHandler()->handle($event);
+
+        $this->assertTrue($context->get('refundSuccess'));
+    }
+
+    /**
+     * @test
+     * @group sprint-114-10a
+     * @group a3-agnostic-pi
+     */
+    public function processRefundSetsErrorWhenPaymentIntentIdCannotBeResolved(): void
+    {
+        $context = new EventContext([
+            'orderId' => 'order_xyz',
+            // No paymentIntentId, no contractId => resolver throws
+            'reason' => 'duplicate',
+            'initiator' => 'admin',
+        ]);
+        $event = new StripeRefundRequestEvent($context);
+
+        $this->createHandler()->handle($event);
+
+        $this->assertFalse($context->get('refundSuccess'));
+        $this->assertStringContainsString('PaymentIntent ID is missing', (string) $context->get('error'));
+    }
+
+    private function createSuccessfulRefundResponse(): \OxidEsales\PaymentBase\Adapter\Response\RefundResponse
+    {
+        return \OxidEsales\PaymentBase\Adapter\Response\RefundResponse::success(
+            providerPaymentId: 'pi_test',
+            refundId: 're_test',
+            amountRefunded: 100.0,
+            currency: 'EUR',
+            status: 'succeeded',
+            refundedAt: new \DateTimeImmutable()
+        );
+    }
+
     public function testFullRefundUsesNullAmount(): void
     {
         $context = new EventContext([
