@@ -11,23 +11,25 @@ namespace OxidEsales\Payments\Stripe\Controller\Admin;
 
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeChargeDto;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripePaymentIntentDto;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface;
 use OxidEsales\Payments\Stripe\Service\StripeOrderApiService;
-use Stripe\Charge;
-use Stripe\PaymentIntent;
 
 /**
  * Provides Stripe API view data for the OrderRefund admin template.
  *
  * Sprint 46: Extracted from OrderRefund to reduce ECC.
+ * Sprint 114.10b: Migrated from raw \Stripe\* to StripePaymentIntentDto / StripeChargeDto
+ * (A1 boundary fix — seals Stripe SDK types inside src/Stripe/Adapter/).
  *
  * @since 2.0.0
  */
 class OrderRefundViewDataProvider
 {
-    private ?PaymentIntent $apiOrder = null;
-    private ?Charge $apiCharge = null;
+    private ?StripePaymentIntentDto $apiOrder = null;
+    private ?StripeChargeDto $apiCharge = null;
     private ?string $apiError = null;
 
     public function __construct(
@@ -53,14 +55,14 @@ class OrderRefundViewDataProvider
     }
 
     /**
-     * Retrieve PaymentIntent for order, with caching.
+     * Retrieve PaymentIntent DTO for order, with caching.
      *
      * Sprint 104: uses the expanded PI (latest_charge + refunds) as the canonical
      * source so all render-path reads share one HTTP round-trip.
      * Mutation-path callers (CaptureService, RefundService, etc.) still pass
      * refresh=true to get a fresh post-mutation state.
      */
-    public function getPaymentIntent(Order $order, bool $refresh = false): ?PaymentIntent
+    public function getPaymentIntent(Order $order, bool $refresh = false): ?StripePaymentIntentDto
     {
         try {
             if ($this->apiOrder === null || $refresh) {
@@ -78,13 +80,13 @@ class OrderRefundViewDataProvider
     }
 
     /**
-     * Retrieve last Charge for order, with caching.
+     * Retrieve last Charge DTO for order, with caching.
      *
-     * Sprint 104: derives the Charge from the expanded PI's latest_charge field
-     * instead of making a separate API call. The expanded PI already contains the
-     * full Charge object (including refunds) when fetched via fetchExpandedPaymentIntent.
+     * Sprint 104: derives the Charge DTO from the expanded PI's charge field
+     * instead of making a separate API call.
+     * Sprint 114.10b: returns StripeChargeDto instead of \Stripe\Charge.
      */
-    public function getLastCharge(Order $order, bool $refresh = false): ?Charge
+    public function getLastCharge(Order $order, bool $refresh = false): ?StripeChargeDto
     {
         try {
             $paymentIntent = $this->getPaymentIntent($order, $refresh);
@@ -92,8 +94,7 @@ class OrderRefundViewDataProvider
                 return null;
             }
             if ($this->apiCharge === null || $refresh) {
-                $latestCharge    = $paymentIntent->latest_charge ?? null;
-                $this->apiCharge = $latestCharge instanceof Charge ? $latestCharge : null;
+                $this->apiCharge = $paymentIntent->charge;
                 if ($this->apiCharge === null) {
                     $this->apiError = 'PaymentIntent has no charge';
                 }
@@ -114,7 +115,7 @@ class OrderRefundViewDataProvider
         if ($paymentIntent === null) {
             return false;
         }
-        return ($paymentIntent->status ?? '') === 'requires_capture';
+        return $paymentIntent->status === 'requires_capture';
     }
 
     /**
@@ -134,8 +135,8 @@ class OrderRefundViewDataProvider
         if ($paymentIntent === null) {
             return 0.0;
         }
-        $currency = strtoupper($paymentIntent->currency ?? '');
-        return AmountConverter::toMajorUnits((int) ($paymentIntent->amount ?? 0), $currency);
+        $currency = strtoupper($paymentIntent->currency);
+        return AmountConverter::toMajorUnits($paymentIntent->amount, $currency);
     }
 
     /**
@@ -188,11 +189,11 @@ class OrderRefundViewDataProvider
     public function getStripeCapturedAmount(Order $order): string
     {
         $charge = $this->getLastCharge($order, false);
-        $price = 0;
-        if ($charge && !empty($charge->amount_captured)) {
-            $chargeCurrency = strtoupper($charge->currency ?? '');
-            $price = AmountConverter::toMajorUnits((int) $charge->amount_captured, $chargeCurrency);
+        if ($charge === null || $charge->amountCaptured === 0) {
+            return $this->formatPrice(0.0, $order);
         }
+        $chargeCurrency = strtoupper($charge->currency);
+        $price = AmountConverter::toMajorUnits($charge->amountCaptured, $chargeCurrency);
         return $this->formatPrice($price, $order);
     }
 
@@ -212,60 +213,53 @@ class OrderRefundViewDataProvider
      * Covers all actions regardless of origin (admin, Stripe Dashboard, webhook).
      * Uses expanded PaymentIntent to include refunds (Stripe SDK v19+: Charge.refunds removed).
      * Sprint 104: reads from the shared expanded-PI cache (populated by getPaymentIntent).
+     * Sprint 114.10b: reads StripePaymentIntentDto / StripeChargeDto / StripeRefundDto.
      *
      * @return array<int, array<string, mixed>>
      */
     public function getStripeTransactionHistory(Order $order): array
     {
-        // Read from the shared expanded-PI cache; populates it on first call.
         $paymentIntent = $this->getPaymentIntent($order);
         if ($paymentIntent === null) {
             return [];
         }
 
         $transactions = [];
-        $currency = (string) ($paymentIntent->currency ?? 'eur');
-        $piId = (string) ($paymentIntent->id ?? '');
+        $currency     = $paymentIntent->currency;
 
-        // Authorization
         $transactions[] = [
-            'type' => 'authorization',
-            'status' => $this->mapPiStatusToLabel($paymentIntent->status ?? ''),
-            'amount' => AmountConverter::toMajorUnits((int) ($paymentIntent->amount ?? 0), $currency),
-            'currency' => $currency,
-            'transactionId' => $piId,
-            'createdAt' => date('Y-m-d H:i:s', (int) ($paymentIntent->created ?? 0)),
+            'type'          => 'authorization',
+            'status'        => $this->mapPiStatusToLabel($paymentIntent->status),
+            'amount'        => AmountConverter::toMajorUnits($paymentIntent->amount, $currency),
+            'currency'      => $currency,
+            'transactionId' => $paymentIntent->id,
+            'createdAt'     => date('Y-m-d H:i:s', $paymentIntent->created),
         ];
 
-        // Get charge from expanded latest_charge
-        $charge = $paymentIntent->latest_charge;
-        if (!$charge instanceof Charge) {
+        $charge = $paymentIntent->charge;
+        if ($charge === null) {
             return $transactions;
         }
 
-        // Capture
         if ($charge->captured) {
             $transactions[] = [
-                'type' => 'capture',
-                'status' => 'completed',
-                'amount' => AmountConverter::toMajorUnits((int) ($charge->amount_captured ?? 0), $currency),
-                'currency' => $currency,
-                'transactionId' => (string) ($charge->id ?? ''),
-                'createdAt' => date('Y-m-d H:i:s', (int) ($charge->created ?? 0)),
+                'type'          => 'capture',
+                'status'        => 'completed',
+                'amount'        => AmountConverter::toMajorUnits($charge->amountCaptured, $currency),
+                'currency'      => $currency,
+                'transactionId' => $charge->id,
+                'createdAt'     => date('Y-m-d H:i:s', $charge->created),
             ];
         }
 
-        // Refunds — available via expand: 'latest_charge.refunds'
-        $refundsData = $charge->refunds->data ?? [];
-
-        foreach ($refundsData as $refund) {
+        foreach ($charge->refunds as $refundDto) {
             $transactions[] = [
-                'type' => 'refund',
-                'status' => (string) ($refund->status ?? 'unknown'),
-                'amount' => AmountConverter::toMajorUnits((int) ($refund->amount ?? 0), $currency),
-                'currency' => $currency,
-                'transactionId' => (string) ($refund->id ?? ''),
-                'createdAt' => date('Y-m-d H:i:s', (int) ($refund->created ?? 0)),
+                'type'          => 'refund',
+                'status'        => $refundDto->status,
+                'amount'        => AmountConverter::toMajorUnits($refundDto->amount, $currency),
+                'currency'      => $currency,
+                'transactionId' => $refundDto->id,
+                'createdAt'     => date('Y-m-d H:i:s', $refundDto->createdAt),
             ];
         }
 
@@ -294,13 +288,15 @@ class OrderRefundViewDataProvider
     }
 
     /**
-     * Sprint 104: testability seam — fetches the expanded PaymentIntent.
+     * Sprint 104: testability seam — fetches the expanded PaymentIntent DTO.
      *
      * Separated from getPaymentIntent() so tests can override this single
      * method to count HTTP calls without mocking the final StripeOrderApiService.
      * All render-path reads flow through this one entry point.
+     *
+     * Sprint 114.10b: return type changed from ?PaymentIntent to ?StripePaymentIntentDto.
      */
-    protected function fetchExpandedPaymentIntent(Order $order): ?PaymentIntent
+    protected function fetchExpandedPaymentIntent(Order $order): ?StripePaymentIntentDto
     {
         return $this->apiService->getPaymentIntentWithRefunds($order);
     }

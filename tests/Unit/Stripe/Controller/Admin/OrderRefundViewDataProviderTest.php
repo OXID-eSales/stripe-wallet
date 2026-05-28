@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller\Admin;
 
 use OxidEsales\Eshop\Application\Model\Order;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeChargeDto;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider;
 use OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface;
@@ -17,7 +18,6 @@ use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\StripeOrderApiService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Stripe\Charge;
 
 /**
  * Sprint 103: Pins getRemainingRefundableRaw() and isOrderRefundable() against
@@ -143,14 +143,16 @@ final class OrderRefundViewDataProviderTest extends TestCase
 
     /**
      * Creates a testable subclass of OrderRefundViewDataProvider that returns
-     * a fixed charge from getLastCharge(), bypassing the final StripeOrderApiService.
+     * a fixed StripeChargeDto from getLastCharge(), bypassing StripeOrderApiService.
      *
      * StripeOrderApiService is final and cannot be mocked with PHPUnit. We build
      * a real instance with a mocked factory (the factory interface IS mockable) and
      * then override getLastCharge() so the service is never actually called. This
      * pattern follows CLAUDE.md §"Final class mocking".
+     *
+     * Sprint 114.10b: migrated from \Stripe\Charge to StripeChargeDto.
      */
-    private function createProviderWithCharge(?Charge $charge): OrderRefundViewDataProvider
+    private function createProviderWithCharge(?StripeChargeDto $charge): OrderRefundViewDataProvider
     {
         $adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
         $adapterFactory->method('getStripeAdapter')->willReturn($this->createMock(StripeAdapterInterface::class));
@@ -161,26 +163,28 @@ final class OrderRefundViewDataProviderTest extends TestCase
             public function __construct(
                 StripeOrderApiService $apiService,
                 ChargeAmountResolverInterface $chargeAmountResolver,
-                private readonly ?Charge $stubCharge,
+                private readonly ?StripeChargeDto $stubCharge,
             ) {
                 parent::__construct($apiService, $chargeAmountResolver);
             }
 
-            public function getLastCharge(Order $order, bool $refresh = false): ?Charge
+            public function getLastCharge(Order $order, bool $refresh = false): ?StripeChargeDto
             {
                 return $this->stubCharge;
             }
         };
     }
 
-    private function buildCharge(int $amount, int $amountCaptured, int $amountRefunded): Charge
+    private function buildCharge(int $amount, int $amountCaptured, int $amountRefunded): StripeChargeDto
     {
-        return Charge::constructFrom([
-            'id'              => 'ch_test',
-            'amount'          => $amount,
-            'amount_captured' => $amountCaptured,
-            'amount_refunded' => $amountRefunded,
-            'currency'        => 'eur',
-        ]);
+        return new StripeChargeDto(
+            id: 'ch_test',
+            amount: $amount,
+            amountCaptured: $amountCaptured,
+            amountRefunded: $amountRefunded,
+            currency: 'eur',
+            captured: true,
+            created: 0,
+        );
     }
 }

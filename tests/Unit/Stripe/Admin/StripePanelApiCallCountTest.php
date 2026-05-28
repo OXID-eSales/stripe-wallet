@@ -10,14 +10,14 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Admin;
 
 use OxidEsales\Eshop\Application\Model\Order;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeChargeDto;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripePaymentIntentDto;
 use OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider;
 use OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\StripeOrderApiService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Stripe\Charge;
-use Stripe\PaymentIntent;
 
 /**
  * Sprint 104 — Pins the Stripe API call-count invariant for the admin panel render path.
@@ -104,6 +104,8 @@ final class StripePanelApiCallCountTest extends TestCase
      * returns it. Subsequent calls return the cached result without re-entering
      * fetchStripeCharge(). The testable subclass overrides fetchStripeCharge()
      * to count invocations, while getStripeCharge()'s memoisation remains active.
+     *
+     * Sprint 114.10b: stub charge type changed from \Stripe\Charge to StripeChargeDto.
      */
     public function testOrderExtensionMemoisesChargePerInstance(): void
     {
@@ -115,13 +117,13 @@ final class StripePanelApiCallCountTest extends TestCase
             public int $fetchCallCount = 0;
 
             public function __construct(
-                private readonly ?\Stripe\Charge $stubCharge,
+                private readonly ?StripeChargeDto $stubCharge,
                 private readonly ChargeAmountResolverInterface $stubResolver,
             ) {
                 // Skip OXID parent constructor — would attempt DB/Registry access.
             }
 
-            protected function fetchStripeCharge(): ?\Stripe\Charge
+            protected function fetchStripeCharge(): ?StripeChargeDto
             {
                 $this->fetchCallCount++;
                 return $this->stubCharge;
@@ -176,6 +178,8 @@ final class StripePanelApiCallCountTest extends TestCase
      * to intercept and count calls that would otherwise reach the final StripeOrderApiService.
      * Also tracks whether legacy plain-PI or plain-Charge paths are ever invoked (they must not be).
      *
+     * Sprint 114.10b: stub PI type changed from \Stripe\PaymentIntent to StripePaymentIntentDto.
+     *
      * @return OrderRefundViewDataProvider&object{
      *     expandedPiCallCount: int,
      *     plainPiCallCount: int,
@@ -197,12 +201,12 @@ final class StripePanelApiCallCountTest extends TestCase
             public function __construct(
                 StripeOrderApiService $apiService,
                 ChargeAmountResolverInterface $chargeAmountResolver,
-                private readonly PaymentIntent $stubPi,
+                private readonly StripePaymentIntentDto $stubPi,
             ) {
                 parent::__construct($apiService, $chargeAmountResolver);
             }
 
-            protected function fetchExpandedPaymentIntent(Order $order): ?PaymentIntent
+            protected function fetchExpandedPaymentIntent(Order $order): ?StripePaymentIntentDto
             {
                 $this->expandedPiCallCount++;
                 return $this->stubPi;
@@ -210,35 +214,31 @@ final class StripePanelApiCallCountTest extends TestCase
         };
     }
 
-    private function buildPaymentIntent(): PaymentIntent
+    private function buildPaymentIntent(): StripePaymentIntentDto
     {
         $charge = $this->buildCharge();
 
-        return PaymentIntent::constructFrom([
-            'id'            => 'pi_test123',
-            'amount'        => 10000,
-            'currency'      => 'eur',
-            'status'        => 'succeeded',
-            'created'       => 1700000000,
-            'latest_charge' => $charge,
-        ]);
+        return new StripePaymentIntentDto(
+            id: 'pi_test123',
+            status: 'succeeded',
+            amount: 10000,
+            currency: 'eur',
+            created: 1700000000,
+            latestChargeId: $charge->id,
+            charge: $charge,
+        );
     }
 
-    private function buildCharge(): Charge
+    private function buildCharge(): StripeChargeDto
     {
-        return Charge::constructFrom([
-            'id'              => 'ch_test123',
-            'amount'          => 10000,
-            'amount_captured' => 10000,
-            'amount_refunded' => 0,
-            'currency'        => 'eur',
-            'captured'        => true,
-            'created'         => 1700000001,
-            'refunds'         => [
-                'object' => 'list',
-                'data'   => [],
-                'url'    => '/v1/charges/ch_test123/refunds',
-            ],
-        ]);
+        return new StripeChargeDto(
+            id: 'ch_test123',
+            amount: 10000,
+            amountCaptured: 10000,
+            amountRefunded: 0,
+            currency: 'eur',
+            captured: true,
+            created: 1700000001,
+        );
     }
 }

@@ -56,8 +56,8 @@ class StripePanelViewDataBuilder
             'amount'              => $paymentIntent !== null
                 ? number_format(
                     AmountConverter::toMajorUnits(
-                        (int) ($paymentIntent->amount ?? 0),
-                        strtoupper($paymentIntent->currency ?? '')
+                        $paymentIntent->amount,
+                        strtoupper($paymentIntent->currency)
                     ),
                     2,
                     '.',

@@ -9,6 +9,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Adapter;
 
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeCheckoutSessionDto;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripePaymentIntentDto;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeRefundDto;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapter;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -75,7 +78,7 @@ final class StripeAdapterTest extends TestCase
 
         $result = $this->adapter->retrieveCheckoutSession($sessionId, ['payment_intent']);
 
-        $this->assertSame($expectedSession, $result);
+        $this->assertInstanceOf(StripeCheckoutSessionDto::class, $result);
     }
 
     /**
@@ -100,7 +103,7 @@ final class StripeAdapterTest extends TestCase
 
         $result = $this->adapter->retrieveCheckoutSession($sessionId);
 
-        $this->assertSame($expectedSession, $result);
+        $this->assertInstanceOf(StripeCheckoutSessionDto::class, $result);
     }
 
     /**
@@ -133,7 +136,7 @@ final class StripeAdapterTest extends TestCase
 
         $result = $this->adapter->createCheckoutSession($params);
 
-        $this->assertSame($expectedSession, $result);
+        $this->assertInstanceOf(StripeCheckoutSessionDto::class, $result);
     }
 
     /**
@@ -155,7 +158,7 @@ final class StripeAdapterTest extends TestCase
 
         $result = $this->adapter->retrievePaymentIntent($paymentIntentId);
 
-        $this->assertSame($expectedIntent, $result);
+        $this->assertInstanceOf(StripePaymentIntentDto::class, $result);
     }
 
     /**
@@ -177,7 +180,7 @@ final class StripeAdapterTest extends TestCase
 
         $result = $this->adapter->retrievePaymentIntent($paymentIntentId, ['latest_charge']);
 
-        $this->assertSame($expectedIntent, $result);
+        $this->assertInstanceOf(StripePaymentIntentDto::class, $result);
     }
 
     /**
@@ -206,7 +209,7 @@ final class StripeAdapterTest extends TestCase
 
         $result = $this->adapter->createRefundByCharge($chargeId, $amount, $reason);
 
-        $this->assertSame($expectedRefund, $result);
+        $this->assertInstanceOf(StripeRefundDto::class, $result);
     }
 
     /**
@@ -229,7 +232,7 @@ final class StripeAdapterTest extends TestCase
 
         $result = $this->adapter->createRefundByCharge($chargeId);
 
-        $this->assertSame($expectedRefund, $result);
+        $this->assertInstanceOf(StripeRefundDto::class, $result);
     }
 
     /**
@@ -259,6 +262,6 @@ final class StripeAdapterTest extends TestCase
 
         $result = $this->adapter->createRefundByCharge($chargeId, $amount, null, $metadata);
 
-        $this->assertSame($expectedRefund, $result);
+        $this->assertInstanceOf(StripeRefundDto::class, $result);
     }
 }

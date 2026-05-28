@@ -9,15 +9,18 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Model;
 
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeChargeDto;
 use OxidEsales\Payments\Stripe\Model\Order;
 use OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Stripe\Charge;
 
 /**
  * Sprint 103: Pins getStripeRefundedAmount() and hasStripeRefunds() against
  * the partial-capture fixture where amount_refunded includes the auth-release.
+ *
+ * Sprint 114.10b: migrated from \Stripe\Charge fixtures to StripeChargeDto
+ * (A1 boundary fix). Behavior is identical.
  *
  * Order extends Order_parent (OXID class chain) — constructor DI is not
  * possible. Tests use a testable subclass that overrides getStripeCharge()
@@ -126,13 +129,13 @@ final class OrderStripeAmountsTest extends TestCase
      * Creates a testable subclass of Order that overrides getStripeCharge() and
      * the resolver accessor, bypassing ContainerFactory and the Stripe API.
      */
-    private function createOrder(?Charge $charge): Order
+    private function createOrder(?StripeChargeDto $charge): Order
     {
         $resolver = $this->resolver;
 
         return new class ($charge, $resolver) extends Order {
             public function __construct(
-                private readonly ?Charge $stubCharge,
+                private readonly ?StripeChargeDto $stubCharge,
                 private readonly ChargeAmountResolverInterface $stubResolver,
             ) {
                 // Skip OXID parent — Order extends Order_parent (virtual class chain).
@@ -140,7 +143,7 @@ final class OrderStripeAmountsTest extends TestCase
                 // under test only use getStripeCharge() and getChargeAmountResolver().
             }
 
-            protected function getStripeCharge(): ?\Stripe\Charge
+            protected function getStripeCharge(): ?StripeChargeDto
             {
                 return $this->stubCharge;
             }
@@ -157,14 +160,16 @@ final class OrderStripeAmountsTest extends TestCase
         };
     }
 
-    private function buildCharge(int $amount, int $amountCaptured, int $amountRefunded): Charge
+    private function buildCharge(int $amount, int $amountCaptured, int $amountRefunded): StripeChargeDto
     {
-        return Charge::constructFrom([
-            'id'              => 'ch_test',
-            'amount'          => $amount,
-            'amount_captured' => $amountCaptured,
-            'amount_refunded' => $amountRefunded,
-            'currency'        => 'eur',
-        ]);
+        return new StripeChargeDto(
+            id: 'ch_test',
+            amount: $amount,
+            amountCaptured: $amountCaptured,
+            amountRefunded: $amountRefunded,
+            currency: 'eur',
+            captured: true,
+            created: 0,
+        );
     }
 }

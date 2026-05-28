@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use DateTimeImmutable;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeChargeDto;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripePaymentIntentDto;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeRefundDto;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
@@ -15,8 +18,6 @@ use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
-use Stripe\PaymentIntent;
-use Stripe\Refund;
 
 /**
  * TDD Tests for RefundService.
@@ -119,12 +120,7 @@ class RefundServiceTest extends TestCase
         $reason = 'requested_by_customer';
         $metadata = ['order_id' => 'order_123'];
 
-        $refund = Refund::constructFrom([
-            'id' => 're_success_123',
-            'amount' => 5000,
-            'currency' => 'eur',
-            'status' => 'succeeded',
-        ]);
+        $refund = $this->buildRefundDto('re_success_123', 5000, 'eur', 'succeeded');
 
         $this->stripeAdapter
             ->expects($this->once())
@@ -149,12 +145,7 @@ class RefundServiceTest extends TestCase
         // Arrange - always full refund (Sprint 22)
         $chargeId = 'ch_full_456';
 
-        $refund = Refund::constructFrom([
-            'id' => 're_full_456',
-            'amount' => 10000,
-            'currency' => 'eur',
-            'status' => 'succeeded',
-        ]);
+        $refund = $this->buildRefundDto('re_full_456', 10000, 'eur', 'succeeded');
 
         $this->stripeAdapter
             ->expects($this->once())
@@ -174,12 +165,7 @@ class RefundServiceTest extends TestCase
     public function testProcessRefundByChargePendingStatus(): void
     {
         // Arrange
-        $refund = Refund::constructFrom([
-            'id' => 're_pending',
-            'amount' => 2500,
-            'currency' => 'usd',
-            'status' => 'pending',
-        ]);
+        $refund = $this->buildRefundDto('re_pending', 2500, 'usd', 'pending');
 
         $this->stripeAdapter
             ->method('createRefundByCharge')
@@ -197,12 +183,7 @@ class RefundServiceTest extends TestCase
     public function testProcessRefundByChargeFailedStatus(): void
     {
         // Arrange
-        $refund = Refund::constructFrom([
-            'id' => 're_failed',
-            'amount' => 2500,
-            'currency' => 'usd',
-            'status' => 'failed',
-        ]);
+        $refund = $this->buildRefundDto('re_failed', 2500, 'usd', 'failed');
 
         $this->stripeAdapter
             ->method('createRefundByCharge')
@@ -249,17 +230,8 @@ class RefundServiceTest extends TestCase
     public function testProcessFullRefundSuccess(): void
     {
         // Arrange
-        $paymentIntent = PaymentIntent::constructFrom([
-            'id' => 'pi_full_test',
-            'latest_charge' => 'ch_full_test',
-        ]);
-
-        $refund = Refund::constructFrom([
-            'id' => 're_full',
-            'amount' => 10000,
-            'currency' => 'eur',
-            'status' => 'succeeded',
-        ]);
+        $paymentIntent = $this->buildPiDto('pi_full_test', 'ch_full_test');
+        $refund = $this->buildRefundDto('re_full', 10000, 'eur', 'succeeded');
 
         $this->stripeAdapter
             ->method('retrievePaymentIntent')
@@ -292,17 +264,8 @@ class RefundServiceTest extends TestCase
     public function testProcessPartialRefundPassesAmountInCents(): void
     {
         // Arrange
-        $paymentIntent = PaymentIntent::constructFrom([
-            'id' => 'pi_partial_test',
-            'latest_charge' => 'ch_partial_test',
-        ]);
-
-        $refund = Refund::constructFrom([
-            'id' => 're_partial',
-            'amount' => 550,
-            'currency' => 'eur',
-            'status' => 'succeeded',
-        ]);
+        $paymentIntent = $this->buildPiDto('pi_partial_test', 'ch_partial_test');
+        $refund = $this->buildRefundDto('re_partial', 550, 'eur', 'succeeded');
 
         $this->stripeAdapter
             ->method('retrievePaymentIntent')
@@ -337,21 +300,27 @@ class RefundServiceTest extends TestCase
 
     public function testProcessFullRefundHandlesChargeObjectInPaymentIntent(): void
     {
-        // Arrange - PaymentIntent with expanded charge object (not just ID)
-        $paymentIntent = PaymentIntent::constructFrom([
-            'id' => 'pi_expanded',
-            'latest_charge' => [
-                'id' => 'ch_from_object',
-                'amount' => 5000,
-            ],
-        ]);
+        // Arrange — PI with expanded StripeChargeDto; service extracts charge->id
+        $chargeDto = new StripeChargeDto(
+            id: 'ch_from_object',
+            amount: 5000,
+            amountCaptured: 5000,
+            amountRefunded: 0,
+            currency: 'eur',
+            captured: true,
+            created: 1700000000,
+        );
+        $paymentIntent = new StripePaymentIntentDto(
+            id: 'pi_expanded',
+            status: 'succeeded',
+            amount: 5000,
+            currency: 'eur',
+            created: 1700000000,
+            latestChargeId: 'ch_from_object',
+            charge: $chargeDto,
+        );
 
-        $refund = Refund::constructFrom([
-            'id' => 're_from_object',
-            'amount' => 5000,
-            'currency' => 'eur',
-            'status' => 'succeeded',
-        ]);
+        $refund = $this->buildRefundDto('re_from_object', 5000, 'eur', 'succeeded');
 
         $this->stripeAdapter
             ->method('retrievePaymentIntent')
@@ -374,10 +343,7 @@ class RefundServiceTest extends TestCase
     public function testProcessFullRefundFailsWhenNoCharge(): void
     {
         // Arrange
-        $paymentIntent = PaymentIntent::constructFrom([
-            'id' => 'pi_no_charge',
-            'latest_charge' => null,
-        ]);
+        $paymentIntent = $this->buildPiDto('pi_no_charge', null);
 
         $this->stripeAdapter
             ->method('retrievePaymentIntent')
@@ -401,12 +367,7 @@ class RefundServiceTest extends TestCase
 
         // Act & Assert - each valid reason should pass through to adapter
         foreach ($validReasons as $reason) {
-            $refund = Refund::constructFrom([
-                'id' => 're_' . $reason,
-                'amount' => 1000,
-                'currency' => 'eur',
-                'status' => 'succeeded',
-            ]);
+            $refund = $this->buildRefundDto('re_' . $reason, 1000, 'eur', 'succeeded');
 
             // Reset mocks for each iteration
             $this->stripeAdapter = $this->createMock(StripeAdapterInterface::class);
@@ -431,12 +392,7 @@ class RefundServiceTest extends TestCase
     public function testSuccessfulRefundIsLogged(): void
     {
         // Arrange
-        $refund = Refund::constructFrom([
-            'id' => 're_logged',
-            'amount' => 3000,
-            'currency' => 'eur',
-            'status' => 'succeeded',
-        ]);
+        $refund = $this->buildRefundDto('re_logged', 3000, 'eur', 'succeeded');
 
         $this->stripeAdapter
             ->method('createRefundByCharge')
@@ -466,12 +422,7 @@ class RefundServiceTest extends TestCase
         $orderId = 'order_stock_test';
         $metadata = ['order_id' => $orderId];
 
-        $refund = Refund::constructFrom([
-            'id' => 're_stock',
-            'amount' => 5000,
-            'currency' => 'eur',
-            'status' => 'succeeded',
-        ]);
+        $refund = $this->buildRefundDto('re_stock', 5000, 'eur', 'succeeded');
 
         $this->stripeAdapter
             ->method('createRefundByCharge')
@@ -494,12 +445,7 @@ class RefundServiceTest extends TestCase
     public function testRefundWithoutOrderIdSkipsStockRestoration(): void
     {
         // Arrange - no orderId in metadata
-        $refund = Refund::constructFrom([
-            'id' => 're_no_stock',
-            'amount' => 3000,
-            'currency' => 'eur',
-            'status' => 'succeeded',
-        ]);
+        $refund = $this->buildRefundDto('re_no_stock', 3000, 'eur', 'succeeded');
 
         $this->stripeAdapter
             ->method('createRefundByCharge')
@@ -521,12 +467,7 @@ class RefundServiceTest extends TestCase
     public function testFailedRefundDoesNotCallStockRestoration(): void
     {
         // Arrange
-        $refund = Refund::constructFrom([
-            'id' => 're_failed',
-            'amount' => 2500,
-            'currency' => 'eur',
-            'status' => 'failed',
-        ]);
+        $refund = $this->buildRefundDto('re_failed', 2500, 'eur', 'failed');
 
         $this->stripeAdapter
             ->method('createRefundByCharge')
@@ -571,5 +512,38 @@ class RefundServiceTest extends TestCase
         // Act
         $service = $this->createService();
         $service->processRefundByCharge('ch_test');
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private function buildRefundDto(
+        string $id,
+        int $amount,
+        string $currency,
+        string $status,
+        ?string $reason = null
+    ): StripeRefundDto {
+        return new StripeRefundDto(
+            id: $id,
+            amount: $amount,
+            currency: $currency,
+            status: $status,
+            reason: $reason,
+            createdAt: 1700000000,
+        );
+    }
+
+    private function buildPiDto(string $id, ?string $latestChargeId): StripePaymentIntentDto
+    {
+        return new StripePaymentIntentDto(
+            id: $id,
+            status: 'succeeded',
+            amount: 10000,
+            currency: 'eur',
+            created: 1700000000,
+            latestChargeId: $latestChargeId,
+        );
     }
 }

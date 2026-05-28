@@ -30,16 +30,18 @@ use OxidEsales\PaymentBase\Adapter\Response\AuthorizationResponse;
 use OxidEsales\PaymentBase\Adapter\Response\PaymentMethodResponse;
 use OxidEsales\PaymentBase\Adapter\Response\ThreeDSecureResponse;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeChargeDto;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeCheckoutSessionDto;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeCustomerDto;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripePaymentIntentDto;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeRefundDto;
 use OxidEsales\Payments\Stripe\Adapter\Helper\PaymentIntentHelper;
 use OxidEsales\Payments\Stripe\Adapter\Helper\RefundHelper;
 use OxidEsales\Payments\Stripe\Adapter\Helper\CheckoutSessionHelper;
 use OxidEsales\Payments\Stripe\Adapter\Helper\PaymentMethodHelper;
 use OxidEsales\Payments\Stripe\Adapter\Helper\StripeExceptionConverter;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
-use Stripe\Checkout\Session;
 use Stripe\Exception\ApiErrorException;
-use Stripe\PaymentIntent;
-use Stripe\Refund;
 use Stripe\StripeClient;
 use Stripe\Webhook;
 
@@ -280,19 +282,22 @@ final class StripeAdapter implements StripeAdapterInterface
     // STRIPE-SPECIFIC METHODS (Sprint 19)
     // ==========================================
 
-    public function retrieveCheckoutSession(string $sessionId, array $expand = []): Session
+    public function retrieveCheckoutSession(string $sessionId, array $expand = []): StripeCheckoutSessionDto
     {
-        return $this->checkoutSessionHelper->retrieveCheckoutSession($this->stripeClient, $sessionId, $expand);
+        $raw = $this->checkoutSessionHelper->retrieveCheckoutSession($this->stripeClient, $sessionId, $expand);
+        return StripeObjectMapper::fromCheckoutSession($raw);
     }
 
-    public function createCheckoutSession(array $params): Session
+    public function createCheckoutSession(array $params): StripeCheckoutSessionDto
     {
-        return $this->checkoutSessionHelper->createCheckoutSession($this->stripeClient, $params);
+        $raw = $this->checkoutSessionHelper->createCheckoutSession($this->stripeClient, $params);
+        return StripeObjectMapper::fromCheckoutSession($raw);
     }
 
-    public function retrievePaymentIntent(string $paymentIntentId, array $expand = []): PaymentIntent
+    public function retrievePaymentIntent(string $paymentIntentId, array $expand = []): StripePaymentIntentDto
     {
-        return $this->paymentIntentHelper->retrievePaymentIntent($this->stripeClient, $paymentIntentId, $expand);
+        $raw = $this->paymentIntentHelper->retrievePaymentIntent($this->stripeClient, $paymentIntentId, $expand);
+        return StripeObjectMapper::fromPaymentIntent($raw);
     }
 
     public function createRefundByCharge(
@@ -300,13 +305,15 @@ final class StripeAdapter implements StripeAdapterInterface
         ?int $amount = null,
         ?string $reason = null,
         ?array $metadata = null
-    ): Refund {
-        return $this->refundHelper->createRefundByCharge($this->stripeClient, $chargeId, $amount, $reason, $metadata);
+    ): StripeRefundDto {
+        $raw = $this->refundHelper->createRefundByCharge($this->stripeClient, $chargeId, $amount, $reason, $metadata);
+        return StripeObjectMapper::fromRefund($raw);
     }
 
-    public function cancelPaymentIntent(string $paymentIntentId, ?string $cancellationReason = null): PaymentIntent
+    public function cancelPaymentIntent(string $paymentIntentId, ?string $cancellationReason = null): StripePaymentIntentDto
     {
-        return $this->paymentIntentHelper->cancelPaymentIntent($this->stripeClient, $paymentIntentId, $cancellationReason);
+        $raw = $this->paymentIntentHelper->cancelPaymentIntent($this->stripeClient, $paymentIntentId, $cancellationReason);
+        return StripeObjectMapper::fromPaymentIntent($raw);
     }
 
     public function getPaymentIntentRiskScore(string $paymentIntentId): ?float
@@ -314,24 +321,27 @@ final class StripeAdapter implements StripeAdapterInterface
         return $this->paymentIntentHelper->getRiskScore($this->stripeClient, $paymentIntentId);
     }
 
-    public function retrieveCharge(string $chargeId): \Stripe\Charge
+    public function retrieveCharge(string $chargeId): StripeChargeDto
     {
-        return $this->refundHelper->retrieveCharge($this->stripeClient, $chargeId);
+        $raw = $this->refundHelper->retrieveCharge($this->stripeClient, $chargeId);
+        return StripeObjectMapper::fromCharge($raw);
     }
 
-    public function createStripeCustomer(array $params): \Stripe\Customer
+    public function createStripeCustomer(array $params): StripeCustomerDto
     {
         try {
-            return $this->stripeClient->customers->create($params);
+            $raw = $this->stripeClient->customers->create($params);
+            return StripeObjectMapper::fromCustomer($raw);
         } catch (ApiErrorException $e) {
             throw StripeExceptionConverter::convert($e);
         }
     }
 
-    public function retrieveStripeCustomer(string $customerId): \Stripe\Customer
+    public function retrieveStripeCustomer(string $customerId): StripeCustomerDto
     {
         try {
-            return $this->stripeClient->customers->retrieve($customerId, []);
+            $raw = $this->stripeClient->customers->retrieve($customerId, []);
+            return StripeObjectMapper::fromCustomer($raw);
         } catch (ApiErrorException $e) {
             throw StripeExceptionConverter::convert($e);
         }

@@ -11,13 +11,13 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use OxidEsales\PaymentBase\Contract\PaymentCustomer;
 use OxidEsales\PaymentBase\Repository\PaymentCustomerRepositoryInterface;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeCustomerDto;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\StripeCustomerService;
 use OxidEsales\Payments\Stripe\Service\StripeCustomerServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Stripe\Customer;
 
 /**
  * Unit tests for StripeCustomerService.
@@ -224,8 +224,8 @@ class StripeCustomerServiceTest extends TestCase
         return $customer;
     }
 
-    private function createStripeCustomerObject(string $id): Customer
+    private function createStripeCustomerObject(string $id): StripeCustomerDto
     {
-        return Customer::constructFrom(['id' => $id]);
+        return new StripeCustomerDto(id: $id, email: null, metadata: []);
     }
 }

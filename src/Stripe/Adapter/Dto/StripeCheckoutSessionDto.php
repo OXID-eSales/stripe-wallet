@@ -30,6 +30,7 @@ final readonly class StripeCheckoutSessionDto
      * @param array<string,mixed> $metadata             Session metadata key-value pairs
      * @param int                 $amountTotal          Total session amount in Stripe minor units
      * @param string              $currency             ISO-4217 currency code, lowercase
+     * @param string|null         $url                  Stripe-hosted Checkout page URL; null for return-mode sessions
      */
     public function __construct(
         public string $id,
@@ -39,6 +40,7 @@ final readonly class StripeCheckoutSessionDto
         public array $metadata,
         public int $amountTotal,
         public string $currency,
+        public ?string $url = null,
     ) {
     }
 }

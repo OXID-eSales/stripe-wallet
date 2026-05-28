@@ -19,7 +19,6 @@ use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeClientFactory;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
-use Stripe\StripeClient;
 
 /**
  * Stripe-specific factory for creating payment adapter instances.

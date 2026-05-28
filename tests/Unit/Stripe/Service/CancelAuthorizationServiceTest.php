@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Tests\Unit\Stripe\Service;
 
 use OxidEsales\PaymentBase\Adapter\Response\CancellationResponse;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripePaymentIntentDto;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\CancelAuthorizationService;
@@ -12,7 +13,6 @@ use OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Log\NullLogger;
-use Stripe\PaymentIntent;
 
 /**
  * Unit tests for CancelAuthorizationService.
@@ -57,8 +57,7 @@ class CancelAuthorizationServiceTest extends TestCase
     public function testCancelAuthorizationReturnsSuccessResult(): void
     {
         // Arrange
-        $paymentIntent = $this->createMock(PaymentIntent::class);
-        $paymentIntent->status = 'canceled';
+        $paymentIntent = $this->buildCancelledPiDto('canceled');
 
         $this->stripeAdapter->expects($this->once())
             ->method('cancelPaymentIntent')
@@ -82,8 +81,7 @@ class CancelAuthorizationServiceTest extends TestCase
     public function testCancelAuthorizationReturnsSuccessWithNullReason(): void
     {
         // Arrange
-        $paymentIntent = $this->createMock(PaymentIntent::class);
-        $paymentIntent->status = 'canceled';
+        $paymentIntent = $this->buildCancelledPiDto('canceled');
 
         $this->stripeAdapter->expects($this->once())
             ->method('cancelPaymentIntent')
@@ -121,11 +119,10 @@ class CancelAuthorizationServiceTest extends TestCase
         $this->assertSame('API Error: Payment already canceled', $result->errorMessage);
     }
 
-    public function testCancelAuthorizationHandlesDefaultStatusWhenNull(): void
+    public function testCancelAuthorizationReturnsCanceledStatus(): void
     {
-        // Arrange
-        $paymentIntent = $this->createMock(PaymentIntent::class);
-        $paymentIntent->status = null;
+        // Arrange — StripePaymentIntentDto always has a string status (never null)
+        $paymentIntent = $this->buildCancelledPiDto('canceled');
 
         $this->stripeAdapter->expects($this->once())
             ->method('cancelPaymentIntent')
@@ -134,10 +131,26 @@ class CancelAuthorizationServiceTest extends TestCase
         $service = $this->createService();
 
         // Act
-        $result = $service->cancelAuthorization('pi_test_null', null);
+        $result = $service->cancelAuthorization('pi_test_canceled', null);
 
         // Assert
         $this->assertTrue($result->isSuccessful());
         $this->assertSame('canceled', $result->status);
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private function buildCancelledPiDto(string $status): StripePaymentIntentDto
+    {
+        return new StripePaymentIntentDto(
+            id: 'pi_test',
+            status: $status,
+            amount: 10000,
+            currency: 'eur',
+            created: 1700000000,
+            latestChargeId: null,
+        );
     }
 }

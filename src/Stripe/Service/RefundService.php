@@ -13,11 +13,11 @@ use DateTimeImmutable;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
 use OxidEsales\PaymentBase\Service\StockRestorationServiceInterface;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeRefundDto;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use Stripe\Refund;
 
 /**
  * Service for processing Stripe refunds (full and partial).
@@ -94,11 +94,11 @@ final class RefundService implements RefundServiceInterface
         ?int $amountInCents = null
     ): RefundResponse {
         try {
-            $refund = $this->adapterFactory
+            $refundDto = $this->adapterFactory
                 ->getStripeAdapter()
                 ->createRefundByCharge($chargeId, $amountInCents, $reason, $metadata);
 
-            return $this->handleRefundResponse($refund, $chargeId, $orderId, $paymentIntentId);
+            return $this->handleRefundResponse($refundDto, $chargeId, $orderId, $paymentIntentId);
         } catch (PaymentAdapterException $e) {
             return $this->handleRefundError($e, $chargeId);
         }
@@ -107,16 +107,15 @@ final class RefundService implements RefundServiceInterface
     private function getChargeIdFromPaymentIntent(string $paymentIntentId): ?string
     {
         try {
-            $paymentIntent = $this->adapterFactory
+            $piDto = $this->adapterFactory
                 ->getStripeAdapter()
                 ->retrievePaymentIntent($paymentIntentId);
 
-            $latestCharge = $paymentIntent->latest_charge;
-            if ($latestCharge === null) {
-                return null;
+            if ($piDto->charge !== null) {
+                return $piDto->charge->id;
             }
 
-            return is_string($latestCharge) ? $latestCharge : ($latestCharge->id ?? null);
+            return $piDto->latestChargeId;
         } catch (PaymentAdapterException $e) {
             $this->logger->error('Failed to retrieve payment intent', [
                 'payment_intent_id' => $paymentIntentId,
@@ -153,15 +152,13 @@ final class RefundService implements RefundServiceInterface
     }
 
     private function handleRefundResponse(
-        Refund $refund,
+        StripeRefundDto $refund,
         string $chargeId,
         ?string $orderId,
         ?string $paymentIntentId
     ): RefundResponse {
-        $status = $refund->status ?? 'unknown';
-
-        if (!in_array($status, ['succeeded', 'pending'], true)) {
-            return RefundResponse::failure("Refund failed with status: {$status}");
+        if (!in_array($refund->status, ['succeeded', 'pending'], true)) {
+            return RefundResponse::failure("Refund failed with status: {$refund->status}");
         }
 
         // Restore stock for all order articles (Sprint 24)
@@ -174,22 +171,22 @@ final class RefundService implements RefundServiceInterface
         }
 
         // Convert amount from Stripe minor units to major units using the refund's own currency.
-        $refundCurrency = strtoupper($refund->currency ?? '');
-        $amountInMajorUnits = AmountConverter::toMajorUnits((int) ($refund->amount ?? 0), $refundCurrency);
+        $refundCurrency     = strtoupper($refund->currency);
+        $amountInMajorUnits = AmountConverter::toMajorUnits($refund->amount, $refundCurrency);
 
         $this->logger->info('Refund processed successfully', [
             'refund_id' => $refund->id,
-            'amount' => $amountInMajorUnits,
+            'amount'    => $amountInMajorUnits,
             'charge_id' => $chargeId,
-            'status' => $status,
+            'status'    => $refund->status,
         ]);
 
         return RefundResponse::success(
             providerPaymentId: $paymentIntentId ?? $chargeId,
-            refundId: $refund->id ?? 'unknown',
+            refundId: $refund->id !== '' ? $refund->id : 'unknown',
             amountRefunded: $amountInMajorUnits,
-            currency: $refund->currency ?? 'eur',
-            status: $status,
+            currency: $refund->currency,
+            status: $refund->status,
             refundedAt: new DateTimeImmutable(),
             reason: null,
             providerData: ['charge_id' => $chargeId],

@@ -12,6 +12,7 @@ namespace OxidEsales\Payments\Stripe\Model;
 use OxidEsales\Eshop\Core\Counter as EshopCoreCounter;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeChargeDto;
 use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
@@ -169,12 +170,14 @@ class Order extends Order_parent
     // =========================================================================
 
     /**
-     * Sprint 104: instance-level memoisation for the Stripe charge.
+     * Sprint 104: instance-level memoisation for the Stripe charge DTO.
      * $chargeCacheLoaded is required because null is a valid cached value
      * (non-Stripe orders, missing transaction ID). Without the flag, every
      * null result would trigger a re-fetch on the next call.
+     *
+     * Sprint 114.10b: type changed from \Stripe\Charge to StripeChargeDto.
      */
-    private ?\Stripe\Charge $cachedCharge = null;
+    private ?StripeChargeDto $cachedCharge = null;
     private bool $chargeCacheLoaded = false;
 
     /**
@@ -188,8 +191,8 @@ class Order extends Order_parent
             return '';
         }
 
-        $chargeCurrency = strtoupper($charge->currency ?? '');
-        $amount = AmountConverter::toMajorUnits((int) ($charge->amount_captured ?? 0), $chargeCurrency);
+        $chargeCurrency = strtoupper($charge->currency);
+        $amount = AmountConverter::toMajorUnits($charge->amountCaptured, $chargeCurrency);
         return $this->formatStripeAmount($amount);
     }
 
@@ -241,7 +244,7 @@ class Order extends Order_parent
         return $resolver->hasCustomerRefund($charge);
     }
 
-    protected function getStripeCharge(): ?\Stripe\Charge
+    protected function getStripeCharge(): ?StripeChargeDto
     {
         if ($this->chargeCacheLoaded) {
             return $this->cachedCharge;
@@ -255,11 +258,17 @@ class Order extends Order_parent
      * Sprint 104: testability seam — performs the actual Stripe API fetch.
      *
      * Separated from getStripeCharge() so testable subclasses can override
-     * this method to inject a fixture charge while the memoisation in
-     * getStripeCharge() remains active. This preserves the protected seam
-     * that Sprint 103 tests rely on (they override getStripeCharge() directly).
+     * this method to inject a fixture charge DTO while the memoisation in
+     * getStripeCharge() remains active.
+     *
+     * Sprint 114.10b: return type changed from ?\Stripe\Charge to ?StripeChargeDto.
+     * The DTO is derived from the PI's charge field (populated when PI is retrieved
+     * without expansion — latestChargeId is a string; a second API call retrieves it).
+     * After migration getPaymentIntent() returns a StripePaymentIntentDto whose
+     * charge field is populated only when the PI was expanded. For the order overview
+     * tab we use the plain (non-expanded) PI path and fall back to retrieveCharge().
      */
-    protected function fetchStripeCharge(): ?\Stripe\Charge
+    protected function fetchStripeCharge(): ?StripeChargeDto
     {
         /** @phpstan-ignore-next-line OXID core: magic property */
         $paymentType = (string) ($this->oxorder__oxpaymenttype->value ?? '');
@@ -275,7 +284,14 @@ class Order extends Order_parent
             if ($paymentIntent === null) {
                 return null;
             }
-            return $apiService->getLastCharge($paymentIntent);
+            // Use the expanded charge if available; fall back to latestChargeId lookup.
+            if ($paymentIntent->charge !== null) {
+                return $paymentIntent->charge;
+            }
+            if ($paymentIntent->latestChargeId === null) {
+                return null;
+            }
+            return $apiService->getAdapter()->retrieveCharge($paymentIntent->latestChargeId);
         } catch (\Throwable $e) {
             return null;
         }

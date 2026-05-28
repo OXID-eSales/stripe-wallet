@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeCheckoutSessionDto;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\Result\CheckoutSessionResult;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
@@ -14,7 +15,6 @@ use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
-use Stripe\Checkout\Session;
 
 /**
  * TDD Tests for CheckoutSessionService.
@@ -107,10 +107,7 @@ class CheckoutSessionServiceTest extends TestCase
     {
         // Arrange
         $basketSnapshot = $this->createBasketSnapshot();
-        $session = Session::constructFrom([
-            'id' => 'cs_test_abc123',
-            'url' => 'https://checkout.stripe.com/pay/cs_test_abc123',
-        ]);
+        $session = $this->buildSessionDto('cs_test_abc123', 'https://checkout.stripe.com/pay/cs_test_abc123');
 
         $this->stripeAdapter
             ->expects($this->once())
@@ -138,10 +135,7 @@ class CheckoutSessionServiceTest extends TestCase
     {
         // Arrange
         $basketSnapshot = $this->createBasketSnapshot();
-        $session = Session::constructFrom([
-            'id' => 'cs_manual',
-            'url' => 'https://checkout.stripe.com/pay/cs_manual',
-        ]);
+        $session = $this->buildSessionDto('cs_manual', 'https://checkout.stripe.com/pay/cs_manual');
 
         $capturedParams = null;
         $this->stripeAdapter
@@ -172,10 +166,7 @@ class CheckoutSessionServiceTest extends TestCase
     {
         // Arrange
         $basketSnapshot = $this->createBasketSnapshot();
-        $session = Session::constructFrom([
-            'id' => 'cs_metadata',
-            'url' => 'https://checkout.stripe.com/pay/cs_metadata',
-        ]);
+        $session = $this->buildSessionDto('cs_metadata', 'https://checkout.stripe.com/pay/cs_metadata');
 
         $capturedParams = null;
         $this->stripeAdapter
@@ -205,10 +196,7 @@ class CheckoutSessionServiceTest extends TestCase
     {
         // Arrange
         $basketSnapshot = $this->createBasketSnapshot();
-        $session = Session::constructFrom([
-            'id' => 'cs_order_num',
-            'url' => 'https://checkout.stripe.com/pay/cs_order_num',
-        ]);
+        $session = $this->buildSessionDto('cs_order_num', 'https://checkout.stripe.com/pay/cs_order_num');
 
         $capturedParams = null;
         $this->stripeAdapter
@@ -242,10 +230,7 @@ class CheckoutSessionServiceTest extends TestCase
     {
         // Arrange
         $basketSnapshot = $this->createBasketSnapshot();
-        $session = Session::constructFrom([
-            'id' => 'cs_no_order',
-            'url' => 'https://checkout.stripe.com/pay/cs_no_order',
-        ]);
+        $session = $this->buildSessionDto('cs_no_order', 'https://checkout.stripe.com/pay/cs_no_order');
 
         $capturedParams = null;
         $this->stripeAdapter
@@ -475,10 +460,7 @@ class CheckoutSessionServiceTest extends TestCase
     public function testCreateSessionWithStripeCustomerId(): void
     {
         $basketSnapshot = $this->createBasketSnapshot();
-        $session = Session::constructFrom([
-            'id' => 'cs_with_customer',
-            'url' => 'https://checkout.stripe.com/pay/cs_with_customer',
-        ]);
+        $session = $this->buildSessionDto('cs_with_customer', 'https://checkout.stripe.com/pay/cs_with_customer');
 
         $capturedParams = null;
         $this->stripeAdapter
@@ -508,10 +490,7 @@ class CheckoutSessionServiceTest extends TestCase
     public function testCreateSessionWithoutStripeCustomerIdOmitsCustomerParam(): void
     {
         $basketSnapshot = $this->createBasketSnapshot();
-        $session = Session::constructFrom([
-            'id' => 'cs_no_customer',
-            'url' => 'https://checkout.stripe.com/pay/cs_no_customer',
-        ]);
+        $session = $this->buildSessionDto('cs_no_customer', 'https://checkout.stripe.com/pay/cs_no_customer');
 
         $capturedParams = null;
         $this->stripeAdapter
@@ -709,10 +688,7 @@ class CheckoutSessionServiceTest extends TestCase
             ]
         );
 
-        $session = Session::constructFrom([
-            'id' => 'cs_discount_test',
-            'url' => 'https://checkout.stripe.com/pay/cs_discount_test',
-        ]);
+        $session = $this->buildSessionDto('cs_discount_test', 'https://checkout.stripe.com/pay/cs_discount_test');
 
         $capturedParams = null;
         $this->stripeAdapter
@@ -799,16 +775,31 @@ class CheckoutSessionServiceTest extends TestCase
         $this->assertEquals('Shipping', $lineItems[1]['price_data']['product_data']['name']);
     }
 
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private function buildSessionDto(string $id, string $url): StripeCheckoutSessionDto
+    {
+        return new StripeCheckoutSessionDto(
+            id: $id,
+            paymentStatus: 'paid',
+            paymentIntentId: '',
+            paymentIntentStatus: 'unknown',
+            metadata: [],
+            amountTotal: 0,
+            currency: 'eur',
+            url: $url,
+        );
+    }
+
     // --- Logging Tests ---
 
     public function testSuccessfulSessionCreationIsLogged(): void
     {
         // Arrange
         $basketSnapshot = $this->createBasketSnapshot();
-        $session = Session::constructFrom([
-            'id' => 'cs_logged',
-            'url' => 'https://checkout.stripe.com/pay/cs_logged',
-        ]);
+        $session = $this->buildSessionDto('cs_logged', 'https://checkout.stripe.com/pay/cs_logged');
 
         $this->stripeAdapter
             ->method('createCheckoutSession')

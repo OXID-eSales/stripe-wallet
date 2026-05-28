@@ -9,19 +9,22 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeChargeDto;
 use OxidEsales\Payments\Stripe\Service\StripeChargeAmountResolver;
 use PHPUnit\Framework\TestCase;
-use Stripe\Charge;
 
 /**
  * Sprint 103: Pins the partial-capture refund math in isolation.
  *
- * All charge fixtures are built with Charge::constructFrom() so no
- * network call is made. Each case verifies the three accessors of
- * StripeChargeAmountResolver against the Liskov postconditions:
- *   - customerRefundedAmount ∈ [0, amount_captured / 100]
- *   - availableForRefund ∈ [0, amount_captured / 100]
- *   - customerRefundedAmount + availableForRefund == amount_captured / 100
+ * Sprint 114.10b: migrated from \Stripe\Charge fixtures to StripeChargeDto
+ * fixtures (A1 boundary fix). Behavior is identical; only the fixture builder
+ * changed from Charge::constructFrom() to new StripeChargeDto(...).
+ *
+ * Verifies the three accessors of StripeChargeAmountResolver against the
+ * Liskov postconditions:
+ *   - customerRefundedAmount ∈ [0, amountCaptured / 100]
+ *   - availableForRefund ∈ [0, amountCaptured / 100]
+ *   - customerRefundedAmount + availableForRefund == amountCaptured / 100
  *   - hasCustomerRefund ⟺ customerRefundedAmount > 0
  *
  * @covers \OxidEsales\Payments\Stripe\Service\StripeChargeAmountResolver
@@ -108,14 +111,16 @@ final class StripeChargeAmountResolverTest extends TestCase
         self::assertFalse($this->resolver->hasCustomerRefund($charge) && $this->resolver->availableForRefund($charge) < 0.0);
     }
 
-    private function buildCharge(int $amount, int $amountCaptured, int $amountRefunded): Charge
+    private function buildCharge(int $amount, int $amountCaptured, int $amountRefunded): StripeChargeDto
     {
-        return Charge::constructFrom([
-            'id'              => 'ch_test',
-            'amount'          => $amount,
-            'amount_captured' => $amountCaptured,
-            'amount_refunded' => $amountRefunded,
-            'currency'        => 'eur',
-        ]);
+        return new StripeChargeDto(
+            id: 'ch_test',
+            amount: $amount,
+            amountCaptured: $amountCaptured,
+            amountRefunded: $amountRefunded,
+            currency: 'eur',
+            captured: true,
+            created: 0,
+        );
     }
 }

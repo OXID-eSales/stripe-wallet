@@ -47,7 +47,7 @@ final class CancelAuthorizationService implements CancelAuthorizationServiceInte
             return CancellationResponse::success(
                 providerPaymentId: $paymentIntentId,
                 authorizationId: $paymentIntentId,
-                status: $cancelledPaymentIntent->status ?? 'canceled',
+                status: $cancelledPaymentIntent->status,
                 cancelledAt: new DateTimeImmutable(),
                 reason: $reason
             );

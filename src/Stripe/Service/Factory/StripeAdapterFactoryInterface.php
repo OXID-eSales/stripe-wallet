@@ -11,7 +11,6 @@ namespace OxidEsales\Payments\Stripe\Service\Factory;
 
 use OxidEsales\PaymentBase\Service\Factory\PaymentAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
-use Stripe\StripeClient;
 
 /**
  * Stripe-specific adapter factory interface.

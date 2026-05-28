@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeCheckoutSessionDto;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
@@ -14,7 +15,6 @@ use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
-use Stripe\Checkout\Session;
 
 /**
  * TDD Tests for CheckoutReturnService.
@@ -119,14 +119,15 @@ class CheckoutReturnServiceTest extends TestCase
             ->with($contractToken, $contractId)
             ->willReturn(true);
 
-        $session = Session::constructFrom([
-            'id' => $checkoutSessionId,
-            'payment_status' => 'paid',
-            'payment_intent' => 'pi_test_123',
-            'amount_total' => 10000,
-            'currency' => 'eur',
-            'metadata' => ['contract_id' => $contractId],
-        ]);
+        $session = new StripeCheckoutSessionDto(
+            id: $checkoutSessionId,
+            paymentStatus: 'paid',
+            paymentIntentId: 'pi_test_123',
+            paymentIntentStatus: 'unknown',
+            metadata: ['contract_id' => $contractId],
+            amountTotal: 10000,
+            currency: 'eur',
+        );
 
         $this->stripeAdapter
             ->expects($this->once())
@@ -177,14 +178,15 @@ class CheckoutReturnServiceTest extends TestCase
             ->method('validateToken')
             ->willReturn(true);
 
-        $session = Session::constructFrom([
-            'id' => 'cs_unpaid',
-            'payment_status' => 'unpaid',
-            'payment_intent' => 'pi_unpaid',
-            'amount_total' => 5000,
-            'currency' => 'eur',
-            'metadata' => ['contract_id' => 'contract_123'],
-        ]);
+        $session = new StripeCheckoutSessionDto(
+            id: 'cs_unpaid',
+            paymentStatus: 'unpaid',
+            paymentIntentId: 'pi_unpaid',
+            paymentIntentStatus: 'unknown',
+            metadata: ['contract_id' => 'contract_123'],
+            amountTotal: 5000,
+            currency: 'eur',
+        );
 
         $this->stripeAdapter
             ->method('retrieveCheckoutSession')
@@ -207,17 +209,15 @@ class CheckoutReturnServiceTest extends TestCase
             ->method('validateToken')
             ->willReturn(true);
 
-        $session = Session::constructFrom([
-            'id' => 'cs_mismatch',
-            'payment_status' => 'paid',
-            'payment_intent' => [
-                'id' => 'pi_mismatch',
-                'status' => 'succeeded',
-            ],
-            'amount_total' => 5000,
-            'currency' => 'eur',
-            'metadata' => ['contract_id' => 'different_contract'],
-        ]);
+        $session = new StripeCheckoutSessionDto(
+            id: 'cs_mismatch',
+            paymentStatus: 'paid',
+            paymentIntentId: 'pi_mismatch',
+            paymentIntentStatus: 'succeeded',
+            metadata: ['contract_id' => 'different_contract'],
+            amountTotal: 5000,
+            currency: 'eur',
+        );
 
         $this->stripeAdapter
             ->method('retrieveCheckoutSession')
@@ -244,14 +244,15 @@ class CheckoutReturnServiceTest extends TestCase
             ->method('validateToken')
             ->willReturn(true);
 
-        $session = Session::constructFrom([
-            'id' => 'cs_no_metadata',
-            'payment_status' => 'paid',
-            'payment_intent' => 'pi_no_meta',
-            'amount_total' => 5000,
-            'currency' => 'eur',
-            'metadata' => [],
-        ]);
+        $session = new StripeCheckoutSessionDto(
+            id: 'cs_no_metadata',
+            paymentStatus: 'paid',
+            paymentIntentId: 'pi_no_meta',
+            paymentIntentStatus: 'unknown',
+            metadata: [],
+            amountTotal: 5000,
+            currency: 'eur',
+        );
 
         $this->stripeAdapter
             ->method('retrieveCheckoutSession')
@@ -304,17 +305,15 @@ class CheckoutReturnServiceTest extends TestCase
             ->method('validateToken')
             ->willReturn(true);
 
-        $session = Session::constructFrom([
-            'id' => 'cs_object_pi',
-            'payment_status' => 'paid',
-            'payment_intent' => [
-                'id' => 'pi_from_object',
-                'amount' => 10000,
-            ],
-            'amount_total' => 10000,
-            'currency' => 'usd',
-            'metadata' => ['contract_id' => 'contract_obj'],
-        ]);
+        $session = new StripeCheckoutSessionDto(
+            id: 'cs_object_pi',
+            paymentStatus: 'paid',
+            paymentIntentId: 'pi_from_object',
+            paymentIntentStatus: 'unknown',
+            metadata: ['contract_id' => 'contract_obj'],
+            amountTotal: 10000,
+            currency: 'usd',
+        );
 
         $this->stripeAdapter
             ->method('retrieveCheckoutSession')
@@ -338,14 +337,15 @@ class CheckoutReturnServiceTest extends TestCase
             ->method('validateToken')
             ->willReturn(true);
 
-        $session = Session::constructFrom([
-            'id' => 'cs_logged',
-            'payment_status' => 'paid',
-            'payment_intent' => 'pi_logged',
-            'amount_total' => 5000,
-            'currency' => 'eur',
-            'metadata' => ['contract_id' => 'contract_logged'],
-        ]);
+        $session = new StripeCheckoutSessionDto(
+            id: 'cs_logged',
+            paymentStatus: 'paid',
+            paymentIntentId: 'pi_logged',
+            paymentIntentStatus: 'unknown',
+            metadata: ['contract_id' => 'contract_logged'],
+            amountTotal: 5000,
+            currency: 'eur',
+        );
 
         $this->stripeAdapter
             ->method('retrieveCheckoutSession')

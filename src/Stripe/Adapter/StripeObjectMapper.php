@@ -55,6 +55,8 @@ final class StripeObjectMapper
         /** @var array<string,mixed> $metadata */
         $metadata = $session->metadata !== null ? $session->metadata->toArray() : [];
 
+        $url = $session->url ?? null;
+
         return new StripeCheckoutSessionDto(
             id: (string) ($session->id ?? ''),
             paymentStatus: (string) ($session->payment_status ?? 'unknown'),
@@ -63,6 +65,7 @@ final class StripeObjectMapper
             metadata: $metadata,
             amountTotal: (int) ($session->amount_total ?? 0),
             currency: (string) ($session->currency ?? 'eur'),
+            url: $url !== null ? (string) $url : null,
         );
     }
 
@@ -169,10 +172,10 @@ final class StripeObjectMapper
         }
 
         if (is_object($paymentIntentField) && isset($paymentIntentField->id)) {
-            $id     = (string) $paymentIntentField->id;
-            $status = isset($paymentIntentField->status)
-                ? (string) $paymentIntentField->status
-                : 'unknown';
+            $idRaw     = $paymentIntentField->id;
+            $statusRaw = $paymentIntentField->status ?? null;
+            $id        = is_scalar($idRaw) ? (string) $idRaw : '';
+            $status    = is_scalar($statusRaw) ? (string) $statusRaw : 'unknown';
             return [$id, $status];
         }
 
@@ -190,21 +193,7 @@ final class StripeObjectMapper
 
         $dtos = [];
         foreach ($refundsData as $refund) {
-            if ($refund instanceof Refund) {
-                $dtos[] = self::fromRefund($refund);
-                continue;
-            }
-            // constructFrom can return StripeObject for nested items; handle gracefully
-            if (is_object($refund)) {
-                $dtos[] = new StripeRefundDto(
-                    id: (string) ($refund->id ?? ''),
-                    amount: (int) ($refund->amount ?? 0),
-                    currency: (string) ($refund->currency ?? ''),
-                    status: (string) ($refund->status ?? 'unknown'),
-                    reason: isset($refund->reason) ? (string) $refund->reason : null,
-                    createdAt: (int) ($refund->created ?? 0),
-                );
-            }
+            $dtos[] = self::fromRefund($refund);
         }
 
         return $dtos;
