@@ -47,7 +47,13 @@ class OxidContractLinkedOrderUpdater implements ContractLinkedOrderUpdaterInterf
         $order->save();
     }
 
-    private function loadOrder(string $orderId): ?Order
+    /**
+     * Load an Order by ID.
+     *
+     * Protected so testable subclasses can inject a fake Order without
+     * requiring a full OXID framework bootstrap (oxNew seam).
+     */
+    protected function loadOrder(string $orderId): ?Order
     {
         if ($orderId === '') {
             return null;
