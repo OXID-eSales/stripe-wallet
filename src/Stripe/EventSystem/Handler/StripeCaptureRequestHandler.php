@@ -12,7 +12,6 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
 use OxidEsales\Payments\Stripe\Service\CaptureServiceInterface;
-use OxidEsales\Payments\Stripe\Service\PaymentIntentResolver;
 use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -45,7 +44,6 @@ class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
         private readonly ShopAdapterInterface $shopAdapter,
         ?LoggerInterface $logger = null,
         ?FileLoggerInterface $eventLogger = null,
-        private readonly ?PaymentIntentResolver $paymentIntentResolver = null
     ) {
         $this->logger = $logger ?? new NullLogger();
         $this->eventLogger = $eventLogger;
@@ -114,52 +112,24 @@ class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
 
         $context->set('contract', $contract);
 
-        // Sprint 114.11b (S3): capturable-state policy moved to CaptureService::processCapture().
-        // The handler no longer validates state here; the service returns CaptureResponse::failure()
-        // for non-capturable contracts, which handleCaptureResult() converts to an exception.
-
-        // Get PaymentIntent ID from contract
-        $paymentIntentId = $this->getPaymentIntentId($event, $contract, $context);
-        if ($paymentIntentId === null) {
-            return;
-        }
-
-        // Execute capture
-        $this->executeCapture($event, $contract, $paymentIntentId, $context);
-    }
-
-    /**
-     * Get PaymentIntent ID from event or contract via PaymentIntentResolver.
-     */
-    private function getPaymentIntentId(
-        StripeCaptureRequestEvent $event,
-        PaymentContractInterface $contract,
-        EventContext $context
-    ): ?string {
-        $resolver = $this->paymentIntentResolver ?? new PaymentIntentResolver($this->contractRepository);
-        try {
-            return $resolver->resolve($event->getPaymentIntentId(), $event->getContractId());
-        } catch (RuntimeException $e) {
-            $context->set('error', $e->getMessage());
-            $context->set('captureSuccess', false);
-            return null;
-        }
+        // Sprint 114.11b (S3): capturable-state policy lives in CaptureService::processCapture().
+        // The handler delegates directly; the service owns state validation and PI ID resolution.
+        $this->executeCapture($event, $contract, $context);
     }
 
     /**
      * Execute the capture via CaptureService.
      *
      * Sprint 9: Delegates to CaptureService for capture execution and contract state transition.
+     * Sprint 114.11b (S3): no longer pre-resolves PI ID — service owns state check + PI lookup.
      */
     private function executeCapture(
         StripeCaptureRequestEvent $event,
         PaymentContractInterface $contract,
-        string $paymentIntentId,
         EventContext $context
     ): void {
         $this->logger->info('Executing Stripe capture', [
             'contract_id' => $event->getContractId(),
-            'payment_intent_id' => $paymentIntentId,
             'amount' => $event->getAmount(),
             'initiator' => $event->getInitiator(),
         ]);
@@ -252,7 +222,7 @@ class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
         EventContext $context
     ): void {
         if (!$result->isSuccessful()) {
-            throw new \RuntimeException($result->errorMessage ?? 'Capture failed');
+            throw new RuntimeException($result->errorMessage ?? 'Capture failed');
         }
 
         $this->logger->info('Stripe capture successful', [

@@ -604,7 +604,7 @@ services:
       $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
-      $paymentIntentResolver: '@OxidEsales\Payments\Stripe\Service\PaymentIntentResolver'
+      # Sprint 114.11b (S3): $paymentIntentResolver removed — PI resolution now inside CaptureService
     tags:
       - { name: payment.event_handler }
     public: false

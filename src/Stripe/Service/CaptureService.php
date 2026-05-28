@@ -61,8 +61,8 @@ final class CaptureService implements CaptureServiceInterface
             ));
         }
 
-        $paymentIntentId = $contract->getProviderOrderId();
-        if (!is_string($paymentIntentId) || $paymentIntentId === '') {
+        $paymentIntentId = $this->resolvePaymentIntentId($contract);
+        if ($paymentIntentId === null) {
             return CaptureResponse::failure('Contract has no PaymentIntent ID');
         }
 
@@ -74,6 +74,25 @@ final class CaptureService implements CaptureServiceInterface
         }
 
         return $result;
+    }
+
+    /**
+     * Resolves the PaymentIntent ID from the contract.
+     * Checks providerOrderId first, then falls back to metadata 'payment_intent_id'.
+     */
+    private function resolvePaymentIntentId(PaymentContractInterface $contract): ?string
+    {
+        $providerOrderId = $contract->getProviderOrderId();
+        if (is_string($providerOrderId) && $providerOrderId !== '') {
+            return $providerOrderId;
+        }
+
+        $metadataId = $contract->getMetadata('payment_intent_id');
+        if (is_string($metadataId) && $metadataId !== '') {
+            return $metadataId;
+        }
+
+        return null;
     }
 
     public function processDirectCapture(

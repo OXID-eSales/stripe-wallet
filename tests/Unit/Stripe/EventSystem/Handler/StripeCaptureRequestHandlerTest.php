@@ -182,6 +182,10 @@ class StripeCaptureRequestHandlerTest extends TestCase
         $this->assertStringContainsString('not in capturable state', $context->get('error'));
     }
 
+    /**
+     * Sprint 114.11b (S3): PI ID resolution moved to CaptureService.
+     * The handler delegates to processCapture(); service returns failure when PI ID missing.
+     */
     public function testHandleSetsErrorWhenNoPaymentIntentFound(): void
     {
         $context = new EventContext([
@@ -191,16 +195,20 @@ class StripeCaptureRequestHandlerTest extends TestCase
 
         $contract = $this->createContractInState(ContractState::authorized());
         $contract->method('getProviderOrderId')->willReturn(null);
-        $contract->method('getMetadata')->with('payment_intent_id')->willReturn(null);
 
         $this->contractRepository
             ->method('findById')
             ->willReturn($contract);
 
+        // Service returns failure when it cannot resolve PI ID
+        $this->captureService
+            ->method('processCapture')
+            ->willReturn(CaptureResponse::failure('Contract has no PaymentIntent ID'));
+
         $this->handler->handle($event);
 
         $this->assertFalse($context->get('captureSuccess'));
-        $this->assertStringContainsString('No PaymentIntent ID found', $context->get('error'));
+        $this->assertNotNull($context->get('error'));
     }
 
     public function testHandleSuccessfulCapture(): void
@@ -595,10 +603,10 @@ class StripeCaptureRequestHandlerTest extends TestCase
     }
 
     /**
-     * Test that PaymentIntent ID from contract metadata is used when providerOrderId is empty.
-     * Sprint 9: Handler still resolves PaymentIntent ID, then delegates to CaptureService.
+     * Sprint 114.11b (S3): Handler delegates to CaptureService unconditionally.
+     * Service owns PI ID resolution (getProviderOrderId or metadata fallback).
      */
-    public function testHandleUsesPaymentIntentFromMetadataWhenProviderOrderIdEmpty(): void
+    public function testHandleDelegatesToCaptureServiceForContractCapture(): void
     {
         $context = new EventContext([
             'contractId' => 'contract_metadata',
@@ -606,22 +614,15 @@ class StripeCaptureRequestHandlerTest extends TestCase
         ]);
         $event = new StripeCaptureRequestEvent($context);
 
-        // Contract with empty providerOrderId but PaymentIntent in metadata
         $contract = $this->createMock(PaymentContract::class);
         $contract->method('getState')->willReturn(ContractState::authorized());
-        $contract->method('getProviderOrderId')->willReturn('');  // Empty string
-        $contract->method('getMetadata')->willReturnCallback(function (string $key) {
-            if ($key === 'payment_intent_id') {
-                return 'pi_from_metadata_123';
-            }
-            return null;
-        });
+        $contract->method('getProviderOrderId')->willReturn('pi_from_contract');
 
         $this->contractRepository
             ->method('findById')
             ->willReturn($contract);
 
-        // Sprint 9: CaptureService receives the contract and handles the PI lookup internally
+        // Handler delegates to service — service owns PI resolution and state check
         $this->captureService
             ->expects($this->once())
             ->method('processCapture')
@@ -641,10 +642,10 @@ class StripeCaptureRequestHandlerTest extends TestCase
     }
 
     /**
-     * Test that empty string PaymentIntent in metadata triggers error.
-     * This catches mutations that flip the !== '' check to === ''.
+     * Sprint 114.11b (S3): PI ID resolution moved to CaptureService.
+     * When contract has no PI ID, service returns failure — handler propagates.
      */
-    public function testHandleSetsErrorWhenMetadataPaymentIntentIsEmptyString(): void
+    public function testHandleSetsErrorWhenContractHasNoPaymentIntentId(): void
     {
         $context = new EventContext([
             'contractId' => 'contract_empty_meta',
@@ -652,27 +653,24 @@ class StripeCaptureRequestHandlerTest extends TestCase
         ]);
         $event = new StripeCaptureRequestEvent($context);
 
-        // Contract with no providerOrderId and empty metadata payment_intent_id
         $contract = $this->createMock(PaymentContract::class);
         $contract->method('getState')->willReturn(ContractState::authorized());
         $contract->method('getProviderOrderId')->willReturn(null);
-        $contract->method('getMetadata')->willReturnCallback(function (string $key) {
-            if ($key === 'payment_intent_id') {
-                return '';  // Empty string - should fail validation
-            }
-            return null;
-        });
 
         $this->contractRepository
             ->method('findById')
             ->willReturn($contract);
 
-        $this->captureService->expects($this->never())->method('processCapture');
+        // Service returns failure when it cannot resolve PI ID
+        $this->captureService
+            ->expects($this->once())
+            ->method('processCapture')
+            ->willReturn(CaptureResponse::failure('Contract has no PaymentIntent ID'));
 
         $this->handler->handle($event);
 
         $this->assertFalse($context->get('captureSuccess'));
-        $this->assertStringContainsString('No PaymentIntent ID found', $context->get('error'));
+        $this->assertNotNull($context->get('error'));
     }
 
     /**
