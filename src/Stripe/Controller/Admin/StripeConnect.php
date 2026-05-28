@@ -33,9 +33,18 @@ class StripeConnect extends AdminController
 
     private ModuleSettingBridgeInterface $moduleSettingService;
 
-    public function __construct()
+    /**
+     * Resolve collaborators once from the DI container.
+     *
+     * WHY init() and not __construct(): OXID admin controllers extend a virtual
+     * parent class built at runtime; constructor DI is not available. init()
+     * is the earliest safe resolution point per R-4.2.
+     * Test subclasses bypass init() entirely and call initializeCollaborators()
+     * directly with mocked dependencies.
+     */
+    public function init(): void
     {
-        parent::__construct();
+        parent::init();
 
         $container = ContainerFactory::getInstance()->getContainer();
 
@@ -46,7 +55,7 @@ class StripeConnect extends AdminController
     }
 
     /**
-     * Constructor seam — test subclasses bypass parent::__construct() and call
+     * Init seam — test subclasses bypass parent::init() and call
      * this directly with mocked collaborators.
      */
     protected function initializeCollaborators(

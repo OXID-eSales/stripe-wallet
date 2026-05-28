@@ -11,13 +11,13 @@ namespace OxidEsales\Payments\Stripe\Model;
 
 use OxidEsales\Eshop\Core\Counter as EshopCoreCounter;
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeChargeDto;
 use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface;
 use OxidEsales\Payments\Stripe\Service\StripeOrderApiService;
+use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
 
 /**
  * Stripe Order Model Extension
@@ -33,6 +33,8 @@ use OxidEsales\Payments\Stripe\Service\StripeOrderApiService;
  */
 class Order extends Order_parent
 {
+    use ServiceContainer;
+
     /**
      * Ensure order number is always set.
      *
@@ -278,7 +280,7 @@ class Order extends Order_parent
 
         try {
             /** @var StripeOrderApiService $apiService */
-            $apiService = ContainerFactory::getInstance()->getContainer()->get(StripeOrderApiService::class);
+            $apiService = $this->getServiceFromContainer(StripeOrderApiService::class);
             /** @phpstan-ignore-next-line OXID core: virtual parent — $this is Order extension */
             $paymentIntent = $apiService->getPaymentIntent($this);
             if ($paymentIntent === null) {
@@ -310,11 +312,7 @@ class Order extends Order_parent
     protected function getChargeAmountResolver(): ?ChargeAmountResolverInterface
     {
         try {
-            /** @var ChargeAmountResolverInterface $resolver */
-            $resolver = ContainerFactory::getInstance()->getContainer()->get(
-                ChargeAmountResolverInterface::class
-            );
-            return $resolver;
+            return $this->getServiceFromContainer(ChargeAmountResolverInterface::class);
         } catch (\Throwable $e) {
             return null;
         }

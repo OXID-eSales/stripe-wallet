@@ -47,6 +47,8 @@ class ModuleConfiguration extends ModuleConfiguration_parent
     private ?ModuleConfigurationServiceInterface $moduleConfig = null;
     private ?WebhookEndpointRegistrarInterface $webhookRegistrar = null;
     private ?LoggerInterface $webhookLogger = null;
+    private ?ConfigurationValidatorInterface $configurationValidator = null;
+    private ?ModuleSettingBridgeInterface $moduleSettingBridge = null;
 
     private function getModuleConfig(): ModuleConfigurationServiceInterface
     {
@@ -83,6 +85,30 @@ class ModuleConfiguration extends ModuleConfiguration_parent
             $this->webhookLogger = $logger;
         }
         return $this->webhookLogger;
+    }
+
+    protected function getConfigurationValidator(): ConfigurationValidatorInterface
+    {
+        if ($this->configurationValidator === null) {
+            /** @var ConfigurationValidatorInterface $validator */
+            $validator = ContainerFactory::getInstance()
+                ->getContainer()
+                ->get(ConfigurationValidatorInterface::class);
+            $this->configurationValidator = $validator;
+        }
+        return $this->configurationValidator;
+    }
+
+    private function getModuleSettingBridge(): ModuleSettingBridgeInterface
+    {
+        if ($this->moduleSettingBridge === null) {
+            $bridge = ContainerFactory::getInstance()
+                ->getContainer()
+                ->get(ModuleSettingBridgeInterface::class);
+            assert($bridge instanceof ModuleSettingBridgeInterface);
+            $this->moduleSettingBridge = $bridge;
+        }
+        return $this->moduleSettingBridge;
     }
 
     /**
@@ -139,11 +165,7 @@ class ModuleConfiguration extends ModuleConfiguration_parent
      */
     public function stripeGetKeyValidationError(): ?string
     {
-        /** @var ConfigurationValidatorInterface $validator */
-        $validator = ContainerFactory::getInstance()
-            ->getContainer()
-            ->get(ConfigurationValidatorInterface::class);
-        return $validator->getKeyValidationError();
+        return $this->getConfigurationValidator()->getKeyValidationError();
     }
 
     /**
@@ -367,11 +389,7 @@ class ModuleConfiguration extends ModuleConfiguration_parent
      */
     protected function saveModuleSetting(string $key, string $value): void
     {
-        $bridge = ContainerFactory::getInstance()
-            ->getContainer()
-            ->get(ModuleSettingBridgeInterface::class);
-        assert($bridge instanceof ModuleSettingBridgeInterface);
-        $bridge->save($key, $value, Module::MODULE_ID);
+        $this->getModuleSettingBridge()->save($key, $value, Module::MODULE_ID);
     }
 
     /**

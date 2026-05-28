@@ -35,6 +35,7 @@ class WebhookController extends FrontendController
 
     protected ?StripeWebhookProcessor $processor = null;
     protected ?WebhookLogServiceInterface $webhookLogger = null;
+    protected ?RetryCleanupService $cleanupService = null;
     private ?WebhookRequestGuardInterface $guard = null;
 
     /**
@@ -60,6 +61,16 @@ class WebhookController extends FrontendController
             $this->guard = $guard instanceof WebhookRequestGuardInterface ? $guard : null;
         } catch (\Exception $e) {
             Registry::getLogger()->warning('Webhook guard chain unavailable — processing without rate limiting/IP checks', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            /** @var RetryCleanupService $cleanupService */
+            $cleanupService = $container->get(RetryCleanupService::class);
+            $this->cleanupService = $cleanupService;
+        } catch (\Exception $e) {
+            Registry::getLogger()->warning('Stale-order cleanup service unavailable', [
                 'error' => $e->getMessage(),
             ]);
         }
@@ -173,11 +184,12 @@ class WebhookController extends FrontendController
      */
     protected function cleanupStaleNotFinishedOrders(): void
     {
+        if ($this->cleanupService === null) {
+            return;
+        }
+
         try {
-            $container = ContainerFactory::getInstance()->getContainer();
-            /** @var RetryCleanupService $cleanupService */
-            $cleanupService = $container->get(RetryCleanupService::class);
-            $cleaned = $cleanupService->cleanupStaleContracts($this->staleThresholdMinutes);
+            $cleaned = $this->cleanupService->cleanupStaleContracts($this->staleThresholdMinutes);
             if ($cleaned > 0) {
                 Registry::getLogger()->info('Cleaned up ' . $cleaned . ' stale NOT_FINISHED order(s)');
             }
