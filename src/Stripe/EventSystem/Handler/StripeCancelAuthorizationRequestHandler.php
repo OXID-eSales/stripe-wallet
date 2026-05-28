@@ -191,5 +191,4 @@ class StripeCancelAuthorizationRequestHandler extends AbstractStripeRequestHandl
             shopId: (int) $this->shopAdapter->getShopId()
         );
     }
-
 }

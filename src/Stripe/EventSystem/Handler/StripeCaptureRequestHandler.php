@@ -302,5 +302,4 @@ class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
             shopId: (int) $this->shopAdapter->getShopId()
         );
     }
-
 }
