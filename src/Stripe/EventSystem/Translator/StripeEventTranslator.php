@@ -26,9 +26,24 @@ use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
  * concrete event classes. The broker dispatches the translated event
  * through the standard dispatcher; existing Stripe handlers fire
  * unchanged.
+ *
+ * O10 (Sprint 114.13): refactored from an instanceof ladder to a
+ * static mapping table so new mappings are additive array entries
+ * rather than edits to a conditional chain (OCP, R-2.2).
  */
 final class StripeEventTranslator implements ProviderEventTranslatorInterface
 {
+    /**
+     * Maps each abstract event class to its Stripe-specific counterpart.
+     *
+     * @var array<class-string<AbstractProviderRequestEvent>, class-string<EventInterface>>
+     */
+    private const EVENT_MAP = [
+        RefundRequestedEvent::class              => StripeRefundRequestEvent::class,
+        CaptureRequestedEvent::class             => StripeCaptureRequestEvent::class,
+        CancelAuthorizationRequestedEvent::class => StripeCancelAuthorizationRequestEvent::class,
+    ];
+
     public function supports(string $providerName): bool
     {
         return $providerName === StripeDefinitions::PROVIDER;
@@ -36,25 +51,19 @@ final class StripeEventTranslator implements ProviderEventTranslatorInterface
 
     public function translate(AbstractProviderRequestEvent $event): ?EventInterface
     {
-        // Stripe's concrete event classes constructor-inject the concrete
-        // EventContext (not the interface). Narrow once at the entry, so
-        // each branch below can hand the context over cleanly. Returns
-        // null on the unexpected interface-but-not-concrete case so the
-        // broker treats the event as unhandled.
+        // Stripe concrete events require the concrete EventContext (not the
+        // interface). Guard here once; return null so the broker treats the
+        // event as unhandled if a non-concrete context arrives.
         $context = $event->getContext();
         if (!$context instanceof EventContext) {
             return null;
         }
 
-        if ($event instanceof RefundRequestedEvent) {
-            return new StripeRefundRequestEvent($context);
+        $concreteClass = self::EVENT_MAP[$event::class] ?? null;
+        if ($concreteClass === null) {
+            return null;
         }
-        if ($event instanceof CaptureRequestedEvent) {
-            return new StripeCaptureRequestEvent($context);
-        }
-        if ($event instanceof CancelAuthorizationRequestedEvent) {
-            return new StripeCancelAuthorizationRequestEvent($context);
-        }
-        return null;
+
+        return new $concreteClass($context);
     }
 }
