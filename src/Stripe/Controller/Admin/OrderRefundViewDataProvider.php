@@ -13,6 +13,7 @@ use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeChargeDto;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripePaymentIntentDto;
+use OxidEsales\Payments\Stripe\Admin\StripeTransactionHistoryBuilder;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface;
 use OxidEsales\Payments\Stripe\Service\StripeOrderApiService;
@@ -35,6 +36,7 @@ class OrderRefundViewDataProvider
     public function __construct(
         private readonly StripeOrderApiService $apiService,
         private readonly ChargeAmountResolverInterface $chargeAmountResolver,
+        private readonly StripeTransactionHistoryBuilder $historyBuilder,
     ) {
     }
 
@@ -214,6 +216,7 @@ class OrderRefundViewDataProvider
      * Uses expanded PaymentIntent to include refunds (Stripe SDK v19+: Charge.refunds removed).
      * Sprint 104: reads from the shared expanded-PI cache (populated by getPaymentIntent).
      * Sprint 114.10b: reads StripePaymentIntentDto / StripeChargeDto / StripeRefundDto.
+     * Sprint 114.11b (S4): history assembly delegated to StripeTransactionHistoryBuilder.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -224,57 +227,7 @@ class OrderRefundViewDataProvider
             return [];
         }
 
-        $transactions = [];
-        $currency     = $paymentIntent->currency;
-
-        $transactions[] = [
-            'type'          => 'authorization',
-            'status'        => $this->mapPiStatusToLabel($paymentIntent->status),
-            'amount'        => AmountConverter::toMajorUnits($paymentIntent->amount, $currency),
-            'currency'      => $currency,
-            'transactionId' => $paymentIntent->id,
-            'createdAt'     => date('Y-m-d H:i:s', $paymentIntent->created),
-        ];
-
-        $charge = $paymentIntent->charge;
-        if ($charge === null) {
-            return $transactions;
-        }
-
-        if ($charge->captured) {
-            $transactions[] = [
-                'type'          => 'capture',
-                'status'        => 'completed',
-                'amount'        => AmountConverter::toMajorUnits($charge->amountCaptured, $currency),
-                'currency'      => $currency,
-                'transactionId' => $charge->id,
-                'createdAt'     => date('Y-m-d H:i:s', $charge->created),
-            ];
-        }
-
-        foreach ($charge->refunds as $refundDto) {
-            $transactions[] = [
-                'type'          => 'refund',
-                'status'        => $refundDto->status,
-                'amount'        => AmountConverter::toMajorUnits($refundDto->amount, $currency),
-                'currency'      => $currency,
-                'transactionId' => $refundDto->id,
-                'createdAt'     => date('Y-m-d H:i:s', $refundDto->createdAt),
-            ];
-        }
-
-        return $transactions;
-    }
-
-    private function mapPiStatusToLabel(string $status): string
-    {
-        return match ($status) {
-            'requires_capture' => 'authorized',
-            'succeeded' => 'completed',
-            'canceled' => 'cancelled',
-            'requires_payment_method', 'requires_confirmation', 'requires_action' => 'pending',
-            default => $status,
-        };
+        return $this->historyBuilder->build($paymentIntent);
     }
 
     /**

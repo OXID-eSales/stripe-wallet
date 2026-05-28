@@ -12,6 +12,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Admin;
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeChargeDto;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripePaymentIntentDto;
+use OxidEsales\Payments\Stripe\Admin\StripeTransactionHistoryBuilder;
 use OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider;
 use OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
@@ -203,7 +204,7 @@ final class StripePanelApiCallCountTest extends TestCase
                 ChargeAmountResolverInterface $chargeAmountResolver,
                 private readonly StripePaymentIntentDto $stubPi,
             ) {
-                parent::__construct($apiService, $chargeAmountResolver);
+                parent::__construct($apiService, $chargeAmountResolver, new StripeTransactionHistoryBuilder());
             }
 
             protected function fetchExpandedPaymentIntent(Order $order): ?StripePaymentIntentDto

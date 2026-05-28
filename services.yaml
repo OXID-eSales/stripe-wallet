@@ -1063,9 +1063,14 @@ services:
       $contractResolver: '@OxidEsales\Payments\Stripe\Service\OrderContractResolver'
     public: true
 
+  # Sprint 114.11b (S4): Extracted from OrderRefundViewDataProvider — history assembly.
+  OxidEsales\Payments\Stripe\Admin\StripeTransactionHistoryBuilder:
+    public: false
+
   OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider:
     arguments:
       $chargeAmountResolver: '@OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface'
+      $historyBuilder: '@OxidEsales\Payments\Stripe\Admin\StripeTransactionHistoryBuilder'
     public: true
 
   # Sprint 103: Resolver for derived charge amounts (customer-refunded,

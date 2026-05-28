@@ -12,6 +12,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller\Admin;
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeChargeDto;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
+use OxidEsales\Payments\Stripe\Admin\StripeTransactionHistoryBuilder;
 use OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider;
 use OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
@@ -165,7 +166,7 @@ final class OrderRefundViewDataProviderTest extends TestCase
                 ChargeAmountResolverInterface $chargeAmountResolver,
                 private readonly ?StripeChargeDto $stubCharge,
             ) {
-                parent::__construct($apiService, $chargeAmountResolver);
+                parent::__construct($apiService, $chargeAmountResolver, new StripeTransactionHistoryBuilder());
             }
 
             public function getLastCharge(Order $order, bool $refresh = false): ?StripeChargeDto
