@@ -15,6 +15,7 @@ use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelUrlBuildEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeSuccessUrlBuildEvent;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\Result\CheckoutSessionResult;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
@@ -54,7 +55,7 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
         string $successUrl,
         string $cancelUrl,
         string $shopId = '1',
-        string $captureMode = 'automatic',
+        string $captureMode = StripeDefinitions::CAPTURE_MODE_AUTOMATIC,
         ?string $orderId = null,
         ?string $orderNumber = null,
         ?string $stripeCustomerId = null

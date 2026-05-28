@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\Result\CheckoutSessionResult;
 
 /**
@@ -48,7 +49,7 @@ interface CheckoutSessionServiceInterface
         string $successUrl,
         string $cancelUrl,
         string $shopId = '1',
-        string $captureMode = 'automatic',
+        string $captureMode = StripeDefinitions::CAPTURE_MODE_AUTOMATIC,
         ?string $orderId = null,
         ?string $orderNumber = null,
         ?string $stripeCustomerId = null

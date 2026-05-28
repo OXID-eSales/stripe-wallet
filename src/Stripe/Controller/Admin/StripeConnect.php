@@ -13,6 +13,7 @@ use OxidEsales\Eshop\Application\Controller\Admin\AdminController;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Bridge\ModuleSettingBridgeInterface;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Module;
 
 /**
@@ -103,7 +104,7 @@ class StripeConnect extends AdminController
         if ($accessToken === '') {
             return false;
         }
-        return $mode === 'test' || $mode === 'live';
+        return $mode === StripeDefinitions::MODE_TEST || $mode === StripeDefinitions::MODE_LIVE;
     }
 
     private function persistCredentials(string $mode, string $accessToken, string $publishableKey): void
@@ -114,11 +115,11 @@ class StripeConnect extends AdminController
 
     private function tokenKey(string $mode): string
     {
-        return $mode === 'live' ? 'sStripeLiveToken' : 'sStripeTestToken';
+        return $mode === StripeDefinitions::MODE_LIVE ? 'sStripeLiveToken' : 'sStripeTestToken';
     }
 
     private function publishableKeyKey(string $mode): string
     {
-        return $mode === 'live' ? 'sStripeLivePk' : 'sStripeTestPk';
+        return $mode === StripeDefinitions::MODE_LIVE ? 'sStripeLivePk' : 'sStripeTestPk';
     }
 }

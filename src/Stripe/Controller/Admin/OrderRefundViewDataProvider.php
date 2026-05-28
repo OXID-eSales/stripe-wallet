@@ -13,6 +13,7 @@ use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeChargeDto;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripePaymentIntentDto;
+use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Admin\StripeTransactionHistoryBuilder;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface;
@@ -117,7 +118,7 @@ class OrderRefundViewDataProvider
         if ($paymentIntent === null) {
             return false;
         }
-        return $paymentIntent->status === 'requires_capture';
+        return $paymentIntent->status === StripeStatusMapper::STRIPE_REQUIRES_CAPTURE;
     }
 
     /**

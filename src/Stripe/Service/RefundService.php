@@ -14,6 +14,7 @@ use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
 use OxidEsales\PaymentBase\Service\StockRestorationServiceInterface;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeRefundDto;
+use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
@@ -157,7 +158,7 @@ final class RefundService implements RefundServiceInterface
         ?string $orderId,
         ?string $paymentIntentId
     ): RefundResponse {
-        if (!in_array($refund->status, ['succeeded', 'pending'], true)) {
+        if (!in_array($refund->status, [StripeStatusMapper::STRIPE_SUCCEEDED, StripeStatusMapper::STRIPE_REFUND_STATUS_PENDING], true)) {
             return RefundResponse::failure("Refund failed with status: {$refund->status}");
         }
 

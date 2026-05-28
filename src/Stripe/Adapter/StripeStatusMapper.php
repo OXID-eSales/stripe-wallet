@@ -40,6 +40,23 @@ final class StripeStatusMapper
     public const STATUS_PARTIALLY_REFUNDED = NormalizedPaymentStatus::PARTIALLY_REFUNDED;
 
     /**
+     * Stripe Checkout Session `payment_status` values (Sprint 114.12 C4).
+     *
+     * @see https://stripe.com/docs/api/checkout/sessions/object#checkout_session_object-payment_status
+     */
+    public const CHECKOUT_PAYMENT_STATUS_PAID = 'paid';
+    public const CHECKOUT_PAYMENT_STATUS_UNPAID = 'unpaid';
+
+    /**
+     * Stripe Refund object `status` values (Sprint 114.12 C4).
+     *
+     * Distinct from PaymentIntent statuses — refund objects have their own lifecycle.
+     *
+     * @see https://stripe.com/docs/api/refunds/object#refund_object-status
+     */
+    public const STRIPE_REFUND_STATUS_PENDING = 'pending';
+
+    /**
      * Stripe PaymentIntent statuses.
      *
      * @see https://stripe.com/docs/api/payment_intents/object#payment_intent_object-status

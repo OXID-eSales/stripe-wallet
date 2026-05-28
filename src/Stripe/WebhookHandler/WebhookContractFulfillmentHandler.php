@@ -11,6 +11,7 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
 use OxidEsales\Payments\Stripe\Service\ContractRefundRecorder;
 
@@ -49,7 +50,7 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
         if ($result === true) {
             $contract = $this->findContractByProviderOrderId($providerOrderId);
             if ($contract !== null) {
-                $this->recordAudit($contract, 'capture', $contract->getCapturedAmount() ?? 0.0);
+                $this->recordAudit($contract, StripeDefinitions::TRANSACTION_TYPE_CAPTURE, $contract->getCapturedAmount() ?? 0.0);
             }
         }
 
@@ -77,7 +78,7 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
         if ($refundAmount > 0.0) {
             $recorder = $this->refundRecorder ?? new ContractRefundRecorder($this->contractRepository);
             $recorder->record($contract, $refundAmount);
-            $this->recordAudit($contract, 'refund', $refundAmount);
+            $this->recordAudit($contract, StripeDefinitions::TRANSACTION_TYPE_REFUND, $refundAmount);
         }
 
         return true;
@@ -143,7 +144,7 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
             contractId: $contract->getId(),
             provider: StripeDefinitions::PROVIDER,
             type: $type,
-            status: 'completed',
+            status: StripeDefinitions::TRANSACTION_STATUS_COMPLETED,
             amount: $amount,
             currency: $contract->getCurrency()
         );

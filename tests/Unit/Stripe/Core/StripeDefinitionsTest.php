@@ -93,4 +93,48 @@ class StripeDefinitionsTest extends TestCase
             'wrong prefix' => ['stripe_wallet'],
         ];
     }
+
+    // ==========================================
+    // C4 — mode/capture/transaction constants (Sprint 114.12)
+    // ==========================================
+
+    public function testModeTestConstantHasCorrectValue(): void
+    {
+        $this->assertSame('test', StripeDefinitions::MODE_TEST);
+    }
+
+    public function testModeLiveConstantHasCorrectValue(): void
+    {
+        $this->assertSame('live', StripeDefinitions::MODE_LIVE);
+    }
+
+    public function testCaptureModeAutomaticConstantHasCorrectValue(): void
+    {
+        $this->assertSame('automatic', StripeDefinitions::CAPTURE_MODE_AUTOMATIC);
+    }
+
+    public function testCaptureModeManualConstantHasCorrectValue(): void
+    {
+        $this->assertSame('manual', StripeDefinitions::CAPTURE_MODE_MANUAL);
+    }
+
+    public function testTransactionTypeCaptureConstantHasCorrectValue(): void
+    {
+        $this->assertSame('capture', StripeDefinitions::TRANSACTION_TYPE_CAPTURE);
+    }
+
+    public function testTransactionTypeRefundConstantHasCorrectValue(): void
+    {
+        $this->assertSame('refund', StripeDefinitions::TRANSACTION_TYPE_REFUND);
+    }
+
+    public function testTransactionStatusCompletedConstantHasCorrectValue(): void
+    {
+        $this->assertSame('completed', StripeDefinitions::TRANSACTION_STATUS_COMPLETED);
+    }
+
+    public function testDefaultCurrencyConstantHasCorrectValue(): void
+    {
+        $this->assertSame('EUR', StripeDefinitions::DEFAULT_CURRENCY);
+    }
 }

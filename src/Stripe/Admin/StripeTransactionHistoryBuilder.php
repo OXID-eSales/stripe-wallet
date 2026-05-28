@@ -10,7 +10,9 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Admin;
 
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripePaymentIntentDto;
+use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 
 /**
  * Assembles the transaction-history row array from Stripe DTO objects.
@@ -53,8 +55,8 @@ final class StripeTransactionHistoryBuilder
 
         if ($charge->captured) {
             $transactions[] = [
-                'type'          => 'capture',
-                'status'        => 'completed',
+                'type'          => StripeDefinitions::TRANSACTION_TYPE_CAPTURE,
+                'status'        => StripeDefinitions::TRANSACTION_STATUS_COMPLETED,
                 'amount'        => AmountConverter::toMajorUnits($charge->amountCaptured, $currency),
                 'currency'      => $currency,
                 'transactionId' => $charge->id,
@@ -64,7 +66,7 @@ final class StripeTransactionHistoryBuilder
 
         foreach ($charge->refunds as $refundDto) {
             $transactions[] = [
-                'type'          => 'refund',
+                'type'          => StripeDefinitions::TRANSACTION_TYPE_REFUND,
                 'status'        => $refundDto->status,
                 'amount'        => AmountConverter::toMajorUnits($refundDto->amount, $currency),
                 'currency'      => $currency,
@@ -79,11 +81,11 @@ final class StripeTransactionHistoryBuilder
     private function mapPiStatusToLabel(string $status): string
     {
         return match ($status) {
-            'requires_capture'                                                          => 'authorized',
-            'succeeded'                                                                 => 'completed',
-            'canceled'                                                                  => 'cancelled',
-            'requires_payment_method', 'requires_confirmation', 'requires_action'      => 'pending',
-            default                                                                     => $status,
+            StripeStatusMapper::STRIPE_REQUIRES_CAPTURE                                                                                              => 'authorized',
+            StripeStatusMapper::STRIPE_SUCCEEDED                                                                                                     => StripeDefinitions::TRANSACTION_STATUS_COMPLETED,
+            StripeStatusMapper::STRIPE_CANCELED                                                                                                      => 'cancelled',
+            StripeStatusMapper::STRIPE_REQUIRES_PAYMENT_METHOD, StripeStatusMapper::STRIPE_REQUIRES_CONFIRMATION, StripeStatusMapper::STRIPE_REQUIRES_ACTION => 'pending',
+            default                                                                                                                                  => $status,
         };
     }
 }

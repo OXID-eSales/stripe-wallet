@@ -12,6 +12,7 @@ namespace OxidEsales\Payments\Stripe\Controller\Admin;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Bridge\ModuleSettingBridgeInterface;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Module;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\Exception\WebhookRegistrationException;
@@ -44,6 +45,18 @@ use Psr\Log\NullLogger;
  */
 class ModuleConfiguration extends ModuleConfiguration_parent
 {
+    /**
+     * Stripe Connect onboarding middleware URL for test mode.
+     * Kept here rather than in StripeDefinitions to isolate admin-UI routing
+     * from the core payment definitions.
+     */
+    private const CONNECT_MIDDLEWARE_TEST_URL = 'https://stripe-middleware-test.oxid-esales.com/stripe-connect';
+
+    /**
+     * Stripe Connect onboarding middleware URL for live mode.
+     */
+    private const CONNECT_MIDDLEWARE_LIVE_URL = 'https://osm.oxid-esales.com/stripe-connect';
+
     private ?ModuleConfigurationServiceInterface $moduleConfig = null;
     private ?WebhookEndpointRegistrarInterface $webhookRegistrar = null;
     private ?LoggerInterface $webhookLogger = null;
@@ -176,16 +189,16 @@ class ModuleConfiguration extends ModuleConfiguration_parent
      */
     public function stripeGetConnectUrl(string $sVarName): string
     {
-        $sMode = $sVarName === 'sStripeTestToken' ? 'test' : 'live';
+        $sMode = $sVarName === 'sStripeTestToken' ? StripeDefinitions::MODE_TEST : StripeDefinitions::MODE_LIVE;
         $redirectUrl = Registry::getConfig()->getShopUrl(0, true) . 'admin/index.php?cl=StripeConnect&fnc=stripeFinishOnBoarding';
         $redirectUrl .= '&stoken=' . Registry::getSession()->getSessionChallengeToken();
         $redirectUrl .= '&shop_param=' . $sMode;
         $redirectUrl .= '&shp=' . Registry::getConfig()->getShopId();
 
-        if ($sMode === 'test') {
-            return 'https://stripe-middleware-test.oxid-esales.com/stripe-connect?shop_redirect_url=' . rawurlencode($redirectUrl);
+        if ($sMode === StripeDefinitions::MODE_TEST) {
+            return self::CONNECT_MIDDLEWARE_TEST_URL . '?shop_redirect_url=' . rawurlencode($redirectUrl);
         }
-        return 'https://osm.oxid-esales.com/stripe-connect?shop_redirect_url=' . rawurlencode($redirectUrl);
+        return self::CONNECT_MIDDLEWARE_LIVE_URL . '?shop_redirect_url=' . rawurlencode($redirectUrl);
     }
 
     // -------------------------------------------------------------------------
@@ -291,7 +304,7 @@ class ModuleConfiguration extends ModuleConfiguration_parent
 
     private function forgetAllLocalEndpointMetadata(): void
     {
-        foreach (['test', 'live'] as $mode) {
+        foreach ([StripeDefinitions::MODE_TEST, StripeDefinitions::MODE_LIVE] as $mode) {
             $this->saveOxConfigVar($this->endpointIdKey($mode), '');
             $this->saveOxConfigVar($this->endpointSecretKey($mode), '');
         }

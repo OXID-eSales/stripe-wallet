@@ -133,6 +133,25 @@ final class StripeStatusMapperTest extends TestCase
         }
     }
 
+    // ==========================================
+    // C4 — checkout payment status constants (Sprint 114.12)
+    // ==========================================
+
+    public function testCheckoutPaymentStatusPaidConstantHasCorrectValue(): void
+    {
+        $this->assertSame('paid', StripeStatusMapper::CHECKOUT_PAYMENT_STATUS_PAID);
+    }
+
+    public function testCheckoutPaymentStatusUnpaidConstantHasCorrectValue(): void
+    {
+        $this->assertSame('unpaid', StripeStatusMapper::CHECKOUT_PAYMENT_STATUS_UNPAID);
+    }
+
+    public function testStripeRefundStatusPendingConstantHasCorrectValue(): void
+    {
+        $this->assertSame('pending', StripeStatusMapper::STRIPE_REFUND_STATUS_PENDING);
+    }
+
     public function testNormalizedStatusesAreProviderAgnostic(): void
     {
         // Verify that all normalized statuses are generic (not Stripe-specific)

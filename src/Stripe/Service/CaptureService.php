@@ -151,10 +151,10 @@ final class CaptureService implements CaptureServiceInterface
             orderId: $contract->getOrderId() ?? '',
             contractId: $contract->getId(),
             provider: StripeDefinitions::PROVIDER,
-            type: 'capture',
-            status: 'completed',
+            type: StripeDefinitions::TRANSACTION_TYPE_CAPTURE,
+            status: StripeDefinitions::TRANSACTION_STATUS_COMPLETED,
             amount: $result->amountCaptured ?? 0,
-            currency: $result->currency ?? 'EUR'
+            currency: $result->currency ?? StripeDefinitions::DEFAULT_CURRENCY
         );
         $transaction->setTransactionId($result->captureId);
         $transaction->setProviderOrderId($contract->getProviderOrderId());

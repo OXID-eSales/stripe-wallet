@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service\Result;
 
+use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
 
 /**
@@ -50,8 +51,8 @@ final readonly class CheckoutReturnResult
         string $paymentIntentId,
         int $amountCents,
         string $currency,
-        string $paymentStatus = 'paid',
-        string $paymentIntentStatus = 'succeeded'
+        string $paymentStatus = StripeStatusMapper::CHECKOUT_PAYMENT_STATUS_PAID,
+        string $paymentIntentStatus = StripeStatusMapper::STRIPE_SUCCEEDED
     ): self {
         return new self(
             successful: true,
@@ -172,7 +173,7 @@ final readonly class CheckoutReturnResult
      */
     public function isRequiresCapture(): bool
     {
-        return $this->paymentIntentStatus === 'requires_capture';
+        return $this->paymentIntentStatus === StripeStatusMapper::STRIPE_REQUIRES_CAPTURE;
     }
 
     /**
@@ -180,7 +181,7 @@ final readonly class CheckoutReturnResult
      */
     public function isCaptured(): bool
     {
-        return $this->paymentIntentStatus === 'succeeded';
+        return $this->paymentIntentStatus === StripeStatusMapper::STRIPE_SUCCEEDED;
     }
 
     public function getErrorMessage(): ?string

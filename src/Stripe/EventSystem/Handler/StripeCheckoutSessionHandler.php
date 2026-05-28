@@ -132,7 +132,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
     private function buildCheckoutParams(EventContext $context, PaymentContractInterface $contract): array
     {
         $contractId = $contract->getId() ?? '';
-        $captureMode = $this->getContextString($context, 'captureMode', 'automatic');
+        $captureMode = $this->getContextString($context, 'captureMode', StripeDefinitions::CAPTURE_MODE_AUTOMATIC);
         $shopUrl = $this->getContextString($context, 'shopUrl', $this->shopAdapter->getShopUrl());
         $sessionId = $this->getContextString($context, 'sessionId', '');
         $shopId = $this->getContextString($context, 'shopId', '1');

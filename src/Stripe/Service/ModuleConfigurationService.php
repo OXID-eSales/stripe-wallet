@@ -13,6 +13,7 @@ use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Dao\ModuleConfigurationDaoInterface;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\DataObject\ModuleConfiguration;
 use OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Module;
 use Throwable;
 
@@ -64,7 +65,7 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
      */
     public function isTestMode(): bool
     {
-        return $this->getMode() === 'test';
+        return $this->getMode() === StripeDefinitions::MODE_TEST;
     }
 
     /**
@@ -74,10 +75,10 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     public function getMode(): string
     {
         $mode = $this->get('sStripeMode');
-        if (is_string($mode) && $mode === 'live') {
-            return 'live';
+        if (is_string($mode) && $mode === StripeDefinitions::MODE_LIVE) {
+            return StripeDefinitions::MODE_LIVE;
         }
-        return 'test';
+        return StripeDefinitions::MODE_TEST;
     }
 
     /**
@@ -264,10 +265,10 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     public function getCaptureMode(): string
     {
         $mode = $this->get('sStripeCaptureMode');
-        if (is_string($mode) && in_array($mode, ['automatic', 'manual'], true)) {
+        if (is_string($mode) && in_array($mode, [StripeDefinitions::CAPTURE_MODE_AUTOMATIC, StripeDefinitions::CAPTURE_MODE_MANUAL], true)) {
             return $mode;
         }
-        return 'automatic';
+        return StripeDefinitions::CAPTURE_MODE_AUTOMATIC;
     }
 
     /**

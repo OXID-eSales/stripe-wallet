@@ -12,6 +12,7 @@ namespace OxidEsales\Payments\Stripe\Service;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeCheckoutSessionDto;
+use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
@@ -68,8 +69,9 @@ final class CheckoutReturnService implements CheckoutReturnServiceInterface
 
         // Step 4: Validate payment status
         // Accept 'paid' (automatic capture) OR 'unpaid' with requires_capture (manual capture)
-        $isAutomaticCapture = $paymentStatus === 'paid';
-        $isManualCapture = $paymentStatus === 'unpaid' && $paymentIntentStatus === 'requires_capture';
+        $isAutomaticCapture = $paymentStatus === StripeStatusMapper::CHECKOUT_PAYMENT_STATUS_PAID;
+        $isManualCapture = $paymentStatus === StripeStatusMapper::CHECKOUT_PAYMENT_STATUS_UNPAID
+            && $paymentIntentStatus === StripeStatusMapper::STRIPE_REQUIRES_CAPTURE;
 
         if (!$isAutomaticCapture && !$isManualCapture) {
             return CheckoutReturnResult::failure("Payment not completed: {$paymentStatus}");

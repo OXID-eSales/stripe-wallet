@@ -38,6 +38,44 @@ final class StripeDefinitions
      */
     public const PROVIDER = 'stripe';
 
+    // -------------------------------------------------------------------------
+    // Module mode constants (Sprint 114.12 C4)
+    // -------------------------------------------------------------------------
+
+    /** Stripe test mode identifier (stored in sStripeMode setting). */
+    public const MODE_TEST = 'test';
+
+    /** Stripe live mode identifier (stored in sStripeMode setting). */
+    public const MODE_LIVE = 'live';
+
+    /** Automatic capture mode: payment captured immediately on authorization. */
+    public const CAPTURE_MODE_AUTOMATIC = 'automatic';
+
+    /** Manual capture mode: payment authorized, captured later (e.g. on shipping). */
+    public const CAPTURE_MODE_MANUAL = 'manual';
+
+    // -------------------------------------------------------------------------
+    // Audit-transaction type/status constants (Sprint 114.12 C4)
+    // -------------------------------------------------------------------------
+
+    /** Transaction type written to oe_payments_transaction when a capture succeeds. */
+    public const TRANSACTION_TYPE_CAPTURE = 'capture';
+
+    /** Transaction type written to oe_payments_transaction when a refund succeeds. */
+    public const TRANSACTION_TYPE_REFUND = 'refund';
+
+    /** Terminal status for a successfully processed transaction audit record. */
+    public const TRANSACTION_STATUS_COMPLETED = 'completed';
+
+    /**
+     * Fallback currency used when a Stripe API response omits the currency field.
+     *
+     * A missing currency in a CaptureResponse or CheckoutSession represents a Stripe
+     * API anomaly. The EUR default is a last-resort guard — in production this branch
+     * should never be reached; log a warning if it is.
+     */
+    public const DEFAULT_CURRENCY = 'EUR';
+
     // Payment constraints
     private const PAYMENT_CONSTRAINTS_DEFAULT = [
         'oxfromamount' => 0.50,

@@ -53,7 +53,7 @@ final class PaymentIntentHelper
     {
         try {
             $amountInCents = AmountConverter::toMinorUnits($request->amount, $request->currency);
-            $captureMethod = $request->directCapture ? 'automatic' : 'manual';
+            $captureMethod = $request->directCapture ? StripeDefinitions::CAPTURE_MODE_AUTOMATIC : StripeDefinitions::CAPTURE_MODE_MANUAL;
 
             $params = $this->buildPaymentIntentParams($amountInCents, $request->currency, $captureMethod, $request);
 
@@ -140,7 +140,7 @@ final class PaymentIntentHelper
         try {
             $amountInCents = AmountConverter::toMinorUnits($request->amount, $request->currency);
 
-            $params = $this->buildPaymentIntentParams($amountInCents, $request->currency, 'manual', $request);
+            $params = $this->buildPaymentIntentParams($amountInCents, $request->currency, StripeDefinitions::CAPTURE_MODE_MANUAL, $request);
 
             /** @phpstan-ignore argument.type (dynamic params built by buildPaymentIntentParams) */
             $paymentIntent = $client->paymentIntents->create($params);

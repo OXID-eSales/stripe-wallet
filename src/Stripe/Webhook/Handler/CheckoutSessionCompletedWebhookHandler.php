@@ -12,6 +12,7 @@ namespace OxidEsales\Payments\Stripe\Webhook\Handler;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\PaymentBase\Webhook\WebhookResult;
+use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookOutcome;
@@ -49,7 +50,7 @@ final class CheckoutSessionCompletedWebhookHandler extends AbstractStripeWebhook
         $object = $event->getObject();
         $paymentStatus = $object['payment_status'] ?? '';
 
-        if ($paymentStatus !== 'paid') {
+        if ($paymentStatus !== StripeStatusMapper::CHECKOUT_PAYMENT_STATUS_PAID) {
             return StripeWebhookOutcome::of(WebhookResult::skipped('Checkout session not paid'));
         }
 
