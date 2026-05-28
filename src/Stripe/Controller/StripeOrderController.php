@@ -155,6 +155,7 @@ class StripeOrderController extends OrderController
      * Create Stripe Checkout Session (AJAX endpoint).
      *
      * Returns JSON with session ID for client-side redirect.
+     * Delegates to focused helpers to stay within the 25-line budget.
      */
     public function createCheckoutSession(): void
     {
@@ -173,63 +174,10 @@ class StripeOrderController extends OrderController
         }
 
         try {
-            // STRP-100: Clean up previous checkout attempt on retry
             $this->cleanupPreviousCheckoutAttempt($helper);
-
-            // 0. Validate API key configuration
-            $validator = $this->getServiceFromContainer(ConfigurationValidatorInterface::class);
-            $keyValidationError = $validator->getKeyValidationError();
-            if ($keyValidationError !== null) {
-                throw new \RuntimeException('Stripe configuration error: ' . $keyValidationError);
-            }
-
-            // 1. Validate
-            $basket = $helper->getBasketFromSession();
-            if ($basket->getProductsCount() === 0) {
-                throw new \RuntimeException('Basket is empty');
-            }
-
-            $user = $this->getUser();
-            if ($user === null) {
-                throw new \RuntimeException('User not found');
-            }
-
-            // 2. Create context - ONLY DATA
-            $context = new EventContext([
-                'basket' => $basket,
-                'user' => $user,
-                'userId' => $user->getId(),
-                'paymentId' => StripeDefinitions::STRIPE_WALLET_PAYMENT_ID,
-                'sessionId' => $helper->getSessionId(),
-                'shopId' => $helper->getShopId(),
-                'shopUrl' => $helper->getShopUrl(),
-                'languageId' => $helper->getActiveLanguageId(),
-                'captureMode' => $helper->getCaptureMode(),
-                'conditionTypes' => ['payment_authorized'],
-            ]);
-
-            // 3. Dispatch event - HANDLERS DO THE WORK
-            // Set the skip-addr-check flag BEFORE dispatch so that
-            // Order::validateDeliveryAddress() (called during finalizeOrder inside
-            // the event handlers) recognises this as the legitimate return flow.
-            // Cleared by clearStripeSessionVariables() on completion or cancellation.
-            $helper->setSessionVariable(ControllerRequestHelper::SESSION_SKIP_ADDR_CHECK, true);
-            $event = new StripeCheckoutSessionRequestEvent($context);
-            $this->getEventDispatcher()->dispatch($event);
-
-            // 4. Store in session
-            if ($sessionId = $context->get('checkoutSessionId')) {
-                $helper->setSessionVariable('stripe_checkout_session_id', $sessionId);
-            }
-            if ($contractId = $context->get('contractId')) {
-                $helper->setSessionVariable('stripe_contract_id', $contractId);
-            }
-
-            echo json_encode([
-                'id' => $context->get('checkoutSessionId'),
-                'url' => $context->get('checkoutUrl'),
-                'contract_id' => $context->get('contractId'),
-            ]);
+            $context = $this->buildCheckoutEventContext($helper);
+            $this->dispatchSessionEvent($helper, $context);
+            $this->emitSessionResponse($context);
         } catch (\Throwable $e) {
             $this->setHttpResponseCode(500);
             $helper->logError('createCheckoutSession failed', $e);
@@ -237,6 +185,96 @@ class StripeOrderController extends OrderController
         }
 
         $this->exitWithJson();
+    }
+
+    /**
+     * Validate API key, basket, and user before creating the checkout context.
+     *
+     * @throws \RuntimeException on any precondition failure
+     */
+    private function validateCheckoutPreconditions(ControllerRequestHelper $helper): void
+    {
+        $validator = $this->getServiceFromContainer(ConfigurationValidatorInterface::class);
+        $keyValidationError = $validator->getKeyValidationError();
+        if ($keyValidationError !== null) {
+            throw new \RuntimeException('Stripe configuration error: ' . $keyValidationError);
+        }
+
+        $basket = $helper->getBasketFromSession();
+        if ($basket->getProductsCount() === 0) {
+            throw new \RuntimeException('Basket is empty');
+        }
+
+        if ($this->getUser() === null) {
+            throw new \RuntimeException('User not found');
+        }
+    }
+
+    /**
+     * Build the EventContext for the checkout session request.
+     *
+     * Validates preconditions first, then assembles context data.
+     *
+     * @throws \RuntimeException when API key, basket, or user is invalid
+     */
+    private function buildCheckoutEventContext(ControllerRequestHelper $helper): EventContext
+    {
+        $this->validateCheckoutPreconditions($helper);
+
+        $basket = $helper->getBasketFromSession();
+        $user   = $this->getUser();
+
+        if ($user === null) {
+            throw new \RuntimeException('User not found');
+        }
+
+        return new EventContext([
+            'basket'         => $basket,
+            'user'           => $user,
+            'userId'         => $user->getId(),
+            'paymentId'      => StripeDefinitions::STRIPE_WALLET_PAYMENT_ID,
+            'sessionId'      => $helper->getSessionId(),
+            'shopId'         => $helper->getShopId(),
+            'shopUrl'        => $helper->getShopUrl(),
+            'languageId'     => $helper->getActiveLanguageId(),
+            'captureMode'    => $helper->getCaptureMode(),
+            'conditionTypes' => ['payment_authorized'],
+        ]);
+    }
+
+    /**
+     * Set skip-addr-check flag, dispatch the checkout session event, and persist
+     * session IDs (checkoutSessionId, contractId) returned in the context.
+     *
+     * The skip-addr-check flag must be set BEFORE dispatch so that
+     * Order::validateDeliveryAddress() (called during finalizeOrder inside the
+     * event handlers) recognises this as the legitimate return flow.
+     * It is cleared by clearStripeSessionVariables() on completion or cancellation.
+     */
+    private function dispatchSessionEvent(ControllerRequestHelper $helper, EventContext $context): void
+    {
+        $helper->setSessionVariable(ControllerRequestHelper::SESSION_SKIP_ADDR_CHECK, true);
+        $event = new StripeCheckoutSessionRequestEvent($context);
+        $this->getEventDispatcher()->dispatch($event);
+
+        if ($sessionId = $context->get('checkoutSessionId')) {
+            $helper->setSessionVariable('stripe_checkout_session_id', $sessionId);
+        }
+        if ($contractId = $context->get('contractId')) {
+            $helper->setSessionVariable('stripe_contract_id', $contractId);
+        }
+    }
+
+    /**
+     * Write the JSON body with checkoutSessionId, checkoutUrl, and contractId.
+     */
+    private function emitSessionResponse(EventContext $context): void
+    {
+        echo json_encode([
+            'id'          => $context->get('checkoutSessionId'),
+            'url'         => $context->get('checkoutUrl'),
+            'contract_id' => $context->get('contractId'),
+        ]);
     }
 
     /**

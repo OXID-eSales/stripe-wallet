@@ -42,19 +42,8 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
     {
         try {
             [$basket, $user] = $this->validateBasketAndUser($request);
-
-            if ($request->orderRemark !== null) {
-                Registry::getSession()->setVariable('ordRem', $request->orderRemark);
-            }
-
-            /** @var Order $order */
-            $order = oxNew(Order::class);
-            /** @var int $orderState */
-            $orderState = $order->finalizeOrder($basket, $user, false);
-
-            $this->validateOrderState($orderState, $request, $basket);
+            [$order, $orderState] = $this->finalizeAndValidateOrder($basket, $user, $request);
             $this->setOrderFieldsAfterCreation($order, $request);
-
             return $this->buildOrderResponse($order, $basket, $user, $orderState, $request);
         } catch (ShopOrderException $e) {
             throw $e;
@@ -69,6 +58,34 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
                 previous: $e
             );
         }
+    }
+
+    /**
+     * Finalize the order via OXID and validate its resulting state.
+     *
+     * Stores the order remark in session if provided, calls finalizeOrder(),
+     * and delegates state validation to validateOrderState().
+     *
+     * @return array{Order, int} The finalized order and its OXID state code
+     * @throws ShopOrderException on invalid order state
+     */
+    private function finalizeAndValidateOrder(
+        Basket $basket,
+        User $user,
+        CreateOrderRequest $request
+    ): array {
+        if ($request->orderRemark !== null) {
+            Registry::getSession()->setVariable('ordRem', $request->orderRemark);
+        }
+
+        /** @var Order $order */
+        $order = oxNew(Order::class);
+        /** @var int $orderState */
+        $orderState = $order->finalizeOrder($basket, $user, false);
+
+        $this->validateOrderState($orderState, $request, $basket);
+
+        return [$order, $orderState];
     }
 
     /**
