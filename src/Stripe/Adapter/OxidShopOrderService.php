@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Adapter;
 
 use DateTimeImmutable;
+use Exception;
 use OxidEsales\Eshop\Application\Model\Basket;
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Application\Model\User;
@@ -18,6 +19,7 @@ use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
 use OxidEsales\PaymentBase\Adapter\Request\CreateOrderRequest;
 use OxidEsales\PaymentBase\Adapter\Response\OrderResponse;
 use OxidEsales\PaymentBase\Adapter\Exception\ShopOrderException;
+use Throwable;
 
 /**
  * OXID eShop implementation of ShopOrderServiceInterface.
@@ -47,7 +49,7 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
             return $this->buildOrderResponse($order, $basket, $user, $orderState, $request);
         } catch (ShopOrderException $e) {
             throw $e;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             throw new ShopOrderException(
                 message: 'Unexpected error during order creation: ' . $e->getMessage(),
                 errorCode: 'unexpected_error',
@@ -165,6 +167,7 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
         }
 
         $errorCode = $this->mapOrderStateToErrorCode($orderState);
+        $basketPrice = $basket->getPrice();
         Registry::getLogger()->error('OxidShopOrderService: Order finalization failed', [
             'order_state' => $orderState,
             'error_code' => $errorCode,
@@ -172,7 +175,8 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
             'user_id' => $request->userId,
             'payment_id' => $request->paymentId,
             'basket_count' => $basket->getProductsCount(),
-            'basket_total' => $basket->getPrice()->getBruttoPrice(),
+            // @phpstan-ignore ternary.alwaysTrue (OXID Basket::getPrice() PHPDoc is non-nullable, but defensive)
+            'basket_total' => $basketPrice ? (float) $basketPrice->getBruttoPrice() : 0.0,
         ]);
         throw new ShopOrderException(
             message: 'Order finalization failed with state: ' . $orderState . ' (' . $errorCode . ')',
@@ -318,7 +322,7 @@ final class OxidShopOrderService implements ShopOrderServiceInterface
         if ($dateStr && is_string($dateStr)) {
             try {
                 return new DateTimeImmutable($dateStr);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Fallback to current time if date parsing fails
             }
         }

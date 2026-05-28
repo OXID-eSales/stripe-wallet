@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
+use RuntimeException;
 
 /**
  * Service for generating and validating secure tokens for contract identification in URLs.
@@ -44,7 +45,7 @@ final class ContractTokenService implements TokenServiceInterface
             $apiSecret = $this->configService->getWebhookSecret();
         }
         if (empty($apiSecret)) {
-            throw new \RuntimeException(
+            throw new RuntimeException(
                 'Stripe contract token service requires a configured API secret key or webhook secret. '
                 . 'Configure sStripeTestToken/sStripeLiveToken or sStripeWebhookEndpointSecret in module settings.'
             );

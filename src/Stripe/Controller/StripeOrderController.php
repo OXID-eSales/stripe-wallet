@@ -6,6 +6,8 @@ namespace OxidEsales\Payments\Stripe\Controller;
 
 use OxidEsales\Eshop\Application\Controller\OrderController;
 use OxidEsales\Eshop\Core\Registry;
+use RuntimeException;
+use Throwable;
 use OxidEsales\PaymentBase\Controller\CheckoutReturnResponder;
 use OxidEsales\PaymentBase\Controller\HandlesCheckoutReturn;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
@@ -89,7 +91,7 @@ class StripeOrderController extends OrderController
         try {
             $cleanupService = $this->getServiceFromContainer(RetryCleanupService::class);
             $cleanupService->cleanupPreviousAttempt($contractId);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Registry::getLogger()->error('STRP-105: Order page cleanup failed', [
                 'error' => $e->getMessage(),
             ]);
@@ -178,7 +180,7 @@ class StripeOrderController extends OrderController
             $context = $this->buildCheckoutEventContext($helper);
             $this->dispatchSessionEvent($helper, $context);
             $this->emitSessionResponse($context);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->setHttpResponseCode(500);
             $helper->logError('createCheckoutSession failed', $e);
             echo json_encode(['error' => 'Payment processing failed. Please try again.']);
@@ -190,23 +192,23 @@ class StripeOrderController extends OrderController
     /**
      * Validate API key, basket, and user before creating the checkout context.
      *
-     * @throws \RuntimeException on any precondition failure
+     * @throws RuntimeException on any precondition failure
      */
     private function validateCheckoutPreconditions(ControllerRequestHelper $helper): void
     {
         $validator = $this->getServiceFromContainer(ConfigurationValidatorInterface::class);
         $keyValidationError = $validator->getKeyValidationError();
         if ($keyValidationError !== null) {
-            throw new \RuntimeException('Stripe configuration error: ' . $keyValidationError);
+            throw new RuntimeException('Stripe configuration error: ' . $keyValidationError);
         }
 
         $basket = $helper->getBasketFromSession();
         if ($basket->getProductsCount() === 0) {
-            throw new \RuntimeException('Basket is empty');
+            throw new RuntimeException('Basket is empty');
         }
 
         if ($this->getUser() === null) {
-            throw new \RuntimeException('User not found');
+            throw new RuntimeException('User not found');
         }
     }
 
@@ -215,7 +217,7 @@ class StripeOrderController extends OrderController
      *
      * Validates preconditions first, then assembles context data.
      *
-     * @throws \RuntimeException when API key, basket, or user is invalid
+     * @throws RuntimeException when API key, basket, or user is invalid
      */
     private function buildCheckoutEventContext(ControllerRequestHelper $helper): EventContext
     {
@@ -225,7 +227,7 @@ class StripeOrderController extends OrderController
         $user   = $this->getUser();
 
         if ($user === null) {
-            throw new \RuntimeException('User not found');
+            throw new RuntimeException('User not found');
         }
 
         return new EventContext([
@@ -436,7 +438,7 @@ class StripeOrderController extends OrderController
             try {
                 $cleanupService = $this->getServiceFromContainer(RetryCleanupService::class);
                 $cleanupService->cleanupPreviousAttempt($contractId);
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 $helper->logError('checkoutCancel cleanup failed', $e);
             }
             $helper->clearStripeSessionVariables();

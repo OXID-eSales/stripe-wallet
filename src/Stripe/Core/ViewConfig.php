@@ -119,7 +119,11 @@ class ViewConfig extends ViewConfig_parent
 
 
     /**
-     * @TODO probably needs to be enhanced, more values should be checked
+     * Check if Stripe Checkout is active and ready to present to the customer.
+     *
+     * Currently checks only for a non-empty publishable key. A fully-configured
+     * module also requires a webhook secret — if stricter checks are needed in
+     * future, extend to call `$config->isConfigured()` instead.
      *
      * @return bool
      */

@@ -159,7 +159,12 @@ class ModuleConfiguration extends ModuleConfiguration_parent
     }
 
     /**
-     * @TODO Find a more descriptive name for this method
+     * Returns true when the admin edit context is the Stripe module itself.
+     *
+     * Used by the module_config template to conditionally render Stripe-specific
+     * settings panels. The name `stripeIsStripe` is load-bearing in the Twig
+     * template (module_config.html.twig:239) and must not be changed without
+     * updating the template reference.
      *
      * @return bool
      */

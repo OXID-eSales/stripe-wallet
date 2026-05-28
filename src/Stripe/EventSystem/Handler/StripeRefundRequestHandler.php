@@ -17,6 +17,7 @@ use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use Throwable;
 
 /**
  * Handles refund requests via Stripe API (full and partial).
@@ -75,7 +76,7 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
             ]);
             $this->processRefund($event, $context);
             $this->logEvent('StripeRefundRequestHandler::handle() END - SUCCESS');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->logEvent('StripeRefundRequestHandler: EXCEPTION', [
                 'error' => $e->getMessage(),
             ]);
@@ -236,7 +237,7 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
     }
 
     private function handleException(
-        \Throwable $e,
+        Throwable $e,
         EventContext $context,
         StripeRefundRequestEvent $event
     ): void {
@@ -256,7 +257,7 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
      *
      * Sprint 8: Now delegates to RequestLogService (Facade pattern).
      */
-    private function logExceptionToRequestLog(\Throwable $e, StripeRefundRequestEvent $event): void
+    private function logExceptionToRequestLog(Throwable $e, StripeRefundRequestEvent $event): void
     {
         $orderId = $event->getOrderId();
         if ($orderId === null) {

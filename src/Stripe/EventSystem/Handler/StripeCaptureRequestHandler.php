@@ -16,6 +16,7 @@ use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use Throwable;
 
 /**
  * Handles capture requests for Stripe authorized payments.
@@ -72,7 +73,7 @@ class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
             ]);
             $this->processCapture($event, $context);
             $this->logEvent('StripeCaptureRequestHandler::handle() END - SUCCESS');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->logEvent('StripeCaptureRequestHandler: EXCEPTION', [
                 'error' => $e->getMessage(),
             ]);
@@ -266,7 +267,7 @@ class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
     }
 
     private function handleException(
-        \Throwable $e,
+        Throwable $e,
         EventContext $context,
         StripeCaptureRequestEvent $event
     ): void {
@@ -287,7 +288,7 @@ class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
      *
      * Sprint 8: Now delegates to RequestLogService (Facade pattern).
      */
-    private function logExceptionToRequestLog(\Throwable $e, StripeCaptureRequestEvent $event): void
+    private function logExceptionToRequestLog(Throwable $e, StripeCaptureRequestEvent $event): void
     {
         $referenceId = $event->getContractId() ?? $event->getOrderId() ?? '';
         if ($referenceId === '') {

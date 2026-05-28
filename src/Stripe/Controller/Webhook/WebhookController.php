@@ -10,6 +10,8 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Controller\Webhook;
 
 use DateTimeImmutable;
+use Exception;
+use Throwable;
 use OxidEsales\Eshop\Application\Controller\FrontendController;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
@@ -50,7 +52,7 @@ class WebhookController extends FrontendController
         try {
             $this->processor = $container->get(StripeWebhookProcessor::class);
             $this->webhookLogger = $container->get(WebhookLogServiceInterface::class);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Registry::getLogger()->error('Webhook services not available', [
                 'error' => $e->getMessage(),
             ]);
@@ -59,7 +61,7 @@ class WebhookController extends FrontendController
         try {
             $guard = $container->get(WebhookRequestGuardInterface::class);
             $this->guard = $guard instanceof WebhookRequestGuardInterface ? $guard : null;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Registry::getLogger()->warning('Webhook guard chain unavailable — processing without rate limiting/IP checks', [
                 'error' => $e->getMessage(),
             ]);
@@ -69,7 +71,7 @@ class WebhookController extends FrontendController
             /** @var RetryCleanupService $cleanupService */
             $cleanupService = $container->get(RetryCleanupService::class);
             $this->cleanupService = $cleanupService;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Registry::getLogger()->warning('Stale-order cleanup service unavailable', [
                 'error' => $e->getMessage(),
             ]);
@@ -193,7 +195,7 @@ class WebhookController extends FrontendController
             if ($cleaned > 0) {
                 Registry::getLogger()->info('Cleaned up ' . $cleaned . ' stale NOT_FINISHED order(s)');
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Registry::getLogger()->warning('Stale order cleanup failed', [
                 'error' => $e->getMessage(),
             ]);

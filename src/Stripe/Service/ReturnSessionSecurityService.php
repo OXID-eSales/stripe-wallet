@@ -115,22 +115,24 @@ final class ReturnSessionSecurityService implements ReturnSecurityValidatorInter
         $originalCountry = $contract->getMetadata('user_country');
         $currentCountry = $currentContext['country'] ?? null;
 
-        if ($originalCountry !== null && $currentCountry !== null) {
-            if ($originalCountry !== $currentCountry) {
-                // Country changed - heavy penalty
-                $score -= self::PENALTY_COUNTRY_CHANGED;
-                $warnings[] = 'country_changed';
-            } else {
-                // Same country - moderate penalty
-                $score -= self::PENALTY_IP_CHANGED;
-                $score += self::PENALTY_IP_SAME_COUNTRY; // Partial restoration
-                $warnings[] = 'ip_changed_same_country';
-            }
-        } else {
-            // Can't determine country - standard IP change penalty
-            $score -= self::PENALTY_IP_CHANGED;
-            $warnings[] = 'ip_changed';
+        if ($originalCountry !== null && $currentCountry !== null && $originalCountry !== $currentCountry) {
+            // Country changed - heavy penalty
+            $score -= self::PENALTY_COUNTRY_CHANGED;
+            $warnings[] = 'country_changed';
+            return [$score, $warnings];
         }
+
+        if ($originalCountry !== null && $currentCountry !== null) {
+            // Same country - moderate penalty (partial restoration)
+            $score -= self::PENALTY_IP_CHANGED;
+            $score += self::PENALTY_IP_SAME_COUNTRY;
+            $warnings[] = 'ip_changed_same_country';
+            return [$score, $warnings];
+        }
+
+        // Can't determine country - standard IP change penalty
+        $score -= self::PENALTY_IP_CHANGED;
+        $warnings[] = 'ip_changed';
 
         return [$score, $warnings];
     }
@@ -159,11 +161,14 @@ final class ReturnSessionSecurityService implements ReturnSecurityValidatorInter
         if ($elapsed >= self::VERY_LATE_THRESHOLD) {
             $score -= self::PENALTY_VERY_LATE_RETURN;
             $warnings[] = 'very_late_return';
-        } elseif ($elapsed >= self::SLOW_RETURN_THRESHOLD) {
+            return [$score, $warnings];
+        }
+
+        if ($elapsed >= self::SLOW_RETURN_THRESHOLD) {
             $score -= self::PENALTY_SLOW_RETURN;
             $warnings[] = 'slow_return';
         }
-        // Quick return (< 15 min) - no penalty
+        // Quick return (< SLOW_RETURN_THRESHOLD) - no penalty
 
         return [$score, $warnings];
     }

@@ -6,6 +6,7 @@ namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 
 /**
@@ -78,7 +79,7 @@ class RetryCleanupService
         return $cleaned;
     }
 
-    private function cancelContractAndDeleteOrder(?\OxidEsales\PaymentBase\Contract\PaymentContractInterface $contract): bool
+    private function cancelContractAndDeleteOrder(?PaymentContractInterface $contract): bool
     {
         if (!$contract instanceof PaymentContract) {
             return false;

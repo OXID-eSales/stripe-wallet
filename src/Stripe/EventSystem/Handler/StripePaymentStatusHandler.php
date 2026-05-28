@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
+use OxidEsales\PaymentBase\Adapter\Response\PaymentDetailsResponse;
 use OxidEsales\PaymentBase\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
@@ -113,7 +114,7 @@ class StripePaymentStatusHandler implements HandlerInterface
 
     private function handleSuccess(
         EventContext $context,
-        \OxidEsales\PaymentBase\Adapter\Response\PaymentDetailsResponse $paymentDetails,
+        PaymentDetailsResponse $paymentDetails,
         string $paymentIntentId
     ): void {
         // Dispatch PaymentAuthorizedEvent to trigger condition fulfillment
@@ -135,7 +136,7 @@ class StripePaymentStatusHandler implements HandlerInterface
 
     private function handlePending(
         EventContext $context,
-        \OxidEsales\PaymentBase\Adapter\Response\PaymentDetailsResponse $paymentDetails,
+        PaymentDetailsResponse $paymentDetails,
         string $paymentIntentId
     ): void {
         $stripeStatus = $paymentDetails->providerData['status'] ?? '';
@@ -150,15 +151,16 @@ class StripePaymentStatusHandler implements HandlerInterface
             $context->set('requires3DS', true);
             $context->set('clientSecret', $paymentDetails->providerData['client_secret'] ?? null);
             $context->set('redirectTarget', 'order');
-        } else {
-            // Other pending state - treat as failure
-            $this->handleFailure($context, $paymentDetails);
+            return;
         }
+
+        // Other pending state - treat as failure
+        $this->handleFailure($context, $paymentDetails);
     }
 
     private function handleFailure(
         EventContext $context,
-        \OxidEsales\PaymentBase\Adapter\Response\PaymentDetailsResponse $paymentDetails
+        PaymentDetailsResponse $paymentDetails
     ): void {
         $this->logEvent('StripePaymentStatusHandler: handleFailure', [
             'status' => $paymentDetails->status,

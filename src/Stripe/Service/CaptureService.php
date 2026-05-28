@@ -16,6 +16,7 @@ use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Throwable;
 
 /**
  * Service for capturing Stripe payments.
@@ -131,7 +132,7 @@ final class CaptureService implements CaptureServiceInterface
             ]);
 
             return $response;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->logger->error('Capture failed', [
                 'payment_intent_id' => $paymentIntentId,
                 'error' => $e->getMessage(),
