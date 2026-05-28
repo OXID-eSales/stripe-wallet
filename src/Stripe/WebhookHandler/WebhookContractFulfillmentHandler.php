@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\WebhookHandler;
 
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
-use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Contract\Transaction;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
@@ -49,7 +48,7 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
 
         if ($result === true) {
             $contract = $this->findContractByProviderOrderId($providerOrderId);
-            if ($contract instanceof PaymentContract) {
+            if ($contract !== null) {
                 $this->recordAudit($contract, 'capture', $contract->getCapturedAmount() ?? 0.0);
             }
         }
@@ -75,7 +74,7 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
 
         // Sprint 8 / 114.8: Record refund amount on contract (accumulates for partial refunds).
         // Delegates to ContractRefundRecorder which enforces the FULFILLED guard uniformly.
-        if ($refundAmount > 0.0 && $contract instanceof PaymentContract) {
+        if ($refundAmount > 0.0) {
             $recorder = $this->refundRecorder ?? new ContractRefundRecorder($this->contractRepository);
             $recorder->record($contract, $refundAmount);
             $this->recordAudit($contract, 'refund', $refundAmount);
@@ -100,16 +99,12 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
             return false;
         }
 
-        // Mark contract as failed using the concrete method
-        if ($contract instanceof PaymentContract) {
-            $contract->fail($failureReason);
-            $this->contractRepository->save($contract);
-            $this->mirrorFailureOnLinkedOrder($contract, $failureReason);
-            $this->recordAudit($contract, 'failure', 0.0);
-            return true;
-        }
-
-        return false;
+        // Mark contract as failed
+        $contract->fail($failureReason);
+        $this->contractRepository->save($contract);
+        $this->mirrorFailureOnLinkedOrder($contract, $failureReason);
+        $this->recordAudit($contract, 'failure', 0.0);
+        return true;
     }
 
     /**
@@ -131,19 +126,15 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
             return false;
         }
 
-        // Mark contract as cancelled using the concrete method
-        if ($contract instanceof PaymentContract) {
-            $contract->cancel($cancellationReason);
-            $this->contractRepository->save($contract);
-            $this->mirrorCancellationOnLinkedOrder($contract);
-            $this->recordAudit($contract, 'cancellation', 0.0);
-            return true;
-        }
-
-        return false;
+        // Mark contract as cancelled
+        $contract->cancel($cancellationReason);
+        $this->contractRepository->save($contract);
+        $this->mirrorCancellationOnLinkedOrder($contract);
+        $this->recordAudit($contract, 'cancellation', 0.0);
+        return true;
     }
 
-    private function recordAudit(PaymentContract $contract, string $type, float $amount): void
+    private function recordAudit(PaymentContractInterface $contract, string $type, float $amount): void
     {
         $transaction = new Transaction(
             id: $type . '_' . bin2hex(random_bytes(16)),
@@ -161,7 +152,7 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
         $this->transactionRepository->save($transaction);
     }
 
-    private function mirrorCancellationOnLinkedOrder(PaymentContract $contract): void
+    private function mirrorCancellationOnLinkedOrder(PaymentContractInterface $contract): void
     {
         $orderId = $contract->getOrderId();
         if ($orderId === null || $orderId === '') {
@@ -171,7 +162,7 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
         $this->orderUpdater->markCancelled($orderId);
     }
 
-    private function mirrorFailureOnLinkedOrder(PaymentContract $contract, string $reason): void
+    private function mirrorFailureOnLinkedOrder(PaymentContractInterface $contract, string $reason): void
     {
         $orderId = $contract->getOrderId();
         if ($orderId === null || $orderId === '') {

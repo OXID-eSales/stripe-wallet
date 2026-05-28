@@ -578,6 +578,102 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     }
 
     // =========================================================================
+    // Sprint 114.10a (L3): Parity tests — behaviour must work via interface, not downcast
+    // RED: these fail with the current instanceof-guarded code.
+    // GREEN: they pass after removing the 4 instanceof guards.
+    // =========================================================================
+
+    /**
+     * @test
+     * @group sprint-114-10a
+     * @group l3-downcast
+     */
+    public function handlePaymentFailedWorksWithPaymentContractInterface(): void
+    {
+        $providerOrderId = 'pi_fail_interface';
+
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getState')->willReturn(ContractState::pending());
+        $contract->method('getId')->willReturn('c_fail_iface');
+        $contract->method('getOrderId')->willReturn('o_fail_iface');
+        $contract->method('getCurrency')->willReturn('EUR');
+        $contract->method('getProviderOrderId')->willReturn($providerOrderId);
+        $contract->expects($this->once())->method('fail')->with('card_declined');
+
+        $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
+        $this->contractRepository->expects($this->once())->method('save');
+
+        $result = $this->makeHandler()->handlePaymentFailed($providerOrderId, 'card_declined');
+
+        $this->assertTrue($result);
+    }
+
+    /**
+     * @test
+     * @group sprint-114-10a
+     * @group l3-downcast
+     */
+    public function handlePaymentCanceledWorksWithPaymentContractInterface(): void
+    {
+        $providerOrderId = 'pi_cancel_interface';
+
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getState')->willReturn(ContractState::pending());
+        $contract->method('getId')->willReturn('c_cancel_iface');
+        $contract->method('getOrderId')->willReturn('o_cancel_iface');
+        $contract->method('getCurrency')->willReturn('EUR');
+        $contract->method('getProviderOrderId')->willReturn($providerOrderId);
+        $contract->expects($this->once())->method('cancel')->with('user_requested');
+
+        $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
+        $this->contractRepository->expects($this->once())->method('save');
+
+        $result = $this->makeHandler()->handlePaymentCanceled($providerOrderId, 'user_requested');
+
+        $this->assertTrue($result);
+    }
+
+    /**
+     * @test
+     * @group sprint-114-10a
+     * @group l3-downcast
+     */
+    public function handleChargeRefundedRecordsRefundAmountOnInterface(): void
+    {
+        $providerOrderId = 'pi_refund_interface';
+        $refundAmount = 25.0;
+
+        // Use concrete PaymentContract so we can verify addRefundedAmount was called
+        $snapshot = BasketSnapshot::fromArray([
+            'items' => [],
+            'discounts' => [],
+            'totalGross' => 100.0,
+            'totalNet' => 84.03,
+            'totalVat' => 15.97,
+            'currency' => 'EUR',
+            'capturedAt' => date('Y-m-d H:i:s'),
+        ]);
+
+        $contract = new PaymentContract(1, 'user_refund_iface', $snapshot);
+        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order_refund_iface');
+        $contract->transitionToPending();
+        $contract->setProvider('stripe', $providerOrderId);
+        $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED, ['authId' => 'auth_123']);
+        $contract->commitToOrder('order_refund_iface');
+        $contract->fulfill();
+
+        $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
+        // The recorder will call save when recording
+        $this->contractRepository->expects($this->atLeastOnce())->method('save');
+
+        $result = $this->makeHandler()->handleChargeRefunded($providerOrderId, $refundAmount);
+
+        $this->assertTrue($result);
+        $this->assertEqualsWithDelta($refundAmount, $contract->getRefundedAmount() ?? 0.0, 0.001);
+    }
+
+    // =========================================================================
     // Helper Methods
     // =========================================================================
 
