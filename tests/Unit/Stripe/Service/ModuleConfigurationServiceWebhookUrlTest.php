@@ -10,69 +10,60 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationService;
+use OxidEsales\Payments\Stripe\Service\ModuleDescriptionProvider;
+use OxidEsales\Payments\Stripe\Service\StripeUrlBuilder;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 /**
  * Sprint 109 Step 2.5 — webhook URL must use the SSL form of the shop URL
  * unconditionally, regardless of the scheme of the current admin request.
  *
- * Stripe rejects non-HTTPS webhook URLs with `invalid_request_error`, so
- * `getWebhookUrl()` must not pass through whatever scheme the admin happens
- * to be browsing the OXID backend with.
+ * Sprint 114.11b (S2): ModuleConfigurationService::getWebhookUrl() now delegates
+ * to StripeUrlBuilder (SRP extraction). This test verifies the delegation contract.
+ * URL-construction behaviour is fully covered by StripeUrlBuilderTest.
  *
  * @covers \OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::getWebhookUrl
- * @group sprint-109
  */
 final class ModuleConfigurationServiceWebhookUrlTest extends TestCase
 {
-    public function testWebhookUrlUsesSslSchemeEvenWhenSslBaseUrlReturnsHttps(): void
+    public function testGetWebhookUrlDelegatesToUrlBuilder(): void
     {
-        $service = $this->createServiceWithSslShopUrl('https://shop.example.com/');
+        $expectedUrl = 'https://shop.example.com/index.php?cl=StripeWebhookController';
 
-        $url = $service->getWebhookUrl();
+        $urlBuilder = $this->createMock(StripeUrlBuilder::class);
+        $urlBuilder->method('getWebhookUrl')->willReturn($expectedUrl);
 
-        $this->assertSame('https://shop.example.com/index.php?cl=StripeWebhookController', $url);
+        $service = $this->createServiceWithUrlBuilder($urlBuilder);
+
+        $this->assertSame($expectedUrl, $service->getWebhookUrl());
     }
 
-    public function testWebhookUrlStripsTrailingSlashFromBaseUrl(): void
+    public function testGetWebhookUrlCallsBuilderExactlyOnce(): void
     {
-        $service = $this->createServiceWithSslShopUrl('https://shop.example.com/');
+        $urlBuilder = $this->createMock(StripeUrlBuilder::class);
+        $urlBuilder->expects($this->once())->method('getWebhookUrl')
+            ->willReturn('https://shop.example.com/index.php?cl=StripeWebhookController');
 
-        $this->assertStringStartsWith('https://shop.example.com/index.php', $service->getWebhookUrl());
-        $this->assertStringNotContainsString('//index.php', $service->getWebhookUrl());
+        $service = $this->createServiceWithUrlBuilder($urlBuilder);
+
+        $service->getWebhookUrl();
     }
 
-    /**
-     * The seam: production code must read from the SSL base URL unconditionally.
-     */
-    public function testWebhookUrlUsesSslSchemeUnconditionally(): void
+    private function createServiceWithUrlBuilder(StripeUrlBuilder&MockObject $urlBuilder): ModuleConfigurationService
     {
-        $service = new class extends ModuleConfigurationService {
-            public function __construct()
-            {
-                // Skip parent constructor — keep test free of OXID framework.
-            }
+        $descriptionProvider = $this->createMock(ModuleDescriptionProvider::class);
 
-            protected function getSslShopBaseUrl(): string
-            {
-                return 'https://shop.example.com/';
-            }
-        };
-
-        $this->assertStringStartsWith('https://', $service->getWebhookUrl());
-    }
-
-    private function createServiceWithSslShopUrl(string $sslShopUrl): ModuleConfigurationService
-    {
-        return new class ($sslShopUrl) extends ModuleConfigurationService {
-            public function __construct(private readonly string $stubbedSslUrl)
-            {
-                // Skip parent constructor — keep test free of OXID framework.
-            }
-
-            protected function getSslShopBaseUrl(): string
-            {
-                return $this->stubbedSslUrl;
+        return new class ($urlBuilder, $descriptionProvider) extends ModuleConfigurationService {
+            public function __construct(
+                StripeUrlBuilder $urlBuilder,
+                ModuleDescriptionProvider $descriptionProvider,
+            ) {
+                // Skip OXID bootstrap — pure unit test.
+                // Use reflection to set readonly parent properties.
+                $parent = new \ReflectionClass(parent::class);
+                $parent->getProperty('urlBuilder')->setValue($this, $urlBuilder);
+                $parent->getProperty('descriptionProvider')->setValue($this, $descriptionProvider);
             }
         };
     }

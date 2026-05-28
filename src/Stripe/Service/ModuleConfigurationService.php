@@ -17,29 +17,15 @@ use OxidEsales\Payments\Stripe\Module;
 use Throwable;
 
 /**
- * Service for managing Stripe module configuration settings
+ * Service for managing Stripe module configuration settings.
  *
- * This service acts as a centralized configuration manager for the Stripe module,
- * providing type-safe access to all module settings and credentials.
+ * Single responsibility: typed setting access (read/cast OXID module settings).
  *
- * Responsibilities:
- * - Manages test/live mode switching
- * - Retrieves API keys (publishable and secret) based on current mode
- * - Provides access to webhook configuration
- * - Handles order status mappings
- * - Manages webhook settings
- * - Controls payment method restrictions (country, currency)
- * - Provides transaction logging settings
- *
- * Benefits:
- * - Single source of truth for all configuration
- * - Abstracts away OXID's Config class complexity
- * - Ensures type-safe access to settings
- * - Makes it easy to switch between test and live mode
- * - Reduces code duplication across controllers and services
+ * Sprint 114.11b (S2): URL construction delegated to StripeUrlBuilder;
+ * module-description extraction delegated to ModuleDescriptionProvider.
+ * This service keeps only the typed setting getters + isConfigured().
  *
  * @package OxidEsales\Payments\Stripe\Service
- * @author OXID eSales AG
  * @since 1.0.0
  */
 class ModuleConfigurationService implements ModuleConfigurationServiceInterface
@@ -49,6 +35,8 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     public function __construct(
         private ContextInterface $context,
         private ModuleConfigurationDaoInterface $moduleConfigurationDao,
+        private readonly StripeUrlBuilder $urlBuilder,
+        private readonly ModuleDescriptionProvider $descriptionProvider,
     ) {
         try {
             $this->moduleConfig = $this->moduleConfigurationDao->get(Module::MODULE_ID, $this->context->getCurrentShopId());
@@ -227,24 +215,11 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     /**
      * Get the webhook URL for Stripe configuration.
      *
-     * Always emits an https:// URL. Stripe rejects http endpoints at
-     * WebhookEndpoint::create time, and getCurrentShopUrl()/getShopUrl() will
-     * return whatever scheme the current request used — unreliable for an
-     * outbound URL stripe will dial back into.
+     * Delegates to StripeUrlBuilder (Sprint 114.11b S2 extraction).
      */
     public function getWebhookUrl(): string
     {
-        $shopUrl = $this->getSslShopBaseUrl();
-        return rtrim($shopUrl, '/') . '/index.php?cl=StripeWebhookController';
-    }
-
-    /**
-     * Get the SSL form of the shop URL. Used for outbound URLs that third
-     * parties dial back into (Stripe webhooks, Connect callbacks).
-     */
-    protected function getSslShopBaseUrl(): string
-    {
-        return Registry::getConfig()->getSslShopUrl();
+        return $this->urlBuilder->getWebhookUrl();
     }
 
     /**
@@ -264,21 +239,11 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     /**
      * Returns metadata.php's `description.en` for this module.
      *
-     * Falls back to the first available translation, then to an empty string when
-     * the module is not yet activated (so the registrar can pass an empty string
-     * to Stripe rather than crashing).
+     * Delegates to ModuleDescriptionProvider (Sprint 114.11b S2 extraction).
      */
     public function getModuleDescription(): string
     {
-        if ($this->moduleConfig === null) {
-            return '';
-        }
-        $descriptions = $this->moduleConfig->getDescription();
-        if (isset($descriptions['en']) && is_string($descriptions['en'])) {
-            return $descriptions['en'];
-        }
-        $first = reset($descriptions);
-        return is_string($first) ? $first : '';
+        return $this->descriptionProvider->getModuleDescription();
     }
 
     /**

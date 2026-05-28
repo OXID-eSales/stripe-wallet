@@ -16,6 +16,14 @@ services:
       - 'src/Stripe/Service/WebhookEndpointRegistrationResult.php'
     public: true
 
+  # Sprint 114.11b (S2): Extracted from ModuleConfigurationService — URL construction.
+  OxidEsales\Payments\Stripe\Service\StripeUrlBuilder:
+    public: false
+
+  # Sprint 114.11b (S2): Extracted from ModuleConfigurationService — description extraction.
+  OxidEsales\Payments\Stripe\Service\ModuleDescriptionProvider:
+    public: false
+
   # Sprint 43: Service Interface Aliases (LSP Compliance)
   OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface:
     alias: OxidEsales\Payments\Stripe\Service\ModuleConfigurationService
