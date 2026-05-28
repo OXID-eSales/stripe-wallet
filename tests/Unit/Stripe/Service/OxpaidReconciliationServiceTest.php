@@ -67,10 +67,17 @@ class OxpaidReconciliationServiceTest extends TestCase
 
     /**
      * @test
+     * Verifies the service returns an empty array when no unpaid orders exist.
      */
-    public function serviceCanBeInstantiated(): void
+    public function findUnpaidOrdersReturnsEmptyArrayWhenNoneExist(): void
     {
-        $this->assertInstanceOf(OxpaidReconciliationService::class, $this->service);
+        $this->connection
+            ->method('fetchAllAssociative')
+            ->willReturn([]);
+
+        $result = $this->service->findUnpaidOrders(1);
+
+        $this->assertSame([], $result);
     }
 
     /**

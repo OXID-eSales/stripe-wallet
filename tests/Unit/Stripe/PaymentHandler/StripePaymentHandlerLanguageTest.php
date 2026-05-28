@@ -9,7 +9,7 @@ use OxidEsales\Eshop\Core\Session;
 use OxidEsales\PaymentBase\Adapter\PaymentContextInterface;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
-use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractServiceInterface;
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
@@ -59,7 +59,7 @@ final class StripePaymentHandlerLanguageTest extends TestCase
         $this->tokenService->method('generateToken')->willReturn('tok_abc');
 
         $this->contractService->method('createContract')
-            ->willReturn($this->createMock(PaymentContract::class));
+            ->willReturn($this->createMock(PaymentContractInterface::class));
 
         // Stub OXID session — handler reads its id when composing URLs.
         $session = $this->createMock(Session::class);

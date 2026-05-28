@@ -63,8 +63,7 @@ class RequestLogServiceTest extends TestCase
             referenceId: 'order_123',
             shopId: 1
         );
-
-        $this->assertTrue(true);
+        // Assertion: fileLogger->log() was called exactly once (verified by expects($this->once()) above)
     }
 
     public function testLogExceptionDoesNotThrowOnSuccess(): void
@@ -91,8 +90,7 @@ class RequestLogServiceTest extends TestCase
             referenceId: 'order_123',
             shopId: 1
         );
-
-        $this->assertTrue(true);
+        // Assertion: fileLogger->log() was called exactly once (verified by expects($this->once()) above)
     }
 
     public function testLogRequestHandlesLoggingFailureGracefully(): void

@@ -7,7 +7,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 use DateTimeImmutable;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\ContractState;
-use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Adapter\Response\CaptureResponse;
@@ -65,11 +65,10 @@ class StripeCaptureRequestHandlerTest extends TestCase
     {
         $otherEvent = new \stdClass();
 
-        // Should not throw, just return
-        $this->handler->handle($otherEvent);
+        $this->captureService->expects($this->never())->method('processCapture');
+        $this->captureService->expects($this->never())->method('processDirectCapture');
 
-        // No exception means success
-        $this->assertTrue(true);
+        $this->handler->handle($otherEvent);
     }
 
     public function testHandleSetsErrorWhenPaymentIntentIdMissingInDirectMode(): void
@@ -389,7 +388,7 @@ class StripeCaptureRequestHandlerTest extends TestCase
         ]);
         $event = new StripeCaptureRequestEvent($context);
 
-        $contract = $this->createMock(PaymentContract::class);
+        $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getState')->willReturn(ContractState::authorized());
         $contract->method('getProviderOrderId')->willReturn('pi_auth_test');
 
@@ -614,7 +613,7 @@ class StripeCaptureRequestHandlerTest extends TestCase
         ]);
         $event = new StripeCaptureRequestEvent($context);
 
-        $contract = $this->createMock(PaymentContract::class);
+        $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getState')->willReturn(ContractState::authorized());
         $contract->method('getProviderOrderId')->willReturn('pi_from_contract');
 
@@ -653,7 +652,7 @@ class StripeCaptureRequestHandlerTest extends TestCase
         ]);
         $event = new StripeCaptureRequestEvent($context);
 
-        $contract = $this->createMock(PaymentContract::class);
+        $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getState')->willReturn(ContractState::authorized());
         $contract->method('getProviderOrderId')->willReturn(null);
 
@@ -808,21 +807,21 @@ class StripeCaptureRequestHandlerTest extends TestCase
     // --- Helper methods ---
 
     /**
-     * @return PaymentContract&MockObject
+     * @return PaymentContractInterface&MockObject
      */
-    private function createContractInState(ContractState $state): PaymentContract&MockObject
+    private function createContractInState(ContractState $state): PaymentContractInterface&MockObject
     {
-        $contract = $this->createMock(PaymentContract::class);
+        $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getState')->willReturn($state);
         return $contract;
     }
 
     /**
-     * @return PaymentContract&MockObject
+     * @return PaymentContractInterface&MockObject
      */
-    private function createAuthorizedContractWithPaymentIntent(string $paymentIntentId): PaymentContract&MockObject
+    private function createAuthorizedContractWithPaymentIntent(string $paymentIntentId): PaymentContractInterface&MockObject
     {
-        $contract = $this->createMock(PaymentContract::class);
+        $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getState')->willReturn(ContractState::authorized());
         $contract->method('getProviderOrderId')->willReturn($paymentIntentId);
         $contract->method('getMetadata')->willReturnCallback(function (string $key) {
@@ -834,7 +833,7 @@ class StripeCaptureRequestHandlerTest extends TestCase
     /**
      * Sprint 82: Create a contract in COMMITTED state with PaymentIntent ID.
      *
-     * @return PaymentContract&MockObject
+     * @return PaymentContractInterface&MockObject
      */
     /**
      * S7 (sprint-114.11a): Priority is config-driven via the services.yaml tag.
@@ -849,9 +848,9 @@ class StripeCaptureRequestHandlerTest extends TestCase
         );
     }
 
-    private function createCommittedContractWithPaymentIntent(string $paymentIntentId): PaymentContract&MockObject
+    private function createCommittedContractWithPaymentIntent(string $paymentIntentId): PaymentContractInterface&MockObject
     {
-        $contract = $this->createMock(PaymentContract::class);
+        $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getState')->willReturn(ContractState::committed());
         $contract->method('getProviderOrderId')->willReturn($paymentIntentId);
         $contract->method('getMetadata')->willReturnCallback(function (string $key) {

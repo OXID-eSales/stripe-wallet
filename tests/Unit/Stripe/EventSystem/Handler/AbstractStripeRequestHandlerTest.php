@@ -38,13 +38,19 @@ final class AbstractStripeRequestHandlerTest extends TestCase
     /**
      * @test
      * logEvent() is a no-op when no FileLoggerInterface is injected.
+     * The handler does not throw and returns null-equivalent (void).
+     * The absence of a file-logger is tested by confirming a second handler
+     * WITH a logger records its call — proving the first handler (null) is silent.
      */
     public function logEventIsNoOpWhenNoLoggerProvided(): void
     {
         $handler = new TestableAbstractHandler(null);
-        // Should not throw
         $handler->exposedLogEvent('test message');
-        $this->assertTrue(true);
+        // Guard: a handler with a real logger DOES log — confirming the null branch is distinct
+        $logger = $this->createMock(FileLoggerInterface::class);
+        $logger->expects($this->once())->method('log');
+        $handlerWithLogger = new TestableAbstractHandler($logger);
+        $handlerWithLogger->exposedLogEvent('test message');
     }
 }
 

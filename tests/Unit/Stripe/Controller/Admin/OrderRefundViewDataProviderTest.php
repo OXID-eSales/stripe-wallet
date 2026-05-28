@@ -16,6 +16,7 @@ use OxidEsales\Payments\Stripe\Admin\StripeTransactionHistoryBuilder;
 use OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider;
 use OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
+use OxidEsales\Payments\Stripe\Service\StripeChargeAmountResolver;
 use OxidEsales\Payments\Stripe\Service\StripeOrderApiService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -27,120 +28,129 @@ use PHPUnit\Framework\TestCase;
  * StripeOrderApiService is final — mocking it directly is not possible. The test
  * uses a testable subclass of OrderRefundViewDataProvider that overrides
  * getLastCharge() to return a controlled fixture charge, eliminating any real
- * API or framework dependency. The ChargeAmountResolverInterface is injected
- * via constructor and stubbed per-test.
+ * API or framework dependency.
+ *
+ * T3 fix (Sprint 114.13): regression tests for the partial-capture formula now
+ * inject the real StripeChargeAmountResolver so the fixture charge numbers
+ * actually drive the result. Delegation-only tests retain a mock resolver.
  *
  * @covers \OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider
  */
 final class OrderRefundViewDataProviderTest extends TestCase
 {
-    private ChargeAmountResolverInterface&MockObject $resolver;
+    private ChargeAmountResolverInterface&MockObject $mockResolver;
+    private StripeChargeAmountResolver $realResolver;
 
     protected function setUp(): void
     {
-        $this->resolver = $this->createMock(ChargeAmountResolverInterface::class);
+        $this->mockResolver = $this->createMock(ChargeAmountResolverInterface::class);
+        $this->realResolver = new StripeChargeAmountResolver();
     }
+
+    // --- Regression tests: real resolver, fixture numbers drive the result ---
 
     public function testRemainingRefundableRawForFullCaptureNoRefundReturnsCapturedAmount(): void
     {
-        // Arrange — full capture, no refund: available = 100.0
+        // Full capture, no refund: 10000 cents / 100 = 100.0 EUR
         $charge = $this->buildCharge(amount: 10000, amountCaptured: 10000, amountRefunded: 0);
-        $this->resolver->method('availableForRefund')->willReturn(100.0);
-        $provider = $this->createProviderWithCharge($charge);
+        $provider = $this->createProviderWithChargeAndRealResolver($charge);
 
-        // Act
         $result = $provider->getRemainingRefundableRaw($this->createMock(Order::class));
 
-        // Assert
         self::assertSame(100.0, $result);
     }
 
     public function testRemainingRefundableRawForFullCaptureWithCustomerRefundReturnsResidual(): void
     {
-        // Arrange — full capture, 30 EUR customer refund: available = 70.0
+        // Full capture (10000 cents), 3000 cents customer refund → 70.0 EUR available
         $charge = $this->buildCharge(amount: 10000, amountCaptured: 10000, amountRefunded: 3000);
-        $this->resolver->method('availableForRefund')->willReturn(70.0);
-        $provider = $this->createProviderWithCharge($charge);
+        $provider = $this->createProviderWithChargeAndRealResolver($charge);
 
-        // Act
         $result = $provider->getRemainingRefundableRaw($this->createMock(Order::class));
 
-        // Assert
         self::assertSame(70.0, $result);
     }
 
+    /**
+     * Regression for the partial-capture bug: Stripe encodes the released
+     * (uncaptured) portion as amount_refunded. The pre-fix formula produced
+     * (10000 − 29700) / 100 = −197.0. With the corrected formula the fixture
+     * should yield 100.0 — exactly the captured amount, with no customer refund.
+     */
     public function testRemainingRefundableRawForPartialCaptureNoCustomerRefundReturnsCapturedAmount(): void
     {
-        // Arrange — partial capture 397→100, Stripe encodes 297 release as amount_refunded.
-        // Pre-fix: (10000 − 29700) / 100 = −197.0. Post-fix: available = 100.0.
+        // 397 EUR originally authorized, 100 EUR captured, 297 EUR auto-released
         $charge = $this->buildCharge(amount: 39700, amountCaptured: 10000, amountRefunded: 29700);
-        $this->resolver->method('availableForRefund')->willReturn(100.0);
-        $provider = $this->createProviderWithCharge($charge);
+        $provider = $this->createProviderWithChargeAndRealResolver($charge);
 
-        // Act
         $result = $provider->getRemainingRefundableRaw($this->createMock(Order::class));
 
-        // Assert — regression case: must return 100.0, not −197.0
-        self::assertSame(100.0, $result);
+        self::assertSame(100.0, $result, 'Pre-fix would have returned -197.0');
     }
 
     public function testRemainingRefundableRawForPartialCaptureWithCustomerRefundReturnsResidual(): void
     {
-        // Arrange — partial capture 397→100, then 50 EUR customer refund: available = 50.0
+        // 397 EUR authorized, 100 EUR captured, 297 EUR auto-released + 50 EUR customer refund
         $charge = $this->buildCharge(amount: 39700, amountCaptured: 10000, amountRefunded: 34700);
-        $this->resolver->method('availableForRefund')->willReturn(50.0);
-        $provider = $this->createProviderWithCharge($charge);
+        $provider = $this->createProviderWithChargeAndRealResolver($charge);
 
-        // Act
         $result = $provider->getRemainingRefundableRaw($this->createMock(Order::class));
 
-        // Assert
         self::assertSame(50.0, $result);
     }
 
     public function testIsOrderRefundableTrueForPartialCaptureNoCustomerRefund(): void
     {
-        // Arrange — partial capture, no customer refund: available = 100.0 → refundable
         $charge = $this->buildCharge(amount: 39700, amountCaptured: 10000, amountRefunded: 29700);
-        $this->resolver->method('availableForRefund')->willReturn(100.0);
-        $provider = $this->createProviderWithCharge($charge);
+        $provider = $this->createProviderWithChargeAndRealResolver($charge);
 
-        // Act
-        $result = $provider->isOrderRefundable($this->createMock(Order::class));
-
-        // Assert
-        self::assertTrue($result);
+        self::assertTrue($provider->isOrderRefundable($this->createMock(Order::class)));
     }
 
     public function testIsOrderRefundableFalseWhenCaptureFullyRefundedToCustomer(): void
     {
-        // Arrange — full capture, full customer refund: available = 0.0 → not refundable
         $charge = $this->buildCharge(amount: 10000, amountCaptured: 10000, amountRefunded: 10000);
-        $this->resolver->method('availableForRefund')->willReturn(0.0);
-        $provider = $this->createProviderWithCharge($charge);
+        $provider = $this->createProviderWithChargeAndRealResolver($charge);
 
-        // Act
-        $result = $provider->isOrderRefundable($this->createMock(Order::class));
+        self::assertFalse($provider->isOrderRefundable($this->createMock(Order::class)));
+    }
 
-        // Assert
-        self::assertFalse($result);
+    // --- Delegation test: verifies getRemainingRefundableRaw passes charge to the resolver ---
+
+    public function testRemainingRefundableRawDelegatesToInjectedResolver(): void
+    {
+        $charge = $this->buildCharge(amount: 10000, amountCaptured: 5000, amountRefunded: 0);
+        $this->mockResolver->expects($this->once())
+            ->method('availableForRefund')
+            ->with($this->equalTo($charge))
+            ->willReturn(50.0);
+        $provider = $this->createProviderWithCharge($charge, $this->mockResolver);
+
+        $result = $provider->getRemainingRefundableRaw($this->createMock(Order::class));
+
+        self::assertSame(50.0, $result);
     }
 
     public function testIsOrderRefundableFalseWhenChargeIsNull(): void
     {
-        // Arrange — no charge available (network error or no transaction ID)
-        $provider = $this->createProviderWithCharge(null);
+        // No charge available (network error or no transaction ID)
+        $provider = $this->createProviderWithCharge(null, $this->mockResolver);
 
-        // Act
-        $result = $provider->isOrderRefundable($this->createMock(Order::class));
-
-        // Assert
-        self::assertFalse($result);
+        self::assertFalse($provider->isOrderRefundable($this->createMock(Order::class)));
     }
 
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Builds a provider backed by the real StripeChargeAmountResolver.
+     * The fixture charge's minor-unit values drive the computed result.
+     */
+    private function createProviderWithChargeAndRealResolver(?StripeChargeDto $charge): OrderRefundViewDataProvider
+    {
+        return $this->createProviderWithCharge($charge, $this->realResolver);
+    }
 
     /**
      * Creates a testable subclass of OrderRefundViewDataProvider that returns
@@ -153,12 +163,13 @@ final class OrderRefundViewDataProviderTest extends TestCase
      *
      * Sprint 114.10b: migrated from \Stripe\Charge to StripeChargeDto.
      */
-    private function createProviderWithCharge(?StripeChargeDto $charge): OrderRefundViewDataProvider
-    {
+    private function createProviderWithCharge(
+        ?StripeChargeDto $charge,
+        ChargeAmountResolverInterface $resolver
+    ): OrderRefundViewDataProvider {
         $adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
         $adapterFactory->method('getStripeAdapter')->willReturn($this->createMock(StripeAdapterInterface::class));
         $apiService = new StripeOrderApiService($adapterFactory);
-        $resolver   = $this->resolver;
 
         return new class ($apiService, $resolver, $charge) extends OrderRefundViewDataProvider {
             public function __construct(
