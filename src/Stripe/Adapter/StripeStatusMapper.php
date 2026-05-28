@@ -9,26 +9,35 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Adapter;
 
+use OxidEsales\PaymentBase\Adapter\Response\NormalizedPaymentStatus;
+
 /**
  * Maps Stripe PaymentIntent statuses to normalized payment statuses.
  *
  * Provides bidirectional mapping between Stripe-specific statuses
  * and provider-agnostic normalized statuses.
  *
+ * Sprint 114.10a (A2): Normalized status constants are now canonical in
+ * {@see NormalizedPaymentStatus} (payment-base). The STATUS_* aliases below
+ * are preserved for backwards compatibility so every existing reader keeps
+ * working with zero edits.
+ *
  * @since 1.0.0
  */
 final class StripeStatusMapper
 {
     /**
-     * Normalized payment statuses used across all providers.
+     * Normalized payment statuses — delegates to the canonical payment-base constants.
+     *
+     * @see NormalizedPaymentStatus for the single source of truth.
      */
-    public const STATUS_PENDING = 'pending';
-    public const STATUS_AUTHORIZED = 'authorized';
-    public const STATUS_CAPTURED = 'captured';
-    public const STATUS_FAILED = 'failed';
-    public const STATUS_CANCELLED = 'cancelled';
-    public const STATUS_REFUNDED = 'refunded';
-    public const STATUS_PARTIALLY_REFUNDED = 'partially_refunded';
+    public const STATUS_PENDING = NormalizedPaymentStatus::PENDING;
+    public const STATUS_AUTHORIZED = NormalizedPaymentStatus::AUTHORIZED;
+    public const STATUS_CAPTURED = NormalizedPaymentStatus::CAPTURED;
+    public const STATUS_FAILED = NormalizedPaymentStatus::FAILED;
+    public const STATUS_CANCELLED = NormalizedPaymentStatus::CANCELLED;
+    public const STATUS_REFUNDED = NormalizedPaymentStatus::REFUNDED;
+    public const STATUS_PARTIALLY_REFUNDED = NormalizedPaymentStatus::PARTIALLY_REFUNDED;
 
     /**
      * Stripe PaymentIntent statuses.
