@@ -27,6 +27,7 @@ use Psr\Container\ContainerInterface;
  *
  * @group integration
  * @group sprint-93
+ * @group requires-oxid-container
  */
 final class PaymentPanelRegistryIntegrationTest extends TestCase
 {
@@ -36,15 +37,10 @@ final class PaymentPanelRegistryIntegrationTest extends TestCase
     {
         parent::setUp();
 
-        try {
-            $this->container = ContainerFactory::getInstance()->getContainer();
-        } catch (\Throwable $e) {
-            self::markTestSkipped(
-                'OXID container could not be initialised — '
-                . 'integration tests require a fully booted shop. '
-                . 'Error: ' . $e->getMessage()
-            );
-        }
+        // T6 (Sprint 114.13): container boot failure is now a HARD test failure in this
+        // suite. These tests are gated by @group requires-oxid-container and run only
+        // via --testsuite Integration-with-container where a booted shop is guaranteed.
+        $this->container = ContainerFactory::getInstance()->getContainer();
     }
 
     public function testRegistryResolvesStripeProviderByName(): void

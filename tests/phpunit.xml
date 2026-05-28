@@ -20,8 +20,29 @@
     <testsuite name="Unit">
       <directory>Unit/</directory>
     </testsuite>
+    <!-- Default suite: all integration tests except live-Stripe and OXID-container groups.
+         Always runnable inside Docker without extra setup. -->
     <testsuite name="Integration">
       <directory>Integration/</directory>
+      <exclude>Integration/Stripe/Adapter/StripeAdapterIntegrationTest.php</exclude>
+      <exclude>Integration/Stripe/Adapter/Stripe3DSecureIntegrationTest.php</exclude>
+      <exclude>Integration/Stripe/Adapter/StripeAuthorizationFlowIntegrationTest.php</exclude>
+      <exclude>Integration/Stripe/Adapter/StripePaymentMethodIntegrationTest.php</exclude>
+      <exclude>Integration/Admin/PaymentPanelRegistryIntegrationTest.php</exclude>
+      <exclude>Integration/Module/ModuleLifecycleTest.php</exclude>
+    </testsuite>
+    <!-- Live-Stripe suite: ~47 tests hitting the real Stripe sandbox API.
+         Requires STRIPE_TEST_SECRET_KEY set in tests/.env.
+         Run with: phpunit -c extensions/stripe/tests/phpunit.xml Integration-live-stripe -->
+    <testsuite name="Integration-live-stripe">
+      <directory>Integration/Stripe/Adapter/</directory>
+    </testsuite>
+    <!-- OXID-container suite: tests that need a fully booted shop.
+         Run inside Docker after: oe:module:activate oe_payments_stripe_wallet
+         Container-boot failures in this suite are hard errors (not skips). -->
+    <testsuite name="Integration-with-container">
+      <file>Integration/Admin/PaymentPanelRegistryIntegrationTest.php</file>
+      <file>Integration/Module/ModuleLifecycleTest.php</file>
     </testsuite>
   </testsuites>
   <php>

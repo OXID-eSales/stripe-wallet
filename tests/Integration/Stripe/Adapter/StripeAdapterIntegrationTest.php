@@ -26,6 +26,7 @@ use OxidEsales\Payments\Stripe\Tests\Integration\Stripe\StripeIntegrationTestCas
  * @group integration
  * @group stripe
  * @group api
+ * @group requires-stripe-creds
  *
  * @covers \OxidEsales\Payments\Stripe\Adapter\StripeAdapter
  */

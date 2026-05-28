@@ -23,6 +23,7 @@ use Psr\Container\ContainerInterface;
  * @group integration
  * @group module
  * @group lifecycle
+ * @group requires-oxid-container
  *
  * @covers \OxidEsales\Payments\Stripe\Core\ModuleEvents
  */
@@ -39,17 +40,13 @@ class ModuleLifecycleTest extends TestCase
     {
         parent::setUp();
 
-        try {
-            $this->container = ContainerFactory::getInstance()->getContainer();
-            $this->activationService = $this->container->get(ModuleActivationServiceInterface::class);
-            $this->stateService = $this->container->get(ModuleStateServiceInterface::class);
-        } catch (\Throwable $e) {
-            $this->markTestSkipped(
-                'Cannot initialize OXID container. ' .
-                'These tests require a fully initialized OXID shop environment. ' .
-                'Error: ' . $e->getMessage()
-            );
-        }
+        // T6 (Sprint 114.13): container boot failure is now a HARD test failure in this
+        // suite. These tests are gated by @group requires-oxid-container and run only
+        // via --testsuite Integration-with-container where a booted shop is guaranteed.
+        // Any Throwable from ContainerFactory propagates as a test ERROR, not a skip.
+        $this->container = ContainerFactory::getInstance()->getContainer();
+        $this->activationService = $this->container->get(ModuleActivationServiceInterface::class);
+        $this->stateService = $this->container->get(ModuleStateServiceInterface::class);
     }
 
     /**

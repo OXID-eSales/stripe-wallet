@@ -1,132 +1,97 @@
-# Why ~53 integration tests are reported as "Skipped"
+# Integration test suites and gating
 
-On a fresh `docker compose exec php phpunit --testsuite Integration` the tally
-typically reads:
-
-```
-Tests: 157, Assertions: 431, Skipped: 53.
-```
-
-The 53 skips come from three known, intentional sources. None of them indicate
-broken code; each test calls `$this->markTestSkipped(...)` with a specific
-reason when the local environment cannot satisfy its preconditions.
+Sprint 114.13 (T6) reorganised the integration suite to be honest about its
+coverage. The former behaviour — silently skipping ~53 tests so the suite
+reported green while most of the live-Stripe layer didn't execute — is replaced
+by **explicit gating via PHPUnit suite names**.
 
 ---
 
-## 1. Stripe live-credential tests (~40 of the 53)
+## Default suite: `Integration` (~87 tests)
 
-Tests extending `tests/Integration/Stripe/StripeIntegrationTestCase.php`
-exercise the real Stripe PHP SDK against the real Stripe sandbox API (HTTPS
-requests to `api.stripe.com`). They need a working test secret key.
-
-**Skip trigger** (`StripeIntegrationTestCase.php:45`):
-
-```php
-if (empty($this->testSecretKey) || $this->testSecretKey === 'sk_test_your_key_here') {
-    $this->markTestSkipped(
-        'Stripe test credentials not configured. ' .
-        'Set STRIPE_TEST_SECRET_KEY in tests/.env file. ' .
-        'Get test keys from https://dashboard.stripe.com/test/apikeys'
-    );
-}
-```
-
-**To enable:**
-
+Run:
 ```bash
-cp tests/.env.dist tests/.env
-# Edit tests/.env, set STRIPE_TEST_SECRET_KEY=sk_test_…
 docker compose exec php phpunit -c extensions/stripe/tests/phpunit.xml --testsuite Integration
 ```
 
-CI does **not** run these — they would consume Stripe API quota and require
-storing real credentials in CI secrets. They are useful as a manual smoke gate
-when changing the Stripe API call surface.
+Contains all integration tests **except**:
+- live-Stripe adapter tests (the `requires-stripe-creds` group)
+- OXID-container lifecycle tests (the `requires-oxid-container` group)
+
+These are always runnable inside the Docker dev environment with no extra setup.
 
 ---
 
-## 2. OXID-shop-context tests (~10 of the 53)
+## Live-Stripe suite: `Integration-live-stripe` (~47 tests)
 
-Two test files need a fully-booted OXID shop (active module, configured
-database, populated service container):
-
-- `tests/Integration/Admin/PaymentPanelRegistryIntegrationTest.php` (~5 tests)
-- `tests/Integration/Module/ModuleLifecycleTest.php` (~4 tests)
-
-**Skip trigger** (e.g. `PaymentPanelRegistryIntegrationTest.php:42`):
-
-```php
-try {
-    $this->container = ContainerFactory::getInstance()->getContainer();
-} catch (\Throwable $e) {
-    $this->markTestSkipped('OXID container could not be initialised — …');
-}
-```
-
-These pass when the integration suite runs through `make` against a fully
-configured shop (the same setup used by the e2e tests). The skip path fires on
-bare developer environments where the shop isn't fully bootstrapped.
-
----
-
-## 3. Conditional "feature-not-present" tests (1 of the 53)
-
-These tests inspect optional sections of `metadata.php`. When the section is
-absent there is no shape to validate, so the test skips. As of today there is
-exactly **one** such test in the module:
-
-| Test | File | Skip condition |
-|---|---|---|
-| `MetadataTest::testTemplatesDefined` | `tests/Integration/Module/MetadataTest.php:345` | `!isset($this->moduleData['templates'])` — module declares no `templates` section |
-
-```php
-if (!isset($this->moduleData['templates'])) {
-    $this->markTestSkipped('Module does not define templates');
-}
-```
-
-To re‑enable the test, add a `'templates' => [...]` entry to `metadata.php`.
-The other `MetadataTest::*` methods (id, version, title, description,
-controllers, settings, events) are required and do **not** skip — if those
-sections are missing the test fails (which is the desired behaviour).
-
----
-
-## Related: other skip / incomplete sources (not "feature-not-present", but visible in the report)
-
-These don't fall into any of the three categories above, but they appear in
-the test output and are worth knowing about so you can recognise them:
-
-| Site | Reason | Class of skip |
-|---|---|---|
-| `tests/Unit/Stripe/Twig/DumpExtensionTest.php:102` | `'services.yaml not found'` | Test‑helper guard — fires only if the file moves; not a runtime concern |
-| `tests/Unit/Stripe/Twig/DumpExtensionTest.php:119` | `'services.yaml not found'` | Same as above (second test in the same file) |
-| `tests/Unit/Stripe/Model/OrderAddressValidationTest.php:39` | `markTestIncomplete` — "requires OXID framework fully initialized" | The test documents desired behaviour that isn't yet implemented; placeholder |
-| `tests/Integration/Stripe/Adapter/StripeAdapterIntegrationTest.php:367` | `markTestIncomplete('Charge data not available in test mode')` | Stripe's sandbox doesn't populate `Charge::charges` reliably; assertion can't run |
-
-`markTestIncomplete` shows up in the suite tally as `Incomplete: 1` (the
-OrderAddressValidationTest case is the persistent one). The
-StripeAdapterIntegrationTest one only triggers when its containing test runs
-(requires Stripe credentials — see §1).
-
----
-
-## What to do if you see more than 53 skips
-
-A growing skip count is usually a regression, not a feature. Common causes:
-
-- The OXID shop is in maintenance mode (`oxconfig.blShopStopped = 1`) and the
-  container falls back to the skip path. See dev-log
-  `20260522/done/sprint-110-…md` for the EE grace-period fix.
-- The module's `metadata.php` was reverted to declare templates but the shape
-  changed.
-- A new test was added that `markTestSkipped()`s for an env reason that
-  shouldn't apply locally.
-
-Run with `--display-skipped` to see the exact reason per test:
-
+Run:
 ```bash
-docker compose exec php phpunit \
-    -c extensions/stripe/tests/phpunit.xml \
-    --testsuite Integration --display-skipped
+# 1. Set STRIPE_TEST_SECRET_KEY in tests/.env
+cp tests/.env.dist tests/.env
+# Edit tests/.env: STRIPE_TEST_SECRET_KEY=sk_test_...
+
+# 2. Run
+docker compose exec php phpunit -c extensions/stripe/tests/phpunit.xml --testsuite Integration-live-stripe
 ```
+
+Contains tests in `tests/Integration/Stripe/Adapter/` (all marked
+`@group requires-stripe-creds`):
+
+| File | Tests |
+|---|---|
+| `StripeAdapterIntegrationTest.php` | ~14 |
+| `Stripe3DSecureIntegrationTest.php` | ~11 |
+| `StripeAuthorizationFlowIntegrationTest.php` | ~11 |
+| `StripePaymentMethodIntegrationTest.php` | ~11 |
+
+The base class `StripeIntegrationTestCase` still calls `markTestSkipped`
+when credentials are absent — so running this suite without a key still
+skips cleanly. The `@group` gate means the default suite no longer counts
+those as silently-skipped tests.
+
+---
+
+## OXID-container suite: `Integration-with-container` (~6 tests)
+
+Run **inside Docker after** activating both modules:
+```bash
+bin/oe-console oe:module:activate oe_payments_stripe_wallet
+docker compose exec php phpunit -c extensions/stripe/tests/phpunit.xml --testsuite Integration-with-container
+```
+
+Contains tests marked `@group requires-oxid-container`:
+- `tests/Integration/Admin/PaymentPanelRegistryIntegrationTest.php`
+- `tests/Integration/Module/ModuleLifecycleTest.php`
+
+**Container-boot failures in this suite are hard errors (not skips).**
+The `markTestSkipped` call has been removed from both classes — if
+`ContainerFactory::getInstance()->getContainer()` throws, the test fails
+with an ERROR, which is the correct outcome when the container should be
+available.
+
+---
+
+## Remaining skips in the default suite
+
+A small number of tests in the default `Integration` suite still call
+`markTestSkipped` for legitimate reasons:
+
+| Test | Reason | Action |
+|---|---|---|
+| `MetadataTest::testTemplatesDefined` | Module declares no `templates` section | Expected; add `templates` to metadata.php to enable |
+| `StripeAdapterIntegrationTest::*` | Stripe credentials absent (redirected to live-stripe suite) | No longer in default suite |
+| `tests/Unit/Stripe/Twig/DumpExtensionTest.php:102,119` | `services.yaml not found` | Unit-test guard; fires only if file moves |
+| `tests/Unit/Stripe/Model/OrderAddressValidationTest.php:39` | `markTestIncomplete` — requires full OXID bootstrap | Placeholder; tracked in backlog |
+| `StripeAdapterIntegrationTest::testCharge*` | `markTestIncomplete` — sandbox data unavailable | Only in live-stripe suite anyway |
+
+---
+
+## Before/after gating summary (T6)
+
+| | Before (Sprint 114.12) | After (Sprint 114.13) |
+|---|---|---|
+| Default `Integration` suite tests | ~157 | ~87 |
+| Silently skipped in default suite | ~53 | ~1 (`MetadataTest`) |
+| `Integration-live-stripe` suite | (included in default, skipped) | ~47 explicit |
+| `Integration-with-container` suite | (included in default, skipped) | ~6 explicit, hard-fail |
+| Total creds-required tests made honest | 0 | 47 |
