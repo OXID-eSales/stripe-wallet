@@ -52,11 +52,6 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         return StripeCheckoutSessionRequestEvent::class;
     }
 
-    public function getPriority(): int
-    {
-        return 0;
-    }
-
     public function handle(object $event): void
     {
         $this->logEvent('StripeCheckoutSessionHandler::handle() START');

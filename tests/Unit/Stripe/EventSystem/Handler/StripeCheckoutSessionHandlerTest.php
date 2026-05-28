@@ -522,6 +522,21 @@ class StripeCheckoutSessionHandlerTest extends TestCase
         return $contract;
     }
 
+    /**
+     * S7 (sprint-114.11a): Priority is config-driven via the services.yaml tag.
+     * The in-code getPriority() override is redundant for a zero-priority handler
+     * and has been removed; EventListenerProvider falls back to 0 automatically.
+     */
+    public function testDoesNotOverridePriorityMethod(): void
+    {
+        $handler = $this->createHandler();
+
+        $this->assertFalse(
+            method_exists($handler, 'getPriority'),
+            'getPriority() must not be declared — priority is owned by the services.yaml tag'
+        );
+    }
+
     private function createContextWithContract(PaymentContractInterface $contract): EventContext
     {
         $context = new EventContext([

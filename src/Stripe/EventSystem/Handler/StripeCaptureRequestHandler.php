@@ -56,11 +56,6 @@ class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
         return StripeCaptureRequestEvent::class;
     }
 
-    public function getPriority(): int
-    {
-        return 0;
-    }
-
     public function handle(object $event): void
     {
         $this->logEvent('StripeCaptureRequestHandler::handle() START');
