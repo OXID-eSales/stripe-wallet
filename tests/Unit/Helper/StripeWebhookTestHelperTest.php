@@ -13,6 +13,17 @@ use OxidEsales\Payments\Stripe\Tests\Helper\StripeWebhookTestHelper;
 use PHPUnit\Framework\TestCase;
 
 /**
+ * Contract tests for StripeWebhookTestHelper's public API.
+ *
+ * T4 fix (Sprint 114.13): removed self-verification tests that called
+ * StripeWebhookTestHelper::generateSignature() and then verified with
+ * StripeWebhookTestHelper::verifySignature(). Those tests only prove
+ * that the helper is internally consistent — they do not exercise any
+ * production code and give false confidence in webhook security.
+ *
+ * The remaining tests lock the observable output shape of the helper's
+ * factory methods so refactors can safely modify internals.
+ *
  * @covers \OxidEsales\Payments\Stripe\Tests\Helper\StripeWebhookTestHelper
  * @group sprint-13
  * @group webhook
@@ -33,62 +44,6 @@ final class StripeWebhookTestHelperTest extends TestCase
         $signature = StripeWebhookTestHelper::generateSignature($payload, self::TEST_SECRET, $timestamp);
 
         $this->assertStringStartsWith('t=1733400000,v1=', $signature);
-    }
-
-    /**
-     * @test
-     */
-    public function verifySignatureAcceptsValidSignature(): void
-    {
-        $payload = '{"id":"evt_123","type":"payment_intent.succeeded"}';
-        $signature = StripeWebhookTestHelper::generateSignature($payload, self::TEST_SECRET);
-
-        $result = StripeWebhookTestHelper::verifySignature($payload, $signature, self::TEST_SECRET);
-
-        $this->assertTrue($result);
-    }
-
-    /**
-     * @test
-     */
-    public function verifySignatureRejectsInvalidSignature(): void
-    {
-        $payload = '{"id":"evt_123"}';
-        $signature = StripeWebhookTestHelper::generateSignature($payload, self::TEST_SECRET);
-
-        // Modify payload after signing
-        $modifiedPayload = '{"id":"evt_456"}';
-
-        $result = StripeWebhookTestHelper::verifySignature($modifiedPayload, $signature, self::TEST_SECRET);
-
-        $this->assertFalse($result);
-    }
-
-    /**
-     * @test
-     */
-    public function verifySignatureRejectsWrongSecret(): void
-    {
-        $payload = '{"id":"evt_123"}';
-        $signature = StripeWebhookTestHelper::generateSignature($payload, self::TEST_SECRET);
-
-        $result = StripeWebhookTestHelper::verifySignature($payload, $signature, 'wrong_secret');
-
-        $this->assertFalse($result);
-    }
-
-    /**
-     * @test
-     */
-    public function verifySignatureRejectsExpiredTimestamp(): void
-    {
-        $payload = '{"id":"evt_123"}';
-        $oldTimestamp = time() - 400; // 400 seconds ago
-        $signature = StripeWebhookTestHelper::generateSignature($payload, self::TEST_SECRET, $oldTimestamp);
-
-        $result = StripeWebhookTestHelper::verifySignature($payload, $signature, self::TEST_SECRET, 300);
-
-        $this->assertFalse($result);
     }
 
     /**
@@ -149,19 +104,5 @@ final class StripeWebhookTestHelperTest extends TestCase
         $this->assertCount(2, $result['signatures']);
         $this->assertContains('abc123', $result['signatures']);
         $this->assertContains('def456', $result['signatures']);
-    }
-
-    /**
-     * @test
-     */
-    public function generatedSignatureWorksWithStripeVerifier(): void
-    {
-        $payload = StripeWebhookTestHelper::createPaymentIntentSucceededPayload('pi_integration_test');
-        $signature = StripeWebhookTestHelper::generateSignature($payload, self::TEST_SECRET);
-
-        // Verify our helper can verify its own signatures
-        $this->assertTrue(
-            StripeWebhookTestHelper::verifySignature($payload, $signature, self::TEST_SECRET)
-        );
     }
 }
