@@ -57,7 +57,7 @@ final class CaptureService implements CaptureServiceInterface
             return CaptureResponse::failure('Contract has no PaymentIntent ID');
         }
 
-        $result = $this->executeCapture($paymentIntentId, $amount, $metadata);
+        $result = $this->executeCapture($paymentIntentId, $amount, $metadata, $contract->getCurrency());
 
         if ($result->isSuccessful()) {
             $this->recordCaptureTransaction($contract, $result);
@@ -72,6 +72,7 @@ final class CaptureService implements CaptureServiceInterface
         ?float $amount,
         array $metadata
     ): CaptureResponse {
+        // No currency available here without an extra API call — null falls back to 2-decimal behaviour.
         return $this->executeCapture($paymentIntentId, $amount, $metadata);
     }
 
@@ -81,13 +82,15 @@ final class CaptureService implements CaptureServiceInterface
     private function executeCapture(
         string $paymentIntentId,
         ?float $amount,
-        array $metadata
+        array $metadata,
+        ?string $currency = null
     ): CaptureResponse {
         try {
             $request = new CapturePaymentRequest(
                 providerPaymentId: $paymentIntentId,
                 amount: $amount,
-                metadata: $metadata
+                metadata: $metadata,
+                currency: $currency
             );
 
             $response = $this->adapterFactory->getStripeAdapter()->capturePayment($request);

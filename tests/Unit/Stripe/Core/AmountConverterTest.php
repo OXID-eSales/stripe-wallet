@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Core;
 
+use OxidEsales\PaymentBase\Adapter\Request\CapturePaymentRequest;
+use OxidEsales\PaymentBase\Adapter\Request\RefundPaymentRequest;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use PHPUnit\Framework\TestCase;
 
@@ -220,5 +222,61 @@ final class AmountConverterTest extends TestCase
         foreach ($expected as $currency) {
             self::assertSame(3, AmountConverter::decimalsFor($currency), "Expected {$currency} to be three-decimal");
         }
+    }
+
+    // ---------------------------------------------------------------
+    // Sprint 114.10a (§6.2): currency field threading via request DTOs
+    // ---------------------------------------------------------------
+
+    /**
+     * @test
+     */
+    public function captureRequestWithJpyCurrencyConvertsToCorrectMinorUnits(): void
+    {
+        $request = new CapturePaymentRequest(
+            providerPaymentId: 'pi_jpy_test',
+            amount: 1000.0,
+            currency: 'JPY'
+        );
+
+        // JPY is zero-decimal: 1000 major units = 1000 minor units (NOT 100000)
+        $minorUnits = AmountConverter::toMinorUnits($request->amount, $request->currency ?? '');
+
+        self::assertSame(1000, $minorUnits);
+    }
+
+    /**
+     * @test
+     */
+    public function refundRequestWithJpyCurrencyConvertsToCorrectMinorUnits(): void
+    {
+        $request = new RefundPaymentRequest(
+            providerPaymentId: 'pi_jpy_test',
+            amount: 1000.0,
+            currency: 'JPY'
+        );
+
+        // JPY is zero-decimal: 1000 major units = 1000 minor units (NOT 100000)
+        $minorUnits = AmountConverter::toMinorUnits($request->amount, $request->currency ?? '');
+
+        self::assertSame(1000, $minorUnits);
+    }
+
+    /**
+     * @test
+     * Confirms the regression: without currency field, empty string → 2-decimal default.
+     * With currency 'JPY', the correct zero-decimal is used.
+     */
+    public function withoutCurrencyEmptyStringDefaultsToTwoDecimalsForJpy(): void
+    {
+        // This was the bug: treating JPY as if it were EUR
+        $wrongMinorUnits = AmountConverter::toMinorUnits(1000.0, '');
+
+        // Empty currency → 2-decimal fallback → 1000 * 100 = 100000 (WRONG for JPY)
+        self::assertSame(100000, $wrongMinorUnits);
+
+        // With JPY currency → correct zero-decimal → 1000 (CORRECT)
+        $correctMinorUnits = AmountConverter::toMinorUnits(1000.0, 'JPY');
+        self::assertSame(1000, $correctMinorUnits);
     }
 }

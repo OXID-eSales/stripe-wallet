@@ -83,10 +83,10 @@ final class RefundHelper
             $params = ['payment_intent' => $request->providerPaymentId];
 
             if ($request->amount !== null) {
-                // RefundPaymentRequest carries no currency; AmountConverter defaults to 2 decimals
-                // when currency is empty — correct for EUR. Currency threading requires a schema change
-                // in payment-base (out of scope for Sprint 114.7).
-                $params['amount'] = AmountConverter::toMinorUnits($request->amount, '');
+                // Sprint 114.10a (§6.2): RefundPaymentRequest now carries an optional currency;
+                // use it for correct minor-unit conversion (zero-decimal currencies like JPY
+                // must NOT be multiplied by 100). Null/empty falls back to 2-decimal behaviour.
+                $params['amount'] = AmountConverter::toMinorUnits($request->amount, $request->currency ?? '');
             }
 
             if ($request->reason !== null) {

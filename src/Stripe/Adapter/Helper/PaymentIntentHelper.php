@@ -293,11 +293,10 @@ final class PaymentIntentHelper
         try {
             $params = [];
             if ($request->amount !== null) {
-                // CapturePaymentRequest carries no currency; AmountConverter defaults to
-                // 2 decimals when currency is empty — correct for EUR (the module's primary currency).
-                // Sprint 114.7: currency threading requires a CapturePaymentRequest schema change (payment-base)
-                // which is out of scope; the fallback is documented and safe for the current shop scope.
-                $params['amount_to_capture'] = AmountConverter::toMinorUnits($request->amount, '');
+                // Sprint 114.10a (§6.2): CapturePaymentRequest now carries an optional currency;
+                // use it for correct minor-unit conversion (zero-decimal currencies like JPY
+                // must NOT be multiplied by 100). Null/empty falls back to 2-decimal behaviour.
+                $params['amount_to_capture'] = AmountConverter::toMinorUnits($request->amount, $request->currency ?? '');
             }
             if (!empty($request->metadata)) {
                 $params['metadata'] = $request->metadata;
