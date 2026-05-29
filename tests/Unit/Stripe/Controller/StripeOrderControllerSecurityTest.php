@@ -20,6 +20,8 @@ use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\Return\StripeReturnResolver;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
+use OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface;
+use OxidEsales\Payments\Stripe\Service\UserFieldReaderInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -403,6 +405,22 @@ class StripeOrderControllerSecurityTest extends TestCase
             {
                 $basketUser = $this->stubHelper->basket?->getBasketUser();
                 return $basketUser instanceof User ? $basketUser : null;
+            }
+
+            protected function getUserDataValidator(): UserDataValidatorInterface
+            {
+                return new class implements UserDataValidatorInterface {
+                    public function validateForUser(UserFieldReaderInterface $reader): array
+                    {
+                        return [];
+                    }
+
+                    /** @param array<string, string> $fields */
+                    public function validateFieldMap(array $fields, string $addressKind = 'billing'): array
+                    {
+                        return [];
+                    }
+                };
             }
 
             protected function exitWithJson(): void

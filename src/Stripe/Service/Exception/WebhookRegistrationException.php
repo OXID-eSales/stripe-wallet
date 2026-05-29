@@ -20,7 +20,7 @@ use Throwable;
  * this, return the exception message to the client as JSON, and let the admin
  * decide whether to retry, fix the platform key, or paste the secret by hand.
  */
-final class WebhookRegistrationException extends RuntimeException
+class WebhookRegistrationException extends RuntimeException
 {
     public static function nonHttpsUrl(string $url): self
     {

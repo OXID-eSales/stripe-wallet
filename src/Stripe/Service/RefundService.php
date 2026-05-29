@@ -25,7 +25,7 @@ use Psr\Log\NullLogger;
  *
  * @since 2.0.0
  */
-final class RefundService implements RefundServiceInterface
+class RefundService implements RefundServiceInterface
 {
     /** @var array<string> Valid Stripe refund reasons */
     private const VALID_REASONS = ['duplicate', 'fraudulent', 'requested_by_customer'];

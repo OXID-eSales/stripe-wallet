@@ -16,7 +16,7 @@ namespace OxidEsales\Payments\Stripe\Controller\Webhook;
  *
  * @since 2.1.0
  */
-final readonly class WebhookGuardResult
+readonly class WebhookGuardResult
 {
     public function __construct(
         public string $reason,

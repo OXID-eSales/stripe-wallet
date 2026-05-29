@@ -19,7 +19,7 @@ namespace OxidEsales\Payments\Stripe\Controller\Webhook;
  *
  * @since 2.1.0
  */
-final class WebhookIpAllowlistGuard implements WebhookRequestGuardInterface
+class WebhookIpAllowlistGuard implements WebhookRequestGuardInterface
 {
     /**
      * @param string[] $allowedCidrs CIDR ranges (e.g., ['54.187.174.169/32'])

@@ -20,7 +20,7 @@ use OxidEsales\PaymentBase\Adapter\SessionAdapterInterface;
  *
  * @since 2.0.0
  */
-final class OxidSessionAdapter implements SessionAdapterInterface
+class OxidSessionAdapter implements SessionAdapterInterface
 {
     public function getSessionId(): string
     {

@@ -10,7 +10,9 @@ env:
   PHP_VERSION: '8.2'
   MYSQL_VERSION: '5.7'
   TEMPLATE_ENGINE: 'twig'
-  PAYMENT_BASE_BRANCH: 'dev-b-7.4.x'
+  # Branch of OXID-eSales/payment-base to test against. Change in sync with
+  # the stripe branch when the two repos co-evolve (Sprint 119/STRP-129).
+  PAYMENT_BASE_BRANCH: 'b-7.4.x'
 
 jobs:
   install_shop_with_module:
@@ -95,7 +97,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: OXID-eSales/payment-base
-          ref: b-7.4.x
+          ref: ${{ env.PAYMENT_BASE_BRANCH }}
           path: source/payment-base
           token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
 
@@ -268,7 +270,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: OXID-eSales/payment-base
-          ref: b-7.4.x
+          ref: ${{ env.PAYMENT_BASE_BRANCH }}
           path: source/payment-base
           token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
 
@@ -336,7 +338,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: OXID-eSales/payment-base
-          ref: b-7.4.x
+          ref: ${{ env.PAYMENT_BASE_BRANCH }}
           path: source/payment-base
           token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
 
@@ -390,7 +392,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: OXID-eSales/payment-base
-          ref: b-7.4.x
+          ref: ${{ env.PAYMENT_BASE_BRANCH }}
           path: source/payment-base
           token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
 

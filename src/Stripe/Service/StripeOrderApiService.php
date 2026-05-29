@@ -23,7 +23,7 @@ use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
  *
  * @since 2.0.0
  */
-final class StripeOrderApiService
+class StripeOrderApiService
 {
     private ?StripeAdapterInterface $adapter = null;
 

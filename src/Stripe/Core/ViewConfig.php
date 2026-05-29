@@ -113,8 +113,20 @@ class ViewConfig extends ViewConfig_parent
             return (string) time();
         }
 
-        // Use module version in production
-        return '1.0.0';
+        // Production: module version + bundle mtime so a rebuilt asset busts
+        // the browser cache automatically (the version alone is static).
+        return '1.0.0-' . $this->getBundleFingerprint();
+    }
+
+    /**
+     * Modification time of the served JS bundle, used as a cache-bust suffix.
+     */
+    private function getBundleFingerprint(): string
+    {
+        $bundle = __DIR__ . '/../../../assets/' . $this->getStripeJsPath();
+        $mtime = is_file($bundle) ? filemtime($bundle) : false;
+
+        return $mtime === false ? '0' : (string) $mtime;
     }
 
 

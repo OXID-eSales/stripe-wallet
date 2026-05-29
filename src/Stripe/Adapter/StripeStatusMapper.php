@@ -24,7 +24,7 @@ use OxidEsales\PaymentBase\Adapter\Response\NormalizedPaymentStatus;
  *
  * @since 1.0.0
  */
-final class StripeStatusMapper
+class StripeStatusMapper
 {
     /**
      * Normalized payment statuses — delegates to the canonical payment-base constants.

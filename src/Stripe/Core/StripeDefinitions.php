@@ -15,7 +15,7 @@ namespace OxidEsales\Payments\Stripe\Core;
  * Centralized configuration for Stripe Wallet payment method
  * including multilingual descriptions, constraints, and supported currencies.
  */
-final class StripeDefinitions
+class StripeDefinitions
 {
     // Payment method ID
     public const STRIPE_WALLET_PAYMENT_ID = 'oe_payments_stripe_wallet';

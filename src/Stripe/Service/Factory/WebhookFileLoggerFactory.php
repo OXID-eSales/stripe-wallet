@@ -21,7 +21,7 @@ use OxidEsales\PaymentBase\Service\Factory\AbstractFileLoggerFactory;
  *
  * @since 2.0.0
  */
-final class WebhookFileLoggerFactory extends AbstractFileLoggerFactory
+class WebhookFileLoggerFactory extends AbstractFileLoggerFactory
 {
     protected function getLogFile(): string
     {

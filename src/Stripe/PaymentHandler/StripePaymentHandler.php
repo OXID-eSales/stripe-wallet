@@ -21,6 +21,7 @@ use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractServiceInterface;
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
+use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
 use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
@@ -180,6 +181,13 @@ class StripePaymentHandler implements PaymentHandlerInterface
         $basket = $session->getBasket();
         $basket->setPayment($paymentMethodId);
         $session->setVariable('paymentid', $paymentMethodId);
+
+        // OPC parity with StripeOrderController::createCheckoutSession: the OPC
+        // address is entered + saved via AJAX, so no sDeliveryAddressMD5 form
+        // param reaches finalizeOrder() and OXID's validateDeliveryAddress would
+        // reject the order (state 7, invalid_delivery_address). Stripe owns the
+        // address validation, so set the skip flag before finalizeOrder runs.
+        $session->setVariable(ControllerRequestHelper::SESSION_SKIP_ADDR_CHECK, true);
 
         $request = new CreateOrderRequest(
             sessionId: $sessionId,

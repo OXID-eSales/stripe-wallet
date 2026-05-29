@@ -14,7 +14,7 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
-use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler;
+use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler;
 use PHPUnit\Framework\TestCase;
 
 /**

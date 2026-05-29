@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Controller;
 
-use OxidEsales\Eshop\Application\Controller\OrderController;
 use OxidEsales\Eshop\Core\Registry;
 use RuntimeException;
 use Throwable;
@@ -19,11 +18,16 @@ use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEve
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\PaymentBase\Validation\Message\MessageFormatterInterface;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\ContractTokenService;
+use OxidEsales\Payments\Stripe\Service\FieldValidationFailure;
 use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
+use OxidEsales\Payments\Stripe\Service\OxidUserFieldReader;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
+use OxidEsales\Payments\Stripe\Service\UserDataValidationMessageFormatter;
+use OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface;
 
 /**
  * Thin Stripe Order Controller.
@@ -41,7 +45,7 @@ use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
  *
  * @since 2.0.0
  */
-class StripeOrderController extends OrderController
+class StripeOrderController extends StripeOrderController_parent
 {
     use ServiceContainer;
     use HandlesCheckoutReturn;
@@ -180,6 +184,8 @@ class StripeOrderController extends OrderController
             $context = $this->buildCheckoutEventContext($helper);
             $this->dispatchSessionEvent($helper, $context);
             $this->emitSessionResponse($context);
+        } catch (UserDataValidationException $e) {
+            $this->emitUserDataValidationErrors($e->getFailures());
         } catch (Throwable $e) {
             $this->setHttpResponseCode(500);
             $helper->logError('createCheckoutSession failed', $e);
@@ -229,6 +235,8 @@ class StripeOrderController extends OrderController
         if ($user === null) {
             throw new RuntimeException('User not found');
         }
+
+        $this->validateUserData($user);
 
         return new EventContext([
             'basket'         => $basket,
@@ -560,5 +568,87 @@ class StripeOrderController extends OrderController
             );
         }
         return $this->requestHelper;
+    }
+
+    /**
+     * DI seam — resolves UserDataValidatorInterface from the container.
+     *
+     * Overridden in testable subclasses to inject a stub without booting the
+     * DI container. Matches the getEventDispatcher() seam pattern.
+     */
+    protected function getUserDataValidator(): UserDataValidatorInterface
+    {
+        return $this->getServiceFromContainer(UserDataValidatorInterface::class);
+    }
+
+    /**
+     * Validates user billing and delivery fields via the UserDataValidator.
+     *
+     * Throws UserDataValidationException when one or more fields fail
+     * character-level validation. The exception carries the structured failure
+     * list so createCheckoutSession() can emit a 422 JSON response without
+     * repeating the validation call.
+     *
+     * Sprint 119 Phase C (STRP-129).
+     *
+     * @throws UserDataValidationException when any field fails validation
+     */
+    private function validateUserData(\OxidEsales\Eshop\Application\Model\User $user): void
+    {
+        $reader   = new OxidUserFieldReader($user);
+        $failures = $this->getUserDataValidator()->validateForUser($reader);
+
+        if ($failures === []) {
+            return;
+        }
+
+        throw new UserDataValidationException($failures);
+    }
+
+    /**
+     * Emits a 422 Unprocessable Entity JSON response with the structured
+     * field-validation failures.
+     *
+     * Response shape:
+     *   {"valid": false, "errors": [{"field": "…", "code": "…", "char": "…", "addressKind": "…", "message": "…"}]}
+     *
+     * Sprint 119 Phase C (STRP-129). Phase E: adds `message` via formatter.
+     *
+     * @param FieldValidationFailure[] $failures Non-empty list of field violations.
+     */
+    private function emitUserDataValidationErrors(array $failures): void
+    {
+        $this->setHttpResponseCode(422);
+
+        $formatter = $this->getUserDataValidationMessageFormatter();
+        $errors    = array_map(
+            fn(FieldValidationFailure $f): array => [
+                'field'       => $f->field,
+                'code'        => $f->code,
+                'char'        => $f->offendingChar,
+                'addressKind' => $f->addressKind,
+                'message'     => $formatter !== null
+                    ? $formatter->format($f->field, $f->code, $f->offendingChar)
+                    : null,
+            ],
+            $failures,
+        );
+
+        echo json_encode(['valid' => false, 'errors' => $errors]);
+    }
+
+    /**
+     * DI seam — resolves the message formatter from the container.
+     *
+     * Overridden in testable subclasses to inject a stub.
+     * Returns null when the service is unavailable (formatter is optional).
+     */
+    protected function getUserDataValidationMessageFormatter(): ?MessageFormatterInterface
+    {
+        try {
+            return $this->getServiceFromContainer(UserDataValidationMessageFormatter::class);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

@@ -27,3 +27,13 @@ class_alias(
     OxidEsales\Eshop\Core\ViewConfig::class,
     OxidEsales\Payments\Stripe\Core\ViewConfig_parent::class
 );
+
+class_alias(
+    OxidEsales\Eshop\Application\Controller\PaymentController::class,
+    OxidEsales\Payments\Stripe\Controller\PaymentController_parent::class
+);
+
+class_alias(
+    OxidEsales\Eshop\Application\Controller\OrderController::class,
+    OxidEsales\Payments\Stripe\Controller\StripeOrderController_parent::class
+);

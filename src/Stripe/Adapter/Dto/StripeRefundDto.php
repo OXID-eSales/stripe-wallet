@@ -19,7 +19,7 @@ namespace OxidEsales\Payments\Stripe\Adapter\Dto;
  *
  * @since 2.0.0
  */
-final readonly class StripeRefundDto
+readonly class StripeRefundDto
 {
     /**
      * @param string      $id        Refund ID (rf_...)

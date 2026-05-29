@@ -23,7 +23,7 @@ use OxidEsales\PaymentBase\Webhook\WebhookResult;
  *
  * @since Sprint 114.4
  */
-final readonly class StripeWebhookOutcome
+readonly class StripeWebhookOutcome
 {
     public function __construct(
         public WebhookResult $result,

@@ -12,7 +12,7 @@ namespace OxidEsales\Payments\Stripe\Service;
 use OxidEsales\Payments\Stripe\Adapter\StripeWebhookEndpointApiInterface;
 use OxidEsales\Payments\Stripe\Service\Exception\WebhookRegistrationException;
 
-final class WebhookEndpointRegistrar implements WebhookEndpointRegistrarInterface
+class WebhookEndpointRegistrar implements WebhookEndpointRegistrarInterface
 {
     public function __construct(
         private readonly StripeWebhookEndpointApiInterface $api,

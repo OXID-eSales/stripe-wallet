@@ -31,7 +31,7 @@ use Psr\Log\NullLogger;
  *
  * @since 2.0.0
  */
-final class CheckoutReturnService implements CheckoutReturnServiceInterface
+class CheckoutReturnService implements CheckoutReturnServiceInterface
 {
     private LoggerInterface $logger;
 

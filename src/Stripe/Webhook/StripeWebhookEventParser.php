@@ -19,7 +19,7 @@ use OxidEsales\Payments\Stripe\Core\AmountConverter;
  *
  * @since 2.0.0
  */
-final class StripeWebhookEventParser
+class StripeWebhookEventParser
 {
     /**
      * Extract payment intent ID from event data.

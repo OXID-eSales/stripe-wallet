@@ -25,7 +25,7 @@ use OxidEsales\Payments\Stripe\Core\AmountConverter;
  *
  * @since 2.0.0
  */
-final readonly class CheckoutReturnResult
+readonly class CheckoutReturnResult
 {
     private function __construct(
         private bool $successful,

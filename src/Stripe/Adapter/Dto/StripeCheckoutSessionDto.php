@@ -20,7 +20,7 @@ namespace OxidEsales\Payments\Stripe\Adapter\Dto;
  *
  * @since 2.0.0
  */
-final readonly class StripeCheckoutSessionDto
+readonly class StripeCheckoutSessionDto
 {
     /**
      * @param string              $id                   Session ID (cs_...)

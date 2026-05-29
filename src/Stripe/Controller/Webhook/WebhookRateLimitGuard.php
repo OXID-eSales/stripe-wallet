@@ -21,7 +21,7 @@ use OxidEsales\PaymentBase\Mcp\Http\RateLimiterInterface;
  *
  * @since 2.1.0
  */
-final class WebhookRateLimitGuard implements WebhookRequestGuardInterface
+class WebhookRateLimitGuard implements WebhookRequestGuardInterface
 {
     public function __construct(private readonly RateLimiterInterface $rateLimiter)
     {

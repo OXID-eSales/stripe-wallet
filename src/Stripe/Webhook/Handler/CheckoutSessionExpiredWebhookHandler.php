@@ -14,7 +14,6 @@ use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookOutcome;
-use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -25,7 +24,7 @@ use Psr\Log\LoggerInterface;
  *
  * @since Sprint 114.4
  */
-final class CheckoutSessionExpiredWebhookHandler extends AbstractStripeWebhookHandler
+class CheckoutSessionExpiredWebhookHandler extends AbstractStripeWebhookHandler
 {
     private const EVENT_TYPE = 'checkout.session.expired';
 

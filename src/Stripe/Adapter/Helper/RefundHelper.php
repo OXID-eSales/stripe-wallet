@@ -27,7 +27,7 @@ use Stripe\StripeClient;
  *
  * @since 2.0.0
  */
-final class RefundHelper
+class RefundHelper
 {
     private const DEFAULT_TTL_SECONDS = 86400;
 

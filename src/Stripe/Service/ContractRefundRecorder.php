@@ -24,7 +24,7 @@ use Psr\Log\NullLogger;
  *
  * @since 2.0.0
  */
-final class ContractRefundRecorder
+class ContractRefundRecorder
 {
     private LoggerInterface $logger;
 

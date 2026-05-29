@@ -21,7 +21,7 @@ use RuntimeException;
  *
  * @since 2.0.0
  */
-final class PaymentIntentResolver
+class PaymentIntentResolver
 {
     public function __construct(
         private readonly ContractRepositoryInterface $contractRepository

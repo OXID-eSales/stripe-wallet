@@ -24,7 +24,7 @@ use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
  *
  * @since 2.0.0
  */
-final class StripeTransactionHistoryBuilder
+class StripeTransactionHistoryBuilder
 {
     /**
      * Build the transaction history array from a StripePaymentIntentDto.

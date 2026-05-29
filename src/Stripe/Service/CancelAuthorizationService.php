@@ -18,7 +18,7 @@ use Psr\Log\NullLogger;
  *
  * @since 2.0.0
  */
-final class CancelAuthorizationService implements CancelAuthorizationServiceInterface
+class CancelAuthorizationService implements CancelAuthorizationServiceInterface
 {
     private readonly LoggerInterface $logger;
 

@@ -19,7 +19,7 @@ namespace OxidEsales\Payments\Stripe\Controller\Webhook;
  *
  * @since 2.1.0
  */
-final class WebhookPayloadSizeGuard implements WebhookRequestGuardInterface
+class WebhookPayloadSizeGuard implements WebhookRequestGuardInterface
 {
     public function __construct(private readonly int $maxBytes = 65536)
     {

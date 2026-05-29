@@ -31,7 +31,7 @@ use Psr\Log\NullLogger;
  *
  * @since 2.0.0
  */
-final class OxidStockRestorationService implements StockRestorationServiceInterface
+class OxidStockRestorationService implements StockRestorationServiceInterface
 {
     private LoggerInterface $logger;
 

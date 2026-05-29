@@ -34,7 +34,7 @@ use Stripe\Refund;
  *
  * @since 2.0.0
  */
-final class StripeObjectMapper
+class StripeObjectMapper
 {
     /**
      * Map a Stripe Checkout Session to a neutral DTO.

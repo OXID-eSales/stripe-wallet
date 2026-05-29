@@ -31,7 +31,7 @@ namespace OxidEsales\Payments\Stripe\Core;
  *
  * @since 2.0.0
  */
-final class AmountConverter
+class AmountConverter
 {
     /**
      * Zero-decimal currencies per Stripe's published list.

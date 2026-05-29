@@ -13,7 +13,7 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
-use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler;
+use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -21,7 +21,7 @@ use PHPUnit\Framework\TestCase;
  * Sprint 114.1: WebhookContractFulfillmentHandler audit rows must use the
  * injected shop id, not a hardcoded 1.
  *
- * @covers \OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler
+ * @covers \OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler
  */
 class WebhookContractFulfillmentHandlerShopIdTest extends TestCase
 {

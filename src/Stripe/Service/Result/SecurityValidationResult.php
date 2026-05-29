@@ -20,7 +20,7 @@ use OxidEsales\PaymentBase\Contract\SecurityValidationResultInterface;
  * Implements SecurityValidationResultInterface for LSP compliance -
  * can be substituted anywhere the interface is expected.
  */
-final class SecurityValidationResult implements SecurityValidationResultInterface
+class SecurityValidationResult implements SecurityValidationResultInterface
 {
     private int $score;
 

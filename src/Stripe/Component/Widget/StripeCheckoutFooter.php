@@ -53,7 +53,20 @@ class StripeCheckoutFooter extends WidgetController
             'totalPrice' => (float) $this->getViewParameter('totalPrice'),
             'currency' => (string) ($this->getViewParameter('currency') ?: 'EUR'),
             'csrfToken' => (string) $this->getViewParameter('csrfToken'),
+            'validationUrl' => $this->getShopUrl() . 'index.php?cl=oepaymentvalidationapi&fnc=validate',
+            'pluginModuleId' => Module::MODULE_ID,
         ];
+    }
+
+    /**
+     * Returns the shop base URL for building the validation endpoint URL.
+     *
+     * Extracted as a protected method so tests can override it without
+     * bootstrapping the full OXID Registry.
+     */
+    protected function getShopUrl(): string
+    {
+        return Registry::getConfig()->getShopUrl();
     }
 
     /**

@@ -33,7 +33,7 @@ use Psr\Log\NullLogger;
  * provider order ID, and any unexpected adapter failure (degraded
  * mode: the listener falls back to its conservative default).
  */
-final class StripePaymentCaptureStatusQuery implements PaymentCaptureStatusQueryInterface
+class StripePaymentCaptureStatusQuery implements PaymentCaptureStatusQueryInterface
 {
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,

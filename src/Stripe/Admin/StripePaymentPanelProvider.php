@@ -30,7 +30,7 @@ use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
  * is body-only — the shared wrapper in payment-base owns head / transfer
  * form / admin layout closes.
  */
-final class StripePaymentPanelProvider implements PaymentPanelProviderInterface
+class StripePaymentPanelProvider implements PaymentPanelProviderInterface
 {
     /**
      * Backwards-compat alias. New code should reference

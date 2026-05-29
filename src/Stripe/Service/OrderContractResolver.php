@@ -21,7 +21,7 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
  *
  * @since 2.0.0
  */
-final class OrderContractResolver
+class OrderContractResolver
 {
     public function __construct(
         private readonly ContractRepositoryInterface $contractRepository

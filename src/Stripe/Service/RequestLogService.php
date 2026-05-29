@@ -22,7 +22,7 @@ use Psr\Log\NullLogger;
  * Logs to log/stripe/stripe_requests.log via RequestFileLoggerFactory.
  *
  */
-final class RequestLogService implements RequestLogServiceInterface
+class RequestLogService implements RequestLogServiceInterface
 {
     private readonly LoggerInterface $fallbackLogger;
 

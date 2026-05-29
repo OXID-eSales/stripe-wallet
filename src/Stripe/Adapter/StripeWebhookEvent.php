@@ -19,7 +19,7 @@ use Stripe\Event;
  *
  * @since 1.0.0
  */
-final class StripeWebhookEvent implements WebhookEvent
+class StripeWebhookEvent implements WebhookEvent
 {
     private readonly bool $verified;
 

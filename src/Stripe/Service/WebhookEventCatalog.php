@@ -15,7 +15,7 @@ namespace OxidEsales\Payments\Stripe\Service;
  * Extracted from the WebhookHandler/* classes — adding or removing an event
  * type means one edit here, not three (registration, handler dispatch, docs).
  */
-final class WebhookEventCatalog
+class WebhookEventCatalog
 {
     /**
      * @var list<string>

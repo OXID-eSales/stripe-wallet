@@ -33,7 +33,7 @@ use Throwable;
  *
  * @since 1.0.0
  */
-final class OxidShopOrderService implements ShopOrderServiceInterface
+class OxidShopOrderService implements ShopOrderServiceInterface
 {
     // No constructor dependencies — all OXID operations use Registry/oxNew.
 

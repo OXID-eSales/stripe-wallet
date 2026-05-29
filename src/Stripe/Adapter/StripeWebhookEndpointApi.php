@@ -26,7 +26,7 @@ use Stripe\StripeClient;
  * StripeClientFactory::create(). StripeClientProviderInterface::forKey() pins the
  * same stripe_version as the rest of the module, ensuring consistent API behaviour.
  */
-final class StripeWebhookEndpointApi implements StripeWebhookEndpointApiInterface
+class StripeWebhookEndpointApi implements StripeWebhookEndpointApiInterface
 {
     public function __construct(
         private readonly StripeClientProviderInterface $clientProvider

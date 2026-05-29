@@ -33,7 +33,7 @@ use Throwable;
  *
  * @since 2.0.0
  */
-final class CaptureService implements CaptureServiceInterface
+class CaptureService implements CaptureServiceInterface
 {
     private readonly LoggerInterface $logger;
 

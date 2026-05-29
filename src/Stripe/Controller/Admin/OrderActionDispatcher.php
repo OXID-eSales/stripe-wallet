@@ -26,7 +26,7 @@ use OxidEsales\Payments\Stripe\Service\OrderContractResolver;
  *
  * @since 2.0.0
  */
-final class OrderActionDispatcher implements AdminActionDispatcherInterface
+class OrderActionDispatcher implements AdminActionDispatcherInterface
 {
     public function __construct(
         private readonly EventDispatcherInterface $eventDispatcher,

@@ -19,7 +19,7 @@ namespace OxidEsales\Payments\Stripe\Adapter\Dto;
  *
  * @since 2.0.0
  */
-final readonly class StripeChargeDto
+readonly class StripeChargeDto
 {
     /**
      * @param string              $id              Charge ID (ch_...)

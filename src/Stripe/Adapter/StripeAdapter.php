@@ -56,7 +56,7 @@ use Stripe\Webhook;
  *
  * @since 1.0.0
  */
-final class StripeAdapter implements StripeAdapterInterface
+class StripeAdapter implements StripeAdapterInterface
 {
     private readonly PaymentIntentHelper $paymentIntentHelper;
     private readonly RefundHelper $refundHelper;

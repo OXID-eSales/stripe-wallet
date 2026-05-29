@@ -15,7 +15,7 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\Payments\Stripe\Webhook\Handler\CheckoutSessionCompletedWebhookHandler;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
-use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface;
+use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;

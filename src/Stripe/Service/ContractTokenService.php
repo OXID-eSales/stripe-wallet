@@ -21,7 +21,7 @@ use RuntimeException;
  * Implements TokenServiceInterface for LSP compliance -
  * can be substituted anywhere the interface is expected.
  */
-final class ContractTokenService implements TokenServiceInterface
+class ContractTokenService implements TokenServiceInterface
 {
     private const TOKEN_SEPARATOR = ':';
     private const HASH_ALGORITHM = 'sha256';

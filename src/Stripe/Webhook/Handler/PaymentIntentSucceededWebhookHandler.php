@@ -15,7 +15,6 @@ use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookOutcome;
-use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -27,7 +26,7 @@ use Psr\Log\LoggerInterface;
  *
  * @since Sprint 114.4
  */
-final class PaymentIntentSucceededWebhookHandler extends AbstractStripeWebhookHandler
+class PaymentIntentSucceededWebhookHandler extends AbstractStripeWebhookHandler
 {
     private const EVENT_TYPE = 'payment_intent.succeeded';
 

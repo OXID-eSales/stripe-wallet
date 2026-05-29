@@ -34,7 +34,7 @@ use Stripe\StripeClient;
  *
  * @since 2.0.0
  */
-final class PaymentIntentHelper
+class PaymentIntentHelper
 {
     private const DEFAULT_TTL_SECONDS = 86400;
 

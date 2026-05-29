@@ -112,4 +112,100 @@ $aLang = [
     'STRIPE_JS_URL_NOT_CONFIGURED'              => 'Zahlungs-URL ist nicht konfiguriert',
     'STRIPE_JS_INTENT_INVALID'                  => 'Ungültige Payment Intent Antwort',
     'STRIPE_JS_PROCESSING'                      => 'Verarbeitung...',
+
+    // -----------------------------------------------------------------------
+    // Benutzer-Daten-Feldvalidierungsmeldungen (STRP-129)
+    // Eine Meldung nennt die ERLAUBTEN Zeichen: STRIPE_VALIDATION_FIELD_INVALID
+    // %1$s = Feldbezeichnung, %2$s = Beschreibung der erlaubten Zeichen.
+    // -----------------------------------------------------------------------
+    'STRIPE_VALIDATION_FIELD_INVALID'                        => 'Das Feld %1$s ist ungültig. Erlaubte Zeichen sind: %2$s',
+    'STRIPE_VALIDATION_UNDERSTAND'                           => 'Verstanden',
+
+    // Zeichenklassen-Wörter für die Auflistung der erlaubten Zeichen.
+    'STRIPE_VALIDATION_CLASS_LETTERS'                        => 'Buchstaben',
+    'STRIPE_VALIDATION_CLASS_DIGITS'                         => 'Ziffern',
+    'STRIPE_VALIDATION_CLASS_SPACES'                         => 'Leerzeichen',
+
+    // Feldbezeichnungen.
+    'STRIPE_VALIDATION_LABEL_FIRSTNAME'                      => 'Vorname',
+    'STRIPE_VALIDATION_LABEL_LASTNAME'                       => 'Nachname',
+    'STRIPE_VALIDATION_LABEL_ADDITIONALINFO'                 => 'Adresszusatz',
+    'STRIPE_VALIDATION_LABEL_STREET'                         => 'Straße',
+    'STRIPE_VALIDATION_LABEL_HOUSENUMBER'                    => 'Hausnummer',
+    'STRIPE_VALIDATION_LABEL_POSTALCODE'                     => 'Postleitzahl',
+    'STRIPE_VALIDATION_LABEL_CITY'                           => 'Stadt',
+    'STRIPE_VALIDATION_LABEL_COMPANY'                        => 'Firma',
+    'STRIPE_VALIDATION_LABEL_VATID'                          => 'USt-IdNr.',
+    'STRIPE_VALIDATION_LABEL_PHONE'                          => 'Telefon',
+    'STRIPE_VALIDATION_LABEL_CELLPHONE'                      => 'Mobiltelefon',
+    'STRIPE_VALIDATION_LABEL_PERSONALPHONE'                  => 'Privattelefon',
+    'STRIPE_VALIDATION_LABEL_FAX'                            => 'Fax',
+
+    // Alt-Schlüssel (vom Formatter nicht mehr verwendet; aus Kompatibilität belassen).
+    'STRIPE_VALIDATION_GENERIC'                              => "Der eingegebene Wert für das Feld %s enthält ein ungültiges Zeichen: '%s'.",
+
+    // firstName → Vorname
+    'STRIPE_VALIDATION_FIRSTNAME_BLOCKED_CHARACTER'          => "Der Vorname darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_FIRSTNAME_DISALLOWED_CHARACTER'       => "Der Vorname darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_FIRSTNAME_CONTROL_CHARACTER'          => 'Der Vorname enthält ein unsichtbares oder Steuerzeichen. Bitte geben Sie den Wert erneut ein.',
+
+    // lastName → Nachname
+    'STRIPE_VALIDATION_LASTNAME_BLOCKED_CHARACTER'           => "Der Nachname darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_LASTNAME_DISALLOWED_CHARACTER'        => "Der Nachname darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_LASTNAME_CONTROL_CHARACTER'           => 'Der Nachname enthält ein unsichtbares oder Steuerzeichen. Bitte geben Sie den Wert erneut ein.',
+
+    // additionalInfo → Adresszusatz
+    'STRIPE_VALIDATION_ADDITIONALINFO_BLOCKED_CHARACTER'     => "Der Adresszusatz darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_ADDITIONALINFO_DISALLOWED_CHARACTER'  => "Der Adresszusatz darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_ADDITIONALINFO_CONTROL_CHARACTER'     => 'Der Adresszusatz enthält ein unsichtbares oder Steuerzeichen. Bitte geben Sie den Wert erneut ein.',
+
+    // street → Straße
+    'STRIPE_VALIDATION_STREET_BLOCKED_CHARACTER'             => "Die Straße darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_STREET_DISALLOWED_CHARACTER'          => "Die Straße darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_STREET_CONTROL_CHARACTER'             => 'Die Straße enthält ein unsichtbares oder Steuerzeichen. Bitte geben Sie den Wert erneut ein.',
+
+    // houseNumber → Hausnummer
+    'STRIPE_VALIDATION_HOUSENUMBER_BLOCKED_CHARACTER'        => "Die Hausnummer darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_HOUSENUMBER_DISALLOWED_CHARACTER'     => "Die Hausnummer darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_HOUSENUMBER_CONTROL_CHARACTER'        => 'Die Hausnummer enthält ein unsichtbares oder Steuerzeichen. Bitte geben Sie den Wert erneut ein.',
+
+    // postalCode → Postleitzahl
+    'STRIPE_VALIDATION_POSTALCODE_BLOCKED_CHARACTER'         => "Die Postleitzahl darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_POSTALCODE_DISALLOWED_CHARACTER'      => "Die Postleitzahl darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_POSTALCODE_CONTROL_CHARACTER'         => 'Die Postleitzahl enthält ein unsichtbares oder Steuerzeichen. Bitte geben Sie den Wert erneut ein.',
+
+    // city → Stadt
+    'STRIPE_VALIDATION_CITY_BLOCKED_CHARACTER'               => "Die Stadt darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_CITY_DISALLOWED_CHARACTER'            => "Die Stadt darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_CITY_CONTROL_CHARACTER'               => 'Die Stadt enthält ein unsichtbares oder Steuerzeichen. Bitte geben Sie den Wert erneut ein.',
+
+    // company → Firma
+    'STRIPE_VALIDATION_COMPANY_BLOCKED_CHARACTER'            => "Der Firmenname darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_COMPANY_DISALLOWED_CHARACTER'         => "Der Firmenname darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_COMPANY_CONTROL_CHARACTER'            => 'Der Firmenname enthält ein unsichtbares oder Steuerzeichen. Bitte geben Sie den Wert erneut ein.',
+
+    // vatId → USt-IdNr.
+    'STRIPE_VALIDATION_VATID_BLOCKED_CHARACTER'              => "Die USt-IdNr. darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_VATID_DISALLOWED_CHARACTER'           => "Die USt-IdNr. darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_VATID_CONTROL_CHARACTER'              => 'Die USt-IdNr. enthält ein unsichtbares oder Steuerzeichen. Bitte geben Sie den Wert erneut ein.',
+
+    // phone → Telefon
+    'STRIPE_VALIDATION_PHONE_BLOCKED_CHARACTER'              => "Die Telefonnummer darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_PHONE_DISALLOWED_CHARACTER'           => "Die Telefonnummer darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_PHONE_CONTROL_CHARACTER'              => 'Die Telefonnummer enthält ein unsichtbares oder Steuerzeichen. Bitte geben Sie den Wert erneut ein.',
+
+    // cellPhone → Privattelefon
+    'STRIPE_VALIDATION_CELLPHONE_BLOCKED_CHARACTER'          => "Die Privattelefonnummer darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_CELLPHONE_DISALLOWED_CHARACTER'       => "Die Privattelefonnummer darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_CELLPHONE_CONTROL_CHARACTER'          => 'Die Privattelefonnummer enthält ein unsichtbares oder Steuerzeichen. Bitte geben Sie den Wert erneut ein.',
+
+    // personalPhone → Mobiltelefon
+    'STRIPE_VALIDATION_PERSONALPHONE_BLOCKED_CHARACTER'      => "Die Mobiltelefonnummer darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_PERSONALPHONE_DISALLOWED_CHARACTER'   => "Die Mobiltelefonnummer darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_PERSONALPHONE_CONTROL_CHARACTER'      => 'Die Mobiltelefonnummer enthält ein unsichtbares oder Steuerzeichen. Bitte geben Sie den Wert erneut ein.',
+
+    // fax → Fax
+    'STRIPE_VALIDATION_FAX_BLOCKED_CHARACTER'                => "Die Faxnummer darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_FAX_DISALLOWED_CHARACTER'             => "Die Faxnummer darf das Zeichen '%s' nicht enthalten.",
+    'STRIPE_VALIDATION_FAX_CONTROL_CHARACTER'                => 'Die Faxnummer enthält ein unsichtbares oder Steuerzeichen. Bitte geben Sie den Wert erneut ein.',
 ];

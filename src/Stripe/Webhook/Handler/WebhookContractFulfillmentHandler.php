@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OxidEsales\Payments\Stripe\WebhookHandler;
+namespace OxidEsales\Payments\Stripe\Webhook\Handler;
 
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;

@@ -32,7 +32,7 @@ use OxidEsales\Payments\Stripe\Core\AmountConverter;
  *
  * @since 2.0.0
  */
-final class StripeChargeAmountResolver implements ChargeAmountResolverInterface
+class StripeChargeAmountResolver implements ChargeAmountResolverInterface
 {
     public function customerRefundedAmount(StripeChargeDto $charge): float
     {

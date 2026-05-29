@@ -22,7 +22,7 @@ namespace OxidEsales\Payments\Stripe\Service\Result;
  *
  * @since 2.0.0
  */
-final readonly class CheckoutSessionResult
+readonly class CheckoutSessionResult
 {
     private function __construct(
         private bool $successful,

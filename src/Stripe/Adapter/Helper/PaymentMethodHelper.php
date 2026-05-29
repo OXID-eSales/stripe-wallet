@@ -23,7 +23,7 @@ use Stripe\StripeClient;
  *
  * @since 2.0.0
  */
-final class PaymentMethodHelper
+class PaymentMethodHelper
 {
     public function createPaymentMethod(StripeClient $client, CreatePaymentMethodRequest $request): PaymentMethodResponse
     {

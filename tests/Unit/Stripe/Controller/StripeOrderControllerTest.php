@@ -18,6 +18,8 @@ use OxidEsales\Payments\Stripe\Service\Return\StripeReturnResolver;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
+use OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface;
+use OxidEsales\Payments\Stripe\Service\UserFieldReaderInterface;
 use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use PHPUnit\Framework\TestCase;
@@ -724,6 +726,22 @@ class StripeOrderControllerTest extends TestCase
             public function getTestTplParams(): array
             {
                 return $this->tplParams;
+            }
+
+            protected function getUserDataValidator(): UserDataValidatorInterface
+            {
+                return new class implements UserDataValidatorInterface {
+                    public function validateForUser(UserFieldReaderInterface $reader): array
+                    {
+                        return [];
+                    }
+
+                    /** @param array<string, string> $fields */
+                    public function validateFieldMap(array $fields, string $addressKind = 'billing'): array
+                    {
+                        return [];
+                    }
+                };
             }
 
             protected function exitWithJson(): void

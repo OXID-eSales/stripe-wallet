@@ -16,7 +16,7 @@ use OxidEsales\PaymentBase\Controller\SessionWriterInterface;
  * to this tiny class — keeping payment-base decoupled from the
  * OXID shop classes.
  */
-final class OxidSessionWriter implements SessionWriterInterface
+class OxidSessionWriter implements SessionWriterInterface
 {
     public function writeSessChallenge(string $orderId): void
     {

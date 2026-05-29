@@ -11,7 +11,7 @@ namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\Eshop\Core\Registry;
 
-final class OxidLanguageResolver implements LanguageResolverInterface
+class OxidLanguageResolver implements LanguageResolverInterface
 {
     public function getActiveLanguageId(): int
     {

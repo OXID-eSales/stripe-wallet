@@ -14,7 +14,6 @@ use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventHandlerInterface;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookOutcome;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
-use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface;
 use Psr\Log\LoggerInterface;
 
 /**

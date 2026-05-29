@@ -20,7 +20,7 @@ use OxidEsales\PaymentBase\Service\Factory\AbstractFileLoggerFactory;
  *
  * @since Sprint 25
  */
-final class EventFileLoggerFactory extends AbstractFileLoggerFactory
+class EventFileLoggerFactory extends AbstractFileLoggerFactory
 {
     protected function getLogFile(): string
     {

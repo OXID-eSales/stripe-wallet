@@ -25,7 +25,7 @@ use OxidEsales\Payments\Stripe\Service\Result\SecurityValidationResult;
  * Implements ReturnSecurityValidatorInterface for LSP compliance -
  * can be substituted anywhere the interface is expected.
  */
-final class ReturnSessionSecurityService implements ReturnSecurityValidatorInterface
+class ReturnSessionSecurityService implements ReturnSecurityValidatorInterface
 {
     // Timing thresholds (in seconds)
     private const SLOW_RETURN_THRESHOLD = 1800; // 30 minutes

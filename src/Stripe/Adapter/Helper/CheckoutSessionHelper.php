@@ -20,7 +20,7 @@ use Stripe\StripeClient;
  *
  * @since 2.0.0
  */
-final class CheckoutSessionHelper
+class CheckoutSessionHelper
 {
     /**
      * @param array<string, mixed> $params

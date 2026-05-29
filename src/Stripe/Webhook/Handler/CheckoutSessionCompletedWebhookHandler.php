@@ -16,7 +16,6 @@ use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookOutcome;
-use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -27,7 +26,7 @@ use Psr\Log\LoggerInterface;
  *
  * @since Sprint 114.4
  */
-final class CheckoutSessionCompletedWebhookHandler extends AbstractStripeWebhookHandler
+class CheckoutSessionCompletedWebhookHandler extends AbstractStripeWebhookHandler
 {
     private const EVENT_TYPE = 'checkout.session.completed';
 

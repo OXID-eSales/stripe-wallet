@@ -31,7 +31,7 @@ use RuntimeException;
  *
  * @since 2.0.0
  */
-final class IdempotentExecutor
+class IdempotentExecutor
 {
     public const STATUS_PROCESSING = 'processing';
     public const STATUS_COMPLETED = 'completed';

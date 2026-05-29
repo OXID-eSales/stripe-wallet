@@ -11,6 +11,8 @@ use OxidEsales\Payments\Stripe\Controller\StripeOrderController;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
+use OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface;
+use OxidEsales\Payments\Stripe\Service\UserFieldReaderInterface;
 use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -290,6 +292,22 @@ class StripeOrderControllerAgbConfirmationTest extends TestCase
             public function addTplParam($name, $value): void
             {
                 // No-op in tests
+            }
+
+            protected function getUserDataValidator(): UserDataValidatorInterface
+            {
+                return new class implements UserDataValidatorInterface {
+                    public function validateForUser(UserFieldReaderInterface $reader): array
+                    {
+                        return [];
+                    }
+
+                    /** @param array<string, string> $fields */
+                    public function validateFieldMap(array $fields, string $addressKind = 'billing'): array
+                    {
+                        return [];
+                    }
+                };
             }
 
             protected function exitWithJson(): void

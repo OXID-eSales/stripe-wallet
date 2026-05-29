@@ -19,7 +19,7 @@ use OxidEsales\PaymentBase\Service\FileLoggerInterface;
  *
  * @since 2.0.0
  */
-final class WebhookLogService implements WebhookLogServiceInterface
+class WebhookLogService implements WebhookLogServiceInterface
 {
     public function __construct(
         private readonly FileLoggerInterface $fileLogger

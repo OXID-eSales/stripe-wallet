@@ -17,7 +17,7 @@ namespace OxidEsales\Payments\Stripe\Controller\Webhook;
  *
  * @since 2.1.0
  */
-final class WebhookGuardChain implements WebhookRequestGuardInterface
+class WebhookGuardChain implements WebhookRequestGuardInterface
 {
     /** @param WebhookRequestGuardInterface[] $guards */
     public function __construct(private readonly array $guards)

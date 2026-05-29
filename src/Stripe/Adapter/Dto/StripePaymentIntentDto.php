@@ -20,7 +20,7 @@ namespace OxidEsales\Payments\Stripe\Adapter\Dto;
  *
  * @since 2.0.0
  */
-final readonly class StripePaymentIntentDto
+readonly class StripePaymentIntentDto
 {
     /**
      * @param string               $id            PaymentIntent ID (pi_...)

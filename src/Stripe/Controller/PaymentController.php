@@ -9,7 +9,6 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Controller;
 
-use OxidEsales\Eshop\Application\Controller\PaymentController as CorePaymentController;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\ContractTokenService;
@@ -24,7 +23,7 @@ use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
  * Adds Stripe-specific logic to payment method selection page.
  * Session access is fully delegated to ControllerRequestHelper (D6).
  */
-class PaymentController extends CorePaymentController
+class PaymentController extends PaymentController_parent
 {
     use ServiceContainer;
 
@@ -57,7 +56,7 @@ class PaymentController extends CorePaymentController
      *
      * @return string Template name
      */
-    public function render()
+    public function render(): string
     {
         $this->cleanupStaleCheckoutAttempt();
 

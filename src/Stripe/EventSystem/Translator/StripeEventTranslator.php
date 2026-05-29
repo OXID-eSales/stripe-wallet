@@ -31,7 +31,7 @@ use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
  * static mapping table so new mappings are additive array entries
  * rather than edits to a conditional chain (OCP, R-2.2).
  */
-final class StripeEventTranslator implements ProviderEventTranslatorInterface
+class StripeEventTranslator implements ProviderEventTranslatorInterface
 {
     /**
      * Maps each abstract event class to its Stripe-specific counterpart.

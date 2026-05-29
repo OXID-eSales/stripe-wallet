@@ -12,9 +12,12 @@
  #}
 
 <div class="checkout-footer-stripe"
-     data-controller="stripe-checkout-footer"
+     data-controller="stripe-checkout-footer stripe-user-data-validator"
      data-stripe-checkout-footer-payment-method-value="{{ checkoutData.paymentMethodId }}"
-     data-stripe-checkout-footer-csrf-token-value="{{ checkoutData.csrfToken }}">
+     data-stripe-checkout-footer-csrf-token-value="{{ checkoutData.csrfToken }}"
+     data-stripe-user-data-validator-url-value="{{ checkoutData.validationUrl }}"
+     data-stripe-user-data-validator-plugin-id-value="{{ checkoutData.pluginModuleId }}"
+     data-stripe-user-data-validator-csrf-value="{{ checkoutData.csrfToken }}">
 
     <div class="alert alert-danger mt-2"
          data-stripe-checkout-footer-target="error"
@@ -156,6 +159,188 @@
 
   opc.stimulus.register('stripe-checkout-footer', StripeCheckoutFooterController);
   console.log('[StripeCheckoutFooter] Registered with OnepageCheckout.stimulus');
+
+  // -----------------------------------------------------------------------
+  // stripe-user-data-validator Stimulus controller
+  //
+  // Intercepts the Stripe footer submit, POSTs live OPC form values to the
+  // central payment-base validation endpoint, renders per-field inline
+  // errors on `valid:false`, and releases submit on `valid:true`.
+  //
+  // Fail-open policy: on HTTP 4xx/5xx (guard failure or transient backend
+  // error) we LOG and RELEASE the submit. The standard-checkout path
+  // (StripeOrderController) is the synchronous source of truth; OPC
+  // fail-open is the explicitly accepted residual risk for this path
+  // (see sprint-119 §8 Risks).
+  //
+  // OPC submit-event contract (documented here after grepping OPC source):
+  //   The Stripe footer widget has its OWN submit button. It is NOT triggered
+  //   by an OPC-level submit event. The button's data-action is:
+  //     click->stripe-checkout-footer#submitPayment
+  //   There is no published "opc:submit-attempt" or equivalent event that
+  //   fires before submitPayment. Intercept strategy: at connect() time,
+  //   wrap `submitPayment` on the stripe-checkout-footer controller instance
+  //   via Stimulus's cross-controller lookup. The wrapper runs validation
+  //   first, then delegates to the original method on success.
+  //
+  // OPC field selectors (verified from delivery-address.html.twig):
+  //   id="buyNowFirstName"  name="firstName"
+  //   id="buyNowLastName"   name="lastName"
+  //   id="buyNowStreet"     name="street"
+  //   id="buyNowStreetNr"   name="streetNr"
+  //   id="buyNowZip"        name="zip"
+  //   id="buyNowCity"       name="city"
+  //   Additional fields (phone, company, etc.) use name="oxuser__ox*" from
+  //   OXID core templates — included defensively; missing = silently skipped.
+  // -----------------------------------------------------------------------
+
+  class StripeUserDataValidatorController extends BaseController {
+    static values = {
+      url:      String,
+      pluginId: String,
+      csrf:     String
+    }
+
+    connect() {
+      console.log('[StripeUserDataValidator] Connected — wrapping stripe-checkout-footer#submitPayment');
+      this._wrapSubmitPayment();
+    }
+
+    disconnect() {
+      this._unwrapSubmitPayment();
+    }
+
+    // ---- private helpers ----
+
+    _wrapSubmitPayment() {
+      var footerCtrl = this.application.getControllerForElementAndIdentifier(
+        this.element,
+        'stripe-checkout-footer'
+      );
+
+      if (!footerCtrl) {
+        console.warn('[StripeUserDataValidator] stripe-checkout-footer not found — skipping wrap');
+        return;
+      }
+
+      // Store originals for disconnect-time restoration.
+      this._footerCtrl          = footerCtrl;
+      this._originalSubmit      = footerCtrl.submitPayment.bind(footerCtrl);
+      footerCtrl.submitPayment  = this._interceptSubmit.bind(this);
+      console.log('[StripeUserDataValidator] submitPayment wrapped');
+    }
+
+    _unwrapSubmitPayment() {
+      if (this._footerCtrl && this._originalSubmit) {
+        this._footerCtrl.submitPayment = this._originalSubmit;
+        console.log('[StripeUserDataValidator] submitPayment restored');
+      }
+    }
+
+    async _interceptSubmit(event) {
+      if (event) event.preventDefault();
+
+      this._clearErrors();
+
+      var fields = this._collectFields();
+      if (Object.keys(fields).length === 0) {
+        // Nothing to validate — release immediately.
+        this._originalSubmit(event);
+        return;
+      }
+
+      try {
+        var body = new FormData();
+        body.append('pluginModuleId', this.pluginIdValue);
+        body.append('stoken',         this.csrfValue);
+        for (var [k, v] of Object.entries(fields)) {
+          body.append(k, v);
+        }
+
+        var resp = await fetch(this.urlValue, {
+          method:      'POST',
+          credentials: 'same-origin',
+          headers:     { 'X-Requested-With': 'XMLHttpRequest' },
+          body:        body
+        });
+
+        if (!resp.ok) {
+          // Fail open — see header comment.
+          console.warn('[StripeUserDataValidator] backend returned', resp.status, '— releasing submit');
+          this._originalSubmit(event);
+          return;
+        }
+
+        var data = await resp.json();
+        if (data.valid) {
+          this._originalSubmit(event);
+          return;
+        }
+
+        this._renderErrors(data.errors || []);
+
+      } catch (err) {
+        console.warn('[StripeUserDataValidator] fetch error, failing open:', err);
+        this._originalSubmit(event);
+      }
+    }
+
+    _collectFields() {
+      // logical-name → OPC Stimulus address-target.
+      // Source: one-page-checkout/.../shared/address-form-fields.html.twig
+      // (fields render with data-{billing|delivery}-address-target="…"; we read
+      //  whichever address form is on the page). A rename there surfaces as
+      //  "no fields collected → validation skipped" rather than a silent error.
+      var TARGET_MAP = {
+        firstName:   'firstName',
+        lastName:    'lastName',
+        street:      'street',
+        houseNumber: 'streetNumber',
+        postalCode:  'zipCode',
+        city:        'city'
+      };
+
+      var out = {};
+      for (var [logical, target] of Object.entries(TARGET_MAP)) {
+        var nodes = document.querySelectorAll(
+          '[data-billing-address-target="' + target + '"], ' +
+          '[data-delivery-address-target="' + target + '"]'
+        );
+        for (var el of nodes) {
+          var v = el && typeof el.value === 'string' ? el.value.trim() : '';
+          if (v !== '') { out[logical] = v; break; }
+        }
+      }
+      return out;
+    }
+
+    // STRP-129: ONE error -> ONE event. For each failed field we dispatch the
+    // `oe:payment:error` document event OPC already listens for (its
+    // notification_controller via the eventBus bridge + modal_state_controller
+    // directly), so the standard OPC notice box appears automatically. The
+    // per-field message is the SAME one the classic checkout shows (err.message,
+    // produced server-side by UserDataValidationMessageFormatter).
+    _renderErrors(errors) {
+      if (!Array.isArray(errors)) {
+        return;
+      }
+
+      for (var err of errors) {
+        var message = err.message || ('Invalid value for ' + (err.field || ''));
+        document.dispatchEvent(new CustomEvent('oe:payment:error', {
+          detail: { message: message }
+        }));
+      }
+    }
+
+    _clearErrors() {
+      // No own box to clear — OPC's notification system owns the notice lifecycle.
+    }
+
+  }
+
+  opc.stimulus.register('stripe-user-data-validator', StripeUserDataValidatorController);
+  console.log('[StripeUserDataValidator] Registered with OnepageCheckout.stimulus');
 })();
 </script>
 

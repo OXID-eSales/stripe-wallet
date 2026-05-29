@@ -14,6 +14,15 @@ services:
       - 'src/Stripe/Service/WebhookLogService.php'
       - 'src/Stripe/Service/OxidStockRestorationService.php'
       - 'src/Stripe/Service/WebhookEndpointRegistrationResult.php'
+      # Sprint 119 Phase B: VOs, interfaces, and OXID-model-bound readers excluded from autowire sweep
+      - 'src/Stripe/Service/FieldValidationFailure.php'
+      - 'src/Stripe/Service/UserDataValidatorInterface.php'
+      - 'src/Stripe/Service/UserFieldReaderInterface.php'
+      - 'src/Stripe/Service/OxidUserFieldReader.php'
+      # Sprint 119 Phase E: narrow translator interface excluded from autowire sweep
+      - 'src/Stripe/Service/LanguageTranslatorInterface.php'
+      # STRP-129: array-arg constructor — wired explicitly via ValidationRulesProvider factory
+      - 'src/Stripe/Service/AllowedSymbolsDescriber.php'
     public: true
 
   # Sprint 114.11b (S2): Extracted from ModuleConfigurationService — URL construction.
@@ -834,8 +843,8 @@ services:
 
   # Interface binding
   # Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
-  OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface:
-    class: OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler
+  OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface:
+    class: OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler
     arguments:
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $contractFulfillmentService: '@OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface'
@@ -854,8 +863,8 @@ services:
     alias: OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface
 
   # Concrete implementation alias
-  OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler:
-    alias: OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface
+  OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler:
+    alias: OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface
 
   # ==========================================
   # Stripe Webhook Processor (Sprint 5)
@@ -885,7 +894,7 @@ services:
   OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededWebhookHandler:
     arguments:
       $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
-      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
     tags: [ { name: stripe.webhook_handler } ]
@@ -894,7 +903,7 @@ services:
   OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentFailedWebhookHandler:
     arguments:
       $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
-      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
     tags: [ { name: stripe.webhook_handler } ]
@@ -903,7 +912,7 @@ services:
   OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentCanceledWebhookHandler:
     arguments:
       $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
-      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
     tags: [ { name: stripe.webhook_handler } ]
@@ -912,7 +921,7 @@ services:
   OxidEsales\Payments\Stripe\Webhook\Handler\ChargeRefundedWebhookHandler:
     arguments:
       $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
-      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
     tags: [ { name: stripe.webhook_handler } ]
@@ -921,7 +930,7 @@ services:
   OxidEsales\Payments\Stripe\Webhook\Handler\ChargeDisputeCreatedWebhookHandler:
     arguments:
       $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
-      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
     tags: [ { name: stripe.webhook_handler } ]
@@ -930,7 +939,7 @@ services:
   OxidEsales\Payments\Stripe\Webhook\Handler\CheckoutSessionCompletedWebhookHandler:
     arguments:
       $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
-      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
     tags: [ { name: stripe.webhook_handler } ]
@@ -939,7 +948,7 @@ services:
   OxidEsales\Payments\Stripe\Webhook\Handler\CheckoutSessionExpiredWebhookHandler:
     arguments:
       $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
-      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandlerInterface'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
     tags: [ { name: stripe.webhook_handler } ]
@@ -1037,19 +1046,14 @@ services:
   # Controllers
   # ==========================================
 
-  # PaymentController - Extended OXID PaymentController with Stripe payment integration
-  OxidEsales\Payments\Stripe\Controller\PaymentController:
-    arguments:
-      - '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
-    tags:
-      - { name: oxid.view_controller, controller_key: payment }
-    public: true
-
-  # StripeOrderController - Extended OXID OrderController with Stripe payment integration
-  OxidEsales\Payments\Stripe\Controller\StripeOrderController:
-    tags:
-      - { name: oxid.view_controller, controller_key: order }
-    public: true
+  # PaymentController and StripeOrderController are NOT registered as services.
+  # They are pure OXID class-chain extensions (see metadata.php `extend`: they
+  # `extends PaymentController_parent` / `StripeOrderController_parent`) and access
+  # services at runtime via the ServiceContainer trait — they have no constructor DI.
+  # Registering a chain extension as a `oxid.view_controller` service makes the DI
+  # compiler reflect/autoload the class, which triggers the OXID class-chain build
+  # and re-enters the container compiler (ActiveModulesDataProviderBridge
+  # ArgumentCountError). Keeping them out of services.yaml is the OXID-standard shape.
 
   # Sprint 46: Extracted services for OrderRefund admin controller
   OxidEsales\Payments\Stripe\Service\OrderContractResolver:
@@ -1246,6 +1250,51 @@ services:
         - '@OxidEsales\Payments\Stripe\Controller\Webhook\WebhookPayloadSizeGuard'
         - '@OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRateLimitGuard'
         - '@OxidEsales\Payments\Stripe\Controller\Webhook\WebhookIpAllowlistGuard'
+
+  # ---- Sprint 119 Phase B: user-data character-level validation (STRP-129) ----
+
+  # ValidationBase bound for the Stripe plugin. The module id is a YAML literal
+  # because YAML cannot reference PHP constants; StripeDefinitions::STRIPE_WALLET_PAYMENT_ID
+  # resolves to the same value ('oe_payments_stripe_wallet').
+  OxidEsales\PaymentBase\Validation\ValidationBaseInterface:
+    class: OxidEsales\PaymentBase\Validation\ValidationBase
+    arguments:
+      $pluginModuleId: 'oe_payments_stripe_wallet'
+      $loader: '@OxidEsales\PaymentBase\Validation\ValidationRuleLoaderInterface'
+    public: false
+
+  # UserDataValidator facade — stateless singleton; receives UserFieldReaderInterface
+  # as a validateForUser() method argument so it can be DI-singleton while the
+  # reader is request-scoped (bound to the live User object in Phase C controller).
+  OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface:
+    class: OxidEsales\Payments\Stripe\Service\UserDataValidator
+    arguments:
+      - '@OxidEsales\PaymentBase\Validation\ValidationBaseInterface'
+    public: true
+
+  # Sprint 119 Phase E (STRP-129) — narrow language-translation seam for testability.
+  OxidEsales\Payments\Stripe\Service\LanguageTranslatorInterface:
+    class: OxidEsales\Payments\Stripe\Service\OxidLanguageTranslator
+    public: false
+
+  # Sprint 119 Phase E (STRP-129) — user-data validation message formatter.
+  # Tagged with oe.payment_base.validation_message_formatter so that
+  # ValidationApiController picks it up for the OPC endpoint path.
+  # STRP-129: allowed-symbols describer — built from validation-rules.php via the
+  # provider factory so the describer keeps its unit-testable (translator, array) ctor.
+  OxidEsales\Payments\Stripe\Service\AllowedSymbolsDescriber:
+    factory: ['@OxidEsales\Payments\Stripe\Service\ValidationRulesProvider', 'createDescriber']
+    arguments:
+      - '@OxidEsales\Payments\Stripe\Service\LanguageTranslatorInterface'
+    public: true
+
+  OxidEsales\Payments\Stripe\Service\UserDataValidationMessageFormatter:
+    arguments:
+      $translator: '@OxidEsales\Payments\Stripe\Service\LanguageTranslatorInterface'
+      $allowedSymbolsDescriber: '@OxidEsales\Payments\Stripe\Service\AllowedSymbolsDescriber'
+    tags:
+      - { name: oe.payment_base.validation_message_formatter }
+    public: true
 
 parameters:
   # Fraud check toggle (default: enabled)

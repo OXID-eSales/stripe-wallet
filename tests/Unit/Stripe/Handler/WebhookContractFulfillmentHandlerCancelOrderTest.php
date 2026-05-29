@@ -17,7 +17,7 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
-use OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler;
+use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -25,7 +25,7 @@ use PHPUnit\Framework\TestCase;
  * the linked oxorder row so cancelled orders no longer look paid in the admin
  * order list.
  *
- * @covers \OxidEsales\Payments\Stripe\WebhookHandler\WebhookContractFulfillmentHandler
+ * @covers \OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler
  */
 class WebhookContractFulfillmentHandlerCancelOrderTest extends TestCase
 {

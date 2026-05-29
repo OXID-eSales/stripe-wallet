@@ -23,7 +23,7 @@ use Stripe\StripeClient;
  *
  * @since 1.0.0
  */
-final class StripeClientFactory implements StripeClientProviderInterface
+class StripeClientFactory implements StripeClientProviderInterface
 {
     private string $secretKey;
     private bool $testMode;

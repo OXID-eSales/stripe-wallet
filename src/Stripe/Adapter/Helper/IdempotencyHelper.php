@@ -19,7 +19,7 @@ use OxidEsales\PaymentBase\Contract\IdempotencyRecord;
  *
  * @since 2.0.0
  */
-final class IdempotencyHelper
+class IdempotencyHelper
 {
     public static function reuseOrCreate(
         ?IdempotencyRecord $existing,

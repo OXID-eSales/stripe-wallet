@@ -17,7 +17,7 @@ namespace OxidEsales\Payments\Stripe\Service\Result;
  *
  * @since 2.0.0
  */
-final class ReconciliationResult
+class ReconciliationResult
 {
     public function __construct(
         public readonly string $orderId,

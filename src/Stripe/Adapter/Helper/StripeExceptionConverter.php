@@ -20,7 +20,7 @@ use Stripe\Exception\ApiErrorException;
  *
  * @since 2.0.0
  */
-final class StripeExceptionConverter
+class StripeExceptionConverter
 {
     public static function convert(ApiErrorException $e): PaymentAdapterException
     {

@@ -16,7 +16,7 @@ namespace OxidEsales\Payments\Stripe\Adapter\Dto;
  *
  * @since 2.0.0
  */
-final readonly class StripeCustomerDto
+readonly class StripeCustomerDto
 {
     /**
      * @param string              $id       Customer ID (cus_...)

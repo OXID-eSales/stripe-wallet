@@ -1,0 +1,61 @@
+<?php
+
+/**
+ * Copyright © OXID eSales AG. All rights reserved.
+ * See LICENSE file for license details.
+ */
+
+declare(strict_types=1);
+
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
+
+use OxidEsales\Payments\Stripe\Service\AllowedSymbolsDescriber;
+use OxidEsales\Payments\Stripe\Service\LanguageTranslatorInterface;
+use OxidEsales\Payments\Stripe\Service\ValidationRulesProvider;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * STRP-129: provider reads the real validation-rules.php and exposes the
+ * field -> allow-token-string map used by the AllowedSymbolsDescriber.
+ *
+ * @covers \OxidEsales\Payments\Stripe\Service\ValidationRulesProvider
+ * @group user-data-validation
+ */
+final class ValidationRulesProviderTest extends TestCase
+{
+    private ValidationRulesProvider $sut;
+
+    protected function setUp(): void
+    {
+        $this->sut = new ValidationRulesProvider();
+    }
+
+    public function testReturnsAllowStringForKnownFields(): void
+    {
+        $map = $this->sut->getFieldAllowMap();
+
+        $this->assertArrayHasKey('firstName', $map);
+        $this->assertSame("UNICODE_LETTERS SPACES ' - .", $map['firstName']);
+        $this->assertSame('NUMBERS SPACES + - ( )', $map['phone']);
+    }
+
+    public function testCoversAllThirteenFields(): void
+    {
+        $this->assertCount(13, $this->sut->getFieldAllowMap());
+    }
+
+    public function testBuildsDescriberWithTheRealMap(): void
+    {
+        $translator = $this->createMock(LanguageTranslatorInterface::class);
+        $translator->method('translateString')->willReturnMap([
+            ['STRIPE_VALIDATION_CLASS_LETTERS', 'letters'],
+            ['STRIPE_VALIDATION_CLASS_DIGITS', 'digits'],
+            ['STRIPE_VALIDATION_CLASS_SPACES', 'spaces'],
+        ]);
+
+        $describer = $this->sut->createDescriber($translator);
+
+        $this->assertInstanceOf(AllowedSymbolsDescriber::class, $describer);
+        $this->assertSame("letters, spaces, ' - .", $describer->describe('firstName'));
+    }
+}

@@ -20,7 +20,7 @@ namespace OxidEsales\Payments\Stripe\Service;
  *
  * @since 2.0.0
  */
-final class CustomerDataSanitizer
+class CustomerDataSanitizer
 {
     public function sanitize(string $value, int $maxLength = 255): string
     {

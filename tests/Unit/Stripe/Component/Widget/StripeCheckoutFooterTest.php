@@ -100,6 +100,41 @@ final class StripeCheckoutFooterTest extends TestCase
         self::assertSame(12.50, $data['totalPrice']);
     }
 
+    // --- getCheckoutData() — Phase D new keys ---
+
+    public function testWidgetExposesValidationUrlAndPluginId(): void
+    {
+        $footer = $this->buildFooterWithShopUrl(
+            ['csrfToken' => 'tok'],
+            'pk_test',
+            'https://shop.example.com/'
+        );
+
+        $data = $footer->exposedGetCheckoutData();
+
+        self::assertSame(Module::MODULE_ID, $data['pluginModuleId']);
+        self::assertStringContainsString('cl=oepaymentvalidationapi', $data['validationUrl']);
+        self::assertStringContainsString('fnc=validate', $data['validationUrl']);
+        self::assertStringStartsWith('https://shop.example.com/', $data['validationUrl']);
+    }
+
+    public function testWidgetReusesExistingCsrfTokenKey(): void
+    {
+        $footer = $this->buildFooterWithShopUrl(
+            ['csrfToken' => 'my_csrf_token'],
+            'pk_test',
+            'https://shop.example.com/'
+        );
+
+        $data = $footer->exposedGetCheckoutData();
+
+        self::assertArrayHasKey('csrfToken', $data);
+        self::assertSame('my_csrf_token', $data['csrfToken']);
+        // Guard: no duplicate key under a different name was introduced.
+        $csrfKeys = array_filter(array_keys($data), static fn(string $k) => str_contains($k, 'csrf') || str_contains($k, 'Csrf'));
+        self::assertCount(1, $csrfKeys, 'Exactly one csrf key must exist in checkoutData.');
+    }
+
     // --- getStripeConfig() ---
 
     public function testGetStripeConfigReturnsPublishableKey(): void
@@ -133,7 +168,23 @@ final class StripeCheckoutFooterTest extends TestCase
         $configService = $this->createMock(ModuleConfigurationServiceInterface::class);
         $configService->method('getPublishableKey')->willReturn($publishableKey);
 
-        return new TestableStripeCheckoutFooter($viewParams, $configService);
+        return new TestableStripeCheckoutFooter($viewParams, $configService, 'https://localhost.local/');
+    }
+
+    /**
+     * Builds a testable subclass with an explicit shop URL for Phase D assertions.
+     *
+     * @param array<string, mixed> $viewParams
+     */
+    private function buildFooterWithShopUrl(
+        array $viewParams,
+        string $publishableKey,
+        string $shopUrl
+    ): TestableStripeCheckoutFooter {
+        $configService = $this->createMock(ModuleConfigurationServiceInterface::class);
+        $configService->method('getPublishableKey')->willReturn($publishableKey);
+
+        return new TestableStripeCheckoutFooter($viewParams, $configService, $shopUrl);
     }
 
     /**
@@ -147,7 +198,7 @@ final class StripeCheckoutFooterTest extends TestCase
         $configService->method('getPublishableKey')
             ->willThrowException(new \RuntimeException('Config not available'));
 
-        return new TestableStripeCheckoutFooter($viewParams, $configService);
+        return new TestableStripeCheckoutFooter($viewParams, $configService, 'https://localhost.local/');
     }
 }
 
@@ -166,8 +217,14 @@ final class TestableStripeCheckoutFooter extends StripeCheckoutFooter
     public function __construct(
         private readonly array $viewParams,
         private readonly ModuleConfigurationServiceInterface $configService,
+        private readonly string $shopUrl = 'https://localhost.local/',
     ) {
         // Skip OXID parent constructor
+    }
+
+    protected function getShopUrl(): string
+    {
+        return $this->shopUrl;
     }
 
     public function render(): string

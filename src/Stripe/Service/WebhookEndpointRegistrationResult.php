@@ -16,7 +16,7 @@ namespace OxidEsales\Payments\Stripe\Service;
  * signing secret is preserved by Stripe but not re-emitted by the API, so the
  * caller must keep the previously stored value. See {@see WebhookEndpointRegistrar::register()}.
  */
-final class WebhookEndpointRegistrationResult
+class WebhookEndpointRegistrationResult
 {
     public function __construct(
         public readonly string $endpointId,
