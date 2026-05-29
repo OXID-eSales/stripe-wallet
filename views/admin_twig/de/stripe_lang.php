@@ -92,6 +92,7 @@ $aLang = array(
     'STRIPE_PAYMENT_LIMITATION_TO'                      => 'bis',
     'STRIPE_PAYMENT_LIMITATION_UNLIMITED'               => 'unbegrenzt',
     'STRIPE_PAYMENT_DETAILS'                            => 'Zahlungsdetails',
+    'STRIPE_ORDER_NUMBER'                               => 'Bestell-Nr.',
     'STRIPE_CONTRACT_ID'                                => 'Vertrags-ID',
     'STRIPE_ORDER_ID'                                   => 'Bestell-ID',
     'STRIPE_PAYMENT_TYPE'                               => 'Zahlart',

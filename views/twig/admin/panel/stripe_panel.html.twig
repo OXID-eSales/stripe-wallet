@@ -193,6 +193,16 @@
         <div class="s-card-header">{{ translate({ ident: "STRIPE_PAYMENT_DETAILS" }) }}</div>
         <table class="s-details">
             <tr>
+                <td class="s-label">{{ translate({ ident: "STRIPE_ORDER_NUMBER" }) }}</td>
+                <td class="s-value" data-testid="order-number">
+                    {% if orderNumber is defined and orderNumber and orderNumber != '0' %}
+                        <strong>{{ orderNumber }}</strong>
+                    {% else %}
+                        <span class="s-muted">&ndash;</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
                 <td class="s-label">{{ translate({ ident: "STRIPE_CONTRACT_ID" }) }}</td>
                 <td class="s-value" data-testid="contract-id">
                     {% if contractId is defined and contractId %}
@@ -421,4 +431,3 @@
         </div>
     {% endif %}
 </div>
-

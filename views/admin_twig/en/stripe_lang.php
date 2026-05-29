@@ -92,6 +92,7 @@ $aLang = array(
     'STRIPE_PAYMENT_LIMITATION_TO'                      => 'to',
     'STRIPE_PAYMENT_LIMITATION_UNLIMITED'               => 'unlimited',
     'STRIPE_PAYMENT_DETAILS'                            => 'Payment details',
+    'STRIPE_ORDER_NUMBER'                               => 'Order No.',
     'STRIPE_CONTRACT_ID'                                => 'Contract ID',
     'STRIPE_ORDER_ID'                                   => 'Order ID',
     'STRIPE_PAYMENT_TYPE'                               => 'Payment type',
