@@ -17,7 +17,9 @@
      data-stripe-checkout-footer-csrf-token-value="{{ checkoutData.csrfToken }}"
      data-stripe-user-data-validator-url-value="{{ checkoutData.validationUrl }}"
      data-stripe-user-data-validator-plugin-id-value="{{ checkoutData.pluginModuleId }}"
-     data-stripe-user-data-validator-csrf-value="{{ checkoutData.csrfToken }}">
+     data-stripe-user-data-validator-csrf-value="{{ checkoutData.csrfToken }}"
+     data-stripe-user-data-validator-allowed-value="{{ checkoutData.fieldAllowed|json_encode|e('html_attr') }}"
+     data-stripe-user-data-validator-review-message-value="{{ translate({ ident: 'STRIPE_VALIDATION_REVIEW_ADDRESS' }) }}">
 
     <div class="alert alert-danger mt-2"
          data-stripe-checkout-footer-target="error"
@@ -196,9 +198,11 @@
 
   class StripeUserDataValidatorController extends BaseController {
     static values = {
-      url:      String,
-      pluginId: String,
-      csrf:     String
+      url:           String,
+      pluginId:      String,
+      csrf:          String,
+      allowed:       Object,
+      reviewMessage: String
     }
 
     connect() {
@@ -321,16 +325,23 @@
     // per-field message is the SAME one the classic checkout shows (err.message,
     // produced server-side by UserDataValidationMessageFormatter).
     _renderErrors(errors) {
-      if (!Array.isArray(errors)) {
+      if (!Array.isArray(errors) || errors.length === 0) {
         return;
       }
 
+      var allowedMap = this.allowedValue || {};
+
+      // One field-level event per failed field, carrying the allowed symbols.
       for (var err of errors) {
-        var message = err.message || ('Invalid value for ' + (err.field || ''));
-        document.dispatchEvent(new CustomEvent('oe:payment:error', {
-          detail: { message: message }
+        document.dispatchEvent(new CustomEvent('oe:payment:error:field', {
+          detail: { field: err.field, allowed: allowedMap[err.field] || '' }
         }));
       }
+
+      // One generic error notice for OPC's notification system.
+      document.dispatchEvent(new CustomEvent('oe:payment:error', {
+        detail: { message: this.reviewMessageValue || 'Please review your address details.' }
+      }));
     }
 
     _clearErrors() {

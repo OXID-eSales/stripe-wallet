@@ -120,6 +120,7 @@ $aLang = [
     // -----------------------------------------------------------------------
     'STRIPE_VALIDATION_FIELD_INVALID'                        => 'The %1$s field is not valid. Allowed symbols are: %2$s',
     'STRIPE_VALIDATION_UNDERSTAND'                           => 'Understand',
+    'STRIPE_VALIDATION_REVIEW_ADDRESS'                       => 'Please review your address details.',
 
     // Character-class words used to render the allowed-symbols list.
     'STRIPE_VALIDATION_CLASS_LETTERS'                        => 'letters',

@@ -55,7 +55,40 @@ class StripeCheckoutFooter extends WidgetController
             'csrfToken' => (string) $this->getViewParameter('csrfToken'),
             'validationUrl' => $this->getShopUrl() . 'index.php?cl=oepaymentvalidationapi&fnc=validate',
             'pluginModuleId' => Module::MODULE_ID,
+            'fieldAllowed' => $this->getValidationFieldAllowed(),
         ];
+    }
+
+    /**
+     * field => human-readable allowed-symbols string (e.g. "letters, spaces, ' - .").
+     * Consumed by the OPC widget to put `allowed` in the per-field
+     * `oe:payment:error:field` event. Returns [] if unavailable (never throws).
+     *
+     * @return array<string, string>
+     */
+    protected function getValidationFieldAllowed(): array
+    {
+        try {
+            $provider = $this->getServiceFromContainer(
+                \OxidEsales\Payments\Stripe\Service\ValidationRulesProvider::class
+            );
+            $describer = $this->getServiceFromContainer(
+                \OxidEsales\Payments\Stripe\Service\AllowedSymbolsDescriber::class
+            );
+
+            $allowed = [];
+            foreach (array_keys($provider->getFieldAllowMap()) as $field) {
+                $allowed[$field] = $describer->describe($field);
+            }
+
+            return $allowed;
+        } catch (\Throwable $e) {
+            Registry::getLogger()->error('[StripeCheckoutFooter] Failed to build allowed-symbols map', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
     }
 
     /**
