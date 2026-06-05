@@ -10,8 +10,10 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Admin;
 
 use OxidEsales\Eshop\Application\Model\Order;
+use OxidEsales\PaymentBase\Validation\Message\MessageFormatterInterface;
 use OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
+use OxidEsales\Payments\Stripe\Service\LanguageTranslatorInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\OrderContractResolver;
 
@@ -25,10 +27,27 @@ use OxidEsales\Payments\Stripe\Service\OrderContractResolver;
  */
 class StripePanelViewDataBuilder
 {
+    /**
+     * Per-code message keys for semantic amount failures (Sprint 121).
+     * Char-level failures route through the message formatter instead.
+     *
+     * @var array<string, string>
+     */
+    private const AMOUNT_MESSAGE_KEYS = [
+        AmountValidationResult::CODE_MALFORMED         => 'STRIPE_VALIDATION_AMOUNT_MALFORMED',
+        AmountValidationResult::CODE_NOT_POSITIVE      => 'STRIPE_VALIDATION_AMOUNT_NOT_POSITIVE',
+        AmountValidationResult::CODE_PRECISION         => 'STRIPE_VALIDATION_AMOUNT_PRECISION',
+        AmountValidationResult::CODE_EXCEEDS_BOUND     => 'STRIPE_VALIDATION_AMOUNT_EXCEEDS_BOUND',
+        AmountValidationResult::CODE_BOUND_UNAVAILABLE => 'STRIPE_VALIDATION_AMOUNT_BOUND_UNAVAILABLE',
+    ];
+
     public function __construct(
         private readonly OrderRefundViewDataProvider $viewDataProvider,
         private readonly OrderContractResolver $contractResolver,
         private readonly ModuleConfigurationServiceInterface $moduleConfig,
+        private readonly AdminValidationFeedbackInterface $validationFeedback,
+        private readonly MessageFormatterInterface $messageFormatter,
+        private readonly LanguageTranslatorInterface $translator,
     ) {
     }
 
@@ -87,7 +106,52 @@ class StripePanelViewDataBuilder
 
             // Transaction history
             'transactions'        => $provider->getStripeTransactionHistory($order),
+
+            // Sprint 120 (STRP-129): admin validation failures from the
+            // session-backed feedback channel, rendered as translated messages.
+            'validationErrors'    => $this->buildValidationErrors((string) $order->getId()),
         ];
+    }
+
+    /**
+     * Consumes (read-and-clear) the stored validation failures and formats
+     * each via the Stripe message formatter — the same message shape the
+     * storefront shows ("The {label} field is not valid. Allowed symbols
+     * are: ..."), translated through the admin language files.
+     *
+     * @return list<string>
+     */
+    private function buildValidationErrors(string $orderId): array
+    {
+        $messages = [];
+
+        foreach ($this->validationFeedback->consume($orderId) as $entry) {
+            $messages[] = $this->formatEntryMessage($entry);
+        }
+
+        return $messages;
+    }
+
+    /**
+     * Semantic amount codes (Sprint 121) get per-code messages; char-level
+     * codes keep the Sprint 119/120 "allowed symbols" formatter. Numeric
+     * interpolation is deliberately omitted — the panel already displays
+     * the capturable/refundable figures next to the forms.
+     *
+     * @param array{field: string, code: string, char: ?string, action: string} $entry
+     */
+    private function formatEntryMessage(array $entry): string
+    {
+        $amountKey = self::AMOUNT_MESSAGE_KEYS[$entry['code']] ?? null;
+        if ($amountKey !== null) {
+            return $this->translator->translateString($amountKey);
+        }
+
+        return $this->messageFormatter->format(
+            $entry['field'],
+            $entry['code'],
+            $entry['char'],
+        );
     }
 
     /**

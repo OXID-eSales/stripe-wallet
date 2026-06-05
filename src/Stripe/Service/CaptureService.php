@@ -53,6 +53,12 @@ class CaptureService implements CaptureServiceInterface
         ?float $amount,
         array $metadata
     ): CaptureResponse {
+        // Sprint 121 (STRP-129): defense-in-depth — no caller may push a
+        // non-positive partial amount to the Stripe API. Null = full capture.
+        if ($amount !== null && $amount <= 0.0) {
+            return CaptureResponse::failure('Capture amount must be greater than zero');
+        }
+
         // Sprint 114.11b (S3): capturable-state policy lives in the service, not the handler.
         // Only AUTHORIZED and COMMITTED contracts may be captured.
         if (!$contract->getState()->isAuthorized() && !$contract->getState()->isCommitted()) {
@@ -101,6 +107,11 @@ class CaptureService implements CaptureServiceInterface
         ?float $amount,
         array $metadata
     ): CaptureResponse {
+        // Sprint 121 (STRP-129): same non-positive guard as processCapture.
+        if ($amount !== null && $amount <= 0.0) {
+            return CaptureResponse::failure('Capture amount must be greater than zero');
+        }
+
         // No currency available here without an extra API call — null falls back to 2-decimal behaviour.
         return $this->executeCapture($paymentIntentId, $amount, $metadata);
     }

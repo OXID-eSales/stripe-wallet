@@ -1098,15 +1098,46 @@ services:
       $actionDispatcher: '@OxidEsales\Payments\Stripe\Controller\Admin\OrderActionDispatcher'
       $viewDataBuilder: '@OxidEsales\Payments\Stripe\Admin\StripePanelViewDataBuilder'
       $orderLoader: '@OxidEsales\Payments\Stripe\Admin\StripePanelOrderLoader'
+      # Sprint 120 (STRP-129): capture_reason pre-dispatch gate + feedback channel
+      $userDataValidator: '@OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface'
+      $validationFeedback: '@OxidEsales\Payments\Stripe\Admin\AdminValidationFeedbackInterface'
+      # Sprint 121 (STRP-129): semantic amount gate + PSP-derived bounds
+      $amountValidator: '@OxidEsales\Payments\Stripe\Admin\AdminAmountValidator'
+      $actionBounds: '@OxidEsales\Payments\Stripe\Admin\AdminActionBoundsInterface'
     tags:
       - { name: 'oe.payment.admin_panel' }
     public: true
+
+  # Sprint 121 (STRP-129): stateless semantic amount validator (no interface —
+  # pure deterministic function; tests use the real instance).
+  OxidEsales\Payments\Stripe\Admin\AdminAmountValidator:
+    public: false
+
+  # Sprint 121 (STRP-129): narrow bounds seam over OrderRefundViewDataProvider.
+  OxidEsales\Payments\Stripe\Admin\AdminActionBoundsInterface:
+    class: OxidEsales\Payments\Stripe\Admin\StripeAdminActionBounds
+    arguments:
+      $viewDataProvider: '@OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider'
+    public: false
+
+  # Sprint 120 (STRP-129): session-backed feedback channel for admin
+  # Payment-tab validation failures (store on gate path, consume on render).
+  OxidEsales\Payments\Stripe\Admin\AdminValidationFeedbackInterface:
+    class: OxidEsales\Payments\Stripe\Admin\AdminValidationFeedback
+    arguments:
+      $session: '@OxidEsales\PaymentBase\Adapter\SessionAdapterInterface'
+    public: false
 
   OxidEsales\Payments\Stripe\Admin\StripePanelViewDataBuilder:
     arguments:
       $viewDataProvider: '@OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider'
       $contractResolver: '@OxidEsales\Payments\Stripe\Service\OrderContractResolver'
       $moduleConfig: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+      # Sprint 120 (STRP-129): consume validation feedback + format messages
+      $validationFeedback: '@OxidEsales\Payments\Stripe\Admin\AdminValidationFeedbackInterface'
+      $messageFormatter: '@OxidEsales\Payments\Stripe\Service\UserDataValidationMessageFormatter'
+      # Sprint 121 (STRP-129): per-code amount messages
+      $translator: '@OxidEsales\Payments\Stripe\Service\LanguageTranslatorInterface'
     public: false
 
   OxidEsales\Payments\Stripe\Admin\StripePanelOrderLoader:

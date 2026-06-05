@@ -88,5 +88,25 @@ return [
                 'allow' => 'NUMBERS SPACES + - ( )',
             ],
         ],
+        // Sprint 120 (STRP-129): admin Payment-tab capture-reason — outbound free
+        // text into Stripe PaymentIntent capture metadata. UNICODE_LETTERS so
+        // German umlauts pass; block set mirrors additionalInfo plus ".
+        [
+            'field' => 'captureReason',
+            'rules' => [
+                'allow' => "UNICODE_LETTERS NUMBERS SPACES ' - . , / # ( ) :",
+                'block' => '< > { } [ ] | \\ ~ ! @ $ % ^ * = + "',
+            ],
+        ],
+        // Sprint 121 (STRP-129): admin refund description — POST-reachable
+        // free text into Stripe refund metadata (not present in the panel
+        // form; the controller forwards $_POST wholesale).
+        [
+            'field' => 'refundDescription',
+            'rules' => [
+                'allow' => "UNICODE_LETTERS NUMBERS SPACES ' - . , / # ( ) :",
+                'block' => '< > { } [ ] | \\ ~ ! @ $ % ^ * = + "',
+            ],
+        ],
     ],
 ];

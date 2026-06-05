@@ -12,12 +12,19 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Admin;
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\PaymentBase\Admin\Panel\PaymentPanelContext;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Validation\FieldValidationResult;
+use OxidEsales\Payments\Stripe\Admin\AdminActionBoundsInterface;
+use OxidEsales\Payments\Stripe\Admin\AdminAmountValidator;
+use OxidEsales\Payments\Stripe\Admin\AdminValidationFeedbackInterface;
+use OxidEsales\Payments\Stripe\Admin\AmountValidationResult;
 use OxidEsales\Payments\Stripe\Admin\StripePanelOrderLoader;
 use OxidEsales\Payments\Stripe\Admin\StripePanelViewDataBuilder;
 use OxidEsales\Payments\Stripe\Admin\StripePaymentPanelProvider;
 use OxidEsales\PaymentBase\Admin\Contract\AdminActionDispatcherInterface;
 use OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\Payments\Stripe\Service\FieldValidationFailure;
+use OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -104,11 +111,7 @@ final class StripePaymentPanelProviderTest extends TestCase
                 self::callback(static fn(array $extras): bool => array_key_exists('description', $extras)),
             );
 
-        $provider = new StripePaymentPanelProvider(
-            actionDispatcher: $dispatcher,
-            viewDataBuilder: $this->viewDataBuilderStub([]),
-            orderLoader: $this->orderLoaderStub($this->orderStub()),
-        );
+        $provider = $this->provider(dispatcher: $dispatcher);
 
         $provider->handleAction(
             'refund',
@@ -124,11 +127,7 @@ final class StripePaymentPanelProviderTest extends TestCase
         $dispatcher->expects(self::never())->method('capture');
         $dispatcher->expects(self::never())->method('cancel');
 
-        $provider = new StripePaymentPanelProvider(
-            actionDispatcher: $dispatcher,
-            viewDataBuilder: $this->viewDataBuilderStub([]),
-            orderLoader: $this->orderLoaderStub(null),
-        );
+        $provider = $this->provider(dispatcher: $dispatcher, noOrder: true);
 
         $provider->handleAction(
             'refund',
@@ -137,12 +136,359 @@ final class StripePaymentPanelProviderTest extends TestCase
         );
     }
 
-    private function provider(array $withViewData = []): StripePaymentPanelProvider
+    // ---------------------------------------------------------------------------
+    // Sprint 120 Phase C (STRP-129): capture_reason pre-dispatch gate
+    // ---------------------------------------------------------------------------
+
+    public function testInvalidCaptureReasonBlocksDispatchAndStoresFeedback(): void
     {
+        // C1 — the critical pair: capture() NEVER called, failures stored.
+        $dispatcher = $this->createMock(AdminActionDispatcherInterface::class);
+        $dispatcher->expects(self::never())->method('capture');
+
+        $failure = $this->captureReasonFailure('<');
+        $validator = $this->createMock(UserDataValidatorInterface::class);
+        $validator->method('validateFieldMap')
+            ->with(['captureReason' => '<script>'], 'admin')
+            ->willReturn([$failure]);
+
+        $feedback = $this->createMock(AdminValidationFeedbackInterface::class);
+        $feedback->expects(self::once())
+            ->method('store')
+            ->with(self::anything(), 'capture', [$failure]);
+
+        $provider = $this->provider(dispatcher: $dispatcher, validator: $validator, feedback: $feedback);
+
+        $provider->handleAction(
+            'capture',
+            ['capture_amount' => '10.00', 'capture_reason' => '<script>'],
+            $this->context(paymentType: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, provider: 'stripe'),
+        );
+    }
+
+    public function testValidCaptureReasonDispatchesUnchangedAndStoresNothing(): void
+    {
+        // C2
+        $dispatcher = $this->createMock(AdminActionDispatcherInterface::class);
+        $dispatcher->expects(self::once())
+            ->method('capture')
+            ->with(
+                self::isInstanceOf(Order::class),
+                10.0,
+                'Teillieferung #2',
+                self::callback(static fn(array $extras): bool => array_key_exists('paymentIntentId', $extras)),
+            );
+
+        $validator = $this->createMock(UserDataValidatorInterface::class);
+        $validator->method('validateFieldMap')->willReturn([]);
+
+        $feedback = $this->createMock(AdminValidationFeedbackInterface::class);
+        $feedback->expects(self::never())->method('store');
+
+        $provider = $this->provider(dispatcher: $dispatcher, validator: $validator, feedback: $feedback);
+
+        $provider->handleAction(
+            'capture',
+            ['capture_amount' => '10.00', 'capture_reason' => 'Teillieferung #2'],
+            $this->context(paymentType: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, provider: 'stripe'),
+        );
+    }
+
+    public function testEmptyCaptureReasonSkipsValidationAndDispatchesWithNullReason(): void
+    {
+        // C3 — reason is optional; full-capture semantics untouched.
+        $dispatcher = $this->createMock(AdminActionDispatcherInterface::class);
+        $dispatcher->expects(self::once())
+            ->method('capture')
+            ->with(self::isInstanceOf(Order::class), null, null, self::anything());
+
+        $validator = $this->createMock(UserDataValidatorInterface::class);
+        $validator->expects(self::never())->method('validateFieldMap');
+
+        $provider = $this->provider(dispatcher: $dispatcher, validator: $validator);
+
+        $provider->handleAction(
+            'capture',
+            ['capture_amount' => '', 'capture_reason' => ''],
+            $this->context(paymentType: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, provider: 'stripe'),
+        );
+    }
+
+    public function testRefundAndCancelActionsDoNotInvokeTheReasonValidator(): void
+    {
+        // C4 — guards the Sprint 121 follow-up boundary.
+        $dispatcher = $this->createMock(AdminActionDispatcherInterface::class);
+        $dispatcher->expects(self::once())->method('refund');
+        $dispatcher->expects(self::once())->method('cancel');
+
+        $validator = $this->createMock(UserDataValidatorInterface::class);
+        $validator->expects(self::never())->method('validateFieldMap');
+
+        $provider = $this->provider(dispatcher: $dispatcher, validator: $validator);
+        $context = $this->context(paymentType: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, provider: 'stripe');
+
+        $provider->handleAction('refund', ['refund_reason' => 'duplicate'], $context);
+        $provider->handleAction('cancel', ['cancel_reason' => 'duplicate'], $context);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Sprint 121 Phase C (STRP-129): amount gates + refund_description gate
+    // ---------------------------------------------------------------------------
+
+    public function testMalformedCaptureAmountBlocksDispatch(): void
+    {
+        // C1 — the sprint's raison d'être: '12,30 EUR' used to become null = FULL capture.
+        $dispatcher = $this->createMock(AdminActionDispatcherInterface::class);
+        $dispatcher->expects(self::never())->method('capture');
+
+        $feedback = $this->createMock(AdminValidationFeedbackInterface::class);
+        $feedback->expects(self::once())
+            ->method('store')
+            ->with(self::anything(), 'capture', self::callback(
+                static fn(array $failures): bool => count($failures) === 1
+                    && $failures[0]->field === 'captureAmount'
+                    && $failures[0]->code === AmountValidationResult::CODE_MALFORMED
+            ));
+
+        $provider = $this->provider(dispatcher: $dispatcher, feedback: $feedback);
+
+        $provider->handleAction(
+            'capture',
+            ['capture_amount' => '12,30 EUR', 'capture_reason' => ''],
+            $this->context(paymentType: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, provider: 'stripe'),
+        );
+    }
+
+    public function testCaptureAmountAboveBoundBlocksDispatch(): void
+    {
+        // C2
+        $dispatcher = $this->createMock(AdminActionDispatcherInterface::class);
+        $dispatcher->expects(self::never())->method('capture');
+
+        $bounds = $this->createMock(AdminActionBoundsInterface::class);
+        $bounds->method('captureBound')->willReturn(100.00);
+
+        $feedback = $this->createMock(AdminValidationFeedbackInterface::class);
+        $feedback->expects(self::once())
+            ->method('store')
+            ->with(self::anything(), 'capture', self::callback(
+                static fn(array $failures): bool =>
+                    $failures[0]->code === AmountValidationResult::CODE_EXCEEDS_BOUND
+            ));
+
+        $provider = $this->provider(dispatcher: $dispatcher, feedback: $feedback, bounds: $bounds);
+
+        $provider->handleAction(
+            'capture',
+            ['capture_amount' => '100.01'],
+            $this->context(paymentType: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, provider: 'stripe'),
+        );
+    }
+
+    public function testValidCommaAmountDispatchesTheParsedFloat(): void
+    {
+        // C3 — parse once: the validated float travels, not a re-parse of the raw.
+        $dispatcher = $this->createMock(AdminActionDispatcherInterface::class);
+        $dispatcher->expects(self::once())
+            ->method('capture')
+            ->with(self::isInstanceOf(Order::class), 50.0, null, self::anything());
+
+        $provider = $this->provider(dispatcher: $dispatcher);
+
+        $provider->handleAction(
+            'capture',
+            ['capture_amount' => '50,00'],
+            $this->context(paymentType: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, provider: 'stripe'),
+        );
+    }
+
+    public function testEmptyCaptureAmountStillMeansFullCaptureAndSkipsBoundLookup(): void
+    {
+        // C4 — absent amount = full capture; no PSP bound call wasted on it.
+        $dispatcher = $this->createMock(AdminActionDispatcherInterface::class);
+        $dispatcher->expects(self::once())
+            ->method('capture')
+            ->with(self::isInstanceOf(Order::class), null, null, self::anything());
+
+        $bounds = $this->createMock(AdminActionBoundsInterface::class);
+        $bounds->expects(self::never())->method('captureBound');
+
+        $provider = $this->provider(dispatcher: $dispatcher, bounds: $bounds);
+
+        $provider->handleAction(
+            'capture',
+            ['capture_amount' => ''],
+            $this->context(paymentType: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, provider: 'stripe'),
+        );
+    }
+
+    public function testMalformedRefundAmountBlocksDispatch(): void
+    {
+        // C5a — same footgun killed on the refund path.
+        $dispatcher = $this->createMock(AdminActionDispatcherInterface::class);
+        $dispatcher->expects(self::never())->method('refund');
+
+        $feedback = $this->createMock(AdminValidationFeedbackInterface::class);
+        $feedback->expects(self::once())
+            ->method('store')
+            ->with(self::anything(), 'refund', self::callback(
+                static fn(array $failures): bool => $failures[0]->field === 'refundAmount'
+                    && $failures[0]->code === AmountValidationResult::CODE_MALFORMED
+            ));
+
+        $provider = $this->provider(dispatcher: $dispatcher, feedback: $feedback);
+
+        $provider->handleAction(
+            'refund',
+            ['refund_amount' => 'abc'],
+            $this->context(paymentType: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, provider: 'stripe'),
+        );
+    }
+
+    public function testValidRefundAmountChecksRefundBoundAndDispatches(): void
+    {
+        // C5b
+        $dispatcher = $this->createMock(AdminActionDispatcherInterface::class);
+        $dispatcher->expects(self::once())
+            ->method('refund')
+            ->with(self::isInstanceOf(Order::class), 12.5, 'requested_by_customer', self::anything());
+
+        $bounds = $this->createMock(AdminActionBoundsInterface::class);
+        $bounds->expects(self::once())->method('refundBound')->willReturn(20.00);
+        $bounds->expects(self::never())->method('captureBound');
+
+        $provider = $this->provider(dispatcher: $dispatcher, bounds: $bounds);
+
+        $provider->handleAction(
+            'refund',
+            ['refund_amount' => '12,50', 'refund_reason' => 'requested_by_customer'],
+            $this->context(paymentType: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, provider: 'stripe'),
+        );
+    }
+
+    public function testAmountAndReasonFailuresAreStoredTogetherInOneCall(): void
+    {
+        // C6
+        $dispatcher = $this->createMock(AdminActionDispatcherInterface::class);
+        $dispatcher->expects(self::never())->method('capture');
+
+        $reasonFailure = $this->captureReasonFailure('<');
+        $validator = $this->createMock(UserDataValidatorInterface::class);
+        $validator->method('validateFieldMap')->willReturn([$reasonFailure]);
+
+        $feedback = $this->createMock(AdminValidationFeedbackInterface::class);
+        $feedback->expects(self::once())
+            ->method('store')
+            ->with(self::anything(), 'capture', self::callback(
+                static function (array $failures): bool {
+                    $fields = array_map(static fn($f) => $f->field, $failures);
+                    return count($failures) === 2
+                        && in_array('captureReason', $fields, true)
+                        && in_array('captureAmount', $fields, true);
+                }
+            ));
+
+        $provider = $this->provider(dispatcher: $dispatcher, validator: $validator, feedback: $feedback);
+
+        $provider->handleAction(
+            'capture',
+            ['capture_amount' => 'abc', 'capture_reason' => '<bad>'],
+            $this->context(paymentType: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, provider: 'stripe'),
+        );
+    }
+
+    public function testInvalidRefundDescriptionBlocksDispatch(): void
+    {
+        // C7 — refund_description is POST-reachable free text into Stripe metadata.
+        $dispatcher = $this->createMock(AdminActionDispatcherInterface::class);
+        $dispatcher->expects(self::never())->method('refund');
+
+        $failure = new FieldValidationFailure(
+            field: 'refundDescription',
+            addressKind: 'admin',
+            code: FieldValidationResult::CODE_BLOCKED_CHARACTER,
+            offendingChar: '<',
+            oxidColumn: null,
+        );
+        $validator = $this->createMock(UserDataValidatorInterface::class);
+        $validator->method('validateFieldMap')
+            ->with(['refundDescription' => '<img src=x>'], 'admin')
+            ->willReturn([$failure]);
+
+        $feedback = $this->createMock(AdminValidationFeedbackInterface::class);
+        $feedback->expects(self::once())
+            ->method('store')
+            ->with(self::anything(), 'refund', [$failure]);
+
+        $provider = $this->provider(dispatcher: $dispatcher, validator: $validator, feedback: $feedback);
+
+        $provider->handleAction(
+            'refund',
+            ['refund_description' => '<img src=x>'],
+            $this->context(paymentType: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, provider: 'stripe'),
+        );
+    }
+
+    public function testBoundResolutionFailureFailsClosed(): void
+    {
+        // C8 — PSP unavailable: reject the action, never fail-open to full capture.
+        $dispatcher = $this->createMock(AdminActionDispatcherInterface::class);
+        $dispatcher->expects(self::never())->method('capture');
+
+        $bounds = $this->createMock(AdminActionBoundsInterface::class);
+        $bounds->method('captureBound')->willThrowException(new \RuntimeException('PI fetch failed'));
+
+        $feedback = $this->createMock(AdminValidationFeedbackInterface::class);
+        $feedback->expects(self::once())
+            ->method('store')
+            ->with(self::anything(), 'capture', self::callback(
+                static fn(array $failures): bool =>
+                    $failures[0]->code === AmountValidationResult::CODE_BOUND_UNAVAILABLE
+            ));
+
+        $provider = $this->provider(dispatcher: $dispatcher, feedback: $feedback, bounds: $bounds);
+
+        $provider->handleAction(
+            'capture',
+            ['capture_amount' => '50.00'],
+            $this->context(paymentType: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, provider: 'stripe'),
+        );
+    }
+
+    private function provider(
+        array $withViewData = [],
+        ?AdminActionDispatcherInterface $dispatcher = null,
+        ?UserDataValidatorInterface $validator = null,
+        ?AdminValidationFeedbackInterface $feedback = null,
+        ?AdminActionBoundsInterface $bounds = null,
+        bool $noOrder = false,
+    ): StripePaymentPanelProvider {
+        if ($bounds === null) {
+            // Generous defaults so amount-agnostic tests pass the bound check.
+            $bounds = $this->createMock(AdminActionBoundsInterface::class);
+            $bounds->method('captureBound')->willReturn(999999.0);
+            $bounds->method('refundBound')->willReturn(999999.0);
+        }
+
         return new StripePaymentPanelProvider(
-            actionDispatcher: $this->createMock(AdminActionDispatcherInterface::class),
+            actionDispatcher: $dispatcher ?? $this->createMock(AdminActionDispatcherInterface::class),
             viewDataBuilder: $this->viewDataBuilderStub($withViewData),
-            orderLoader: $this->orderLoaderStub($this->orderStub()),
+            orderLoader: $this->orderLoaderStub($noOrder ? null : $this->orderStub()),
+            userDataValidator: $validator ?? $this->createMock(UserDataValidatorInterface::class),
+            validationFeedback: $feedback ?? $this->createMock(AdminValidationFeedbackInterface::class),
+            amountValidator: new AdminAmountValidator(),
+            actionBounds: $bounds,
+        );
+    }
+
+    private function captureReasonFailure(string $char): FieldValidationFailure
+    {
+        return new FieldValidationFailure(
+            field: 'captureReason',
+            addressKind: 'admin',
+            code: FieldValidationResult::CODE_BLOCKED_CHARACTER,
+            offendingChar: $char,
+            oxidColumn: null,
         );
     }
 

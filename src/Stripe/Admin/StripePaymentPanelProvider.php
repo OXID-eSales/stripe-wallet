@@ -15,6 +15,9 @@ use OxidEsales\PaymentBase\Admin\Contract\PaymentPanelProviderInterface;
 use OxidEsales\PaymentBase\Admin\Panel\PaymentPanelContext;
 use OxidEsales\PaymentBase\Admin\Panel\PaymentPanelRenderable;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\Payments\Stripe\Service\FieldValidationFailure;
+use OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface;
+use Throwable;
 
 /**
  * Sprint I — Stripe's panel for payment-base's shared "Payment" tab.
@@ -44,6 +47,10 @@ class StripePaymentPanelProvider implements PaymentPanelProviderInterface
         private readonly AdminActionDispatcherInterface $actionDispatcher,
         private readonly StripePanelViewDataBuilder $viewDataBuilder,
         private readonly StripePanelOrderLoader $orderLoader,
+        private readonly UserDataValidatorInterface $userDataValidator,
+        private readonly AdminValidationFeedbackInterface $validationFeedback,
+        private readonly AdminAmountValidator $amountValidator,
+        private readonly AdminActionBoundsInterface $actionBounds,
     ) {
     }
 
@@ -92,11 +99,24 @@ class StripePaymentPanelProvider implements PaymentPanelProviderInterface
      */
     private function handleRefund(Order $order, array $request): void
     {
+        $description = $this->parseString($request['refund_description'] ?? null);
+
+        $failures = $this->collectTextFailures('refundDescription', $description);
+        $amountResult = $this->validateAmount($order, 'refund', $request['refund_amount'] ?? null);
+        if (!$amountResult->isOk()) {
+            $failures[] = $this->amountFailure('refundAmount', (string) $amountResult->code);
+        }
+
+        if ($failures !== []) {
+            $this->validationFeedback->store((string) $order->getId(), 'refund', $failures);
+            return;
+        }
+
         $this->actionDispatcher->refund(
             $order,
-            $this->parseAmount($request['refund_amount'] ?? null),
+            $amountResult->amount,
             $this->parseString($request['refund_reason'] ?? null),
-            ['description' => $this->parseString($request['refund_description'] ?? null)],
+            ['description' => $description],
         );
     }
 
@@ -105,12 +125,92 @@ class StripePaymentPanelProvider implements PaymentPanelProviderInterface
      */
     private function handleCapture(Order $order, array $request): void
     {
+        $reason = $this->parseString($request['capture_reason'] ?? null);
+
+        // Sprint 120/121 (STRP-129): pre-dispatch gate — on invalid input the
+        // capture event never fires (no contract transition, no Stripe call).
+        $failures = $this->collectTextFailures('captureReason', $reason);
+        $amountResult = $this->validateAmount($order, 'capture', $request['capture_amount'] ?? null);
+        if (!$amountResult->isOk()) {
+            $failures[] = $this->amountFailure('captureAmount', (string) $amountResult->code);
+        }
+
+        if ($failures !== []) {
+            $this->validationFeedback->store((string) $order->getId(), 'capture', $failures);
+            return;
+        }
+
         $this->actionDispatcher->capture(
             $order,
-            $this->parseAmount($request['capture_amount'] ?? null),
-            $this->parseString($request['capture_reason'] ?? null),
+            $amountResult->amount,
+            $reason,
             ['paymentIntentId' => $this->parseString($request['payment_intent_id'] ?? null)],
         );
+    }
+
+    /**
+     * Character-level validation of an optional free-text field via the
+     * shared Sprint 119 chain (UserDataValidator -> ValidationBase ->
+     * validation-rules.php). Null (absent) input is valid.
+     *
+     * @return FieldValidationFailure[]
+     */
+    private function collectTextFailures(string $logicalField, ?string $value): array
+    {
+        if ($value === null) {
+            return [];
+        }
+
+        return $this->userDataValidator->validateFieldMap([$logicalField => $value], 'admin');
+    }
+
+    /**
+     * Semantic amount validation (Sprint 121, STRP-129). Absent input
+     * short-circuits to ok(null) = full action — no PSP bound lookup is
+     * wasted on it. Bound resolution failures FAIL CLOSED: a partial
+     * amount is never dispatched unchecked because the PSP was unreachable.
+     */
+    private function validateAmount(Order $order, string $action, mixed $raw): AmountValidationResult
+    {
+        if ($raw === null || $raw === '') {
+            return AmountValidationResult::ok(null);
+        }
+
+        try {
+            $bound = $action === 'capture'
+                ? $this->actionBounds->captureBound($order)
+                : $this->actionBounds->refundBound($order);
+        } catch (Throwable) {
+            return AmountValidationResult::failure(AmountValidationResult::CODE_BOUND_UNAVAILABLE);
+        }
+
+        return $this->amountValidator->validate($raw, $bound, $this->orderCurrency($order));
+    }
+
+    private function amountFailure(string $logicalField, string $code): FieldValidationFailure
+    {
+        return new FieldValidationFailure(
+            field: $logicalField,
+            addressKind: 'admin',
+            code: $code,
+            offendingChar: null,
+            oxidColumn: null,
+        );
+    }
+
+    /**
+     * Order currency for precision validation; '' (= 2-decimal default)
+     * when unavailable. Magic-wrapper read — getFieldData() warns on
+     * partially loaded models.
+     */
+    private function orderCurrency(Order $order): string
+    {
+        /** @phpstan-ignore-next-line OXID core magic property */
+        $wrapper = $order->oxorder__oxcurrency ?? null;
+        if (is_object($wrapper) && isset($wrapper->value) && is_string($wrapper->value)) {
+            return $wrapper->value;
+        }
+        return '';
     }
 
     /**
@@ -123,17 +223,6 @@ class StripePaymentPanelProvider implements PaymentPanelProviderInterface
             $this->parseString($request['cancel_reason'] ?? null),
             ['paymentIntentId' => $this->parseString($request['payment_intent_id'] ?? null)],
         );
-    }
-
-    private function parseAmount(mixed $value): ?float
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-        if (is_string($value)) {
-            $value = str_replace(',', '.', $value);
-        }
-        return is_numeric($value) ? (float) $value : null;
     }
 
     private function parseString(mixed $value): ?string

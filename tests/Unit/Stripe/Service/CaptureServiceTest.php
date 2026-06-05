@@ -68,6 +68,40 @@ class CaptureServiceTest extends TestCase
         $this->assertInstanceOf(CaptureServiceInterface::class, $service);
     }
 
+    /**
+     * Sprint 121 Phase E (STRP-129): defense-in-depth at the convergence
+     * point — no caller (panel, opalreturns, future) can push a non-positive
+     * partial amount to the Stripe API.
+     */
+    public function testNonPositiveCaptureAmountIsRejectedBeforeAnyAdapterCall(): void
+    {
+        $this->adapter->expects($this->never())->method('capturePayment');
+
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getProviderOrderId')->willReturn('pi_123');
+        $contract->method('getState')->willReturn(
+            \OxidEsales\PaymentBase\Contract\ContractState::authorized()
+        );
+
+        $service = $this->createService();
+
+        foreach ([-5.0, 0.0] as $amount) {
+            $result = $service->processCapture($contract, $amount, []);
+
+            $this->assertFalse($result->successful, "Amount {$amount} must be rejected");
+            $this->assertStringContainsString('greater than zero', (string) $result->errorMessage);
+        }
+    }
+
+    public function testNonPositiveDirectCaptureAmountIsRejected(): void
+    {
+        $this->adapter->expects($this->never())->method('capturePayment');
+
+        $result = $this->createService()->processDirectCapture('pi_123', -1.0, []);
+
+        $this->assertFalse($result->successful);
+    }
+
     public function testProcessCaptureWithContractReturnsSuccess(): void
     {
         $capturedAt = new \DateTimeImmutable();

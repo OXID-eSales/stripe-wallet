@@ -48,6 +48,12 @@ class RefundService implements RefundServiceInterface
         string $initiator = 'admin',
         ?float $amount = null
     ): RefundResponse {
+        // Sprint 121 (STRP-129): defense-in-depth — no caller may push a
+        // non-positive partial amount to the Stripe API. Null = full refund.
+        if ($amount !== null && $amount <= 0.0) {
+            return RefundResponse::failure('Refund amount must be greater than zero');
+        }
+
         if ($paymentIntentId === null) {
             return RefundResponse::failure('Payment intent ID is required for refund');
         }
@@ -77,7 +83,9 @@ class RefundService implements RefundServiceInterface
         // Extract orderId from metadata if available
         $orderId = $metadata['order_id'] ?? null;
 
-        return $this->executeRefundByCharge($chargeId, $orderId, null, $reason, $metadata);
+        // Sprint 121 (STRP-129): same enum whitelist as processRefund — the
+        // by-charge path previously passed the raw string to Stripe's reason param.
+        return $this->executeRefundByCharge($chargeId, $orderId, null, $this->validateReason($reason), $metadata);
     }
 
     /**

@@ -176,4 +176,20 @@ $aLang = array(
     // Sprint 113 — maskierte API-Schlüssel-Felder mit Augen-Umschalter
     'STRIPE_REVEAL_API_KEY'                             => 'API-Schlüssel anzeigen',
     'STRIPE_HIDE_API_KEY'                               => 'API-Schlüssel verbergen',
+    // Sprint 120 (STRP-129) — Validierungsmeldungen für den Buchungsgrund.
+    // Spiegelt die Storefront-Schlüssel aus translations/de — der Admin-Kontext
+    // löst translateString() über views/admin_twig auf, nicht translations/.
+    'STRIPE_VALIDATION_FIELD_INVALID'                   => 'Das Feld %1$s ist ungültig. Erlaubte Zeichen sind: %2$s',
+    'STRIPE_VALIDATION_LABEL_CAPTUREREASON'             => 'Buchungsgrund',
+    'STRIPE_VALIDATION_CLASS_LETTERS'                   => 'Buchstaben',
+    'STRIPE_VALIDATION_CLASS_DIGITS'                    => 'Ziffern',
+    'STRIPE_VALIDATION_CLASS_SPACES'                    => 'Leerzeichen',
+
+    // Sprint 121 (STRP-129) — semantische Betragsvalidierung + Erstattungsbeschreibung.
+    'STRIPE_VALIDATION_LABEL_REFUNDDESCRIPTION'         => 'Erstattungsbeschreibung',
+    'STRIPE_VALIDATION_AMOUNT_MALFORMED'                => 'Der Betrag ist keine gültige Zahl. Verwenden Sie ein Format wie 12,50.',
+    'STRIPE_VALIDATION_AMOUNT_NOT_POSITIVE'             => 'Der Betrag muss größer als Null sein.',
+    'STRIPE_VALIDATION_AMOUNT_PRECISION'                => 'Der Betrag hat zu viele Nachkommastellen für diese Währung.',
+    'STRIPE_VALIDATION_AMOUNT_EXCEEDS_BOUND'            => 'Der Betrag überschreitet das verfügbare Maximum für diese Aktion.',
+    'STRIPE_VALIDATION_AMOUNT_BOUND_UNAVAILABLE'        => 'Der verfügbare Betrag konnte nicht mit Stripe verifiziert werden. Bitte versuchen Sie es erneut.',
 );

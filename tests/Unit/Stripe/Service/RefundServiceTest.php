@@ -387,6 +387,63 @@ class RefundServiceTest extends TestCase
         }
     }
 
+    // --- Sprint 121 Phase B (STRP-129): reason-whitelist regression pins ---
+
+    public function testInvalidRefundReasonIsWhitelistedToNullOnProcessRefund(): void
+    {
+        // Pin: a forged/unknown refund_reason never reaches Stripe's enum param.
+        $paymentIntent = $this->buildPiDto('pi_pin_test', 'ch_pin_test');
+        $refund = $this->buildRefundDto('re_pin', 10000, 'eur', 'succeeded');
+
+        $this->stripeAdapter
+            ->method('retrievePaymentIntent')
+            ->willReturn($paymentIntent);
+
+        $this->stripeAdapter
+            ->expects($this->once())
+            ->method('createRefundByCharge')
+            ->with('ch_pin_test', null, null, $this->anything())
+            ->willReturn($refund);
+
+        $result = $this->createService()->processRefund('order_pin', 'pi_pin_test', '<script>not-a-reason');
+
+        $this->assertTrue($result->isSuccessful());
+    }
+
+    public function testInvalidRefundReasonIsWhitelistedToNullOnProcessRefundByCharge(): void
+    {
+        // Pin: the by-charge path (chargeId-carrying events) must apply the
+        // same whitelist — it previously passed the raw string through.
+        $refund = $this->buildRefundDto('re_pin_charge', 1000, 'eur', 'succeeded');
+
+        $this->stripeAdapter
+            ->expects($this->once())
+            ->method('createRefundByCharge')
+            ->with('ch_pin_charge', null, null, null)
+            ->willReturn($refund);
+
+        $result = $this->createService()->processRefundByCharge('ch_pin_charge', 'garbage-reason');
+
+        $this->assertTrue($result->isSuccessful());
+    }
+
+    public function testNonPositiveRefundAmountIsRejectedBeforeAnyAdapterCall(): void
+    {
+        // Sprint 121 Phase E (STRP-129): defense-in-depth at the convergence
+        // point — applies to every caller, not just the admin panel gate.
+        $this->stripeAdapter->expects($this->never())->method('retrievePaymentIntent');
+        $this->stripeAdapter->expects($this->never())->method('createRefundByCharge');
+
+        $service = $this->createService();
+
+        foreach ([-5.0, 0.0] as $amount) {
+            $result = $service->processRefund('order_x', 'pi_x', null, null, 'admin', $amount);
+
+            $this->assertFalse($result->isSuccessful(), "Amount {$amount} must be rejected");
+            $this->assertStringContainsString('greater than zero', (string) $result->errorMessage);
+        }
+    }
+
     // --- Logging Tests ---
 
     public function testSuccessfulRefundIsLogged(): void

@@ -39,9 +39,46 @@ final class ValidationRulesProviderTest extends TestCase
         $this->assertSame('NUMBERS SPACES + - ( )', $map['phone']);
     }
 
-    public function testCoversAllThirteenFields(): void
+    public function testCoversAllFifteenFields(): void
     {
-        $this->assertCount(13, $this->sut->getFieldAllowMap());
+        $this->assertCount(15, $this->sut->getFieldAllowMap());
+    }
+
+    public function testRefundDescriptionAllowString(): void
+    {
+        // Sprint 121 (STRP-129): refund_description is POST-reachable free text
+        // into Stripe refund metadata (not present in the panel form).
+        $map = $this->sut->getFieldAllowMap();
+
+        $this->assertArrayHasKey('refundDescription', $map);
+        $this->assertSame("UNICODE_LETTERS NUMBERS SPACES ' - . , / # ( ) :", $map['refundDescription']);
+    }
+
+    public function testCaptureReasonAllowString(): void
+    {
+        // Sprint 120 (STRP-129): admin Payment-tab capture-reason field.
+        // UNICODE_LETTERS (not LETTERS) — German admins type umlauts.
+        $map = $this->sut->getFieldAllowMap();
+
+        $this->assertArrayHasKey('captureReason', $map);
+        $this->assertSame("UNICODE_LETTERS NUMBERS SPACES ' - . , / # ( ) :", $map['captureReason']);
+    }
+
+    public function testDescribesCaptureReasonAllowedSymbols(): void
+    {
+        $translator = $this->createMock(LanguageTranslatorInterface::class);
+        $translator->method('translateString')->willReturnMap([
+            ['STRIPE_VALIDATION_CLASS_LETTERS', 'letters'],
+            ['STRIPE_VALIDATION_CLASS_DIGITS', 'digits'],
+            ['STRIPE_VALIDATION_CLASS_SPACES', 'spaces'],
+        ]);
+
+        $describer = $this->sut->createDescriber($translator);
+
+        $this->assertSame(
+            "letters, digits, spaces, ' - . , / # ( ) :",
+            $describer->describe('captureReason')
+        );
     }
 
     public function testBuildsDescriberWithTheRealMap(): void

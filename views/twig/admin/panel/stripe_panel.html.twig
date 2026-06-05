@@ -188,6 +188,18 @@
         </div>
     {% endif %}
 
+    {# Sprint 120 (STRP-129): admin validation failures (capture-reason gate).
+       Filled from the session-backed feedback channel; consume-once means the
+       alert disappears on the next render. Twig auto-escaping keeps the
+       offending input inert. #}
+    {% if validationErrors is defined and validationErrors is not empty %}
+        <div class="s-alert s-alert-danger" data-testid="stripe-admin-validation-error">
+            {% for message in validationErrors %}
+                <div>{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
     {# ===== Payment Details ===== #}
     <div class="s-card">
         <div class="s-card-header">{{ translate({ ident: "STRIPE_PAYMENT_DETAILS" }) }}</div>

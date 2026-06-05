@@ -176,4 +176,20 @@ $aLang = array(
     // Sprint 113 — masked API-key fields with eye-toggle
     'STRIPE_REVEAL_API_KEY'                             => 'Reveal API key',
     'STRIPE_HIDE_API_KEY'                               => 'Hide API key',
+    // Sprint 120 (STRP-129) — admin capture-reason validation messages.
+    // Mirrors the storefront keys in translations/en — admin context
+    // resolves translateString() from views/admin_twig, not translations/.
+    'STRIPE_VALIDATION_FIELD_INVALID'                   => 'The %1$s field is not valid. Allowed symbols are: %2$s',
+    'STRIPE_VALIDATION_LABEL_CAPTUREREASON'             => 'capture reason',
+    'STRIPE_VALIDATION_CLASS_LETTERS'                   => 'letters',
+    'STRIPE_VALIDATION_CLASS_DIGITS'                    => 'digits',
+    'STRIPE_VALIDATION_CLASS_SPACES'                    => 'spaces',
+
+    // Sprint 121 (STRP-129) — semantic amount validation + refund description.
+    'STRIPE_VALIDATION_LABEL_REFUNDDESCRIPTION'         => 'refund description',
+    'STRIPE_VALIDATION_AMOUNT_MALFORMED'                => 'The amount is not a valid number. Use a format like 12.50.',
+    'STRIPE_VALIDATION_AMOUNT_NOT_POSITIVE'             => 'The amount must be greater than zero.',
+    'STRIPE_VALIDATION_AMOUNT_PRECISION'                => 'The amount has too many decimal places for this currency.',
+    'STRIPE_VALIDATION_AMOUNT_EXCEEDS_BOUND'            => 'The amount exceeds the maximum available for this action.',
+    'STRIPE_VALIDATION_AMOUNT_BOUND_UNAVAILABLE'        => 'The available amount could not be verified with Stripe. Please try again.',
 );
