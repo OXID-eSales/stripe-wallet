@@ -331,16 +331,17 @@
 
       var allowedMap = this.allowedValue || {};
 
-      // One field-level event per failed field, carrying the allowed symbols.
+      var violatedFieldsList = [];
       for (var err of errors) {
-        document.dispatchEvent(new CustomEvent('oe:payment:error:field', {
-          detail: { field: err.field, allowed: allowedMap[err.field] || '' }
-        }));
+          violatedFieldsList.push({ field: err.field, allowed: allowedMap[err.field] || '' });
       }
 
       // One generic error notice for OPC's notification system.
       document.dispatchEvent(new CustomEvent('oe:payment:error', {
-        detail: { message: this.reviewMessageValue || 'Please review your address details.' }
+        detail: {
+          message: this.reviewMessageValue || 'Please review your address details.',
+          fields: violatedFieldsList
+        }
       }));
     }
 
