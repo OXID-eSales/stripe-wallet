@@ -2,12 +2,23 @@ name: Playwright E2E
 
 on:
   workflow_dispatch:
+    inputs:
+      url:
+        description: 'Shop base URL to test against (no trailing slash, e.g. https://pay1.oxid.dev)'
+        required: true
+        default: 'https://pay1.oxid.dev'
+        type: string
+      test_groups:
+        description: 'Playwright projects to run, space- or comma-separated (admin-tests, checkout-tests, chromium). Leave empty to run all.'
+        required: false
+        default: ''
+        type: string
 
 env:
   SHOP_PATH: /var/www/oxid/oxid75
   MODULE_PATH: /var/www/oxid/oxid75/source/extensions/stripe
   PLAYWRIGHT_PATH: tests/e2e/playwright/playwright
-  SHOP_HOME_URL: https://pay1.oxid.dev
+  SHOP_HOME_URL: ${{ inputs.url }}
 
 jobs:
   deploy:
@@ -92,7 +103,7 @@ jobs:
           echo ${{ env.SHOP_HOME_URL }}
           cat <<EOF > .env
           SHOP_URL=${{ env.SHOP_HOME_URL }}
-          ADMIN_URL=${{ secrets.SHOP_HOME_URL }}/admin/
+          ADMIN_URL=${{ env.SHOP_HOME_URL }}/admin/
           TEST_USER_EMAIL=${{ secrets.TEST_USER_EMAIL }}
           TEST_USER_PASSWORD=${{ secrets.TEST_USER_PASSWORD }}
           HEADLESS=true
@@ -102,7 +113,14 @@ jobs:
         working-directory: ${{ env.PLAYWRIGHT_PATH }}
         env:
           CI: true
-        run: npx playwright test
+          TEST_GROUPS: ${{ inputs.test_groups }}
+        run: |
+          project_args=""
+          for group in $(echo "$TEST_GROUPS" | tr ',' ' '); do
+            project_args="$project_args --project=$group"
+          done
+          echo "Running: npx playwright test${project_args:- (all projects)}"
+          npx playwright test $project_args
 
       - name: Upload test report
         if: always()
