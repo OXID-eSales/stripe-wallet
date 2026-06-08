@@ -40,8 +40,65 @@ export default class extends Controller {
       this._coreCheckbox.addEventListener('change', () => this.checkboxChanged())
     }
 
+    // Sprint 122: Listen for the submit-lifecycle-ended signal dispatched by
+    // order_submit_controller#hideLoading(). This fires on error, on bfcache
+    // restore, and on any explicit call — always safe (updateButtonStates is
+    // idempotent). agb-validation is the authority on the resting disabled
+    // value; it must always have the last word (see sprint plan §4.2).
+    // No own pageshow listener here — the seam is the only coordination path.
+    //
+    // Sprint 123: Extended to also unlock the checkbox before recomputing
+    // button states, so the customer can retry after an error or bfcache return.
+    this._onSubmitEnd = () => { this.unlockCheckbox(); if (this.enabledValue) this.updateButtonStates() }
+    document.addEventListener('oe:stripe:submit-end', this._onSubmitEnd)
+
+    // Sprint 123: Listen for the submit-lifecycle-started signal dispatched by
+    // order_submit_controller#showLoading(). Locks the AGB checkbox for the
+    // duration of the in-flight submit to prevent visible consent contradiction.
+    this._onSubmitStart = () => this.lockCheckbox()
+    document.addEventListener('oe:stripe:submit-start', this._onSubmitStart)
+
     if (this.enabledValue) {
       this.updateButtonStates()
+    }
+  }
+
+  /**
+   * Called when controller is disconnected from DOM.
+   *
+   * Sprint 122/123: Remove both submit-lifecycle listeners using the exact
+   * bound references stored in connect() — symmetric, leak-free across
+   * Stimulus reconnects.
+   */
+  disconnect() {
+    document.removeEventListener('oe:stripe:submit-end', this._onSubmitEnd)
+    document.removeEventListener('oe:stripe:submit-start', this._onSubmitStart)
+  }
+
+  /**
+   * Lock the AGB checkbox so it cannot be toggled while a submit is in flight.
+   *
+   * Sprint 123: UI-integrity fix only — the consent is already captured in
+   * ord_agb=1 by appendAgbState() before this lock matters (§0/§4.3 of
+   * sprint plan). Null-guarded: if blConfirmAGB is off and the checkbox is
+   * absent, this is a safe no-op.
+   */
+  lockCheckbox() {
+    if (this._coreCheckbox) {
+      this._coreCheckbox.disabled = true
+    }
+  }
+
+  /**
+   * Unlock the AGB checkbox after a submit lifecycle ends (error, bfcache
+   * restore, or any future path that calls hideLoading()).
+   *
+   * Sprint 123: Idempotent — safe to call multiple times. Null-guarded for
+   * the blConfirmAGB=off case where no checkbox is rendered.
+   */
+  unlockCheckbox() {
+    if (this._coreCheckbox) {
+      this._coreCheckbox.disabled = false
     }
   }
 

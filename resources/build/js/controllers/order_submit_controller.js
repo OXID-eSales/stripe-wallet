@@ -26,18 +26,32 @@ export default class extends Controller {
   }
 
   /**
-   * Called when controller is connected to DOM
+   * Called when controller is connected to DOM.
+   *
+   * Sprint 122: Register a pageshow listener so that when the browser restores
+   * this page from the back-forward cache (bfcache) after a Stripe redirect,
+   * hideLoading() clears the frozen mid-submit state and dispatches
+   * 'oe:stripe:submit-end' — allowing agb-validation to recompute the resting
+   * button state as the authoritative last step (see sprint plan §4.2).
    */
   connect() {
     console.log('Order Submit controller connected')
     console.log('Button element:', this.element)
+
+    this._onPageShow = (e) => { if (e.persisted) this.hideLoading() }
+    window.addEventListener('pageshow', this._onPageShow)
   }
 
   /**
-   * Called when controller is disconnected from DOM
+   * Called when controller is disconnected from DOM.
+   *
+   * Sprint 122: Remove the pageshow listener using the exact same bound
+   * reference stored in connect() — symmetric, leak-free.
    */
   disconnect() {
     console.log('Order Submit controller disconnected')
+
+    window.removeEventListener('pageshow', this._onPageShow)
   }
 
   /**
@@ -284,22 +298,41 @@ export default class extends Controller {
   }
 
   /**
-   * Show loading state on button
+   * Show loading state on button.
+   *
+   * Sprint 123: Dispatch 'oe:stripe:submit-start' so that agb-validation
+   * can lock the AGB checkbox for the duration of the submit, preventing the
+   * customer from unticking it while the request is in flight. The lock is
+   * automatically lifted when hideLoading() fires (error path, bfcache restore)
+   * via the mirror 'oe:stripe:submit-end' event established in Sprint 122.
    */
   showLoading() {
     this.element.disabled = true
     this.originalText = this.element.textContent
     this.element.textContent = window.oStripe?.i18n?.PROCESSING || 'Processing...'
+    document.dispatchEvent(new CustomEvent('oe:stripe:submit-start'))
   }
 
   /**
-   * Hide loading state on button
+   * Hide loading state on button.
+   *
+   * Sprint 122: After restoring the button's resting DOM state, dispatch
+   * 'oe:stripe:submit-end' so that agb-validation (the authority on the
+   * resting disabled value) recomputes from the live checkbox. The dispatch
+   * is synchronous — agb-validation's recompute runs before hideLoading()
+   * returns, ensuring deterministic ordering with no listener-ordering race
+   * (see sprint plan §4.2).
+   *
+   * This fires on three paths: normal error (finally block), bfcache restore
+   * (pageshow persisted handler), and any future explicit call — all are safe
+   * because hideLoading() and updateButtonStates() are idempotent.
    */
   hideLoading() {
     this.element.disabled = false
     if (this.originalText) {
       this.element.textContent = this.originalText
     }
+    document.dispatchEvent(new CustomEvent('oe:stripe:submit-end'))
   }
 
   /**
