@@ -58,8 +58,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
-          submodules: true
+          submodules: false
+          persist-credentials: false
           token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN }}
+
+      - name: Check out private Playwright submodule
+        env:
+          GH_PAT_PLAYWRIGHT: ${{ secrets.GH_PAT_PLAYWRIGHT }}
+        run: |
+          git submodule sync -- tests/e2e/playwright
+          git -c "url.https://x-access-token:${GH_PAT_PLAYWRIGHT}@github.com/.insteadOf=https://github.com/" \
+            submodule update --init --depth=1 -- tests/e2e/playwright
 
       - name: Verify Playwright submodule branch
         run: |
