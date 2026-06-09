@@ -99,6 +99,31 @@ jobs:
             exit 1
           fi
 
+      # ── Ensure the shop stack (esp. the php container) is running. Apache may
+      #     answer HTTP 200 while the php service is down, which breaks every
+      #     `make php …` step below. Idempotent: starts only what's stopped. ──────
+      - name: Ensure shop stack is up
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SHOP_HOST }}
+          username: ${{ secrets.SHOP_SSH_USER }}
+          key: ${{ secrets.SHOP_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ env.SHOP_PATH }}
+            docker compose up -d
+            # Wait until `docker compose exec php` works (service running + execable).
+            for i in $(seq 1 30); do
+              if docker compose exec -T php true 2>/dev/null; then
+                echo "php service is up"
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "::error::php service did not come up"
+            docker compose ps
+            exit 1
+
       # ── SAFETY 2: Stripe MUST be in test mode (never load live keys) ─────────
       - name: Check Stripe test mode
         uses: appleboy/ssh-action@v1
