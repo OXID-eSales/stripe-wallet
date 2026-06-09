@@ -224,23 +224,37 @@ jobs:
       #     never touch live keys. Quoted heredoc -> no shell $ expansion. ────────
       - name: Configure Stripe test mode
         run: |
+          # display_errors is off in the container, so force errors to STDERR and
+          # catch Throwable -> the real cause is visible (a silent fatal = exit 255
+          # with no message otherwise). Best-effort: the browse scenario needs no
+          # Stripe config, so a failure here only limits the checkout scenario.
           cat > source/_loadtest_stripe_cfg.php <<'PHP'
           <?php
+          ini_set('display_errors', 'stderr');
+          error_reporting(E_ALL);
           require '/var/www/source/bootstrap.php';
-          $c = \OxidEsales\EshopCommunity\Internal\Container\ContainerFactory::getInstance()->getContainer();
-          $bridge = $c->get(\OxidEsales\EshopCommunity\Internal\Framework\Module\Setting\ModuleSettingBridgeInterface::class);
-          $moduleId = 'oe_payments_stripe_wallet';
-          $bridge->save('sStripeMode', 'test', $moduleId);
-          $bridge->save('sStripeTestToken', (string) getenv('STRIPE_TEST_SECRET_KEY'), $moduleId);
-          $bridge->save('sStripeTestPk', (string) getenv('STRIPE_TEST_PUBLISHABLE_KEY'), $moduleId);
-          echo "stripe configured: mode=test\n";
+          try {
+              $c = \OxidEsales\EshopCommunity\Internal\Container\ContainerFactory::getInstance()->getContainer();
+              $bridge = $c->get(\OxidEsales\EshopCommunity\Internal\Framework\Module\Setting\ModuleSettingBridgeInterface::class);
+              $moduleId = 'oe_payments_stripe_wallet';
+              $bridge->save('sStripeMode', 'test', $moduleId);
+              $bridge->save('sStripeTestToken', (string) getenv('STRIPE_TEST_SECRET_KEY'), $moduleId);
+              $bridge->save('sStripeTestPk', (string) getenv('STRIPE_TEST_PUBLISHABLE_KEY'), $moduleId);
+              echo "stripe configured: mode=test\n";
+          } catch (\Throwable $e) {
+              fwrite(STDERR, 'STRIPE_CFG_ERROR: ' . get_class($e) . ': ' . $e->getMessage() . "\n");
+              exit(3);
+          }
           PHP
-          docker compose exec -T \
+          if docker compose exec -T \
             -e STRIPE_TEST_SECRET_KEY="${{ secrets.STRIPE_TEST_SECRET_KEY }}" \
             -e STRIPE_TEST_PUBLISHABLE_KEY="${{ secrets.STRIPE_TEST_PUBLISHABLE_KEY }}" \
-            php php /var/www/_loadtest_stripe_cfg.php
+            php php /var/www/_loadtest_stripe_cfg.php; then
+            docker compose exec -T php bin/oe-console oe:cache:clear || true
+          else
+            echo "::warning::Stripe test-mode config failed — checkout scenario's createCheckoutSession will be limited (browse unaffected)"
+          fi
           rm -f source/_loadtest_stripe_cfg.php
-          docker compose exec -T php bin/oe-console oe:cache:clear || true
 
       - name: Seed login-able users + high stock
         run: |
