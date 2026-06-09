@@ -1,0 +1,8 @@
+# CI/local-only deps for the capacity charting tool (chart/).
+# Never installed into the application image.
+matplotlib==3.8.4
+
+# Optional: enables the "DB transactions / s" sweep dimension (--mysql-dsn).
+# Uncomment locally if you want the DB chart; the tool degrades gracefully
+# (skips that one chart) when it is absent.
+# PyMySQL==1.1.1

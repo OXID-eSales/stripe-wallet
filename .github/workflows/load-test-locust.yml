@@ -1,0 +1,271 @@
+name: Load Test (Locust)
+
+# Manual only — never on push/PR. A Locust heavy-load profile mirroring the
+# VBWD-platform `Heavy Load` workflow, adapted to drive the already-deployed
+# OXID shop (pay1.oxid.dev) instead of booting a stack in CI.
+#
+# IMPORTANT (payment safety): this targets a live shop, so a hard pre-flight
+# REFUSES to run unless Stripe is in TEST mode. We never load-test against live
+# keys.
+#
+# Scope caveat: Locust is HTTP-level. It exercises shop page rendering, session
+# + basket, and the Stripe `createCheckoutSession` endpoint — it does NOT drive
+# the Stripe hosted-checkout redirect or the 3DS browser flow (that is what the
+# k6 browser-mode `load-test.yml` is for).
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Shop base URL to load (no trailing slash)'
+        required: true
+        default: 'https://pay1.oxid.dev'
+        type: string
+      users:
+        description: 'Concurrent virtual users'
+        required: true
+        default: '50'
+        type: string
+      spawn_rate:
+        description: 'Spawn rate (users/sec) — ramps the user count up'
+        required: true
+        default: '5'
+        type: string
+      duration:
+        description: 'Run time (e.g. 30s, 2m, 5m)'
+        required: true
+        default: '2m'
+        type: string
+      scenarios:
+        description: 'Scenario preset'
+        required: true
+        default: 'all'
+        type: choice
+        options: [all, browse, checkout]
+      fail_p95_ms:
+        description: 'p95 latency budget (ms); breach fails the job'
+        required: true
+        default: '1500'
+        type: string
+      fail_pct_error:
+        description: '% failed requests budget; breach fails the job'
+        required: true
+        default: '1.0'
+        type: string
+      chart_yscale:
+        description: 'Capacity-chart Y axis (response time). log10 keeps a wide ms span legible; linear shows absolute magnitude.'
+        required: true
+        default: 'log10'
+        type: choice
+        options: [log10, linear, ln]
+      chart_xscale:
+        description: 'Capacity-chart X axis (concurrent users). linear is usual; log10 spreads a wide load range.'
+        required: true
+        default: 'linear'
+        type: choice
+        options: [linear, log10, ln]
+
+concurrency:
+  group: load-test-locust
+  cancel-in-progress: false   # never auto-cancel an in-flight load run
+
+env:
+  SHOP_PATH: /var/www/oxid/oxid75
+  LOCUST_DIR: tests/load/locust
+  # Seeded users (see the "Seed" step) — the checkout scenario logs in as these.
+  LOAD_USER_PREFIX: loadtest_user_
+  LOAD_USER_DOMAIN: '@oxid-esales.dev'
+  LOAD_USER_COUNT: '200'
+  LOAD_TEST_PASSWORD: useruser
+
+jobs:
+  load:
+    name: "Locust — ${{ inputs.scenarios }} · ${{ inputs.users }} VU · ${{ inputs.duration }}"
+    runs-on: [arc-runner-set]
+    timeout-minutes: 60
+    env:
+      LOAD_FAIL_P95_MS: ${{ inputs.fail_p95_ms }}
+      LOAD_FAIL_PCT_ERROR: ${{ inputs.fail_pct_error }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      # ── SAFETY 1: shop reachable ────────────────────────────────────────────
+      - name: Check shop is reachable
+        run: |
+          STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "${{ inputs.target_url }}")
+          echo "Shop responded with HTTP $STATUS"
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 400 ]; then
+            echo "::error::Shop is not healthy (HTTP $STATUS)"
+            exit 1
+          fi
+
+      # ── SAFETY 2: Stripe MUST be in test mode (never load live keys) ─────────
+      - name: Check Stripe test mode
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SHOP_HOST }}
+          username: ${{ secrets.SHOP_SSH_USER }}
+          key: ${{ secrets.SHOP_SSH_KEY }}
+          script: |
+            cd ${{ env.SHOP_PATH }}
+            MODE=$(make php CMD="php -r \"
+              require 'source/bootstrap.php';
+              \\\$c = \\OxidEsales\\EshopCommunity\\Internal\\Container\\ContainerFactory::getInstance()->getContainer();
+              echo \\\$c->get(\\OxidEsales\\Payments\\Stripe\\Service\\ModuleConfigurationServiceInterface::class)->getStripeMode();
+            \"" 2>/dev/null | tail -1)
+            echo "Stripe mode: $MODE"
+            if [ "$MODE" != "test" ]; then
+              echo "FATAL: Stripe is NOT in test mode. Aborting load test."
+              exit 1
+            fi
+
+      # ── Seed login-able users + high stock (idempotent), so the checkout
+      #     scenario can actually log in and fill a basket. ──────────────────────
+      - name: Seed test users and stock
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SHOP_HOST }}
+          username: ${{ secrets.SHOP_SSH_USER }}
+          key: ${{ secrets.SHOP_SSH_KEY }}
+          script: |
+            cd ${{ env.SHOP_PATH }}
+            make php CMD="php -r \"
+              require 'source/bootstrap.php';
+              \\\$db = \\OxidEsales\\Eshop\\Core\\DatabaseProvider::getDb();
+              for (\\\$i = 1; \\\$i <= 200; \\\$i++) {
+                \\\$num = str_pad(\\\$i, 3, '0', STR_PAD_LEFT);
+                \\\$email = 'loadtest_user_' . \\\$num . '@oxid-esales.dev';
+                \\\$exists = \\\$db->getOne('SELECT COUNT(*) FROM oxuser WHERE OXUSERNAME = ?', [\\\$email]);
+                if (\\\$exists > 0) continue;
+                \\\$userId = md5(\\\$email);
+                \\\$passHash = password_hash('useruser', PASSWORD_DEFAULT);
+                \\\$db->execute(
+                  'INSERT INTO oxuser (OXID, OXACTIVE, OXUSERNAME, OXPASSWORD, OXFNAME, OXLNAME, OXSTREET, OXSTREETNR, OXZIP, OXCITY, OXCOUNTRYID, OXSAL)
+                   VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                  [\\\$userId, \\\$email, \\\$passHash, 'Load', 'Test'.\\\$num, 'Bertoldstr.', \\\$num, '79098', 'Freiburg', 'a7c40f631fc920687.20179984', 'MR']
+                );
+              }
+              echo 'Seeded load test users';
+            \""
+            make php CMD="php -r \"
+              require 'source/bootstrap.php';
+              \\\$db = \\OxidEsales\\Eshop\\Core\\DatabaseProvider::getDb();
+              \\\$db->execute('UPDATE oxarticles SET OXSTOCK = 99999 WHERE OXACTIVE = 1 AND OXSTOCK < 99999');
+              echo 'Stock set high for active products';
+            \""
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Locust + charting deps
+        working-directory: ${{ env.LOCUST_DIR }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install locust==2.31.8 -r requirements-chart.txt
+
+      - name: Run Locust
+        working-directory: ${{ env.LOCUST_DIR }}
+        env:
+          LOAD_TARGET_URL: ${{ inputs.target_url }}
+        run: |
+          mkdir -p load-report
+          case "${{ inputs.scenarios }}" in
+            browse)   CLASSES="AnonymousBrowse" ;;
+            checkout) CLASSES="CheckoutFlow" ;;
+            *)        CLASSES="" ;;
+          esac
+          # Don't let a threshold-breach exit (pipefail) abort this step before we
+          # capture the code — the dedicated final step does the job gating.
+          set +o pipefail
+          locust -f locustfile.py \
+            --host "${{ inputs.target_url }}" \
+            --headless \
+            --users "${{ inputs.users }}" \
+            --spawn-rate "${{ inputs.spawn_rate }}" \
+            --run-time "${{ inputs.duration }}" \
+            --csv load-report/stats \
+            --html load-report/index.html \
+            $CLASSES \
+            2>&1 | tee load-report/locust-output.txt
+          # Locust's own exit code (threshold breach -> non-zero) is what fails the job.
+          echo "LOCUST_EXIT=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
+
+      - name: Generate capacity charts (X=${{ inputs.chart_xscale }} Y=${{ inputs.chart_yscale }})
+        if: always()
+        continue-on-error: true
+        working-directory: ${{ env.LOCUST_DIR }}
+        run: |
+          HIST=load-report/stats_stats_history.csv
+          if [ -f "$HIST" ]; then
+            python -m chart.render \
+              --history "$HIST" \
+              --out load-report/charts \
+              --xscale "${{ inputs.chart_xscale }}" --yscale "${{ inputs.chart_yscale }}"
+          else
+            echo "no history CSV at $HIST — skipping charts"
+          fi
+
+      - name: Embed charts into Locust report
+        if: always()
+        continue-on-error: true
+        working-directory: ${{ env.LOCUST_DIR }}
+        run: |
+          if [ -f load-report/index.html ] && ls load-report/charts/*.png >/dev/null 2>&1; then
+            python -m chart.embed \
+              --index load-report/index.html \
+              --charts load-report/charts/*.png
+          else
+            echo "no index.html or charts — skipping embed"
+          fi
+
+      - name: Step summary
+        if: always()
+        working-directory: ${{ env.LOCUST_DIR }}
+        run: |
+          {
+            echo "## Locust Load Test"
+            echo ""
+            echo "| Parameter | Value |"
+            echo "|-----------|-------|"
+            echo "| Target | ${{ inputs.target_url }} |"
+            echo "| Scenario | ${{ inputs.scenarios }} |"
+            echo "| Users | ${{ inputs.users }} (spawn ${{ inputs.spawn_rate }}/s) |"
+            echo "| Duration | ${{ inputs.duration }} |"
+            echo "| p95 budget | ${{ inputs.fail_p95_ms }} ms |"
+            echo "| error budget | ${{ inputs.fail_pct_error }} % |"
+            echo ""
+            if [ -f load-report/stats_stats.csv ]; then
+              echo "### Aggregated stats"
+              echo '```'
+              cat load-report/stats_stats.csv
+              echo '```'
+            fi
+            if grep -q '^BREACH ' load-report/locust-output.txt 2>/dev/null; then
+              echo "### Threshold breaches"
+              echo '```'
+              grep '^BREACH ' load-report/locust-output.txt
+              echo '```'
+            fi
+            echo ""
+            echo "See the **locust-report** artifact for the self-contained HTML report (charts embedded)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report + charts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: locust-report-${{ github.run_number }}
+          path: ${{ env.LOCUST_DIR }}/load-report/
+          retention-days: 30
+
+      - name: Fail job on threshold breach
+        if: always()
+        run: |
+          echo "Locust exit code: ${LOCUST_EXIT:-unknown}"
+          if [ "${LOCUST_EXIT:-1}" != "0" ]; then
+            echo "::error::Locust signalled a threshold breach or run error (exit ${LOCUST_EXIT:-1})"
+            exit 1
+          fi
