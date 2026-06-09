@@ -44,7 +44,7 @@ $aModule = [
         'en' => 'Stripe payment integration with Smart Contracts for OXID eShop 7',
     ],
     'thumbnail' => 'img/stripe_logo.png',
-    'version' => '3.0.0',
+    'version' => '3.0.1',
     'author' => 'OXID eSales AG',
     'url' => 'https://www.oxid-esales.com',
     'email' => 'info@oxid-esales.com',
