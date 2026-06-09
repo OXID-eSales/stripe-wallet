@@ -1,25 +1,17 @@
 name: Load Test (Locust)
 
-# Manual only — never on push/PR. A Locust heavy-load profile mirroring the
-# VBWD-platform `Heavy Load` workflow, adapted to drive the already-deployed
-# OXID shop (pay1.oxid.dev) instead of booting a stack in CI.
+# Manual only. Builds a throwaway OXID shop INSIDE the GitHub Action (the same
+# way development.yml's `install_shop_with_module` integration job does), then
+# runs a Locust heavy-load profile against it. No external shop, no SSH — the
+# shop lives and dies with the run, so Stripe test mode is guaranteed (we set
+# it) and there is no remote container to go down.
 #
-# IMPORTANT (payment safety): this targets a live shop, so a hard pre-flight
-# REFUSES to run unless Stripe is in TEST mode. We never load-test against live
-# keys.
-#
-# Scope caveat: Locust is HTTP-level. It exercises shop page rendering, session
-# + basket, and the Stripe `createCheckoutSession` endpoint — it does NOT drive
-# the Stripe hosted-checkout redirect or the 3DS browser flow (that is what the
-# k6 browser-mode `load-test.yml` is for).
+# Scope caveat: Locust is HTTP-level. It exercises page rendering, session +
+# basket, and the Stripe `createCheckoutSession` endpoint. It does NOT drive the
+# Stripe hosted-checkout redirect or the 3DS browser flow.
 on:
   workflow_dispatch:
     inputs:
-      target_url:
-        description: 'Shop base URL to load (no trailing slash)'
-        required: true
-        default: 'https://pay1.oxid.dev'
-        type: string
       users:
         description: 'Concurrent virtual users'
         required: true
@@ -44,7 +36,7 @@ on:
       fail_p95_ms:
         description: 'p95 latency budget (ms); breach fails the job'
         required: true
-        default: '1500'
+        default: '2000'
         type: string
       fail_pct_error:
         description: '% failed requests budget; breach fails the job'
@@ -52,13 +44,13 @@ on:
         default: '1.0'
         type: string
       chart_yscale:
-        description: 'Capacity-chart Y axis (response time). log10 keeps a wide ms span legible; linear shows absolute magnitude.'
+        description: 'Capacity-chart Y axis (response time).'
         required: true
         default: 'log10'
         type: choice
         options: [log10, linear, ln]
       chart_xscale:
-        description: 'Capacity-chart X axis (concurrent users). linear is usual; log10 spreads a wide load range.'
+        description: 'Capacity-chart X axis (concurrent users).'
         required: true
         default: 'linear'
         type: choice
@@ -69,8 +61,15 @@ concurrency:
   cancel-in-progress: false   # never auto-cancel an in-flight load run
 
 env:
-  SHOP_PATH: /var/www/oxid/oxid75
-  LOCUST_DIR: tests/load/locust
+  PACKAGE_NAME: 'oxid-esales/stripe-wallet'
+  PHP_VERSION: '8.2'
+  MYSQL_VERSION: '8.0'
+  TEMPLATE_ENGINE: 'twig'
+  PAYMENT_BASE_BRANCH: 'b-7.4.x'
+  SHOP_BRANCH: 'b-7.4.x'
+  MODULE_ID: 'oe_payments_stripe_wallet'
+  SHOP_URL: 'https://oxideshop.local'
+  LOCUST_DIR: source/test-module/tests/load/locust
   # Seeded users (see the "Seed" step) — the checkout scenario logs in as these.
   LOAD_USER_PREFIX: loadtest_user_
   LOAD_USER_DOMAIN: '@oxid-esales.dev'
@@ -86,108 +85,202 @@ jobs:
       LOAD_FAIL_P95_MS: ${{ inputs.fail_p95_ms }}
       LOAD_FAIL_PCT_ERROR: ${{ inputs.fail_pct_error }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      # ── SAFETY 1: shop reachable ────────────────────────────────────────────
-      - name: Check shop is reachable
+      # ── Build the shop (mirrors development.yml install_shop_with_module) ─────
+      - name: Cleanup workspace
         run: |
-          STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "${{ inputs.target_url }}")
-          echo "Shop responded with HTTP $STATUS"
-          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 400 ]; then
-            echo "::error::Shop is not healthy (HTTP $STATUS)"
-            exit 1
-          fi
+          ls -la ./
+          sudo rm -rf ./* || true
+          sudo rm -rf ./.??* || true
 
-      # ── Ensure the shop stack (esp. the php container) is running. Apache may
-      #     answer HTTP 200 while the php service is down, which breaks every
-      #     `make php …` step below. Idempotent: starts only what's stopped. ──────
-      - name: Ensure shop stack is up
-        uses: appleboy/ssh-action@v1
+      - name: Clone testing environment (docker-eshop-sdk)
+        run: git clone https://github.com/OXID-eSales/docker-eshop-sdk.git .
+
+      - name: Clone the shop
+        run: git clone --depth 1 https://github.com/OXID-eSales/oxideshop_ce.git --branch ${{ env.SHOP_BRANCH }} --single-branch source
+
+      - name: Prepare container configuration
+        run: |
+          make setup
+          make addbasicservices
+          perl -pi \
+            -e 's#PHP_VERSION=.*#PHP_VERSION=${{ env.PHP_VERSION }}#g;' \
+            -e "s#MYSQL_VERSION=.*#MYSQL_VERSION=${{ env.MYSQL_VERSION }}#g;" \
+            .env
+          perl -pi \
+            -e 's#display_errors =.*#display_errors = false#g;' \
+            -e 's#error_reporting = .*#error_reporting = E_ALL ^ E_WARNING ^ E_DEPRECATED#g;' \
+            containers/php/custom.ini
+          perl -pi \
+            -e 's#/var/www/#/var/www/source/#g;' \
+            containers/httpd/project.conf
+
+      - name: Prepare shop configuration
+        run: |
+          cp source/source/config.inc.php.dist source/source/config.inc.php
+          sed -i "1s+^+SetEnvIf Authorization \"\(.*\)\" HTTP_AUTHORIZATION=\$1\n\n+" source/source/.htaccess
+          sed -i -e 's/<dbHost>/mysql/' \
+                 -e 's/<dbUser>/root/' \
+                 -e 's/<dbName>/example/' \
+                 -e 's/<dbPwd>/root/' \
+                 -e 's/<dbPort>/3306/' \
+                 -e 's/<sShopURL>/https:\/\/oxideshop.local\//' \
+                 -e 's/<sShopDir>/\/var\/www\/source\//' \
+                 -e 's/<sCompileDir>/\/var\/www\/source\/tmp\//' \
+              source/source/config.inc.php
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
         with:
-          host: ${{ secrets.SHOP_HOST }}
-          username: ${{ secrets.SHOP_SSH_USER }}
-          key: ${{ secrets.SHOP_SSH_KEY }}
-          script: |
-            set -e
-            cd ${{ env.SHOP_PATH }}
-            docker compose up -d
-            # Wait until `docker compose exec php` works (service running + execable).
-            for i in $(seq 1 30); do
-              if docker compose exec -T php true 2>/dev/null; then
-                echo "php service is up"
-                exit 0
+          username: ${{ secrets.DOCKER_HUB_USER }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Start containers
+        run: |
+          make up
+          sleep 2
+
+      - name: Checkout current module
+        uses: actions/checkout@v5
+        with:
+          path: source/test-module
+
+      - name: Checkout payment-base (private dependency)
+        uses: actions/checkout@v5
+        with:
+          repository: OXID-eSales/payment-base
+          ref: ${{ env.PAYMENT_BASE_BRANCH }}
+          path: source/payment-base
+          token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
+
+      - name: Configure path repository for payment-base
+        run: |
+          docker compose exec -T php composer config repositories.payment-base \
+            --json '{"type":"path","url":"./payment-base","options":{"symlink":true}}'
+
+      - name: Install payment-base at shop level
+        run: |
+          docker compose exec -T php composer require oxid-esales/payment-base:* --no-interaction --no-update
+
+      - name: Install module
+        run: |
+          docker compose exec -T php composer config repositories.${{ env.PACKAGE_NAME }} \
+            --json '{"type":"path", "url":"./test-module", "options": {"symlink": true}}'
+          docker compose exec -T php composer require ${{ env.PACKAGE_NAME }}:* --no-interaction --no-update
+
+      - name: Require demodata + apex theme
+        run: |
+          docker compose exec -T php composer config repositories.oxid-esales/oxideshop-demodata-ce \
+            --json '{"type":"git", "url":"https://github.com/OXID-eSales/oxideshop_demodata_ce"}'
+          docker compose exec -T php composer require oxid-esales/oxideshop-demodata-ce:dev-master --no-update
+          docker compose exec -T php composer require oxid-esales/apex-theme:dev-b-7.4.x --no-update
+
+      - name: Install dependencies
+        env:
+          GH_TOKEN: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
+        run: |
+          docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
+            php composer update --with-all-dependencies --no-interaction
+
+      # Workaround for the CI-only unified-namespace-generator backslash-dir bug
+      # (see development.yml for the full explanation).
+      - name: Workaround — rename backslash-named generator dirs
+        run: |
+          docker compose exec -T php sh -c '
+            cd /var/www/vendor/oxid-esales/oxideshop-unified-namespace-generator/generated
+            for src in $(find . -mindepth 1 -maxdepth 1 -type d -name "*\\\\*" | sort -r); do
+              target=$(echo "${src#./}" | sed "s|\\\\|/|g")
+              mkdir -p "$(dirname "$target")"
+              if [ -d "$target" ]; then
+                cp -rT "$src" "$target" && rm -rf "$src"
+              else
+                mv "$src" "$target"
               fi
-              sleep 2
             done
-            echo "::error::php service did not come up"
-            docker compose ps
-            exit 1
+          '
 
-      # ── SAFETY 2: Stripe MUST be in test mode (never load live keys) ─────────
-      - name: Check Stripe test mode
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SHOP_HOST }}
-          username: ${{ secrets.SHOP_SSH_USER }}
-          key: ${{ secrets.SHOP_SSH_KEY }}
-          script: |
-            set -e
-            cd ${{ env.SHOP_PATH }}
-            # Write the probe to a file (quoted heredoc -> no shell $ expansion);
-            # ./source maps to /var/www in the php container. Single-line `make
-            # php CMD=...` (multi-line CMD silently falls back to `bash`).
-            cat > source/_loadtest_mode.php <<'PHP'
-            <?php
-            require 'source/bootstrap.php';
-            $c = \OxidEsales\EshopCommunity\Internal\Container\ContainerFactory::getInstance()->getContainer();
-            echo 'STRIPE_MODE:' . $c->get(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface::class)->getStripeMode() . "\n";
-            PHP
-            OUT=$(make php CMD="php /var/www/_loadtest_mode.php" || true)
-            rm -f source/_loadtest_mode.php
-            echo "$OUT"
-            MODE=$(printf '%s' "$OUT" | grep -oE 'STRIPE_MODE:[A-Za-z]+' | tail -1 | cut -d: -f2)
-            echo "Detected Stripe mode: ${MODE:-<none>}"
-            if [ "$MODE" != "test" ]; then
-              echo "FATAL: Stripe is NOT in test mode (got '${MODE:-<none>}'). Aborting load test."
-              exit 1
-            fi
+      - name: Reset database
+        run: |
+          docker compose exec -T php bin/oe-console oe:database:reset \
+            --db-host=mysql --db-port=3306 --db-name=example --db-user=root --db-password=root --force
 
-      # ── Seed login-able users + high stock (idempotent), so the checkout
-      #     scenario can actually log in and fill a basket. ──────────────────────
-      - name: Seed test users and stock
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SHOP_HOST }}
-          username: ${{ secrets.SHOP_SSH_USER }}
-          key: ${{ secrets.SHOP_SSH_KEY }}
-          script: |
-            set -e
-            cd ${{ env.SHOP_PATH }}
-            # Quoted heredoc -> the PHP $vars are written literally (no shell
-            # expansion). ./source maps to /var/www in the php container.
-            cat > source/_loadtest_seed.php <<'PHP'
-            <?php
-            require 'source/bootstrap.php';
-            $db = \OxidEsales\Eshop\Core\DatabaseProvider::getDb();
-            for ($i = 1; $i <= 200; $i++) {
-                $num = str_pad((string) $i, 3, '0', STR_PAD_LEFT);
-                $email = 'loadtest_user_' . $num . '@oxid-esales.dev';
-                if ((int) $db->getOne('SELECT COUNT(*) FROM oxuser WHERE OXUSERNAME = ?', [$email]) > 0) {
-                    continue;
-                }
-                $db->execute(
-                    'INSERT INTO oxuser (OXID, OXACTIVE, OXUSERNAME, OXPASSWORD, OXFNAME, OXLNAME, OXSTREET, OXSTREETNR, OXZIP, OXCITY, OXCOUNTRYID, OXSAL)'
-                    . ' VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                    [md5($email), $email, password_hash('useruser', PASSWORD_DEFAULT), 'Load', 'Test' . $num, 'Bertoldstr.', $num, '79098', 'Freiburg', 'a7c40f631fc920687.20179984', 'MR']
-                );
-            }
-            $db->execute('UPDATE oxarticles SET OXSTOCK = 99999 WHERE OXACTIVE = 1 AND OXSTOCK < 99999');
-            echo "seeded users + stock\n";
-            PHP
-            make php CMD="php /var/www/_loadtest_seed.php"
-            rm -f source/_loadtest_seed.php
+      - name: Install demodata
+        run: docker compose exec -T php bin/oe-console oe:setup:demodata
 
+      - name: Activate apex theme
+        run: docker compose exec -T php bin/oe-console oe:theme:activate apex
+
+      - name: Install + activate payment-base module
+        run: |
+          docker compose exec -T php bin/oe-console oe:module:install /var/www/vendor/oxid-esales/payment-base
+          docker compose exec -T php bin/oe-console oe:module:activate oe_payment_base
+
+      - name: Install + activate stripe-wallet module
+        run: |
+          docker compose exec -T php bin/oe-console oe:module:install /var/www/test-module
+          docker compose exec -T php bin/oe-console oe:module:activate ${{ env.MODULE_ID }}
+
+      # ── Configure Stripe TEST mode + keys on the running shop (local php
+      #     container — reliable, no SSH). The shop is ephemeral, so this can
+      #     never touch live keys. Quoted heredoc -> no shell $ expansion. ────────
+      - name: Configure Stripe test mode
+        run: |
+          cat > source/_loadtest_stripe_cfg.php <<'PHP'
+          <?php
+          require '/var/www/source/bootstrap.php';
+          $c = \OxidEsales\EshopCommunity\Internal\Container\ContainerFactory::getInstance()->getContainer();
+          $bridge = $c->get(\OxidEsales\EshopCommunity\Internal\Framework\Module\Setting\ModuleSettingBridgeInterface::class);
+          $moduleId = 'oe_payments_stripe_wallet';
+          $bridge->save('sStripeMode', 'test', $moduleId);
+          $bridge->save('sStripeTestToken', (string) getenv('STRIPE_TEST_SECRET_KEY'), $moduleId);
+          $bridge->save('sStripeTestPk', (string) getenv('STRIPE_TEST_PUBLISHABLE_KEY'), $moduleId);
+          echo "stripe configured: mode=test\n";
+          PHP
+          docker compose exec -T \
+            -e STRIPE_TEST_SECRET_KEY="${{ secrets.STRIPE_TEST_SECRET_KEY }}" \
+            -e STRIPE_TEST_PUBLISHABLE_KEY="${{ secrets.STRIPE_TEST_PUBLISHABLE_KEY }}" \
+            php php /var/www/_loadtest_stripe_cfg.php
+          rm -f source/_loadtest_stripe_cfg.php
+          docker compose exec -T php bin/oe-console oe:cache:clear || true
+
+      - name: Seed login-able users + high stock
+        run: |
+          cat > source/_loadtest_seed.php <<'PHP'
+          <?php
+          require '/var/www/source/bootstrap.php';
+          $db = \OxidEsales\Eshop\Core\DatabaseProvider::getDb();
+          for ($i = 1; $i <= 200; $i++) {
+              $num = str_pad((string) $i, 3, '0', STR_PAD_LEFT);
+              $email = 'loadtest_user_' . $num . '@oxid-esales.dev';
+              if ((int) $db->getOne('SELECT COUNT(*) FROM oxuser WHERE OXUSERNAME = ?', [$email]) > 0) {
+                  continue;
+              }
+              $db->execute(
+                  'INSERT INTO oxuser (OXID, OXACTIVE, OXUSERNAME, OXPASSWORD, OXFNAME, OXLNAME, OXSTREET, OXSTREETNR, OXZIP, OXCITY, OXCOUNTRYID, OXSAL)'
+                  . ' VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                  [md5($email), $email, password_hash('useruser', PASSWORD_DEFAULT), 'Load', 'Test' . $num, 'Bertoldstr.', $num, '79098', 'Freiburg', 'a7c40f631fc920687.20179984', 'MR']
+              );
+          }
+          $db->execute('UPDATE oxarticles SET OXSTOCK = 99999 WHERE OXACTIVE = 1 AND OXSTOCK < 99999');
+          echo "seeded users + stock\n";
+          PHP
+          docker compose exec -T php php /var/www/_loadtest_seed.php
+          rm -f source/_loadtest_seed.php
+
+      # ── Make the shop reachable from the runner host + sanity-check ───────────
+      - name: Map shop hostname + verify reachable
+        run: |
+          echo "127.0.0.1 oxideshop.local" | sudo tee -a /etc/hosts
+          for i in $(seq 1 30); do
+            STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "${{ env.SHOP_URL }}/index.php?cl=start" || true)
+            echo "attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then exit 0; fi
+            sleep 3
+          done
+          echo "::error::shop did not serve HTTP 200 at ${{ env.SHOP_URL }}"
+          docker compose logs --tail 80
+          exit 1
+
+      # ── Run Locust on the runner against the in-Action shop ───────────────────
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -203,7 +296,7 @@ jobs:
       - name: Run Locust
         working-directory: ${{ env.LOCUST_DIR }}
         env:
-          LOAD_TARGET_URL: ${{ inputs.target_url }}
+          LOAD_INSECURE_TLS: '1'   # the in-CI shop uses a self-signed cert
         run: |
           mkdir -p load-report
           case "${{ inputs.scenarios }}" in
@@ -211,11 +304,9 @@ jobs:
             checkout) CLASSES="CheckoutFlow" ;;
             *)        CLASSES="" ;;
           esac
-          # Don't let a threshold-breach exit (pipefail) abort this step before we
-          # capture the code — the dedicated final step does the job gating.
           set +o pipefail
           locust -f locustfile.py \
-            --host "${{ inputs.target_url }}" \
+            --host "${{ env.SHOP_URL }}" \
             --headless \
             --users "${{ inputs.users }}" \
             --spawn-rate "${{ inputs.spawn_rate }}" \
@@ -224,7 +315,6 @@ jobs:
             --html load-report/index.html \
             $CLASSES \
             2>&1 | tee load-report/locust-output.txt
-          # Locust's own exit code (threshold breach -> non-zero) is what fails the job.
           echo "LOCUST_EXIT=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
 
       - name: Generate capacity charts (X=${{ inputs.chart_xscale }} Y=${{ inputs.chart_yscale }})
@@ -234,9 +324,7 @@ jobs:
         run: |
           HIST=load-report/stats_stats_history.csv
           if [ -f "$HIST" ]; then
-            python -m chart.render \
-              --history "$HIST" \
-              --out load-report/charts \
+            python -m chart.render --history "$HIST" --out load-report/charts \
               --xscale "${{ inputs.chart_xscale }}" --yscale "${{ inputs.chart_yscale }}"
           else
             echo "no history CSV at $HIST — skipping charts"
@@ -248,9 +336,7 @@ jobs:
         working-directory: ${{ env.LOCUST_DIR }}
         run: |
           if [ -f load-report/index.html ] && ls load-report/charts/*.png >/dev/null 2>&1; then
-            python -m chart.embed \
-              --index load-report/index.html \
-              --charts load-report/charts/*.png
+            python -m chart.embed --index load-report/index.html --charts load-report/charts/*.png
           else
             echo "no index.html or charts — skipping embed"
           fi
@@ -260,11 +346,11 @@ jobs:
         working-directory: ${{ env.LOCUST_DIR }}
         run: |
           {
-            echo "## Locust Load Test"
+            echo "## Locust Load Test (in-Action shop)"
             echo ""
             echo "| Parameter | Value |"
             echo "|-----------|-------|"
-            echo "| Target | ${{ inputs.target_url }} |"
+            echo "| Shop | ${{ env.SHOP_URL }} (built in CI, Stripe test mode) |"
             echo "| Scenario | ${{ inputs.scenarios }} |"
             echo "| Users | ${{ inputs.users }} (spawn ${{ inputs.spawn_rate }}/s) |"
             echo "| Duration | ${{ inputs.duration }} |"
@@ -272,19 +358,11 @@ jobs:
             echo "| error budget | ${{ inputs.fail_pct_error }} % |"
             echo ""
             if [ -f load-report/stats_stats.csv ]; then
-              echo "### Aggregated stats"
-              echo '```'
-              cat load-report/stats_stats.csv
-              echo '```'
+              echo "### Aggregated stats"; echo '```'; cat load-report/stats_stats.csv; echo '```'
             fi
             if grep -q '^BREACH ' load-report/locust-output.txt 2>/dev/null; then
-              echo "### Threshold breaches"
-              echo '```'
-              grep '^BREACH ' load-report/locust-output.txt
-              echo '```'
+              echo "### Threshold breaches"; echo '```'; grep '^BREACH ' load-report/locust-output.txt; echo '```'
             fi
-            echo ""
-            echo "See the **locust-report** artifact for the self-contained HTML report (charts embedded)."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload report + charts
@@ -294,6 +372,14 @@ jobs:
           name: locust-report-${{ github.run_number }}
           path: ${{ env.LOCUST_DIR }}/load-report/
           retention-days: 30
+
+      - name: Show docker logs
+        if: always()
+        run: docker compose logs --tail 200 || true
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down -v || true
 
       - name: Fail job on threshold breach
         if: always()

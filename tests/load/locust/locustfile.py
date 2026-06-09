@@ -23,11 +23,18 @@ import random
 import re
 from typing import Any, List, Optional
 
+import urllib3
 from locust import HttpUser, between, events, task
 
 # Sibling import: Locust puts the locustfile's dir on sys.path[0] at load time,
 # so `thresholds` resolves at runtime (the unit-test conftest adds the same dir).
 from thresholds import DEFAULT_THRESHOLDS, evaluate
+
+# The in-CI shop serves a self-signed cert on https://oxideshop.local. Set
+# LOAD_INSECURE_TLS=1 to skip verification (and silence the warning) for that.
+_INSECURE_TLS = os.environ.get("LOAD_INSECURE_TLS") == "1"
+if _INSECURE_TLS:
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ── Config (env-overridable) ──────────────────────────────────────────────────
 USER_PREFIX = os.environ.get("LOAD_USER_PREFIX", "loadtest_user_")
@@ -104,7 +111,7 @@ def _warm(environment, **_: Any) -> None:
 
     class _Shim:
         def get(self, path, name=None):  # noqa: ARG002 — name kept for parity
-            return requests.get(f"{host}{path}", timeout=15)
+            return requests.get(f"{host}{path}", timeout=15, verify=not _INSECURE_TLS)
 
     _Catalog.discover(_Shim())
     print(
@@ -135,6 +142,10 @@ class AnonymousBrowse(HttpUser):
 
     weight = 6
     wait_time = between(0.5, 2.0)
+
+    def on_start(self) -> None:
+        if _INSECURE_TLS:
+            self.client.verify = False
 
     @task(4)
     def start_page(self) -> None:
@@ -178,6 +189,8 @@ class CheckoutFlow(HttpUser):
     wait_time = between(1.0, 3.0)
 
     def on_start(self) -> None:
+        if _INSECURE_TLS:
+            self.client.verify = False
         _Catalog.discover(self.client)
         self._login()
 
