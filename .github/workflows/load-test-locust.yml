@@ -107,15 +107,24 @@ jobs:
           username: ${{ secrets.SHOP_SSH_USER }}
           key: ${{ secrets.SHOP_SSH_KEY }}
           script: |
+            set -e
             cd ${{ env.SHOP_PATH }}
-            MODE=$(make php CMD="php -r \"
-              require 'source/bootstrap.php';
-              \\\$c = \\OxidEsales\\EshopCommunity\\Internal\\Container\\ContainerFactory::getInstance()->getContainer();
-              echo \\\$c->get(\\OxidEsales\\Payments\\Stripe\\Service\\ModuleConfigurationServiceInterface::class)->getStripeMode();
-            \"" 2>/dev/null | tail -1)
-            echo "Stripe mode: $MODE"
+            # Write the probe to a file (quoted heredoc -> no shell $ expansion);
+            # ./source maps to /var/www in the php container. Single-line `make
+            # php CMD=...` (multi-line CMD silently falls back to `bash`).
+            cat > source/_loadtest_mode.php <<'PHP'
+            <?php
+            require 'source/bootstrap.php';
+            $c = \OxidEsales\EshopCommunity\Internal\Container\ContainerFactory::getInstance()->getContainer();
+            echo 'STRIPE_MODE:' . $c->get(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface::class)->getStripeMode() . "\n";
+            PHP
+            OUT=$(make php CMD="php /var/www/_loadtest_mode.php" || true)
+            rm -f source/_loadtest_mode.php
+            echo "$OUT"
+            MODE=$(printf '%s' "$OUT" | grep -oE 'STRIPE_MODE:[A-Za-z]+' | tail -1 | cut -d: -f2)
+            echo "Detected Stripe mode: ${MODE:-<none>}"
             if [ "$MODE" != "test" ]; then
-              echo "FATAL: Stripe is NOT in test mode. Aborting load test."
+              echo "FATAL: Stripe is NOT in test mode (got '${MODE:-<none>}'). Aborting load test."
               exit 1
             fi
 
@@ -128,31 +137,31 @@ jobs:
           username: ${{ secrets.SHOP_SSH_USER }}
           key: ${{ secrets.SHOP_SSH_KEY }}
           script: |
+            set -e
             cd ${{ env.SHOP_PATH }}
-            make php CMD="php -r \"
-              require 'source/bootstrap.php';
-              \\\$db = \\OxidEsales\\Eshop\\Core\\DatabaseProvider::getDb();
-              for (\\\$i = 1; \\\$i <= 200; \\\$i++) {
-                \\\$num = str_pad(\\\$i, 3, '0', STR_PAD_LEFT);
-                \\\$email = 'loadtest_user_' . \\\$num . '@oxid-esales.dev';
-                \\\$exists = \\\$db->getOne('SELECT COUNT(*) FROM oxuser WHERE OXUSERNAME = ?', [\\\$email]);
-                if (\\\$exists > 0) continue;
-                \\\$userId = md5(\\\$email);
-                \\\$passHash = password_hash('useruser', PASSWORD_DEFAULT);
-                \\\$db->execute(
-                  'INSERT INTO oxuser (OXID, OXACTIVE, OXUSERNAME, OXPASSWORD, OXFNAME, OXLNAME, OXSTREET, OXSTREETNR, OXZIP, OXCITY, OXCOUNTRYID, OXSAL)
-                   VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                  [\\\$userId, \\\$email, \\\$passHash, 'Load', 'Test'.\\\$num, 'Bertoldstr.', \\\$num, '79098', 'Freiburg', 'a7c40f631fc920687.20179984', 'MR']
+            # Quoted heredoc -> the PHP $vars are written literally (no shell
+            # expansion). ./source maps to /var/www in the php container.
+            cat > source/_loadtest_seed.php <<'PHP'
+            <?php
+            require 'source/bootstrap.php';
+            $db = \OxidEsales\Eshop\Core\DatabaseProvider::getDb();
+            for ($i = 1; $i <= 200; $i++) {
+                $num = str_pad((string) $i, 3, '0', STR_PAD_LEFT);
+                $email = 'loadtest_user_' . $num . '@oxid-esales.dev';
+                if ((int) $db->getOne('SELECT COUNT(*) FROM oxuser WHERE OXUSERNAME = ?', [$email]) > 0) {
+                    continue;
+                }
+                $db->execute(
+                    'INSERT INTO oxuser (OXID, OXACTIVE, OXUSERNAME, OXPASSWORD, OXFNAME, OXLNAME, OXSTREET, OXSTREETNR, OXZIP, OXCITY, OXCOUNTRYID, OXSAL)'
+                    . ' VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    [md5($email), $email, password_hash('useruser', PASSWORD_DEFAULT), 'Load', 'Test' . $num, 'Bertoldstr.', $num, '79098', 'Freiburg', 'a7c40f631fc920687.20179984', 'MR']
                 );
-              }
-              echo 'Seeded load test users';
-            \""
-            make php CMD="php -r \"
-              require 'source/bootstrap.php';
-              \\\$db = \\OxidEsales\\Eshop\\Core\\DatabaseProvider::getDb();
-              \\\$db->execute('UPDATE oxarticles SET OXSTOCK = 99999 WHERE OXACTIVE = 1 AND OXSTOCK < 99999');
-              echo 'Stock set high for active products';
-            \""
+            }
+            $db->execute('UPDATE oxarticles SET OXSTOCK = 99999 WHERE OXACTIVE = 1 AND OXSTOCK < 99999');
+            echo "seeded users + stock\n";
+            PHP
+            make php CMD="php /var/www/_loadtest_seed.php"
+            rm -f source/_loadtest_seed.php
 
       - name: Setup Python
         uses: actions/setup-python@v5
