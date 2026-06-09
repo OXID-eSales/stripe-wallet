@@ -137,7 +137,9 @@ class AnonymousBrowse(HttpUser):
     wait_time = between(0.5, 2.0)
 
     @task(4)
-    def start(self) -> None:
+    def start_page(self) -> None:
+        # NB: must NOT be named `start` — that shadows HttpUser.start(group),
+        # the lifecycle method Locust's runner calls to launch the VU greenlet.
         _read(self.client, "/index.php?cl=start", "GET start")
 
     @task(3)
