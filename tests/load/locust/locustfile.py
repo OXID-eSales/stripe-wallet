@@ -291,6 +291,9 @@ def _enforce_thresholds(environment, **_: Any) -> None:
         "throughput_rps": stats.total_rps,
     }
     thresholds = dict(DEFAULT_THRESHOLDS)
+    # Throughput is an *outcome* of the chosen VU count + think-time, not an SLO:
+    # a fixed floor false-fails low-VU runs. The job gates on latency + errors.
+    thresholds.pop("min_throughput_rps", None)
     thresholds["error_pct"] = ("<=", float(os.environ.get("LOAD_FAIL_PCT_ERROR", "1.0")))
     thresholds["p95_ms"] = ("<=", float(os.environ.get("LOAD_FAIL_P95_MS", "1500")))
 

@@ -275,10 +275,22 @@ jobs:
               );
           }
           $db->execute('UPDATE oxarticles SET OXSTOCK = 99999 WHERE OXACTIVE = 1 AND OXSTOCK < 99999');
+          // Hand a real, buyable product OXID to the load harness — the SEO shop
+          // exposes no anid= links to scrape, so discovery would otherwise be empty.
+          $anid = (string) $db->getOne(
+              "SELECT OXID FROM oxarticles WHERE OXACTIVE = 1 AND (OXPARENTID = '' OR OXPARENTID IS NULL) AND OXSTOCK > 0 LIMIT 1"
+          );
+          echo 'PRODUCT_ANID:' . $anid . "\n";
           echo "seeded users + stock\n";
           PHP
-          docker compose exec -T php php /var/www/_loadtest_seed.php
+          OUT=$(docker compose exec -T php php /var/www/_loadtest_seed.php)
+          echo "$OUT"
           rm -f source/_loadtest_seed.php
+          ANID=$(printf '%s' "$OUT" | grep -oE 'PRODUCT_ANID:[0-9a-zA-Z._-]+' | head -1 | cut -d: -f2)
+          if [ -n "$ANID" ]; then
+            echo "LOAD_PRODUCT_ANID=$ANID" >> "$GITHUB_ENV"
+            echo "discovered product anid: $ANID"
+          fi
 
       # ── Make the shop reachable from the runner host + sanity-check ───────────
       - name: Map shop hostname + verify reachable
