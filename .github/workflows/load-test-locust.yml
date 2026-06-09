@@ -302,6 +302,7 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
+          cache-dependency-path: ${{ env.LOCUST_DIR }}/requirements-chart.txt
 
       - name: Install Locust + charting deps
         working-directory: ${{ env.LOCUST_DIR }}
