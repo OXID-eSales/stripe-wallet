@@ -118,13 +118,31 @@
     }
 
     async _processCheckout() {
+      // OPC-47 cross-module follow-up: the OPC CheckoutService since v1.3.9
+      // server-side-rejects processCheckout when either consent flag is
+      // false (CONSENTS_NOT_ACCEPTED), so the Stripe footer must forward
+      // the actual checkbox state. The OPC modal renders
+      // #confirmTermsCheckout + #confirmPrivacyCheckout in its shared
+      // modal-footer fragment; the Stripe footer is AJAX-loaded INSIDE the
+      // same modal, so the IDs are reachable via document.getElementById.
+      // Missing checkbox defaults to `true` (covers payment-base flows
+      // that omit the checkboxes — not the OPC modal where both render).
+      var termsEl = document.getElementById('confirmTermsCheckout');
+      var privacyEl = document.getElementById('confirmPrivacyCheckout');
+      var termsAccepted = termsEl ? !!termsEl.checked : true;
+      var privacyAccepted = privacyEl ? !!privacyEl.checked : true;
+
       var resp = await fetch('/index.php?cl=OeCheckoutApi&fnc=processCheckout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-CSRF-Token': this.csrfTokenValue
         },
-        body: JSON.stringify({ paymentMethodId: this.paymentMethodValue })
+        body: JSON.stringify({
+          paymentMethodId: this.paymentMethodValue,
+          confirmTermsAndConditions: termsAccepted,
+          confirmPrivacyPolicy: privacyAccepted
+        })
       });
       if (!resp.ok) throw new Error('HTTP error: ' + resp.status);
       var text = await resp.text();
