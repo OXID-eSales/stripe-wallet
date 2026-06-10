@@ -1,10 +1,17 @@
 name: Load Test (Locust)
 
-# Manual only. Builds a throwaway OXID shop INSIDE the GitHub Action (the same
-# way development.yml's `install_shop_with_module` integration job does), then
-# runs a Locust heavy-load profile against it. No external shop, no SSH — the
-# shop lives and dies with the run, so Stripe test mode is guaranteed (we set
-# it) and there is no remote container to go down.
+# Manual only. Two target modes:
+#   1. In-Action shop (default, `url` empty): builds a throwaway OXID shop
+#      INSIDE the GitHub Action (mirrors development.yml's
+#      `install_shop_with_module` job), runs Locust against it, then tears it
+#      down. Stripe test mode is guaranteed (we set it) and there is no remote
+#      container to go down.
+#   2. External shop (`url` provided): skips the whole build/seed/teardown and
+#      runs Locust against the given URL. The external shop is ASSUMED to be in
+#      Stripe TEST mode and already seeded with `loadtest_user_*` accounts —
+#      this workflow does not verify or configure it. Pass `product_anid` so the
+#      checkout scenario has a buyable product (the in-Action path auto-discovers
+#      one; an external SEO shop exposes no anid= links to scrape).
 #
 # Scope caveat: Locust is HTTP-level. It exercises page rendering, session +
 # basket, and the Stripe `createCheckoutSession` endpoint. It does NOT drive the
@@ -12,6 +19,16 @@ name: Load Test (Locust)
 on:
   workflow_dispatch:
     inputs:
+      url:
+        description: 'External shop URL to test (no trailing slash). Leave empty to build a throwaway shop inside this Action.'
+        required: false
+        default: ''
+        type: string
+      product_anid:
+        description: 'Buyable product OXID for the checkout scenario (external URL only; in-Action shop auto-discovers one).'
+        required: false
+        default: ''
+        type: string
       users:
         description: 'Concurrent virtual users'
         required: true
@@ -68,7 +85,8 @@ env:
   PAYMENT_BASE_BRANCH: 'b-7.4.x'
   SHOP_BRANCH: 'b-7.4.x'
   MODULE_ID: 'oe_payments_stripe_wallet'
-  SHOP_URL: 'https://oxideshop.local'
+  # External URL when given, otherwise the in-Action shop hostname.
+  SHOP_URL: ${{ inputs.url != '' && inputs.url || 'https://oxideshop.local' }}
   LOCUST_DIR: source/test-module/tests/load/locust
   # Seeded users (see the "Seed" step) — the checkout scenario logs in as these.
   LOAD_USER_PREFIX: loadtest_user_
@@ -86,19 +104,24 @@ jobs:
       LOAD_FAIL_PCT_ERROR: ${{ inputs.fail_pct_error }}
     steps:
       # ── Build the shop (mirrors development.yml install_shop_with_module) ─────
+      # Every step in this block is in-Action only; an external `url` skips them.
       - name: Cleanup workspace
+        if: inputs.url == ''
         run: |
           ls -la ./
           sudo rm -rf ./* || true
           sudo rm -rf ./.??* || true
 
       - name: Clone testing environment (docker-eshop-sdk)
+        if: inputs.url == ''
         run: git clone https://github.com/OXID-eSales/docker-eshop-sdk.git .
 
       - name: Clone the shop
+        if: inputs.url == ''
         run: git clone --depth 1 https://github.com/OXID-eSales/oxideshop_ce.git --branch ${{ env.SHOP_BRANCH }} --single-branch source
 
       - name: Prepare container configuration
+        if: inputs.url == ''
         run: |
           make setup
           make addbasicservices
@@ -115,6 +138,7 @@ jobs:
             containers/httpd/project.conf
 
       - name: Prepare shop configuration
+        if: inputs.url == ''
         run: |
           cp source/source/config.inc.php.dist source/source/config.inc.php
           sed -i "1s+^+SetEnvIf Authorization \"\(.*\)\" HTTP_AUTHORIZATION=\$1\n\n+" source/source/.htaccess
@@ -129,22 +153,26 @@ jobs:
               source/source/config.inc.php
 
       - name: Login to Docker Hub
+        if: inputs.url == ''
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USER }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
       - name: Start containers
+        if: inputs.url == ''
         run: |
           make up
           sleep 2
 
+      # Needed in BOTH modes — this is where the Locust files live (LOCUST_DIR).
       - name: Checkout current module
         uses: actions/checkout@v5
         with:
           path: source/test-module
 
       - name: Checkout payment-base (private dependency)
+        if: inputs.url == ''
         uses: actions/checkout@v5
         with:
           repository: OXID-eSales/payment-base
@@ -153,21 +181,25 @@ jobs:
           token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
 
       - name: Configure path repository for payment-base
+        if: inputs.url == ''
         run: |
           docker compose exec -T php composer config repositories.payment-base \
             --json '{"type":"path","url":"./payment-base","options":{"symlink":true}}'
 
       - name: Install payment-base at shop level
+        if: inputs.url == ''
         run: |
           docker compose exec -T php composer require oxid-esales/payment-base:* --no-interaction --no-update
 
       - name: Install module
+        if: inputs.url == ''
         run: |
           docker compose exec -T php composer config repositories.${{ env.PACKAGE_NAME }} \
             --json '{"type":"path", "url":"./test-module", "options": {"symlink": true}}'
           docker compose exec -T php composer require ${{ env.PACKAGE_NAME }}:* --no-interaction --no-update
 
       - name: Require demodata + apex theme
+        if: inputs.url == ''
         run: |
           docker compose exec -T php composer config repositories.oxid-esales/oxideshop-demodata-ce \
             --json '{"type":"git", "url":"https://github.com/OXID-eSales/oxideshop_demodata_ce"}'
@@ -175,6 +207,7 @@ jobs:
           docker compose exec -T php composer require oxid-esales/apex-theme:dev-b-7.4.x --no-update
 
       - name: Install dependencies
+        if: inputs.url == ''
         env:
           GH_TOKEN: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
         run: |
@@ -184,6 +217,7 @@ jobs:
       # Workaround for the CI-only unified-namespace-generator backslash-dir bug
       # (see development.yml for the full explanation).
       - name: Workaround — rename backslash-named generator dirs
+        if: inputs.url == ''
         run: |
           docker compose exec -T php sh -c '
             cd /var/www/vendor/oxid-esales/oxideshop-unified-namespace-generator/generated
@@ -199,22 +233,27 @@ jobs:
           '
 
       - name: Reset database
+        if: inputs.url == ''
         run: |
           docker compose exec -T php bin/oe-console oe:database:reset \
             --db-host=mysql --db-port=3306 --db-name=example --db-user=root --db-password=root --force
 
       - name: Install demodata
+        if: inputs.url == ''
         run: docker compose exec -T php bin/oe-console oe:setup:demodata
 
       - name: Activate apex theme
+        if: inputs.url == ''
         run: docker compose exec -T php bin/oe-console oe:theme:activate apex
 
       - name: Install + activate payment-base module
+        if: inputs.url == ''
         run: |
           docker compose exec -T php bin/oe-console oe:module:install /var/www/vendor/oxid-esales/payment-base
           docker compose exec -T php bin/oe-console oe:module:activate oe_payment_base
 
       - name: Install + activate stripe-wallet module
+        if: inputs.url == ''
         run: |
           docker compose exec -T php bin/oe-console oe:module:install /var/www/test-module
           docker compose exec -T php bin/oe-console oe:module:activate ${{ env.MODULE_ID }}
@@ -223,6 +262,7 @@ jobs:
       #     container — reliable, no SSH). The shop is ephemeral, so this can
       #     never touch live keys. Quoted heredoc -> no shell $ expansion. ────────
       - name: Configure Stripe test mode
+        if: inputs.url == ''
         run: |
           # display_errors is off in the container, so force errors to STDERR and
           # catch Throwable -> the real cause is visible (a silent fatal = exit 255
@@ -257,6 +297,7 @@ jobs:
           rm -f source/_loadtest_stripe_cfg.php
 
       - name: Seed login-able users + high stock
+        if: inputs.url == ''
         run: |
           cat > source/_loadtest_seed.php <<'PHP'
           <?php
@@ -293,9 +334,12 @@ jobs:
           fi
 
       # ── Make the shop reachable from the runner host + sanity-check ───────────
-      - name: Map shop hostname + verify reachable
+      - name: Map shop hostname (in-Action shop)
+        if: inputs.url == ''
+        run: echo "127.0.0.1 oxideshop.local" | sudo tee -a /etc/hosts
+
+      - name: Verify shop reachable
         run: |
-          echo "127.0.0.1 oxideshop.local" | sudo tee -a /etc/hosts
           for i in $(seq 1 30); do
             # -L: follow the SEO 301 from index.php?cl=start to the canonical
             # start URL; accept any 2xx/3xx as "shop is serving".
@@ -304,8 +348,8 @@ jobs:
             if [ -n "$STATUS" ] && [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then exit 0; fi
             sleep 3
           done
-          echo "::error::shop did not serve HTTP 200 at ${{ env.SHOP_URL }}"
-          docker compose logs --tail 80
+          echo "::error::shop did not serve HTTP 2xx/3xx at ${{ env.SHOP_URL }}"
+          if [ -z "${{ inputs.url }}" ]; then docker compose logs --tail 80; fi
           exit 1
 
       # ── Run Locust on the runner against the in-Action shop ───────────────────
@@ -326,6 +370,9 @@ jobs:
         working-directory: ${{ env.LOCUST_DIR }}
         env:
           LOAD_INSECURE_TLS: '1'   # the in-CI shop uses a self-signed cert
+          # External run: take the anid from the input. In-Action run: fall back
+          # to the OXID auto-discovered during seeding (set via $GITHUB_ENV).
+          LOAD_PRODUCT_ANID: ${{ inputs.product_anid != '' && inputs.product_anid || env.LOAD_PRODUCT_ANID }}
         run: |
           mkdir -p load-report
           case "${{ inputs.scenarios }}" in
@@ -379,7 +426,11 @@ jobs:
             echo ""
             echo "| Parameter | Value |"
             echo "|-----------|-------|"
-            echo "| Shop | ${{ env.SHOP_URL }} (built in CI, Stripe test mode) |"
+            if [ -z "${{ inputs.url }}" ]; then
+              echo "| Shop | ${{ env.SHOP_URL }} (built in CI, Stripe test mode) |"
+            else
+              echo "| Shop | ${{ env.SHOP_URL }} (external — assumed Stripe test mode) |"
+            fi
             echo "| Scenario | ${{ inputs.scenarios }} |"
             echo "| Users | ${{ inputs.users }} (spawn ${{ inputs.spawn_rate }}/s) |"
             echo "| Duration | ${{ inputs.duration }} |"
@@ -403,11 +454,11 @@ jobs:
           retention-days: 30
 
       - name: Show docker logs
-        if: always()
+        if: always() && inputs.url == ''
         run: docker compose logs --tail 200 || true
 
       - name: Stop containers
-        if: always()
+        if: always() && inputs.url == ''
         run: docker compose down -v || true
 
       - name: Fail job on threshold breach
