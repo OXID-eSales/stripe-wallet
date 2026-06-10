@@ -66,6 +66,7 @@ jobs:
           script: |
             set -e
             cd ${{ env.SHOP_PATH }}
+            make php CMD="bin/oe-console oe:module:install vendor/oxid-esales/stripe-wallet"
             make php CMD="bin/oe-console oe:module:deactivate oe_payments_stripe_wallet"
             make php CMD="bin/oe-console oe:module:activate oe_payments_stripe_wallet"
             make php CMD="bin/oe-console o:c:c"
