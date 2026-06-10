@@ -141,25 +141,27 @@ jobs:
           chmod +x k6
           ./k6 version
 
-      - name: Install Chromium dependencies
+      - name: Install Google Chrome (for k6 browser module)
         run: |
+          # The k6 browser module drives a REAL Chrome — it does not bundle or
+          # auto-download one, so a browser binary must exist on the runner or
+          # every iteration dies at IterStart with "couldn't detect ... chrome".
+          # Installing the official .deb lets apt resolve all the shared-library
+          # dependencies automatically (no need to hand-list libnss3 etc.).
           sudo apt-get update -qq
-          # libasound2 was renamed to libasound2t64 on Ubuntu 24.04 (Noble);
-          # fall back to the old name on older runners.
-          ALSA_PKG=libasound2t64
-          apt-cache show "$ALSA_PKG" >/dev/null 2>&1 || ALSA_PKG=libasound2
-          sudo apt-get install -y --no-install-recommends \
-            libnss3 libatk-bridge2.0-0 libdrm2 libxcomposite1 libxdamage1 \
-            libxfixes3 libxrandr2 libgbm1 "$ALSA_PKG" libpango-1.0-0 \
-            libcairo2 libcups2 libxkbcommon0 fonts-liberation
-          # k6 browser module auto-downloads Chromium on first run
-          K6_BROWSER_ENABLED=true ./k6 run --no-summary -e LOAD_DRY_RUN=true tests/load/k6.config.js 2>/dev/null || true
+          curl -sSL -o /tmp/chrome.deb \
+            https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y --no-install-recommends /tmp/chrome.deb
+          rm -f /tmp/chrome.deb
+          google-chrome --version
 
       - name: Run k6 load test (browser mode)
         working-directory: tests/load
         env:
           K6_BROWSER_ENABLED: 'true'
-          K6_BROWSER_ARGS: 'ignore-certificate-errors'
+          K6_BROWSER_EXECUTABLE_PATH: /usr/bin/google-chrome
+          # no-sandbox: Chrome won't start as root (CI containers) without it.
+          K6_BROWSER_ARGS: 'no-sandbox,ignore-certificate-errors'
           K6_BASE_URL: ${{ env.SHOP_URL }}
           K6_TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
           LOAD_TARGET_VUS: ${{ inputs.target_vus }}
