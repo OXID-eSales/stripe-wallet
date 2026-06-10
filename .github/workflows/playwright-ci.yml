@@ -4,19 +4,39 @@ on:
   workflow_dispatch:
     inputs:
       url:
-        description: 'Shop base URL to test against (no trailing slash, e.g. https://pay1.oxid.dev)'
+        description: 'Shop base URL to test against (no trailing slash)'
         required: true
         default: 'https://pay1.oxid.dev'
         type: string
-      test_groups:
-        description: 'Playwright projects to run, space- or comma-separated (admin-tests, checkout-tests, chromium). Leave empty to run all.'
-        required: false
-        default: ''
+      branch:
+        description: 'stripe-wallet branch to deploy (composer ref, e.g. dev-b-7.4.x)'
+        required: true
+        default: 'dev-b-7.4.x'
         type: string
+      test_suite:
+        description: 'Which tests to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - checkout
+          - discounts
+          - admin
+          - capture
+      screenshots:
+        description: 'Capture screenshots during the run'
+        required: false
+        default: true
+        type: boolean
+      video:
+        description: 'Capture video during the run'
+        required: false
+        default: true
+        type: boolean
 
 env:
   SHOP_PATH: /var/www/oxid/oxid75
-  MODULE_PATH: /var/www/oxid/oxid75/source/extensions/stripe
   PLAYWRIGHT_PATH: tests/e2e/playwright/playwright
   SHOP_HOME_URL: ${{ inputs.url }}
 
@@ -25,27 +45,27 @@ jobs:
     name: Deploy & activate module
     runs-on: [arc-runner-set]
     steps:
-      - name: Checkout module on remote shop
+      - name: Require chosen branch and update dependencies
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SHOP_HOST }}
           username: ${{ secrets.SHOP_SSH_USER }}
           key: ${{ secrets.SHOP_SSH_KEY }}
           script: |
-            cd ${{ env.MODULE_PATH }}
-            git fetch origin
-            git checkout ${{ github.ref_name }}
-            git reset --hard origin/${{ github.ref_name }}
-
-      - name: Update dependencies and activate module
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SHOP_HOST }}
-          username: ${{ secrets.SHOP_SSH_USER }}
-          key: ${{ secrets.SHOP_SSH_KEY }}
-          script: |
+            set -e
             cd ${{ env.SHOP_PATH }}
-            make php CMD="composer update --no-interaction"
+            make php CMD="composer require oxid-esales/stripe-wallet:${{ inputs.branch }} --no-update --no-interaction"
+            make php CMD="composer update oxid-esales/stripe-wallet --with-all-dependencies --no-interaction"
+
+      - name: Reinstall and activate module
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SHOP_HOST }}
+          username: ${{ secrets.SHOP_SSH_USER }}
+          key: ${{ secrets.SHOP_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ env.SHOP_PATH }}
             make php CMD="bin/oe-console oe:module:deactivate oe_payments_stripe_wallet"
             make php CMD="bin/oe-console oe:module:activate oe_payments_stripe_wallet"
             make php CMD="bin/oe-console o:c:c"
@@ -69,11 +89,6 @@ jobs:
           git submodule sync -- tests/e2e/playwright
           git -c "url.https://x-access-token:${GH_PAT_PLAYWRIGHT}@github.com/.insteadOf=https://github.com/" \
             submodule update --init --depth=1 -- tests/e2e/playwright
-
-      - name: Verify Playwright submodule branch
-        run: |
-          cd ${{ env.PLAYWRIGHT_PATH }}
-          ls -la
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -107,9 +122,6 @@ jobs:
       - name: Create .env
         working-directory: ${{ env.PLAYWRIGHT_PATH }}
         run: |
-          ls -la
-          echo "shop url"
-          echo ${{ env.SHOP_HOME_URL }}
           cat <<EOF > .env
           SHOP_URL=${{ env.SHOP_HOME_URL }}
           ADMIN_URL=${{ env.SHOP_HOME_URL }}/admin/
@@ -122,14 +134,20 @@ jobs:
         working-directory: ${{ env.PLAYWRIGHT_PATH }}
         env:
           CI: true
-          TEST_GROUPS: ${{ inputs.test_groups }}
+          TEST_SUITE: ${{ inputs.test_suite }}
+          PW_SCREENSHOT: ${{ inputs.screenshots && 'on' || 'off' }}
+          PW_VIDEO: ${{ inputs.video && 'on' || 'off' }}
         run: |
-          project_args=""
-          for group in $(echo "$TEST_GROUPS" | tr ',' ' '); do
-            project_args="$project_args --project=$group"
-          done
-          echo "Running: npx playwright test${project_args:- (all projects)}"
-          npx playwright test $project_args
+          case "$TEST_SUITE" in
+            checkout)  args="--project=checkout-tests" ;;
+            admin)     args="--project=admin-tests" ;;
+            discounts) args="--project=chromium tests/e2e/StripeStandard/CouponsDiscounts.spec.ts" ;;
+            capture)   args="--project=admin-tests tests/admin/stripe-admin-capture.spec.ts tests/admin/stripe-manual-capture-fix.spec.ts" ;;
+            all|*)     args="" ;;
+          esac
+          echo "Suite: $TEST_SUITE -> npx playwright test ${args:-(all projects)}"
+          echo "Screenshots: $PW_SCREENSHOT | Video: $PW_VIDEO"
+          npx playwright test $args
 
       - name: Upload test report
         if: always()
