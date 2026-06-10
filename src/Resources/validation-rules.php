@@ -18,30 +18,34 @@ return [
                 'block' => ': ; < > { } [ ] ( ) | \\ / ~ ! @ # $ % ^ * = + " ? , & _',
             ],
         ],
+        // Sprint 124 (STRP-129): the six address fields (additionalInfo, street,
+        // houseNumber, postalCode, company, vatId) use UNICODE_LETTERS (\p{L}),
+        // not ASCII-only LETTERS, so German umlauts (öäüß) and Polish letters
+        // (ł ą ę …) pass. Block lists are unchanged; injection surface unchanged.
         [
             'field' => 'additionalInfo',
             'rules' => [
-                'allow' => "LETTERS NUMBERS SPACES ' - . , / #",
+                'allow' => "UNICODE_LETTERS NUMBERS SPACES ' - . , / #",
                 'block' => '< > { } [ ] | \\ ~ ! @ $ % ^ * = +',
             ],
         ],
         [
             'field' => 'street',
             'rules' => [
-                'allow' => "LETTERS NUMBERS SPACES ' - . , /",
+                'allow' => "UNICODE_LETTERS NUMBERS SPACES ' - . , /",
                 'block' => ': ; < > { } [ ] | \\ ~ ! @ $ % ^ * = +',
             ],
         ],
         [
             'field' => 'houseNumber',
             'rules' => [
-                'allow' => 'NUMBERS LETTERS - /',
+                'allow' => 'NUMBERS UNICODE_LETTERS - /',
             ],
         ],
         [
             'field' => 'postalCode',
             'rules' => [
-                'allow' => 'LETTERS NUMBERS SPACES -',
+                'allow' => 'UNICODE_LETTERS NUMBERS SPACES -',
             ],
         ],
         [
@@ -54,14 +58,14 @@ return [
         [
             'field' => 'company',
             'rules' => [
-                'allow' => "LETTERS NUMBERS SPACES ' - . & ,",
+                'allow' => "UNICODE_LETTERS NUMBERS SPACES ' - . & ,",
                 'block' => '< > { } [ ] | \\ ~ ! @ $ % ^ * = +',
             ],
         ],
         [
             'field' => 'vatId',
             'rules' => [
-                'allow' => 'LETTERS NUMBERS SPACES -',
+                'allow' => 'UNICODE_LETTERS NUMBERS SPACES -',
             ],
         ],
         [

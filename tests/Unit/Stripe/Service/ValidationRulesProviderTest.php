@@ -64,6 +64,22 @@ final class ValidationRulesProviderTest extends TestCase
         $this->assertSame("UNICODE_LETTERS NUMBERS SPACES ' - . , / # ( ) :", $map['captureReason']);
     }
 
+    public function testAddressFieldsAcceptUnicodeLetters(): void
+    {
+        // Sprint 124 (STRP-129): the six address fields used the ASCII-only
+        // LETTERS token, blocking German umlauts / Polish letters on street,
+        // company, etc. They now use UNICODE_LETTERS (\p{L}). Block lists and
+        // literals are unchanged.
+        $map = $this->sut->getFieldAllowMap();
+
+        $this->assertSame("UNICODE_LETTERS NUMBERS SPACES ' - . , / #", $map['additionalInfo']);
+        $this->assertSame("UNICODE_LETTERS NUMBERS SPACES ' - . , /", $map['street']);
+        $this->assertSame('NUMBERS UNICODE_LETTERS - /', $map['houseNumber']);
+        $this->assertSame('UNICODE_LETTERS NUMBERS SPACES -', $map['postalCode']);
+        $this->assertSame("UNICODE_LETTERS NUMBERS SPACES ' - . & ,", $map['company']);
+        $this->assertSame('UNICODE_LETTERS NUMBERS SPACES -', $map['vatId']);
+    }
+
     public function testDescribesCaptureReasonAllowedSymbols(): void
     {
         $translator = $this->createMock(LanguageTranslatorInterface::class);
