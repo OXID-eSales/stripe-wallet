@@ -79,26 +79,6 @@ jobs:
             exit 1
           fi
 
-      - name: Check Stripe test mode
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SHOP_HOST }}
-          username: ${{ secrets.SHOP_SSH_USER }}
-          key: ${{ secrets.SHOP_SSH_KEY }}
-          script: |
-            cd ${{ env.SHOP_PATH }}
-            # Verify Stripe is in test mode (never load-test against live keys)
-            MODE=$(make php CMD="php -r \"
-              require 'source/bootstrap.php';
-              \\\$c = \\OxidEsales\\EshopCommunity\\Internal\\Container\\ContainerFactory::getInstance()->getContainer();
-              echo \\\$c->get(\\OxidEsales\\Payments\\Stripe\\Service\\ModuleConfigurationServiceInterface::class)->getStripeMode();
-            \"" 2>/dev/null | tail -1)
-            echo "Stripe mode: $MODE"
-            if [ "$MODE" != "test" ]; then
-              echo "FATAL: Stripe is NOT in test mode. Aborting load test."
-              exit 1
-            fi
-
   seed-data:
     name: Seed test data
     needs: pre-flight

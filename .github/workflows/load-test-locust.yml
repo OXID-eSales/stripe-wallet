@@ -6,12 +6,14 @@ name: Load Test (Locust)
 #      `install_shop_with_module` job), runs Locust against it, then tears it
 #      down. Stripe test mode is guaranteed (we set it) and there is no remote
 #      container to go down.
-#   2. External shop (`url` provided): skips the whole build/seed/teardown and
-#      runs Locust against the given URL. The external shop is ASSUMED to be in
-#      Stripe TEST mode and already seeded with `loadtest_user_*` accounts —
-#      this workflow does not verify or configure it. Pass `product_anid` so the
-#      checkout scenario has a buyable product (the in-Action path auto-discovers
-#      one; an external SEO shop exposes no anid= links to scrape).
+#   2. External shop (`url` provided): skips the build/teardown but DOES seed
+#      the shop over SSH (200 `loadtest_user_*` accounts + high stock), the same
+#      way load-test.yml does. The external shop is reached via the SHOP_HOST /
+#      SHOP_SSH_* secrets, so `url` is expected to point at that same host. It is
+#      ASSUMED to be in Stripe TEST mode — this workflow does not verify mode.
+#      Pass `product_anid` so the checkout scenario has a buyable product (the
+#      in-Action path auto-discovers one; an external SEO shop exposes no anid=
+#      links to scrape).
 #
 # Scope caveat: Locust is HTTP-level. It exercises page rendering, session +
 # basket, and the Stripe `createCheckoutSession` endpoint. It does NOT drive the
@@ -333,6 +335,44 @@ jobs:
             echo "discovered product anid: $ANID"
           fi
 
+      # External shop: seed over SSH (mirrors load-test.yml). The checkout
+      # scenario logs in as these users and needs stock; pass `product_anid`
+      # for the basket (auto-discovery only works for the in-Action shop).
+      - name: Seed external shop (users + high stock)
+        if: inputs.url != ''
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SHOP_HOST }}
+          username: ${{ secrets.SHOP_SSH_USER }}
+          key: ${{ secrets.SHOP_SSH_KEY }}
+          script: |
+            cd /var/www/oxid/oxid75
+
+            # Seed 200 login-able users (idempotent — skips existing)
+            make php CMD="php -r \"
+              require 'source/bootstrap.php';
+              \\\$db = \\OxidEsales\\Eshop\\Core\\DatabaseProvider::getDb();
+              for (\\\$i = 1; \\\$i <= 200; \\\$i++) {
+                \\\$num = str_pad((string) \\\$i, 3, '0', STR_PAD_LEFT);
+                \\\$email = 'loadtest_user_' . \\\$num . '@oxid-esales.dev';
+                if ((int) \\\$db->getOne('SELECT COUNT(*) FROM oxuser WHERE OXUSERNAME = ?', [\\\$email]) > 0) continue;
+                \\\$db->execute(
+                  'INSERT INTO oxuser (OXID, OXACTIVE, OXUSERNAME, OXPASSWORD, OXFNAME, OXLNAME, OXSTREET, OXSTREETNR, OXZIP, OXCITY, OXCOUNTRYID, OXSAL)
+                   VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                  [md5(\\\$email), \\\$email, password_hash('useruser', PASSWORD_DEFAULT), 'Load', 'Test'.\\\$num, 'Bertoldstr.', \\\$num, '79098', 'Freiburg', 'a7c40f631fc920687.20179984', 'MR']
+                );
+              }
+              echo 'Seeded 200 load test users';
+            \""
+
+            # Set high stock on all active products
+            make php CMD="php -r \"
+              require 'source/bootstrap.php';
+              \\\$db = \\OxidEsales\\Eshop\\Core\\DatabaseProvider::getDb();
+              \\\$db->execute('UPDATE oxarticles SET OXSTOCK = 99999 WHERE OXACTIVE = 1 AND OXSTOCK < 99999');
+              echo 'Stock set to 99999 for all active products';
+            \""
+
       # ── Make the shop reachable from the runner host + sanity-check ───────────
       - name: Map shop hostname (in-Action shop)
         if: inputs.url == ''
@@ -375,6 +415,9 @@ jobs:
           LOAD_PRODUCT_ANID: ${{ inputs.product_anid != '' && inputs.product_anid || env.LOAD_PRODUCT_ANID }}
         run: |
           mkdir -p load-report
+          if [ -n "${{ inputs.url }}" ] && [ -z "$LOAD_PRODUCT_ANID" ] && [ "${{ inputs.scenarios }}" != "browse" ]; then
+            echo "::warning::External run without product_anid — the checkout scenario has no product to add to basket. Pass the 'product_anid' input."
+          fi
           case "${{ inputs.scenarios }}" in
             browse)   CLASSES="AnonymousBrowse" ;;
             checkout) CLASSES="CheckoutFlow" ;;
