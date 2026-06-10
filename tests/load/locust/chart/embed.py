@@ -23,6 +23,9 @@ _MARKER = "data-charts-embed"
 _EXISTING = re.compile(
     rf'<section[^>]*{_MARKER}.*?</section>', re.DOTALL | re.IGNORECASE
 )
+# The document's real </body> — the one that closes the page (followed by
+# </html>), as opposed to any </body> embedded in a script string or JSON blob.
+_CLOSING_BODY = re.compile(r'</body\s*>\s*</html\s*>', re.IGNORECASE)
 
 
 def _img_tag(png_path: str) -> str:
@@ -55,12 +58,18 @@ def embed(index_html: str, png_paths: List[str]) -> str:
     section = build_section(png_paths)
     if _EXISTING.search(index_html):
         return _EXISTING.sub(section, index_html, count=1)
-    # Insert before the LAST </body>. The Locust report bundles a chart-popup
-    # template string ('<body …></body>') inside its module script, so the
-    # FIRST </body> lives in the middle of the JS — injecting there breaks the
-    # bundle and blanks the page. The document's real </body> is the last one.
-    marker = "</body>"
-    index = index_html.rfind(marker)
+    # Insert before the document-closing </body> — the one immediately followed
+    # by </html>. The Locust report bundles a chart-popup template string
+    # ('<body …></body>') inside its head module script, and stray "</body>"
+    # text can also appear inside the templateArgs JSON; injecting at either
+    # corrupts the page and blanks it. Anchoring on the </body></html> pair
+    # targets the real body unambiguously.
+    closing = _CLOSING_BODY.search(index_html)
+    if closing:
+        at = closing.start()
+        return index_html[:at] + section + "\n" + index_html[at:]
+    # Fallbacks for malformed input: last </body>, else append.
+    index = index_html.rfind("</body>")
     if index != -1:
         return index_html[:index] + section + "\n" + index_html[index:]
     return index_html + section

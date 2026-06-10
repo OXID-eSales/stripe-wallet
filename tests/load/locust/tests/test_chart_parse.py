@@ -67,3 +67,22 @@ def test_embed_is_idempotent():
     assert once.count("data-charts-embed") == 1
     assert twice.count("data-charts-embed") == 1  # replaced, not stacked
     assert twice.count("</body>") == 1
+
+
+def test_embed_targets_real_body_not_head_script_string():
+    # Regression: the Locust report bundles a chart-popup template string
+    # ('<body …></body>') inside its head module script (ECharts save-as-image).
+    # A naive find("</body>") injects there, corrupting the JS bundle and
+    # blanking the page. Embedding must land in the REAL document body and leave
+    # the script string byte-for-byte intact.
+    script = "var b='<body style=\"margin:0;\"><img/></body>',w=open();"
+    html = (
+        "<html><head><script>" + script + "</script></head>"
+        "<body><div id=\"root\"></div></body></html>"
+    )
+    out = embed(html, [])
+    assert script in out                                  # JS string untouched
+    assert out.endswith("</body></html>")                 # real closing tag kept
+    assert out.count("data-charts-embed") == 1
+    # section landed after the real mount point, not inside the head script
+    assert out.index("data-charts-embed") > out.index('<div id="root"')
