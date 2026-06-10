@@ -55,8 +55,14 @@ def embed(index_html: str, png_paths: List[str]) -> str:
     section = build_section(png_paths)
     if _EXISTING.search(index_html):
         return _EXISTING.sub(section, index_html, count=1)
-    if "</body>" in index_html:
-        return index_html.replace("</body>", section + "\n</body>", 1)
+    # Insert before the LAST </body>. The Locust report bundles a chart-popup
+    # template string ('<body …></body>') inside its module script, so the
+    # FIRST </body> lives in the middle of the JS — injecting there breaks the
+    # bundle and blanks the page. The document's real </body> is the last one.
+    marker = "</body>"
+    index = index_html.rfind(marker)
+    if index != -1:
+        return index_html[:index] + section + "\n" + index_html[index:]
     return index_html + section
 
 
