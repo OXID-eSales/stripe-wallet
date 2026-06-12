@@ -87,7 +87,10 @@ concurrency:
 
 env:
   PACKAGE_NAME: 'oxid-esales/stripe-wallet'
-  PHP_VERSION: '8.2'
+  # PHP must satisfy the selected shop branch: OXID CE b-7.5.x requires PHP ^8.3
+  # (doctrine-wrapper, namespace-generator, phpunit ^12.5 all demand >=8.3);
+  # b-7.4.x / b-7.3.x build on 8.2.
+  PHP_VERSION: ${{ inputs.shop_branch == 'b-7.5.x' && '8.3' || '8.2' }}
   MYSQL_VERSION: '8.0'
   TEMPLATE_ENGINE: 'twig'
   # payment-base + the Stripe module stay on our dev branch regardless of the
