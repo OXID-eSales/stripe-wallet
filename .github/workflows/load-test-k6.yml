@@ -3,6 +3,11 @@ name: Load Test (k6 scenarios)
 on:
   workflow_dispatch:
     inputs:
+      url:
+        description: 'Shop URL the load test runs against (no trailing slash). Leave empty for the default pay1 shop.'
+        required: false
+        default: ''
+        type: string
       target_vus:
         description: 'Target virtual users per minute'
         required: true
@@ -68,7 +73,10 @@ on:
 env:
   SHOP_PATH: /var/www/oxid/oxid75
   MODULE_PATH: /var/www/oxid/oxid75/source/extensions/stripe
-  SHOP_URL: https://pay1.oxid.dev
+  # HTTP target for the load run: the `url` input when given, else the pay1 shop.
+  # NB: the seed/validate jobs reach the shop over SSH via the SHOP_HOST secret —
+  # point `url` at that same host, or seeding/DB checks will target a different box.
+  SHOP_URL: ${{ inputs.url != '' && inputs.url || 'https://pay1.oxid.dev' }}
   K6_VERSION: '0.54.0'
 
 jobs:
@@ -238,7 +246,7 @@ jobs:
             --param "Ramp-up=${{ inputs.ramp_up }} min" \
             --param "Scenario=${{ inputs.scenario }}" \
             --param "Dry run=${{ inputs.dry_run }}" \
-            --param "Server=${{ env.SHOP_URL }}"
+            --param "Shop URL=${{ env.SHOP_URL }}"
 
       - name: Step summary
         if: always()
@@ -253,7 +261,7 @@ jobs:
             echo "| Ramp-up | ${{ inputs.ramp_up }} min |"
             echo "| Scenario | ${{ inputs.scenario }} |"
             echo "| Dry run | ${{ inputs.dry_run }} |"
-            echo "| Server | ${{ env.SHOP_URL }} |"
+            echo "| Shop URL | ${{ env.SHOP_URL }} |"
             echo ""
             if [ -f tests/load/k6-report/summary.md ]; then
               echo "### Aggregated statistics"
@@ -361,6 +369,6 @@ jobs:
           echo "| Ramp-up | ${{ inputs.ramp_up }} min |" >> $GITHUB_STEP_SUMMARY
           echo "| Scenario | ${{ inputs.scenario }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Dry run | ${{ inputs.dry_run }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Server | pay1.oxid.dev |" >> $GITHUB_STEP_SUMMARY
+          echo "| Shop URL | ${{ env.SHOP_URL }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "See artifacts for detailed k6 results and DB validation output." >> $GITHUB_STEP_SUMMARY
