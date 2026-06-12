@@ -7,7 +7,9 @@ unit-testable:
 - :mod:`plot`   — pure scale transforms + a single matplotlib ``savefig`` edge.
 - :mod:`charts` — the default chart set (which fields, which scales).
 - :mod:`render` — charts from ONE existing run's ``stats_history.csv`` (no load).
-- :mod:`embed`  — base64-inline the PNG charts into the Locust ``index.html``.
+- :mod:`embed`  — base64-inline the PNG charts into an ``index.html``.
 - :mod:`sweep`  — orchestrates N headless Locust runs into ``sweep.csv`` + charts.
 - :mod:`dbstat` — optional read-only MySQL transaction-rate sampler.
+- :mod:`k6`        — pure k6-NDJSON/summary parsers -> the same Sample/SweepPoint.
+- :mod:`k6_render` — the k6 counterpart of :mod:`render`: charts + HTML + summary.
 """

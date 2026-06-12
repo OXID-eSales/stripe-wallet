@@ -52,6 +52,18 @@ on:
         required: false
         default: false
         type: boolean
+      chart_yscale:
+        description: 'Capacity-chart Y axis (response time).'
+        required: true
+        default: 'log10'
+        type: choice
+        options: [log10, linear, ln]
+      chart_xscale:
+        description: 'Capacity-chart X axis (concurrent users).'
+        required: true
+        default: 'linear'
+        type: choice
+        options: [linear, log10, ln]
 
 env:
   SHOP_PATH: /var/www/oxid/oxid75
@@ -172,18 +184,93 @@ jobs:
         run: |
           ../../k6 run \
             --out json=results.json \
+            --summary-export=summary.json \
             --summary-trend-stats="avg,min,med,max,p(90),p(95),p(99)" \
             k6.config.js \
             2>&1 | tee k6-output.txt
 
-      - name: Upload k6 results
+      # ── Statistics + capacity charts (same report shape as the Locust run) ────
+      # The charting tool lives under tests/load/locust/chart and is reused
+      # verbatim: a k6 adapter (chart.k6) folds the k6 NDJSON time series into the
+      # same Sample shape the Locust history parser yields, so the identical chart
+      # set + embedded HTML report is produced. Steps run from the locust dir
+      # (where the package is) and read the k6 outputs one level up (../).
+      - name: Setup Python
+        if: always()
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: tests/load/locust/requirements-chart.txt
+
+      - name: Install charting deps
+        if: always()
+        working-directory: tests/load/locust
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest -r requirements-chart.txt
+
+      # Gate on the charting unit tests: a bad parse/embed silently produces a
+      # blank report. Fail fast here, not after parsing a multi-GB results.json.
+      - name: Unit-test charting tools
+        if: always()
+        working-directory: tests/load/locust
+        run: python -m pytest tests/test_k6_parse.py tests/test_chart_parse.py -q
+
+      - name: Generate capacity report (X=${{ inputs.chart_xscale }} Y=${{ inputs.chart_yscale }})
+        if: always()
+        continue-on-error: true
+        working-directory: tests/load/locust
+        run: |
+          if [ ! -f ../results.json ]; then
+            echo "no k6 results.json — skipping report"
+            exit 0
+          fi
+          python -m chart.k6_render \
+            --results ../results.json \
+            --summary ../summary.json \
+            --out ../k6-report \
+            --xscale "${{ inputs.chart_xscale }}" \
+            --yscale "${{ inputs.chart_yscale }}" \
+            --title "k6 — ${{ inputs.scenario }} · ${{ inputs.target_vus }} VU/min · ${{ inputs.duration }}min" \
+            --param "Target VUs=${{ inputs.target_vus }}/min" \
+            --param "Duration=${{ inputs.duration }} min" \
+            --param "Ramp-up=${{ inputs.ramp_up }} min" \
+            --param "Scenario=${{ inputs.scenario }}" \
+            --param "Dry run=${{ inputs.dry_run }}" \
+            --param "Server=${{ env.SHOP_URL }}"
+
+      - name: Step summary
+        if: always()
+        run: |
+          {
+            echo "## k6 Load Test"
+            echo ""
+            echo "| Parameter | Value |"
+            echo "|-----------|-------|"
+            echo "| Target VUs | ${{ inputs.target_vus }}/min |"
+            echo "| Duration | ${{ inputs.duration }} min |"
+            echo "| Ramp-up | ${{ inputs.ramp_up }} min |"
+            echo "| Scenario | ${{ inputs.scenario }} |"
+            echo "| Dry run | ${{ inputs.dry_run }} |"
+            echo "| Server | ${{ env.SHOP_URL }} |"
+            echo ""
+            if [ -f tests/load/k6-report/summary.md ]; then
+              echo "### Aggregated statistics"
+              cat tests/load/k6-report/summary.md
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload k6 results + report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: k6-results-${{ github.run_number }}
           path: |
             tests/load/results.json
+            tests/load/summary.json
             tests/load/k6-output.txt
+            tests/load/k6-report/
           retention-days: 30
 
   post-validation:
