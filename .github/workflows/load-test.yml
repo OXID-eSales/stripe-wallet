@@ -1,4 +1,4 @@
-name: Load Test — Stripe Payment
+name: Load Test (k6 scenarios)
 
 on:
   workflow_dispatch:
