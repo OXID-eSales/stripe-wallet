@@ -274,6 +274,31 @@ class CheckoutFlow(HttpUser):
                     f"createCheckoutSession -> {resp.status_code} {resp.text[:160]}"
                 )
 
+        # 4. Exercise the OXID order controller's place-order action directly
+        #    (cl=order&fnc=execute). This is the classic non-JS submit path and
+        #    the heaviest server-side write on the checkout: it builds the basket
+        #    order, runs validation, and hands off to the Stripe smart-contract.
+        #    Over raw HTTP a precondition bounce (AGB/address/payment) is the
+        #    normal outcome, so 2xx/3xx/4xx are all tolerated — only a 5xx faults.
+        with self.client.post(
+            "/index.php",
+            data={
+                "cl": "order",
+                "fnc": "execute",
+                "stoken": stoken,
+                "ord_agb": "1",
+                "sDeliveryAddressMD5": "",
+            },
+            name="POST order execute",
+            catch_response=True,
+        ) as resp:
+            if resp.status_code in _OK or 400 <= resp.status_code < 500:
+                resp.success()
+            else:
+                resp.failure(
+                    f"order execute -> {resp.status_code} {resp.text[:160]}"
+                )
+
 
 # ── Threshold enforcement (typed, via thresholds.py) ──────────────────────────
 

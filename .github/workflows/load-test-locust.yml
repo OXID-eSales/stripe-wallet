@@ -31,6 +31,12 @@ on:
         required: false
         default: ''
         type: string
+      shop_branch:
+        description: 'OXID eShop CE branch to build (in-Action shop only). Switch it across runs to compare core speed.'
+        required: true
+        default: 'b-7.4.x'
+        type: choice
+        options: [b-7.4.x, b-7.5.x, b-7.3.x]
       users:
         description: 'Concurrent virtual users'
         required: true
@@ -84,8 +90,12 @@ env:
   PHP_VERSION: '8.2'
   MYSQL_VERSION: '8.0'
   TEMPLATE_ENGINE: 'twig'
+  # payment-base + the Stripe module stay on our dev branch regardless of the
+  # shop core branch under test, so we measure pure OXID-core speed differences.
   PAYMENT_BASE_BRANCH: 'b-7.4.x'
-  SHOP_BRANCH: 'b-7.4.x'
+  # The shop core branch is selectable per run (in-Action build only). The apex
+  # theme tracks it (themes are versioned per compilation: dev-b-7.5.x, …).
+  SHOP_BRANCH: ${{ inputs.shop_branch }}
   MODULE_ID: 'oe_payments_stripe_wallet'
   # External URL when given, otherwise the in-Action shop hostname.
   SHOP_URL: ${{ inputs.url != '' && inputs.url || 'https://oxideshop.local' }}
@@ -98,7 +108,7 @@ env:
 
 jobs:
   load:
-    name: "Locust — ${{ inputs.scenarios }} · ${{ inputs.users }} VU · ${{ inputs.duration }}"
+    name: "Locust — ${{ inputs.scenarios }} · ${{ inputs.users }} VU · ${{ inputs.duration }} · ${{ inputs.url == '' && inputs.shop_branch || 'external' }}"
     runs-on: [arc-runner-set]
     timeout-minutes: 60
     env:
@@ -206,7 +216,7 @@ jobs:
           docker compose exec -T php composer config repositories.oxid-esales/oxideshop-demodata-ce \
             --json '{"type":"git", "url":"https://github.com/OXID-eSales/oxideshop_demodata_ce"}'
           docker compose exec -T php composer require oxid-esales/oxideshop-demodata-ce:dev-master --no-update
-          docker compose exec -T php composer require oxid-esales/apex-theme:dev-b-7.4.x --no-update
+          docker compose exec -T php composer require oxid-esales/apex-theme:dev-${{ env.SHOP_BRANCH }} --no-update
 
       - name: Install dependencies
         if: inputs.url == ''
@@ -478,6 +488,7 @@ jobs:
             echo "|-----------|-------|"
             if [ -z "${{ inputs.url }}" ]; then
               echo "| Shop | ${{ env.SHOP_URL }} (built in CI, Stripe test mode) |"
+              echo "| OXID CE branch | ${{ inputs.shop_branch }} (apex-theme dev-${{ inputs.shop_branch }}) |"
             else
               echo "| Shop | ${{ env.SHOP_URL }} (external — assumed Stripe test mode) |"
             fi
