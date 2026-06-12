@@ -4,10 +4,15 @@ import json
 from chart.embed import embed
 from chart.k6 import (
     build_report_html,
+    parse_k6_rich,
     parse_k6_stream,
     parse_k6_summary,
+    saturation_rows,
+    scenario_rows,
     summary_markdown,
     summary_rows,
+    threshold_rows,
+    webvital_rows,
 )
 from chart.parse import aggregate_by_users
 
@@ -93,9 +98,90 @@ def test_parse_k6_summary_tolerates_garbage():
 
 
 def test_report_html_is_embeddable():
-    html = build_report_html("k6", [("Users", "100")], [("Orders created", "88")])
+    html = build_report_html(
+        "k6",
+        [("Run parameters", [("Users", "100")]), ("Aggregated statistics", [("Orders created", "88")])],
+    )
     assert html.endswith("</body></html>")
-    # The embed contract: charts land inside the real body, table preserved.
+    assert "Run parameters" in html and "Aggregated statistics" in html
+    # The embed contract: charts land inside the real body, tables preserved.
     out = embed(html, [])
     assert out.count("data-charts-embed") == 1
     assert "Orders created" in out
+
+
+def test_build_report_html_skips_empty_sections():
+    html = build_report_html("k6", [("Web Vitals (browser UX)", []), ("Stats", [("Orders", "5")])])
+    assert "Web Vitals" not in html   # empty section omitted
+    assert "Stats" in html and "Orders" in html
+
+
+# ── rich parser: web vitals + per-scenario breakdown ──────────────────────────
+
+def _tagged(metric, t, value, scenario=None):
+    data = {"time": t, "value": value}
+    if scenario:
+        data["tags"] = {"scenario": scenario}
+    return json.dumps({"type": "Point", "metric": metric, "data": data})
+
+
+_RICH = "\n".join([
+    _point("vus", "2026-06-12T10:00:00Z", 10),
+    _tagged("browser_http_req_duration", "2026-06-12T10:00:01Z", 100, "happy_path"),
+    _tagged("browser_http_req_duration", "2026-06-12T10:00:02Z", 300, "happy_path"),
+    _tagged("browser_http_req_duration", "2026-06-12T10:00:03Z", 500, "threeds"),
+    _tagged("browser_http_req_failed", "2026-06-12T10:00:03Z", 1, "threeds"),
+    _point("browser_web_vital_lcp", "2026-06-12T10:00:02Z", 2200),
+    _point("browser_web_vital_fcp", "2026-06-12T10:00:02Z", 900),
+])
+
+
+def test_parse_k6_rich_collects_samples_webvitals_scenarios():
+    parsed = parse_k6_rich(_RICH.splitlines(), bucket_seconds=10.0)
+    assert [s.user_count for s in parsed.samples] == [10]
+    # Web vitals bucketed at the 10-VU level.
+    assert len(parsed.web_vitals) == 1
+    wv = parsed.web_vitals[0]
+    assert wv.users == 10 and wv.lcp == 2200.0 and wv.fcp == 900.0
+    # Per-scenario: happy_path has 2 reqs / 0 fail, threeds 1 req / 1 fail.
+    by_name = {s.scenario: s for s in parsed.scenarios}
+    assert by_name["happy_path"].requests == 2 and by_name["happy_path"].failures == 0
+    assert by_name["threeds"].requests == 1 and by_name["threeds"].error_pct == 100.0
+    # Sorted by request volume.
+    assert parsed.scenarios[0].scenario == "happy_path"
+
+
+_RICH_SUMMARY = json.dumps({
+    "metrics": {
+        "browser_web_vital_lcp": {"p(75)": 2100.0, "p(95)": 3400.0},
+        "browser_web_vital_cls": {"p(75)": 0.04, "p(95)": 0.12},
+        "dropped_iterations": {"count": 12, "rate": 0.4},
+        "iterations": {"count": 240, "rate": 4.0},
+        "vus_max": {"value": 200},
+        "checks": {"passes": 480, "fails": 5, "value": 0.9897},
+        "data_received": {"count": 5242880},
+        "checkout_duration": {"thresholds": {"p(95)<60000": {"ok": True}}},
+        "checkout_success_rate": {"thresholds": {"rate>0.90": {"ok": False}}},
+    }
+})
+
+
+def test_webvital_rows_p75_and_cls_precision():
+    rows = dict(webvital_rows(parse_k6_summary(_RICH_SUMMARY)))
+    assert rows["LCP — Largest Contentful Paint (ms)"] == "p75 2100 · p95 3400"
+    assert rows["CLS — Cumulative Layout Shift"] == "p75 0.040 · p95 0.120"
+
+
+def test_saturation_rows_dropped_iterations_and_bytes():
+    rows = dict(saturation_rows(parse_k6_summary(_RICH_SUMMARY)))
+    assert rows["Dropped iterations (overload)"] == "12 (rate 0.40/s)"
+    assert rows["Completed journeys (iterations)"] == "240 (rate 4.00/s)"
+    assert rows["Peak VUs"] == "200"
+    assert rows["Data received"] == "5.0 MB"
+    assert "98.97%" in rows["Checks passed"]
+
+
+def test_threshold_rows_pass_and_fail():
+    rows = dict(threshold_rows(parse_k6_summary(_RICH_SUMMARY)))
+    assert rows["checkout_duration p(95)<60000"] == "✅ PASS"
+    assert rows["checkout_success_rate rate>0.90"] == "❌ FAIL"

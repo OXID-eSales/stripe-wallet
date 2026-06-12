@@ -190,10 +190,12 @@ jobs:
           LOAD_SCENARIO: ${{ inputs.scenario }}
           LOAD_DRY_RUN: ${{ inputs.dry_run }}
         run: |
+          # p(75) is included so the report can show Core Web Vitals at their
+          # conventional p75, alongside p95/p99 for the tail.
           ../../k6 run \
             --out json=results.json \
             --summary-export=summary.json \
-            --summary-trend-stats="avg,min,med,max,p(90),p(95),p(99)" \
+            --summary-trend-stats="avg,min,med,max,p(75),p(90),p(95),p(99)" \
             k6.config.js \
             2>&1 | tee k6-output.txt
 

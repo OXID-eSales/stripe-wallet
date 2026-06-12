@@ -148,6 +148,204 @@ def parse_k6_stream(
     return samples
 
 
+# ── Rich single pass: web-vitals series + per-scenario breakdown ──────────────
+
+# Web Vitals the k6 browser module auto-collects. The four ms-valued ones are
+# chartable on a shared axis; CLS is unitless (table only).
+WEB_VITAL_MS = {
+    "browser_web_vital_lcp": "lcp",
+    "browser_web_vital_fcp": "fcp",
+    "browser_web_vital_ttfb": "ttfb",
+    "browser_web_vital_inp": "inp",
+}
+
+
+@dataclass
+class WebVitalPoint:
+    """p95 of each ms-valued Web Vital at one concurrent-user level."""
+
+    users: int
+    lcp: float = 0.0
+    fcp: float = 0.0
+    ttfb: float = 0.0
+    inp: float = 0.0
+
+
+@dataclass
+class ScenarioStats:
+    """Per-scenario aggregate of the latency metric (from the ``scenario`` tag)."""
+
+    scenario: str
+    requests: int
+    failures: int
+    p50: float
+    p95: float
+    p99: float
+
+    @property
+    def error_pct(self) -> float:
+        if not self.requests:
+            return 0.0
+        return self.failures / self.requests * 100.0
+
+
+@dataclass
+class K6Parsed:
+    """Everything one stream pass yields: primary samples + extras."""
+
+    samples: List[Sample]
+    web_vitals: List[WebVitalPoint]
+    scenarios: List[ScenarioStats]
+
+
+@dataclass
+class _ScenAcc:
+    requests: int = 0
+    failures: int = 0
+    latencies: List[float] = field(default_factory=list)
+
+
+def _resolve_users(vus_buckets: Dict[int, List[float]], keys: Iterable[int]) -> Dict[int, int]:
+    """Map every bucket key to the active VU count, carrying the gauge forward."""
+    resolved: Dict[int, int] = {}
+    last = 0.0
+    for key in sorted(set(vus_buckets) | set(keys)):
+        readings = vus_buckets.get(key)
+        if readings:
+            last = sum(readings) / len(readings)
+        resolved[key] = int(round(last))
+    return resolved
+
+
+def parse_k6_rich(
+    lines: Iterable[str],
+    *,
+    latency_metric: str = DEFAULT_LATENCY_METRIC,
+    failed_metric: str = DEFAULT_FAILED_METRIC,
+    vus_metric: str = DEFAULT_VUS_METRIC,
+    bucket_seconds: float = 10.0,
+) -> K6Parsed:
+    """Single pass over the k6 NDJSON yielding primary samples, the Web-Vitals
+    series (p95 by user level) and the per-scenario latency breakdown.
+
+    One pass keeps a multi-GB ``results.json`` readable once, not once per chart.
+    """
+    buckets: Dict[int, _Bucket] = {}
+    vus_buckets: Dict[int, List[float]] = {}
+    wv_buckets: Dict[int, Dict[str, List[float]]] = {}
+    scenarios: Dict[str, _ScenAcc] = {}
+
+    for line in lines:
+        line = line.strip()
+        if not line or line[0] != "{":
+            continue
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if record.get("type") != "Point":
+            continue
+        data = record.get("data") or {}
+        t = _parse_time(data.get("time", ""))
+        value = data.get("value")
+        if t is None or value is None:
+            continue
+        value = float(value)
+        key = int(t // bucket_seconds)
+        metric = record.get("metric")
+        tags = data.get("tags") or {}
+        scenario = tags.get("scenario")
+
+        if metric == latency_metric:
+            bucket = buckets.setdefault(key, _Bucket())
+            bucket.latencies.append(value)
+            bucket.requests += 1
+            if scenario:
+                scenarios.setdefault(scenario, _ScenAcc()).requests += 1
+                scenarios[scenario].latencies.append(value)
+        elif metric == failed_metric:
+            if value > 0:
+                buckets.setdefault(key, _Bucket()).failures += 1
+                if scenario:
+                    scenarios.setdefault(scenario, _ScenAcc()).failures += 1
+        elif metric == vus_metric:
+            vus_buckets.setdefault(key, []).append(value)
+        elif metric in WEB_VITAL_MS:
+            wv_buckets.setdefault(key, {}).setdefault(metric, []).append(value)
+
+    resolved = _resolve_users(vus_buckets, list(buckets) + list(wv_buckets))
+
+    samples: List[Sample] = []
+    for key in sorted(buckets):
+        bucket = buckets[key]
+        users = resolved.get(key, 0)
+        if users <= 0 or not bucket.latencies:
+            continue
+        samples.append(
+            Sample(
+                user_count=users,
+                rps=bucket.requests / bucket_seconds,
+                p50=_percentile(bucket.latencies, 50),
+                p95=_percentile(bucket.latencies, 95),
+                p99=_percentile(bucket.latencies, 99),
+                failures_per_s=bucket.failures / bucket_seconds,
+                p100=max(bucket.latencies),
+            )
+        )
+
+    web_vitals = _web_vital_points(wv_buckets, resolved)
+    scenario_stats = _scenario_stats(scenarios)
+    return K6Parsed(samples=samples, web_vitals=web_vitals, scenarios=scenario_stats)
+
+
+def _web_vital_points(
+    wv_buckets: Dict[int, Dict[str, List[float]]],
+    resolved: Dict[int, int],
+) -> List[WebVitalPoint]:
+    by_users: Dict[int, Dict[str, List[float]]] = {}
+    for key, metric_map in wv_buckets.items():
+        users = resolved.get(key, 0)
+        if users <= 0:
+            continue
+        dest = by_users.setdefault(users, {})
+        for metric, values in metric_map.items():
+            dest.setdefault(metric, []).extend(values)
+
+    points: List[WebVitalPoint] = []
+    for users in sorted(by_users):
+        collected = by_users[users]
+
+        def p95(metric: str) -> float:
+            values = collected.get(metric)
+            return _percentile(values, 95) if values else 0.0
+
+        points.append(
+            WebVitalPoint(
+                users=users,
+                lcp=p95("browser_web_vital_lcp"),
+                fcp=p95("browser_web_vital_fcp"),
+                ttfb=p95("browser_web_vital_ttfb"),
+                inp=p95("browser_web_vital_inp"),
+            )
+        )
+    return points
+
+
+def _scenario_stats(scenarios: Dict[str, _ScenAcc]) -> List[ScenarioStats]:
+    stats = [
+        ScenarioStats(
+            scenario=name,
+            requests=acc.requests,
+            failures=acc.failures,
+            p50=_percentile(acc.latencies, 50),
+            p95=_percentile(acc.latencies, 95),
+            p99=_percentile(acc.latencies, 99),
+        )
+        for name, acc in scenarios.items()
+    ]
+    return sorted(stats, key=lambda s: s.requests, reverse=True)
+
+
 # ── Summary export (statistics table) ─────────────────────────────────────────
 
 # Curated metric -> label. Only metrics present in the export are rendered, so a
@@ -211,6 +409,101 @@ def summary_rows(metrics: Dict[str, dict]) -> List[Tuple[str, str]]:
     return rows
 
 
+# Web Vitals: p75 is the field-data convention (Core Web Vitals); p95 catches the
+# tail. Needs ``p(75)`` in --summary-trend-stats (the workflow sets it).
+_SUMMARY_WEBVITALS_MS: List[Tuple[str, str]] = [
+    ("browser_web_vital_lcp", "LCP — Largest Contentful Paint (ms)"),
+    ("browser_web_vital_fcp", "FCP — First Contentful Paint (ms)"),
+    ("browser_web_vital_ttfb", "TTFB — Time To First Byte (ms)"),
+    ("browser_web_vital_inp", "INP — Interaction to Next Paint (ms)"),
+]
+
+
+def webvital_rows(metrics: Dict[str, dict]) -> List[Tuple[str, str]]:
+    """Web-Vitals (p75 · p95) rows; CLS rendered with finer precision (unitless)."""
+    rows: List[Tuple[str, str]] = []
+    for key, label in _SUMMARY_WEBVITALS_MS:
+        metric = metrics.get(key)
+        if metric:
+            rows.append((label, f"p75 {metric.get('p(75)', 0):.0f} · p95 {metric.get('p(95)', 0):.0f}"))
+    cls = metrics.get("browser_web_vital_cls")
+    if cls:
+        rows.append((
+            "CLS — Cumulative Layout Shift",
+            f"p75 {cls.get('p(75)', 0):.3f} · p95 {cls.get('p(95)', 0):.3f}",
+        ))
+    return rows
+
+
+def _human_bytes(value: float) -> str:
+    number = float(value)
+    for unit in ("B", "KB", "MB", "GB"):
+        if number < 1024 or unit == "GB":
+            return f"{number:.1f} {unit}"
+        number /= 1024
+    return f"{number:.1f} GB"
+
+
+def saturation_rows(metrics: Dict[str, dict]) -> List[Tuple[str, str]]:
+    """Capacity-ceiling signals: dropped iterations, journey throughput, peak VUs,
+    overall check pass-rate, and bytes transferred."""
+    rows: List[Tuple[str, str]] = []
+    dropped = metrics.get("dropped_iterations")
+    if dropped is not None:
+        rows.append((
+            "Dropped iterations (overload)",
+            f"{int(dropped.get('count', 0))} (rate {dropped.get('rate', 0):.2f}/s)",
+        ))
+    iterations = metrics.get("iterations")
+    if iterations:
+        rows.append((
+            "Completed journeys (iterations)",
+            f"{int(iterations.get('count', 0))} (rate {iterations.get('rate', 0):.2f}/s)",
+        ))
+    peak = metrics.get("vus_max")
+    if peak:
+        rows.append(("Peak VUs", f"{int(peak.get('value', peak.get('max', 0)))}"))
+    checks = metrics.get("checks")
+    if checks:
+        fraction = checks.get("value", checks.get("rate"))
+        if fraction is not None:
+            text = f"{float(fraction) * 100:.2f}%"
+            if "passes" in checks and "fails" in checks:
+                total = int(checks["passes"]) + int(checks["fails"])
+                text += f" ({int(checks['passes'])}/{total})"
+            rows.append(("Checks passed", text))
+    for key, label in (("data_received", "Data received"), ("data_sent", "Data sent")):
+        metric = metrics.get(key)
+        if metric:
+            rows.append((label, _human_bytes(metric.get("count", 0))))
+    return rows
+
+
+def threshold_rows(metrics: Dict[str, dict]) -> List[Tuple[str, str]]:
+    """Each configured threshold with its PASS/FAIL verdict (from the export)."""
+    rows: List[Tuple[str, str]] = []
+    for name, metric in metrics.items():
+        thresholds = metric.get("thresholds") if isinstance(metric, dict) else None
+        if not isinstance(thresholds, dict):
+            continue
+        for expr, result in thresholds.items():
+            ok = result.get("ok", False) if isinstance(result, dict) else bool(result)
+            rows.append((f"{name} {expr}", "✅ PASS" if ok else "❌ FAIL"))
+    return rows
+
+
+def scenario_rows(scenarios: List[ScenarioStats]) -> List[Tuple[str, str]]:
+    """One row per scenario: requests, error %, and latency percentiles."""
+    return [
+        (
+            scenario.scenario,
+            f"reqs {scenario.requests} · err {scenario.error_pct:.2f}% · "
+            f"p50 {scenario.p50:.0f} · p95 {scenario.p95:.0f} · p99 {scenario.p99:.0f} ms",
+        )
+        for scenario in scenarios
+    ]
+
+
 def summary_markdown(rows: List[Tuple[str, str]]) -> str:
     """Render (label, value) rows as a GitHub-flavoured Markdown table."""
     if not rows:
@@ -220,22 +513,37 @@ def summary_markdown(rows: List[Tuple[str, str]]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def markdown_sections(sections: List[Tuple[str, List[Tuple[str, str]]]]) -> str:
+    """Render titled (heading, rows) sections as stacked Markdown tables."""
+    parts: List[str] = []
+    for heading, rows in sections:
+        if not rows:
+            continue
+        parts.append(f"### {heading}\n\n")
+        parts.append("| Metric | Value |\n|--------|-------|\n")
+        parts.extend(f"| {label} | {value} |\n" for label, value in rows)
+        parts.append("\n")
+    if not parts:
+        return "_No k6 summary metrics were exported._\n"
+    return "".join(parts)
+
+
 # ── Self-contained HTML report (base for chart.embed) ─────────────────────────
 
 def build_report_html(
     title: str,
-    param_rows: List[Tuple[str, str]],
-    stat_rows: List[Tuple[str, str]],
+    sections: List[Tuple[str, List[Tuple[str, str]]]],
 ) -> str:
     """Minimal self-contained HTML report; ``chart.embed`` inlines the PNGs.
 
-    Ends with the ``</body></html>`` pair :func:`chart.embed.embed` anchors on, so
-    the same embed path used for the Locust report works unchanged here.
+    ``sections`` is an ordered list of ``(heading, rows)``; empty sections are
+    skipped. Ends with the ``</body></html>`` pair :func:`chart.embed.embed`
+    anchors on, so the same embed path used for the Locust report works here.
     """
     def table(rows: List[Tuple[str, str]]) -> str:
         body = "".join(f"<tr><td>{key}</td><td>{value}</td></tr>" for key, value in rows)
         return (
-            '<table style="border-collapse:collapse;font:14px sans-serif">'
+            '<table style="border-collapse:collapse;font:14px sans-serif;margin-bottom:1rem">'
             '<tbody>' + body + '</tbody></table>'
         )
 
@@ -244,11 +552,13 @@ def build_report_html(
         "h1{font:700 22px sans-serif}h2{font:700 18px sans-serif}"
         "body{margin:0;padding:1rem 2rem;color:#222}"
     )
-    return (
-        "<!doctype html><html><head><meta charset=\"utf-8\">"
-        f"<title>{title}</title><style>{style}</style></head><body>"
-        f"<h1>{title}</h1>"
-        "<h2>Run parameters</h2>" + table(param_rows) +
-        "<h2>Aggregated statistics</h2>" + table(stat_rows) +
-        "</body></html>"
-    )
+    chunks = [
+        "<!doctype html><html><head><meta charset=\"utf-8\">",
+        f"<title>{title}</title><style>{style}</style></head><body>",
+        f"<h1>{title}</h1>",
+    ]
+    for heading, rows in sections:
+        if rows:
+            chunks.append(f"<h2>{heading}</h2>{table(rows)}")
+    chunks.append("</body></html>")
+    return "".join(chunks)
