@@ -2,7 +2,7 @@
 
 **Ticket:** STRP-129 (follow-up) · **Branch:** `b-7.4.x-validation-STRP-149`
 **Date:** 2026-06-10 · **Mode:** TDD-first, single logical change
-**Plan:** [`../sprints/sprint-124-strp-129-extended-latin-address-fields.md`](../sprints/sprint-124-strp-129-extended-latin-address-fields.md)
+**Plan:** [`../sprints/sprint-124-strp-129-extended-latin-address-fields.md`](sprint-124-strp-129-extended-latin-address-fields.md)
 **Review:** [`../reports/validation-extended-latin-letters-review.md`](../reports/validation-extended-latin-letters-review.md)
 
 ## What changed

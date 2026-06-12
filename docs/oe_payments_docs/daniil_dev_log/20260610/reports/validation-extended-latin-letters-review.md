@@ -3,7 +3,7 @@
 **Date:** 2026-06-10
 **Module:** `extensions/stripe` (rules file) — payment-base **untouched**
 **Ticket lineage:** STRP-129 (Sprints 119 / 120 / 121)
-**Status:** Defect confirmed. TDD remediation plan: [`../sprints/sprint-124-strp-129-extended-latin-address-fields.md`](../sprints/sprint-124-strp-129-extended-latin-address-fields.md)
+**Status:** Defect confirmed. TDD remediation plan: [`../sprints/sprint-124-strp-129-extended-latin-address-fields.md`](../done/sprint-124-strp-129-extended-latin-address-fields.md)
 
 ---
 
@@ -126,7 +126,7 @@ submits decomposed forms) and flagged as a follow-up only if it ever surfaces.
 ## 8. Recommendation
 
 Proceed with the single-commit TDD remediation in
-[`sprint-124`](../sprints/sprint-124-strp-129-extended-latin-address-fields.md):
+[`sprint-124`](../done/sprint-124-strp-129-extended-latin-address-fields.md):
 RED tests first (provider allow-strings + real-rules umlaut/ł integration),
 then the six-line rules edit, then `pre-commit-check.sh --full`. No payment-base
 touch, no message changes, no migration.
