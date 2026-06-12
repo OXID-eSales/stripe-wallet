@@ -69,6 +69,19 @@ def test_embed_is_idempotent():
     assert twice.count("</body>") == 1
 
 
+def test_embed_renders_run_parameters_table():
+    html = "<html><body><h1>report</h1></body></html>"
+    out = embed(html, [], [("Scenario", "all"), ("Concurrent users", "50")])
+    assert "Run parameters" in out
+    assert "Scenario" in out and "all" in out
+    assert "Concurrent users" in out and "50" in out
+    # Params live inside the single marked, idempotent section.
+    assert out.count("data-charts-embed") == 1
+    twice = embed(out, [], [("Scenario", "browse")])
+    assert twice.count("data-charts-embed") == 1   # replaced, not stacked
+    assert "browse" in twice and "all" not in twice
+
+
 def test_embed_targets_real_body_not_head_script_string():
     # Regression: the Locust report bundles a chart-popup template string
     # ('<body …></body>') inside its head module script (ECharts save-as-image).

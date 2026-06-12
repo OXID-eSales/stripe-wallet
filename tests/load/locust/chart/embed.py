@@ -40,22 +40,47 @@ def _img_tag(png_path: str) -> str:
     )
 
 
-def build_section(png_paths: List[str]) -> str:
-    figures = "\n".join(_img_tag(path) for path in png_paths if os.path.exists(path))
+def _param_table(param_rows: List[tuple]) -> str:
+    """Render the user-set run parameters as a small table (empty -> "")."""
+    if not param_rows:
+        return ""
+    cell = "border:1px solid #ddd;padding:.3rem .6rem"
+    body = "".join(
+        f'<tr><td style="{cell}">{label}</td><td style="{cell}">{value}</td></tr>'
+        for label, value in param_rows
+    )
     return (
-        f'<section {_MARKER} style="padding:1rem 2rem">'
-        f'<h2 style="font:700 18px sans-serif">Capacity charts</h2>'
-        f"{figures}</section>"
+        '<h2 style="font:700 18px sans-serif">Run parameters</h2>'
+        '<table style="border-collapse:collapse;font:14px sans-serif;margin-bottom:1rem">'
+        f"<tbody>{body}</tbody></table>"
     )
 
 
-def embed(index_html: str, png_paths: List[str]) -> str:
-    """Return ``index_html`` with the charts section inserted before ``</body>``.
+def build_section(png_paths: List[str], param_rows: Optional[List[tuple]] = None) -> str:
+    figures = "\n".join(_img_tag(path) for path in png_paths if os.path.exists(path))
+    charts_heading = (
+        '<h2 style="font:700 18px sans-serif">Capacity charts</h2>' if figures else ""
+    )
+    return (
+        f'<section {_MARKER} style="padding:1rem 2rem">'
+        f"{_param_table(param_rows or [])}"
+        f"{charts_heading}{figures}</section>"
+    )
+
+
+def embed(
+    index_html: str,
+    png_paths: List[str],
+    param_rows: Optional[List[tuple]] = None,
+) -> str:
+    """Return ``index_html`` with the charts/parameters section before ``</body>``.
 
     Pure string transform (unit-testable). If a previous embed block exists it is
-    replaced; if there is no ``</body>`` the section is appended.
+    replaced; if there is no ``</body>`` the section is appended. ``param_rows`` is
+    an optional list of ``(label, value)`` shown as a "Run parameters" table above
+    the charts — the user-set run inputs the Locust report header omits.
     """
-    section = build_section(png_paths)
+    section = build_section(png_paths, param_rows)
     if _EXISTING.search(index_html):
         return _EXISTING.sub(section, index_html, count=1)
     # Insert before the document-closing </body> — the one immediately followed
@@ -81,7 +106,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         description="Inline chart PNGs into the Locust index.html.",
     )
     parser.add_argument("--index", required=True, help="path to Locust index.html")
-    parser.add_argument("--charts", nargs="+", required=True, help="chart PNG paths")
+    parser.add_argument("--charts", nargs="*", default=[], help="chart PNG paths")
+    parser.add_argument(
+        "--param",
+        action="append",
+        default=[],
+        metavar="LABEL=VALUE",
+        help="user-set run parameter row for the report (repeatable)",
+    )
     args = parser.parse_args(argv)
 
     if not os.path.exists(args.index):
@@ -89,15 +121,20 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 1
 
     pngs = [path for path in args.charts if os.path.exists(path)]
-    if not pngs:
-        print("no chart PNGs to embed — leaving index.html unchanged", file=sys.stderr)
+    param_rows = []
+    for item in args.param:
+        label, _, value = item.partition("=")
+        param_rows.append((label.strip(), value.strip()))
+
+    if not pngs and not param_rows:
+        print("no charts or parameters to embed — leaving index.html unchanged", file=sys.stderr)
         return 0
 
     with open(args.index, encoding="utf-8") as handle:
         original = handle.read()
     with open(args.index, "w", encoding="utf-8") as handle:
-        handle.write(embed(original, pngs))
-    print(f"embedded {len(pngs)} chart(s) into {args.index}")
+        handle.write(embed(original, pngs, param_rows))
+    print(f"embedded {len(pngs)} chart(s) + {len(param_rows)} parameter(s) into {args.index}")
     return 0
 
 

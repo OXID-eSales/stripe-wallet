@@ -469,16 +469,32 @@ jobs:
             echo "no history CSV at $HIST — skipping charts"
           fi
 
-      - name: Embed charts into Locust report
+      - name: Embed charts + run parameters into Locust report
         if: always()
         continue-on-error: true
         working-directory: ${{ env.LOCUST_DIR }}
         run: |
-          if [ -f load-report/index.html ] && ls load-report/charts/*.png >/dev/null 2>&1; then
-            python -m chart.embed --index load-report/index.html --charts load-report/charts/*.png
-          else
-            echo "no index.html or charts — skipping embed"
+          if [ ! -f load-report/index.html ]; then
+            echo "no index.html — skipping embed"
+            exit 0
           fi
+          # --charts globs to nothing harmlessly when no PNGs exist (the tool
+          # filters non-existent paths); the run-parameter rows are still injected
+          # so the report shows every input the user set, which Locust's own
+          # header (During / Target Host / Script) omits.
+          python -m chart.embed \
+            --index load-report/index.html \
+            --charts load-report/charts/*.png \
+            --param "Scenario=${{ inputs.scenarios }}" \
+            --param "Concurrent users=${{ inputs.users }}" \
+            --param "Spawn rate=${{ inputs.spawn_rate }}/s" \
+            --param "Duration=${{ inputs.duration }}" \
+            --param "p95 budget=${{ inputs.fail_p95_ms }} ms" \
+            --param "Error budget=${{ inputs.fail_pct_error }} %" \
+            --param "Chart axes (X / Y)=${{ inputs.chart_xscale }} / ${{ inputs.chart_yscale }}" \
+            --param "Shop=${{ inputs.url == '' && 'in-Action build' || inputs.url }}" \
+            --param "OXID CE branch=${{ inputs.url == '' && inputs.shop_branch || 'n/a (external)' }}" \
+            --param "Product anid=${{ inputs.product_anid != '' && inputs.product_anid || env.LOAD_PRODUCT_ANID }}"
 
       - name: Step summary
         if: always()
