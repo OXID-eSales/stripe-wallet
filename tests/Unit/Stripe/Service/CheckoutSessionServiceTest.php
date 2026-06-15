@@ -605,6 +605,37 @@ class CheckoutSessionServiceTest extends TestCase
     }
 
     /**
+     * Per-line gross prices rounded to cents can diverge from OXID's grouped-VAT
+     * basket total by a rounding residue (STRP-157). When that happens, the amount
+     * charged by Stripe MUST equal the authoritative cart total, not the itemized sum.
+     *
+     * Reported: 2× "Amber" — Stripe charged €168.00 while the cart showed €168.01.
+     * Itemized sum: 2 × 8400 = 16800. Authoritative totalGross: 16801.
+     */
+    public function testBuildLineItemsFallsBackToTotalGrossOnRoundingResidue(): void
+    {
+        // Arrange: itemized sum (168.00) does NOT match the grouped-VAT total (168.01)
+        $snapshot = $this->createBasketSnapshot(
+            items: [
+                ['title' => 'Amber', 'unitPrice' => 84.00, 'quantity' => 2],
+            ],
+            totalGross: 168.01,
+            discounts: []
+        );
+
+        // Act
+        $service = $this->createService();
+        $lineItems = $service->buildLineItems($snapshot);
+
+        // Assert — charged total must equal the authoritative cart total (16801 cents)
+        $totalCents = 0;
+        foreach ($lineItems as $li) {
+            $totalCents += $li['price_data']['unit_amount'] * $li['quantity'];
+        }
+        $this->assertEquals(16801, $totalCents, 'Stripe total must match the cart total (€168.01), not the itemized sum (€168.00)');
+    }
+
+    /**
      * Discounts must appear as visible line items so the customer sees them on the Stripe page.
      */
     public function testBuildLineItemsIncludesDiscountsAsVisibleItems(): void

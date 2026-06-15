@@ -144,7 +144,17 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
             return $this->buildTotalLineItem($snapshot, $currency);
         }
 
-        return $this->buildItemizedLineItems($snapshot, $currency);
+        $itemized = $this->buildItemizedLineItems($snapshot, $currency);
+
+        if ($this->itemizedTotalCents($snapshot, $currency) === $this->totalGrossCents($snapshot, $currency)) {
+            return $itemized;
+        }
+
+        // Per-line gross prices rounded to cents can sum to a different total
+        // than OXID's grouped-VAT basket total (STRP-157 rounding residue).
+        // Stripe must charge the authoritative cart total, so fall back to a
+        // single total line item instead of under/over-charging by a cent.
+        return $this->buildTotalLineItem($snapshot, $currency);
     }
 
     /**
@@ -159,25 +169,68 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
         $lineItems = [];
 
         foreach ($snapshot->getItems() as $item) {
-            $title = isset($item['title']) && is_string($item['title']) ? $item['title'] : 'Product';
-            $unitPrice = isset($item['unitPrice']) && (is_float($item['unitPrice']) || is_int($item['unitPrice']))
-                ? (float) $item['unitPrice']
-                : 0.0;
-            $quantity = isset($item['quantity']) && is_int($item['quantity']) ? $item['quantity'] : 1;
-
             $lineItems[] = [
                 'price_data' => [
                     'currency' => $currency,
-                    'unit_amount' => AmountConverter::toMinorUnits($unitPrice, $currency),
+                    'unit_amount' => AmountConverter::toMinorUnits($this->itemUnitPrice($item), $currency),
                     'product_data' => [
-                        'name' => $title,
+                        'name' => $this->itemTitle($item),
                     ],
                 ],
-                'quantity' => $quantity,
+                'quantity' => $this->itemQuantity($item),
             ];
         }
 
         return $lineItems;
+    }
+
+    /**
+     * Sum of the itemized line items in minor units (cents).
+     */
+    private function itemizedTotalCents(BasketSnapshot $snapshot, string $currency): int
+    {
+        $sumCents = 0;
+
+        foreach ($snapshot->getItems() as $item) {
+            $sumCents += AmountConverter::toMinorUnits($this->itemUnitPrice($item), $currency)
+                * $this->itemQuantity($item);
+        }
+
+        return $sumCents;
+    }
+
+    /**
+     * Authoritative OXID basket gross total in minor units (cents).
+     */
+    private function totalGrossCents(BasketSnapshot $snapshot, string $currency): int
+    {
+        return AmountConverter::toMinorUnits($snapshot->getTotalGross(), $currency);
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     */
+    private function itemTitle(array $item): string
+    {
+        return isset($item['title']) && is_string($item['title']) ? $item['title'] : 'Product';
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     */
+    private function itemUnitPrice(array $item): float
+    {
+        return isset($item['unitPrice']) && (is_float($item['unitPrice']) || is_int($item['unitPrice']))
+            ? (float) $item['unitPrice']
+            : 0.0;
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     */
+    private function itemQuantity(array $item): int
+    {
+        return isset($item['quantity']) && is_int($item['quantity']) ? $item['quantity'] : 1;
     }
 
     /**

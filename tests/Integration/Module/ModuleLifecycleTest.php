@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Integration\Module;
 
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
-use OxidEsales\EshopCommunity\Internal\Framework\Module\Setup\Service\ModuleActivationServiceInterface;
+use OxidEsales\EshopCommunity\Internal\Framework\Module\Setup\Bridge\ModuleActivationBridgeInterface;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\State\ModuleStateServiceInterface;
 use OxidEsales\Payments\Stripe\Module;
 use PHPUnit\Framework\TestCase;
@@ -33,7 +33,7 @@ class ModuleLifecycleTest extends TestCase
     private const SHOP_ID = 1;
 
     private ?ContainerInterface $container = null;
-    private ?ModuleActivationServiceInterface $activationService = null;
+    private ?ModuleActivationBridgeInterface $activationService = null;
     private ?ModuleStateServiceInterface $stateService = null;
 
     protected function setUp(): void
@@ -45,7 +45,12 @@ class ModuleLifecycleTest extends TestCase
         // via --testsuite Integration-with-container where a booted shop is guaranteed.
         // Any Throwable from ContainerFactory propagates as a test ERROR, not a skip.
         $this->container = ContainerFactory::getInstance()->getContainer();
-        $this->activationService = $this->container->get(ModuleActivationServiceInterface::class);
+        // Resolve the public ModuleActivationBridge, NOT the underlying
+        // ModuleActivationServiceInterface: the latter is a private autowired
+        // service in the shop container (Symfony inlines/removes it), so
+        // ->get() on it throws ServiceNotFoundException. The bridge exposes the
+        // same activate()/deactivate() API and IS public.
+        $this->activationService = $this->container->get(ModuleActivationBridgeInterface::class);
         $this->stateService = $this->container->get(ModuleStateServiceInterface::class);
     }
 
