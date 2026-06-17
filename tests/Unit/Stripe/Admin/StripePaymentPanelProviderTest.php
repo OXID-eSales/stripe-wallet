@@ -137,6 +137,97 @@ final class StripePaymentPanelProviderTest extends TestCase
     }
 
     // ---------------------------------------------------------------------------
+    // Sprint 127 (STRP-15123): cache reset after action — H1 characterization
+    //
+    // Root cause: handleAction() → dispatcher.refund/capture/cancel() fires,
+    // then OXID calls render() in the SAME HTTP request. If viewDataBuilder's
+    // cache is not invalidated after the action, render() reads the pre-action
+    // charge from the per-instance cache and shows the wrong prefill amount.
+    //
+    // Fix contract: viewDataBuilder.resetViewCache() must be called after each
+    // dispatched action (refund / capture / cancel). The three tests below are
+    // RED today (resetViewCache() is never called). They go GREEN in Phase B.
+    // ---------------------------------------------------------------------------
+
+    public function testHandleRefundActionCallsResetViewCacheAfterDispatch(): void
+    {
+        $dispatcher = $this->createMock(AdminActionDispatcherInterface::class);
+        $dispatcher->method('refund');
+
+        $resetCounter = new \stdClass();
+        $resetCounter->count = 0;
+
+        $provider = $this->providerWithResetTracker($dispatcher, $resetCounter);
+
+        $provider->handleAction(
+            'refund',
+            ['refund_amount' => '12.50', 'refund_reason' => 'duplicate'],
+            $this->context(paymentType: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, provider: 'stripe'),
+        );
+
+        self::assertSame(1, $resetCounter->count, 'viewDataBuilder.resetViewCache() must be called after refund dispatch');
+    }
+
+    public function testHandleCaptureActionCallsResetViewCacheAfterDispatch(): void
+    {
+        $dispatcher = $this->createMock(AdminActionDispatcherInterface::class);
+        $dispatcher->method('capture');
+
+        $resetCounter = new \stdClass();
+        $resetCounter->count = 0;
+
+        $provider = $this->providerWithResetTracker($dispatcher, $resetCounter);
+
+        $provider->handleAction(
+            'capture',
+            ['capture_amount' => '10.00'],
+            $this->context(paymentType: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, provider: 'stripe'),
+        );
+
+        self::assertSame(1, $resetCounter->count, 'viewDataBuilder.resetViewCache() must be called after capture dispatch');
+    }
+
+    public function testHandleCancelActionCallsResetViewCacheAfterDispatch(): void
+    {
+        $dispatcher = $this->createMock(AdminActionDispatcherInterface::class);
+        $dispatcher->method('cancel');
+
+        $resetCounter = new \stdClass();
+        $resetCounter->count = 0;
+
+        $provider = $this->providerWithResetTracker($dispatcher, $resetCounter);
+
+        $provider->handleAction(
+            'cancel',
+            [],
+            $this->context(paymentType: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, provider: 'stripe'),
+        );
+
+        self::assertSame(1, $resetCounter->count, 'viewDataBuilder.resetViewCache() must be called after cancel dispatch');
+    }
+
+    public function testResetViewCacheIsNotCalledWhenValidationFails(): void
+    {
+        // Gate: resetViewCache() must NOT fire when validation rejects the action
+        // (dispatcher never called — no Stripe mutation, no need to bust cache).
+        $dispatcher = $this->createMock(AdminActionDispatcherInterface::class);
+        $dispatcher->expects(self::never())->method('refund');
+
+        $resetCounter = new \stdClass();
+        $resetCounter->count = 0;
+
+        $provider = $this->providerWithResetTracker($dispatcher, $resetCounter);
+
+        $provider->handleAction(
+            'refund',
+            ['refund_amount' => 'not-a-number'],
+            $this->context(paymentType: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, provider: 'stripe'),
+        );
+
+        self::assertSame(0, $resetCounter->count, 'resetViewCache() must not fire when validation blocks dispatch');
+    }
+
+    // ---------------------------------------------------------------------------
     // Sprint 120 Phase C (STRP-129): capture_reason pre-dispatch gate
     // ---------------------------------------------------------------------------
 
@@ -481,6 +572,47 @@ final class StripePaymentPanelProviderTest extends TestCase
         );
     }
 
+    /**
+     * Builds a StripePaymentPanelProvider wired to a viewDataBuilder subclass
+     * that tracks calls to resetViewCache(). The counter object is shared by
+     * reference so the test can inspect it after handleAction() returns.
+     */
+    private function providerWithResetTracker(
+        AdminActionDispatcherInterface $dispatcher,
+        \stdClass $resetCounter,
+    ): StripePaymentPanelProvider {
+        $bounds = $this->createMock(AdminActionBoundsInterface::class);
+        $bounds->method('captureBound')->willReturn(999999.0);
+        $bounds->method('refundBound')->willReturn(999999.0);
+
+        $builder = new class ($resetCounter) extends StripePanelViewDataBuilder {
+            /** @phpstan-ignore-next-line constructor.dependency */
+            public function __construct(private readonly \stdClass $counter)
+            {
+            }
+
+            public function build(Order $order): array
+            {
+                return [];
+            }
+
+            public function resetViewCache(): void
+            {
+                $this->counter->count++;
+            }
+        };
+
+        return new StripePaymentPanelProvider(
+            actionDispatcher: $dispatcher,
+            viewDataBuilder: $builder,
+            orderLoader: $this->orderLoaderStub($this->orderStub()),
+            userDataValidator: $this->createMock(UserDataValidatorInterface::class),
+            validationFeedback: $this->createMock(AdminValidationFeedbackInterface::class),
+            amountValidator: new AdminAmountValidator(),
+            actionBounds: $bounds,
+        );
+    }
+
     private function captureReasonFailure(string $char): FieldValidationFailure
     {
         return new FieldValidationFailure(
@@ -502,6 +634,10 @@ final class StripePaymentPanelProviderTest extends TestCase
             public function build(Order $order): array
             {
                 return $this->stubData;
+            }
+            public function resetViewCache(): void
+            {
+                // No-op in stubs — the H1 reset tests use providerWithResetTracker().
             }
         };
     }

@@ -11,6 +11,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller\Admin;
 
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeChargeDto;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripePaymentIntentDto;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Admin\StripeTransactionHistoryBuilder;
 use OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider;
@@ -140,6 +141,49 @@ final class OrderRefundViewDataProviderTest extends TestCase
     }
 
     // -------------------------------------------------------------------------
+    // Issue 2 (STRP-15123): getCaptureableRaw() must return remaining capturable,
+    // not the full authorized amount.
+    // -------------------------------------------------------------------------
+
+    /**
+     * Repro: PI authorized 100.00, but only 40.00 is still capturable.
+     * getCaptureableRaw() must return 40.0, not 100.0.
+     * RED today — StripePaymentIntentDto has no amountCapturable field.
+     *
+     * @group strp-15123
+     */
+    public function testGetCaptureableRawReturnsRemainingCapturableNotFullAuthorized(): void
+    {
+        $pi = $this->buildPiDtoWithAmountCapturable(
+            amount: 10000,
+            amountCapturable: 4000,
+            currency: 'eur',
+        );
+        $provider = $this->createProviderWithPaymentIntent($pi);
+
+        self::assertSame(40.0, $provider->getCaptureableRaw($this->createMock(Order::class)));
+    }
+
+    /**
+     * Repro: PI authorized 100.00, amountCapturable == amount (no prior partial capture).
+     * getCaptureableRaw() must return 100.0 (no regression for the fresh-authorized case).
+     * RED today — StripePaymentIntentDto has no amountCapturable field.
+     *
+     * @group strp-15123
+     */
+    public function testGetCaptureableRawReturnFullAmountWhenNoPriorCapture(): void
+    {
+        $pi = $this->buildPiDtoWithAmountCapturable(
+            amount: 10000,
+            amountCapturable: 10000,
+            currency: 'eur',
+        );
+        $provider = $this->createProviderWithPaymentIntent($pi);
+
+        self::assertSame(100.0, $provider->getCaptureableRaw($this->createMock(Order::class)));
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
@@ -198,5 +242,54 @@ final class OrderRefundViewDataProviderTest extends TestCase
             captured: true,
             created: 0,
         );
+    }
+
+    /**
+     * Constructs a StripePaymentIntentDto with explicit amountCapturable.
+     * Phase A2: will fail with "Unknown named argument" until Phase B2 adds the field.
+     */
+    private function buildPiDtoWithAmountCapturable(
+        int $amount,
+        int $amountCapturable,
+        string $currency = 'eur',
+    ): StripePaymentIntentDto {
+        return new StripePaymentIntentDto(
+            id: 'pi_test',
+            status: 'requires_capture',
+            amount: $amount,
+            currency: $currency,
+            created: 0,
+            latestChargeId: null,
+            charge: null,
+            amountCapturable: $amountCapturable,
+        );
+    }
+
+    /**
+     * Creates a provider whose getPaymentIntent() returns the given PI DTO,
+     * bypassing StripeOrderApiService entirely (it is final and cannot be mocked).
+     * Uses the same fetchExpandedPaymentIntent() seam as OrderRefundViewDataProviderDtoCharacterizationTest.
+     */
+    private function createProviderWithPaymentIntent(?StripePaymentIntentDto $pi): OrderRefundViewDataProvider
+    {
+        $adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
+        $adapterFactory->method('getStripeAdapter')->willReturn($this->createMock(StripeAdapterInterface::class));
+        $apiService = new StripeOrderApiService($adapterFactory);
+        $resolver   = $this->mockResolver;
+
+        return new class ($apiService, $resolver, $pi) extends OrderRefundViewDataProvider {
+            public function __construct(
+                StripeOrderApiService $apiService,
+                ChargeAmountResolverInterface $chargeAmountResolver,
+                private readonly ?StripePaymentIntentDto $stubPi,
+            ) {
+                parent::__construct($apiService, $chargeAmountResolver, new StripeTransactionHistoryBuilder());
+            }
+
+            protected function fetchExpandedPaymentIntent(Order $order): ?StripePaymentIntentDto
+            {
+                return $this->stubPi;
+            }
+        };
     }
 }

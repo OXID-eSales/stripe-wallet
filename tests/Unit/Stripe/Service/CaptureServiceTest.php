@@ -124,6 +124,9 @@ class CaptureServiceTest extends TestCase
         $contract->method('getState')->willReturn(
             \OxidEsales\PaymentBase\Contract\ContractState::authorized()
         );
+        // Sprint 127: over-capture guard reads getAmount()/getCapturedAmount().
+        $contract->method('getAmount')->willReturn(100.0);
+        $contract->method('getCapturedAmount')->willReturn(null);
         $contract->expects($this->once())->method('captureAuthorization');
 
         $this->repository->expects($this->once())->method('save')->with($contract);
@@ -185,6 +188,9 @@ class CaptureServiceTest extends TestCase
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_123');
         $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::authorized());
+        // Sprint 127: over-capture guard reads getAmount()/getCapturedAmount().
+        $contract->method('getAmount')->willReturn(100.0);
+        $contract->method('getCapturedAmount')->willReturn(null);
 
         $service = $this->createService();
 
@@ -226,6 +232,9 @@ class CaptureServiceTest extends TestCase
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_123');
         $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::authorized());
+        // Sprint 127: over-capture guard reads getAmount()/getCapturedAmount().
+        $contract->method('getAmount')->willReturn(100.0);
+        $contract->method('getCapturedAmount')->willReturn(null);
 
         $this->repository->expects($this->never())->method('save');
 
@@ -242,6 +251,9 @@ class CaptureServiceTest extends TestCase
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn(null);
         $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::authorized());
+        // Sprint 127: over-capture guard reads getAmount()/getCapturedAmount().
+        $contract->method('getAmount')->willReturn(100.0);
+        $contract->method('getCapturedAmount')->willReturn(null);
 
         $this->adapter->expects($this->never())->method('capturePayment');
         $this->repository->expects($this->never())->method('save');
@@ -470,6 +482,9 @@ class CaptureServiceTest extends TestCase
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_123');
         $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::authorized());
+        // Sprint 127: over-capture guard reads getAmount()/getCapturedAmount().
+        $contract->method('getAmount')->willReturn(100.0);
+        $contract->method('getCapturedAmount')->willReturn(null);
 
         $service = $this->createService();
 
@@ -525,6 +540,101 @@ class CaptureServiceTest extends TestCase
 
         $this->assertNotNull($capturedTransaction);
         $this->assertSame(5, $capturedTransaction->getShopId());
+    }
+
+    // --- Issue 2 (STRP-15123): Over-capture guard ---
+
+    /**
+     * Repro: contract authorized 100.00, already captured 60.00 → remaining 40.00.
+     * Submitting 50.00 must be rejected before any Stripe API call.
+     * RED today — CaptureService has no remaining-capturable guard.
+     *
+     * @group strp-15123
+     */
+    public function testProcessCaptureRejectsAmountAboveRemainingCapturable(): void
+    {
+        $this->adapter->expects($this->never())->method('capturePayment');
+
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getProviderOrderId')->willReturn('pi_123');
+        $contract->method('getState')->willReturn(
+            \OxidEsales\PaymentBase\Contract\ContractState::authorized()
+        );
+        $contract->method('getAmount')->willReturn(100.0);
+        $contract->method('getCapturedAmount')->willReturn(60.0);
+
+        $service = $this->createService();
+        $result  = $service->processCapture($contract, 50.0, []);
+
+        $this->assertFalse($result->isSuccessful());
+        $this->assertStringContainsString('exceeds remaining capturable', (string) $result->errorMessage);
+    }
+
+    /**
+     * Edge: amount exactly equal to remaining (40.00) must be allowed through.
+     * RED today — no guard, adapter not yet called (guard check with 40.0 must reach the adapter).
+     *
+     * @group strp-15123
+     */
+    public function testProcessCaptureAllowsAmountEqualToRemainingCapturable(): void
+    {
+        $capturedAt = new \DateTimeImmutable();
+        $response   = CaptureResponse::success(
+            providerPaymentId: 'pi_123',
+            captureId: 'ch_eq',
+            amountCaptured: 40.0,
+            currency: 'eur',
+            status: 'succeeded',
+            capturedAt: $capturedAt,
+        );
+        $this->adapter->expects($this->once())->method('capturePayment')->willReturn($response);
+
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getProviderOrderId')->willReturn('pi_123');
+        $contract->method('getState')->willReturn(
+            \OxidEsales\PaymentBase\Contract\ContractState::authorized()
+        );
+        $contract->method('getAmount')->willReturn(100.0);
+        $contract->method('getCapturedAmount')->willReturn(60.0);
+        $contract->expects($this->once())->method('captureAuthorization');
+        $this->repository->expects($this->once())->method('save');
+
+        $service = $this->createService();
+        $result  = $service->processCapture($contract, 40.0, []);
+
+        $this->assertTrue($result->isSuccessful());
+    }
+
+    /**
+     * Edge: null amount (full capture) must bypass the remaining-capturable guard entirely.
+     * Existing tests cover this behavior; this is an explicit guard against regression.
+     *
+     * @group strp-15123
+     */
+    public function testProcessCaptureWithNullAmountBypassesOverCaptureGuard(): void
+    {
+        $response = CaptureResponse::success(
+            providerPaymentId: 'pi_full',
+            captureId: 'ch_full',
+            amountCaptured: 40.0,
+            currency: 'eur',
+            status: 'succeeded',
+            capturedAt: new \DateTimeImmutable(),
+        );
+        $this->adapter->expects($this->once())->method('capturePayment')->willReturn($response);
+
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getProviderOrderId')->willReturn('pi_full');
+        $contract->method('getState')->willReturn(
+            \OxidEsales\PaymentBase\Contract\ContractState::authorized()
+        );
+        // getAmount/getCapturedAmount intentionally NOT mocked — guard must not be reached
+        $contract->expects($this->once())->method('captureAuthorization');
+        $this->repository->expects($this->once())->method('save');
+
+        $result = $this->createService()->processCapture($contract, null, []);
+
+        $this->assertTrue($result->isSuccessful());
     }
 
     // --- Sprint 114.11b (S3): Capturable-state policy moved from handler to service ---

@@ -131,6 +131,13 @@ class OrderRefundViewDataProvider
 
     /**
      * Get capturable amount as raw float (for input fields).
+     *
+     * Sprint 127 (STRP-15123): reads Stripe's `amount_capturable` — the amount
+     * still available for capture — rather than `amount` (the full authorized
+     * total). After a partial capture Stripe auto-releases the remainder and
+     * sets amount_capturable = 0, so `isOrderCapturable()` returns false and
+     * this section does not render. The fix is still correct for any future
+     * flow where amount_capturable < amount while status == requires_capture.
      */
     public function getCaptureableRaw(Order $order): float
     {
@@ -139,7 +146,7 @@ class OrderRefundViewDataProvider
             return 0.0;
         }
         $currency = strtoupper($paymentIntent->currency);
-        return AmountConverter::toMajorUnits($paymentIntent->amount, $currency);
+        return AmountConverter::toMajorUnits($paymentIntent->amountCapturable, $currency);
     }
 
     /**

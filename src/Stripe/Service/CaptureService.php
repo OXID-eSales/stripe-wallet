@@ -35,6 +35,13 @@ use Throwable;
  */
 class CaptureService implements CaptureServiceInterface
 {
+    /**
+     * Half a cent — floating-point equality tolerance for amount comparisons.
+     * Matches the resolver's epsilon so a capture for exactly the remaining
+     * capturable amount is never incorrectly rejected.
+     */
+    private const AMOUNT_EPSILON = 0.005;
+
     private readonly LoggerInterface $logger;
 
     public function __construct(
@@ -57,6 +64,20 @@ class CaptureService implements CaptureServiceInterface
         // non-positive partial amount to the Stripe API. Null = full capture.
         if ($amount !== null && $amount <= 0.0) {
             return CaptureResponse::failure('Capture amount must be greater than zero');
+        }
+
+        // Sprint 127 (STRP-15123): reject partial captures above the remaining capturable.
+        // Browser max= is UX only; an over-capture otherwise reaches Stripe and corrupts state.
+        // Null amount = full capture (no partial-amount guard needed).
+        if ($amount !== null) {
+            $remaining = $contract->getAmount() - ($contract->getCapturedAmount() ?? 0.0);
+            if ($amount > $remaining + self::AMOUNT_EPSILON) {
+                return CaptureResponse::failure(sprintf(
+                    'Capture amount %.2f exceeds remaining capturable %.2f',
+                    $amount,
+                    max(0.0, $remaining)
+                ));
+            }
         }
 
         // Sprint 114.11b (S3): capturable-state policy lives in the service, not the handler.

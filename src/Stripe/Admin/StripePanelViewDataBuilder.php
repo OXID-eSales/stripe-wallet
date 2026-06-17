@@ -155,6 +155,21 @@ class StripePanelViewDataBuilder
     }
 
     /**
+     * Invalidate the view-data provider's per-request API cache.
+     *
+     * Called by StripePaymentPanelProvider after each successful action dispatch
+     * (refund / capture / cancel) so the subsequent render() in the same HTTP request
+     * reads fresh post-action data from Stripe instead of the stale pre-action charge.
+     *
+     * Sprint 127 (STRP-15123): fixes the partial-refund amount prefill bug where
+     * the refund Amount field showed the full captured amount after a partial refund.
+     */
+    public function resetViewCache(): void
+    {
+        $this->viewDataProvider->resetCache();
+    }
+
+    /**
      * Read a legacy OXID field (`oxorder__*`) via the magic field wrapper.
      * Returns '' on miss.
      */

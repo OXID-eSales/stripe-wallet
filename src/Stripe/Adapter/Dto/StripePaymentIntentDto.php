@@ -23,13 +23,17 @@ namespace OxidEsales\Payments\Stripe\Adapter\Dto;
 readonly class StripePaymentIntentDto
 {
     /**
-     * @param string               $id            PaymentIntent ID (pi_...)
-     * @param string               $status        Stripe PI status string
-     * @param int                  $amount        Authorized amount in Stripe minor units
-     * @param string               $currency      ISO-4217 currency code, lowercase
-     * @param int                  $created       Unix timestamp of PI creation
-     * @param string|null          $latestChargeId Charge ID string when not expanded, null if absent
-     * @param StripeChargeDto|null $charge        Populated when PI was retrieved with charge expansion
+     * @param string               $id               PaymentIntent ID (pi_...)
+     * @param string               $status           Stripe PI status string
+     * @param int                  $amount           Authorized amount in Stripe minor units
+     * @param string               $currency         ISO-4217 currency code, lowercase
+     * @param int                  $created          Unix timestamp of PI creation
+     * @param string|null          $latestChargeId   Charge ID string when not expanded, null if absent
+     * @param StripeChargeDto|null $charge           Populated when PI was retrieved with charge expansion
+     * @param int                  $amountCapturable Amount still available for capture in Stripe minor units
+     *                                               (Stripe `amount_capturable`). Non-zero only while the PI
+     *                                               is in `requires_capture` status. Default 0 preserves all
+     *                                               existing call sites (additive widening).
      */
     public function __construct(
         public string $id,
@@ -39,6 +43,7 @@ readonly class StripePaymentIntentDto
         public int $created,
         public ?string $latestChargeId,
         public ?StripeChargeDto $charge = null,
+        public int $amountCapturable = 0,
     ) {
     }
 }

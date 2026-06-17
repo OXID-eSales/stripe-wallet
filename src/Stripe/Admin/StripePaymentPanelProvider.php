@@ -118,6 +118,11 @@ class StripePaymentPanelProvider implements PaymentPanelProviderInterface
             $this->parseString($request['refund_reason'] ?? null),
             ['description' => $description],
         );
+
+        // Sprint 127 (STRP-15123): bust the per-request cache so the re-render
+        // in the same HTTP request (fnc=dispatchAction → OXID calls render())
+        // reads the post-refund charge from Stripe, not the stale pre-action data.
+        $this->viewDataBuilder->resetViewCache();
     }
 
     /**
@@ -146,6 +151,10 @@ class StripePaymentPanelProvider implements PaymentPanelProviderInterface
             $reason,
             ['paymentIntentId' => $this->parseString($request['payment_intent_id'] ?? null)],
         );
+
+        // Sprint 127 (STRP-15123): bust the per-request cache after capture so
+        // the same-request re-render reads fresh post-capture amounts.
+        $this->viewDataBuilder->resetViewCache();
     }
 
     /**
@@ -223,6 +232,10 @@ class StripePaymentPanelProvider implements PaymentPanelProviderInterface
             $this->parseString($request['cancel_reason'] ?? null),
             ['paymentIntentId' => $this->parseString($request['payment_intent_id'] ?? null)],
         );
+
+        // Sprint 127 (STRP-15123): bust the per-request cache after cancel so
+        // the same-request re-render reads fresh post-cancellation amounts.
+        $this->viewDataBuilder->resetViewCache();
     }
 
     private function parseString(mixed $value): ?string

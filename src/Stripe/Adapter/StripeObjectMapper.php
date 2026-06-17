@@ -98,6 +98,7 @@ class StripeObjectMapper
             created: (int) ($pi->created ?? 0),
             latestChargeId: $latestChargeId,
             charge: $chargeDto,
+            amountCapturable: (int) ($pi->amount_capturable ?? 0),
         );
     }
 

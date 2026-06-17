@@ -133,19 +133,20 @@ final class OrderRefundViewDataProviderDtoCharacterizationTest extends TestCase
         self::assertFalse($provider->isOrderCapturable($this->createMock(Order::class)));
     }
 
-    public function testGetCaptureableRawReturnsAmountInMajorUnits(): void
+    public function testGetCaptureableRawReturnsAmountCapturableInMajorUnits(): void
     {
-        // 10000 EUR minor units → 100.0 major units
-        $piDto = $this->buildPiDto(amount: 10000, currency: 'eur');
+        // Sprint 127 (STRP-15123): getCaptureableRaw() reads amountCapturable, not amount.
+        // Fresh authorized PI: amountCapturable == amount == 10000 EUR minor units → 100.0.
+        $piDto = $this->buildPiDto(amount: 10000, currency: 'eur', amountCapturable: 10000);
         $provider = $this->buildProviderWithPi($piDto);
 
         self::assertSame(100.0, $provider->getCaptureableRaw($this->createMock(Order::class)));
     }
 
-    public function testGetCaptureableRawJpyReturnsUnchangedAmount(): void
+    public function testGetCaptureableRawJpyReturnsUnchangedAmountCapturable(): void
     {
-        // 1000 JPY minor units → 1000.0 major units (zero-decimal)
-        $piDto = $this->buildPiDto(amount: 1000, currency: 'jpy');
+        // Sprint 127 (STRP-15123): JPY zero-decimal — amountCapturable 1000 minor → 1000.0 major.
+        $piDto = $this->buildPiDto(amount: 1000, currency: 'jpy', amountCapturable: 1000);
         $provider = $this->buildProviderWithPi($piDto);
 
         self::assertSame(1000.0, $provider->getCaptureableRaw($this->createMock(Order::class)));
@@ -242,6 +243,7 @@ final class OrderRefundViewDataProviderDtoCharacterizationTest extends TestCase
         string $status = 'succeeded',
         int $amount = 10000,
         string $currency = 'eur',
+        int $amountCapturable = 0,
     ): StripePaymentIntentDto {
         return new StripePaymentIntentDto(
             id: 'pi_test',
@@ -251,6 +253,7 @@ final class OrderRefundViewDataProviderDtoCharacterizationTest extends TestCase
             created: 1700000000,
             latestChargeId: null,
             charge: null,
+            amountCapturable: $amountCapturable,
         );
     }
 
