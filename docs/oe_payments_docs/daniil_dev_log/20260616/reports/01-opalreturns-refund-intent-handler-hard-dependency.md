@@ -180,3 +180,38 @@ Implemented in **Sprint 126** (`../sprints/sprint-126-…`), opalreturns
 `b-7.4.x-agnosticism`, commits `7adeb87 → 8478dc0 → 9ba9f50 → 91947b8`. Unit 297→308
 (+11, green), PHPStan max 0, PHPCS 0. Activation proven HTTP 200 with payment-base
 present; absent-state proven at container-compile level.
+
+### End-to-end verification run (2026-06-16, canonical payment-base present)
+
+Ran against the live dev shop with payment-base path-symlinked into vendor (working
+tree carries `RefundIntentHandler`). Sequence + evidence:
+
+1. `oe:cache:clear` → "Cleared cache files".
+2. `oe:module:deactivate opalreturns` → deactivated (clean slate).
+3. `oe:module:activate opalreturns` → **"Module was activated", exit 0** — the exact
+   step that previously fataled. **No fatal.**
+4. `curl http://localhost.local/` → **HTTP 200**.
+5. Booted-container introspection:
+   - `opalreturns.refund_intent_handler` resolves to
+     `OxidEsales\PaymentBase\EventSystem\Handler\RefundIntentHandler` — the **REAL**
+     handler (factory chose it, not the null-listener), `is_callable` = YES.
+   - `class_exists(RefundIntentHandler::class)` = YES (canonical payment-base on autoload).
+6. Compiled container (`var/cache/container/container_cache_shop_1.php`, the file the
+   HTTP-200 shop runs) registers the listener in `getEventDispatcherInterface2Service`:
+   ```
+   $instance->addListener('Opal\OpalReturns\Domain\Event\ReturnRefundRequestedEvent',
+     [closure → opalreturns.refund_intent_handler (factory: RefundIntentListenerFactory)], '__invoke', 0);
+   ```
+   It sits in the **same dispatcher-builder method as all 5 pre-existing opalreturns
+   listeners** (ReturnInspected, PaymentRefunded, ReturnApproved, ReturnRequested,
+   ReturnResolved) → peer-identical wiring. (A throwaway CLI probe of
+   `EventDispatcherInterface` showed 0 listeners — a CLI artifact: OXID attaches
+   listeners to the `…Interface2` instance, not the one that bare id resolves to.)
+
+**Note on `composer update`:** deliberately skipped. payment-base is a composer
+**path-symlink** repo, so `composer update` never advances its git state (it's a no-op
+for the dependency under test) and risks the known unified-namespace-generator
+local-CI quirk. The symlinked working tree already carries canonical `b-7.4.x` @ `7bc2ef9`,
+which is what the shop autoloads — so the run reflects the real merged state.
+
+**Verdict: both prongs verified end-to-end. `b-7.4.x-agnosticism` is mergeable.**
