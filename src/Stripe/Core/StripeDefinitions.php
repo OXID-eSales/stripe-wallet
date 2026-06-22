@@ -101,11 +101,11 @@ class StripeDefinitions
         self::STRIPE_WALLET_PAYMENT_ID => [
             'descriptions' => [
                 'de' => [
-                    'desc' => 'Digitale Geldbörse (Stripe)',
+                    'desc' => 'Stripe Wallet',
                     'longdesc' => 'Bezahlen Sie sicher mit Apple Pay, Google Pay oder anderen digitalen Geldbörsen via Stripe.',
                 ],
                 'en' => [
-                    'desc' => 'Digital Wallet (Stripe)',
+                    'desc' => 'Stripe Wallet',
                     'longdesc' => 'Pay securely with Apple Pay, Google Pay, or other digital wallets via Stripe.',
                 ]
             ],
