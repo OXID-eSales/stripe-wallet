@@ -35,13 +35,6 @@ use Throwable;
  */
 class CaptureService implements CaptureServiceInterface
 {
-    /**
-     * Half a cent — floating-point equality tolerance for amount comparisons.
-     * Matches the resolver's epsilon so a capture for exactly the remaining
-     * capturable amount is never incorrectly rejected.
-     */
-    private const AMOUNT_EPSILON = 0.005;
-
     private readonly LoggerInterface $logger;
 
     public function __construct(
@@ -70,12 +63,13 @@ class CaptureService implements CaptureServiceInterface
         // Browser max= is UX only; an over-capture otherwise reaches Stripe and corrupts state.
         // Null amount = full capture (no partial-amount guard needed).
         if ($amount !== null) {
-            $remaining = $contract->getAmount() - ($contract->getCapturedAmount() ?? 0.0);
-            if ($amount > $remaining + self::AMOUNT_EPSILON) {
+            $authorized = $contract->getAmount();
+            $captured = $contract->getCapturedAmount();
+            if (CapturableAmount::isExceededBy($amount, $authorized, $captured)) {
                 return CaptureResponse::failure(sprintf(
                     'Capture amount %.2f exceeds remaining capturable %.2f',
                     $amount,
-                    max(0.0, $remaining)
+                    max(0.0, CapturableAmount::remaining($authorized, $captured))
                 ));
             }
         }
