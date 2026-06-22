@@ -18,7 +18,8 @@ import { Controller } from '@hotwired/stimulus'
 export default class extends Controller {
   static targets = ['submitButton']
   static values = {
-    enabled: Boolean
+    enabled: Boolean,
+    priorConsent: Boolean
   }
 
   /**
@@ -57,6 +58,15 @@ export default class extends Controller {
     // duration of the in-flight submit to prevent visible consent contradiction.
     this._onSubmitStart = () => this.lockCheckbox()
     document.addEventListener('oe:stripe:submit-start', this._onSubmitStart)
+
+    // Sprint 128: restore consent the customer gave before the redirect so the
+    // Order-now button is enabled on a fresh-load return. The flag is rendered
+    // from the server-persisted session consent. Re-checking #checkAgbTop here is
+    // in-bounds (this controller already locks/unlocks it). Null-guarded.
+    if (this.enabledValue && this.priorConsentValue
+        && this._coreCheckbox && !this._coreCheckbox.checked) {
+      this._coreCheckbox.checked = true
+    }
 
     if (this.enabledValue) {
       this.updateButtonStates()

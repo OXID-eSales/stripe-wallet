@@ -303,6 +303,7 @@ class StripeOrderController extends StripeOrderController_parent
         }
 
         if ($helper->getAgbAcceptedFromRequest()) {
+            $helper->persistAgbConsent();
             return true;
         }
 
@@ -347,6 +348,7 @@ class StripeOrderController extends StripeOrderController_parent
         }
 
         $helper->clearStripeSessionVariables();
+        $helper->clearAgbConsent();
         return 'thankyou';
     }
 
@@ -457,6 +459,10 @@ class StripeOrderController extends StripeOrderController_parent
         // the storno'd order that remains in the database.
         $helper->setSessionVariable('sess_challenge', $this->generateNewSessChallenge());
 
+        // Sprint 128: Clear consent — customer cancelled, so a new attempt
+        // must require fresh consent.
+        $helper->clearAgbConsent();
+
         return 'payment';
     }
 
@@ -536,6 +542,21 @@ class StripeOrderController extends StripeOrderController_parent
     {
         /** @phpstan-ignore-next-line */
         parent::addTplParam($name, $value);
+    }
+
+    /**
+     * Return true when the customer gave AGB consent in a prior checkout
+     * submission that was persisted to the session.
+     *
+     * Consumed by the template via oView.isPriorAgbConsent() to render
+     * data-agb-validation-prior-consent-value so the JS controller can
+     * re-check #checkAgbTop on a fresh-load return from the payment page.
+     *
+     * @since 2.0.0 Sprint 128
+     */
+    public function isPriorAgbConsent(): bool
+    {
+        return $this->getRequestHelper()->hasPersistedAgbConsent();
     }
 
     protected function getEventDispatcher(): EventDispatcherInterface

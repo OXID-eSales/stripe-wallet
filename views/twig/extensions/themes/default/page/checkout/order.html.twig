@@ -90,7 +90,8 @@
             {# Sprint 101: AGB validation Stimulus controller — resolves #checkAgbTop from apex
                via connect(); disabled if blConfirmAGB is off. #}
             <div data-controller="agb-validation"
-                 data-agb-validation-enabled-value="{{ oView.isConfirmAGBActive() ? 'true' : 'false' }}">
+                 data-agb-validation-enabled-value="{{ oView.isConfirmAGBActive() ? 'true' : 'false' }}"
+                 data-agb-validation-prior-consent-value="{{ oView.isPriorAgbConsent() ? 'true' : 'false' }}">
                 <button id="stripe-checkout-btn"
                         type="button"
                         class="btn btn-highlight btn-lg w-100"

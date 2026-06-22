@@ -163,6 +163,56 @@ class ControllerRequestHelper
         return (bool) Registry::getConfig()->getConfigParam('blConfirmAGB');
     }
 
+    /**
+     * Session key for the AGB consent flag.
+     *
+     * Deliberately NOT included in clearStripeSessionVariables() so it survives
+     * cleanupStaleCheckoutOnRender() on the back-to-order fresh-load render.
+     * This survival is the core invariant of Sprint 128: the customer's
+     * pre-redirect consent is re-applied on return so the button is re-enabled.
+     *
+     * @since 2.0.0 Sprint 128
+     */
+    public const AGB_CONSENT_SESSION_KEY = 'stripe_agb_confirmed';
+
+    /**
+     * Persist the customer's AGB consent for the active checkout lifetime.
+     *
+     * Called when ord_agb=1 is confirmed in ensureAgbAccepted().
+     *
+     * @since 2.0.0 Sprint 128
+     */
+    public function persistAgbConsent(): void
+    {
+        $this->setSessionVariable(self::AGB_CONSENT_SESSION_KEY, true);
+    }
+
+    /**
+     * Return true when a prior AGB consent was persisted for this session.
+     *
+     * Reads the live session directly — no controller-property capture needed
+     * because this key is outside clearStripeSessionVariables().
+     *
+     * @since 2.0.0 Sprint 128
+     */
+    public function hasPersistedAgbConsent(): bool
+    {
+        return (bool) Registry::getSession()->getVariable(self::AGB_CONSENT_SESSION_KEY);
+    }
+
+    /**
+     * Clear the AGB consent flag.
+     *
+     * Called on checkout completion (checkoutSuccess) and explicit cancellation
+     * (checkoutCancel) so a new checkout attempt starts without stale consent.
+     *
+     * @since 2.0.0 Sprint 128
+     */
+    public function clearAgbConsent(): void
+    {
+        $this->deleteSessionVariable(self::AGB_CONSENT_SESSION_KEY);
+    }
+
     // ==========================================
     // VALIDATION
     // ==========================================

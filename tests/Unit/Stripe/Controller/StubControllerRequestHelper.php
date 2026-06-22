@@ -142,7 +142,31 @@ class StubControllerRequestHelper extends ControllerRequestHelper
 
     public function clearStripeSessionVariables(): void
     {
-        $this->sessionVars = [];
+        // Mirror production: clear ONLY the 5 stripe session keys.
+        // AGB_CONSENT_SESSION_KEY is deliberately excluded so it survives
+        // cleanupStaleCheckoutOnRender() — Sprint 128 survival invariant.
+        unset(
+            $this->sessionVars['stripe_payment_intent_id'],
+            $this->sessionVars['stripe_client_secret'],
+            $this->sessionVars['stripe_checkout_session_id'],
+            $this->sessionVars['stripe_contract_id'],
+            $this->sessionVars[ControllerRequestHelper::SESSION_SKIP_ADDR_CHECK]
+        );
+    }
+
+    public function persistAgbConsent(): void
+    {
+        $this->sessionVars[ControllerRequestHelper::AGB_CONSENT_SESSION_KEY] = true;
+    }
+
+    public function hasPersistedAgbConsent(): bool
+    {
+        return (bool) ($this->sessionVars[ControllerRequestHelper::AGB_CONSENT_SESSION_KEY] ?? false);
+    }
+
+    public function clearAgbConsent(): void
+    {
+        unset($this->sessionVars[ControllerRequestHelper::AGB_CONSENT_SESSION_KEY]);
     }
 
     public function getAgbAcceptedFromRequest(): bool
