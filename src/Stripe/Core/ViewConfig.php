@@ -102,6 +102,29 @@ class ViewConfig extends ViewConfig_parent
     }
 
     /**
+     * Phase 5 — frontend debug flag driven by the log-level resolver.
+     *
+     * Returns true only when the effective sStripeLogLevel is 'debug'.
+     * The single resolution path lives in ModuleConfigurationService::isFrontendDebugEnabled();
+     * this method is a DRY delegate so templates stay free of config-read logic.
+     *
+     * Safe to call when the module service is unavailable (e.g., during deactivation):
+     * returns false, which means no console output — correct fail-safe default.
+     *
+     * @return bool
+     */
+    public function isStripeDebug(): bool
+    {
+        $config = $this->getStripeConfig();
+
+        if ($config === null) {
+            return false;
+        }
+
+        return $config->isFrontendDebugEnabled();
+    }
+
+    /**
      * Get Stripe module version (for cache busting)
      *
      * @return string

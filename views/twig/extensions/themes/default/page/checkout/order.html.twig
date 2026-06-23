@@ -100,6 +100,7 @@
                         data-order-submit-url-value="{{ createCheckoutSessionUrl | raw }}"
                         data-order-submit-payment-type-value="wallet"
                         data-order-submit-publishable-key-value="{{ oViewConf.getStripePublishableKey() | raw }}"
+                        data-order-submit-stripe-debug-value="{{ oViewConf.isStripeDebug() ? 'true' : 'false' }}"
                         data-order-submit-target="button"
                         data-agb-validation-target="submitButton"
                         {% if oView.isLowOrderPrice() and displayBasketOrderButton == 'disabled' %}

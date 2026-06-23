@@ -234,10 +234,113 @@ class MetadataTest extends TestCase
         );
 
         // Logging and behavior settings
+        // blStripeLogTransactionInfo is kept for back-compat seeding (Phase 3 reads it).
         $this->assertContains(
             'blStripeLogTransactionInfo',
             $settingNames,
-            'Transaction logging setting must be defined'
+            'Transaction logging setting must remain defined (deprecated, kept for Phase 3 seeding)'
+        );
+
+        // Phase 2 (logging-control sprint): new logging controls.
+        $this->assertContains(
+            'sStripeLogLevel',
+            $settingNames,
+            'Log level setting must be defined'
+        );
+
+        $this->assertContains(
+            'blStripeLogWebhooks',
+            $settingNames,
+            'Log webhooks setting must be defined'
+        );
+    }
+
+    /**
+     * Test 13: sStripeLogLevel has correct type, default, and constraints
+     */
+    public function testStripeLogLevelSettingConfiguration(): void
+    {
+        $this->assertArrayHasKey('settings', $this->moduleData);
+        $settings = $this->moduleData['settings'];
+
+        $logLevelSetting = null;
+        foreach ($settings as $setting) {
+            if ($setting['name'] === 'sStripeLogLevel') {
+                $logLevelSetting = $setting;
+                break;
+            }
+        }
+
+        $this->assertNotNull($logLevelSetting, 'sStripeLogLevel setting must exist');
+
+        $this->assertSame(
+            'select',
+            $logLevelSetting['type'],
+            'sStripeLogLevel must be of type "select"'
+        );
+
+        $this->assertSame(
+            'normal',
+            $logLevelSetting['value'],
+            'sStripeLogLevel default must be "normal"'
+        );
+
+        $this->assertArrayHasKey(
+            'constraints',
+            $logLevelSetting,
+            'sStripeLogLevel must have constraints'
+        );
+
+        $options = explode('|', (string) $logLevelSetting['constraints']);
+        foreach (['off', 'errors', 'normal', 'debug'] as $expectedOption) {
+            $this->assertContains(
+                $expectedOption,
+                $options,
+                "sStripeLogLevel constraints must include \"{$expectedOption}\""
+            );
+        }
+
+        $this->assertSame(
+            'STRIPE_LOGGING',
+            $logLevelSetting['group'],
+            'sStripeLogLevel must belong to STRIPE_LOGGING group'
+        );
+    }
+
+    /**
+     * Test 14: blStripeLogWebhooks has correct type and default
+     */
+    public function testStripeLogWebhooksSettingConfiguration(): void
+    {
+        $this->assertArrayHasKey('settings', $this->moduleData);
+        $settings = $this->moduleData['settings'];
+
+        $logWebhooksSetting = null;
+        foreach ($settings as $setting) {
+            if ($setting['name'] === 'blStripeLogWebhooks') {
+                $logWebhooksSetting = $setting;
+                break;
+            }
+        }
+
+        $this->assertNotNull($logWebhooksSetting, 'blStripeLogWebhooks setting must exist');
+
+        $this->assertSame(
+            'bool',
+            $logWebhooksSetting['type'],
+            'blStripeLogWebhooks must be of type "bool"'
+        );
+
+        $this->assertSame(
+            '1',
+            $logWebhooksSetting['value'],
+            'blStripeLogWebhooks default must be "1" (enabled)'
+        );
+
+        $this->assertSame(
+            'STRIPE_LOGGING',
+            $logWebhooksSetting['group'],
+            'blStripeLogWebhooks must belong to STRIPE_LOGGING group'
         );
     }
 

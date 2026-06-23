@@ -290,10 +290,114 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     }
 
     /**
-     * Check if logging is enabled
+     * Resolve the effective log level: off | errors | normal | debug.
+     *
+     * Resolution order:
+     * 1. If sStripeLogLevel is set to a known value → return it.
+     * 2. If sStripeLogLevel is unset/empty → seed from legacy blStripeLogTransactionInfo:
+     *      truthy → 'normal', falsy → 'off'.
+     * 3. Unknown/garbage value → safe default 'normal'.
+     *
+     * Once a merchant sets sStripeLogLevel explicitly, the legacy bool is ignored.
      */
-    public function isLoggingEnabled(): bool
+    public function getLogLevel(): string
     {
-        return (bool) $this->get('blStripeEnableLogging');
+        $explicit = $this->get('sStripeLogLevel');
+
+        if (is_string($explicit) && $explicit !== '') {
+            return $this->validateLevel($explicit);
+        }
+
+        return $this->seedLevelFromLegacy();
+    }
+
+    /**
+     * Requests channel: level ∈ {errors, normal, debug}.
+     *
+     * At 'errors' level exceptions are still logged; full request/response at normal+.
+     * This gate controls the channel; individual call severity is not filtered here.
+     */
+    public function isRequestLoggingEnabled(): bool
+    {
+        return $this->isAtLeast('errors');
+    }
+
+    /**
+     * Reconciliation channel: level ∈ {normal, debug}.
+     */
+    public function isReconciliationLoggingEnabled(): bool
+    {
+        return $this->isAtLeast('normal');
+    }
+
+    /**
+     * Events channel: level == debug only.
+     */
+    public function isEventLoggingEnabled(): bool
+    {
+        return $this->getLogLevel() === 'debug';
+    }
+
+    /**
+     * Webhook channel: blStripeLogWebhooks on AND level ∈ {normal, debug}.
+     */
+    public function isWebhookLoggingEnabled(): bool
+    {
+        if (!(bool) $this->get('blStripeLogWebhooks')) {
+            return false;
+        }
+
+        return $this->isAtLeast('normal');
+    }
+
+    /**
+     * Frontend debug: level == debug. Wired in Phase 5; resolver lives here for DRY.
+     */
+    public function isFrontendDebugEnabled(): bool
+    {
+        return $this->getLogLevel() === 'debug';
+    }
+
+    // -------------------------------------------------------------------------
+    // Private level-resolution helpers
+    // -------------------------------------------------------------------------
+
+    /** Ordered severity rank — used by isAtLeast(). */
+    private const LEVEL_RANK = ['off' => 0, 'errors' => 1, 'normal' => 2, 'debug' => 3];
+
+    /**
+     * Returns the candidate when it is a known level; otherwise 'normal'.
+     */
+    private function validateLevel(string $candidate): string
+    {
+        return isset(self::LEVEL_RANK[$candidate]) ? $candidate : 'normal';
+    }
+
+    /**
+     * Seeds level from the legacy blStripeLogTransactionInfo bool.
+     * truthy → 'normal', falsy/absent → 'off'. Unset → 'normal' (safe default).
+     */
+    private function seedLevelFromLegacy(): string
+    {
+        $legacy = $this->get('blStripeLogTransactionInfo');
+
+        // '' means the key was never set → fresh install → default to 'normal'
+        if ($legacy === '') {
+            return 'normal';
+        }
+
+        return (bool) $legacy ? 'normal' : 'off';
+    }
+
+    /**
+     * Returns true when the current log level is at or above $minimum in the
+     * severity order: off < errors < normal < debug.
+     */
+    private function isAtLeast(string $minimum): bool
+    {
+        $currentRank = self::LEVEL_RANK[$this->getLogLevel()] ?? 0;
+        $minimumRank = self::LEVEL_RANK[$minimum] ?? 0;
+
+        return $currentRank >= $minimumRank;
     }
 }

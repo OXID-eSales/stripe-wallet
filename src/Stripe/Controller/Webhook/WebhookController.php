@@ -16,6 +16,7 @@ use OxidEsales\Eshop\Application\Controller\FrontendController;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\PaymentBase\Webhook\WebhookRequest;
+use OxidEsales\Payments\Stripe\Adapter\Helper\ResponseHeaders;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use OxidEsales\Payments\Stripe\Service\WebhookLogServiceInterface;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;
@@ -147,7 +148,11 @@ class WebhookController extends FrontendController
      */
     protected function setResponseContentType(): void
     {
-        Registry::getUtils()->setHeader('Content-Type: application/json');
+        $utils = Registry::getUtils();
+        $utils->setHeader('Content-Type: application/json');
+        ResponseHeaders::applySecurity(static function (string $header) use ($utils): void {
+            $utils->setHeader($header);
+        });
     }
 
     /**

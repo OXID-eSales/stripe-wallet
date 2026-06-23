@@ -1,4 +1,4 @@
-name: Development
+name: Stripe full tests onm OXID CE 7.5
 
 on: [ push, pull_request ]
 
@@ -37,7 +37,7 @@ jobs:
         run: git clone https://github.com/OXID-eSales/docker-eshop-sdk.git .
 
       - name: Clone the shop
-        run: git clone --depth 1 https://github.com/OXID-eSales/oxideshop_ce.git --branch b-7.4.x --single-branch source
+        run: git clone --depth 1 https://github.com/OXID-eSales/oxideshop_ce.git --branch b-7.5.x --single-branch source
 
       - name: Cache current installation
         # Restore-only: the dedicated "Save cache" step (actions/cache/save@v4) below is the
@@ -128,7 +128,7 @@ jobs:
             php composer config repositories.oxid-esales/oxideshop-demodata-ce \
             --json '{"type":"git", "url":"https://github.com/OXID-eSales/oxideshop_demodata_ce"}'
           docker compose exec -T php composer require oxid-esales/oxideshop-demodata-ce:dev-master --no-update
-          docker compose exec -T php composer require oxid-esales/apex-theme:dev-b-7.4.x --no-update
+          docker compose exec -T php composer require oxid-esales/apex-theme:dev-b-7.5.x --no-update
 
 
       - name: Install dependencies, reset shop, activate theme

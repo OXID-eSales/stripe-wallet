@@ -14,6 +14,32 @@ const PATHS = {
 /**
  * Production build configuration
  * Outputs minified bundles to assets/js/
+ *
+ * Phase 5 — build-strip mechanism:
+ * `pure` marks these console methods as side-effect-free. When `minify: true`,
+ * esbuild removes calls whose return value is unused — which covers every
+ * direct `console.log(...)` call a developer might leave in controller source.
+ *
+ * Intentional `debug(...)` calls use `consoleRef.log(...)` (aliased reference)
+ * inside debug.js, so esbuild cannot statically match them — they survive in
+ * the bundle and the runtime flag controls whether they fire.
+ *
+ * `console.error` is deliberately ABSENT from this list so genuine failure
+ * paths are always present in the production bundle.
+ *
+ * NOTE: Do NOT use `drop: ['console']` — it removes `console.error` too.
+ */
+const PRODUCTION_PURE_CONSOLE = [
+    'console.log',
+    'console.info',
+    'console.debug',
+    'console.warn',
+    'console.trace'
+];
+
+/**
+ * Production build configuration
+ * Outputs minified bundles to assets/js/
  */
 const productionConfig = {
     // Main frontend bundle
@@ -28,7 +54,8 @@ const productionConfig = {
         target: ['es2017'],
         define: {
             'process.env.NODE_ENV': '"production"'
-        }
+        },
+        pure: PRODUCTION_PURE_CONSOLE
     },
 
     // Admin bundle (if needed)
@@ -43,7 +70,8 @@ const productionConfig = {
         target: ['es2017'],
         define: {
             'process.env.NODE_ENV': '"production"'
-        }
+        },
+        pure: PRODUCTION_PURE_CONSOLE
     }
 };
 

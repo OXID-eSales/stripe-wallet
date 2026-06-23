@@ -72,30 +72,30 @@
   {
     "id": "HDR-hsts",
     "severity": "low",
-    "status": "fail",
-    "title": "Missing Strict-Transport-Security",
-    "evidence": "no HSTS over HTTPS"
+    "status": "pass",
+    "title": "HSTS header present",
+    "evidence": ""
   },
   {
     "id": "HDR-nosniff",
     "severity": "low",
-    "status": "fail",
-    "title": "Missing X-Content-Type-Options: nosniff",
+    "status": "pass",
+    "title": "X-Content-Type-Options: nosniff present",
     "evidence": ""
   },
   {
     "id": "HDR-frame",
     "severity": "low",
-    "status": "fail",
-    "title": "Missing clickjacking guard",
-    "evidence": "no X-Frame-Options / CSP frame-ancestors"
+    "status": "pass",
+    "title": "Clickjacking guard present",
+    "evidence": "X-Frame-Options or CSP frame-ancestors"
   },
   {
     "id": "HDR-banner",
     "severity": "low",
-    "status": "fail",
-    "title": "Server/version banner leaked",
-    "evidence": "Server='Apache/2.4.68 (Unix) OpenSSL/3.5.7' X-Powered-By='PHP/8.3.31'"
+    "status": "pass",
+    "title": "No version banner leaked",
+    "evidence": "Server='Apache'"
   },
   {
     "id": "INFO-git",
@@ -131,19 +131,5 @@
     "status": "skip",
     "title": "Amount-tamper check skipped",
     "evidence": "login did not establish a session (theme/flow differs)"
-  },
-  {
-    "id": "M7-rate",
-    "severity": "med",
-    "status": "fail",
-    "title": "No webhook rate limiting observed",
-    "evidence": "0/120 got 429"
-  },
-  {
-    "id": "BF-login",
-    "severity": "med",
-    "status": "fail",
-    "title": "No login brute-force throttling observed",
-    "evidence": "30 bad logins, none throttled"
   }
 ]

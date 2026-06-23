@@ -12,6 +12,7 @@ namespace OxidEsales\Payments\Stripe\Controller\Admin;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Bridge\ModuleSettingBridgeInterface;
+use OxidEsales\Payments\Stripe\Adapter\Helper\ResponseHeaders;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Module;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
@@ -473,6 +474,9 @@ class ModuleConfiguration extends ModuleConfiguration_parent
     {
         http_response_code($statusCode);
         header('Content-Type: application/json');
+        ResponseHeaders::applySecurity(static function (string $header): void {
+            header($header);
+        });
         echo json_encode($payload);
         $this->terminate();
     }

@@ -1,0 +1,6 @@
+# Dev log — 2026-06-24
+
+## Logging architecture analysis + remediation plan
+
+- **Report:** [reports/01-logging-architecture.md](reports/01-logging-architecture.md) — how logging is managed across payment-base & Stripe (3 channels: PSR-3/Monolog, file audit, DB webhook log). Key findings: the `blStripeLogTransactionInfo` on/off toggle is **orphaned** (read method never called → all channels always-on), and **frontend `console.log` is uncontrolled** (25 calls ship in the prod bundle). Zero tests assert "logging off ⇒ no writes".
+- **Sprint:** [sprints/harmonize-logging-control.md](sprints/harmonize-logging-control.md) — ✅ **DONE** (Phases 0–6, via `tdd-solid-engineer`, commits held). Harmonizes logging into **2 admin controls** (`sStripeLogLevel` off/errors/normal/debug + `blStripeLogWebhooks`), gates loggers via an additive `?\Closure $isEnabled` seam in payment-base (no new interface), preserves legacy value via level-seeding, build-strips + runtime-gates frontend console. 7 phases (0–6), TDD-first, executed via the `tdd-solid-engineer` agent one phase per dispatch.

@@ -92,6 +92,12 @@ $aModule = [
         // Sprint 110: platform secret key for registering Connect webhooks (paste from Stripe Dashboard → Developers → API keys).
         // Distinct from sStripeLiveToken (connected-account access_token from OAuth).
         ['group' => 'STRIPE_LIVE_CONFIG',       'name' => 'sStripeLiveKey',                     'type' => 'str',        'value' => '',          'position' => 32],
+        // Phase 2 (logging-control sprint): blStripeLogTransactionInfo is DEPRECATED.
+        // It is kept readable here so Phase 3 can seed sStripeLogLevel from it
+        // (legacy-bool==0 → effective 'off'; legacy-bool==1 → effective 'normal').
+        // It is intentionally moved out of the STRIPE_LOGGING group so it does not
+        // surface as an editable field alongside the new controls. Remove in the
+        // follow-up release once Phase 3 seeding lands.
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeLogTransactionInfo',         'type' => 'bool',       'value' => '1',         'position' => 34],
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeRemoveByBillingCountry',     'type' => 'bool',       'value' => '1',         'position' => 35],
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeRemoveByBasketCurrency',     'type' => 'bool',       'value' => '1',         'position' => 36],
@@ -102,5 +108,20 @@ $aModule = [
         // Sprint 109/111: per-mode endpoint ID and signing secret are stored in oxconfig
         // (via saveShopConfVar with module: prefix) — NOT as module settings — so they do
         // not surface as editable form fields in the module_config admin view.
+
+        // Phase 2 (logging-control sprint): two new controls replace the orphaned
+        // blStripeLogTransactionInfo toggle.  The old bool stays in STRIPE_GENERAL
+        // (above) for back-compat seeding in Phase 3; these are the live controls.
+        //
+        // sStripeLogLevel options map to channels as follows (Phase 3 wires this):
+        //   off    → all channels use NullFileLogger (no writes)
+        //   errors → request channel logs exceptions only
+        //   normal → requests (full) + reconciliation
+        //   debug  → all channels including events + frontend console
+        //
+        // blStripeLogWebhooks is independent of the level so merchants can silence
+        // chatty webhook traffic without going dark on other channels.
+        ['group' => 'STRIPE_LOGGING',           'name' => 'sStripeLogLevel',                    'type' => 'select',     'value' => 'normal',    'position' => 200, 'constraints' => 'off|errors|normal|debug'],
+        ['group' => 'STRIPE_LOGGING',           'name' => 'blStripeLogWebhooks',                'type' => 'bool',       'value' => '1',         'position' => 210],
     ]
 ];

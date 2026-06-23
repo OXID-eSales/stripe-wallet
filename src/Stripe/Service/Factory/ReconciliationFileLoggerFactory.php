@@ -11,17 +11,25 @@ namespace OxidEsales\Payments\Stripe\Service\Factory;
 
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentBase\Service\Factory\AbstractFileLoggerFactory;
+use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 
 /**
  * Factory for creating the reconciliation file logger.
  *
  * Sprint 27: Extends AbstractFileLoggerFactory using Template Method Pattern.
  * Sprint 14: Logs to log/stripe/stripe_reconciliation.log for OXPAID reconciliation.
+ * Phase 3: Gated via ModuleConfigurationServiceInterface::isReconciliationLoggingEnabled().
+ * Logs to log/stripe/stripe_reconciliation_<date>.log.
  *
  * @since Sprint 14
  */
 class ReconciliationFileLoggerFactory extends AbstractFileLoggerFactory
 {
+    public function __construct(ModuleConfigurationServiceInterface $config)
+    {
+        parent::__construct(static fn (): bool => $config->isReconciliationLoggingEnabled());
+    }
+
     protected function getLogFile(): string
     {
         $date = date('Y-m-d');

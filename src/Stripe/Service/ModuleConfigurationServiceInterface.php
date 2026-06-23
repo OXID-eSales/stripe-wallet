@@ -78,5 +78,43 @@ interface ModuleConfigurationServiceInterface
 
     public function getMinimumOrderAmount(): float;
 
-    public function isLoggingEnabled(): bool;
+    /**
+     * Resolve the effective log level: off | errors | normal | debug.
+     *
+     * When sStripeLogLevel is explicitly set to a known value → return it.
+     * When sStripeLogLevel is unset/empty → seed from legacy blStripeLogTransactionInfo:
+     *   '1'/truthy → 'normal', '0'/falsy → 'off'. Default: 'normal'.
+     * Unknown values → safe default 'normal'.
+     */
+    public function getLogLevel(): string;
+
+    /**
+     * Requests channel: enabled when level ∈ {errors, normal, debug}.
+     * Note: at 'errors' level, exceptions are still logged; full request/response at normal+.
+     * The gate controls the channel, not individual call severity.
+     */
+    public function isRequestLoggingEnabled(): bool;
+
+    /**
+     * Reconciliation channel: enabled when level ∈ {normal, debug}.
+     */
+    public function isReconciliationLoggingEnabled(): bool;
+
+    /**
+     * Events channel: enabled when level == debug only.
+     */
+    public function isEventLoggingEnabled(): bool;
+
+    /**
+     * Webhook channel: enabled when blStripeLogWebhooks is on AND level ∈ {normal, debug}.
+     * The webhook switch is independent so merchants can silence chatty webhooks
+     * without going dark on requests/reconciliation.
+     */
+    public function isWebhookLoggingEnabled(): bool;
+
+    /**
+     * Frontend debug: enabled when level == debug.
+     * Wired in Phase 5 (frontend); resolver defined here for a single DRY path.
+     */
+    public function isFrontendDebugEnabled(): bool;
 }

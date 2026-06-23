@@ -667,7 +667,11 @@ services:
   # Logs to log/osc/stripe_requests.log
 
   # Request file logger factory
-  OxidEsales\Payments\Stripe\Service\Factory\RequestFileLoggerFactory: ~
+  # Phase 3: gated via ModuleConfigurationServiceInterface::isRequestLoggingEnabled()
+  OxidEsales\Payments\Stripe\Service\Factory\RequestFileLoggerFactory:
+    autowire: false
+    arguments:
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
 
   # Request file logger instance (created by factory)
   stripe.request_file_logger:
@@ -694,7 +698,11 @@ services:
   # Logs to log/osc/stripe_webhooks.log
 
   # Webhook file logger factory
-  OxidEsales\Payments\Stripe\Service\Factory\WebhookFileLoggerFactory: ~
+  # Phase 3: gated via ModuleConfigurationServiceInterface::isWebhookLoggingEnabled()
+  OxidEsales\Payments\Stripe\Service\Factory\WebhookFileLoggerFactory:
+    autowire: false
+    arguments:
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
 
   # Webhook file logger instance (created by factory)
   stripe.webhook_file_logger:
@@ -1004,13 +1012,24 @@ services:
       $connection: '@doctrine.dbal.connection'
     public: true
 
-  # Webhook Log Service - Sprint 7 Phase 4: Proper layering for webhook log access
-  # Architecture: Controller/Service → WebhookLogService → WebhookLogRepository → Database
-  OxidEsales\PaymentBase\Service\WebhookLogServiceInterface:
-    class: OxidEsales\PaymentBase\Service\WebhookLogService
+  # Webhook DB Log Service Factory (logging-control sprint Phase 4)
+  # Injects the isWebhookLoggingEnabled() gate into the payment-base WebhookLogService
+  # as the optional $shouldLogPayload closure, keeping payment-base provider-agnostic.
+  # The claim row (OXEVENTID dedup/idempotency) is always written; only OXPAYLOAD and
+  # the PSR-3 mirror are gated behind blStripeLogWebhooks + level >= normal.
+  OxidEsales\Payments\Stripe\Service\Factory\WebhookDbLogServiceFactory:
+    autowire: false
     arguments:
       $repository: '@OxidEsales\PaymentBase\Repository\WebhookLogRepositoryInterface'
       $logger: '@Psr\Log\LoggerInterface'
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+
+  # Webhook Log Service - Sprint 7 Phase 4: Proper layering for webhook log access
+  # Architecture: Controller/Service → WebhookLogService → WebhookLogRepository → Database
+  # Phase 4 (logging-control): built via factory to inject the shouldLogPayload closure.
+  OxidEsales\PaymentBase\Service\WebhookLogServiceInterface:
+    class: OxidEsales\PaymentBase\Service\WebhookLogService
+    factory: ['@OxidEsales\Payments\Stripe\Service\Factory\WebhookDbLogServiceFactory', 'create']
     public: true
 
   # Payment Order State Repository - DEPRECATED (No longer used)
@@ -1161,7 +1180,11 @@ services:
 
   # Event File Logger Factory - Creates logger with correct shop path
   # Sprint 25: Logging for event system debugging
+  # Phase 3: gated via ModuleConfigurationServiceInterface::isEventLoggingEnabled()
   OxidEsales\Payments\Stripe\Service\Factory\EventFileLoggerFactory:
+    autowire: false
+    arguments:
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
     public: false
 
   # Event File Logger - Writes to log/osc/stripe_events.log
@@ -1173,7 +1196,11 @@ services:
 
   # Reconciliation File Logger Factory - Creates logger with correct shop path
   # Sprint 14: Factory approach for OXID compatibility (no kernel.project_dir)
+  # Phase 3: gated via ModuleConfigurationServiceInterface::isReconciliationLoggingEnabled()
   OxidEsales\Payments\Stripe\Service\Factory\ReconciliationFileLoggerFactory:
+    autowire: false
+    arguments:
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
     public: false
 
   # Reconciliation File Logger - Writes to log/osc/stripe_reconciliation.log

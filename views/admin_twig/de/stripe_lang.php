@@ -32,7 +32,10 @@ $aLang = array(
     'SHOP_MODULE_sStripeWebhookEndpointSecret'          => 'Webhook Sicherheits-Schlüssel',
     'SHOP_MODULE_blStripeProvideCustomerEmailAddress'   => 'Kunden-E-Mail-Adresse an Stripe senden',
 
-    'HELP_SHOP_MODULE_blStripeLogTransactionInfo'       => 'Log-Datei zu finden unter SHOPROOT/log/StripeTransactions.log',
+    // Phase 2 (Logging-Steuerungs-Sprint): blStripeLogTransactionInfo ist veraltet.
+    // Der Hilfetext verwies bisher auf eine Log-Datei, die nicht mehr existiert.
+    // Phase 3 liest diesen Legacy-Bool als Ausgangswert für sStripeLogLevel.
+    'HELP_SHOP_MODULE_blStripeLogTransactionInfo'       => 'Veraltet. Diese Einstellung wird nur aus Kompatibilitätsgründen beibehalten. Verwenden Sie stattdessen die Logging-Gruppe (sStripeLogLevel, blStripeLogWebhooks). Stripe-Protokolldateien befinden sich unter log/stripe/stripe_*_&lt;Datum&gt;.log.',
     'HELP_SHOP_MODULE_blStripeRemoveDeactivatedMethods' => 'Entfernt in der Zahlart-Auswahl im Frontend die Zahlarten, die im Stripe Dashboard nicht aktiviert wurden und somit zu einem Fehler führen würden.',
     'HELP_SHOP_MODULE_blStripeRemoveByBillingCountry'   => 'Entfernt in der Zahlart-Auswahl im Frontend die Zahlarten, die für das vom Kunden angegebene Rechnungsland nicht unterstützt sind und somit zu einem Fehler führen würden.',
     'HELP_SHOP_MODULE_blStripeRemoveByBasketCurrency'   => 'Entfernt in der Zahlart-Auswahl im Frontend die Zahlarten, die für das vom Warenkorb angegebene Wärung nicht unterstützt sind und somit zu einem Fehler führen würden.',
@@ -43,6 +46,21 @@ $aLang = array(
     'SHOP_MODULE_sStripeCaptureMode_automatic'          => 'Automatisch (sofort erfassen)',
     'SHOP_MODULE_sStripeCaptureMode_manual'             => 'Manuell (nur autorisieren, später erfassen)',
     'HELP_SHOP_MODULE_sStripeCaptureMode'               => 'Wählen Sie, wann Zahlungen erfasst werden sollen. Im automatischen Modus werden die Gelder sofort erfasst, wenn der Kunde den Checkout abschließt. Im manuellen Modus wird die Zahlung nur autorisiert - Sie müssen sie innerhalb von 7 Tagen manuell auf der Bestelladmin-Seite erfassen.',
+
+    // Logging-Einstellungen (Phase 2 — Logging-Steuerungs-Sprint)
+    // sStripeLogLevel steuert den Umfang der Backend-Datei-Logs.
+    // blStripeLogWebhooks ist unabhängig davon, sodass Händler störende
+    // Webhook-Protokolle stumm schalten können, ohne andere Kanäle zu deaktivieren.
+    // Protokolldateien: log/stripe/stripe_<kanal>_<datum>.log
+    'SHOP_MODULE_GROUP_STRIPE_LOGGING'                  => 'Protokollierung',
+    'SHOP_MODULE_sStripeLogLevel'                       => 'Protokollierungsstufe',
+    'SHOP_MODULE_sStripeLogLevel_off'                   => 'Aus (keine Protokollierung)',
+    'SHOP_MODULE_sStripeLogLevel_errors'                => 'Nur Fehler',
+    'SHOP_MODULE_sStripeLogLevel_normal'                => 'Normal (Anfragen + Abstimmung)',
+    'SHOP_MODULE_sStripeLogLevel_debug'                 => 'Debug (alle Kanäle + Browser-Konsole)',
+    'HELP_SHOP_MODULE_sStripeLogLevel'                  => 'Steuert, wie viel das Stripe-Modul in seine dateibasierten Audit-Logs schreibt (log/stripe/stripe_*_&lt;Datum&gt;.log). "Aus" unterdrückt alle Datei-Schreibvorgänge. "Nur Fehler" protokolliert lediglich Ausnahmedetails. "Normal" protokolliert vollständige Anfrage-/Antwortzyklen und Abstimmungsereignisse. "Debug" aktiviert alle Kanäle einschließlich Ereignisfluss und Browser-Konsolenausgabe. Die Webhook-Protokollierung wird separat über die Einstellung "Webhooks protokollieren" gesteuert.',
+    'SHOP_MODULE_blStripeLogWebhooks'                   => 'Webhooks protokollieren',
+    'HELP_SHOP_MODULE_blStripeLogWebhooks'              => 'Wenn aktiviert, werden eingehende Stripe-Webhook-Ereignisse in log/stripe/stripe_webhooks_&lt;Datum&gt;.log geschrieben. Dies ist unabhängig von der Protokollierungsstufe, sodass störende Webhook-Protokolle stummgeschaltet werden können, ohne Anfragen- oder Abstimmungslogs zu beeinflussen. Der Webhook-Idempotenz-Eintrag wird unabhängig von dieser Einstellung immer geschrieben.',
 
     'STRIPE_YES'                                        => 'Ja',
     'STRIPE_NO'                                         => 'Nein',

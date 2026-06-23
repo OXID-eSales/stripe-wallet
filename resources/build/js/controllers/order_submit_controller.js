@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { createDebugLogger } from '../debug.js'
 
 /**
  * Stimulus Controller for Order Submit Button
@@ -13,16 +14,22 @@ import { Controller } from "@hotwired/stimulus"
  *         data-action="click->order-submit#handleSubmit"
  *         data-order-submit-url-value="..."
  *         data-order-submit-payment-type-value="wallet|card"
+ *         data-order-submit-stripe-debug-value="false"
  *         type="button">
  *   Submit Order
  * </button>
+ *
+ * Phase 5: stripeDebug Stimulus value drives the shared debug() logger.
+ * When false (production default), all debug() calls are no-ops.
+ * When true (level=debug in admin), console output is enabled at runtime.
  */
 export default class extends Controller {
   static targets = ["status"]
   static values = {
     url: String,
     paymentType: String,
-    publishableKey: String
+    publishableKey: String,
+    stripeDebug: { type: Boolean, default: false }
   }
 
   /**
@@ -35,8 +42,10 @@ export default class extends Controller {
    * button state as the authoritative last step (see sprint plan §4.2).
    */
   connect() {
-    console.log('Order Submit controller connected')
-    console.log('Button element:', this.element)
+    this._debug = createDebugLogger(() => this.stripeDebugValue)
+
+    this._debug('Order Submit controller connected')
+    this._debug('Button element:', this.element)
 
     this._onPageShow = (e) => { if (e.persisted) this.hideLoading() }
     window.addEventListener('pageshow', this._onPageShow)
@@ -49,7 +58,7 @@ export default class extends Controller {
    * reference stored in connect() — symmetric, leak-free.
    */
   disconnect() {
-    console.log('Order Submit controller disconnected')
+    this._debug('Order Submit controller disconnected')
 
     window.removeEventListener('pageshow', this._onPageShow)
   }
@@ -75,7 +84,7 @@ export default class extends Controller {
       return null
     }
 
-    console.log('Found stripe-order controller:', controller)
+    this._debug('Found stripe-order controller:', controller)
     return controller
   }
 
@@ -87,7 +96,7 @@ export default class extends Controller {
   async handleSubmit(event) {
     event.preventDefault()
 
-    console.log('Order submit button clicked', {
+    this._debug('Order submit button clicked', {
       buttonId: this.element.id,
       paymentType: this.paymentTypeValue,
       timestamp: new Date().toISOString()
@@ -161,8 +170,8 @@ export default class extends Controller {
       throw new Error(window.oStripe?.i18n?.SESSION_INVALID || 'Invalid checkout session response')
     }
 
-    console.log('Checkout Session created:', data.id, 'URL:', data.url)
-    console.log('Debug info:', data._debug)
+    this._debug('Checkout Session created:', data.id, 'URL:', data.url)
+    this._debug('Debug info:', data._debug)
 
     // Redirect to Stripe Checkout using direct URL (more reliable)
     if (data.url) {
@@ -201,7 +210,7 @@ export default class extends Controller {
       throw new Error(window.oStripe?.i18n?.FORM_NOT_READY || 'Payment form not initialized. Please refresh the page.')
     }
 
-    console.log('Stripe controller ready:', {
+    this._debug('Stripe controller ready:', {
       hasCard: !!stripeOrderController.card,
       hasStripe: !!stripeOrderController.stripe
     })
@@ -218,7 +227,7 @@ export default class extends Controller {
     if (confirmPaymentResponse.error) {
       throw new Error(confirmPaymentResponse.error.message)
     } else if (confirmPaymentResponse.paymentIntent && confirmPaymentResponse.paymentIntent.status === 'succeeded') {
-      console.log('Payment succeeded', confirmPaymentResponse.paymentIntent)
+      this._debug('Payment succeeded', confirmPaymentResponse.paymentIntent)
       // TODO: Submit final order to backend
     } else {
       throw new Error(window.oStripe?.i18n?.PAYMENT_NOT_COMPLETED || 'Payment not completed')
@@ -235,7 +244,7 @@ export default class extends Controller {
       throw new Error(window.oStripe?.i18n?.URL_NOT_CONFIGURED || 'Payment URL is not configured')
     }
 
-    console.log('Creating payment intent via URL:', this.urlValue)
+    this._debug('Creating payment intent via URL:', this.urlValue)
 
     const response = await fetch(this.appendAgbState(this.buildUrlWithCsrfToken(this.urlValue)), {
       method: 'POST',
@@ -271,7 +280,7 @@ export default class extends Controller {
   buildUrlWithCsrfToken(url) {
     const stoken = document.querySelector('input[name="stoken"]')?.value || ''
     if (!stoken) {
-      console.warn('CSRF token (stoken) not found in form')
+      this._debug('CSRF token (stoken) not found in form')
       return url
     }
     const separator = url.includes('?') ? '&' : '?'
@@ -344,7 +353,7 @@ export default class extends Controller {
       this.statusTarget.textContent = message
       this.statusTarget.className = 'mt-2 text-center text-muted'
     }
-    console.log('Status:', message)
+    this._debug('Status:', message)
   }
 
   /**

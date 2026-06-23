@@ -1,0 +1,28 @@
+# Stripe module — security response headers (Sprint 131 / STRP-XXX)
+#
+# Append this block to the OXID shop's `source/.htaccess`. It sets the shop-wide
+# security headers the black-box pentest checks for (HDR-hsts / HDR-nosniff /
+# HDR-frame) plus removes the PHP banner. Requires Apache `mod_headers` and the
+# vhost `AllowOverride All` (both present in the OXID docker-eshop-sdk).
+#
+# NOTE: the `Server:` version banner CANNOT be removed from .htaccess —
+# `ServerTokens Prod` / `ServerSignature Off` are server-config context and must
+# live in httpd/vhost config. `expose_php = Off` (php.ini) removes X-Powered-By at
+# source; the `unset` below is the belt-and-braces fallback. See
+# docs/for_operator/security-headers.md for the full recipe + rationale.
+<IfModule mod_headers.c>
+    # Stop MIME-type sniffing.
+    Header always set X-Content-Type-Options "nosniff"
+
+    # Clickjacking guard. SAMEORIGIN (not DENY): the OXID admin uses framesets and
+    # must be allowed to frame its own pages from the same origin.
+    Header always set X-Frame-Options "SAMEORIGIN"
+
+    # Force HTTPS for a year incl. subdomains. Browsers ignore HSTS sent over
+    # plain HTTP, so this is safe to set unconditionally; add `; preload` only
+    # after you have verified every subdomain is HTTPS-only.
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+    # Drop the PHP banner (belt-and-braces; prefer expose_php=Off in php.ini).
+    Header always unset X-Powered-By
+</IfModule>

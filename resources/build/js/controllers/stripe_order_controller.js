@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { createDebugLogger } from '../debug.js'
 
 /**
  * Stimulus Controller for Stripe Payment Element on Order Page
@@ -8,23 +9,31 @@ import { Controller } from "@hotwired/stimulus"
  * Usage in Twig:
  * <div data-controller="stripe-order"
  *      data-stripe-order-publishable-key-value="pk_..."
- *      data-stripe-order-client-secret-value="pi_..._secret_...">
+ *      data-stripe-order-client-secret-value="pi_..._secret_..."
+ *      data-stripe-order-stripe-debug-value="false">
  *   <div id="payment-element"></div>
  *   <div id="payment-errors" style="display:none">
  *     <span data-stripe-order-target="errorMessage"></span>
  *   </div>
  * </div>
+ *
+ * Phase 5: stripeDebug Stimulus value drives the shared debug() logger.
+ * When false (production default), all debug() calls are no-ops.
+ * When true (level=debug in admin), console output is enabled at runtime.
  */
 export default class extends Controller {
   static values = {
     publishableKey: String,
-    clientSecret: String
+    clientSecret: String,
+    stripeDebug: { type: Boolean, default: false }
   }
 
   static targets = ["errorMessage", "loading"]
 
   connect() {
-    console.log('Stripe Order controller connected', {
+    this._debug = createDebugLogger(() => this.stripeDebugValue)
+
+    this._debug('Stripe Order controller connected', {
       hasPublishableKey: !!this.publishableKeyValue,
       publishableKey: this.publishableKeyValue ? this.publishableKeyValue.substring(0, 10) + '...' : 'missing',
     })
@@ -32,7 +41,7 @@ export default class extends Controller {
     // Get debug info from element
     const debugInfo = this.element.getAttribute('data-debug-info')
     if (debugInfo) {
-      console.log('Debug info:', debugInfo)
+      this._debug('Debug info:', debugInfo)
     }
 
     // Validate required configuration
@@ -59,7 +68,7 @@ export default class extends Controller {
   async initializeStripe() {
     // Wait for Stripe.js to be available
     if (typeof Stripe === 'undefined') {
-      console.log('Waiting for Stripe.js to load...')
+      this._debug('Waiting for Stripe.js to load...')
       await this.waitForStripe()
     }
 
@@ -86,7 +95,7 @@ export default class extends Controller {
       this.card = this.elements.create('card');
       this.card.mount('#card-element');
 
-      console.log('Stripe Payment Element initialized successfully')
+      this._debug('Stripe Payment Element initialized successfully')
 
     } catch (error) {
       console.error('Failed to initialize Stripe:', error)

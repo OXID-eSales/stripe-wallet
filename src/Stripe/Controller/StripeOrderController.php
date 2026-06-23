@@ -12,6 +12,7 @@ use OxidEsales\PaymentBase\Controller\HandlesCheckoutReturn;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\Payments\Stripe\Adapter\Helper\ResponseHeaders;
 use OxidEsales\Payments\Stripe\Service\Return\StripeReturnResolver;
 use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
@@ -166,7 +167,7 @@ class StripeOrderController extends StripeOrderController_parent
     public function createCheckoutSession(): void
     {
         $helper = $this->getRequestHelper();
-        header('Content-Type: application/json');
+        $this->sendSecureJsonHeaders();
 
         if (!$helper->validateSessionChallenge()) {
             $this->setHttpResponseCode(403);
@@ -572,6 +573,25 @@ class StripeOrderController extends StripeOrderController_parent
     protected function setHttpResponseCode(int $code): void
     {
         http_response_code($code);
+    }
+
+    /**
+     * Header sink seam (real emission); overridden in tests to capture.
+     */
+    protected function emitHeader(string $header): void
+    {
+        header($header);
+    }
+
+    /**
+     * Content-Type + security headers for this JSON endpoint's response.
+     */
+    protected function sendSecureJsonHeaders(): void
+    {
+        $this->emitHeader('Content-Type: application/json');
+        ResponseHeaders::applySecurity(function (string $header): void {
+            $this->emitHeader($header);
+        });
     }
 
     protected function generateNewSessChallenge(): string

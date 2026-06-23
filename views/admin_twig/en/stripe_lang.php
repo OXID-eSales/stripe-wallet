@@ -31,7 +31,10 @@ $aLang = array(
     'HELP_SHOP_MODULE_sStripeWebhookEndpoint'           => 'Paste your Stripe Webhook Endpoint URL here, or use the button below to create and register it automatically using your platform secret key.',
     'SHOP_MODULE_sStripeWebhookEndpointSecret'          => 'Webhook Endpoint secret',
     'SHOP_MODULE_blStripeProvideCustomerEmailAddress'   => 'Send customer email address to Stripe',
-    'HELP_SHOP_MODULE_blStripeLogTransactionInfo'       => 'Log file to be found here: SHOPROOT/log/StripeTransactions.log',
+    // Phase 2 (logging-control sprint): blStripeLogTransactionInfo is deprecated.
+    // The help text previously referenced a log file that no longer exists.
+    // Phase 3 will read this legacy bool as a seed for sStripeLogLevel.
+    'HELP_SHOP_MODULE_blStripeLogTransactionInfo'       => 'Deprecated. This setting is kept for back-compatibility only. Use the Logging group controls (sStripeLogLevel, blStripeLogWebhooks) instead. Stripe logs are written to log/stripe/stripe_*_&lt;date&gt;.log.',
     'HELP_SHOP_MODULE_blStripeRemoveDeactivatedMethods' => 'Removes the payment types from the frontend payment selection which are not activated in the Stripe Dashboard and thus would result in an error.',
     'HELP_SHOP_MODULE_blStripeRemoveByBillingCountry'   => 'Removes the payment types from the frontend payment selection which are not supported for the billing country given by the customer and thus would result in an error.',
     'HELP_SHOP_MODULE_blStripeRemoveByBasketCurrency'   => 'Removes the payment types from the frontend payment selection which are not supported for the basket currency given by the customer and thus would result in an error.',
@@ -43,6 +46,21 @@ $aLang = array(
     'SHOP_MODULE_sStripeCaptureMode_automatic'          => 'Automatic (capture immediately)',
     'SHOP_MODULE_sStripeCaptureMode_manual'             => 'Manual (authorize only, capture later)',
     'HELP_SHOP_MODULE_sStripeCaptureMode'               => 'Choose when to capture payments. Automatic mode captures funds immediately when the customer completes checkout. Manual mode only authorizes the payment - you must capture it manually from the order admin page within 7 days.',
+
+    // Logging Settings (Phase 2 — logging-control sprint)
+    // sStripeLogLevel controls how much the backend file channels write.
+    // blStripeLogWebhooks is independent so merchants can silence chatty
+    // webhook traffic without going dark on other channels.
+    // Real log files: log/stripe/stripe_<channel>_<date>.log
+    'SHOP_MODULE_GROUP_STRIPE_LOGGING'                  => 'Logging',
+    'SHOP_MODULE_sStripeLogLevel'                       => 'Log level',
+    'SHOP_MODULE_sStripeLogLevel_off'                   => 'Off (no logging)',
+    'SHOP_MODULE_sStripeLogLevel_errors'                => 'Errors only',
+    'SHOP_MODULE_sStripeLogLevel_normal'                => 'Normal (requests + reconciliation)',
+    'SHOP_MODULE_sStripeLogLevel_debug'                 => 'Debug (all channels + frontend console)',
+    'HELP_SHOP_MODULE_sStripeLogLevel'                  => 'Controls how much the Stripe module writes to its file-based audit logs (log/stripe/stripe_*_&lt;date&gt;.log). "Off" suppresses all file writes. "Errors" logs exception details only. "Normal" logs full request/response cycles and reconciliation events. "Debug" enables all channels including event flow and browser console output. Webhook logging is controlled separately by the "Log webhooks" setting.',
+    'SHOP_MODULE_blStripeLogWebhooks'                   => 'Log webhooks',
+    'HELP_SHOP_MODULE_blStripeLogWebhooks'              => 'When enabled, incoming Stripe webhook events are written to log/stripe/stripe_webhooks_&lt;date&gt;.log. This is independent of the Log Level setting so you can silence chatty webhook traffic without affecting request or reconciliation logs. The webhook idempotency record is always written regardless of this setting.',
 
     'STRIPE_YES'                                        => 'Yes',
     'STRIPE_NO'                                         => 'No',
