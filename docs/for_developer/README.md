@@ -56,6 +56,7 @@ src/Stripe/
 | 1 | [Module Principles](01-module-principles.md) | Contract-first model, event-driven architecture, handler registration, design patterns |
 | 2 | [Payment-Component Dependency](02-payment-component-dependency.md) | What payment-component provides, interface mappings, services.yaml wiring, database schema |
 | 3 | [Extending the Stripe Module](03-extending-the-stripe-module.md) | 6 extension patterns with code examples, full subscription/booking examples, testing, pitfalls |
+| 4 | [Money & Amounts](04-money-and-amounts.md) | Integer minor units vs OXID floats, `AmountConverter`, `CapturableAmount`, refund math, `Money` comparisons |
 
 ---
 
