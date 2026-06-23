@@ -1,0 +1,149 @@
+[
+  {
+    "id": "M8-size",
+    "severity": "med",
+    "status": "pass",
+    "title": "Webhook rejects oversized payload",
+    "evidence": "413 (size guard)"
+  },
+  {
+    "id": "M8-normal",
+    "severity": "info",
+    "status": "pass",
+    "title": "Normal payload not size-rejected",
+    "evidence": "400"
+  },
+  {
+    "id": "SIG-verify",
+    "severity": "high",
+    "status": "pass",
+    "title": "Invalid webhook signature rejected",
+    "evidence": "400"
+  },
+  {
+    "id": "C3-replay",
+    "severity": "high",
+    "status": "skip",
+    "title": "Replay dedup not observable",
+    "evidence": "needs a valid signature to reach the idempotency layer"
+  },
+  {
+    "id": "TLS-webhook",
+    "severity": "low",
+    "status": "pass",
+    "title": "Cleartext webhook not served",
+    "evidence": "400"
+  },
+  {
+    "id": "H8-checkout",
+    "severity": "high",
+    "status": "pass",
+    "title": "createCheckoutSession rejects missing stoken",
+    "evidence": "403"
+  },
+  {
+    "id": "H8-admin",
+    "severity": "high",
+    "status": "pass",
+    "title": "Admin refund not directly accessible",
+    "evidence": "302"
+  },
+  {
+    "id": "F14-redirect",
+    "severity": "high",
+    "status": "pass",
+    "title": "No off-host redirect on tested params",
+    "evidence": "tried 7 params x 3 endpoints"
+  },
+  {
+    "id": "F18-adminauth",
+    "severity": "crit",
+    "status": "pass",
+    "title": "Admin redirected to login (no session)",
+    "evidence": "302"
+  },
+  {
+    "id": "F12-mcp",
+    "severity": "high",
+    "status": "pass",
+    "title": "No secret/JWT disclosed on MCP routes",
+    "evidence": "tried 3 routes"
+  },
+  {
+    "id": "HDR-hsts",
+    "severity": "low",
+    "status": "fail",
+    "title": "Missing Strict-Transport-Security",
+    "evidence": "no HSTS over HTTPS"
+  },
+  {
+    "id": "HDR-nosniff",
+    "severity": "low",
+    "status": "fail",
+    "title": "Missing X-Content-Type-Options: nosniff",
+    "evidence": ""
+  },
+  {
+    "id": "HDR-frame",
+    "severity": "low",
+    "status": "fail",
+    "title": "Missing clickjacking guard",
+    "evidence": "no X-Frame-Options / CSP frame-ancestors"
+  },
+  {
+    "id": "HDR-banner",
+    "severity": "low",
+    "status": "fail",
+    "title": "Server/version banner leaked",
+    "evidence": "Server='Apache/2.4.68 (Unix) OpenSSL/3.5.7' X-Powered-By='PHP/8.3.31'"
+  },
+  {
+    "id": "INFO-git",
+    "severity": "high",
+    "status": "pass",
+    "title": ".git not exposed",
+    "evidence": "301"
+  },
+  {
+    "id": "INFO-composer",
+    "severity": "med",
+    "status": "pass",
+    "title": "composer.json not exposed",
+    "evidence": "403"
+  },
+  {
+    "id": "INFO-config",
+    "severity": "crit",
+    "status": "pass",
+    "title": "config.inc.php not disclosed",
+    "evidence": "no source/credentials in response"
+  },
+  {
+    "id": "INFO-debug",
+    "severity": "med",
+    "status": "pass",
+    "title": "No verbose error output",
+    "evidence": "errors suppressed"
+  },
+  {
+    "id": "F15-tamper",
+    "severity": "high",
+    "status": "skip",
+    "title": "Amount-tamper check skipped",
+    "evidence": "login did not establish a session (theme/flow differs)"
+  },
+  {
+    "id": "M7-rate",
+    "severity": "med",
+    "status": "fail",
+    "title": "No webhook rate limiting observed",
+    "evidence": "0/120 got 429"
+  },
+  {
+    "id": "BF-login",
+    "severity": "med",
+    "status": "fail",
+    "title": "No login brute-force throttling observed",
+    "evidence": "30 bad logins, none throttled"
+  }
+]

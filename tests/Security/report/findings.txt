@@ -1,0 +1,21 @@
+M8-size|med|pass|Webhook rejects oversized payload|413 (size guard)
+M8-normal|info|pass|Normal payload not size-rejected|400
+SIG-verify|high|pass|Invalid webhook signature rejected|400
+C3-replay|high|skip|Replay dedup not observable|needs a valid signature to reach the idempotency layer
+TLS-webhook|low|pass|Cleartext webhook not served|400
+H8-checkout|high|pass|createCheckoutSession rejects missing stoken|403
+H8-admin|high|pass|Admin refund not directly accessible|302
+F14-redirect|high|pass|No off-host redirect on tested params|tried 7 params x 3 endpoints
+F18-adminauth|crit|pass|Admin redirected to login (no session)|302
+F12-mcp|high|pass|No secret/JWT disclosed on MCP routes|tried 3 routes
+HDR-hsts|low|fail|Missing Strict-Transport-Security|no HSTS over HTTPS
+HDR-nosniff|low|fail|Missing X-Content-Type-Options: nosniff|
+HDR-frame|low|fail|Missing clickjacking guard|no X-Frame-Options / CSP frame-ancestors
+HDR-banner|low|fail|Server/version banner leaked|Server='Apache/2.4.68 (Unix) OpenSSL/3.5.7' X-Powered-By='PHP/8.3.31'
+INFO-git|high|pass|.git not exposed|301
+INFO-composer|med|pass|composer.json not exposed|403
+INFO-config|crit|pass|config.inc.php not disclosed|no source/credentials in response
+INFO-debug|med|pass|No verbose error output|errors suppressed
+F15-tamper|high|skip|Amount-tamper check skipped|login did not establish a session (theme/flow differs)
+M7-rate|med|fail|No webhook rate limiting observed|0/120 got 429
+BF-login|med|fail|No login brute-force throttling observed|30 bad logins, none throttled
