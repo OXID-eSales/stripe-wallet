@@ -226,10 +226,33 @@
     connect() {
       console.log('[StripeUserDataValidator] Connected — wrapping stripe-checkout-footer#submitPayment');
       this._wrapSubmitPayment();
+      this._attachClearOnInputListeners();
     }
 
     disconnect() {
       this._unwrapSubmitPayment();
+      this._detachClearOnInputListeners();
+    }
+
+    // Logical-field → OPC Stimulus address-target.
+    // Single source of truth shared by _collectFields, _renderErrors,
+    // _clearErrors and _attachClearOnInputListeners — keep in sync.
+    _fieldTargetMap() {
+      return {
+        firstName:   'firstName',
+        lastName:    'lastName',
+        street:      'street',
+        houseNumber: 'streetNumber',
+        postalCode:  'zipCode',
+        city:        'city'
+      };
+    }
+
+    _fieldNodes(target) {
+      return document.querySelectorAll(
+        '[data-billing-address-target="' + target + '"], ' +
+        '[data-delivery-address-target="' + target + '"]'
+      );
     }
 
     // ---- private helpers ----
@@ -308,27 +331,12 @@
     }
 
     _collectFields() {
-      // logical-name → OPC Stimulus address-target.
-      // Source: one-page-checkout/.../shared/address-form-fields.html.twig
-      // (fields render with data-{billing|delivery}-address-target="…"; we read
-      //  whichever address form is on the page). A rename there surfaces as
-      //  "no fields collected → validation skipped" rather than a silent error.
-      var TARGET_MAP = {
-        firstName:   'firstName',
-        lastName:    'lastName',
-        street:      'street',
-        houseNumber: 'streetNumber',
-        postalCode:  'zipCode',
-        city:        'city'
-      };
-
+      // Reads whichever OPC address form is on the page (billing or delivery).
+      // A field-target rename in one-page-checkout/.../shared/address-form-fields.html.twig
+      // surfaces as "no fields collected → validation skipped" rather than a silent error.
       var out = {};
-      for (var [logical, target] of Object.entries(TARGET_MAP)) {
-        var nodes = document.querySelectorAll(
-          '[data-billing-address-target="' + target + '"], ' +
-          '[data-delivery-address-target="' + target + '"]'
-        );
-        for (var el of nodes) {
+      for (var [logical, target] of Object.entries(this._fieldTargetMap())) {
+        for (var el of this._fieldNodes(target)) {
           var v = el && typeof el.value === 'string' ? el.value.trim() : '';
           if (v !== '') { out[logical] = v; break; }
         }
@@ -336,25 +344,44 @@
       return out;
     }
 
-    // STRP-129: ONE error -> ONE event. For each failed field we dispatch the
-    // `oe:payment:error` document event OPC already listens for (its
-    // notification_controller via the eventBus bridge + modal_state_controller
-    // directly), so the standard OPC notice box appears automatically. The
-    // per-field message is the SAME one the classic checkout shows (err.message,
-    // produced server-side by UserDataValidationMessageFormatter).
+    // OPC-90 (was STRP-129): for each rejected field, paint the corresponding
+    // OPC address input with `.is-invalid` + sibling `.invalid-feedback` carrying
+    // the SPECIFIC server-formatted message ("The first name field is not valid.
+    // Allowed symbols are: letters" — produced by UserDataValidationMessageFormatter).
+    // The generic `reviewMessageValue` continues to drive OPC's notification box
+    // via the `oe:payment:error` event so an unobservant shopper still gets the
+    // global cue — but the actionable detail lives next to the field they typed.
     _renderErrors(errors) {
       if (!Array.isArray(errors) || errors.length === 0) {
         return;
       }
 
       var allowedMap = this.allowedValue || {};
-
+      var targetMap = this._fieldTargetMap();
       var violatedFieldsList = [];
+
       for (var err of errors) {
-          violatedFieldsList.push({ field: err.field, allowed: allowedMap[err.field] || '' });
+        violatedFieldsList.push({ field: err.field, allowed: allowedMap[err.field] || '' });
+        var target = err && err.field ? targetMap[err.field] : null;
+        if (!target) {
+          continue;
+        }
+        for (var el of this._fieldNodes(target)) {
+          el.classList.add('is-invalid');
+          var existing = el.parentElement
+            && el.parentElement.querySelector('.invalid-feedback[data-stripe-validation]');
+          if (existing) {
+            existing.remove();
+          }
+          var feedback = document.createElement('div');
+          feedback.className = 'invalid-feedback d-block';
+          feedback.setAttribute('data-stripe-validation', 'true');
+          feedback.textContent = (err.message || '').toString().trim() || 'Invalid value';
+          el.insertAdjacentElement('afterend', feedback);
+        }
       }
 
-      // One generic error notice for OPC's notification system.
+      // Generic notice for OPC's notification system (unchanged contract).
       document.dispatchEvent(new CustomEvent('oe:payment:error', {
         detail: {
           message: this.reviewMessageValue || 'Please review your address details.',
@@ -363,8 +390,56 @@
       }));
     }
 
+    // Wipe every `.is-invalid` + stripe-validation feedback we own. Called
+    // at the start of every submit attempt so stale errors from a previous
+    // attempt do not linger when the user resubmits.
     _clearErrors() {
-      // No own box to clear — OPC's notification system owns the notice lifecycle.
+      for (var target of Object.values(this._fieldTargetMap())) {
+        for (var el of this._fieldNodes(target)) {
+          el.classList.remove('is-invalid');
+          var fb = el.parentElement
+            && el.parentElement.querySelector('.invalid-feedback[data-stripe-validation]');
+          if (fb) {
+            fb.remove();
+          }
+        }
+      }
+    }
+
+    // Auto-clear per-field error as soon as the shopper starts editing the
+    // field — removes the red border + the inline message without waiting
+    // for the next submit cycle. Listeners are tracked in _inputListeners
+    // and removed on disconnect to prevent leaks when the widget is torn
+    // down and re-rendered (OPC reloads the footer widget on payment-method
+    // change).
+    _attachClearOnInputListeners() {
+      this._inputListeners = [];
+      for (var target of Object.values(this._fieldTargetMap())) {
+        for (var el of this._fieldNodes(target)) {
+          var handler = this._handleFieldInput.bind(this, el);
+          el.addEventListener('input', handler);
+          this._inputListeners.push({ el: el, handler: handler });
+        }
+      }
+    }
+
+    _detachClearOnInputListeners() {
+      if (!Array.isArray(this._inputListeners)) {
+        return;
+      }
+      for (var rec of this._inputListeners) {
+        rec.el.removeEventListener('input', rec.handler);
+      }
+      this._inputListeners = [];
+    }
+
+    _handleFieldInput(el) {
+      el.classList.remove('is-invalid');
+      var fb = el.parentElement
+        && el.parentElement.querySelector('.invalid-feedback[data-stripe-validation]');
+      if (fb) {
+        fb.remove();
+      }
     }
 
   }
