@@ -1,7 +1,7 @@
 # Sprint: Harmonize logging control
 
 **Date:** 2026-06-24
-**Status:** TODO — decisions locked, then revised after a balance review (see "Decisions")
+**Status:** DONE (Phases 0–6 + Phase 5b live-verification follow-up, 2026-06-24/25). Commits held.
 **Related report:** `../reports/01-logging-architecture.md`
 
 ## Core requirements (non-negotiable)
@@ -57,7 +57,7 @@ Give merchants **simple, working control** of logging — one volume knob plus a
    - `sStripeLogLevel`: `off | errors | normal | debug`
    - `blStripeLogWebhooks`: on/off (the explicitly-requested separate webhook control)
    - `blStripeLogFrontend` is **dropped** — frontend console turns on at `debug` level.
-3. **Frontend = build-time strip + runtime wrapper (defense in depth).** Add `drop: ['console']` (keep `console.error`) to the production esbuild config, AND keep a runtime `debug()` wrapper gated by the `debug` level. Build strips stray raw calls a dev adds later; `debug()` survives for intentional opt-in live diagnostics.
+3. **Frontend = build-time strip + runtime wrapper (defense in depth).** Use esbuild `pure: ['console.log','console.info','console.debug','console.warn','console.trace']` (NOT `drop: ['console']`, which would also remove `console.error`) on the production build, AND a runtime `debug()` wrapper gated by the `debug` level. Build strips stray raw calls in bundled controllers; `debug()` (via an aliased `globalThis.console` so `pure` can't strip it) survives for intentional opt-in live diagnostics. **Settled during implementation:** `pure` over `drop` is the mechanism that keeps `console.error`.
 
 ## Config model
 
@@ -96,7 +96,7 @@ Dedicated `STRIPE_LOGGING` group — **2 controls**:
 - `ViewConfig::isStripeDebug(): bool` returns `getLogLevel() === 'debug'` via `ModuleSettingServiceInterface`.
 - Template passes `data-stripe-debug-value="{{ oViewConf.isStripeDebug() ? 'true' : 'false' }}"` onto the controller root in `checkout/order.html.twig`.
 - Add a shared `debug(...args)` helper (Stimulus mixin / base controller) that no-ops unless the value is true; replace raw `console.log/debug/warn` in controllers with it. **Genuine `console.error` stays unconditional.**
-- Production esbuild config: `drop: ['console']` with `console.error` preserved (esbuild `drop` removes all `console.*`; keep error via `pure`-exclusion or route real errors through a retained `reportError`-style call — settle the exact mechanism in Phase 5).
+- Production esbuild config: `pure: ['console.log','console.info','console.debug','console.warn','console.trace']` (NOT `drop: ['console']`) so `console.error` is preserved while stray bundled `console.log` is stripped. The `debug()` wrapper calls `globalThis.console` (aliased) so `pure` can't strip the intentional path.
 
 ## Phases (TDD, one commit each)
 
@@ -124,9 +124,17 @@ Dedicated `STRIPE_LOGGING` group — **2 controls**:
 
 **Phase 5 — Frontend: build strip + runtime wrapper**
 - Add `ViewConfig::isStripeDebug()` + PHP unit test.
-- esbuild prod: `drop` console (preserve real errors); confirm prod bundle has no stray `console.log`.
-- Add `data-stripe-debug-value`; add `debug()` helper; replace raw console.log/debug/warn in `stripe_order_controller.js` / `order_submit_controller.js`.
-- `npm run build`; verify: prod bundle silent at `normal`, verbose at `debug`. Manual check noted in status if no JS test harness.
+- esbuild prod: `pure` console list (preserve `console.error`); confirm prod bundle has no stray `console.log`.
+- Add `data-stripe-debug-value`; add shared `debug()` helper (`debug.js`, aliased `globalThis.console`); replace raw console.log/debug/warn in `stripe_order_controller.js` / `order_submit_controller.js`.
+- `npm run build`; verify: prod bundle silent at `normal`, verbose at `debug`.
+
+**Phase 5b — Live-verification follow-up (2026-06-25)**
+Real-shop Playwright run on `localhost.local` (feature OFF) revealed Phase 5 was incomplete — the console still flooded. Two causes, both fixed:
+- **Deploy/opcache (operational, not a code bug).** PHP-FPM ran stale pre-gating classes, so backend file logs kept writing. Required `docker compose restart php` + `oe:cache:clear` + `oe:module:install-assets`. After redeploy, the event log stayed 0 bytes through a full checkout at level `off`. ([[feedback_php_opcache_fpm]] — class changes need a php restart.)
+- **Frontend gaps Phase 5 didn't cover.** `app.js` set `Stimulus.debug = true` from `process.env.NODE_ENV` (build/domain), and `views/twig/widget/checkout/stripe-footer.html.twig` had 10 raw `console.log/warn` in its inline OPC script — neither gated by the feature. Because `.local` is a dev domain, `isStripeDevelopmentMode()` serves the **non-stripped dev bundle**, so the feature being off never silenced them.
+  - Fix: surface the flag as `oStripe.debug = {{ oViewConf.isStripeDebug() }}` in `stripe_i18n.html.twig`; `app.js` sets `Stimulus.debug = window.oStripe?.debug === true` and routes its init logs through the shared `debug()` wrapper; the footer widget routes its 10 log/warn calls through a runtime `sdbg()` gate (the 3 `console.error` stay unconditional). Rebuild both bundles + reinstall assets + clear twig cache.
+- **Regression test (replaces the missing frontend "off ⇒ silent" coverage):** `tests/e2e/.../StripeStandard/FrontendLoggingGated.spec.ts` runs a full standard checkout and asserts **0 Stripe-emitted console logs** (`Stripe Module:` + `[StripeCheckoutFooter]`/`[StripeUserDataValidator]`) while the feature is off. Verified green (order completed, 0 leaks).
+- **Out of scope (documented, not fixed):** `[CheckoutFooterManager]`, `UserReactiveController`, `apex-*`, and `details:{identifier: stripe-…}` Stimulus-lifecycle lines are emitted by the OPC/apex theme's own `Stimulus.debug` (a different codebase, silent in production, verbose only on dev domains).
 
 **Phase 6 — Cleanup + docs**
 - Remove remaining orphaned methods/keys; update `01-logging-architecture.md` (incl. Frontend section + new config model).
@@ -160,21 +168,25 @@ Dedicated `STRIPE_LOGGING` group — **2 controls**:
 
 ## Acceptance criteria
 
-- [ ] **2 admin controls** (`sStripeLogLevel` + `blStripeLogWebhooks`) replace the orphaned single checkbox; webhook logging independently switchable.
-- [ ] `off` ⇒ no file written on any channel (`assertFileDoesNotExist`); `debug` ⇒ all channels + frontend console active.
-- [ ] Legacy `blStripeLogTransactionInfo` value preserved via level seeding (0→off, 1→normal); merchant never silently flipped.
-- [ ] DB `claimEvent()` row always written; only `OXPAYLOAD`/PSR-3 mirror gated; idempotency unaffected (tested).
-- [ ] Production JS bundle has no stray `console.log` (build-strip) AND `debug()` is silent unless level==`debug`.
-- [ ] No orphaned config-read methods; no `LoggingTogglesInterface`; help text accurate.
-- [ ] payment-base changes additive; null-closure path preserves old behavior; PayPal + OPC suite counts unchanged.
-- [ ] PHPCS / PHPStan (max) / PHPMD clean; no new suppressions/baseline entries.
+- [x] **2 admin controls** (`sStripeLogLevel` + `blStripeLogWebhooks`) replace the orphaned single checkbox; webhook logging independently switchable.
+- [x] `off` ⇒ no file written on any channel (`assertFileDoesNotExist`); `debug` ⇒ all channels + frontend console active.
+- [x] Legacy `blStripeLogTransactionInfo` value preserved via level seeding (0→off, 1→normal); merchant never silently flipped.
+- [x] DB `claimEvent()` row always written; only `OXPAYLOAD`/PSR-3 mirror gated; idempotency unaffected (tested).
+- [x] Production JS bundle has no stray `console.log` (build-strip) AND `debug()` is silent unless level==`debug`.
+- [x] No orphaned config-read methods; no `LoggingTogglesInterface`; help text accurate.
+- [x] payment-base changes additive; null-closure path preserves old behavior; PayPal + OPC suite counts unchanged.
+- [x] PHPCS / PHPStan (max) / PHPMD clean; no new suppressions/baseline entries.
+- [x] **Live verification (Phase 5b):** full Playwright standard checkout on `localhost.local` at level `off` → backend event log 0 bytes AND 0 Stripe-emitted console logs; guarded by `FrontendLoggingGated.spec.ts`. Requires redeploy (`restart php` + cache clear + asset reinstall) for the running shop to pick up gating.
 
 ## Risks / gotchas
 
 - **`oe_payments_webhooklogs` doubles as the idempotency ledger** — never gate `claimEvent()`; only the payload/mirror.
 - **payment-base is a separate git repo** — commit there separately; path-symlink repo, so `composer update` won't advance its git state.
 - **Keep the closure seam minimal** — a bare `?\Closure $isEnabled`. Do NOT reintroduce an interface/enum until a 2nd provider consumes it.
-- **`drop: ['console']` removes `console.error` too** — settle how genuine errors survive (pure-exclusion list, or a retained reporter) in Phase 5; don't silently swallow real failures.
+- **`drop: ['console']` removes `console.error` too** — RESOLVED by using `pure` (excluding `console.error`) instead of `drop`. Never switch to `drop`.
+- **Frontend gating is NOT build/domain-driven** — `isStripeDevelopmentMode()` (.local/.dev/.test) serves the non-stripped dev bundle, so any debug tied to `NODE_ENV`/domain leaks when the feature is off. Drive all frontend logging (incl. `Stimulus.debug` and inline twig-widget scripts) from the runtime `oStripe.debug` flag. (Phase 5b lesson.)
+- **Inline twig `<script>` logging is never bundled** — esbuild `pure` cannot strip it; it must be runtime-gated (`sdbg()` reading `oStripe.debug`). (Phase 5b: footer widget.)
+- **PHP-FPM opcache** — backend gating won't take effect on the running shop until `docker compose restart php` + `oe:cache:clear` + `oe:module:install-assets`. Unit tests pass while the live shop still runs old classes.
 - **Level-seeding edge case** — once a merchant sets `sStripeLogLevel` explicitly, stop consulting the legacy bool; only seed when the select is unset/empty.
 - **Lang keys split admin vs storefront** — logging settings are admin-only; every setting (incl. each select option) needs keys in `views/admin_twig/{en,de}` or the admin tab errors.
 - **Caches** — clear `source/tmp/*` after template changes; `docker compose restart php` after class changes.

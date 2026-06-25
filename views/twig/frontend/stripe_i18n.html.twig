@@ -5,6 +5,9 @@
 
 <script>
     var oStripe = oStripe || {};
+    // Frontend debug flag — driven by the module log level (sStripeLogLevel === 'debug').
+    // Read by app.js to gate Stimulus.debug and all module console output at runtime.
+    oStripe.debug = {{ oViewConf.isStripeDebug() ? 'true' : 'false' }};
     oStripe.i18n = {
         // AGB Validation
         AGB_REQUIRED: "{{ translate({ ident: 'STRIPE_JS_AGB_REQUIRED' }) }}",

@@ -65,6 +65,15 @@
     return;
   }
 
+  // Frontend debug gate — only logs when the module log level is 'debug'
+  // (surfaced as window.oStripe.debug by stripe_i18n.html.twig). console.error
+  // stays unconditional; log/warn diagnostics are silent unless debug is on.
+  var sdbg = function() {
+    if (window.oStripe && window.oStripe.debug === true) {
+      console.log.apply(console, arguments);
+    }
+  };
+
   // Always register (idempotent) — needed for dynamic widget loading
   var BaseController = opc.Controller;
 
@@ -79,7 +88,7 @@
     ]
 
     connect() {
-      console.log('[StripeCheckoutFooter] Connected (redirect mode)');
+      sdbg('[StripeCheckoutFooter] Connected (redirect mode)');
       if (this.hasSubmitButtonTarget) {
         this.submitButtonTarget.disabled = false;
       }
@@ -105,7 +114,7 @@
           throw new Error('No redirect URL returned from Stripe');
         }
 
-        console.log('[StripeCheckoutFooter] Redirecting to Stripe checkout:', redirectUrl);
+        sdbg('[StripeCheckoutFooter] Redirecting to Stripe checkout:', redirectUrl);
 
         // Step 3: Redirect to Stripe hosted checkout page
         window.location.href = redirectUrl;
@@ -178,7 +187,7 @@
   }
 
   opc.stimulus.register('stripe-checkout-footer', StripeCheckoutFooterController);
-  console.log('[StripeCheckoutFooter] Registered with OnepageCheckout.stimulus');
+  sdbg('[StripeCheckoutFooter] Registered with OnepageCheckout.stimulus');
 
   // -----------------------------------------------------------------------
   // stripe-user-data-validator Stimulus controller
@@ -224,7 +233,7 @@
     }
 
     connect() {
-      console.log('[StripeUserDataValidator] Connected — wrapping stripe-checkout-footer#submitPayment');
+      sdbg('[StripeUserDataValidator] Connected — wrapping stripe-checkout-footer#submitPayment');
       this._wrapSubmitPayment();
       this._attachClearOnInputListeners();
     }
@@ -264,7 +273,7 @@
       );
 
       if (!footerCtrl) {
-        console.warn('[StripeUserDataValidator] stripe-checkout-footer not found — skipping wrap');
+        sdbg('[StripeUserDataValidator] stripe-checkout-footer not found — skipping wrap');
         return;
       }
 
@@ -272,13 +281,13 @@
       this._footerCtrl          = footerCtrl;
       this._originalSubmit      = footerCtrl.submitPayment.bind(footerCtrl);
       footerCtrl.submitPayment  = this._interceptSubmit.bind(this);
-      console.log('[StripeUserDataValidator] submitPayment wrapped');
+      sdbg('[StripeUserDataValidator] submitPayment wrapped');
     }
 
     _unwrapSubmitPayment() {
       if (this._footerCtrl && this._originalSubmit) {
         this._footerCtrl.submitPayment = this._originalSubmit;
-        console.log('[StripeUserDataValidator] submitPayment restored');
+        sdbg('[StripeUserDataValidator] submitPayment restored');
       }
     }
 
@@ -311,7 +320,7 @@
 
         if (!resp.ok) {
           // Fail open — see header comment.
-          console.warn('[StripeUserDataValidator] backend returned', resp.status, '— releasing submit');
+          sdbg('[StripeUserDataValidator] backend returned', resp.status, '— releasing submit');
           this._originalSubmit(event);
           return;
         }
@@ -325,7 +334,7 @@
         this._renderErrors(data.errors || []);
 
       } catch (err) {
-        console.warn('[StripeUserDataValidator] fetch error, failing open:', err);
+        sdbg('[StripeUserDataValidator] fetch error, failing open:', err);
         this._originalSubmit(event);
       }
     }
@@ -445,7 +454,7 @@
   }
 
   opc.stimulus.register('stripe-user-data-validator', StripeUserDataValidatorController);
-  console.log('[StripeUserDataValidator] Registered with OnepageCheckout.stimulus');
+  sdbg('[StripeUserDataValidator] Registered with OnepageCheckout.stimulus');
 })();
 </script>
 

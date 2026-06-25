@@ -10,6 +10,7 @@ import { Application } from "@hotwired/stimulus"
 import StripeOrderController from "./controllers/stripe_order_controller"
 import OrderSubmitController from "./controllers/order_submit_controller"
 import AgbValidationController from "./controllers/agb_validation_controller"
+import { createDebugLogger } from "./debug.js"
 
 // Start Stimulus application
 window.Stimulus = Application.start()
@@ -19,10 +20,13 @@ Stimulus.register("stripe-order", StripeOrderController)
 Stimulus.register("order-submit", OrderSubmitController)
 Stimulus.register("agb-validation", AgbValidationController)
 
-// Debug mode in development
-if (process.env.NODE_ENV === 'development') {
-  Stimulus.debug = true
-  console.log('Stripe Module: Stimulus initialized with controllers:', Stimulus.router.modulesByIdentifier)
-}
+// Frontend debug is gated by the module's log level (sStripeLogLevel === 'debug'),
+// surfaced to JS as window.oStripe.debug by stripe_i18n.html.twig. It is NOT tied
+// to the build target or domain, so switching the logging feature off silences the
+// console — including Stimulus's own lifecycle logging — even on dev domains.
+const stripeDebugEnabled = () => window.oStripe?.debug === true
+const debug = createDebugLogger(stripeDebugEnabled)
 
-console.log('Stripe Module: JavaScript loaded and ready')
+Stimulus.debug = stripeDebugEnabled()
+debug('Stripe Module: Stimulus initialized with controllers:', Stimulus.router.modulesByIdentifier)
+debug('Stripe Module: JavaScript loaded and ready')
