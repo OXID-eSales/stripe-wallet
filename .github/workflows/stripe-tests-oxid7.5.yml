@@ -1,4 +1,4 @@
-name: Stripe full tests onm OXID CE 7.5
+name: Stripe full tests OXID CE 7.5
 
 on: [ push, pull_request ]
 
