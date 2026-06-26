@@ -2,15 +2,6 @@
   "name": "oxid-esales/stripe-wallet",
   "description": "Stripe Payment Module for Oxid 7",
   "type": "oxideshop-module",
-  "repositories": [
-    {
-      "type": "path",
-      "url": "../payment-base",
-      "options": {
-        "symlink": true
-      }
-    }
-  ],
   "keywords": [
     "oxid",
     "modules",
@@ -27,7 +18,7 @@
   "prefer-stable": true,
   "require": {
     "php": "^8.2",
-    "oxid-esales/payment-base": "*",
+    "oxid-esales/payment-base": "v1.0.0 || dev-b-7.4.x",
     "stripe/stripe-php": "^19.3",
     "doctrine/dbal": "^2.13"
   },
