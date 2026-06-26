@@ -12,10 +12,9 @@ use PHPUnit\Framework\TestCase;
  * Unit tests for DeliveryAddressHashService.
  *
  * Sprint 20: Encapsulate $_REQUEST modification for delivery address hash.
- *
- * @covers \OxidEsales\PaymentBase\Service\DeliveryAddressHashService
- * @group sprint-20
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\PaymentBase\Service\DeliveryAddressHashService::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-20')]
 final class DeliveryAddressHashServiceTest extends TestCase
 {
     private DeliveryAddressHashService $service;
@@ -38,10 +37,7 @@ final class DeliveryAddressHashServiceTest extends TestCase
         parent::tearDown();
     }
 
-    /**
-     * @test
-     * LSP: Service implements interface
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function implementsInterface(): void
     {
         $this->assertInstanceOf(
@@ -50,10 +46,7 @@ final class DeliveryAddressHashServiceTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * SRP: Restores hash to $_REQUEST for OXID validation
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function restoresHashToRequest(): void
     {
         // Arrange
@@ -66,10 +59,7 @@ final class DeliveryAddressHashServiceTest extends TestCase
         $this->assertSame($hash, $_REQUEST['sDeliveryAddressMD5']);
     }
 
-    /**
-     * @test
-     * Does nothing when hash is null
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function doesNothingWhenHashIsNull(): void
     {
         // Arrange - ensure $_REQUEST is clear
@@ -82,10 +72,7 @@ final class DeliveryAddressHashServiceTest extends TestCase
         $this->assertArrayNotHasKey('sDeliveryAddressMD5', $_REQUEST);
     }
 
-    /**
-     * @test
-     * Does nothing when hash is empty string
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function doesNothingWhenHashIsEmpty(): void
     {
         // Arrange - ensure $_REQUEST is clear
@@ -98,10 +85,7 @@ final class DeliveryAddressHashServiceTest extends TestCase
         $this->assertArrayNotHasKey('sDeliveryAddressMD5', $_REQUEST);
     }
 
-    /**
-     * @test
-     * Clears hash from $_REQUEST
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function clearsHashFromRequest(): void
     {
         // Arrange
@@ -114,10 +98,7 @@ final class DeliveryAddressHashServiceTest extends TestCase
         $this->assertArrayNotHasKey('sDeliveryAddressMD5', $_REQUEST);
     }
 
-    /**
-     * @test
-     * Checks if hash exists in $_REQUEST
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function checksIfHashExists(): void
     {
         // Arrange - no hash
@@ -129,10 +110,7 @@ final class DeliveryAddressHashServiceTest extends TestCase
         $this->assertTrue($this->service->hasHash());
     }
 
-    /**
-     * @test
-     * Gets hash from $_REQUEST
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function getsHashFromRequest(): void
     {
         // Arrange
@@ -146,10 +124,7 @@ final class DeliveryAddressHashServiceTest extends TestCase
         $this->assertSame($expectedHash, $result);
     }
 
-    /**
-     * @test
-     * Returns null when no hash in $_REQUEST
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function returnsNullWhenNoHash(): void
     {
         // Arrange

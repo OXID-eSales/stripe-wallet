@@ -21,9 +21,8 @@ use PHPUnit\Framework\TestCase;
  * Owns transaction-history assembly from StripePaymentIntentDto + StripeChargeDto.
  * Uses DTO fixtures matching the characterization tests in
  * OrderRefundViewDataProviderDtoCharacterizationTest.
- *
- * @covers \OxidEsales\Payments\Stripe\Admin\StripeTransactionHistoryBuilder
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Admin\StripeTransactionHistoryBuilder::class)]
 final class StripeTransactionHistoryBuilderTest extends TestCase
 {
     private StripeTransactionHistoryBuilder $builder;

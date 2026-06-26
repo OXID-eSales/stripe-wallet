@@ -206,9 +206,8 @@ class StripeRefundRequestEventTest extends TestCase
 
     /**
      * Test all Stripe-valid refund reasons.
-     *
-     * @dataProvider validRefundReasonsProvider
      */
+    #[\PHPUnit\Framework\Attributes\DataProvider('validRefundReasonsProvider')]
     public function testValidRefundReasons(string $reason): void
     {
         $context = new EventContext([
@@ -235,9 +234,8 @@ class StripeRefundRequestEventTest extends TestCase
 
     /**
      * Test multi-channel initiators.
-     *
-     * @dataProvider initiatorProvider
      */
+    #[\PHPUnit\Framework\Attributes\DataProvider('initiatorProvider')]
     public function testMultiChannelInitiators(string $initiator): void
     {
         $context = new EventContext([

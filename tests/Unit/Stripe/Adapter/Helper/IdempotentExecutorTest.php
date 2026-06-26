@@ -21,11 +21,10 @@ use RuntimeException;
  * Unit tests for IdempotentExecutor.
  *
  * Sprint 114.8: Extracted generic idempotency wrapper from PaymentIntentHelper and RefundHelper.
- *
- * @covers \OxidEsales\Payments\Stripe\Adapter\Helper\IdempotentExecutor
- * @group sprint-114-8
- * @group idempotency
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Adapter\Helper\IdempotentExecutor::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-114-8')]
+#[\PHPUnit\Framework\Attributes\Group('idempotency')]
 final class IdempotentExecutorTest extends TestCase
 {
     private IdempotencyRepositoryInterface&MockObject $repository;
@@ -39,10 +38,7 @@ final class IdempotentExecutorTest extends TestCase
         $this->executor = new IdempotentExecutor($this->repository);
     }
 
-    /**
-     * @test
-     * First call: no existing record → executes operation and stores COMPLETED result.
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function executeCallsOperationAndStoresCompletedWhenNoRecord(): void
     {
         $this->repository
@@ -72,10 +68,7 @@ final class IdempotentExecutorTest extends TestCase
         $this->assertSame('result-value', $result);
     }
 
-    /**
-     * @test
-     * PROCESSING status → throws "already in progress".
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function executeThrowsWhenExistingRecordIsProcessing(): void
     {
         $record = new IdempotencyRecord(
@@ -107,10 +100,7 @@ final class IdempotentExecutorTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * COMPLETED status with cached result → returns deserialized result WITHOUT re-executing.
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function executeReturnsCachedResultWithoutCallingOperationWhenCompleted(): void
     {
         $record = new IdempotencyRecord(
@@ -151,10 +141,7 @@ final class IdempotentExecutorTest extends TestCase
         $this->assertSame('cached-value', $result);
     }
 
-    /**
-     * @test
-     * Operation throws → status set to FAILED, exception re-thrown.
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function executeStoresFailedStatusAndRethrowsOnException(): void
     {
         $this->repository
@@ -188,10 +175,7 @@ final class IdempotentExecutorTest extends TestCase
         $this->assertSame([IdempotentExecutor::STATUS_PROCESSING, IdempotentExecutor::STATUS_FAILED], $savedStatuses);
     }
 
-    /**
-     * @test
-     * Expired COMPLETED record → operation re-executed (not returned from cache).
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function executeCallsOperationWhenExistingRecordIsExpired(): void
     {
         $expiredRecord = new IdempotencyRecord(

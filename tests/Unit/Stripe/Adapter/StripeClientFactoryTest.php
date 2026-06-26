@@ -15,9 +15,7 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Stripe\StripeClient;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Adapter\StripeClientFactory
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Adapter\StripeClientFactory::class)]
 final class StripeClientFactoryTest extends TestCase
 {
     private ModuleConfigurationServiceInterface|MockObject $configurationService;

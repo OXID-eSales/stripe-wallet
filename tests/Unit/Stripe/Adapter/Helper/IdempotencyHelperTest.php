@@ -18,16 +18,13 @@ use PHPUnit\Framework\TestCase;
  * Unit tests for IdempotencyHelper shared utility.
  *
  * Sprint 46: Extracted from IdempotentStripeAdapter.
- *
- * @covers \OxidEsales\Payments\Stripe\Adapter\Helper\IdempotencyHelper
- * @group sprint-46
- * @group idempotency
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Adapter\Helper\IdempotencyHelper::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-46')]
+#[\PHPUnit\Framework\Attributes\Group('idempotency')]
 final class IdempotencyHelperTest extends TestCase
 {
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function createsNewRecordWhenExistingIsNull(): void
     {
         $record = IdempotencyHelper::reuseOrCreate(null, 'capture:pi_test', 'pi_test', 'capture', 86400);
@@ -38,9 +35,7 @@ final class IdempotencyHelperTest extends TestCase
         $this->assertFalse($record->isExpired());
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function reusesExistingRecordAndResetsStatus(): void
     {
         $existing = new IdempotencyRecord(
@@ -61,9 +56,7 @@ final class IdempotencyHelperTest extends TestCase
         $this->assertNull($record->getResult());
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function newRecordHasCorrectExpiration(): void
     {
         $before = new DateTimeImmutable();
@@ -74,9 +67,7 @@ final class IdempotencyHelperTest extends TestCase
         $this->assertSame('test:key', $record->getKey());
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function newRecordHasUniqueId(): void
     {
         $record1 = IdempotencyHelper::reuseOrCreate(null, 'key1', 'order1', 'test', 3600);

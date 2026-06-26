@@ -19,9 +19,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentCanceledWebhookHandler
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentCanceledWebhookHandler::class)]
 final class PaymentIntentCanceledWebhookHandlerTest extends TestCase
 {
     private WebhookContractFulfillmentHandlerInterface&MockObject $fulfillmentHandler;
@@ -41,20 +39,20 @@ final class PaymentIntentCanceledWebhookHandlerTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function supportsPaymentIntentCanceledEventType(): void
     {
         $this->assertTrue($this->handler->supports('payment_intent.canceled'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function doesNotSupportOtherEventTypes(): void
     {
         $this->assertFalse($this->handler->supports('payment_intent.payment_failed'));
         $this->assertFalse($this->handler->supports('payment_intent.succeeded'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function missingPaymentIntentId_returnsFailure(): void
     {
         $outcome = $this->handler->handle($this->makeEvent([]));
@@ -63,7 +61,7 @@ final class PaymentIntentCanceledWebhookHandlerTest extends TestCase
         $this->assertNull($outcome->contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerReturnsTrue_propagatesCancellationReason_returnsContractCancelled(): void
     {
         $event = $this->makeEvent([

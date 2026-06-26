@@ -14,9 +14,7 @@ use OxidEsales\PaymentBase\Contract\SecurityValidationResultInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Service\ReturnSessionSecurityService
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\ReturnSessionSecurityService::class)]
 class ReturnSessionSecurityServiceTest extends TestCase
 {
     private ReturnSessionSecurityService $service;

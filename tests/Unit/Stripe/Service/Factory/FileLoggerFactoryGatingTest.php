@@ -32,14 +32,13 @@ use PHPUnit\Framework\TestCase;
  *
  * The testable-subclass pattern (override getShopDirectory() with a temp dir)
  * mirrors ConcreteFileLoggerFactoriesTest to avoid OXID Registry dependency.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\Factory\RequestFileLoggerFactory
- * @covers \OxidEsales\Payments\Stripe\Service\Factory\WebhookFileLoggerFactory
- * @covers \OxidEsales\Payments\Stripe\Service\Factory\EventFileLoggerFactory
- * @covers \OxidEsales\Payments\Stripe\Service\Factory\ReconciliationFileLoggerFactory
- * @group logging
- * @group phase-3
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\Factory\RequestFileLoggerFactory::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\Factory\WebhookFileLoggerFactory::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\Factory\EventFileLoggerFactory::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\Factory\ReconciliationFileLoggerFactory::class)]
+#[\PHPUnit\Framework\Attributes\Group('logging')]
+#[\PHPUnit\Framework\Attributes\Group('phase-3')]
 final class FileLoggerFactoryGatingTest extends TestCase
 {
     private string $testShopDir;

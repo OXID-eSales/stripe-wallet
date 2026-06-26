@@ -23,14 +23,13 @@ use PHPUnit\Framework\TestCase;
  * via ContractTokenService BEFORE dispatching any events.
  *
  * Sprint 71: Updated to use StubControllerRequestHelper after accessor extraction.
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\StripeOrderController
- * @group sprint-67a
- * @group security
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\StripeOrderController::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-67a')]
+#[\PHPUnit\Framework\Attributes\Group('security')]
 final class StripeOrderControllerTokenTest extends TestCase
 {
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function checkoutSuccessRejectsInvalidContractToken(): void
     {
         $helper = new StubControllerRequestHelper();
@@ -49,7 +48,7 @@ final class StripeOrderControllerTokenTest extends TestCase
         $this->assertFalse($controller->wasEventDispatched(), 'Event should NOT be dispatched for invalid token');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function checkoutSuccessAcceptsValidContractToken(): void
     {
         $helper = new StubControllerRequestHelper();
@@ -66,7 +65,7 @@ final class StripeOrderControllerTokenTest extends TestCase
         $this->assertTrue($controller->wasEventDispatched(), 'Event SHOULD be dispatched for valid token');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function checkoutSuccessRejectsMissingContractToken(): void
     {
         $helper = new StubControllerRequestHelper();
@@ -83,7 +82,7 @@ final class StripeOrderControllerTokenTest extends TestCase
         $this->assertStringContainsString('Payment verification failed', $helper->lastError ?? '');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function checkoutSuccessRejectsMissingContractId(): void
     {
         $helper = new StubControllerRequestHelper();
@@ -100,7 +99,7 @@ final class StripeOrderControllerTokenTest extends TestCase
         $this->assertStringContainsString('Payment verification failed', $helper->lastError ?? '');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function checkoutSuccessValidatesTokenBeforeSessionCheck(): void
     {
         $helper = new StubControllerRequestHelper();

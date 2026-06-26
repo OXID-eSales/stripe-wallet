@@ -17,9 +17,8 @@ use PHPUnit\Framework\TestCase;
  * Tests the extracted helper class methods that don't require OXID Registry.
  * Registry-dependent methods (getBasketFromSession, getSessionId, etc.) are
  * tested indirectly through controller integration tests.
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper::class)]
 final class ControllerRequestHelperTest extends TestCase
 {
     private TokenServiceInterface&MockObject $tokenService;

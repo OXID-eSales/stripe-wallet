@@ -27,10 +27,9 @@ use PHPUnit\Framework\TestCase;
  * path resolver is stubbed (no DB, no OXID boot). It is the end-to-end check
  * that the original checkout symptom is gone, complementing the allow-string
  * assertions in {@see ValidationRulesProviderTest}.
- *
- * @covers \OxidEsales\PaymentBase\Validation\ValidationBase
- * @group user-data-validation
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\PaymentBase\Validation\ValidationBase::class)]
+#[\PHPUnit\Framework\Attributes\Group('user-data-validation')]
 final class ExtendedLatinAddressFieldsTest extends TestCase
 {
     private ValidationBase $sut;

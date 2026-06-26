@@ -13,14 +13,12 @@ use OxidEsales\PaymentBase\Mcp\Http\RateLimiterInterface;
 use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRateLimitGuard;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRateLimitGuard
- * @group sprint-64b
- * @group security
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRateLimitGuard::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-64b')]
+#[\PHPUnit\Framework\Attributes\Group('security')]
 final class WebhookRateLimitGuardTest extends TestCase
 {
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardRejectsWhenRateLimitExceeded(): void
     {
         $rateLimiter = $this->createMock(RateLimiterInterface::class);
@@ -34,7 +32,7 @@ final class WebhookRateLimitGuardTest extends TestCase
         $this->assertSame('rate_limited', $result->reason);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardAllowsWhenUnderLimit(): void
     {
         $rateLimiter = $this->createMock(RateLimiterInterface::class);
@@ -46,7 +44,7 @@ final class WebhookRateLimitGuardTest extends TestCase
         $this->assertNull($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardUsesIpAsRateLimitIdentifier(): void
     {
         $rateLimiter = $this->createMock(RateLimiterInterface::class);
@@ -59,7 +57,7 @@ final class WebhookRateLimitGuardTest extends TestCase
         $guard->check('{}', 'sig', '203.0.113.50');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardReturns429WithRetryMessage(): void
     {
         $rateLimiter = $this->createMock(RateLimiterInterface::class);

@@ -24,14 +24,13 @@ use PHPUnit\Framework\TestCase;
  *   - processor/webhookLogger promoted to protected (subclass init sets them)
  *   - setResponseContentType() — avoids Registry::getUtils() in tests
  *   - sendErrorResponse() — overridden to throw WebhookTestResponseSent (never contract honoured)
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\Webhook\WebhookController
- * @group sprint-64d
- * @group security
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\Webhook\WebhookController::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-64d')]
+#[\PHPUnit\Framework\Attributes\Group('security')]
 final class WebhookControllerGuardIntegrationTest extends TestCase
 {
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function controllerRejectsWhenGuardChainRejects(): void
     {
         $rejection = new WebhookGuardResult('rate_limited', 429, 'Too many requests');
@@ -51,7 +50,7 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function controllerProceedsWhenGuardChainAllows(): void
     {
         $guard = $this->createMock(WebhookRequestGuardInterface::class);
@@ -71,7 +70,7 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function controllerCallsGuardWithCorrectArguments(): void
     {
         $guard = $this->createMock(WebhookRequestGuardInterface::class);
@@ -94,7 +93,7 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function controllerWorksWithoutGuard(): void
     {
         $controller = new TestableWebhookControllerForGuard();
@@ -110,7 +109,7 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardRejectionPreventsFurtherProcessing(): void
     {
         $rejection = new WebhookGuardResult('payload_too_large', 413, 'Payload too large');
@@ -138,9 +137,8 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
      *
      * Production init() catches the container exception and logs a warning, leaving guard=null.
      * render() must then CONTINUE without the guard (warn-and-continue), not return HTTP 500.
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardChainUnavailableRendersWarnsAndContinues(): void
     {
         // Guard is null (simulates the production case where container throws on guard resolution)
@@ -163,9 +161,8 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
 
     /**
      * Payload-too-large path: guard rejects with 413 before any signature work.
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function payloadTooLargeIsRejectedByGuardBeforeSignatureValidation(): void
     {
         $rejection = new WebhookGuardResult('payload_too_large', 413, 'Payload too large');

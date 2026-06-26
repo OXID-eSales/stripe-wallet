@@ -22,9 +22,8 @@ use PHPUnit\Framework\TestCase;
  *
  * They also prove the JPY correction: sites that previously returned a wrong value
  * for zero-decimal currencies will now return the correct value.
- *
- * @covers \OxidEsales\Payments\Stripe\Core\AmountConverter
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Core\AmountConverter::class)]
 final class AmountConverterBatchACharacterizationTest extends TestCase
 {
     // ---------------------------------------------------------------

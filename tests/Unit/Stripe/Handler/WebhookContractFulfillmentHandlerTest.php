@@ -27,11 +27,10 @@ use PHPUnit\Framework\TestCase;
  * 1. Looking up contract by providerOrderId (payment intent ID)
  * 2. Delegating fulfillment to ContractFulfillmentService
  * 3. Handling capture/refund amounts
- *
- * @group sprint-6
- * @group sprint-18
- * @group contract-aware
  */
+#[\PHPUnit\Framework\Attributes\Group('sprint-6')]
+#[\PHPUnit\Framework\Attributes\Group('sprint-18')]
+#[\PHPUnit\Framework\Attributes\Group('contract-aware')]
 class WebhookContractFulfillmentHandlerTest extends TestCase
 {
     private ContractRepositoryInterface $contractRepository;
@@ -64,13 +63,10 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     // =========================================================================
     // Test 1: Handler finds contract by provider order ID
     // =========================================================================
-
-    /**
-     * @test
-     * @group sprint-6
-     * @group sprint-18
-     * @group contract-aware
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-6')]
+    #[\PHPUnit\Framework\Attributes\Group('sprint-18')]
+    #[\PHPUnit\Framework\Attributes\Group('contract-aware')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerFindsContractByProviderOrderId(): void
     {
         $providerOrderId = 'pi_test_123';
@@ -92,13 +88,10 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     // =========================================================================
     // Test 2: Handler skips already fulfilled contracts (idempotency)
     // =========================================================================
-
-    /**
-     * @test
-     * @group sprint-6
-     * @group sprint-18
-     * @group contract-aware
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-6')]
+    #[\PHPUnit\Framework\Attributes\Group('sprint-18')]
+    #[\PHPUnit\Framework\Attributes\Group('contract-aware')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerSkipsAlreadyFulfilledContract(): void
     {
         $providerOrderId = 'pi_already_fulfilled';
@@ -120,13 +113,10 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     // =========================================================================
     // Test 3: Handler validates contract is COMMITTED before fulfillment
     // =========================================================================
-
-    /**
-     * @test
-     * @group sprint-6
-     * @group sprint-18
-     * @group contract-aware
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-6')]
+    #[\PHPUnit\Framework\Attributes\Group('sprint-18')]
+    #[\PHPUnit\Framework\Attributes\Group('contract-aware')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerRejectsNonCommittedContract(): void
     {
         $providerOrderId = 'pi_pending_contract';
@@ -148,13 +138,10 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     // =========================================================================
     // Test 4: Handler transitions contract to FULFILLED
     // =========================================================================
-
-    /**
-     * @test
-     * @group sprint-6
-     * @group sprint-18
-     * @group contract-aware
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-6')]
+    #[\PHPUnit\Framework\Attributes\Group('sprint-18')]
+    #[\PHPUnit\Framework\Attributes\Group('contract-aware')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerTransitionsContractToFulfilled(): void
     {
         $providerOrderId = 'pi_to_fulfill';
@@ -176,13 +163,10 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     // =========================================================================
     // Test 5: Handler dispatches ContractFulfilledEvent
     // =========================================================================
-
-    /**
-     * @test
-     * @group sprint-6
-     * @group sprint-18
-     * @group contract-aware
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-6')]
+    #[\PHPUnit\Framework\Attributes\Group('sprint-18')]
+    #[\PHPUnit\Framework\Attributes\Group('contract-aware')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerDelegatesEventDispatchToService(): void
     {
         $providerOrderId = 'pi_dispatch_event';
@@ -204,13 +188,10 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     // =========================================================================
     // Test 6: Handler returns order ID from contract
     // =========================================================================
-
-    /**
-     * @test
-     * @group sprint-6
-     * @group sprint-18
-     * @group contract-aware
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-6')]
+    #[\PHPUnit\Framework\Attributes\Group('sprint-18')]
+    #[\PHPUnit\Framework\Attributes\Group('contract-aware')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerReturnsResultFromService(): void
     {
         $providerOrderId = 'pi_get_order_id';
@@ -232,13 +213,10 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     // =========================================================================
     // Test 7: Handler handles contract not found gracefully
     // =========================================================================
-
-    /**
-     * @test
-     * @group sprint-6
-     * @group sprint-18
-     * @group contract-aware
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-6')]
+    #[\PHPUnit\Framework\Attributes\Group('sprint-18')]
+    #[\PHPUnit\Framework\Attributes\Group('contract-aware')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerReturnsNullWhenContractNotFound(): void
     {
         $providerOrderId = 'pi_no_contract';
@@ -262,17 +240,13 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     // always wins the race. Tests for it were dead-pinning behavior that the
     // production code path no longer reaches.
     // =========================================================================
-
     // =========================================================================
     // Test 10: Handler handles charge.refunded event
     // =========================================================================
-
-    /**
-     * @test
-     * @group sprint-6
-     * @group sprint-18
-     * @group contract-aware
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-6')]
+    #[\PHPUnit\Framework\Attributes\Group('sprint-18')]
+    #[\PHPUnit\Framework\Attributes\Group('contract-aware')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerHandlesChargeRefundedEvent(): void
     {
         $providerOrderId = 'pi_refunded';
@@ -298,13 +272,10 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     // =========================================================================
     // Test 10: Handler handles payment_intent.payment_failed event
     // =========================================================================
-
-    /**
-     * @test
-     * @group sprint-6
-     * @group sprint-18
-     * @group contract-aware
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-6')]
+    #[\PHPUnit\Framework\Attributes\Group('sprint-18')]
+    #[\PHPUnit\Framework\Attributes\Group('contract-aware')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerHandlesPaymentFailed(): void
     {
         $providerOrderId = 'pi_failed';
@@ -351,13 +322,10 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     // Test 11: Handler handles payment_intent.canceled event
     // Sprint 1: Bug fix - contract cancellation was not being handled
     // =========================================================================
-
-    /**
-     * @test
-     * @group sprint-1
-     * @group contract-aware
-     * @group bug-fix
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-1')]
+    #[\PHPUnit\Framework\Attributes\Group('contract-aware')]
+    #[\PHPUnit\Framework\Attributes\Group('bug-fix')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerHandlesPaymentCanceled(): void
     {
         $providerOrderId = 'pi_canceled';
@@ -398,12 +366,10 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
         $this->assertTrue($contract->getState()->isCancelled());
     }
 
-    /**
-     * @test
-     * @group sprint-1
-     * @group contract-aware
-     * @group bug-fix
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-1')]
+    #[\PHPUnit\Framework\Attributes\Group('contract-aware')]
+    #[\PHPUnit\Framework\Attributes\Group('bug-fix')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerReturnsNullWhenContractNotFoundOnCancel(): void
     {
         $providerOrderId = 'pi_no_contract_cancel';
@@ -420,12 +386,10 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
         $this->assertNull($result);
     }
 
-    /**
-     * @test
-     * @group sprint-1
-     * @group contract-aware
-     * @group bug-fix
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-1')]
+    #[\PHPUnit\Framework\Attributes\Group('contract-aware')]
+    #[\PHPUnit\Framework\Attributes\Group('bug-fix')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerReturnsFalseForAlreadyTerminalContractOnCancel(): void
     {
         $providerOrderId = 'pi_already_failed';
@@ -466,13 +430,10 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     // Test 12: Handler handles checkout.session.expired event
     // Sprint 1: Bug fix - expired sessions were not updating contract state
     // =========================================================================
-
-    /**
-     * @test
-     * @group sprint-1
-     * @group contract-aware
-     * @group bug-fix
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-1')]
+    #[\PHPUnit\Framework\Attributes\Group('contract-aware')]
+    #[\PHPUnit\Framework\Attributes\Group('bug-fix')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerHandlesSessionExpired(): void
     {
         $contractId = 'contract_expired_123';
@@ -512,12 +473,10 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
         $this->assertTrue($contract->getState()->isExpired());
     }
 
-    /**
-     * @test
-     * @group sprint-1
-     * @group contract-aware
-     * @group bug-fix
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-1')]
+    #[\PHPUnit\Framework\Attributes\Group('contract-aware')]
+    #[\PHPUnit\Framework\Attributes\Group('bug-fix')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerReturnsNullWhenContractNotFoundOnExpired(): void
     {
         $contractId = 'contract_not_found';
@@ -534,12 +493,10 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
         $this->assertNull($result);
     }
 
-    /**
-     * @test
-     * @group sprint-1
-     * @group contract-aware
-     * @group bug-fix
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-1')]
+    #[\PHPUnit\Framework\Attributes\Group('contract-aware')]
+    #[\PHPUnit\Framework\Attributes\Group('bug-fix')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerReturnsFalseForAlreadyTerminalContractOnExpired(): void
     {
         $contractId = 'contract_already_fulfilled';
@@ -582,12 +539,9 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     // RED: these fail with the current instanceof-guarded code.
     // GREEN: they pass after removing the 4 instanceof guards.
     // =========================================================================
-
-    /**
-     * @test
-     * @group sprint-114-10a
-     * @group l3-downcast
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-114-10a')]
+    #[\PHPUnit\Framework\Attributes\Group('l3-downcast')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlePaymentFailedWorksWithPaymentContractInterface(): void
     {
         $providerOrderId = 'pi_fail_interface';
@@ -608,11 +562,9 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /**
-     * @test
-     * @group sprint-114-10a
-     * @group l3-downcast
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-114-10a')]
+    #[\PHPUnit\Framework\Attributes\Group('l3-downcast')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlePaymentCanceledWorksWithPaymentContractInterface(): void
     {
         $providerOrderId = 'pi_cancel_interface';
@@ -633,11 +585,9 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /**
-     * @test
-     * @group sprint-114-10a
-     * @group l3-downcast
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-114-10a')]
+    #[\PHPUnit\Framework\Attributes\Group('l3-downcast')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handleChargeRefundedRecordsRefundAmountOnInterface(): void
     {
         $providerOrderId = 'pi_refund_interface';

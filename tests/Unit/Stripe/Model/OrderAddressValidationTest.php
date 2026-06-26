@@ -22,9 +22,8 @@ use PHPUnit\Framework\TestCase;
  * The skip flag (SESSION_SKIP_ADDR_CHECK) is set by StripeOrderController
  * immediately before the checkout-session dispatch and cleared by
  * clearStripeSessionVariables() on completion or cancellation.
- *
- * @covers \OxidEsales\Payments\Stripe\Model\Order::validateDeliveryAddress
  */
+#[\PHPUnit\Framework\Attributes\CoversMethod(\OxidEsales\Payments\Stripe\Model\Order::class, 'validateDeliveryAddress')]
 final class OrderAddressValidationTest extends TestCase
 {
     // ==========================================

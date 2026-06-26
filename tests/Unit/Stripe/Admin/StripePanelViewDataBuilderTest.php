@@ -39,10 +39,9 @@ use PHPUnit\Framework\TestCase;
  * The formatter is REAL (UserDataValidationMessageFormatter over a stubbed
  * translator and the real AllowedSymbolsDescriber/rules file) so the test
  * pins the actual message shape the admin sees.
- *
- * @covers \OxidEsales\Payments\Stripe\Admin\StripePanelViewDataBuilder
- * @group sprint-120
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Admin\StripePanelViewDataBuilder::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-120')]
 final class StripePanelViewDataBuilderTest extends TestCase
 {
     public function testProjectsConsumedFailuresAsTranslatedMessages(): void
@@ -140,13 +139,11 @@ final class StripePanelViewDataBuilderTest extends TestCase
     // ---------------------------------------------------------------------------
     // Sprint 127 (STRP-15123): capturableRaw is single-sourced to amountCapturable
     // ---------------------------------------------------------------------------
-
     /**
      * The builder must pass getCaptureableRaw() through unchanged to capturableRaw.
      * No transformation, no re-derivation — one source drives prefill, max, and label.
-     *
-     * @group strp-15123
      */
+    #[\PHPUnit\Framework\Attributes\Group('strp-15123')]
     public function testCapturableRawInViewDataIsPassedThroughFromProvider(): void
     {
         $feedback = $this->createMock(AdminValidationFeedbackInterface::class);
@@ -169,9 +166,8 @@ final class StripePanelViewDataBuilderTest extends TestCase
      *
      * This is the single-source regression lock: any accidental re-derivation
      * from ->amount (the old bug) would return 100.0 instead of 40.0.
-     *
-     * @group strp-15123
      */
+    #[\PHPUnit\Framework\Attributes\Group('strp-15123')]
     public function testCapturableRawInViewDataEqualsPiAmountCapturable(): void
     {
         $feedback = $this->createMock(AdminValidationFeedbackInterface::class);
@@ -202,7 +198,6 @@ final class StripePanelViewDataBuilderTest extends TestCase
     // resolver) already works for fresh reads. The bug is upstream (cache not busted
     // after action), not in the compute chain itself.
     // ---------------------------------------------------------------------------
-
     /**
      * SSOT regression lock: a charge with amountCaptured=10000, amountRefunded=3000
      * (full capture, one 30 EUR refund) must produce remainingRefundableRaw=70.0
@@ -217,9 +212,8 @@ final class StripePanelViewDataBuilderTest extends TestCase
      * Both ultimately delegate to StripeChargeAmountResolver with the same charge data.
      * No SSOT violation requiring a refactor — the two reads are on separate code paths
      * that converge at the resolver.
-     *
-     * @group strp-15123
      */
+    #[\PHPUnit\Framework\Attributes\Group('strp-15123')]
     public function testRemainingRefundableRawInViewDataReflectsPartialRefund(): void
     {
         $feedback = $this->createMock(AdminValidationFeedbackInterface::class);

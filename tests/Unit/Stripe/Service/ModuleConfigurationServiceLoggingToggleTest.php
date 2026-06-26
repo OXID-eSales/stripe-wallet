@@ -28,11 +28,10 @@ use PHPUnit\Framework\TestCase;
  *
  * isTransactionLoggingEnabled() is kept as a public legacy accessor; it is
  * now the seed source for getLogLevel() when sStripeLogLevel is unset.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::isTransactionLoggingEnabled
- * @group logging
- * @group phase-0-characterization
  */
+#[\PHPUnit\Framework\Attributes\CoversMethod(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::class, 'isTransactionLoggingEnabled')]
+#[\PHPUnit\Framework\Attributes\Group('logging')]
+#[\PHPUnit\Framework\Attributes\Group('phase-0-characterization')]
 final class ModuleConfigurationServiceLoggingToggleTest extends TestCase
 {
     // -------------------------------------------------------------------------

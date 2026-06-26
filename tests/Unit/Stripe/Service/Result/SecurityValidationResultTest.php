@@ -12,9 +12,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service\Result;
 use OxidEsales\Payments\Stripe\Service\Result\SecurityValidationResult;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Service\Result\SecurityValidationResult
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\Result\SecurityValidationResult::class)]
 class SecurityValidationResultTest extends TestCase
 {
     public function testCreateWithScore(): void

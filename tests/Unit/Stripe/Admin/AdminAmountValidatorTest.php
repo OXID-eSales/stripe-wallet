@@ -23,11 +23,10 @@ use PHPUnit\Framework\TestCase;
  *   - present but malformed -> failure  = NEVER degrades to null
  *
  * Pure function over its inputs — no mocks anywhere in this suite.
- *
- * @covers \OxidEsales\Payments\Stripe\Admin\AdminAmountValidator
- * @covers \OxidEsales\Payments\Stripe\Admin\AmountValidationResult
- * @group sprint-121
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Admin\AdminAmountValidator::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Admin\AmountValidationResult::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-121')]
 final class AdminAmountValidatorTest extends TestCase
 {
     private AdminAmountValidator $sut;

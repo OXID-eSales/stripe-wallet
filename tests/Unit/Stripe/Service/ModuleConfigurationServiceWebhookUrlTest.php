@@ -22,9 +22,8 @@ use PHPUnit\Framework\TestCase;
  * Sprint 114.11b (S2): ModuleConfigurationService::getWebhookUrl() now delegates
  * to StripeUrlBuilder (SRP extraction). This test verifies the delegation contract.
  * URL-construction behaviour is fully covered by StripeUrlBuilderTest.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::getWebhookUrl
  */
+#[\PHPUnit\Framework\Attributes\CoversMethod(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::class, 'getWebhookUrl')]
 final class ModuleConfigurationServiceWebhookUrlTest extends TestCase
 {
     public function testGetWebhookUrlDelegatesToUrlBuilder(): void

@@ -20,9 +20,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Webhook\Handler\CheckoutSessionCompletedWebhookHandler
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Webhook\Handler\CheckoutSessionCompletedWebhookHandler::class)]
 final class CheckoutSessionCompletedWebhookHandlerTest extends TestCase
 {
     private WebhookContractFulfillmentHandlerInterface&MockObject $fulfillmentHandler;
@@ -42,20 +40,20 @@ final class CheckoutSessionCompletedWebhookHandlerTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function supportsCheckoutSessionCompletedEventType(): void
     {
         $this->assertTrue($this->handler->supports('checkout.session.completed'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function doesNotSupportOtherEventTypes(): void
     {
         $this->assertFalse($this->handler->supports('checkout.session.expired'));
         $this->assertFalse($this->handler->supports('payment_intent.succeeded'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function paymentStatusNotPaid_returnsSkipped(): void
     {
         $outcome = $this->handler->handle($this->makeEvent('unpaid', 'pi_x', null));
@@ -65,7 +63,7 @@ final class CheckoutSessionCompletedWebhookHandlerTest extends TestCase
         $this->assertNull($outcome->contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function paidButNoPaymentIntentId_returnsSkipped(): void
     {
         $event = new WebhookEvent(
@@ -81,7 +79,7 @@ final class CheckoutSessionCompletedWebhookHandlerTest extends TestCase
         $this->assertSame('No payment intent ID in checkout session', $outcome->result->error);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function contractNotFound_returnsSkipped(): void
     {
         $this->contractRepository->method('findById')->willReturn(null);
@@ -93,7 +91,7 @@ final class CheckoutSessionCompletedWebhookHandlerTest extends TestCase
         $this->assertNull($outcome->contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function contractFoundAndCommitted_fulfillmentTrue_returnsContractFulfilled(): void
     {
         $contract = $this->createMock(PaymentContractInterface::class);
@@ -109,7 +107,7 @@ final class CheckoutSessionCompletedWebhookHandlerTest extends TestCase
         $this->assertSame('ctr-committed', $outcome->contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function contractFoundNotCommitted_returnsContractUpdated(): void
     {
         $contract = $this->createMock(PaymentContractInterface::class);

@@ -23,11 +23,10 @@ use PHPUnit\Framework\TestCase;
  * 2. Checkout session URL includes contract_id and contract_token
  * 3. Return handler validates token and restores delivery address hash
  * 4. $_REQUEST['sDeliveryAddressMD5'] is injected for OXID order validation
- *
- * @group integration
- * @group session-restoration
- * @group sprint-1
  */
+#[\PHPUnit\Framework\Attributes\Group('integration')]
+#[\PHPUnit\Framework\Attributes\Group('session-restoration')]
+#[\PHPUnit\Framework\Attributes\Group('sprint-1')]
 class SessionRestorationIntegrationTest extends TestCase
 {
     private ContractRepositoryInterface $contractRepository;
@@ -142,10 +141,7 @@ class SessionRestorationIntegrationTest extends TestCase
     // =================================================================
     // Token Generation and Validation Tests
     // =================================================================
-
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function tokenServiceGeneratesValidTokensForContractId(): void
     {
         $contractId = 'test_contract_' . uniqid();
@@ -156,9 +152,7 @@ class SessionRestorationIntegrationTest extends TestCase
         $this->assertTrue($this->tokenService->validateToken($token, $contractId));
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function tokenServiceRejectsTokensForDifferentContractId(): void
     {
         $contractId1 = 'contract_original';
@@ -169,9 +163,7 @@ class SessionRestorationIntegrationTest extends TestCase
         $this->assertFalse($this->tokenService->validateToken($token, $contractId2));
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function tokenServiceExtractsContractIdFromValidToken(): void
     {
         $contractId = 'contract_extractable_' . uniqid();
@@ -185,10 +177,7 @@ class SessionRestorationIntegrationTest extends TestCase
     // =================================================================
     // Security Validation Tests
     // =================================================================
-
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function securityServiceAllowsReturnFromSameIp(): void
     {
         $contract = $this->createContractWithSecurityMetadata([
@@ -208,9 +197,7 @@ class SessionRestorationIntegrationTest extends TestCase
         $this->assertGreaterThanOrEqual(50, $result->getScore());
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function securityServiceReducesScoreForDifferentIp(): void
     {
         $contract = $this->createContractWithSecurityMetadata([
@@ -230,9 +217,7 @@ class SessionRestorationIntegrationTest extends TestCase
         $this->assertTrue($result->hasWarning('ip_changed'));
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function securityServiceBlocksHighlyAnomalousReturn(): void
     {
         // Create contract with security metadata
@@ -260,10 +245,7 @@ class SessionRestorationIntegrationTest extends TestCase
     // =================================================================
     // Contract Metadata Storage Tests
     // =================================================================
-
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function contractStoresAndRetrievesDeliveryAddressHash(): void
     {
         $deliveryHash = 'abc123def456';
@@ -275,9 +257,7 @@ class SessionRestorationIntegrationTest extends TestCase
         $this->assertEquals($deliveryHash, $retrieved);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function contractStoresAndRetrievesSecurityMetadata(): void
     {
         $contract = $this->createTestContract();
@@ -296,10 +276,7 @@ class SessionRestorationIntegrationTest extends TestCase
     // =================================================================
     // Full Flow Integration Tests
     // =================================================================
-
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function fullFlowCreatesTokenAndValidatesOnReturn(): void
     {
         // STEP 1: Create contract with delivery address hash
@@ -341,9 +318,7 @@ class SessionRestorationIntegrationTest extends TestCase
         $this->assertTrue($securityResult->isAllowed());
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function fullFlowRejectsInvalidToken(): void
     {
         $contract = $this->createTestContract();
@@ -360,9 +335,7 @@ class SessionRestorationIntegrationTest extends TestCase
         $this->assertFalse($this->tokenService->validateToken($tamperedToken, $contractId));
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function fullFlowRejectsContractIdMismatch(): void
     {
         $contract1 = $this->createTestContract('contract_1');
@@ -384,10 +357,7 @@ class SessionRestorationIntegrationTest extends TestCase
     // =================================================================
     // $_REQUEST Injection Tests (Simulated)
     // =================================================================
-
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function requestInjectionSetsDeliveryAddressMd5(): void
     {
         // Simulate what StripeCheckoutReturnHandler does
@@ -400,9 +370,7 @@ class SessionRestorationIntegrationTest extends TestCase
         $this->assertEquals($deliveryHash, $_REQUEST['sDeliveryAddressMD5']);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function completeSessionRestorationSimulation(): void
     {
         // SETUP: Create contract with all metadata
@@ -463,10 +431,7 @@ class SessionRestorationIntegrationTest extends TestCase
     // =================================================================
     // Edge Cases
     // =================================================================
-
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlesContractWithoutDeliveryAddressHash(): void
     {
         $contract = $this->createTestContract();
@@ -480,9 +445,7 @@ class SessionRestorationIntegrationTest extends TestCase
         $this->assertNull($deliveryHash, 'Should return null for missing metadata');
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlesEmptyCurrentContext(): void
     {
         $contract = $this->createContractWithSecurityMetadata([
@@ -501,9 +464,7 @@ class SessionRestorationIntegrationTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function tokenServiceHandlesSpecialCharactersInContractId(): void
     {
         $specialContractId = 'contract+with/special=chars';

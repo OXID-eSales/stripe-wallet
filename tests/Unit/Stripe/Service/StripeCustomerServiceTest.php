@@ -23,10 +23,9 @@ use PHPUnit\Framework\TestCase;
  * Unit tests for StripeCustomerService.
  *
  * Sprint 45: Stripe Customer lifecycle.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\StripeCustomerService
- * @group sprint-45
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\StripeCustomerService::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-45')]
 class StripeCustomerServiceTest extends TestCase
 {
     private PaymentCustomerRepositoryInterface&MockObject $customerRepo;

@@ -23,18 +23,14 @@ use ReflectionClass;
  * - NO ALTER TABLE on oxorder, oxorderarticles, oxuser
  * - NO CREATE TABLE (use Doctrine migrations)
  * - All STRIPE* column additions disabled
- *
- * @group sprint-2
- * @group sprint-5
- * @group events-cleanup
- * @group unit
  */
+#[\PHPUnit\Framework\Attributes\Group('sprint-2')]
+#[\PHPUnit\Framework\Attributes\Group('sprint-5')]
+#[\PHPUnit\Framework\Attributes\Group('events-cleanup')]
+#[\PHPUnit\Framework\Attributes\Group('unit')]
 class EventsCleanupTest extends TestCase
 {
-    /**
-     * @test
-     * RED: Events.php should not create oe_payments_webhook_log table
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function eventsDoesNotCreateWebhookLogTable(): void
     {
         $reflection = new ReflectionClass(Events::class);
@@ -47,10 +43,7 @@ class EventsCleanupTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * RED: Events.php should not create osc_stripe_customer_mapping table
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function eventsDoesNotCreateCustomerMappingTable(): void
     {
         $reflection = new ReflectionClass(Events::class);
@@ -63,10 +56,7 @@ class EventsCleanupTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * RED: Events.php should not create osc_stripe_payment_details table
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function eventsDoesNotCreatePaymentDetailsTable(): void
     {
         $reflection = new ReflectionClass(Events::class);
@@ -79,10 +69,7 @@ class EventsCleanupTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * Sprint 5: Events.php should NOT add STRIPE* columns to oxorder table
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function eventsDoesNotAddStripeColumnsToOxorder(): void
     {
         $reflection = new ReflectionClass(Events::class);
@@ -111,10 +98,7 @@ class EventsCleanupTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * Sprint 5: Events.php should NOT add STRIPE* columns to oxorderarticles table
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function eventsDoesNotAddStripeColumnsToOxorderarticles(): void
     {
         $reflection = new ReflectionClass(Events::class);
@@ -140,10 +124,7 @@ class EventsCleanupTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * Sprint 5: Events.php should NOT add STRIPE* columns to oxuser table
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function eventsDoesNotAddStripeColumnsToOxuser(): void
     {
         $reflection = new ReflectionClass(Events::class);
@@ -169,10 +150,7 @@ class EventsCleanupTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * Sprint 5: Events.php should NOT create oe_payments_* tables (use migrations)
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function eventsDoesNotCreateOscPaymentTables(): void
     {
         $reflection = new ReflectionClass(Events::class);
@@ -201,10 +179,7 @@ class EventsCleanupTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * Sprint 5: Events.php should NOT have addDatabaseStructure method
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function eventsDoesNotHaveAddDatabaseStructureMethod(): void
     {
         $reflection = new ReflectionClass(Events::class);
@@ -215,10 +190,7 @@ class EventsCleanupTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * Sprint 5: Events.php should NOT have addStandardCheckoutTables method
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function eventsDoesNotHaveAddStandardCheckoutTablesMethod(): void
     {
         $reflection = new ReflectionClass(Events::class);
@@ -229,10 +201,7 @@ class EventsCleanupTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * Sprint 5: Events.php should state that migrations handle database schema
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function eventsDocumentationMentionsMigrations(): void
     {
         $reflection = new ReflectionClass(Events::class);

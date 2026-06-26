@@ -21,9 +21,8 @@ use Psr\Log\NullLogger;
  * S5 (sprint-114.11a): ModuleConfiguration::stripeGetKeyValidationError() must
  * delegate to ConfigurationValidatorInterface through a protected getter seam —
  * not call ContainerFactory::getInstance() ad-hoc on every invocation (R-4.2).
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\Admin\ModuleConfiguration
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\Admin\ModuleConfiguration::class)]
 final class ModuleConfigurationValidatorTest extends TestCase
 {
     private ConfigurationValidatorInterface&MockObject $validator;

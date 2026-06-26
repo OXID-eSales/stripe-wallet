@@ -23,19 +23,16 @@ use PHPUnit\Framework\TestCase;
  *
  * The remaining tests lock the observable output shape of the helper's
  * factory methods so refactors can safely modify internals.
- *
- * @covers \OxidEsales\Payments\Stripe\Tests\Helper\StripeWebhookTestHelper
- * @group sprint-13
- * @group webhook
- * @group helper
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Tests\Helper\StripeWebhookTestHelper::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-13')]
+#[\PHPUnit\Framework\Attributes\Group('webhook')]
+#[\PHPUnit\Framework\Attributes\Group('helper')]
 final class StripeWebhookTestHelperTest extends TestCase
 {
     private const TEST_SECRET = 'whsec_test_secret_key_12345';
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function generateSignatureCreatesValidFormat(): void
     {
         $payload = '{"id":"evt_123"}';
@@ -46,9 +43,7 @@ final class StripeWebhookTestHelperTest extends TestCase
         $this->assertStringStartsWith('t=1733400000,v1=', $signature);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function createPaymentIntentSucceededPayloadReturnsValidJson(): void
     {
         $payload = StripeWebhookTestHelper::createPaymentIntentSucceededPayload('pi_test_123', 5000);
@@ -61,9 +56,7 @@ final class StripeWebhookTestHelperTest extends TestCase
         $this->assertSame(5000, $data['data']['object']['amount']);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function createChargeRefundedPayloadReturnsValidJson(): void
     {
         $payload = StripeWebhookTestHelper::createChargeRefundedPayload('pi_test_456', 2500);
@@ -76,9 +69,7 @@ final class StripeWebhookTestHelperTest extends TestCase
         $this->assertSame(2500, $data['data']['object']['amount_refunded']);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function createCheckoutSessionCompletedPayloadReturnsValidJson(): void
     {
         $payload = StripeWebhookTestHelper::createCheckoutSessionCompletedPayload('cs_test_789', 'pi_test_789');
@@ -91,9 +82,7 @@ final class StripeWebhookTestHelperTest extends TestCase
         $this->assertSame('pi_test_789', $data['data']['object']['payment_intent']);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function parseSignatureExtractsComponents(): void
     {
         $signature = 't=1733400000,v1=abc123,v1=def456';

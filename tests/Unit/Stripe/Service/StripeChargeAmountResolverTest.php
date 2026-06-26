@@ -26,9 +26,8 @@ use PHPUnit\Framework\TestCase;
  *   - availableForRefund ∈ [0, amountCaptured / 100]
  *   - customerRefundedAmount + availableForRefund == amountCaptured / 100
  *   - hasCustomerRefund ⟺ customerRefundedAmount > 0
- *
- * @covers \OxidEsales\Payments\Stripe\Service\StripeChargeAmountResolver
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\StripeChargeAmountResolver::class)]
 final class StripeChargeAmountResolverTest extends TestCase
 {
     private StripeChargeAmountResolver $resolver;

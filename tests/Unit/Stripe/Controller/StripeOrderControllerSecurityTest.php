@@ -43,9 +43,8 @@ use PHPUnit\Framework\TestCase;
  *   B5: repo->findById() returns null → "Payment verification failed" (loadReturnContract)
  *   B6: dispatchCheckoutReturn returns null → "Payment verification failed" (line ~297)
  *   B7: happy path → 'thankyou'
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\StripeOrderController
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\StripeOrderController::class)]
 class StripeOrderControllerSecurityTest extends TestCase
 {
     // ==========================================

@@ -15,9 +15,8 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Sprint 72: Tests for RetryCleanupService.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\RetryCleanupService
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\RetryCleanupService::class)]
 class RetryCleanupServiceTest extends TestCase
 {
     private ContractRepositoryInterface&MockObject $contractRepository;

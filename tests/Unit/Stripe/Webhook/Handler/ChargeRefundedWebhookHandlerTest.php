@@ -19,9 +19,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Webhook\Handler\ChargeRefundedWebhookHandler
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Webhook\Handler\ChargeRefundedWebhookHandler::class)]
 final class ChargeRefundedWebhookHandlerTest extends TestCase
 {
     private WebhookContractFulfillmentHandlerInterface&MockObject $fulfillmentHandler;
@@ -41,20 +39,20 @@ final class ChargeRefundedWebhookHandlerTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function supportsChargeRefundedEventType(): void
     {
         $this->assertTrue($this->handler->supports('charge.refunded'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function doesNotSupportOtherEventTypes(): void
     {
         $this->assertFalse($this->handler->supports('charge.captured'));
         $this->assertFalse($this->handler->supports('payment_intent.succeeded'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function missingPaymentIntentIdInCharge_returnsFailure(): void
     {
         $event = $this->makeEvent(['id' => 'ch_nopi']);
@@ -66,7 +64,7 @@ final class ChargeRefundedWebhookHandlerTest extends TestCase
         $this->assertNull($outcome->contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerReturnsTrue_extractsAmountFromCharge_returnsChargeRefunded(): void
     {
         $event = $this->makeEvent([
@@ -89,7 +87,7 @@ final class ChargeRefundedWebhookHandlerTest extends TestCase
         $this->assertSame('ctr-refund', $outcome->contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerReturnsNull_returnsContractNotFoundSkipped(): void
     {
         $event = $this->makeEvent([

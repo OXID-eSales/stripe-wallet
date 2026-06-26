@@ -34,12 +34,11 @@ use Psr\Log\NullLogger;
  *
  * Tests the full handler -> service -> contract state transition flow
  * when a contract is in COMMITTED state (manual capture order that skipped AUTHORIZED).
- *
- * @covers \OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCaptureRequestHandler
- * @covers \OxidEsales\Payments\Stripe\Service\CaptureService
- * @group sprint-82
- * @group manual-capture
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCaptureRequestHandler::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\CaptureService::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-82')]
+#[\PHPUnit\Framework\Attributes\Group('manual-capture')]
 final class ManualCaptureIntegrationTest extends TestCase
 {
     private StripeAdapterInterface&MockObject $stripeAdapter;

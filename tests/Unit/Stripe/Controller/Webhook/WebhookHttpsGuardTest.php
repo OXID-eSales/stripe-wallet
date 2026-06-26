@@ -14,14 +14,13 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Sprint 67b: M6 — HTTPS enforcement on webhook endpoints.
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\Webhook\WebhookHttpsGuard
- * @group sprint-67b
- * @group security
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\Webhook\WebhookHttpsGuard::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-67b')]
+#[\PHPUnit\Framework\Attributes\Group('security')]
 final class WebhookHttpsGuardTest extends TestCase
 {
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardAllowsHttpsRequest(): void
     {
         $guard = new TestableWebhookHttpsGuard(allowInsecureLoopback: false);
@@ -32,7 +31,7 @@ final class WebhookHttpsGuardTest extends TestCase
         $this->assertNull($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardRejectsHttpRequest(): void
     {
         $guard = new TestableWebhookHttpsGuard(allowInsecureLoopback: false);
@@ -45,7 +44,7 @@ final class WebhookHttpsGuardTest extends TestCase
         $this->assertSame('insecure_connection', $result->reason);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardAcceptsXForwardedProtoHttps(): void
     {
         $guard = new TestableWebhookHttpsGuard(allowInsecureLoopback: false);
@@ -56,7 +55,7 @@ final class WebhookHttpsGuardTest extends TestCase
         $this->assertNull($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardRejectsXForwardedProtoHttp(): void
     {
         $guard = new TestableWebhookHttpsGuard(allowInsecureLoopback: false);
@@ -68,7 +67,7 @@ final class WebhookHttpsGuardTest extends TestCase
         $this->assertSame(400, $result->httpStatusCode);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardAllowsLocalhostWhenInsecureLoopbackEnabled(): void
     {
         $guard = new TestableWebhookHttpsGuard(allowInsecureLoopback: true);
@@ -79,7 +78,7 @@ final class WebhookHttpsGuardTest extends TestCase
         $this->assertNull($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardRejectsLocalhostWhenInsecureLoopbackDisabled(): void
     {
         $guard = new TestableWebhookHttpsGuard(allowInsecureLoopback: false);

@@ -18,9 +18,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Webhook\Handler\CheckoutSessionExpiredWebhookHandler
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Webhook\Handler\CheckoutSessionExpiredWebhookHandler::class)]
 final class CheckoutSessionExpiredWebhookHandlerTest extends TestCase
 {
     private WebhookContractFulfillmentHandlerInterface&MockObject $fulfillmentHandler;
@@ -38,20 +36,20 @@ final class CheckoutSessionExpiredWebhookHandlerTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function supportsCheckoutSessionExpiredEventType(): void
     {
         $this->assertTrue($this->handler->supports('checkout.session.expired'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function doesNotSupportOtherEventTypes(): void
     {
         $this->assertFalse($this->handler->supports('checkout.session.completed'));
         $this->assertFalse($this->handler->supports('payment_intent.succeeded'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function noContractIdInMetadata_returnsSkipped(): void
     {
         $event = $this->makeEvent(null);
@@ -63,7 +61,7 @@ final class CheckoutSessionExpiredWebhookHandlerTest extends TestCase
         $this->assertNull($outcome->contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerReturnsTrue_returnsSessionExpiredWithContractId(): void
     {
         $this->fulfillmentHandler->method('handleSessionExpired')->with('ctr-expiry')->willReturn(true);
@@ -74,7 +72,7 @@ final class CheckoutSessionExpiredWebhookHandlerTest extends TestCase
         $this->assertSame('ctr-expiry', $outcome->contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerReturnsFalse_returnsSkippedTerminalState(): void
     {
         $this->fulfillmentHandler->method('handleSessionExpired')->willReturn(false);
@@ -86,7 +84,7 @@ final class CheckoutSessionExpiredWebhookHandlerTest extends TestCase
         $this->assertNull($outcome->contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerReturnsNull_returnsContractNotFoundSkipped(): void
     {
         $this->fulfillmentHandler->method('handleSessionExpired')->willReturn(null);

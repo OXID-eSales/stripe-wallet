@@ -27,14 +27,13 @@ use PHPUnit\Framework\TestCase;
  * Each factory reads Registry::getConfig()->getConfigParam('sShopDir') for the
  * shop dir. The testable-subclass pattern overrides getShopDirectory() to return
  * a predictable temp dir, avoiding the OXID Registry dependency in unit tests.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\Factory\RequestFileLoggerFactory
- * @covers \OxidEsales\Payments\Stripe\Service\Factory\WebhookFileLoggerFactory
- * @covers \OxidEsales\Payments\Stripe\Service\Factory\EventFileLoggerFactory
- * @covers \OxidEsales\Payments\Stripe\Service\Factory\ReconciliationFileLoggerFactory
- * @group logging
- * @group phase-0-characterization
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\Factory\RequestFileLoggerFactory::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\Factory\WebhookFileLoggerFactory::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\Factory\EventFileLoggerFactory::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\Factory\ReconciliationFileLoggerFactory::class)]
+#[\PHPUnit\Framework\Attributes\Group('logging')]
+#[\PHPUnit\Framework\Attributes\Group('phase-0-characterization')]
 final class ConcreteFileLoggerFactoriesTest extends TestCase
 {
     private string $testShopDir;

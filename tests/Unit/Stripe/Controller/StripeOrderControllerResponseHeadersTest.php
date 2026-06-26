@@ -16,11 +16,10 @@ use PHPUnit\Framework\TestCase;
  * Sprint 131 (STRP-XXX): the JSON checkout endpoint emits the module's response
  * security headers (nosniff + X-Frame DENY) alongside its Content-Type. Captures
  * the header sink via a testable subclass so no real headers are emitted.
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\StripeOrderController
- * @group sprint-131
- * @group security
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\StripeOrderController::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-131')]
+#[\PHPUnit\Framework\Attributes\Group('security')]
 final class StripeOrderControllerResponseHeadersTest extends TestCase
 {
     public function testSendSecureJsonHeadersEmitsContentTypeAndSecurityHeaders(): void

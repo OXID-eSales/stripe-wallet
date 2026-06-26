@@ -10,9 +10,7 @@ use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\OxidLanguageResolver;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Service\OxidLanguageResolver
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\OxidLanguageResolver::class)]
 final class OxidLanguageResolverTest extends TestCase
 {
     protected function tearDown(): void

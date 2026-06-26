@@ -24,11 +24,10 @@ use Psr\Container\ContainerInterface;
  * `install_shop_with_module` workflow either did not activate
  * `oe_payment_base` before activating `oe_payments_stripe_wallet`,
  * or the autoload classmap was stale when the activation ran.
- *
- * @group integration
- * @group sprint-93
- * @group requires-oxid-container
  */
+#[\PHPUnit\Framework\Attributes\Group('integration')]
+#[\PHPUnit\Framework\Attributes\Group('sprint-93')]
+#[\PHPUnit\Framework\Attributes\Group('requires-oxid-container')]
 final class PaymentPanelRegistryIntegrationTest extends TestCase
 {
     private ContainerInterface $container;

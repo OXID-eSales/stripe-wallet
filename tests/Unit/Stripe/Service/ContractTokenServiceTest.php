@@ -13,9 +13,7 @@ use OxidEsales\Payments\Stripe\Service\ContractTokenService;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Service\ContractTokenService
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\ContractTokenService::class)]
 class ContractTokenServiceTest extends TestCase
 {
     private ContractTokenService $service;

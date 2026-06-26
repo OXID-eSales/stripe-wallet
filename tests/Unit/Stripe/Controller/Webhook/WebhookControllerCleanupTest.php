@@ -18,9 +18,8 @@ use PHPUnit\Framework\TestCase;
  * S5 (sprint-114.11a): WebhookController::cleanupStaleNotFinishedOrders() must use
  * the RetryCleanupService stored in init() — it must NOT re-fetch the DI container
  * mid-request (R-4.2: never twice).
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\Webhook\WebhookController
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\Webhook\WebhookController::class)]
 final class WebhookControllerCleanupTest extends TestCase
 {
     /**

@@ -21,9 +21,8 @@ use Throwable;
  * Sprint 114.11b (S2): ModuleDescriptionProvider — extracted from ModuleConfigurationService.
  *
  * Owns module description extraction from ModuleConfiguration (metadata.php).
- *
- * @covers \OxidEsales\Payments\Stripe\Service\ModuleDescriptionProvider
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\ModuleDescriptionProvider::class)]
 final class ModuleDescriptionProviderTest extends TestCase
 {
     private ContextInterface&MockObject $context;

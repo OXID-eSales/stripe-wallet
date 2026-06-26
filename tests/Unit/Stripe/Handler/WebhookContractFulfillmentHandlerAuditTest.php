@@ -26,9 +26,8 @@ use PHPUnit\Framework\TestCase;
  * that successfully mutates contract state must also write an audit row to
  * oe_payments_transaction, mirroring what admin-UI flows do via
  * CaptureService/RefundService.
- *
- * @covers \OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler::class)]
 class WebhookContractFulfillmentHandlerAuditTest extends TestCase
 {
     private ContractRepositoryInterface $contractRepository;

@@ -37,12 +37,12 @@ class TestStripeClient extends StripeClient
  * When a PaymentIntent is confirmed (by providing a payment_method_id), Stripe requires
  * a return_url to redirect customers after payment completion.
  *
- * @group unit
- * @group stripe
- * @group adapter
  *
- * @covers \OxidEsales\Payments\Stripe\Adapter\StripeAdapter
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Adapter\StripeAdapter::class)]
+#[\PHPUnit\Framework\Attributes\Group('unit')]
+#[\PHPUnit\Framework\Attributes\Group('stripe')]
+#[\PHPUnit\Framework\Attributes\Group('adapter')]
 final class StripeAdapterReturnUrlTest extends TestCase
 {
     private StripeClient $stripeClient;

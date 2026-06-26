@@ -23,17 +23,15 @@ use PHPUnit\Framework\TestCase;
  * The logic under test is simple: isStripeDebug() returns exactly
  * what isFrontendDebugEnabled() returns, with null-safety when the
  * service is unavailable.
- *
- * @group phase-5
  */
+#[\PHPUnit\Framework\Attributes\Group('phase-5')]
 final class ViewConfigDebugTest extends TestCase
 {
     /**
      * Contract test: the real ViewConfig class must declare isStripeDebug().
      * This is the RED test — it fails until the method is added to ViewConfig.
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function viewConfigClassExposesIsStripeDebugMethod(): void
     {
         $this->assertTrue(
@@ -42,7 +40,7 @@ final class ViewConfigDebugTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function isStripeDebugReturnsTrueWhenFrontendDebugEnabled(): void
     {
         $stripeConfig = $this->createMock(ModuleConfigurationServiceInterface::class);
@@ -53,7 +51,7 @@ final class ViewConfigDebugTest extends TestCase
         $this->assertTrue($viewConfig->isStripeDebug());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function isStripeDebugReturnsFalseWhenFrontendDebugDisabled(): void
     {
         $stripeConfig = $this->createMock(ModuleConfigurationServiceInterface::class);
@@ -64,7 +62,7 @@ final class ViewConfigDebugTest extends TestCase
         $this->assertFalse($viewConfig->isStripeDebug());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function isStripeDebugReturnsFalseWhenServiceUnavailable(): void
     {
         $viewConfig = new StubViewConfigDebug(null);

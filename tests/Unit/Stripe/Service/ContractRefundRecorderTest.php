@@ -15,10 +15,9 @@ use PHPUnit\Framework\TestCase;
  * Unit tests for ContractRefundRecorder.
  *
  * Sprint 114.8: Extracted refund recording with FULFILLED guard from D3 duplication sites.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\ContractRefundRecorder
- * @group sprint-114-8
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\ContractRefundRecorder::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-114-8')]
 final class ContractRefundRecorderTest extends TestCase
 {
     private ContractRepositoryInterface&MockObject $contractRepository;
@@ -32,10 +31,7 @@ final class ContractRefundRecorderTest extends TestCase
         $this->recorder = new ContractRefundRecorder($this->contractRepository);
     }
 
-    /**
-     * @test
-     * FULFILLED contract → addRefundedAmount, setRefundedAt, and save called exactly once.
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function recordsRefundOnFulfilledContract(): void
     {
         $contract = $this->createFulfilledContract();
@@ -47,10 +43,7 @@ final class ContractRefundRecorderTest extends TestCase
         $this->recorder->record($contract, 25.0);
     }
 
-    /**
-     * @test
-     * Non-FULFILLED contract → no mutation, no save. contractId hint appears in log context.
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function doesNotRecordRefundOnNonFulfilledContract(): void
     {
         $contract = $this->createNonFulfilledContract();
@@ -62,10 +55,7 @@ final class ContractRefundRecorderTest extends TestCase
         $this->recorder->record($contract, 25.0, 'contract_abc');
     }
 
-    /**
-     * @test
-     * FULFILLED contract with zero amount → save is still called (zero-amount refund is valid).
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function recordsZeroAmountRefundOnFulfilledContract(): void
     {
         $contract = $this->createFulfilledContract();

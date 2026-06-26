@@ -16,9 +16,7 @@ use OxidEsales\Payments\Stripe\Service\StripeRadarFraudCheckService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Service\StripeRadarFraudCheckService
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\StripeRadarFraudCheckService::class)]
 class StripeRadarFraudCheckServiceTest extends TestCase
 {
     /** @var StripeAdapterFactoryInterface&MockObject */

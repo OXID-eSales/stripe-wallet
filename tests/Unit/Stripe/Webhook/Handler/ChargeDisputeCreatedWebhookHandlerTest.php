@@ -18,9 +18,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Webhook\Handler\ChargeDisputeCreatedWebhookHandler
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Webhook\Handler\ChargeDisputeCreatedWebhookHandler::class)]
 final class ChargeDisputeCreatedWebhookHandlerTest extends TestCase
 {
     private LoggerInterface&MockObject $logger;
@@ -38,20 +36,20 @@ final class ChargeDisputeCreatedWebhookHandlerTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function supportsChargeDisputeCreatedEventType(): void
     {
         $this->assertTrue($this->handler->supports('charge.dispute.created'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function doesNotSupportOtherEventTypes(): void
     {
         $this->assertFalse($this->handler->supports('charge.refunded'));
         $this->assertFalse($this->handler->supports('payment_intent.succeeded'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function alwaysLogsDisputeDetailsAndReturnsDisputeLoggedWithNullContractId(): void
     {
         $event = new WebhookEvent(

@@ -16,9 +16,8 @@ use PHPUnit\Framework\TestCase;
  * D8: OpcModalSessionReader centralises the `oe_opc_modal_session` key and
  * the modal-ID resolution logic shared by OpcModalSuccessUrlHandler and
  * OpcModalCancelUrlHandler.
- *
- * @covers \OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalSessionReader
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalSessionReader::class)]
 class OpcModalSessionReaderTest extends TestCase
 {
     // ==========================================

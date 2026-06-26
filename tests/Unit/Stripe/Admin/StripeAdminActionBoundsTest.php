@@ -18,10 +18,9 @@ use PHPUnit\Framework\TestCase;
 /**
  * Sprint 121 Phase B (STRP-129): bounds delegate to the same PI/charge-derived
  * provider methods the panel view data and form `max` attributes use.
- *
- * @covers \OxidEsales\Payments\Stripe\Admin\StripeAdminActionBounds
- * @group sprint-121
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Admin\StripeAdminActionBounds::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-121')]
 final class StripeAdminActionBoundsTest extends TestCase
 {
     public function testImplementsInterface(): void

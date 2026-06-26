@@ -20,9 +20,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededWebhookHandler
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededWebhookHandler::class)]
 final class PaymentIntentSucceededWebhookHandlerTest extends TestCase
 {
     private WebhookContractFulfillmentHandlerInterface&MockObject $fulfillmentHandler;
@@ -44,13 +42,13 @@ final class PaymentIntentSucceededWebhookHandlerTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function supportsPaymentIntentSucceededEventType(): void
     {
         $this->assertTrue($this->handler->supports('payment_intent.succeeded'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function doesNotSupportOtherEventTypes(): void
     {
         $this->assertFalse($this->handler->supports('payment_intent.payment_failed'));
@@ -58,7 +56,7 @@ final class PaymentIntentSucceededWebhookHandlerTest extends TestCase
         $this->assertFalse($this->handler->supports('checkout.session.completed'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function missingPaymentIntentId_returnsFailure(): void
     {
         $event = $this->makeEvent([]);
@@ -70,7 +68,7 @@ final class PaymentIntentSucceededWebhookHandlerTest extends TestCase
         $this->assertNull($outcome->contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function fulfillmentHandlerReturnsTrue_returnsContractFulfilledOutcome(): void
     {
         $event = $this->makeEvent(['id' => 'pi_ok']);
@@ -88,7 +86,7 @@ final class PaymentIntentSucceededWebhookHandlerTest extends TestCase
         $this->assertSame('ctr-abc', $outcome->contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function fulfillmentHandlerReturnsFalse_returnsSkippedWithContractId(): void
     {
         $event = $this->makeEvent(['id' => 'pi_skip']);
@@ -106,7 +104,7 @@ final class PaymentIntentSucceededWebhookHandlerTest extends TestCase
         $this->assertSame('ctr-skip', $outcome->contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function fulfillmentHandlerReturnsNull_noMetadata_returnsContractNotFoundSkipped(): void
     {
         $event = $this->makeEvent(['id' => 'pi_nf']);
@@ -122,7 +120,7 @@ final class PaymentIntentSucceededWebhookHandlerTest extends TestCase
         $this->assertNull($outcome->contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function fulfillmentHandlerReturnsNull_metadataContractFulfilled_returnsAlreadyFulfilled(): void
     {
         $event = $this->makeEvent([
@@ -144,7 +142,7 @@ final class PaymentIntentSucceededWebhookHandlerTest extends TestCase
         $this->assertSame('ctr-done', $outcome->contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function fulfillmentHandlerReturnsNull_metadataContractCommitted_fulfilledSuccessfully(): void
     {
         $event = $this->makeEvent([

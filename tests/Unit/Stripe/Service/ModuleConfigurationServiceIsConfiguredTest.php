@@ -20,9 +20,8 @@ use PHPUnit\Framework\TestCase;
  * A shop without a webhook secret cannot verify Stripe webhook signatures,
  * so isConfigured() must return false — preventing Stripe from being offered
  * as a payment method.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\ModuleConfigurationService
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::class)]
 class ModuleConfigurationServiceIsConfiguredTest extends TestCase
 {
     /**

@@ -19,9 +19,8 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Sprint 72: Tests for retry cleanup in StripeOrderController::createCheckoutSession().
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\StripeOrderController
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\StripeOrderController::class)]
 class StripeOrderControllerRetryTest extends TestCase
 {
     private EventDispatcherInterface&MockObject $eventDispatcher;

@@ -9,10 +9,9 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Sprint 90: Tests for customer data sanitization before Stripe API calls.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\CustomerDataSanitizer
- * @group sprint-90
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\CustomerDataSanitizer::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-90')]
 final class CustomerDataSanitizerTest extends TestCase
 {
     private CustomerDataSanitizer $sanitizer;

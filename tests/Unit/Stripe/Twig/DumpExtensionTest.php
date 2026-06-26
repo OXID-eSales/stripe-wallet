@@ -13,12 +13,9 @@ use OxidEsales\Payments\Stripe\Environment\DevelopmentEnvironmentCheckerInterfac
 use OxidEsales\Payments\Stripe\Twig\DumpExtension;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Twig\DumpExtension
- *
- * @group security
- * @group owasp-a05
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Twig\DumpExtension::class)]
+#[\PHPUnit\Framework\Attributes\Group('security')]
+#[\PHPUnit\Framework\Attributes\Group('owasp-a05')]
 class DumpExtensionTest extends TestCase
 {
     private DevelopmentEnvironmentCheckerInterface $checkerDev;

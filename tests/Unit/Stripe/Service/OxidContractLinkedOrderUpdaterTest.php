@@ -22,10 +22,9 @@ use PHPUnit\Framework\TestCase;
  * Sprint 114.13 (§8): Characterization tests written before the production
  * class was changed. Uses the testable-subclass pattern to override the
  * protected loadOrder() seam so oxNew() is never called (R-1.5).
- *
- * @covers \OxidEsales\Payments\Stripe\Service\OxidContractLinkedOrderUpdater
- * @group sprint-114-13
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\OxidContractLinkedOrderUpdater::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-114-13')]
 final class OxidContractLinkedOrderUpdaterTest extends TestCase
 {
     public function testImplementsInterface(): void

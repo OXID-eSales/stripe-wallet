@@ -25,9 +25,8 @@ use PHPUnit\Framework\TestCase;
  * Verifies that RefundService correctly handles the charge/refund flow via DTOs:
  * - getChargeIdFromPaymentIntent reads latestChargeId from StripePaymentIntentDto
  * - handleRefundResponse reads from StripeRefundDto
- *
- * @covers \OxidEsales\Payments\Stripe\Service\RefundService
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\RefundService::class)]
 final class RefundServiceDtoCharacterizationTest extends TestCase
 {
     private StripeAdapterFactoryInterface&MockObject $adapterFactory;

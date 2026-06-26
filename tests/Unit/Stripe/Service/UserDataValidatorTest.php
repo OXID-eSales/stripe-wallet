@@ -23,10 +23,9 @@ use PHPUnit\Framework\TestCase;
  * validateForUser() so UserDataValidator can be a stateless DI singleton.
  * The production caller (Phase C controller) creates an OxidUserFieldReader
  * wrapping the live User object and passes it here.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\UserDataValidator
- * @group sprint-119
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\UserDataValidator::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-119')]
 final class UserDataValidatorTest extends TestCase
 {
     // ---------------------------------------------------------------------------

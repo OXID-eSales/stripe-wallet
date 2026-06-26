@@ -26,9 +26,8 @@ use PHPUnit\Framework\TestCase;
  * possible. Tests use a testable subclass that overrides getStripeCharge()
  * and the resolver accessor so no ContainerFactory or Stripe API call is made.
  * This follows CLAUDE.md §"Testable subclass pattern".
- *
- * @covers \OxidEsales\Payments\Stripe\Model\Order
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Model\Order::class)]
 final class OrderStripeAmountsTest extends TestCase
 {
     private ChargeAmountResolverInterface&MockObject $resolver;

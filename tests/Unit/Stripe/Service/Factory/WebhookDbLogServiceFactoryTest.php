@@ -28,11 +28,10 @@ use Psr\Log\LoggerInterface;
  * - When blStripeLogWebhooks is OFF: save() is still called (idempotency row
  *   written), but payload is null and PSR-3 mirror is NOT emitted.
  * - Factory always returns a WebhookLogService instance.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\Factory\WebhookDbLogServiceFactory
- * @group logging
- * @group phase-4
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\Factory\WebhookDbLogServiceFactory::class)]
+#[\PHPUnit\Framework\Attributes\Group('logging')]
+#[\PHPUnit\Framework\Attributes\Group('phase-4')]
 final class WebhookDbLogServiceFactoryTest extends TestCase
 {
     private WebhookLogRepositoryInterface&MockObject $repository;

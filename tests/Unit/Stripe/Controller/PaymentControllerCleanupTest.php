@@ -21,9 +21,8 @@ use PHPUnit\Framework\TestCase;
  * Specifically:
  * - session read (contract ID)  → helper->getContractIdFromSession()
  * - session clear               → helper->clearStripeSessionVariables() (full key set)
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\PaymentController
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\PaymentController::class)]
 class PaymentControllerCleanupTest extends TestCase
 {
     /**

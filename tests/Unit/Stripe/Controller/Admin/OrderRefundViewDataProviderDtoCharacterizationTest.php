@@ -30,9 +30,8 @@ use PHPUnit\Framework\TestCase;
  *
  * Uses a testable subclass that overrides fetchExpandedPaymentIntent() to inject
  * a controlled StripePaymentIntentDto fixture (replaces the old PaymentIntent fixture).
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider::class)]
 final class OrderRefundViewDataProviderDtoCharacterizationTest extends TestCase
 {
     private ChargeAmountResolverInterface&MockObject $resolver;

@@ -29,9 +29,8 @@ use Psr\Log\LoggerInterface;
  *
  * Uses a testable subclass that no-ops the early-order step so we don't need
  * an OXID session bootstrap to verify URL composition.
- *
- * @covers \OxidEsales\Payments\Stripe\PaymentHandler\StripePaymentHandler
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\PaymentHandler\StripePaymentHandler::class)]
 final class StripePaymentHandlerLanguageTest extends TestCase
 {
     private ContractServiceInterface&MockObject $contractService;

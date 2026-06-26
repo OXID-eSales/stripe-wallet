@@ -18,9 +18,8 @@ use PHPUnit\Framework\TestCase;
  *
  * Both must return the mode-correct secret key.
  * No caller should observe any difference in the returned value.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\ModuleConfigurationService
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::class)]
 class ModuleConfigurationServiceTokenAccessorTest extends TestCase
 {
     private function makeService(array $settings): ModuleConfigurationService

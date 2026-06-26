@@ -18,9 +18,8 @@ use PHPUnit\Framework\TestCase;
  * carries the actual payment-intent ID for every event family, instead of
  * defaulting to the nested object's own ID (which is e.g. ch_… for charge.*
  * events, making the log mislabel the field).
- *
- * @covers \OxidEsales\Payments\Stripe\Service\WebhookLogService
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\WebhookLogService::class)]
 class WebhookLogServicePayloadParsingTest extends TestCase
 {
     public function testLogReceivedReportsPaymentIntentIdForChargeRefundedEvent(): void

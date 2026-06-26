@@ -14,16 +14,12 @@ use PHPUnit\Framework\TestCase;
  *
  * Sprint 114.8: Verifies the shared logEvent() plumbing is invoked by concrete handlers.
  * Parity net: all concrete handler tests remain the primary behavior gate.
- *
- * @covers \OxidEsales\Payments\Stripe\EventSystem\Handler\AbstractStripeRequestHandler
- * @group sprint-114-8
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\EventSystem\Handler\AbstractStripeRequestHandler::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-114-8')]
 final class AbstractStripeRequestHandlerTest extends TestCase
 {
-    /**
-     * @test
-     * logEvent() delegates to the injected FileLoggerInterface when present.
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function logEventDelegatesToFileLoggerWhenProvided(): void
     {
         $logger = $this->createMock(FileLoggerInterface::class);
@@ -35,13 +31,7 @@ final class AbstractStripeRequestHandlerTest extends TestCase
         $handler->exposedLogEvent('test message', ['key' => 'val']);
     }
 
-    /**
-     * @test
-     * logEvent() is a no-op when no FileLoggerInterface is injected.
-     * The handler does not throw and returns null-equivalent (void).
-     * The absence of a file-logger is tested by confirming a second handler
-     * WITH a logger records its call — proving the first handler (null) is silent.
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function logEventIsNoOpWhenNoLoggerProvided(): void
     {
         $handler = new TestableAbstractHandler(null);

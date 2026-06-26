@@ -15,18 +15,14 @@ use PHPUnit\Framework\TestCase;
 /**
  * D7: StripeDefinitions::isStripePaymentMethod() must be the single predicate
  * for the `oe_payments_stripe_` prefix check across all call sites.
- *
- * @covers \OxidEsales\Payments\Stripe\Core\StripeDefinitions
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Core\StripeDefinitions::class)]
 class StripeDefinitionsTest extends TestCase
 {
     // ==========================================
     // isStripePaymentMethod() - data-provider tests
     // ==========================================
-
-    /**
-     * @dataProvider stripePaymentMethodProvider
-     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('stripePaymentMethodProvider')]
     public function testIsStripePaymentMethodReturnsTrueForStripeIds(string $paymentId): void
     {
         $this->assertTrue(
@@ -35,9 +31,7 @@ class StripeDefinitionsTest extends TestCase
         );
     }
 
-    /**
-     * @dataProvider nonStripePaymentMethodProvider
-     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('nonStripePaymentMethodProvider')]
     public function testIsStripePaymentMethodReturnsFalseForNonStripeIds(string $paymentId): void
     {
         $this->assertFalse(

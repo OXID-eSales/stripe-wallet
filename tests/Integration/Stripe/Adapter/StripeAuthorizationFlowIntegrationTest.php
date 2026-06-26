@@ -23,14 +23,14 @@ use OxidEsales\Payments\Stripe\Tests\Integration\Stripe\StripeIntegrationTestCas
  * 1. Authorization (hold funds)
  * 2. Capture (take funds) or Void (release funds)
  *
- * @group integration
- * @group stripe
- * @group api
- * @group authorization
- * @group requires-stripe-creds
  *
- * @covers \OxidEsales\Payments\Stripe\Adapter\StripeAdapter
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Adapter\StripeAdapter::class)]
+#[\PHPUnit\Framework\Attributes\Group('integration')]
+#[\PHPUnit\Framework\Attributes\Group('stripe')]
+#[\PHPUnit\Framework\Attributes\Group('api')]
+#[\PHPUnit\Framework\Attributes\Group('authorization')]
+#[\PHPUnit\Framework\Attributes\Group('requires-stripe-creds')]
 final class StripeAuthorizationFlowIntegrationTest extends StripeIntegrationTestCase
 {
     // ==========================================

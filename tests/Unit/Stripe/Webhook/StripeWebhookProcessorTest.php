@@ -28,9 +28,8 @@ use Psr\Log\LoggerInterface;
  *
  * Event-type routing behavior is covered exhaustively by
  * StripeWebhookProcessorCharacterizationTest.
- *
- * @covers \OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor::class)]
 class StripeWebhookProcessorTest extends TestCase
 {
     private WebhookLogRepositoryInterface&MockObject $logRepository;

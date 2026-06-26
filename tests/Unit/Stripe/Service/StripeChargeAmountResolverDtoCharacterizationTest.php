@@ -18,9 +18,8 @@ use PHPUnit\Framework\TestCase;
  *
  * Mirrors StripeChargeAmountResolverTest but feeds StripeChargeDto instead of
  * \Stripe\Charge. Proves behavior parity before and after the migration.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\StripeChargeAmountResolver
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\StripeChargeAmountResolver::class)]
 final class StripeChargeAmountResolverDtoCharacterizationTest extends TestCase
 {
     private StripeChargeAmountResolver $resolver;

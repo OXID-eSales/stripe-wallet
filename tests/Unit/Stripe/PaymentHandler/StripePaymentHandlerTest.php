@@ -17,9 +17,7 @@ use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\PaymentHandler\StripePaymentHandler
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\PaymentHandler\StripePaymentHandler::class)]
 class StripePaymentHandlerTest extends TestCase
 {
     private ContractServiceInterface&MockObject $contractService;

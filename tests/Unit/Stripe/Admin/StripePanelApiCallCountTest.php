@@ -33,10 +33,9 @@ use PHPUnit\Framework\TestCase;
  * introduced in Sprint 104; the counting subclass overrides that seam.
  * For the Order-extension memoisation test, a testable Order subclass
  * overrides getStripeCharge() to count invocations.
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider
- * @covers \OxidEsales\Payments\Stripe\Model\Order
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Model\Order::class)]
 final class StripePanelApiCallCountTest extends TestCase
 {
     private ChargeAmountResolverInterface&MockObject $chargeAmountResolver;

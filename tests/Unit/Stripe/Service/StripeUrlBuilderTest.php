@@ -18,9 +18,8 @@ use PHPUnit\Framework\TestCase;
  * Owns webhook URL construction + SSL shop-base-URL resolution.
  * Tested via anonymous subclass (getSslShopBaseUrl seam), keeping the test
  * free of OXID Registry.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\StripeUrlBuilder
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\StripeUrlBuilder::class)]
 final class StripeUrlBuilderTest extends TestCase
 {
     public function testGetWebhookUrlAppendsControllerParam(): void

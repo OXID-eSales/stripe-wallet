@@ -20,14 +20,14 @@ use OxidEsales\Payments\Stripe\Tests\Integration\Stripe\StripeIntegrationTestCas
  * - Listing customer payment methods
  * - Deleting payment methods
  *
- * @group integration
- * @group stripe
- * @group api
- * @group payment-methods
- * @group requires-stripe-creds
  *
- * @covers \OxidEsales\Payments\Stripe\Adapter\StripeAdapter
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Adapter\StripeAdapter::class)]
+#[\PHPUnit\Framework\Attributes\Group('integration')]
+#[\PHPUnit\Framework\Attributes\Group('stripe')]
+#[\PHPUnit\Framework\Attributes\Group('api')]
+#[\PHPUnit\Framework\Attributes\Group('payment-methods')]
+#[\PHPUnit\Framework\Attributes\Group('requires-stripe-creds')]
 final class StripePaymentMethodIntegrationTest extends StripeIntegrationTestCase
 {
     // ==========================================

@@ -12,14 +12,12 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller\Webhook;
 use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookGuardResult;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Controller\Webhook\WebhookGuardResult
- * @group sprint-64a
- * @group security
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\Webhook\WebhookGuardResult::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-64a')]
+#[\PHPUnit\Framework\Attributes\Group('security')]
 final class WebhookGuardResultTest extends TestCase
 {
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function resultHoldsRejectionData(): void
     {
         $result = new WebhookGuardResult('rate_limited', 429, 'Too many requests');
@@ -29,7 +27,7 @@ final class WebhookGuardResultTest extends TestCase
         $this->assertSame('Too many requests', $result->message);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function resultIsReadonly(): void
     {
         $result = new WebhookGuardResult('payload_too_large', 413, 'Too large');

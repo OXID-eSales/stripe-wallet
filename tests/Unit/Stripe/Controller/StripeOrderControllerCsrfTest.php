@@ -18,15 +18,14 @@ use PHPUnit\Framework\TestCase;
  * Tests that createCheckoutSession and executeStripePayment reject
  * when CSRF token validation fails. Uses testable subclass that overrides
  * validateSessionChallenge() and framework-dependent methods.
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\StripeOrderController
- * @group sprint-64f
- * @group security
- * @group csrf
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\StripeOrderController::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-64f')]
+#[\PHPUnit\Framework\Attributes\Group('security')]
+#[\PHPUnit\Framework\Attributes\Group('csrf')]
 final class StripeOrderControllerCsrfTest extends TestCase
 {
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function createCheckoutSessionRejectsWithoutCsrfToken(): void
     {
         $controller = new TestableStripeOrderControllerForCsrf();
@@ -42,7 +41,7 @@ final class StripeOrderControllerCsrfTest extends TestCase
         $this->assertSame(403, $controller->getLastHttpStatusCode());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function createCheckoutSessionProceedsWithValidCsrfToken(): void
     {
         $controller = new TestableStripeOrderControllerForCsrf();
@@ -57,7 +56,7 @@ final class StripeOrderControllerCsrfTest extends TestCase
         $this->assertNotSame(403, $controller->getLastHttpStatusCode());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function executeStripePaymentRejectsWithoutCsrfToken(): void
     {
         $controller = new TestableStripeOrderControllerForCsrf();
@@ -69,7 +68,7 @@ final class StripeOrderControllerCsrfTest extends TestCase
         $this->assertStringContainsString('Session expired', $controller->getLastError());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function executeStripePaymentProceedsWithValidCsrfToken(): void
     {
         $controller = new TestableStripeOrderControllerForCsrf();
@@ -81,7 +80,7 @@ final class StripeOrderControllerCsrfTest extends TestCase
         $this->assertNotEquals('Session expired', $controller->getLastError());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function csrfRejectionReturnsJsonFor403(): void
     {
         $controller = new TestableStripeOrderControllerForCsrf();

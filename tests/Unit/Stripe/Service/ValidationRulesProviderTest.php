@@ -17,10 +17,9 @@ use PHPUnit\Framework\TestCase;
 /**
  * STRP-129: provider reads the real validation-rules.php and exposes the
  * field -> allow-token-string map used by the AllowedSymbolsDescriber.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\ValidationRulesProvider
- * @group user-data-validation
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\ValidationRulesProvider::class)]
+#[\PHPUnit\Framework\Attributes\Group('user-data-validation')]
 final class ValidationRulesProviderTest extends TestCase
 {
     private ValidationRulesProvider $sut;

@@ -19,12 +19,12 @@ use PHPUnit\Framework\TestCase;
  * Tests isStripePaymentMethod() — the single predicate that determines
  * whether a payment belongs to the Stripe module.
  *
- * @group unit
- * @group stripe
- * @group model
  *
- * @covers \OxidEsales\Payments\Stripe\Model\Payment
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Model\Payment::class)]
+#[\PHPUnit\Framework\Attributes\Group('unit')]
+#[\PHPUnit\Framework\Attributes\Group('stripe')]
+#[\PHPUnit\Framework\Attributes\Group('model')]
 final class PaymentTest extends TestCase
 {
     private function createPaymentWithId(string $paymentId): Payment
@@ -43,11 +43,8 @@ final class PaymentTest extends TestCase
     // ==========================================
     // isStripePaymentMethod() Tests
     // ==========================================
-
-    /**
-     * @test
-     * @dataProvider stripePaymentMethodsProvider
-     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('stripePaymentMethodsProvider')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function testIsStripePaymentMethodReturnsTrueForStripePaymentMethods(string $paymentId): void
     {
         $payment = $this->createPaymentWithId($paymentId);
@@ -60,10 +57,8 @@ final class PaymentTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * @dataProvider nonStripePaymentMethodsProvider
-     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('nonStripePaymentMethodsProvider')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function testIsStripePaymentMethodReturnsFalseForNonStripePaymentMethods(string $paymentId): void
     {
         $payment = $this->createPaymentWithId($paymentId);
@@ -76,9 +71,7 @@ final class PaymentTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function testIsStripePaymentMethodReturnsFalseWhenPaymentIdIsEmpty(): void
     {
         $payment = $this->createPaymentWithId('');
@@ -88,9 +81,7 @@ final class PaymentTest extends TestCase
         $this->assertFalse($result, 'Empty payment ID should return false');
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function testIsStripePaymentMethodReturnsTrueForCustomStripePaymentMethod(): void
     {
         $payment = $this->createPaymentWithId('oe_payments_stripe_custom');
@@ -103,10 +94,8 @@ final class PaymentTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * @dataProvider legacyPaymentMethodsProvider
-     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('legacyPaymentMethodsProvider')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function testIsStripePaymentMethodReturnsFalseForLegacyPaymentMethods(string $paymentId): void
     {
         $payment = $this->createPaymentWithId($paymentId);

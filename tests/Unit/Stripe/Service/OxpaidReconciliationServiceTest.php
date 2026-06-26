@@ -27,14 +27,13 @@ use PHPUnit\Framework\TestCase;
  *
  * Sprint 10: Tests for OXPAID reconciliation with Stripe API.
  * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService
- * @group sprint-10
- * @group sprint-14
- * @group sprint-15
- * @group sprint-18
- * @group reconciliation
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-10')]
+#[\PHPUnit\Framework\Attributes\Group('sprint-14')]
+#[\PHPUnit\Framework\Attributes\Group('sprint-15')]
+#[\PHPUnit\Framework\Attributes\Group('sprint-18')]
+#[\PHPUnit\Framework\Attributes\Group('reconciliation')]
 class OxpaidReconciliationServiceTest extends TestCase
 {
     private Connection $connection;
@@ -65,10 +64,7 @@ class OxpaidReconciliationServiceTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * Verifies the service returns an empty array when no unpaid orders exist.
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function findUnpaidOrdersReturnsEmptyArrayWhenNoneExist(): void
     {
         $this->connection
@@ -80,9 +76,7 @@ class OxpaidReconciliationServiceTest extends TestCase
         $this->assertSame([], $result);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function findUnpaidOrdersQueriesCorrectCriteria(): void
     {
         $expectedOrders = [
@@ -106,9 +100,7 @@ class OxpaidReconciliationServiceTest extends TestCase
         $this->assertEquals('pi_123', $result[0]['OXTRANSID']);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function findUnpaidOrdersReturnsEmptyArrayWhenNoOrders(): void
     {
         $this->connection
@@ -121,10 +113,7 @@ class OxpaidReconciliationServiceTest extends TestCase
         $this->assertEmpty($result);
     }
 
-    /**
-     * @test
-     * Sprint 15: NO_CONTRACT is ERROR - contract is required for reconciliation
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function reconcileOrderFailsWithoutContract(): void
     {
         $orderId = 'test_order_no_contract';
@@ -161,11 +150,7 @@ class OxpaidReconciliationServiceTest extends TestCase
         $this->assertStringContains('No contract found', $result->reason);
     }
 
-    /**
-     * @test
-     * Sprint 15: OXPAID is only updated when contract exists and is COMMITTED
-     * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function reconcileOrderUpdatesOxpaidWhenPaymentIsCaptured(): void
     {
         $orderId = 'test_order_123';
@@ -234,10 +219,7 @@ class OxpaidReconciliationServiceTest extends TestCase
         $this->assertTrue($result->contractUpdated);
     }
 
-    /**
-     * @test
-     * Sprint 15: Skips when payment not captured (but contract exists)
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function reconcileOrderSkipsWhenPaymentNotCaptured(): void
     {
         $orderId = 'test_order_123';
@@ -287,10 +269,7 @@ class OxpaidReconciliationServiceTest extends TestCase
         $this->assertStringContains('not captured', $result->reason);
     }
 
-    /**
-     * @test
-     * Sprint 15: API errors are handled (with contract)
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function reconcileOrderHandlesApiError(): void
     {
         $orderId = 'test_order_123';
@@ -322,10 +301,7 @@ class OxpaidReconciliationServiceTest extends TestCase
         $this->assertStringContains('API Error', $result->reason);
     }
 
-    /**
-     * @test
-     * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function reconcileOrderFulfillsContractWhenFound(): void
     {
         $orderId = 'test_order_123';
@@ -383,10 +359,7 @@ class OxpaidReconciliationServiceTest extends TestCase
         $this->assertTrue($result->contractUpdated);
     }
 
-    /**
-     * @test
-     * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function reconcileOrderDoesNotFulfillContractIfNotCommitted(): void
     {
         $orderId = 'test_order_123';
@@ -442,10 +415,7 @@ class OxpaidReconciliationServiceTest extends TestCase
         $this->assertFalse($result->contractUpdated);
     }
 
-    /**
-     * @test
-     * Sprint 15: reconcileAll requires contracts for each order
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function reconcileAllProcessesAllOrders(): void
     {
         $orders = [
@@ -498,10 +468,7 @@ class OxpaidReconciliationServiceTest extends TestCase
         $this->assertTrue($results[1]->success);
     }
 
-    /**
-     * @test
-     * Sprint 15: reconcileAll skips orders without contracts
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function reconcileAllFailsOrdersWithoutContracts(): void
     {
         $orders = [
@@ -529,9 +496,7 @@ class OxpaidReconciliationServiceTest extends TestCase
         $this->assertEquals('no_contract', $results[0]->action);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function reconcileAllDryRunDoesNotMakeChanges(): void
     {
         $orders = [

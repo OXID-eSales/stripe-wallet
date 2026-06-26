@@ -8,9 +8,8 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Sprint 91: Verifies all required frontend translation keys exist in EN and DE.
- *
- * @group sprint-91
  */
+#[\PHPUnit\Framework\Attributes\Group('sprint-91')]
 final class FrontendTranslationCompletenessTest extends TestCase
 {
     /** Keys used in base_stripe_element_config.html.twig + payment.html.twig */

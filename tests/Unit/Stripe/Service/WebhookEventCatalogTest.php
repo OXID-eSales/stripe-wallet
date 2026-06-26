@@ -12,9 +12,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 use OxidEsales\Payments\Stripe\Service\WebhookEventCatalog;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Service\WebhookEventCatalog
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\WebhookEventCatalog::class)]
 class WebhookEventCatalogTest extends TestCase
 {
     public function testCatalogIncludesPaymentIntentSucceeded(): void

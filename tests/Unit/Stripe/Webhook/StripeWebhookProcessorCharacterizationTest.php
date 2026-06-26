@@ -50,9 +50,8 @@ use ReflectionClass;
  *   6. checkout.session.completed  (5 sub-branches)
  *   7. checkout.session.expired  (3 sub-branches)
  *   8. unknown type → skipped default
- *
- * @covers \OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor::class)]
 final class StripeWebhookProcessorCharacterizationTest extends TestCase
 {
     private WebhookLogRepositoryInterface&MockObject $logRepository;
@@ -73,8 +72,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
     // =========================================================================
     // 1. payment_intent.succeeded
     // =========================================================================
-
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function paymentIntentSucceeded_missingPaymentIntentId_returnsFailure(): void
     {
         $event = $this->makeEvent('payment_intent.succeeded', []);
@@ -87,7 +85,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertNull($contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function paymentIntentSucceeded_fulfillmentHandlerReturnsTrue_returnsContractFulfilled(): void
     {
         $event = $this->makeEvent('payment_intent.succeeded', ['id' => 'pi_abc']);
@@ -104,7 +102,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertSame('contract-1', $contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function paymentIntentSucceeded_fulfillmentHandlerReturnsFalse_returnsSkippedTerminalState(): void
     {
         $event = $this->makeEvent('payment_intent.succeeded', ['id' => 'pi_abc_f']);
@@ -122,7 +120,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertSame('contract-2', $contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function paymentIntentSucceeded_fulfillmentHandlerReturnsNull_noMetadata_returnsContractNotFound(): void
     {
         $event = $this->makeEvent('payment_intent.succeeded', ['id' => 'pi_unknown']);
@@ -139,7 +137,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertNull($contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function paymentIntentSucceeded_fulfillmentHandlerReturnsNull_metadataContractFulfilled_returnsAlreadyFulfilled(): void
     {
         $event = $this->makeEvent('payment_intent.succeeded', [
@@ -162,7 +160,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertSame('ctr-fulfilled', $contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function paymentIntentSucceeded_fulfillmentHandlerReturnsNull_metadataContractCommitted_fulfilledSuccessfully(): void
     {
         $event = $this->makeEvent('payment_intent.succeeded', [
@@ -189,8 +187,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
     // =========================================================================
     // 2. payment_intent.payment_failed
     // =========================================================================
-
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function paymentIntentFailed_missingPaymentIntentId_returnsFailure(): void
     {
         $event = $this->makeEvent('payment_intent.payment_failed', []);
@@ -202,7 +199,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertNull($contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function paymentIntentFailed_handlerReturnsTrue_returnsContractFailed(): void
     {
         $event = $this->makeEvent('payment_intent.payment_failed', [
@@ -224,7 +221,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertSame('ctr-failed', $contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function paymentIntentFailed_handlerReturnsFalse_returnsSkippedTerminalState(): void
     {
         $event = $this->makeEvent('payment_intent.payment_failed', ['id' => 'pi_failed2']);
@@ -242,7 +239,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertSame('ctr-fail2', $contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function paymentIntentFailed_handlerReturnsNull_returnsContractNotFound(): void
     {
         $event = $this->makeEvent('payment_intent.payment_failed', ['id' => 'pi_fail_nf']);
@@ -260,8 +257,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
     // =========================================================================
     // 3. payment_intent.canceled
     // =========================================================================
-
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function paymentIntentCanceled_missingPaymentIntentId_returnsFailure(): void
     {
         $event = $this->makeEvent('payment_intent.canceled', []);
@@ -273,7 +269,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertNull($contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function paymentIntentCanceled_handlerReturnsTrue_returnsContractCancelled(): void
     {
         $event = $this->makeEvent('payment_intent.canceled', [
@@ -295,7 +291,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertSame('ctr-cancel', $contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function paymentIntentCanceled_handlerReturnsFalse_returnsSkippedTerminalState(): void
     {
         $event = $this->makeEvent('payment_intent.canceled', ['id' => 'pi_cancel2']);
@@ -313,7 +309,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertSame('ctr-cancel2', $contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function paymentIntentCanceled_handlerReturnsNull_returnsContractNotFound(): void
     {
         $event = $this->makeEvent('payment_intent.canceled', ['id' => 'pi_cancel_nf']);
@@ -331,8 +327,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
     // =========================================================================
     // 4. charge.refunded
     // =========================================================================
-
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function chargeRefunded_missingPaymentIntentId_returnsFailure(): void
     {
         $event = $this->makeEvent('charge.refunded', ['id' => 'ch_nopi']);
@@ -344,7 +339,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertNull($contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function chargeRefunded_handlerReturnsTrue_returnsChargeRefunded(): void
     {
         $event = $this->makeEvent('charge.refunded', [
@@ -367,7 +362,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertSame('ctr-refund', $contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function chargeRefunded_handlerReturnsFalse_returnsSkippedNotFulfilled(): void
     {
         $event = $this->makeEvent('charge.refunded', [
@@ -389,7 +384,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertSame('ctr-refund2', $contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function chargeRefunded_handlerReturnsNull_returnsContractNotFound(): void
     {
         $event = $this->makeEvent('charge.refunded', [
@@ -411,8 +406,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
     // =========================================================================
     // 5. charge.dispute.created
     // =========================================================================
-
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function chargeDisputeCreated_alwaysReturnsSuccessDisputeLogged(): void
     {
         $event = $this->makeEvent('charge.dispute.created', [
@@ -432,8 +426,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
     // =========================================================================
     // 6. checkout.session.completed
     // =========================================================================
-
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function checkoutSessionCompleted_paymentStatusNotPaid_returnsSkipped(): void
     {
         $event = $this->makeEvent('checkout.session.completed', [
@@ -450,7 +443,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertNull($contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function checkoutSessionCompleted_paidButNoPaymentIntentId_returnsSkipped(): void
     {
         $event = $this->makeEvent('checkout.session.completed', [
@@ -467,7 +460,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertNull($contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function checkoutSessionCompleted_contractNotFound_returnsSkipped(): void
     {
         $event = $this->makeEvent('checkout.session.completed', [
@@ -487,7 +480,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertNull($contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function checkoutSessionCompleted_contractFoundAndCommitted_returnsContractFulfilled(): void
     {
         $event = $this->makeEvent('checkout.session.completed', [
@@ -511,7 +504,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertSame('ctr-committed', $contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function checkoutSessionCompleted_contractFoundNotCommitted_returnsContractUpdated(): void
     {
         $event = $this->makeEvent('checkout.session.completed', [
@@ -536,8 +529,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
     // =========================================================================
     // 7. checkout.session.expired
     // =========================================================================
-
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function checkoutSessionExpired_noContractIdInMetadata_returnsSkipped(): void
     {
         $event = $this->makeEvent('checkout.session.expired', [
@@ -553,7 +545,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertNull($contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function checkoutSessionExpired_handlerReturnsTrue_returnsSessionExpired(): void
     {
         $event = $this->makeEvent('checkout.session.expired', [
@@ -570,7 +562,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertSame('ctr-expiry', $contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function checkoutSessionExpired_handlerReturnsFalse_returnsSkippedTerminalState(): void
     {
         $event = $this->makeEvent('checkout.session.expired', [
@@ -588,7 +580,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertNull($contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function checkoutSessionExpired_handlerReturnsNull_returnsContractNotFound(): void
     {
         $event = $this->makeEvent('checkout.session.expired', [
@@ -609,8 +601,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
     // =========================================================================
     // 8. Unknown event type — default branch
     // =========================================================================
-
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function unknownEventType_returnsSkippedWithUnhandledMessage(): void
     {
         $event = $this->makeEvent('customer.subscription.deleted', ['id' => 'sub_xyz']);

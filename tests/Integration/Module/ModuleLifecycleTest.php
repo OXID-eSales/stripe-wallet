@@ -20,13 +20,13 @@ use Psr\Container\ContainerInterface;
  * IMPORTANT: These tests require a fully initialized OXID shop environment.
  * They must be run in the Docker container with the shop bootstrapped.
  *
- * @group integration
- * @group module
- * @group lifecycle
- * @group requires-oxid-container
  *
- * @covers \OxidEsales\Payments\Stripe\Core\ModuleEvents
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Core\ModuleEvents::class)]
+#[\PHPUnit\Framework\Attributes\Group('integration')]
+#[\PHPUnit\Framework\Attributes\Group('module')]
+#[\PHPUnit\Framework\Attributes\Group('lifecycle')]
+#[\PHPUnit\Framework\Attributes\Group('requires-oxid-container')]
 class ModuleLifecycleTest extends TestCase
 {
     private const MODULE_ID = 'oe_payments_stripe_wallet';
@@ -85,9 +85,8 @@ class ModuleLifecycleTest extends TestCase
 
     /**
      * Test 2: Module can be deactivated without errors
-     *
-     * @depends testModuleCanBeActivated
      */
+    #[\PHPUnit\Framework\Attributes\Depends('testModuleCanBeActivated')]
     public function testModuleCanBeDeactivated(): void
     {
         // Given: Module is active
@@ -116,9 +115,8 @@ class ModuleLifecycleTest extends TestCase
 
     /**
      * Test 3: Module can be reactivated after deactivation
-     *
-     * @depends testModuleCanBeDeactivated
      */
+    #[\PHPUnit\Framework\Attributes\Depends('testModuleCanBeDeactivated')]
     public function testModuleCanBeReactivatedAfterDeactivation(): void
     {
         // Given: Module was deactivated
@@ -159,9 +157,8 @@ class ModuleLifecycleTest extends TestCase
 
     /**
      * Test 5: Services are available after module activation
-     *
-     * @depends testModuleCanBeActivated
      */
+    #[\PHPUnit\Framework\Attributes\Depends('testModuleCanBeActivated')]
     public function testServicesAvailableAfterActivation(): void
     {
         // Given: Module is active

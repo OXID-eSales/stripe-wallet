@@ -26,18 +26,14 @@ use PHPUnit\Framework\TestCase;
  * - Float-drift safety: toMinorUnits uses (int) round(), not truncation
  * - Case-insensitive currency matching
  * - Unknown/empty currency → fallback to 2 decimals
- *
- * @covers \OxidEsales\Payments\Stripe\Core\AmountConverter
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Core\AmountConverter::class)]
 final class AmountConverterTest extends TestCase
 {
     // ---------------------------------------------------------------
     // decimalsFor
     // ---------------------------------------------------------------
-
-    /**
-     * @dataProvider decimalsProvider
-     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('decimalsProvider')]
     public function testDecimalsFor(string $currency, int $expectedDecimals): void
     {
         self::assertSame($expectedDecimals, AmountConverter::decimalsFor($currency));
@@ -86,10 +82,7 @@ final class AmountConverterTest extends TestCase
     // ---------------------------------------------------------------
     // toMinorUnits — EUR (2-decimal) correctness + rounding
     // ---------------------------------------------------------------
-
-    /**
-     * @dataProvider toMinorUnitsProvider
-     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('toMinorUnitsProvider')]
     public function testToMinorUnits(float $major, string $currency, int $expectedMinor): void
     {
         self::assertSame($expectedMinor, AmountConverter::toMinorUnits($major, $currency));
@@ -137,10 +130,7 @@ final class AmountConverterTest extends TestCase
     // ---------------------------------------------------------------
     // toMajorUnits — reverse of toMinorUnits
     // ---------------------------------------------------------------
-
-    /**
-     * @dataProvider toMajorUnitsProvider
-     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('toMajorUnitsProvider')]
     public function testToMajorUnits(int $minor, string $currency, float $expectedMajor): void
     {
         self::assertEqualsWithDelta($expectedMajor, AmountConverter::toMajorUnits($minor, $currency), 0.00001);
@@ -178,10 +168,7 @@ final class AmountConverterTest extends TestCase
     // ---------------------------------------------------------------
     // Round-trip invariant: toMajorUnits(toMinorUnits(x)) == x
     // ---------------------------------------------------------------
-
-    /**
-     * @dataProvider roundTripProvider
-     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('roundTripProvider')]
     public function testRoundTrip(float $major, string $currency): void
     {
         $minor = AmountConverter::toMinorUnits($major, $currency);
@@ -227,10 +214,7 @@ final class AmountConverterTest extends TestCase
     // ---------------------------------------------------------------
     // Sprint 114.10a (§6.2): currency field threading via request DTOs
     // ---------------------------------------------------------------
-
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function captureRequestWithJpyCurrencyConvertsToCorrectMinorUnits(): void
     {
         $request = new CapturePaymentRequest(
@@ -245,9 +229,7 @@ final class AmountConverterTest extends TestCase
         self::assertSame(1000, $minorUnits);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function refundRequestWithJpyCurrencyConvertsToCorrectMinorUnits(): void
     {
         $request = new RefundPaymentRequest(
@@ -262,11 +244,7 @@ final class AmountConverterTest extends TestCase
         self::assertSame(1000, $minorUnits);
     }
 
-    /**
-     * @test
-     * Confirms the regression: without currency field, empty string → 2-decimal default.
-     * With currency 'JPY', the correct zero-decimal is used.
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function withoutCurrencyEmptyStringDefaultsToTwoDecimalsForJpy(): void
     {
         // This was the bug: treating JPY as if it were EUR

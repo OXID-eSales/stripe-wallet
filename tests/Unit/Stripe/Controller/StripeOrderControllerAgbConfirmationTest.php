@@ -24,9 +24,8 @@ use PHPUnit\Framework\TestCase;
  * that do not carry ord_agb=1, and passes requests that do.
  *
  * Mirrors the testable-subclass pattern from StripeOrderControllerRetryTest.
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\StripeOrderController
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\StripeOrderController::class)]
 class StripeOrderControllerAgbConfirmationTest extends TestCase
 {
     private EventDispatcherInterface&MockObject $eventDispatcher;

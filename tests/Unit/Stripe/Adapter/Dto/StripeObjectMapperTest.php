@@ -27,9 +27,8 @@ use Stripe\Refund;
  *
  * Feeds recorded SDK-shape fixtures into Stripe::constructFrom() and
  * asserts the resulting DTOs carry the correct fields. No network calls.
- *
- * @covers \OxidEsales\Payments\Stripe\Adapter\StripeObjectMapper
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Adapter\StripeObjectMapper::class)]
 final class StripeObjectMapperTest extends TestCase
 {
     // -------------------------------------------------------------------------

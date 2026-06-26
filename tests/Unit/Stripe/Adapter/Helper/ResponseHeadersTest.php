@@ -17,11 +17,10 @@ use PHPUnit\Framework\TestCase;
  * (webhook + JSON endpoints). These are API responses that are never legitimately
  * framed, so `X-Frame-Options: DENY` is correct here; shop-wide framing policy
  * (SAMEORIGIN, for admin framesets) is set in the web-server config, not here.
- *
- * @covers \OxidEsales\Payments\Stripe\Adapter\Helper\ResponseHeaders
- * @group sprint-131
- * @group security
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Adapter\Helper\ResponseHeaders::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-131')]
+#[\PHPUnit\Framework\Attributes\Group('security')]
 final class ResponseHeadersTest extends TestCase
 {
     /**

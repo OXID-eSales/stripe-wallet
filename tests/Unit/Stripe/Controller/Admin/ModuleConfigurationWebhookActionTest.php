@@ -30,10 +30,9 @@ use Psr\Log\NullLogger;
  * to the module_config form. The legacy single-valued module settings
  * (`sStripeWebhookEndpoint`, `sStripeWebhookEndpointSecret`) are ALSO written on
  * success, so the admin sees the registered URL + secret in the form on reload.
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\Admin\ModuleConfiguration
- * @group sprint-111
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\Admin\ModuleConfiguration::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-111')]
 final class ModuleConfigurationWebhookActionTest extends TestCase
 {
     private WebhookEndpointRegistrarInterface&MockObject $registrar;

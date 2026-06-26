@@ -18,9 +18,8 @@ use Psr\Log\NullLogger;
 /**
  * D9: ModuleConfiguration::stripeHasApiKeys() must delegate to the service's
  * isConfigured() — the single canonical definition (token + webhook secret).
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\Admin\ModuleConfiguration
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\Admin\ModuleConfiguration::class)]
 final class ModuleConfigurationIsConfiguredTest extends TestCase
 {
     /**

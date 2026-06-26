@@ -24,10 +24,9 @@ use PHPUnit\Framework\TestCase;
  *
  * The session payload is plain arrays (field/code/char/action) — never
  * serialized value objects.
- *
- * @covers \OxidEsales\Payments\Stripe\Admin\AdminValidationFeedback
- * @group sprint-120
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Admin\AdminValidationFeedback::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-120')]
 final class AdminValidationFeedbackTest extends TestCase
 {
     /** In-memory stand-in for the OXID session. @var array<string, mixed> */

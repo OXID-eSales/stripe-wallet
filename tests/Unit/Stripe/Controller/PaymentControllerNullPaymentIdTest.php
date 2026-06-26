@@ -28,9 +28,8 @@ use PHPUnit\Framework\TestCase;
  * Root cause: PaymentController.php line 132:
  *   return str_starts_with($selectedPayment, 'oe_payments_stripe_');
  * where $selectedPayment is null because getPaymentId() returns null when no shipping method is available.
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\PaymentController
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\PaymentController::class)]
 class PaymentControllerNullPaymentIdTest extends TestCase
 {
     /**

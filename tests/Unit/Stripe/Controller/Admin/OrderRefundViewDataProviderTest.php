@@ -34,9 +34,8 @@ use PHPUnit\Framework\TestCase;
  * T3 fix (Sprint 114.13): regression tests for the partial-capture formula now
  * inject the real StripeChargeAmountResolver so the fixture charge numbers
  * actually drive the result. Delegation-only tests retain a mock resolver.
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider::class)]
 final class OrderRefundViewDataProviderTest extends TestCase
 {
     private ChargeAmountResolverInterface&MockObject $mockResolver;
@@ -144,14 +143,12 @@ final class OrderRefundViewDataProviderTest extends TestCase
     // Issue 2 (STRP-15123): getCaptureableRaw() must return remaining capturable,
     // not the full authorized amount.
     // -------------------------------------------------------------------------
-
     /**
      * Repro: PI authorized 100.00, but only 40.00 is still capturable.
      * getCaptureableRaw() must return 40.0, not 100.0.
      * RED today — StripePaymentIntentDto has no amountCapturable field.
-     *
-     * @group strp-15123
      */
+    #[\PHPUnit\Framework\Attributes\Group('strp-15123')]
     public function testGetCaptureableRawReturnsRemainingCapturableNotFullAuthorized(): void
     {
         $pi = $this->buildPiDtoWithAmountCapturable(
@@ -168,9 +165,8 @@ final class OrderRefundViewDataProviderTest extends TestCase
      * Repro: PI authorized 100.00, amountCapturable == amount (no prior partial capture).
      * getCaptureableRaw() must return 100.0 (no regression for the fresh-authorized case).
      * RED today — StripePaymentIntentDto has no amountCapturable field.
-     *
-     * @group strp-15123
      */
+    #[\PHPUnit\Framework\Attributes\Group('strp-15123')]
     public function testGetCaptureableRawReturnFullAmountWhenNoPriorCapture(): void
     {
         $pi = $this->buildPiDtoWithAmountCapturable(

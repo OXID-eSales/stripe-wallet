@@ -26,12 +26,11 @@ use OxidEsales\PaymentBase\Repository\DoctrineContractRepository;
  * - OXTRANSSTATUS: Transaction status (NOT_FINISHED, OK, ERROR)
  * - OXPAID: Payment completion timestamp
  * - OXFOLDER: Order folder for admin (ORDERFOLDER_NEW, ORDERFOLDER_PROBLEMS)
- *
- * @group integration
- * @group order-fields
- * @group oxorder
- * @group sprint-2
  */
+#[\PHPUnit\Framework\Attributes\Group('integration')]
+#[\PHPUnit\Framework\Attributes\Group('order-fields')]
+#[\PHPUnit\Framework\Attributes\Group('oxorder')]
+#[\PHPUnit\Framework\Attributes\Group('sprint-2')]
 final class OxorderFieldPersistenceTest extends IntegrationTestCase
 {
     private const TEST_PREFIX = 'ox_test_';
@@ -64,11 +63,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
     // =========================================================================
     // OXTRANSID Tests
     // =========================================================================
-
-    /**
-     * @test
-     * @group tdd-red
-     */
+    #[\PHPUnit\Framework\Attributes\Group('tdd-red')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function oxtransidIsSetToPaymentIntentIdOnOrderCreation(): void
     {
         // Arrange
@@ -91,10 +87,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         );
     }
 
-    /**
-     * @test
-     * @group tdd-red
-     */
+    #[\PHPUnit\Framework\Attributes\Group('tdd-red')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function oxtransidIsNotOverwrittenOnSubsequentUpdates(): void
     {
         // Arrange
@@ -120,10 +114,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         );
     }
 
-    /**
-     * @test
-     * @group tdd-red
-     */
+    #[\PHPUnit\Framework\Attributes\Group('tdd-red')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function oxtransidAccepts64CharacterPaymentIntentId(): void
     {
         // Arrange - Stripe PaymentIntent IDs can be up to 27 chars, but field is VARCHAR(64)
@@ -145,11 +137,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
     // =========================================================================
     // OXTRANSSTATUS Tests
     // =========================================================================
-
-    /**
-     * @test
-     * @group tdd-red
-     */
+    #[\PHPUnit\Framework\Attributes\Group('tdd-red')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function oxtransstatusIsNotFinishedOnOrderCreation(): void
     {
         // Arrange & Act
@@ -169,10 +158,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         );
     }
 
-    /**
-     * @test
-     * @group tdd-red
-     */
+    #[\PHPUnit\Framework\Attributes\Group('tdd-red')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function oxtransstatusIsOkAfterPaymentSucceeds(): void
     {
         // Arrange
@@ -193,10 +180,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         $this->assertEquals('OK', $dbOrder['OXTRANSSTATUS']);
     }
 
-    /**
-     * @test
-     * @group tdd-red
-     */
+    #[\PHPUnit\Framework\Attributes\Group('tdd-red')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function oxtransstatusIsErrorAfterPaymentFails(): void
     {
         // Arrange
@@ -220,11 +205,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
     // =========================================================================
     // OXPAID Tests
     // =========================================================================
-
-    /**
-     * @test
-     * @group tdd-red
-     */
+    #[\PHPUnit\Framework\Attributes\Group('tdd-red')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function oxpaidIsZeroOnOrderCreation(): void
     {
         // Arrange & Act
@@ -244,10 +226,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         );
     }
 
-    /**
-     * @test
-     * @group tdd-red
-     */
+    #[\PHPUnit\Framework\Attributes\Group('tdd-red')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function oxpaidIsSetOnPaymentCapture(): void
     {
         // Arrange
@@ -279,10 +259,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         );
     }
 
-    /**
-     * @test
-     * @group tdd-red
-     */
+    #[\PHPUnit\Framework\Attributes\Group('tdd-red')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function oxpaidRemainsZeroOnPaymentFailure(): void
     {
         // Arrange
@@ -311,11 +289,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
     // =========================================================================
     // OXFOLDER Tests
     // =========================================================================
-
-    /**
-     * @test
-     * @group tdd-red
-     */
+    #[\PHPUnit\Framework\Attributes\Group('tdd-red')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function oxfolderIsNewOnOrderCreation(): void
     {
         // Arrange & Act
@@ -335,10 +310,8 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         );
     }
 
-    /**
-     * @test
-     * @group tdd-red
-     */
+    #[\PHPUnit\Framework\Attributes\Group('tdd-red')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function oxfolderIsProblemsOnPaymentFailure(): void
     {
         // Arrange
@@ -367,12 +340,9 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
     // =========================================================================
     // Combined Flow Tests
     // =========================================================================
-
-    /**
-     * @test
-     * @group tdd-red
-     * @group complete-flow
-     */
+    #[\PHPUnit\Framework\Attributes\Group('tdd-red')]
+    #[\PHPUnit\Framework\Attributes\Group('complete-flow')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function completePaymentFlowSetsAllFieldsCorrectly(): void
     {
         // Arrange
@@ -408,11 +378,9 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         $this->assertEquals('ORDERFOLDER_NEW', $finalOrder['OXFOLDER'], 'OXFOLDER mismatch');
     }
 
-    /**
-     * @test
-     * @group tdd-red
-     * @group complete-flow
-     */
+    #[\PHPUnit\Framework\Attributes\Group('tdd-red')]
+    #[\PHPUnit\Framework\Attributes\Group('complete-flow')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function failedPaymentFlowSetsFieldsCorrectly(): void
     {
         // Arrange
@@ -438,11 +406,9 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         $this->assertEquals('ORDERFOLDER_PROBLEMS', $dbOrder['OXFOLDER'], 'OXFOLDER should be PROBLEMS');
     }
 
-    /**
-     * @test
-     * @group tdd-red
-     * @group contract-flow
-     */
+    #[\PHPUnit\Framework\Attributes\Group('tdd-red')]
+    #[\PHPUnit\Framework\Attributes\Group('contract-flow')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function contractCommitSetsOxtransidFromProviderInfo(): void
     {
         // Arrange

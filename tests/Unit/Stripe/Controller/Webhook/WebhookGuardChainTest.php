@@ -14,14 +14,12 @@ use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookGuardResult;
 use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRequestGuardInterface;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Controller\Webhook\WebhookGuardChain
- * @group sprint-64a
- * @group security
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\Webhook\WebhookGuardChain::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-64a')]
+#[\PHPUnit\Framework\Attributes\Group('security')]
 final class WebhookGuardChainTest extends TestCase
 {
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function chainAllowsWhenAllGuardsPass(): void
     {
         $guard1 = $this->createMock(WebhookRequestGuardInterface::class);
@@ -34,7 +32,7 @@ final class WebhookGuardChainTest extends TestCase
         $this->assertNull($chain->check('{}', 'sig', '1.2.3.4'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function chainShortCircuitsOnFirstRejection(): void
     {
         $rejection = new WebhookGuardResult('rate_limited', 429, 'Too many requests');
@@ -48,7 +46,7 @@ final class WebhookGuardChainTest extends TestCase
         $this->assertSame($rejection, $chain->check('{}', 'sig', '1.2.3.4'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function emptyChainAllowsAll(): void
     {
         $chain = new WebhookGuardChain([]);
@@ -56,7 +54,7 @@ final class WebhookGuardChainTest extends TestCase
         $this->assertNull($chain->check('{}', 'sig', '1.2.3.4'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function chainReturnsFirstRejectionNotSecond(): void
     {
         $rejection1 = new WebhookGuardResult('payload_too_large', 413, 'Too large');

@@ -16,10 +16,9 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * STRP-129: human-readable "allowed symbols" rendering per field.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\AllowedSymbolsDescriber
- * @group user-data-validation
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\AllowedSymbolsDescriber::class)]
+#[\PHPUnit\Framework\Attributes\Group('user-data-validation')]
 final class AllowedSymbolsDescriberTest extends TestCase
 {
     private LanguageTranslatorInterface&MockObject $translator;

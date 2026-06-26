@@ -19,10 +19,9 @@ use PHPUnit\Framework\TestCase;
  *
  * These tests verify that migrations correctly create all tables, columns,
  * indexes, and foreign keys as specified in the architecture documentation.
- *
- * @group database
- * @group migration
  */
+#[\PHPUnit\Framework\Attributes\Group('database')]
+#[\PHPUnit\Framework\Attributes\Group('migration')]
 class MigrationStructureTest extends TestCase
 {
     private Connection $connection;

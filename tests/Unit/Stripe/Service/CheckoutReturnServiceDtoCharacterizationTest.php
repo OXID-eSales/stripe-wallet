@@ -23,9 +23,8 @@ use PHPUnit\Framework\TestCase;
  *
  * Verifies behavior parity: CheckoutReturnService reads session data via
  * StripeCheckoutSessionDto instead of raw \Stripe\Checkout\Session.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\CheckoutReturnService
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\CheckoutReturnService::class)]
 final class CheckoutReturnServiceDtoCharacterizationTest extends TestCase
 {
     private StripeAdapterFactoryInterface&MockObject $adapterFactory;

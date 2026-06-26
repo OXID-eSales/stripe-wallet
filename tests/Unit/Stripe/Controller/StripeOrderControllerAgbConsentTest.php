@@ -39,10 +39,9 @@ use PHPUnit\Framework\TestCase;
  *  C7 — checkoutCancel() clears consent even without a contractId in session.
  *
  * Uses the testable-subclass pattern established in StripeOrderControllerAgbConfirmationTest.
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\StripeOrderController
- * @covers \OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\StripeOrderController::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper::class)]
 class StripeOrderControllerAgbConsentTest extends TestCase
 {
     private EventDispatcherInterface&MockObject $eventDispatcher;

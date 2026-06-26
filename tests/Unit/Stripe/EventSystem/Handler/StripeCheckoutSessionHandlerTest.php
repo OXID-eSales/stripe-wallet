@@ -25,9 +25,8 @@ use RuntimeException;
  *
  * Sprint 21: Refactored tests for handler with CheckoutSessionService delegation.
  * Sprint 20: Tests updated to include ShopAdapterInterface mock.
- *
- * @covers \OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler::class)]
 class StripeCheckoutSessionHandlerTest extends TestCase
 {
     private CheckoutSessionServiceInterface&MockObject $checkoutSessionService;

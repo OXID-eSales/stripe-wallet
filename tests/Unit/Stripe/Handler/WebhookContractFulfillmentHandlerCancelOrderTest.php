@@ -24,9 +24,8 @@ use PHPUnit\Framework\TestCase;
  * Sprint 112 / G1: cancelled & failed contract transitions must mirror onto
  * the linked oxorder row so cancelled orders no longer look paid in the admin
  * order list.
- *
- * @covers \OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler::class)]
 class WebhookContractFulfillmentHandlerCancelOrderTest extends TestCase
 {
     private ContractRepositoryInterface $contractRepository;

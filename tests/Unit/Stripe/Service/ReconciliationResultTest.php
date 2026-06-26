@@ -14,16 +14,13 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Unit tests for ReconciliationResult DTO
- *
- * @covers \OxidEsales\Payments\Stripe\Service\ReconciliationResult
- * @group sprint-10
- * @group reconciliation
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\ReconciliationResult::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-10')]
+#[\PHPUnit\Framework\Attributes\Group('reconciliation')]
 class ReconciliationResultTest extends TestCase
 {
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function canCreateSuccessResult(): void
     {
         $result = new ReconciliationResult(
@@ -43,9 +40,7 @@ class ReconciliationResultTest extends TestCase
         $this->assertTrue($result->contractUpdated);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function canCreateFailureResult(): void
     {
         $result = new ReconciliationResult(
@@ -61,9 +56,7 @@ class ReconciliationResultTest extends TestCase
         $this->assertFalse($result->contractUpdated);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function contractUpdatedDefaultsToFalse(): void
     {
         $result = new ReconciliationResult(
@@ -77,9 +70,7 @@ class ReconciliationResultTest extends TestCase
         $this->assertFalse($result->contractUpdated);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function toArrayReturnsCorrectStructure(): void
     {
         $result = new ReconciliationResult(
@@ -102,9 +93,7 @@ class ReconciliationResultTest extends TestCase
         $this->assertTrue($array['contract_updated']);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function propertiesAreReadOnly(): void
     {
         $result = new ReconciliationResult(

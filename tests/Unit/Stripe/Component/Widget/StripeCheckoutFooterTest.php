@@ -21,10 +21,9 @@ use PHPUnit\Framework\TestCase;
  * Sprint 114.13 (§8): testable-subclass pattern overrides the OXID
  * framework seams (parent::render, addTplParam, getViewParameter,
  * getServiceFromContainer) so no bootstrap is required.
- *
- * @covers \OxidEsales\Payments\Stripe\Component\Widget\StripeCheckoutFooter
- * @group sprint-114-13
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Component\Widget\StripeCheckoutFooter::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-114-13')]
 final class StripeCheckoutFooterTest extends TestCase
 {
     // --- render() ---

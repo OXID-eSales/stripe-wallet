@@ -12,14 +12,12 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller\Webhook;
 use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookIpAllowlistGuard;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Controller\Webhook\WebhookIpAllowlistGuard
- * @group sprint-64c
- * @group security
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\Webhook\WebhookIpAllowlistGuard::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-64c')]
+#[\PHPUnit\Framework\Attributes\Group('security')]
 final class WebhookIpAllowlistGuardTest extends TestCase
 {
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardAllowsStripeIp(): void
     {
         $guard = new WebhookIpAllowlistGuard(['54.187.174.169/32', '54.187.205.235/32']);
@@ -27,7 +25,7 @@ final class WebhookIpAllowlistGuardTest extends TestCase
         $this->assertNull($guard->check('{}', 'sig', '54.187.174.169'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardRejectsNonStripeIp(): void
     {
         $guard = new WebhookIpAllowlistGuard(['54.187.174.169/32']);
@@ -38,7 +36,7 @@ final class WebhookIpAllowlistGuardTest extends TestCase
         $this->assertSame('ip_not_allowed', $result->reason);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function emptyAllowlistDisablesGuard(): void
     {
         $guard = new WebhookIpAllowlistGuard([]);
@@ -46,7 +44,7 @@ final class WebhookIpAllowlistGuardTest extends TestCase
         $this->assertNull($guard->check('{}', 'sig', '1.2.3.4'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardHandlesCidrNotation(): void
     {
         $guard = new WebhookIpAllowlistGuard(['54.187.174.0/24']);
@@ -55,7 +53,7 @@ final class WebhookIpAllowlistGuardTest extends TestCase
         $this->assertNotNull($guard->check('{}', 'sig', '54.187.175.1'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardAllowsLoopbackInDevMode(): void
     {
         $guard = new WebhookIpAllowlistGuard(['54.187.174.0/24'], true);
@@ -64,7 +62,7 @@ final class WebhookIpAllowlistGuardTest extends TestCase
         $this->assertNull($guard->check('{}', 'sig', '::1'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardRejectsLoopbackInProdMode(): void
     {
         $guard = new WebhookIpAllowlistGuard(['54.187.174.0/24'], false);
@@ -72,7 +70,7 @@ final class WebhookIpAllowlistGuardTest extends TestCase
         $this->assertNotNull($guard->check('{}', 'sig', '127.0.0.1'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardHandlesExactIpWithoutCidr(): void
     {
         $guard = new WebhookIpAllowlistGuard(['54.187.174.169']);
@@ -81,7 +79,7 @@ final class WebhookIpAllowlistGuardTest extends TestCase
         $this->assertNotNull($guard->check('{}', 'sig', '54.187.174.170'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardHandlesInvalidIpGracefully(): void
     {
         $guard = new WebhookIpAllowlistGuard(['54.187.174.0/24']);

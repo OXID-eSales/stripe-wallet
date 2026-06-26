@@ -24,9 +24,8 @@ use PHPUnit\Framework\TestCase;
  * publishable_key returned by Stripe Connect, set a success/failure flag for the
  * view. Webhook registration was moved to `ModuleConfiguration` in Sprint 111
  * (see ModuleConfigurationWebhookActionTest).
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\Admin\StripeConnect
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\Admin\StripeConnect::class)]
 final class StripeConnectTest extends TestCase
 {
     private ModuleSettingBridgeInterface&MockObject $moduleSettings;

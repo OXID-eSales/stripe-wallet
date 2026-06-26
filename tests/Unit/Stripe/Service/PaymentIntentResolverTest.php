@@ -16,10 +16,9 @@ use RuntimeException;
  *
  * Sprint 114.8: Extracted PI-id resolution from StripeCaptureRequestHandler and
  * StripeCancelAuthorizationRequestHandler (D4).
- *
- * @covers \OxidEsales\Payments\Stripe\Service\PaymentIntentResolver
- * @group sprint-114-8
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\PaymentIntentResolver::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-114-8')]
 final class PaymentIntentResolverTest extends TestCase
 {
     private ContractRepositoryInterface&MockObject $contractRepository;
@@ -33,10 +32,7 @@ final class PaymentIntentResolverTest extends TestCase
         $this->resolver = new PaymentIntentResolver($this->contractRepository);
     }
 
-    /**
-     * @test
-     * Explicit PI id provided → returns it directly, no repository call.
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function returnsExplicitPaymentIntentId(): void
     {
         $this->contractRepository->expects($this->never())->method('findById');
@@ -49,10 +45,7 @@ final class PaymentIntentResolverTest extends TestCase
         $this->assertSame('pi_explicit_123', $result);
     }
 
-    /**
-     * @test
-     * No explicit id, contract has providerOrderId → returns providerOrderId.
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function returnsProviderOrderIdFromContract(): void
     {
         $contract = $this->createMock(PaymentContractInterface::class);
@@ -72,10 +65,7 @@ final class PaymentIntentResolverTest extends TestCase
         $this->assertSame('pi_from_contract', $result);
     }
 
-    /**
-     * @test
-     * No explicit id, contract has no providerOrderId but has metadata → returns from metadata.
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function returnsPaymentIntentFromContractMetadata(): void
     {
         $contract = $this->createMock(PaymentContractInterface::class);
@@ -96,10 +86,7 @@ final class PaymentIntentResolverTest extends TestCase
         $this->assertSame('pi_from_metadata', $result);
     }
 
-    /**
-     * @test
-     * No explicit id, no contract id → throws with "missing" message.
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function throwsWhenNeitherIdNorContractProvided(): void
     {
         $this->contractRepository->expects($this->never())->method('findById');
@@ -113,10 +100,7 @@ final class PaymentIntentResolverTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * Contract not found → throws with "Contract not found" message.
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function throwsWhenContractNotFound(): void
     {
         $this->contractRepository
@@ -132,10 +116,7 @@ final class PaymentIntentResolverTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * Contract found but no PI id anywhere → throws "No PaymentIntent ID found".
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function throwsWhenNoPaymentIntentIdFoundOnContract(): void
     {
         $contract = $this->createMock(PaymentContractInterface::class);

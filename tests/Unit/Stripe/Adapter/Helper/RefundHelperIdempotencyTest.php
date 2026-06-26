@@ -24,11 +24,10 @@ use Stripe\StripeClient;
  * Unit tests for RefundHelper idempotency logic.
  *
  * Sprint 46: Idempotency moved from IdempotentStripeAdapter into helper.
- *
- * @covers \OxidEsales\Payments\Stripe\Adapter\Helper\RefundHelper
- * @group sprint-46
- * @group idempotency
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Adapter\Helper\RefundHelper::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-46')]
+#[\PHPUnit\Framework\Attributes\Group('idempotency')]
 final class RefundHelperIdempotencyTest extends TestCase
 {
     private StripeClient&MockObject $stripeClient;
@@ -47,10 +46,7 @@ final class RefundHelperIdempotencyTest extends TestCase
     // ==========================================
     // refundPayment() idempotency tests
     // ==========================================
-
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function refundPaymentCallsStripeWhenNoExistingRecord(): void
     {
         $request = new RefundPaymentRequest('pi_abc123', 25.0);
@@ -75,9 +71,7 @@ final class RefundHelperIdempotencyTest extends TestCase
         $this->assertSame(25.0, $result->amountRefunded);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function refundPaymentReturnsCachedResultWhenCompleted(): void
     {
         $request = new RefundPaymentRequest('pi_abc123', 25.0);
@@ -118,9 +112,7 @@ final class RefundHelperIdempotencyTest extends TestCase
         $this->assertSame(25.0, $result->amountRefunded);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function refundPaymentThrowsWhenProcessing(): void
     {
         $request = new RefundPaymentRequest('pi_abc123');
@@ -146,9 +138,7 @@ final class RefundHelperIdempotencyTest extends TestCase
         $this->helper->refundPayment($this->stripeClient, $request);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function refundPaymentDeserializesFailedCachedResponse(): void
     {
         $request = new RefundPaymentRequest('pi_abc123');
@@ -181,9 +171,7 @@ final class RefundHelperIdempotencyTest extends TestCase
         $this->assertSame('Refund declined', $result->errorMessage);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function refundPaymentWithoutIdempotencyCallsStripeDirectly(): void
     {
         $helperNoIdempotency = new RefundHelper();
@@ -201,10 +189,7 @@ final class RefundHelperIdempotencyTest extends TestCase
     // ==========================================
     // createRefundByCharge() idempotency tests
     // ==========================================
-
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function createRefundByChargeCallsStripeWhenNoExistingRecord(): void
     {
         $refund = $this->createStripeRefund('re_charge', 5000, 'eur', 'succeeded');
@@ -222,9 +207,7 @@ final class RefundHelperIdempotencyTest extends TestCase
         $this->assertSame($refund, $result);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function createRefundByChargeThrowsWhenProcessing(): void
     {
         $existingRecord = new IdempotencyRecord(

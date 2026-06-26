@@ -17,10 +17,8 @@ use OxidEsales\Payments\Stripe\Service\WebhookEventCatalog;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Service\WebhookEndpointRegistrar
- * @group sprint-109
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\WebhookEndpointRegistrar::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-109')]
 final class WebhookEndpointRegistrarTest extends TestCase
 {
     private const ACCESS_TOKEN = 'sk_test_dummy';

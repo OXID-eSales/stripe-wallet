@@ -27,10 +27,9 @@ use PHPUnit\Framework\TestCase;
  * Sprint 114.13 (O10): tests added before refactoring the instanceof ladder
  * to a mapping table. These tests constitute the characterization suite that
  * guards behavior parity during the refactor (R-1.4).
- *
- * @covers \OxidEsales\Payments\Stripe\EventSystem\Translator\StripeEventTranslator
- * @group sprint-114-13
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\EventSystem\Translator\StripeEventTranslator::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-114-13')]
 final class StripeEventTranslatorTest extends TestCase
 {
     private StripeEventTranslator $translator;

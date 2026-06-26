@@ -25,9 +25,8 @@ use PHPUnit\Framework\TestCase;
  * that are impossible to inject. We test via a testable subclass that overrides the
  * protected trans-ID extraction seam. After Phase 4 (interface flip), the adapter mock
  * directly returns StripePaymentIntentDto objects — the mapper has moved into StripeAdapter.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\StripeOrderApiService
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\StripeOrderApiService::class)]
 final class StripeOrderApiServiceDtoCharacterizationTest extends TestCase
 {
     private StripeAdapterFactoryInterface&MockObject $adapterFactory;

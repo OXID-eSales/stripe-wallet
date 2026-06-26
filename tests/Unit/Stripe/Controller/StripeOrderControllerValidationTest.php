@@ -34,11 +34,10 @@ use PHPUnit\Framework\TestCase;
  *
  * Uses the testable-subclass pattern; the controller under test is the real
  * StripeOrderController with seams overridden — not a copy.
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\StripeOrderController
- * @group sprint-119
- * @group user-data-validation
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\StripeOrderController::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-119')]
+#[\PHPUnit\Framework\Attributes\Group('user-data-validation')]
 final class StripeOrderControllerValidationTest extends TestCase
 {
     private EventDispatcherInterface&MockObject $eventDispatcher;
@@ -53,8 +52,7 @@ final class StripeOrderControllerValidationTest extends TestCase
     // ==========================================
     // T1 — Invalid user data → HTTP 422; event NOT dispatched
     // ==========================================
-
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function checkoutDispatchBlockedOnInvalidUserData(): void
     {
         $failure = new FieldValidationFailure(
@@ -90,8 +88,7 @@ final class StripeOrderControllerValidationTest extends TestCase
     // ==========================================
     // T2 — Valid user data → dispatcher IS called (happy-path regression guard)
     // ==========================================
-
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validUserPassesThroughToDispatch(): void
     {
         $validator = $this->stubValidatorReturning([]);
@@ -119,8 +116,7 @@ final class StripeOrderControllerValidationTest extends TestCase
     // ==========================================
     // T3 — Validation runs AFTER preconditions (basket empty → 500 wins over 422)
     // ==========================================
-
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validationRunsAfterPreconditionCheck(): void
     {
         // Validator would return a failure — but basket is empty so preconditions
@@ -152,8 +148,7 @@ final class StripeOrderControllerValidationTest extends TestCase
     // T4 — Validation failure does NOT create contract (StripeCheckoutSessionRequestEvent
     //      not dispatched — covers OrderCreatedEvent which fires inside that handler)
     // ==========================================
-
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validationFailureDoesNotDispatchCheckoutSessionEvent(): void
     {
         $failures = [
@@ -193,8 +188,7 @@ final class StripeOrderControllerValidationTest extends TestCase
     // ==========================================
     // T5 — JSON shape: addressKind and all required fields are present
     // ==========================================
-
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function emittedJsonContainsAddressKindAndAllRequiredFields(): void
     {
         $failure = new FieldValidationFailure(
@@ -229,8 +223,7 @@ final class StripeOrderControllerValidationTest extends TestCase
     // ==========================================
     // T6 — Null offendingChar is serialised as null (not absent)
     // ==========================================
-
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function nullOffendingCharIsIncludedAsNull(): void
     {
         $failure = new FieldValidationFailure(
@@ -260,8 +253,7 @@ final class StripeOrderControllerValidationTest extends TestCase
     // ==========================================
     // T7 — Phase E: JSON errors carry rendered message
     // ==========================================
-
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function emitsErrorsWithRenderedMessage(): void
     {
         $failure = new FieldValidationFailure(

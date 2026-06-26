@@ -12,14 +12,12 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller\Webhook;
 use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookPayloadSizeGuard;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Controller\Webhook\WebhookPayloadSizeGuard
- * @group sprint-64a
- * @group security
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\Webhook\WebhookPayloadSizeGuard::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-64a')]
+#[\PHPUnit\Framework\Attributes\Group('security')]
 final class WebhookPayloadSizeGuardTest extends TestCase
 {
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardRejectsOversizedPayload(): void
     {
         $guard = new WebhookPayloadSizeGuard(1024);
@@ -32,7 +30,7 @@ final class WebhookPayloadSizeGuardTest extends TestCase
         $this->assertSame('payload_too_large', $result->reason);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardAllowsNormalPayload(): void
     {
         $guard = new WebhookPayloadSizeGuard(65536);
@@ -41,7 +39,7 @@ final class WebhookPayloadSizeGuardTest extends TestCase
         $this->assertNull($guard->check($normal, 'sig', '1.2.3.4'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardAllowsEmptyPayload(): void
     {
         $guard = new WebhookPayloadSizeGuard(65536);
@@ -49,7 +47,7 @@ final class WebhookPayloadSizeGuardTest extends TestCase
         $this->assertNull($guard->check('', 'sig', '1.2.3.4'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardAllowsAtExactLimit(): void
     {
         $guard = new WebhookPayloadSizeGuard(100);
@@ -58,7 +56,7 @@ final class WebhookPayloadSizeGuardTest extends TestCase
         $this->assertNull($guard->check($atLimit, 'sig', '1.2.3.4'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardRejectsAtLimitPlusOne(): void
     {
         $guard = new WebhookPayloadSizeGuard(100);
@@ -67,7 +65,7 @@ final class WebhookPayloadSizeGuardTest extends TestCase
         $this->assertNotNull($guard->check($overLimit, 'sig', '1.2.3.4'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guardMessageIncludesMaxSize(): void
     {
         $guard = new WebhookPayloadSizeGuard(1024);

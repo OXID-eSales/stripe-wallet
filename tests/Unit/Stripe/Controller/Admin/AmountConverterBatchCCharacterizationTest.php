@@ -19,9 +19,8 @@ use PHPUnit\Framework\TestCase;
  * - OrderRefundViewDataProvider (lines 136, 191, 231, 248, 262)
  * - StripePanelViewDataBuilder (line 56)
  * - Model/Order (line 193)
- *
- * @covers \OxidEsales\Payments\Stripe\Core\AmountConverter
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Core\AmountConverter::class)]
 final class AmountConverterBatchCCharacterizationTest extends TestCase
 {
     // ---------------------------------------------------------------

@@ -20,9 +20,8 @@ use Psr\Log\LoggerInterface;
  * Unit tests for OxidStockRestorationService.
  *
  * Sprint 24: TDD - tests written first.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\OxidStockRestorationService
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\OxidStockRestorationService::class)]
 class StockRestorationServiceTest extends TestCase
 {
     private Connection&MockObject $connection;

@@ -20,10 +20,9 @@ use PHPUnit\Framework\TestCase;
 /**
  * STRP-129: the validation message must name the field and list the ALLOWED
  * symbols (not the offending character).
- *
- * @covers \OxidEsales\Payments\Stripe\Service\UserDataValidationMessageFormatter
- * @group user-data-validation
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\UserDataValidationMessageFormatter::class)]
+#[\PHPUnit\Framework\Attributes\Group('user-data-validation')]
 final class UserDataValidationMessageFormatterTest extends TestCase
 {
     private LanguageTranslatorInterface&MockObject $translator;

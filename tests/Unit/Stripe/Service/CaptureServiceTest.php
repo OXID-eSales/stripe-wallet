@@ -25,9 +25,8 @@ use Psr\Log\NullLogger;
  *
  * Sprint 9: Tests for the extracted capture business logic.
  * Sprint 26: Updated to use factory instead of direct adapter injection.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\CaptureService
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\CaptureService::class)]
 class CaptureServiceTest extends TestCase
 {
     private StripeAdapterInterface&MockObject $adapter;
@@ -543,14 +542,12 @@ class CaptureServiceTest extends TestCase
     }
 
     // --- Issue 2 (STRP-15123): Over-capture guard ---
-
     /**
      * Repro: contract authorized 100.00, already captured 60.00 → remaining 40.00.
      * Submitting 50.00 must be rejected before any Stripe API call.
      * RED today — CaptureService has no remaining-capturable guard.
-     *
-     * @group strp-15123
      */
+    #[\PHPUnit\Framework\Attributes\Group('strp-15123')]
     public function testProcessCaptureRejectsAmountAboveRemainingCapturable(): void
     {
         $this->adapter->expects($this->never())->method('capturePayment');
@@ -573,9 +570,8 @@ class CaptureServiceTest extends TestCase
     /**
      * Edge: amount exactly equal to remaining (40.00) must be allowed through.
      * RED today — no guard, adapter not yet called (guard check with 40.0 must reach the adapter).
-     *
-     * @group strp-15123
      */
+    #[\PHPUnit\Framework\Attributes\Group('strp-15123')]
     public function testProcessCaptureAllowsAmountEqualToRemainingCapturable(): void
     {
         $capturedAt = new \DateTimeImmutable();
@@ -608,9 +604,8 @@ class CaptureServiceTest extends TestCase
     /**
      * Edge: null amount (full capture) must bypass the remaining-capturable guard entirely.
      * Existing tests cover this behavior; this is an explicit guard against regression.
-     *
-     * @group strp-15123
      */
+    #[\PHPUnit\Framework\Attributes\Group('strp-15123')]
     public function testProcessCaptureWithNullAmountBypassesOverCaptureGuard(): void
     {
         $response = CaptureResponse::success(

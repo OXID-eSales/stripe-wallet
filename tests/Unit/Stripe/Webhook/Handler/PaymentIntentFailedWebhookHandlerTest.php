@@ -19,9 +19,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentFailedWebhookHandler
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentFailedWebhookHandler::class)]
 final class PaymentIntentFailedWebhookHandlerTest extends TestCase
 {
     private WebhookContractFulfillmentHandlerInterface&MockObject $fulfillmentHandler;
@@ -41,20 +39,20 @@ final class PaymentIntentFailedWebhookHandlerTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function supportsPaymentIntentPaymentFailedEventType(): void
     {
         $this->assertTrue($this->handler->supports('payment_intent.payment_failed'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function doesNotSupportOtherEventTypes(): void
     {
         $this->assertFalse($this->handler->supports('payment_intent.succeeded'));
         $this->assertFalse($this->handler->supports('payment_intent.canceled'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function missingPaymentIntentId_returnsFailure(): void
     {
         $outcome = $this->handler->handle($this->makeEvent([]));
@@ -63,7 +61,7 @@ final class PaymentIntentFailedWebhookHandlerTest extends TestCase
         $this->assertNull($outcome->contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerReturnsTrue_propagatesFailureReason_returnsContractFailed(): void
     {
         $event = $this->makeEvent([
@@ -85,7 +83,7 @@ final class PaymentIntentFailedWebhookHandlerTest extends TestCase
         $this->assertSame('ctr-fail', $outcome->contractId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function handlerReturnsNull_returnsContractNotFoundSkipped(): void
     {
         $this->fulfillmentHandler->method('handlePaymentFailed')->willReturn(null);

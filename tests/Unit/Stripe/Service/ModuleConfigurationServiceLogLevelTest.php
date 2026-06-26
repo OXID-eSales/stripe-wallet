@@ -30,16 +30,15 @@ use PHPUnit\Framework\TestCase;
  * - isLoggingEnabled() REMOVED (dead method reading non-existent key).
  * - isTransactionLoggingEnabled() kept for legacy-seed source; its direct read
  *   is now superseded by getLogLevel() legacy-seed logic.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::getLogLevel
- * @covers \OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::isRequestLoggingEnabled
- * @covers \OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::isReconciliationLoggingEnabled
- * @covers \OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::isEventLoggingEnabled
- * @covers \OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::isWebhookLoggingEnabled
- * @covers \OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::isFrontendDebugEnabled
- * @group logging
- * @group phase-3
  */
+#[\PHPUnit\Framework\Attributes\CoversMethod(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::class, 'getLogLevel')]
+#[\PHPUnit\Framework\Attributes\CoversMethod(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::class, 'isRequestLoggingEnabled')]
+#[\PHPUnit\Framework\Attributes\CoversMethod(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::class, 'isReconciliationLoggingEnabled')]
+#[\PHPUnit\Framework\Attributes\CoversMethod(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::class, 'isEventLoggingEnabled')]
+#[\PHPUnit\Framework\Attributes\CoversMethod(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::class, 'isWebhookLoggingEnabled')]
+#[\PHPUnit\Framework\Attributes\CoversMethod(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::class, 'isFrontendDebugEnabled')]
+#[\PHPUnit\Framework\Attributes\Group('logging')]
+#[\PHPUnit\Framework\Attributes\Group('phase-3')]
 final class ModuleConfigurationServiceLogLevelTest extends TestCase
 {
     // =========================================================================

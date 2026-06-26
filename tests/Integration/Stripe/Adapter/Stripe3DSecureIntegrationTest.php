@@ -24,14 +24,14 @@ use OxidEsales\Payments\Stripe\Tests\Integration\Stripe\StripeIntegrationTestCas
  * Note: Full 3DS flow requires browser automation.
  * These tests verify the API-level integration.
  *
- * @group integration
- * @group stripe
- * @group api
- * @group 3ds
- * @group requires-stripe-creds
  *
- * @covers \OxidEsales\Payments\Stripe\Adapter\StripeAdapter
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Adapter\StripeAdapter::class)]
+#[\PHPUnit\Framework\Attributes\Group('integration')]
+#[\PHPUnit\Framework\Attributes\Group('stripe')]
+#[\PHPUnit\Framework\Attributes\Group('api')]
+#[\PHPUnit\Framework\Attributes\Group('3ds')]
+#[\PHPUnit\Framework\Attributes\Group('requires-stripe-creds')]
 final class Stripe3DSecureIntegrationTest extends StripeIntegrationTestCase
 {
     // ==========================================

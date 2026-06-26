@@ -20,9 +20,8 @@ use PHPUnit\Framework\TestCase;
  * - CheckoutSessionService (lines 169, 192)
  * - CheckoutReturnService (line 100 — log only, no storage impact)
  * - CheckoutReturnResult::getAmount (line 140)
- *
- * @covers \OxidEsales\Payments\Stripe\Core\AmountConverter
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Core\AmountConverter::class)]
 final class AmountConverterBatchBCharacterizationTest extends TestCase
 {
     // ---------------------------------------------------------------

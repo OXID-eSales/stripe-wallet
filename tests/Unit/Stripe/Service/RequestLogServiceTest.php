@@ -16,9 +16,8 @@ use Psr\Log\LoggerInterface;
  *
  * Sprint 15: Refactored to use FileLoggerInterface instead of database model.
  * Sprint 20: Tests updated for refactored service.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\RequestLogService
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\RequestLogService::class)]
 class RequestLogServiceTest extends TestCase
 {
     private FileLoggerInterface&MockObject $fileLogger;

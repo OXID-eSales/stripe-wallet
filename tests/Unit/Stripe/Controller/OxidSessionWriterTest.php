@@ -22,10 +22,9 @@ use PHPUnit\Framework\TestCase;
  * Sprint 114.13 (§8): covers the CSRF-relevant write path.
  * Uses Registry::set() to inject a Session mock, matching the same
  * pattern used by OxidLanguageResolverTest.
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\OxidSessionWriter
- * @group sprint-114-13
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\OxidSessionWriter::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-114-13')]
 final class OxidSessionWriterTest extends TestCase
 {
     private Session&MockObject $session;

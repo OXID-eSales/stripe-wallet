@@ -100,12 +100,9 @@ class StripeRefundRequestHandlerTest extends TestCase
     // Sprint 114.10a (A3): PI resolution via agnostic resolver — RED tests
     // These assert the handler resolves the PI id via ContractRepository, not oxNew(Order).
     // =========================================================================
-
-    /**
-     * @test
-     * @group sprint-114-10a
-     * @group a3-agnostic-pi
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-114-10a')]
+    #[\PHPUnit\Framework\Attributes\Group('a3-agnostic-pi')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function processRefundResolvesPaymentIntentIdViaContractRepository(): void
     {
         $contract = $this->createMock(PaymentContractInterface::class);
@@ -143,11 +140,9 @@ class StripeRefundRequestHandlerTest extends TestCase
         $this->assertTrue($context->get('refundSuccess'));
     }
 
-    /**
-     * @test
-     * @group sprint-114-10a
-     * @group a3-agnostic-pi
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-114-10a')]
+    #[\PHPUnit\Framework\Attributes\Group('a3-agnostic-pi')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function processRefundUsesExplicitPaymentIntentIdWhenProvided(): void
     {
         $this->refundService
@@ -176,11 +171,9 @@ class StripeRefundRequestHandlerTest extends TestCase
         $this->assertTrue($context->get('refundSuccess'));
     }
 
-    /**
-     * @test
-     * @group sprint-114-10a
-     * @group a3-agnostic-pi
-     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-114-10a')]
+    #[\PHPUnit\Framework\Attributes\Group('a3-agnostic-pi')]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function processRefundSetsErrorWhenPaymentIntentIdCannotBeResolved(): void
     {
         $context = new EventContext([

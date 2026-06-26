@@ -21,10 +21,9 @@ use Stripe\StripeClient;
  * whitelist in cancelPaymentIntent(). Stripe's cancellation_reason is an
  * enum; unknown values must degrade to 'requested_by_customer', never
  * reach the API raw.
- *
- * @covers \OxidEsales\Payments\Stripe\Adapter\Helper\PaymentIntentHelper
- * @group sprint-121
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Adapter\Helper\PaymentIntentHelper::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-121')]
 final class PaymentIntentHelperCancelReasonTest extends TestCase
 {
     public function testUnknownCancelReasonDegradesToRequestedByCustomer(): void

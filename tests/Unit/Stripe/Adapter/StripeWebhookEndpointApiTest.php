@@ -26,9 +26,8 @@ use Stripe\WebhookEndpoint;
  * S6 (sprint-114.11a): StripeWebhookEndpointApi must use the injected
  * StripeClientProviderInterface (with pinned stripe_version) instead of
  * constructing a bare StripeClient internally.
- *
- * @covers \OxidEsales\Payments\Stripe\Adapter\StripeWebhookEndpointApi
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Adapter\StripeWebhookEndpointApi::class)]
 final class StripeWebhookEndpointApiTest extends TestCase
 {
     private StripeClientProviderInterface&MockObject $clientProvider;

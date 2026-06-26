@@ -23,13 +23,13 @@ use OxidEsales\Payments\Stripe\Tests\Integration\Stripe\StripeIntegrationTestCas
  *
  * Tests real Stripe SDK → Stripe API interactions using test credentials.
  *
- * @group integration
- * @group stripe
- * @group api
- * @group requires-stripe-creds
  *
- * @covers \OxidEsales\Payments\Stripe\Adapter\StripeAdapter
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Adapter\StripeAdapter::class)]
+#[\PHPUnit\Framework\Attributes\Group('integration')]
+#[\PHPUnit\Framework\Attributes\Group('stripe')]
+#[\PHPUnit\Framework\Attributes\Group('api')]
+#[\PHPUnit\Framework\Attributes\Group('requires-stripe-creds')]
 final class StripeAdapterIntegrationTest extends StripeIntegrationTestCase
 {
     // ==========================================

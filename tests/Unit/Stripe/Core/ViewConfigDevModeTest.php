@@ -19,13 +19,12 @@ use PHPUnit\Framework\TestCase;
  *
  * Uses a standalone stub (not extending ViewConfig) to avoid
  * OXID's virtual parent class chain which requires framework bootstrap.
- *
- * @group sprint-70a
- * @group security
  */
+#[\PHPUnit\Framework\Attributes\Group('sprint-70a')]
+#[\PHPUnit\Framework\Attributes\Group('security')]
 final class ViewConfigDevModeTest extends TestCase
 {
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function devModeDetectsLocalhost(): void
     {
         $config = new StubDevModeChecker();
@@ -34,7 +33,7 @@ final class ViewConfigDevModeTest extends TestCase
         $this->assertTrue($config->isStripeDevelopmentMode());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function devModeDetectsDotLocal(): void
     {
         $config = new StubDevModeChecker();
@@ -43,7 +42,7 @@ final class ViewConfigDevModeTest extends TestCase
         $this->assertTrue($config->isStripeDevelopmentMode());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function devModeRejectsPartialMatch(): void
     {
         $config = new StubDevModeChecker();
@@ -52,7 +51,7 @@ final class ViewConfigDevModeTest extends TestCase
         $this->assertFalse($config->isStripeDevelopmentMode());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function devModeRejectsSubdomainTrick(): void
     {
         $config = new StubDevModeChecker();
@@ -61,7 +60,7 @@ final class ViewConfigDevModeTest extends TestCase
         $this->assertFalse($config->isStripeDevelopmentMode());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function devModeAcceptsEnvVariable(): void
     {
         $config = new StubDevModeChecker();
@@ -71,7 +70,7 @@ final class ViewConfigDevModeTest extends TestCase
         $this->assertTrue($config->isStripeDevelopmentMode());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function devModeDefaultsFalseInProduction(): void
     {
         $config = new StubDevModeChecker();

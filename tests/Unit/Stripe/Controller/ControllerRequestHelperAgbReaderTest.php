@@ -20,9 +20,8 @@ use PHPUnit\Framework\TestCase;
  * Covers the boundary between the HTTP request and the controller gate —
  * not the controller's interpretation. Uses Registry::set() to seed a
  * fake request, the same way other helper tests do today.
- *
- * @covers \OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper::class)]
 final class ControllerRequestHelperAgbReaderTest extends TestCase
 {
     private TokenServiceInterface&MockObject $tokenService;

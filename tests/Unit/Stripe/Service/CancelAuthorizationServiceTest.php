@@ -20,9 +20,8 @@ use Psr\Log\NullLogger;
  * Sprint 11: Tests for the extracted cancel authorization service.
  * Sprint 26: Updated to use factory instead of direct adapter injection.
  * Sprint 31: Updated to use CancellationResponse instead of CancellationResult.
- *
- * @covers \OxidEsales\Payments\Stripe\Service\CancelAuthorizationService
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\CancelAuthorizationService::class)]
 class CancelAuthorizationServiceTest extends TestCase
 {
     private StripeAdapterInterface&MockObject $stripeAdapter;

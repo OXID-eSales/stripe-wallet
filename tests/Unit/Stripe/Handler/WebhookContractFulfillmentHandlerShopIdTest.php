@@ -20,9 +20,8 @@ use PHPUnit\Framework\TestCase;
 /**
  * Sprint 114.1: WebhookContractFulfillmentHandler audit rows must use the
  * injected shop id, not a hardcoded 1.
- *
- * @covers \OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler::class)]
 class WebhookContractFulfillmentHandlerShopIdTest extends TestCase
 {
     private ContractRepositoryInterface&MockObject $contractRepository;

@@ -14,12 +14,9 @@ use OxidEsales\Payments\Stripe\Environment\ModuleConfigurationDevelopmentChecker
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \OxidEsales\Payments\Stripe\Environment\ModuleConfigurationDevelopmentChecker
- *
- * @group security
- * @group owasp-a05
- */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Environment\ModuleConfigurationDevelopmentChecker::class)]
+#[\PHPUnit\Framework\Attributes\Group('security')]
+#[\PHPUnit\Framework\Attributes\Group('owasp-a05')]
 class ModuleConfigurationDevelopmentCheckerTest extends TestCase
 {
     public function testImplementsInterface(): void
