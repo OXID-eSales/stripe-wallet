@@ -39,16 +39,33 @@ class StaticContent implements StaticContentInterface
     public function ensureStripePaymentMethods(): void
     {
         foreach (StripeDefinitions::getStripeDefinitions() as $paymentId => $paymentDefinitions) {
-            /** @var EshopModelPayment $paymentMethod */
-            $paymentMethod = oxNew(EshopModelPayment::class);
+            $paymentMethod = $this->makePaymentModel();
             if ($paymentMethod->load($paymentId)) {
-                // Payment method already exists, skip creation
+                // Already installed: refresh the multilingual descriptions so
+                // title and wording changes in StripeDefinitions propagate on
+                // re-activation. oxactive, amount constraints and delivery-set
+                // assignments are left untouched to preserve admin changes.
+                $this->assignDescriptions($paymentId, $paymentDefinitions);
                 continue;
             }
 
             $this->createPaymentMethod($paymentId, $paymentDefinitions);
             $this->assignPaymentToActiveDeliverySets($paymentId);
         }
+    }
+
+    /**
+     * Factory seam for the OXID payment model.
+     *
+     * Isolated so tests can substitute a spy without a live database.
+     *
+     * @return EshopModelPayment
+     */
+    protected function makePaymentModel(): EshopModelPayment
+    {
+        /** @var EshopModelPayment $model */
+        $model = oxNew(EshopModelPayment::class);
+        return $model;
     }
 
     /**
@@ -96,12 +113,8 @@ class StaticContent implements StaticContentInterface
      */
     protected function createPaymentMethod(string $paymentId, array $definitions): void
     {
-        /** @var EshopModelPayment $paymentModel */
-        $paymentModel = oxNew(EshopModelPayment::class);
+        $paymentModel = $this->makePaymentModel();
         $paymentModel->setId($paymentId);
-
-        /** @var array<int|string, int> $iso2LanguageId */
-        $iso2LanguageId = array_flip($this->getLanguageIds());
 
         // Extract constraints
         /** @var array{oxfromamount?: float, oxtoamount?: float, oxaddsumtype?: string} $constraints */
@@ -118,15 +131,39 @@ class StaticContent implements StaticContentInterface
         );
         $paymentModel->save();
 
-        // Assign multilingual descriptions
+        $this->assignDescriptions($paymentId, $definitions);
+    }
+
+    /**
+     * Write the multilingual oxdesc/oxlongdesc fields for a payment method.
+     *
+     * Idempotent — used both when first creating a method and when refreshing an
+     * already-installed one, so StripeDefinitions stays the single source of truth
+     * for payment titles and descriptions. Only the description fields are touched;
+     * oxactive and constraints are left to the caller to preserve admin changes.
+     *
+     * @param string $paymentId
+     * @param array<string, mixed> $definitions
+     * @return void
+     */
+    protected function assignDescriptions(string $paymentId, array $definitions): void
+    {
+        /** @var array<int|string, int> $iso2LanguageId */
+        $iso2LanguageId = array_flip($this->getLanguageIds());
+
         /** @var array<string, array{desc?: string, longdesc?: string}> $descriptions */
         $descriptions = is_array($definitions['descriptions'] ?? null) ? $definitions['descriptions'] : [];
+
         foreach ($descriptions as $langAbbr => $data) {
             if (!is_string($langAbbr) || !isset($iso2LanguageId[$langAbbr])) { // @phpstan-ignore function.alreadyNarrowedType
                 continue;
             }
 
-            $paymentModel->loadInLang($iso2LanguageId[$langAbbr], $paymentModel->getId());
+            $paymentModel = $this->makePaymentModel();
+            if (!$paymentModel->loadInLang($iso2LanguageId[$langAbbr], $paymentId)) {
+                continue;
+            }
+
             $paymentModel->assign(
                 [
                     'oxdesc' => $data['desc'] ?? '',
