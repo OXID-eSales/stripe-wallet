@@ -14,6 +14,7 @@ use Exception;
 use OxidEsales\Eshop\Application\Model\Basket;
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Application\Model\User;
+use OxidEsales\Eshop\Core\Exception\ArticleException;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
 use OxidEsales\PaymentBase\Adapter\Request\CreateOrderRequest;
@@ -50,9 +51,27 @@ class OxidShopOrderService implements ShopOrderServiceInterface
         } catch (ShopOrderException $e) {
             throw $e;
         } catch (Throwable $e) {
-            throw new ShopOrderException(
-                message: 'Unexpected error during order creation: ' . $e->getMessage(),
-                errorCode: 'unexpected_error',
+            throw $this->wrapOrderCreationError($e, $request);
+        }
+    }
+
+    /**
+     * Translate an unexpected order-creation failure into a ShopOrderException.
+     *
+     * OXID ArticleExceptions (article turned unbuyable, out of stock, or removed
+     * between checkout-page render and finalizeOrder) are mapped to the
+     * dedicated 'article_not_buyable' code so the controller can surface a
+     * structured 409 instead of a generic 500. This is the race-window safety
+     * net behind the controller's pre-dispatch buyability check.
+     *
+     * Story 3 (unbuyable-article-checkout).
+     */
+    private function wrapOrderCreationError(Throwable $e, CreateOrderRequest $request): ShopOrderException
+    {
+        if ($e instanceof ArticleException) {
+            return new ShopOrderException(
+                message: $e->getMessage(),
+                errorCode: 'article_not_buyable',
                 context: [
                     'exception_class' => get_class($e),
                     'session_id' => $request->sessionId,
@@ -60,6 +79,16 @@ class OxidShopOrderService implements ShopOrderServiceInterface
                 previous: $e
             );
         }
+
+        return new ShopOrderException(
+            message: 'Unexpected error during order creation: ' . $e->getMessage(),
+            errorCode: 'unexpected_error',
+            context: [
+                'exception_class' => get_class($e),
+                'session_id' => $request->sessionId,
+            ],
+            previous: $e
+        );
     }
 
     /**

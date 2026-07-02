@@ -10,6 +10,8 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Adapter;
 
 use OxidEsales\Eshop\Application\Model\Order;
+use OxidEsales\Eshop\Core\Exception\ArticleInputException;
+use OxidEsales\PaymentBase\Adapter\Exception\ShopOrderException;
 use OxidEsales\PaymentBase\Adapter\Request\CreateOrderRequest;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService;
@@ -125,5 +127,56 @@ final class OxidShopOrderServiceTest extends TestCase
             method_exists($this->service, 'deleteNotFinishedOrder'),
             'OxidShopOrderService must implement deleteNotFinishedOrder()'
         );
+    }
+
+    // ==========================================
+    // Story 3 (unbuyable-article-checkout): mapping an OXID ArticleException
+    // thrown during finalizeOrder to a typed ShopOrderException, so the
+    // controller can surface a structured 409 instead of a raw 500.
+    // ==========================================
+
+    public function testCreateOrder_WhenFinalizeThrowsArticleInputException_WrapsAsShopOrderExceptionWithArticleNotBuyableCode(): void
+    {
+        $request   = $this->orderRequest();
+        $articleEx = new ArticleInputException('ERROR_MESSAGE_ARTICLE_ARTICLE_NOT_BUYABLE');
+
+        $result = $this->invokeWrapOrderCreationError($articleEx, $request);
+
+        $this->assertInstanceOf(ShopOrderException::class, $result);
+        $this->assertSame('article_not_buyable', $result->getErrorCode());
+        $this->assertSame('ERROR_MESSAGE_ARTICLE_ARTICLE_NOT_BUYABLE', $result->getMessage());
+        $this->assertSame($articleEx, $result->getPrevious());
+    }
+
+    public function testCreateOrder_WhenFinalizeThrowsGenericThrowable_KeepsUnexpectedErrorCode(): void
+    {
+        $request = $this->orderRequest();
+        $generic = new \RuntimeException('boom');
+
+        $result = $this->invokeWrapOrderCreationError($generic, $request);
+
+        $this->assertSame('unexpected_error', $result->getErrorCode());
+        $this->assertStringContainsString('boom', $result->getMessage());
+        $this->assertSame($generic, $result->getPrevious());
+    }
+
+    private function orderRequest(): CreateOrderRequest
+    {
+        return new CreateOrderRequest(
+            sessionId: 'sess123',
+            userId: 'user123',
+            paymentId: 'oe_payments_stripe_wallet',
+        );
+    }
+
+    private function invokeWrapOrderCreationError(\Throwable $e, CreateOrderRequest $request): ShopOrderException
+    {
+        $method = new \ReflectionMethod(OxidShopOrderService::class, 'wrapOrderCreationError');
+        $method->setAccessible(true);
+
+        /** @var ShopOrderException $result */
+        $result = $method->invoke($this->service, $e, $request);
+
+        return $result;
     }
 }

@@ -16,6 +16,8 @@ services:
       - 'src/Stripe/Service/WebhookEndpointRegistrationResult.php'
       # Sprint 119 Phase B: VOs, interfaces, and OXID-model-bound readers excluded from autowire sweep
       - 'src/Stripe/Service/FieldValidationFailure.php'
+      # unbuyable-article-checkout Story 1: VO with scalar constructor args — not a service
+      - 'src/Stripe/Service/BuyabilityFailure.php'
       - 'src/Stripe/Service/UserDataValidatorInterface.php'
       - 'src/Stripe/Service/UserFieldReaderInterface.php'
       - 'src/Stripe/Service/OxidUserFieldReader.php'

@@ -7,6 +7,7 @@ namespace OxidEsales\Payments\Stripe\Controller;
 use OxidEsales\Eshop\Core\Registry;
 use RuntimeException;
 use Throwable;
+use OxidEsales\PaymentBase\Adapter\Exception\ShopOrderException;
 use OxidEsales\PaymentBase\Controller\CheckoutReturnResponder;
 use OxidEsales\PaymentBase\Controller\HandlesCheckoutReturn;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
@@ -20,11 +21,15 @@ use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\PaymentBase\Validation\Message\MessageFormatterInterface;
+use OxidEsales\Payments\Stripe\Service\BasketBuyabilityValidator;
+use OxidEsales\Payments\Stripe\Service\BuyabilityFailure;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\ContractTokenService;
 use OxidEsales\Payments\Stripe\Service\FieldValidationFailure;
 use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
+use OxidEsales\Payments\Stripe\Service\LanguageTranslatorInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
+use OxidEsales\Payments\Stripe\Service\OxidLanguageTranslator;
 use OxidEsales\Payments\Stripe\Service\OxidUserFieldReader;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use OxidEsales\Payments\Stripe\Service\UserDataValidationMessageFormatter;
@@ -187,6 +192,8 @@ class StripeOrderController extends StripeOrderController_parent
             $this->emitSessionResponse($context);
         } catch (UserDataValidationException $e) {
             $this->emitUserDataValidationErrors($e->getFailures());
+        } catch (BasketNotBuyableException $e) {
+            $this->emitBuyabilityErrors($e->getFailures());
         } catch (Throwable $e) {
             $this->setHttpResponseCode(500);
             $helper->logError('createCheckoutSession failed', $e);
@@ -225,6 +232,8 @@ class StripeOrderController extends StripeOrderController_parent
      * Validates preconditions first, then assembles context data.
      *
      * @throws RuntimeException when API key, basket, or user is invalid
+     * @throws UserDataValidationException when user field validation fails
+     * @throws BasketNotBuyableException when a cart item is no longer buyable
      */
     private function buildCheckoutEventContext(ControllerRequestHelper $helper): EventContext
     {
@@ -238,6 +247,11 @@ class StripeOrderController extends StripeOrderController_parent
         }
 
         $this->validateUserData($user);
+
+        $buyabilityFailures = $this->getBasketBuyabilityValidator()->validate($basket);
+        if ($buyabilityFailures !== []) {
+            throw new BasketNotBuyableException($buyabilityFailures);
+        }
 
         return new EventContext([
             'basket'         => $basket,
@@ -266,7 +280,20 @@ class StripeOrderController extends StripeOrderController_parent
     {
         $helper->setSessionVariable(ControllerRequestHelper::SESSION_SKIP_ADDR_CHECK, true);
         $event = new StripeCheckoutSessionRequestEvent($context);
-        $this->getEventDispatcher()->dispatch($event);
+
+        try {
+            $this->getEventDispatcher()->dispatch($event);
+        } catch (ShopOrderException $e) {
+            // Race window: an item became unbuyable between the pre-dispatch
+            // check and finalizeOrder. Translate to the domain exception so the
+            // existing 409 path handles it; anything else stays a 500.
+            if ($e->getErrorCode() === 'article_not_buyable') {
+                throw new BasketNotBuyableException([
+                    new BuyabilityFailure('', '', BasketBuyabilityValidator::REASON_NOT_BUYABLE),
+                ]);
+            }
+            throw $e;
+        }
 
         if ($sessionId = $context->get('checkoutSessionId')) {
             $helper->setSessionVariable('stripe_checkout_session_id', $sessionId);
@@ -623,6 +650,27 @@ class StripeOrderController extends StripeOrderController_parent
     }
 
     /**
+     * DI seam — the buyability validator has no dependencies, so it is created
+     * directly rather than resolved from the container. Overridden in testable
+     * subclasses to inject a stub.
+     */
+    protected function getBasketBuyabilityValidator(): BasketBuyabilityValidator
+    {
+        return new BasketBuyabilityValidator();
+    }
+
+    /**
+     * DI seam — the translator is a dependency-free Registry wrapper and is
+     * registered as a private service (injection-only), so it is created
+     * directly rather than fetched from the container. Overridden in testable
+     * subclasses to inject a stub.
+     */
+    protected function getLanguageTranslator(): LanguageTranslatorInterface
+    {
+        return new OxidLanguageTranslator();
+    }
+
+    /**
      * Validates user billing and delivery fields via the UserDataValidator.
      *
      * Throws UserDataValidationException when one or more fields fail
@@ -671,6 +719,37 @@ class StripeOrderController extends StripeOrderController_parent
                 'message'     => $formatter !== null
                     ? $formatter->format($f->field, $f->code, $f->offendingChar)
                     : null,
+            ],
+            $failures,
+        );
+
+        echo json_encode(['valid' => false, 'errors' => $errors]);
+    }
+
+    /**
+     * Emits a 409 Conflict JSON response listing the cart items that are no
+     * longer buyable. 409 (not 422) signals that the basket state changed under
+     * the shopper. The `errors[]` shape matches the frontend contract used by
+     * the user-data path, so the existing validation box renders it unchanged.
+     *
+     * Response shape:
+     *   {"valid": false, "errors": [{"code": "article_not_buyable", "articleId": "…", "productTitle": "…", "message": "…"}]}
+     *
+     * Story 2 (unbuyable-article-checkout).
+     *
+     * @param BuyabilityFailure[] $failures Non-empty list of unbuyable items.
+     */
+    private function emitBuyabilityErrors(array $failures): void
+    {
+        $this->setHttpResponseCode(409);
+
+        $translator = $this->getLanguageTranslator();
+        $errors     = array_map(
+            fn(BuyabilityFailure $f): array => [
+                'code'         => 'article_not_buyable',
+                'articleId'    => $f->articleId,
+                'productTitle' => $f->productTitle,
+                'message'      => $translator->translateString($f->reason),
             ],
             $failures,
         );

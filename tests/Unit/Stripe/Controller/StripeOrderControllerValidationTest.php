@@ -316,6 +316,9 @@ final class StripeOrderControllerValidationTest extends TestCase
         $basket->method('getProductsCount')->willReturn($empty ? 0 : 1);
         $basket->method('getPaymentId')->willReturn('oe_payments_stripe_wallet');
         $basket->method('getBasketUser')->willReturn($empty ? null : $user);
+        // The buyability gate (added in unbuyable-article-checkout Story 2) now
+        // runs on the happy path and iterates basket contents.
+        $basket->method('getContents')->willReturn([]);
 
         return $basket;
     }
