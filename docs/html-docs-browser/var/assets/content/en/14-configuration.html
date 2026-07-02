@@ -1,0 +1,72 @@
+        <div class="s-head">
+          <div class="badge"><span class="dot"></span><span class="step-label">Developer docs &middot; 2 of 5 &middot; Configuration</span></div>
+          <div class="deck">Every flag &middot; what it does &middot; when to flip it</div>
+        </div>
+
+        <h2 class="h-2">Configuration is data, not code.<br/><em class="acc">Everything in <code>metadata.php</code> or the admin panel.</em></h2>
+
+        <p class="lede" style="margin-bottom: 14px;">
+          The Stripe module owns no environment files of its own &mdash; it reads OXID&rsquo;s settings via
+          <code>PaymentConfigServiceInterface</code> (a Payment-Base seam). Same surface for every PSP; same
+          contract for the rest of the codebase to query.
+        </p>
+
+        <div class="cols cols-2" style="gap: 18px; flex: 1 1 0;">
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 10px;">Mode &amp; keys</div>
+            <table class="small" style="width: 100%; border-collapse: collapse; margin: 0 0 16px;">
+              <thead><tr style="background: rgba(67, 56, 202, 0.08);"><th style="text-align: left; padding: 6px 10px; border-bottom: 1px solid rgba(67, 56, 202, 0.3);">Setting</th><th style="text-align: left; padding: 6px 10px; border-bottom: 1px solid rgba(67, 56, 202, 0.3);">What it controls</th></tr></thead>
+              <tbody>
+                <tr><td style="padding: 6px 10px;"><code>sStripeMode</code></td><td style="padding: 6px 10px;"><code>live</code> or <code>test</code></td></tr>
+                <tr><td style="padding: 6px 10px;"><code>sStripeTestToken</code></td><td style="padding: 6px 10px;">Secret key &middot; test mode</td></tr>
+                <tr><td style="padding: 6px 10px;"><code>sStripeLiveToken</code></td><td style="padding: 6px 10px;">Secret key &middot; live mode</td></tr>
+                <tr><td style="padding: 6px 10px;"><code>sStripeTestPk</code></td><td style="padding: 6px 10px;">Publishable key &middot; test</td></tr>
+                <tr><td style="padding: 6px 10px;"><code>sStripeLivePk</code></td><td style="padding: 6px 10px;">Publishable key &middot; live</td></tr>
+                <tr><td style="padding: 6px 10px;"><code>sStripeWebhookEndpointSecret</code></td><td style="padding: 6px 10px;">Per-endpoint <code>whsec_…</code></td></tr>
+              </tbody>
+            </table>
+
+            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 10px;">Capture mode</div>
+            <ul class="small" style="margin: 0;">
+              <li><code>sStripeCaptureMode = "automatic"</code> &mdash; charge on PaymentIntent succeed</li>
+              <li><code>sStripeCaptureMode = "manual"</code> &mdash; authorise only; admin captures from Stripe tab</li>
+              <li>Live changes apply on the <em>next</em> checkout &mdash; in-flight contracts keep their original mode</li>
+            </ul>
+          </div>
+
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 10px;">Availability filters</div>
+            <ul class="small" style="margin: 0 0 16px;">
+              <li><code>blStripeRemoveByBillingCountry</code> &mdash; hide payment for non-matching billing countries</li>
+              <li><code>blStripeRemoveByBasketCurrency</code> &mdash; hide payment when basket currency &ne; configured set</li>
+              <li>Allow-list editing lives on the same Extensions form; saved to <code>oxconfig</code> like every other OXID setting</li>
+            </ul>
+
+            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 10px;">Reading config at runtime</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(67, 56, 202, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0 0 14px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+public function __construct(
+    private PaymentConfigServiceInterface $config
+) {}
+
+public function isLive(): bool {
+    return $this-&gt;config-&gt;getString('sStripeMode')
+        === 'live';
+}
+
+public function isManualCapture(): bool {
+    return $this-&gt;config-&gt;getString('sStripeCaptureMode')
+        === 'manual';
+}
+</pre>
+
+            <div class="callout" style="margin: 0; padding: 12px 14px; font-size: var(--t-12);">
+              <strong>Never <code>Registry::getConfig()-&gt;getConfigParam()</code> directly in Stripe code.</strong>
+              The seam matters &mdash; in tests we inject a fake. A pre-commit grep guard fails the build if it finds the OXID call inside <code>src/Stripe/</code>.
+            </div>
+          </div>
+        </div>
+
+        <div class="s-foot">
+          <div>OXID Stripe Wallet &middot; Configuration</div>
+          <div class="page-num">14 / 18</div>
+        </div>

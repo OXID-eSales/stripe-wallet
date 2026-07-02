@@ -1,0 +1,49 @@
+        <div class="s-head">
+          <div class="badge"><span class="dot"></span><span class="step-label">Was Stripe Wallet liefert</span></div>
+          <div class="deck">Vier S&auml;ulen &middot; ein PSP-Modul auf Payment Base</div>
+        </div>
+
+        <div class="eyebrow">Die Stripe-Referenzimplementierung</div>
+        <h1 class="h-1">Stripe Wallet =<br/><em class="acc">Stripe Checkout, der Payment-Base-Weg.</em></h1>
+
+        <p class="lede" style="margin-bottom: 18px;">
+          <code>oe_payments_stripe_wallet</code> ist ein schlanker Adapter zwischen Stripes APIs und dem Payment-Base-Kern.
+          Das Modul besitzt <strong>kein Dom&auml;nenmodell</strong>, <strong>keine Datenbanktabellen</strong> und importiert
+          niemals einen anderen PSP. Alles PSP-Unabh&auml;ngige bleibt in Payment Base; alles Stripe-Spezifische lebt hier.
+        </p>
+
+        <div class="pillars cols-4" style="margin-bottom: 0;">
+          <div class="pillar">
+            <div class="icon">1</div><h4>Stripe-Checkout-Ablauf</h4>
+            <p>Gehostete Checkout-Sessions mit automatischem 3D Secure. Der Kunde wird zu Stripe geleitet und kehrt zu einer OXID-Bestellung zur&uuml;ck, die bereits im Status <code>NOT_FINISHED</code> existiert.</p>
+          </div>
+          <div class="pillar">
+            <div class="icon">2</div><h4>Capture &amp; Refund</h4>
+            <p>Automatische oder <strong>manuelle</strong> Buchung. Voll- und <strong>Teilerstattungen</strong>. Freigabe der Autorisierung bei Teil-Capture. Alles &uuml;ber Admin-Tab-Aktionen.</p>
+          </div>
+          <div class="pillar">
+            <div class="icon">3</div><h4>Webhook-Processor</h4>
+            <p>HTTPS- / IP- / Rate-Limit- / Payload-<strong>Guards</strong>, Signaturpr&uuml;fung, Idempotenz &mdash; 6 Angriffsfl&auml;chen standardm&auml;&szlig;ig geh&auml;rtet.</p>
+          </div>
+          <div class="pillar">
+            <div class="icon">4</div><h4>Admin-Stripe-Tab</h4>
+            <p>Bestelldetails &rarr; <em>Stripe</em>: Live-Transaktionsverlauf aus der Stripe-API, Capture-/Refund-/Cancel-Formulare, OXPAID-Abgleich.</p>
+          </div>
+        </div>
+
+        <div class="cols cols-3" style="gap: 14px; margin-top: 22px;">
+          <div class="callout" style="margin: 0; padding: 14px 16px; font-size: var(--t-13);">
+            <strong>~33 Service-Klassen.</strong> <code>Capture/</code>, <code>Refund/</code>, <code>Checkout/</code>, <code>Reconciliation/</code>, Factories &amp; Result-Objekte. Jede hat genau eine Verantwortlichkeit.
+          </div>
+          <div class="callout" style="margin: 0; padding: 14px 16px; font-size: var(--t-13);">
+            <strong>8 Stripe-spezifische Events &middot; 9 Handler.</strong> <code>StripeCheckoutSessionRequestEvent</code>, <code>StripeCaptureRequestEvent</code>, <code>StripeRefundRequestEvent</code>, &hellip; &mdash; durchg&auml;ngig PSR-14.
+          </div>
+          <div class="callout" style="margin: 0; padding: 14px 16px; font-size: var(--t-13);">
+            <strong>822+ Unit-Tests &middot; 18 Integrationstests.</strong> Testpyramide, AAA-Struktur, Testable-Subclass-Pattern f&uuml;r OXID-Admin-Controller, Final-Class-Seam-Pattern.
+          </div>
+        </div>
+
+        <div class="s-foot">
+          <div>OXID Stripe Wallet &middot; Modul&uuml;berblick</div>
+          <div class="page-num">02 / 18</div>
+        </div>

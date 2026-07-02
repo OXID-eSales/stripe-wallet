@@ -1,0 +1,16 @@
+{% if oViewConf.isStripeCheckoutActive() %}
+    {# CSP: Restrict script sources on payment pages to self + Stripe domains.
+       SRI (integrity attribute) is NOT supported by Stripe — they deploy updates
+       to the same URL without version pinning. See: github.com/stripe/stripe-js#167
+       CSP script-src is the recommended alternative per Stripe documentation. #}
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://m.stripe.com;">
+    <script src="https://js.stripe.com/v3/"></script>
+    {% set stripeJsPath = oViewConf.getStripeJsPath() %}
+    {% set stripeVersion = oViewConf.getStripeModuleVersion() %}
+
+    <script src="{{ oViewConf.getModuleUrl('oe_payments_stripe_wallet', stripeJsPath) }}?v={{ stripeVersion }}"></script>  
+
+    {% include '@oe_payments_stripe_wallet/frontend/base_stripe_payment_controller_config.html.twig' %}
+    {% include '@oe_payments_stripe_wallet/frontend/base_stripe_element_config.html.twig' %}
+{% endif %}
+

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+    Sprint I (2026-04-23): the Stripe admin tab moved to the shared
+    "Payment" tab owned by `oe_payment_base`. Stripe's contribution
+    is now a PaymentPanelProvider registered via services.yaml; no
+    dedicated menu entry lives here.
+
+    Intentionally empty (OXMENU root only) — file kept so any in-flight
+    branch pointing at it keeps resolving. Delete once all forks merged.
+-->
+<OX>
+    <OXMENU id="NAVIGATION_ESHOPADMIN" />
+</OX>

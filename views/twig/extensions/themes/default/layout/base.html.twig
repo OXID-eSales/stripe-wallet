@@ -1,0 +1,13 @@
+{#
+    Stripe Module - Base Layout Extension
+    Loads Stripe SDK and module JavaScript
+#}
+
+{% extends "layout/base.html.twig" %}
+
+{% block base_js %}
+    {{ parent() }}
+
+    {% include '@oe_payments_stripe_wallet/frontend/stripe_i18n.html.twig' %}
+    {% include '@oe_payments_stripe_wallet/frontend/base_js.html.twig' %}
+{% endblock %}

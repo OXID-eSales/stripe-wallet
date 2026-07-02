@@ -1,0 +1,1369 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+    public: false
+
+  OxidEsales\Payments\Stripe\Service\:
+    resource: 'src/Stripe/Service/*'
+    exclude:
+      - 'src/Stripe/Service/Result/*'
+      - 'src/Stripe/Service/Exception/*'
+      - 'src/Stripe/Service/ReconciliationResult.php'
+      - 'src/Stripe/Service/RequestLogService.php'
+      - 'src/Stripe/Service/WebhookLogService.php'
+      - 'src/Stripe/Service/OxidStockRestorationService.php'
+      - 'src/Stripe/Service/WebhookEndpointRegistrationResult.php'
+      # Sprint 119 Phase B: VOs, interfaces, and OXID-model-bound readers excluded from autowire sweep
+      - 'src/Stripe/Service/FieldValidationFailure.php'
+      # unbuyable-article-checkout Story 1: VO with scalar constructor args — not a service
+      - 'src/Stripe/Service/BuyabilityFailure.php'
+      - 'src/Stripe/Service/UserDataValidatorInterface.php'
+      - 'src/Stripe/Service/UserFieldReaderInterface.php'
+      - 'src/Stripe/Service/OxidUserFieldReader.php'
+      # Sprint 119 Phase E: narrow translator interface excluded from autowire sweep
+      - 'src/Stripe/Service/LanguageTranslatorInterface.php'
+      # STRP-129: array-arg constructor — wired explicitly via ValidationRulesProvider factory
+      - 'src/Stripe/Service/AllowedSymbolsDescriber.php'
+    public: true
+
+  # Sprint 114.11b (S2): Extracted from ModuleConfigurationService — URL construction.
+  OxidEsales\Payments\Stripe\Service\StripeUrlBuilder:
+    public: false
+
+  # Sprint 114.11b (S2): Extracted from ModuleConfigurationService — description extraction.
+  OxidEsales\Payments\Stripe\Service\ModuleDescriptionProvider:
+    public: false
+
+  # Sprint 43: Service Interface Aliases (LSP Compliance)
+  OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface:
+    alias: OxidEsales\Payments\Stripe\Service\ModuleConfigurationService
+    public: true
+
+  OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface:
+    alias: OxidEsales\Payments\Stripe\Service\ConfigurationValidator
+    public: true
+
+  OxidEsales\Payments\Stripe\Service\OxpaidReconciliationServiceInterface:
+    alias: OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService
+    public: true
+
+  # Sprint 109: Webhook auto-registration during Connect onboarding.
+  OxidEsales\Payments\Stripe\Service\WebhookEndpointRegistrarInterface:
+    alias: OxidEsales\Payments\Stripe\Service\WebhookEndpointRegistrar
+    public: true
+
+  OxidEsales\Payments\Stripe\Adapter\StripeWebhookEndpointApiInterface:
+    alias: OxidEsales\Payments\Stripe\Adapter\StripeWebhookEndpointApi
+    public: false
+
+  OxidEsales\Payments\Stripe\Adapter\StripeClientProviderInterface:
+    alias: OxidEsales\Payments\Stripe\Adapter\StripeClientFactory
+    public: false
+
+  OxidEsales\Payments\Stripe\Adapter\StripeWebhookEndpointApi:
+    arguments:
+      $clientProvider: '@OxidEsales\Payments\Stripe\Adapter\StripeClientProviderInterface'
+    public: false
+
+  OxidEsales\Payments\Stripe\Service\WebhookEventCatalog:
+    public: false
+
+  OxidEsales\Payments\Stripe\Service\StaticContentInterface:
+    alias: OxidEsales\Payments\Stripe\Service\StaticContent
+    public: false
+
+  # Sprint 92: Active language resolution (single source of truth, DI-friendly).
+  OxidEsales\Payments\Stripe\Service\LanguageResolverInterface:
+    alias: OxidEsales\Payments\Stripe\Service\OxidLanguageResolver
+    public: true
+
+  # ===========================================
+  # One-Page-Checkout Integration (Sprint 80)
+  # ===========================================
+
+  OxidEsales\Payments\Stripe\PaymentHandler\StripePaymentHandler:
+    tags:
+      - { name: oe.payment.handler }
+    public: true
+
+  # ===========================================
+  # Event System (Component Level)
+  # ===========================================
+
+  # Event Listener Provider - Collects all tagged handlers
+  # Sprint 11: public: true for debugging/verification purposes
+  OxidEsales\PaymentBase\EventSystem\EventListenerProviderInterface:
+    class: OxidEsales\PaymentBase\EventSystem\EventListenerProvider
+    arguments:
+      - !tagged_iterator payment.event_handler
+    public: true
+
+  # Event Dispatcher - Uses provider for listener lookup
+  OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface:
+    class: OxidEsales\PaymentBase\EventSystem\EventDispatcher
+    arguments:
+      - '@OxidEsales\PaymentBase\EventSystem\EventListenerProviderInterface'
+    public: true
+
+  # ===========================================
+  # Order Payment State Service (Sprint 16)
+  # ===========================================
+  # Consolidates all OXPAID/OXTRANSSTATUS/OXTRANSID updates
+  # DRY: Single location for payment state operations
+  # Previously duplicated in 4+ locations with inconsistent date handling
+
+  OxidEsales\PaymentBase\Service\OrderPaymentStateServiceInterface:
+    class: OxidEsales\PaymentBase\Service\OrderPaymentStateService
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+      $logger: '@oxid_esales.monolog.logger'
+    public: true
+
+  # ===========================================
+  # Contract Fulfillment Service (Sprint 18)
+  # ===========================================
+  # Consolidates all contract fulfillment operations
+  # DRY: Single location for fulfill() logic previously duplicated in 8+ locations
+  # Guards: Only COMMITTED contracts can be fulfilled
+
+  OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface:
+    class: OxidEsales\PaymentBase\Service\ContractFulfillmentService
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: true
+
+  # ===========================================
+  # Event Handlers (Tagged for auto-registration)
+  # ===========================================
+  # Note: Handlers are commented out until their dependencies
+  # (ContractServiceInterface, ContractRepositoryInterface, etc.) are registered.
+  # They will be enabled in Sprint 2 when the orchestrator and services are ready.
+
+  # # Contract Creation Handler - Creates payment contracts on PaymentInitiatedEvent
+  # OxidEsales\PaymentBase\EventSystem\Handler\ContractCreationHandler:
+  #   tags:
+  #     - { name: payment.event_handler }
+  #   public: false
+
+  # # Contract Condition Resolver Handler - Transitions contracts to PENDING state
+  # OxidEsales\PaymentBase\EventSystem\Handler\ContractConditionResolverHandler:
+  #   tags:
+  #     - { name: payment.event_handler }
+  #   public: false
+
+  # # Contract Fulfillment Handler - Handles webhook-triggered fulfillment
+  # OxidEsales\PaymentBase\EventSystem\Handler\ContractFulfillmentHandler:
+  #   tags:
+  #     - { name: payment.event_handler }
+  #   public: false
+
+  # # Contract Cleanup Handler - Cleans up terminated contracts
+  # OxidEsales\PaymentBase\EventSystem\Handler\ContractCleanupHandler:
+  #   tags:
+  #     - { name: payment.event_handler }
+  #   public: false
+
+  # # Order Creation Handler - Creates orders from committed contracts
+  # OxidEsales\PaymentBase\EventSystem\Handler\OrderCreationHandler:
+  #   tags:
+  #     - { name: payment.event_handler }
+  #   public: false
+
+  # # Payment Authorization Handler - Handles payment authorization
+  # OxidEsales\PaymentBase\EventSystem\Handler\PaymentAuthorizationHandler:
+  #   tags:
+  #     - { name: payment.event_handler }
+  #   public: false
+
+  # ==========================================
+  # Early Order Creation Handler (Sprint STRP-74)
+  # ==========================================
+  # Handles ContractDraftCompletedEvent to create order early in the flow.
+  # New flow: DRAFT -> NOT_FINISHED (order created here) -> PENDING
+  # Priority 100: Runs early to ensure order is created before other handlers.
+
+  OxidEsales\PaymentBase\EventSystem\Handler\EarlyOrderCreationHandler:
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $shopOrderService: '@OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface'
+      $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
+      $eventLogger: '@stripe.events.file_logger'
+    tags:
+      - { name: payment.event_handler, priority: 100 }
+    public: false
+
+  # ===========================================
+  # Payment Adapter Layer (Provider-Agnostic)
+  # ===========================================
+  #
+  # This layer provides a provider-agnostic payment integration architecture
+  # that supports multiple payment providers (Stripe, Unzer, PayPal, etc.)
+  # through a unified interface.
+  #
+  # Key Features:
+  # - Provider-agnostic PaymentAdapterInterface
+  # - Request/Response objects (no domain leakage)
+  # - Two-step authorization (authorize → capture)
+  # - Vaulting/tokenization (saved cards)
+  # - 3D Secure/SCA support
+  # - Webhook signature verification
+  #
+
+  # Stripe Client Factory - Creates configured Stripe SDK clients
+  # Gets API credentials from ModuleConfigurationService
+  OxidEsales\Payments\Stripe\Adapter\StripeClientFactory:
+    public: false
+
+  # Stripe Client - Actual Stripe SDK client instance
+  # Created via factory method from StripeClientFactory
+  stripe.payment.adapter.client:
+    class: Stripe\StripeClient
+    factory: ['@OxidEsales\Payments\Stripe\Adapter\StripeClientFactory', 'create']
+    public: false
+
+  # Stripe Adapter Factory
+  # Sprint 46: Idempotency moved into helpers; factory injects repository directly.
+  OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactory:
+    arguments:
+      $idempotencyRepository: '@OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface'
+    public: false
+
+  # Payment Adapter Factory Interface - Bind to StripeAdapterFactory
+  # Sprint 46: IdempotentStripeAdapterFactory removed; idempotency handled by helpers.
+  OxidEsales\PaymentBase\Service\Factory\PaymentAdapterFactoryInterface:
+    class: OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactory
+    arguments:
+      $idempotencyRepository: '@OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface'
+    public: true
+
+  # Stripe Adapter Factory Interface - Stripe-specific factory
+  OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface:
+    alias: OxidEsales\PaymentBase\Service\Factory\PaymentAdapterFactoryInterface
+    public: true
+
+  # ==========================================
+  # Shop Adapter Layer (Platform-Agnostic)
+  # ==========================================
+  #
+  # Provides abstraction layer for shop-specific operations like translations,
+  # configuration, session management, etc. This allows the Payment Component
+  # to remain platform-agnostic while working with different shop systems
+  # (OXID, Shopware, Magento, etc.)
+  #
+  # Key Features:
+  # - Platform-agnostic ShopAdapterInterface
+  # - Translation service (replaces deprecated Registry::getLang())
+  # - Shop configuration access
+  # - Language and currency management
+  #
+
+  # Shop Adapter Interface - Bind to OXID implementation
+  OxidEsales\PaymentBase\Adapter\ShopAdapterInterface:
+    class: OxidEsales\Payments\Stripe\Adapter\OxidShopAdapter
+    public: false
+
+  # OXID Shop Adapter - OXID eShop specific implementation
+  OxidEsales\Payments\Stripe\Adapter\OxidShopAdapter:
+    alias: OxidEsales\PaymentBase\Adapter\ShopAdapterInterface
+
+  # Session Adapter Interface - Sprint 27: Uses payment-base interface
+  OxidEsales\PaymentBase\Adapter\SessionAdapterInterface:
+    class: OxidEsales\Payments\Stripe\Adapter\OxidSessionAdapter
+    public: false
+
+  # OXID Session Adapter - OXID eShop specific implementation
+  OxidEsales\Payments\Stripe\Adapter\OxidSessionAdapter:
+    alias: OxidEsales\PaymentBase\Adapter\SessionAdapterInterface
+
+  # ==========================================
+  # Shop Order Service (Order Operations)
+  # ==========================================
+  #
+  # Provides platform-agnostic interface for order operations.
+  # Phase 1 implements order creation from basket/cart.
+  #
+  # Key Features:
+  # - Creates orders via Order::finalizeOrder()
+  # - Maps OXID order states to normalized statuses
+  # - Associates payment transactions with orders
+  # - Stores order metadata
+  #
+
+  # Shop Order Service Interface - Bind to OXID implementation
+  OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface:
+    class: OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService
+    public: true
+
+  # OXID Shop Order Service - OXID eShop specific implementation
+  OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService:
+    alias: OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface
+
+  # ==========================================
+  # Contract Repository (Data Access Layer)
+  # ==========================================
+
+  # Contract Repository Interface - Bind to Doctrine implementation
+  # public: true required for integration tests to access directly
+  OxidEsales\PaymentBase\Repository\ContractRepositoryInterface:
+    class: OxidEsales\PaymentBase\Repository\DoctrineContractRepository
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+    public: true
+
+  # Contract Repository - Alias
+  OxidEsales\PaymentBase\Repository\DoctrineContractRepository:
+    alias: OxidEsales\PaymentBase\Repository\ContractRepositoryInterface
+
+  # ==========================================
+  # Contract Service
+  # ==========================================
+
+  # Contract Service Interface - Bind to implementation
+  OxidEsales\PaymentBase\Service\ContractServiceInterface:
+    class: OxidEsales\PaymentBase\Service\ContractService
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+    public: true
+
+  # ==========================================
+  # Token Service (Security)
+  # ==========================================
+  #
+  # Provides secure token generation and validation for contract-based
+  # payment flows. Used to prevent tampering with return URLs.
+  #
+
+  # Token Service Interface - Bind to implementation
+  # Derives secret from ModuleConfigurationService (no extra env var needed)
+  OxidEsales\PaymentBase\Service\TokenServiceInterface:
+    class: OxidEsales\Payments\Stripe\Service\ContractTokenService
+    public: true
+
+  # Stripe Contract Token Service
+  OxidEsales\Payments\Stripe\Service\ContractTokenService:
+    alias: OxidEsales\PaymentBase\Service\TokenServiceInterface
+    public: true
+
+  # ==========================================
+  # Security Validator (Fraud Prevention)
+  # ==========================================
+  #
+  # Validates return requests from payment providers to detect fraud.
+  #
+
+  # Security Validator Interface - Bind to implementation
+  OxidEsales\PaymentBase\Service\ReturnSecurityValidatorInterface:
+    class: OxidEsales\Payments\Stripe\Service\ReturnSessionSecurityService
+    public: false
+
+  # Stripe Return Security Service
+  OxidEsales\Payments\Stripe\Service\ReturnSessionSecurityService:
+    alias: OxidEsales\PaymentBase\Service\ReturnSecurityValidatorInterface
+
+  # ==========================================
+  # Delivery Address Hash Service (Sprint 27)
+  # ==========================================
+  # Sprint 27: Uses payment-base interface and implementation.
+  # Encapsulates $_REQUEST modification for OXID's delivery address validation.
+
+  OxidEsales\PaymentBase\Service\DeliveryAddressHashServiceInterface:
+    class: OxidEsales\PaymentBase\Service\DeliveryAddressHashService
+    public: false
+
+  # ==========================================
+  # Stripe Checkout Session Service (Sprint 21)
+  # ==========================================
+  # Extracted business logic from StripeCheckoutSessionHandler.
+  # SRP: Service handles checkout session creation logic.
+
+  OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface:
+    class: OxidEsales\Payments\Stripe\Service\CheckoutSessionService
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+      $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
+    public: false
+
+  # OPC Buy Now modal: append opcModalId to Stripe success/cancel URLs so that
+  # both the success handler and the cancel handler can reopen the correct modal.
+  # Modal-ID resolution is centralised in OpcModalSessionReader (D8).
+  OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalSessionReader: ~
+
+  OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalSuccessUrlHandler:
+    arguments:
+      $sessionReader: '@OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalSessionReader'
+    tags:
+      - { name: payment.event_handler }
+
+  OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalCancelUrlHandler:
+    arguments:
+      $sessionReader: '@OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalSessionReader'
+    tags:
+      - { name: payment.event_handler }
+
+  # ==========================================
+  # Stripe Customer Service (Sprint 45)
+  # ==========================================
+  # Resolves or creates Stripe Customer objects for email prefill and saved cards.
+
+  OxidEsales\Payments\Stripe\Service\CustomerDataSanitizer:
+    public: false
+
+  OxidEsales\Payments\Stripe\Service\StripeCustomerServiceInterface:
+    class: OxidEsales\Payments\Stripe\Service\StripeCustomerService
+    arguments:
+      $customerRepository: '@OxidEsales\PaymentBase\Repository\PaymentCustomerRepositoryInterface'
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $sanitizer: '@OxidEsales\Payments\Stripe\Service\CustomerDataSanitizer'
+      $logger: '@oxid_esales.monolog.logger'
+    public: false
+
+  # ==========================================
+  # Contract Metadata Service (Sprint 27)
+  # ==========================================
+  # Sprint 27: Uses payment-base interface and implementation.
+  # SRP: Service handles contract metadata operations.
+
+  # Sprint 68b (M9): Address HMAC service — signs delivery address hashes
+  OxidEsales\PaymentBase\Service\AddressHmacService:
+    arguments:
+      $secret: '%stripe.address_hmac_secret%'
+    public: false
+
+  OxidEsales\PaymentBase\Service\ContractMetadataServiceInterface:
+    class: OxidEsales\PaymentBase\Service\ContractMetadataService
+    arguments:
+      $addressHmacService: '@OxidEsales\PaymentBase\Service\AddressHmacService'
+    public: false
+
+  # ==========================================
+  # Stripe Checkout Session Handlers
+  # ==========================================
+
+  # Stripe Contract Creation Handler - Creates contract for checkout flow
+  # Priority 100: Runs BEFORE StripeCheckoutSessionHandler (priority 0)
+  # Sprint 21: Refactored to delegate metadata to ContractMetadataService
+  # Sprint 25: Added event logger for debugging
+  OxidEsales\Payments\Stripe\EventSystem\Handler\StripeContractCreationHandler:
+    arguments:
+      $contractService: '@OxidEsales\PaymentBase\Service\ContractServiceInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $metadataService: '@OxidEsales\PaymentBase\Service\ContractMetadataServiceInterface'
+      $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
+      $eventLogger: '@stripe.events.file_logger'
+    tags:
+      - { name: payment.event_handler, priority: 100 }
+    public: false
+
+  # Stripe Checkout Session Handler - Creates Stripe Checkout Session
+  # Priority 0 (default): Runs AFTER StripeContractCreationHandler
+  # Sprint 21: Refactored to delegate to CheckoutSessionService (SRP)
+  # Sprint 25: Added event logger for debugging
+  OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler:
+    arguments:
+      $checkoutSessionService: '@OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $tokenService: '@OxidEsales\PaymentBase\Service\TokenServiceInterface'
+      $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
+      $customerService: '@OxidEsales\Payments\Stripe\Service\StripeCustomerServiceInterface'
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+      $eventLogger: '@stripe.events.file_logger'
+    tags:
+      - { name: payment.event_handler, priority: 0 }
+    public: false
+
+  # Order Payment Completed Handler - Updates OXPAID when contract is fulfilled
+  # Sprint 27: Uses payment-base handler (provider-agnostic)
+  # Sprint 14: Event-driven OXPAID update via ContractFulfilledEvent
+  # Sprint 16: Uses OrderPaymentStateService for OXPAID updates (DRY)
+  OxidEsales\PaymentBase\EventSystem\Handler\OrderPaymentCompletedHandler:
+    arguments:
+      $orderPaymentStateService: '@OxidEsales\PaymentBase\Service\OrderPaymentStateServiceInterface'
+      $logger: '@oxid_esales.monolog.logger'
+      $eventLogger: '@stripe.events.file_logger'
+    tags:
+      - { name: payment.event_handler, priority: 0 }
+    public: false
+
+  # ==========================================
+  # Stripe Checkout Return Service (Sprint 21)
+  # ==========================================
+  # Extracted business logic from StripeCheckoutReturnHandler.
+  # SRP: Service handles checkout return validation logic.
+
+  OxidEsales\Payments\Stripe\Service\CheckoutReturnServiceInterface:
+    class: OxidEsales\Payments\Stripe\Service\CheckoutReturnService
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $tokenService: '@OxidEsales\PaymentBase\Service\TokenServiceInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: false
+
+  # ==========================================
+  # Stripe Checkout Return Handlers
+  # ==========================================
+  # These handlers process the return flow when user comes back from Stripe.
+  # Event chain: StripeCheckoutReturnEvent → PaymentAuthorizedEvent → ContractReadyToCommitEvent
+
+  # Stripe Return Resolver - wraps CheckoutReturnService for the shared chain
+  # (payment-base's ReturnResolverInterface).
+  # Sprint C: replaces StripeCheckoutReturnHandler.
+  OxidEsales\Payments\Stripe\Service\Return\StripeReturnResolver:
+    arguments:
+      $checkoutReturnService: '@OxidEsales\Payments\Stripe\Service\CheckoutReturnServiceInterface'
+    public: true
+
+  # Stripe Event Translator - maps abstract request events onto Stripe's
+  # concrete event classes. Collected by payment-base's EventBroker.
+  OxidEsales\Payments\Stripe\EventSystem\Translator\StripeEventTranslator:
+    tags:
+      - { name: oe.payment.event_translator }
+    public: true
+
+  # Payment Authorized Event Handler - Processes PaymentAuthorizedEvent
+  # Priority 90: Runs after StripeCheckoutReturnHandler
+  # Transitions contract to PENDING, fulfills payment_authorized condition
+  # Dispatches ContractReadyToCommitEvent if all conditions met
+  # Sprint 22: EventDispatcher now injected via constructor (no ContainerFactory)
+  OxidEsales\PaymentBase\EventSystem\Handler\PaymentAuthorizedEventHandler:
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
+      $orderPaymentStateService: '@OxidEsales\PaymentBase\Service\OrderPaymentStateServiceInterface'
+      $eventLogger: '@stripe.events.file_logger'
+    tags:
+      - { name: payment.event_handler, priority: 90 }
+    public: false
+
+  # Shared ContractCommitmentHandler in payment-base now owns order commit
+  # + OXPAID stamping + ContractCommittedEvent. Stripe's old
+  # StripeOrderCreationHandler was deleted in Sprint C.
+  OxidEsales\PaymentBase\EventSystem\Handler\ContractCommitmentHandler:
+    arguments:
+      $contracts: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $paymentState: '@OxidEsales\PaymentBase\Service\OrderPaymentStateServiceInterface'
+      $dispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
+    tags:
+      - { name: payment.event_handler, priority: 80 }
+    public: true
+
+  # Shared ContractPendingTransitioner (NOT_FINISHED → PENDING on return).
+  OxidEsales\PaymentBase\EventSystem\Handler\ContractPendingTransitioner:
+    arguments:
+      $contracts: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+    tags:
+      - { name: payment.event_handler, priority: 100 }
+    public: true
+
+  # Shared TransactionRecordingHandler (authorization row on PaymentAuthorizedEvent).
+  OxidEsales\PaymentBase\EventSystem\Handler\TransactionRecordingHandler:
+    arguments:
+      $transactions: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
+    tags:
+      - { name: payment.event_handler, priority: 10 }
+    public: true
+
+  # Event Broker — routes abstract request events through registered translators.
+  OxidEsales\PaymentBase\EventSystem\Broker\EventBroker:
+    arguments:
+      - '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
+      - !tagged_iterator oe.payment.event_translator
+    public: true
+
+  OxidEsales\PaymentBase\EventSystem\Broker\EventBrokerInterface:
+    alias: OxidEsales\PaymentBase\EventSystem\Broker\EventBroker
+    public: true
+
+  # Sprint E: OXID-backed session writer (writes `sess_challenge` so
+  # OXID's thankyou controller can load the order). Aliased to the
+  # framework-neutral interface consumed by CheckoutReturnResponder —
+  # payment-base stays decoupled from the OXID shop classes.
+  OxidEsales\Payments\Stripe\Controller\OxidSessionWriter:
+    public: false
+  OxidEsales\PaymentBase\Controller\SessionWriterInterface:
+    alias: OxidEsales\Payments\Stripe\Controller\OxidSessionWriter
+    public: true
+
+  # Provider-neutral post-return responder. Dispatches the shared
+  # CheckoutReturnCompletedEvent + PaymentAuthorizedEvent, writes
+  # sess_challenge via SessionWriterInterface, returns the orderId.
+  OxidEsales\PaymentBase\Controller\CheckoutReturnResponder:
+    arguments:
+      - '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
+      - '@OxidEsales\PaymentBase\Controller\SessionWriterInterface'
+    public: true
+
+  # PaymentIntentResolver — resolves PI id from event/contract/metadata (Sprint 114.8 D4).
+  OxidEsales\Payments\Stripe\Service\PaymentIntentResolver:
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+    public: false
+
+  # Stripe Capture Request Handler - Handles manual capture requests
+  # Sprint 8: Added RequestLogService for centralized logging
+  # Sprint 9: Now delegates to CaptureService for capture execution
+  # Sprint 25: Added event logger for debugging
+  # Sprint 114.8: Delegates PI-id resolution to PaymentIntentResolver (D4).
+  OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCaptureRequestHandler:
+    arguments:
+      $captureService: '@OxidEsales\Payments\Stripe\Service\CaptureServiceInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $requestLogService: '@OxidEsales\PaymentBase\Service\RequestLogServiceInterface'
+      $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
+      $logger: '@oxid_esales.monolog.logger'
+      $eventLogger: '@stripe.events.file_logger'
+      # Sprint 114.11b (S3): $paymentIntentResolver removed — PI resolution now inside CaptureService
+    tags:
+      - { name: payment.event_handler }
+    public: false
+
+  # Stripe Cancel Authorization Request Handler - Handles cancel authorization for manual capture
+  # Sprint 8: Added RequestLogService for centralized logging
+  # Sprint 11: Now delegates to CancelAuthorizationService (SRP)
+  # Sprint 25: STRP-75 - Cancel authorization feature
+  # Sprint 114.8: Delegates PI-id resolution to PaymentIntentResolver (D4).
+  OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCancelAuthorizationRequestHandler:
+    arguments:
+      $cancelService: '@OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface'
+      $requestLogService: '@OxidEsales\PaymentBase\Service\RequestLogServiceInterface'
+      $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
+      # STRP-AUTOCAP-REFUND Sprint 05: contract fallback for opalreturns
+      # provider-agnostic dispatch (contractId in context, no paymentIntentId).
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+      $eventLogger: '@stripe.events.file_logger'
+      $paymentIntentResolver: '@OxidEsales\Payments\Stripe\Service\PaymentIntentResolver'
+    tags:
+      - { name: payment.event_handler }
+    public: false
+
+  # Stripe Payment Return Handler - Handles return from Payment Element flow
+  # Sprint 25: Added event logger for debugging
+  OxidEsales\Payments\Stripe\EventSystem\Handler\StripePaymentReturnHandler:
+    arguments:
+      $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
+      $eventLogger: '@stripe.events.file_logger'
+    tags:
+      - { name: payment.event_handler }
+    public: false
+
+  # Stripe Payment Status Handler - Verifies payment status for Payment Element flow
+  # Sprint 25: Added event logger for debugging
+  OxidEsales\Payments\Stripe\EventSystem\Handler\StripePaymentStatusHandler:
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
+      $eventLogger: '@stripe.events.file_logger'
+    tags:
+      - { name: payment.event_handler }
+    public: false
+
+  # ==========================================
+  # Request Log Service (Sprint 8, refactored Sprint 15)
+  # ==========================================
+  # Sprint 15: Refactored to use file-based logging instead of database.
+  # Logs to log/osc/stripe_requests.log
+
+  # Request file logger factory
+  # Phase 3: gated via ModuleConfigurationServiceInterface::isRequestLoggingEnabled()
+  OxidEsales\Payments\Stripe\Service\Factory\RequestFileLoggerFactory:
+    autowire: false
+    arguments:
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+
+  # Request file logger instance (created by factory)
+  stripe.request_file_logger:
+    class: OxidEsales\PaymentBase\Service\FileLoggerInterface
+    factory: ['@OxidEsales\Payments\Stripe\Service\Factory\RequestFileLoggerFactory', 'create']
+
+  # Sprint 27: Uses payment-base interface
+  OxidEsales\PaymentBase\Service\RequestLogServiceInterface:
+    class: OxidEsales\Payments\Stripe\Service\RequestLogService
+    autowire: false
+    arguments:
+      $fileLogger: '@stripe.request_file_logger'
+      $fallbackLogger: '@oxid_esales.monolog.logger'
+    public: false
+
+  # Alias class name to interface for direct class type-hints
+  OxidEsales\Payments\Stripe\Service\RequestLogService:
+    alias: OxidEsales\PaymentBase\Service\RequestLogServiceInterface
+
+  # ==========================================
+  # Webhook Log Service (Sprint 16)
+  # ==========================================
+  # Sprint 16: Extracted from WebhookController for SRP compliance.
+  # Logs to log/osc/stripe_webhooks.log
+
+  # Webhook file logger factory
+  # Phase 3: gated via ModuleConfigurationServiceInterface::isWebhookLoggingEnabled()
+  OxidEsales\Payments\Stripe\Service\Factory\WebhookFileLoggerFactory:
+    autowire: false
+    arguments:
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+
+  # Webhook file logger instance (created by factory)
+  stripe.webhook_file_logger:
+    class: OxidEsales\PaymentBase\Service\FileLoggerInterface
+    factory: ['@OxidEsales\Payments\Stripe\Service\Factory\WebhookFileLoggerFactory', 'create']
+
+  OxidEsales\Payments\Stripe\Service\WebhookLogServiceInterface:
+    class: OxidEsales\Payments\Stripe\Service\WebhookLogService
+    autowire: false
+    arguments:
+      $fileLogger: '@stripe.webhook_file_logger'
+    # STRP-AUTOCAP-REFUND: WebhookController fetches this directly from the
+    # container in init() (FrontendController has no constructor DI). Must be
+    # public; otherwise Symfony optimises it away and webhook processing fails
+    # mid-chain — silently breaks OXCAPTUREDAMOUNT propagation on incoming
+    # payment_intent.succeeded events.
+    public: true
+
+  # Alias class name to interface for direct class type-hints
+  OxidEsales\Payments\Stripe\Service\WebhookLogService:
+    alias: OxidEsales\Payments\Stripe\Service\WebhookLogServiceInterface
+    public: true
+
+  # ==========================================
+  # Capture Service (Sprint 9)
+  # ==========================================
+  # Extracted capture business logic from StripeCaptureRequestHandler.
+  # Handles both contract-based and direct captures.
+  # SRP: Service handles capture execution and contract state transition.
+
+  # Sprint 26: Changed $stripeAdapter to $adapterFactory for lazy adapter creation
+  # Sprint 82: Added ContractFulfillmentService for COMMITTED→FULFILLED event dispatch
+  OxidEsales\Payments\Stripe\Service\CaptureServiceInterface:
+    class: OxidEsales\Payments\Stripe\Service\CaptureService
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $contractFulfillmentService: '@OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface'
+      $transactionRepository: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
+      $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: false
+
+  # ==========================================
+  # Cancel Authorization Service (Sprint 11)
+  # ==========================================
+  # Extracted cancel authorization logic from StripeCancelAuthorizationRequestHandler.
+  # SRP: Service handles PaymentIntent cancellation.
+
+  # Sprint 26: Changed $stripeAdapter to $adapterFactory for lazy adapter creation
+  OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface:
+    class: OxidEsales\Payments\Stripe\Service\CancelAuthorizationService
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: false
+
+  # ==========================================
+  # Payment Capture Status Query (Sprint 06, STRP-AUTOCAP-REFUND)
+  # ==========================================
+  # On-demand "is the PaymentIntent captured at Stripe?" lookup for the
+  # opalreturns listener. Disambiguates the `committed` contract state,
+  # which collapses auto-capture (PSP `succeeded`) and manual-capture-
+  # uncaptured (PSP `requires_capture`) into one. Public so opalreturns
+  # autowires it via the payment-base interface.
+  OxidEsales\PaymentBase\Service\PaymentCaptureStatusQueryInterface:
+    class: OxidEsales\Payments\Stripe\Service\StripePaymentCaptureStatusQuery
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: true
+
+  # ==========================================
+  # Stock Restoration Service (Sprint 24)
+  # ==========================================
+  # Restores stock for all order articles on full refund.
+  # Implements same logic as OXID's OrderArticle::storno().
+
+  OxidEsales\PaymentBase\Service\StockRestorationServiceInterface:
+    class: OxidEsales\Payments\Stripe\Service\OxidStockRestorationService
+    autowire: false
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+      $logger: '@oxid_esales.monolog.logger'
+      $useStock: true
+      $allowNegativeStock: false
+    public: false
+
+  # ==========================================
+  # Stripe Refund Service (Sprint 21)
+  # ==========================================
+  # Extracted business logic from StripeRefundRequestHandler.
+  # SRP: Service handles all refund processing logic.
+  # Sprint 24: Added StockRestorationService for stock restoration on refund.
+
+  OxidEsales\Payments\Stripe\Service\RefundServiceInterface:
+    class: OxidEsales\Payments\Stripe\Service\RefundService
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $stockRestorationService: '@OxidEsales\PaymentBase\Service\StockRestorationServiceInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: false
+
+
+  # ==========================================
+  # Contract Refund Recorder (Sprint 114.8)
+  # ==========================================
+  # Extracted from D3 duplication: StripeRefundRequestHandler + WebhookContractFulfillmentHandler.
+  # Centralizes the FULFILLED guard + addRefundedAmount + setRefundedAt + save sequence.
+
+  OxidEsales\Payments\Stripe\Service\ContractRefundRecorder:
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: false
+
+  # ==========================================
+  # Stripe Refund Handler (Sprint 4, Refactored Sprint 21)
+  # ==========================================
+  # Handles StripeRefundRequestEvent from admin panel, webhook, or API.
+  # Sprint 8: Added RequestLogService for centralized logging
+  # Sprint 21: Delegates to RefundService for business logic (SRP).
+  # Sprint 22: Removed OrderRefundUpdateService (dead code), full refund only.
+  # Sprint 25: Added event logger for debugging
+  # Sprint 114.8: Delegates refund recording to ContractRefundRecorder (D3).
+
+  OxidEsales\Payments\Stripe\EventSystem\Handler\StripeRefundRequestHandler:
+    arguments:
+      $refundService: '@OxidEsales\Payments\Stripe\Service\RefundServiceInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $requestLogService: '@OxidEsales\PaymentBase\Service\RequestLogServiceInterface'
+      $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
+      $logger: '@oxid_esales.monolog.logger'
+      $eventLogger: '@stripe.events.file_logger'
+      $refundRecorder: '@OxidEsales\Payments\Stripe\Service\ContractRefundRecorder'
+      $paymentIntentResolver: '@OxidEsales\Payments\Stripe\Service\PaymentIntentResolver'
+    tags:
+      - { name: payment.event_handler }
+    public: false
+
+  # ==========================================
+  # Webhook Contract Fulfillment Handler (Sprint 6)
+  # ==========================================
+  # Handles contract state transitions from webhook events.
+  # Bridges Stripe webhooks to the contract state machine.
+
+  # Interface binding
+  # Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
+  OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface:
+    class: OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $contractFulfillmentService: '@OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface'
+      $orderUpdater: '@OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface'
+      $transactionRepository: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
+      $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
+      $refundRecorder: '@OxidEsales\Payments\Stripe\Service\ContractRefundRecorder'
+    public: false
+
+  # Sprint 112 / G1: mirrors contract cancel/fail transitions onto linked oxorder.
+  OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface:
+    class: OxidEsales\Payments\Stripe\Service\OxidContractLinkedOrderUpdater
+    public: false
+
+  OxidEsales\Payments\Stripe\Service\OxidContractLinkedOrderUpdater:
+    alias: OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface
+
+  # Concrete implementation alias
+  OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler:
+    alias: OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface
+
+  # ==========================================
+  # Stripe Webhook Processor (Sprint 5)
+  # ==========================================
+  # New webhook processor using Template Method pattern from payment-base.
+  # Consolidates: signature verification, idempotency, logging, event routing.
+  #
+  # Sprint 114.4: Event routing is now open-for-extension (OCP) via tagged handler
+  # registry — new event types are handled by registering a new
+  # StripeWebhookEventHandlerInterface tagged 'stripe.webhook_handler', without
+  # editing this class.
+
+  OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser:
+    public: false
+
+  OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor:
+    arguments:
+      $logRepository: '@OxidEsales\PaymentBase\Repository\WebhookLogRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+      $handlers: !tagged_iterator stripe.webhook_handler
+    public: true
+
+  # Sprint 114.4: Tagged stripe.webhook_handler services — one per event type.
+  # Registered here; injected into StripeWebhookProcessor via !tagged_iterator.
+
+  OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededWebhookHandler:
+    arguments:
+      $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    tags: [ { name: stripe.webhook_handler } ]
+    public: false
+
+  OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentFailedWebhookHandler:
+    arguments:
+      $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    tags: [ { name: stripe.webhook_handler } ]
+    public: false
+
+  OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentCanceledWebhookHandler:
+    arguments:
+      $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    tags: [ { name: stripe.webhook_handler } ]
+    public: false
+
+  OxidEsales\Payments\Stripe\Webhook\Handler\ChargeRefundedWebhookHandler:
+    arguments:
+      $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    tags: [ { name: stripe.webhook_handler } ]
+    public: false
+
+  OxidEsales\Payments\Stripe\Webhook\Handler\ChargeDisputeCreatedWebhookHandler:
+    arguments:
+      $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    tags: [ { name: stripe.webhook_handler } ]
+    public: false
+
+  OxidEsales\Payments\Stripe\Webhook\Handler\CheckoutSessionCompletedWebhookHandler:
+    arguments:
+      $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    tags: [ { name: stripe.webhook_handler } ]
+    public: false
+
+  OxidEsales\Payments\Stripe\Webhook\Handler\CheckoutSessionExpiredWebhookHandler:
+    arguments:
+      $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    tags: [ { name: stripe.webhook_handler } ]
+    public: false
+
+  # ==========================================
+  # Repositories (Data Access Layer)
+  # ==========================================
+
+  # Doctrine DBAL Connection - Required for repositories
+  doctrine.dbal.connection:
+    class: Doctrine\DBAL\Connection
+    factory: ['@OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionProviderInterface', 'get']
+    public: false
+
+  # Transaction Repository - Stores payment transactions
+  OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface:
+    class: OxidEsales\PaymentBase\Repository\DoctrineTransactionRepository
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+    public: false
+
+  # Alias for easier reference
+  OxidEsales\PaymentBase\Repository\DoctrineTransactionRepository:
+    alias: OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface
+
+  # Payment Customer Repository - Maps OXID users to payment provider customers
+  # Sprint 45: Stripe Customer lifecycle
+  OxidEsales\PaymentBase\Repository\PaymentCustomerRepositoryInterface:
+    class: OxidEsales\PaymentBase\Repository\DoctrinePaymentCustomerRepository
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+    public: false
+
+  # Idempotency Repository - Prevents duplicate capture/refund API calls
+  # Sprint 42: Uses oe_payments_idempotency table
+  OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface:
+    class: OxidEsales\PaymentBase\Repository\DoctrineIdempotencyRepository
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+    public: false
+
+  # Note: StripePaymentDetailsRepository DELETED
+  # Stripe-specific payment details (card info, 3DS, risk) stored in:
+  # - Contract metadata (oe_payments_contract.OXPROVIDERDATA)
+  # - Transaction entity (oe_payments_transaction)
+
+  # Webhook Log Repository - Logs webhook events for auditing and idempotency
+  # public: true required for integration tests to access directly
+  OxidEsales\PaymentBase\Repository\WebhookLogRepositoryInterface:
+    class: OxidEsales\PaymentBase\Repository\DoctrineWebhookLogRepository
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+    public: true
+
+  # Webhook DB Log Service Factory (logging-control sprint Phase 4)
+  # Injects the isWebhookLoggingEnabled() gate into the payment-base WebhookLogService
+  # as the optional $shouldLogPayload closure, keeping payment-base provider-agnostic.
+  # The claim row (OXEVENTID dedup/idempotency) is always written; only OXPAYLOAD and
+  # the PSR-3 mirror are gated behind blStripeLogWebhooks + level >= normal.
+  OxidEsales\Payments\Stripe\Service\Factory\WebhookDbLogServiceFactory:
+    autowire: false
+    arguments:
+      $repository: '@OxidEsales\PaymentBase\Repository\WebhookLogRepositoryInterface'
+      $logger: '@Psr\Log\LoggerInterface'
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+
+  # Webhook Log Service - Sprint 7 Phase 4: Proper layering for webhook log access
+  # Architecture: Controller/Service → WebhookLogService → WebhookLogRepository → Database
+  # Phase 4 (logging-control): built via factory to inject the shouldLogPayload closure.
+  OxidEsales\PaymentBase\Service\WebhookLogServiceInterface:
+    class: OxidEsales\PaymentBase\Service\WebhookLogService
+    factory: ['@OxidEsales\Payments\Stripe\Service\Factory\WebhookDbLogServiceFactory', 'create']
+    public: true
+
+  # Payment Order State Repository - DEPRECATED (No longer used)
+  # Sprint 8: PaymentOrderStateRepository DELETED
+  # Payment state now tracked via osc_payment_contract with capture/refund fields.
+  # osc_payment_order_state table has been dropped.
+
+  # ==========================================
+  # Twig Extensions
+  # ==========================================
+
+  # Environment Checker - Determines dev/prod mode from Stripe test/live config
+  # Sprint 63d (STRP-99 H1): Used by DumpExtension to gate debug functions
+  OxidEsales\Payments\Stripe\Environment\DevelopmentEnvironmentCheckerInterface:
+    alias: OxidEsales\Payments\Stripe\Environment\ModuleConfigurationDevelopmentChecker
+    public: false
+
+  OxidEsales\Payments\Stripe\Environment\ModuleConfigurationDevelopmentChecker:
+    arguments:
+      - '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+    public: false
+
+  # Dump Extension - Provides dump() for debugging templates (dev mode only)
+  # Sprint 63d (STRP-99 H1): Gated by DevelopmentEnvironmentCheckerInterface
+  OxidEsales\Payments\Stripe\Twig\DumpExtension:
+    arguments:
+      - '@OxidEsales\Payments\Stripe\Environment\DevelopmentEnvironmentCheckerInterface'
+    tags:
+      - { name: twig.extension }
+    public: false
+
+  # ==========================================
+  # Controllers
+  # ==========================================
+
+  # PaymentController and StripeOrderController are NOT registered as services.
+  # They are pure OXID class-chain extensions (see metadata.php `extend`: they
+  # `extends PaymentController_parent` / `StripeOrderController_parent`) and access
+  # services at runtime via the ServiceContainer trait — they have no constructor DI.
+  # Registering a chain extension as a `oxid.view_controller` service makes the DI
+  # compiler reflect/autoload the class, which triggers the OXID class-chain build
+  # and re-enters the container compiler (ActiveModulesDataProviderBridge
+  # ArgumentCountError). Keeping them out of services.yaml is the OXID-standard shape.
+
+  # Sprint 46: Extracted services for OrderRefund admin controller
+  OxidEsales\Payments\Stripe\Service\OrderContractResolver:
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+    public: true
+
+  OxidEsales\Payments\Stripe\Controller\Admin\OrderActionDispatcher:
+    arguments:
+      $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
+      $contractResolver: '@OxidEsales\Payments\Stripe\Service\OrderContractResolver'
+    public: true
+
+  # Sprint 114.11b (S4): Extracted from OrderRefundViewDataProvider — history assembly.
+  OxidEsales\Payments\Stripe\Admin\StripeTransactionHistoryBuilder:
+    public: false
+
+  OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider:
+    arguments:
+      $chargeAmountResolver: '@OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface'
+      $historyBuilder: '@OxidEsales\Payments\Stripe\Admin\StripeTransactionHistoryBuilder'
+    public: true
+
+  # Sprint 103: Resolver for derived charge amounts (customer-refunded,
+  # available-for-refund). Owns the partial-capture math — the formula
+  # `R_customer = max(0, amount_refunded − max(0, amount − amount_captured))`
+  # exists nowhere else in src/Stripe/{Controller,Model}/.
+  OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface:
+    alias: OxidEsales\Payments\Stripe\Service\StripeChargeAmountResolver
+    public: true
+
+  OxidEsales\Payments\Stripe\Service\StripeChargeAmountResolver:
+    public: true
+
+  # Sprint I — Stripe's panel provider for payment-base's shared
+  # "Payment" admin tab. Tagged service → auto-collected by the shared
+  # registry. Deps are wired explicitly to Stripe's concrete dispatcher —
+  # the shared `AdminActionDispatcherInterface` isn't aliased globally
+  # because PayPal implements it too and a global alias would conflict.
+  OxidEsales\Payments\Stripe\Admin\StripePaymentPanelProvider:
+    arguments:
+      $actionDispatcher: '@OxidEsales\Payments\Stripe\Controller\Admin\OrderActionDispatcher'
+      $viewDataBuilder: '@OxidEsales\Payments\Stripe\Admin\StripePanelViewDataBuilder'
+      $orderLoader: '@OxidEsales\Payments\Stripe\Admin\StripePanelOrderLoader'
+      # Sprint 120 (STRP-129): capture_reason pre-dispatch gate + feedback channel
+      $userDataValidator: '@OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface'
+      $validationFeedback: '@OxidEsales\Payments\Stripe\Admin\AdminValidationFeedbackInterface'
+      # Sprint 121 (STRP-129): semantic amount gate + PSP-derived bounds
+      $amountValidator: '@OxidEsales\Payments\Stripe\Admin\AdminAmountValidator'
+      $actionBounds: '@OxidEsales\Payments\Stripe\Admin\AdminActionBoundsInterface'
+    tags:
+      - { name: 'oe.payment.admin_panel' }
+    public: true
+
+  # Sprint 121 (STRP-129): stateless semantic amount validator (no interface —
+  # pure deterministic function; tests use the real instance).
+  OxidEsales\Payments\Stripe\Admin\AdminAmountValidator:
+    public: false
+
+  # Sprint 121 (STRP-129): narrow bounds seam over OrderRefundViewDataProvider.
+  OxidEsales\Payments\Stripe\Admin\AdminActionBoundsInterface:
+    class: OxidEsales\Payments\Stripe\Admin\StripeAdminActionBounds
+    arguments:
+      $viewDataProvider: '@OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider'
+    public: false
+
+  # Sprint 120 (STRP-129): session-backed feedback channel for admin
+  # Payment-tab validation failures (store on gate path, consume on render).
+  OxidEsales\Payments\Stripe\Admin\AdminValidationFeedbackInterface:
+    class: OxidEsales\Payments\Stripe\Admin\AdminValidationFeedback
+    arguments:
+      $session: '@OxidEsales\PaymentBase\Adapter\SessionAdapterInterface'
+    public: false
+
+  OxidEsales\Payments\Stripe\Admin\StripePanelViewDataBuilder:
+    arguments:
+      $viewDataProvider: '@OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider'
+      $contractResolver: '@OxidEsales\Payments\Stripe\Service\OrderContractResolver'
+      $moduleConfig: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+      # Sprint 120 (STRP-129): consume validation feedback + format messages
+      $validationFeedback: '@OxidEsales\Payments\Stripe\Admin\AdminValidationFeedbackInterface'
+      $messageFormatter: '@OxidEsales\Payments\Stripe\Service\UserDataValidationMessageFormatter'
+      # Sprint 121 (STRP-129): per-code amount messages
+      $translator: '@OxidEsales\Payments\Stripe\Service\LanguageTranslatorInterface'
+    public: false
+
+  OxidEsales\Payments\Stripe\Admin\StripePanelOrderLoader:
+    public: false
+
+  # Note: ModuleConfiguration is a class extension (extends ModuleConfiguration_parent)
+  # and cannot use standard DI. It uses ContainerFactory for lazy service retrieval.
+
+  # ==========================================
+  # Webhook Handlers (Sprint 13)
+  # ==========================================
+  # Sprint 114.4: Dead webhook handlers removed (PaymentIntentSucceededHandler,
+  # ChargeRefundedHandler). Their functionality is now implemented as tagged
+  # stripe.webhook_handler services registered above (near StripeWebhookProcessor).
+
+  # ==========================================
+  # OXPAID Reconciliation (Sprint 10)
+  # ==========================================
+  # Service and console command for reconciling OXPAID with Stripe API.
+  # Handles cases where webhooks were missed or delayed.
+
+  # Event File Logger Factory - Creates logger with correct shop path
+  # Sprint 25: Logging for event system debugging
+  # Phase 3: gated via ModuleConfigurationServiceInterface::isEventLoggingEnabled()
+  OxidEsales\Payments\Stripe\Service\Factory\EventFileLoggerFactory:
+    autowire: false
+    arguments:
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+    public: false
+
+  # Event File Logger - Writes to log/osc/stripe_events.log
+  # Sprint 25: Debug logging for event handlers
+  stripe.events.file_logger:
+    class: OxidEsales\PaymentBase\Service\FileLoggerInterface
+    factory: ['@OxidEsales\Payments\Stripe\Service\Factory\EventFileLoggerFactory', 'create']
+    public: false
+
+  # Reconciliation File Logger Factory - Creates logger with correct shop path
+  # Sprint 14: Factory approach for OXID compatibility (no kernel.project_dir)
+  # Phase 3: gated via ModuleConfigurationServiceInterface::isReconciliationLoggingEnabled()
+  OxidEsales\Payments\Stripe\Service\Factory\ReconciliationFileLoggerFactory:
+    autowire: false
+    arguments:
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+    public: false
+
+  # Reconciliation File Logger - Writes to log/osc/stripe_reconciliation.log
+  # Sprint 14: Injected logger for testability (prevents unit tests writing to production logs)
+  stripe.reconciliation.file_logger:
+    class: OxidEsales\PaymentBase\Service\FileLoggerInterface
+    factory: ['@OxidEsales\Payments\Stripe\Service\Factory\ReconciliationFileLoggerFactory', 'create']
+    public: false
+
+  # Reconciliation Service
+  # Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
+  OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService:
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $contractFulfillmentService: '@OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface'
+      $fileLogger: '@stripe.reconciliation.file_logger'
+    public: true
+
+  # Console Command: stripe:reconcile-oxpaid
+  OxidEsales\Payments\Stripe\Command\ReconcileOxpaidCommand:
+    arguments:
+      $reconciliationService: '@OxidEsales\Payments\Stripe\Service\OxpaidReconciliationServiceInterface'
+    tags:
+      - { name: 'console.command', command: 'stripe:reconcile-oxpaid' }
+    public: true
+
+  # ==========================================
+  # Sprint 2: Condition Handlers (Fraud Check)
+  # ==========================================
+  # Fraud check handler manages fraud checking as a contract condition.
+  # Can be disabled via admin configuration.
+  #
+  # Fraud Check:
+  # - ON: Checks Stripe Radar score after payment authorization
+  # - OFF: Fraud check condition immediately fulfilled
+  #
+  # Note: Stock management removed in Sprint 23.
+  # OXID handles stock automatically on order finalization.
+
+  # Fraud Check Handler - Checks fraud score on payment authorization
+  # Priority 85: Runs after stock reservation, before order creation
+  # Binary pass/fail only - no manual review
+  # On failure: contract is failed (will trigger stock release)
+  OxidEsales\PaymentBase\EventSystem\Handler\FraudCheckHandler:
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $fraudCheckService: '@OxidEsales\PaymentBase\Service\FraudCheckServiceInterface'
+      $enabled: '%payment.fraud_check.enabled%'
+    tags:
+      - { name: payment.event_handler, priority: 85 }
+    public: false
+
+  # Stripe Radar Fraud Check Service - Checks Stripe Radar score
+  # Default threshold: 0.7 (score >= 0.7 fails)
+  # Implementation in Stripe module, interface in payment-base
+  OxidEsales\PaymentBase\Service\FraudCheckServiceInterface:
+    class: OxidEsales\Payments\Stripe\Service\StripeRadarFraudCheckService
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $threshold: '%payment.fraud_check.threshold%'
+    public: false
+
+# ==========================================
+# Parameters for Sprint 2 Condition Handlers
+# ==========================================
+# These can be overridden in shop configuration or environment
+
+  # ==========================================
+  # Sprint 64d: Webhook Guard Chain (security hardening)
+  # ==========================================
+
+  # Payload size guard (64KB max — Stripe events are typically 2-5KB)
+  OxidEsales\Payments\Stripe\Controller\Webhook\WebhookPayloadSizeGuard:
+    arguments:
+      $maxBytes: 65536
+
+  # Rate limiter: 100 requests per 60 seconds per IP
+  stripe.webhook.rate_limiter:
+    class: OxidEsales\PaymentBase\Mcp\Http\ApcuRateLimiter
+    arguments: [100, 60, 'stripe_webhook_rate:']
+
+  OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRateLimitGuard:
+    arguments:
+      $rateLimiter: '@stripe.webhook.rate_limiter'
+
+  # IP allowlist: disabled by default (empty list = all IPs allowed)
+  OxidEsales\Payments\Stripe\Controller\Webhook\WebhookIpAllowlistGuard:
+    arguments:
+      $allowedCidrs: []
+      $allowLoopback: true
+
+  # Sprint 67b (M6): HTTPS enforcement guard
+  OxidEsales\Payments\Stripe\Controller\Webhook\WebhookHttpsGuard:
+    arguments:
+      $allowInsecureLoopback: true
+
+  # Guard chain: ordered cheapest → most expensive
+  OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRequestGuardInterface:
+    class: OxidEsales\Payments\Stripe\Controller\Webhook\WebhookGuardChain
+    public: true
+    arguments:
+      - - '@OxidEsales\Payments\Stripe\Controller\Webhook\WebhookHttpsGuard'
+        - '@OxidEsales\Payments\Stripe\Controller\Webhook\WebhookPayloadSizeGuard'
+        - '@OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRateLimitGuard'
+        - '@OxidEsales\Payments\Stripe\Controller\Webhook\WebhookIpAllowlistGuard'
+
+  # ---- Sprint 119 Phase B: user-data character-level validation (STRP-129) ----
+
+  # ValidationBase bound for the Stripe plugin. The module id is a YAML literal
+  # because YAML cannot reference PHP constants; StripeDefinitions::STRIPE_WALLET_PAYMENT_ID
+  # resolves to the same value ('oe_payments_stripe_wallet').
+  OxidEsales\PaymentBase\Validation\ValidationBaseInterface:
+    class: OxidEsales\PaymentBase\Validation\ValidationBase
+    arguments:
+      $pluginModuleId: 'oe_payments_stripe_wallet'
+      $loader: '@OxidEsales\PaymentBase\Validation\ValidationRuleLoaderInterface'
+    public: false
+
+  # UserDataValidator facade — stateless singleton; receives UserFieldReaderInterface
+  # as a validateForUser() method argument so it can be DI-singleton while the
+  # reader is request-scoped (bound to the live User object in Phase C controller).
+  OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface:
+    class: OxidEsales\Payments\Stripe\Service\UserDataValidator
+    arguments:
+      - '@OxidEsales\PaymentBase\Validation\ValidationBaseInterface'
+    public: true
+
+  # Sprint 119 Phase E (STRP-129) — narrow language-translation seam for testability.
+  OxidEsales\Payments\Stripe\Service\LanguageTranslatorInterface:
+    class: OxidEsales\Payments\Stripe\Service\OxidLanguageTranslator
+    public: false
+
+  # Sprint 119 Phase E (STRP-129) — user-data validation message formatter.
+  # Tagged with oe.payment_base.validation_message_formatter so that
+  # ValidationApiController picks it up for the OPC endpoint path.
+  # STRP-129: allowed-symbols describer — built from validation-rules.php via the
+  # provider factory so the describer keeps its unit-testable (translator, array) ctor.
+  OxidEsales\Payments\Stripe\Service\AllowedSymbolsDescriber:
+    factory: ['@OxidEsales\Payments\Stripe\Service\ValidationRulesProvider', 'createDescriber']
+    arguments:
+      - '@OxidEsales\Payments\Stripe\Service\LanguageTranslatorInterface'
+    public: true
+
+  OxidEsales\Payments\Stripe\Service\UserDataValidationMessageFormatter:
+    arguments:
+      $translator: '@OxidEsales\Payments\Stripe\Service\LanguageTranslatorInterface'
+      $allowedSymbolsDescriber: '@OxidEsales\Payments\Stripe\Service\AllowedSymbolsDescriber'
+    tags:
+      - { name: oe.payment_base.validation_message_formatter }
+    public: true
+
+parameters:
+  # Fraud check toggle (default: enabled)
+  payment.fraud_check.enabled: true
+
+  # Fraud check threshold (default: 0.7 = 70% risk score)
+  # Scores >= threshold fail the fraud check
+  payment.fraud_check.threshold: 0.7
+
+  # Sprint 68b (M9): Server-side secret for address hash HMAC
+  # Derived from a fixed salt — unique per installation via Stripe secret key injection at runtime
+  stripe.address_hmac_secret: 'oe_stripe_address_hmac_v1_secret'

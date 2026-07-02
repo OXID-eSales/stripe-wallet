@@ -1,0 +1,72 @@
+        <div class="s-head">
+          <div class="badge"><span class="dot"></span><span class="step-label">Features &middot; 5 of 7 &middot; Webhooks</span></div>
+          <div class="deck">Six guards before a byte of payload is parsed</div>
+        </div>
+
+        <h2 class="h-2">The webhook endpoint is the most-attacked URL.<br/><em class="acc">We harden it with guards, not prayers.</em></h2>
+
+        <p class="lede" style="margin-bottom: 14px;">
+          <code>StripeWebhookController</code> exposes one URL: <code>?cl=StripeWebhookController</code>.
+          Every request passes through an ordered chain of guards before any business logic runs. Guards are
+          individually unit-tested, individually swappable via the service container, and short-circuit on first failure.
+        </p>
+
+        <div class="cols cols-2" style="gap: 18px; flex: 1 1 0;">
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Guard chain (order matters)</div>
+            <ol class="small" style="margin: 0 0 16px;">
+              <li><code>HttpsGuard</code> &mdash; reject plain HTTP. Always.</li>
+              <li><code>PayloadSizeGuard</code> &mdash; cap raw body at 1&nbsp;MB before parsing.</li>
+              <li><code>RateLimitGuard</code> &mdash; per-IP token bucket via APCu/redis (configurable).</li>
+              <li><code>IpAllowlistGuard</code> &mdash; optional Stripe egress range check.</li>
+              <li><code>SignatureGuard</code> &mdash; verify <code>Stripe-Signature</code> with the endpoint secret.</li>
+              <li><code>IdempotencyGuard</code> &mdash; <code>event.id</code> seen? log + 200, do not re-process.</li>
+            </ol>
+
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Logged on every request</div>
+            <ul class="small" style="margin: 0;">
+              <li>Raw payload + headers in <code>oe_payments_webhooklogs</code></li>
+              <li>Which guard (if any) rejected, and why</li>
+              <li>The dispatched event class and handler latency</li>
+            </ul>
+          </div>
+
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Handler dispatch &middot; one switch per event type</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0 0 14px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+match ($event-&gt;type) {
+    'payment_intent.succeeded' =&gt;
+        $this-&gt;piSucceededHandler-&gt;handle($event),
+    'payment_intent.payment_failed' =&gt;
+        $this-&gt;piFailedHandler-&gt;handle($event),
+    'charge.refunded' =&gt;
+        $this-&gt;chargeRefundedHandler-&gt;handle($event),
+    'charge.dispute.created' =&gt;
+        $this-&gt;disputeOpenedHandler-&gt;handle($event),
+    default =&gt;
+        $this-&gt;logger-&gt;info(
+            'Ignored Stripe event',
+            ['type' =&gt; $event-&gt;type]
+        ),
+};
+</pre>
+
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Why webhooks matter even when the redirect works</div>
+            <ul class="small" style="margin: 0;">
+              <li>The customer&rsquo;s browser may die between Stripe&rsquo;s success page and our return URL &mdash; the webhook still closes the order.</li>
+              <li>Dashboard-initiated refunds bypass the admin tab &mdash; the webhook records them in <code>oe_payments_transaction</code>.</li>
+              <li>Disputes and chargebacks have no other entry point.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout" style="margin-top: 14px;">
+          <strong>Always return 200 OK once parsed.</strong> Stripe retries on any non-2xx for <strong>72 hours</strong>.
+          A handler exception is caught at the controller boundary, logged, and the response is still 200 &mdash;
+          but the event is flagged in <code>oe_payments_webhooklogs</code> for ops review.
+        </div>
+
+        <div class="s-foot">
+          <div>OXID Stripe Wallet &middot; Webhook processing</div>
+          <div class="page-num">10 / 18</div>
+        </div>

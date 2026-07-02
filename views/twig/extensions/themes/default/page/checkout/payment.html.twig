@@ -1,0 +1,104 @@
+{% extends "page/checkout/payment.html.twig" %}
+
+{% block select_payment %}
+    {% set config = oViewConf.getStripeWalletConfig() %}
+    {% if sPaymentID == "oscstripe_card" %}
+        {% if config.isActive() %}
+            <div class="payment-option">
+                <div class="payment-option-form">
+                    {% include "@oe_payments_stripe_wallet/frontend/select_payment.html.twig" %}
+                    <label class="form-check-label" for="payment_{{ sPaymentID }}">{{ paymentmethod.oxpayments__oxdesc.value }}</label>
+                        <div class="stripe-card-option-info{% if oView.getCheckedPaymentId() == paymentmethod.oxpayments__oxid.value %} activePayment{% endif %}">
+                            {% for value in paymentmethod.getDynValues() %}
+                                <div class="form-floating mb-3">
+                                    <input type="text" size="20"
+                                           maxlength="64" name="dynvalue[{{ value.name }}]" value="{{ value.value }}"
+                                           class="form-control" id="{{ sPaymentID }}_{{ loop.index }}"
+                                           placeholder="name@example.com">
+                                    <label for="{{ sPaymentID }}_{{ loop.index }}">{{ value.name }}</label>
+                                </div>
+                            {% endfor %}
+
+                            {% include "@oe_payments_stripe_wallet/frontend/stripe_card.html.twig" with {sPaymentID: sPaymentID} %}
+
+                            {% block checkout_payment_longdesc %}
+                                {% if paymentmethod.oxpayments__oxlongdesc.value|striptags|trim %}
+                                    <div class="desc">
+                                        {{ paymentmethod.oxpayments__oxlongdesc.value }}
+                                    </div>
+                                {% endif %}
+                            {% endblock %}
+                        </div>
+                </div>
+                {% if paymentmethod.getPrice() %}
+                    <div class="payment-option-price">
+                        {% set oPaymentPrice = paymentmethod.getPrice() %}
+                        {% if oViewConf.isFunctionalityEnabled('blShowVATForPayCharge') %}
+                            {% apply spaceless %}
+                                {{ format_price(oPaymentPrice.getNettoPrice(), { currency: currency }) }}
+                                {% if oPaymentPrice.getVatValue() > 0 %}
+                                    {{ translate({ ident: "PLUS_VAT" }) }} {{ format_price(oPaymentPrice.getVatValue(), { currency: currency }) }}
+                                {% endif %}
+                            {% endapply %}
+                        {% else %}
+                            {{ format_price(oPaymentPrice.getBruttoPrice(), { currency: currency }) }}
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        {% endif %}
+    {% else %}
+        {{ parent() }}
+    {% endif %}
+{% endblock %}
+
+{% block checkout_payment_nextstep %}
+    {% if not oView.getAllSets() or not oView.getPaymentList() %}
+        <div class="alert alert-warning mt-3">
+            {{ translate({ ident: "MESSAGE_NO_SHIPPING_METHOD_FOUND" }) }}
+        </div>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                var btn = document.querySelector('button[onclick*="requestSubmit"]');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.classList.remove('btn-highlight');
+                    btn.classList.add('btn-secondary');
+                    btn.removeAttribute('onclick');
+                }
+            });
+        </script>
+    {% endif %}
+{% endblock %}
+
+{% block change_payment %}
+    {% if vaultedPaymentSources %}
+        <h4 class="card-header card-title">{{ 'OSC_STRIPE_VAULTING_VAULTED_PAYMENTS'|translate }}</h4>
+        <div class="card-body">
+            {% for paymentTokenId, vaultedPayment in vaultedPaymentSources %}
+                <div class="well well-sm">
+                    <dl>
+                        <dt>
+                            <input type="radio" name="vaulting_paymentsource" class="vaulting_paymentsource"
+                                   id="paymenttoken_{{ vaultedPayment.id }}"
+                                   data-token-id="{{ vaultedPayment.id }}"
+                                   data-paymenttype="{{ vaultedPayment.type }}"
+                            >
+                            <label for="paymenttoken_{{ vaultedPayment.id }}">{{ vaultedPayment.label }}</label>
+                        </dt>
+                    </dl>
+                </div>
+            {% endfor %}
+            <div class="text-right">
+                <button type="submit" name="userform"
+                        class="btn btn-primary pull-right submitButton nextStep largeButton"
+                        id="stripeVaultCheckoutButton"
+                        disabled
+                >
+                    {{ 'OSC_STRIPE_CONTINUE_TO_NEXT_STEP'|translate }} <i class="fa fa-caret-right"></i>
+                </button>
+            </div>
+        </div>
+    {% endif %}
+    {{ parent() }}
+{% endblock %}

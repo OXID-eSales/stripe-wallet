@@ -1,0 +1,61 @@
+        <div class="s-head">
+          <div class="badge"><span class="dot"></span><span class="step-label">Features &middot; 6 of 7 &middot; 3D Secure / SCA</span></div>
+          <div class="deck">PSD2 compliance &mdash; without code on our side</div>
+        </div>
+
+        <h2 class="h-2">3D Secure is Stripe&rsquo;s problem.<br/><em class="acc">We just keep the contract in sync.</em></h2>
+
+        <p class="lede" style="margin-bottom: 14px;">
+          PSD2 mandates Strong Customer Authentication for most EU payments. Stripe Checkout handles the SCA challenge
+          inline &mdash; the customer is already redirected, and the bank&rsquo;s 3DS page renders inside Stripe&rsquo;s domain.
+          Our job is to react to the few outcomes that matter for the contract.
+        </p>
+
+        <div class="cols cols-2" style="gap: 18px; flex: 1 1 0;">
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">The four outcomes we model</div>
+            <table class="small" style="width: 100%; border-collapse: collapse; margin: 0 0 16px;">
+              <thead><tr style="background: rgba(139, 92, 246, 0.08);"><th style="text-align: left; padding: 6px 10px; border-bottom: 1px solid rgba(139, 92, 246, 0.3);">Stripe outcome</th><th style="text-align: left; padding: 6px 10px; border-bottom: 1px solid rgba(139, 92, 246, 0.3);">What we do</th></tr></thead>
+              <tbody>
+                <tr><td style="padding: 6px 10px;">SCA passed &middot; <code>succeeded</code></td><td style="padding: 6px 10px;">contract &rarr; <code>READY_TO_COMMIT</code></td></tr>
+                <tr><td style="padding: 6px 10px;">SCA required at return &middot; <code>requires_action</code></td><td style="padding: 6px 10px;">redirect to <code>next_action.redirect_to_url</code></td></tr>
+                <tr><td style="padding: 6px 10px;">SCA failed &middot; <code>payment_failed</code></td><td style="padding: 6px 10px;">contract &rarr; <code>FAILED</code>; order stays <code>NOT_FINISHED</code></td></tr>
+                <tr><td style="padding: 6px 10px;">SCA timed out &middot; <code>requires_payment_method</code></td><td style="padding: 6px 10px;">return customer to <code>cl=order</code> with toast</td></tr>
+              </tbody>
+            </table>
+
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Test cards in Playwright</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.4; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+4000 0025 0000 3155  &mdash; 3DS authentication required
+4000 0027 6000 3184  &mdash; 3DS, declined after auth
+4242 4242 4242 4242  &mdash; happy path, no SCA
+</pre>
+          </div>
+
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Stripe3DSRequiredEvent</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0 0 16px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+final class Stripe3DSRequiredEvent
+{
+    public function __construct(
+        public readonly PaymentContract $contract,
+        public readonly string $redirectUrl,
+        public readonly string $intentId
+    ) {}
+}
+</pre>
+
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">What stays in the contract</div>
+            <ul class="small" style="margin: 0;">
+              <li>The contract <strong>stays in <code>PENDING</code></strong> while SCA is in progress. <em>Not <code>AUTHORIZED</code></em> &mdash; the bank hasn&rsquo;t agreed yet.</li>
+              <li>The <code>BasketSnapshot</code> guarantees the price the customer saw is the price they&rsquo;re asked to authenticate &mdash; no in-flight changes.</li>
+              <li>If SCA fails permanently, the order remains <code>NOT_FINISHED</code> and is reaped by the housekeeping job after 24h.</li>
+              <li>Recovery email links the customer back to the <em>same</em> contract &mdash; no duplicate orders.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="s-foot">
+          <div>OXID Stripe Wallet &middot; 3D Secure &amp; SCA</div>
+          <div class="page-num">11 / 18</div>
+        </div>

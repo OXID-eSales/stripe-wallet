@@ -1,0 +1,213 @@
+<?php
+/**
+ * Copyright © OXID eSales AG. All rights reserved.
+ * See LICENSE file for license details.
+ */
+
+$sLangName = "English";
+// -------------------------------
+// RESOURCE IDENTITFIER = STRING
+// -------------------------------
+$aLang = array(
+    'charset'                                           => 'UTF-8',
+
+    /* SETTINGS */
+    'SHOP_MODULE_GROUP_STRIPE_GENERAL'                  => 'Basic configuration',
+    'SHOP_MODULE_GROUP_STRIPE_TEST_CONFIG'              => 'Test Configuration',
+    'SHOP_MODULE_GROUP_STRIPE_LIVE_CONFIG'              => 'Live Configuration',
+    'SHOP_MODULE_sStripeMode'                           => 'Live or Test API',
+    'SHOP_MODULE_sStripeMode_live'                      => 'Live',
+    'SHOP_MODULE_sStripeMode_test'                      => 'Test',
+    'SHOP_MODULE_sStripeTestToken'                      => 'Test API Access Token',
+    'SHOP_MODULE_sStripeTestPk'                         => 'Test API Publishable Key',
+    'SHOP_MODULE_sStripeLiveToken'                      => 'Live API  Access Token',
+    'SHOP_MODULE_sStripeLivePk'                         => 'Live API Publishable Key',
+    'SHOP_MODULE_blStripeLogTransactionInfo'            => 'Log result of transaction handling',
+    'SHOP_MODULE_blStripeRemoveDeactivatedMethods'      => 'Remove deactivated payment types',
+    'SHOP_MODULE_blStripeRemoveByBillingCountry'        => 'Remove not supported payment types by billing country',
+    'SHOP_MODULE_blStripeRemoveByBasketCurrency'        => 'Remove not supported payment types by basket currency',
+    'SHOP_MODULE_GROUP_STRIPE_WEBHOOKS'                 => 'Webhooks',
+    'SHOP_MODULE_sStripeWebhookEndpoint'                => 'Webhook Endpoint',
+    'HELP_SHOP_MODULE_sStripeWebhookEndpoint'           => 'Paste your Stripe Webhook Endpoint URL here, or use the button below to create and register it automatically using your platform secret key.',
+    'SHOP_MODULE_sStripeWebhookEndpointSecret'          => 'Webhook Endpoint secret',
+    'SHOP_MODULE_blStripeProvideCustomerEmailAddress'   => 'Send customer email address to Stripe',
+    // Phase 2 (logging-control sprint): blStripeLogTransactionInfo is deprecated.
+    // The help text previously referenced a log file that no longer exists.
+    // Phase 3 will read this legacy bool as a seed for sStripeLogLevel.
+    'HELP_SHOP_MODULE_blStripeLogTransactionInfo'       => 'Deprecated. This setting is kept for back-compatibility only. Use the Logging group controls (sStripeLogLevel, blStripeLogWebhooks) instead. Stripe logs are written to log/stripe/stripe_*_&lt;date&gt;.log.',
+    'HELP_SHOP_MODULE_blStripeRemoveDeactivatedMethods' => 'Removes the payment types from the frontend payment selection which are not activated in the Stripe Dashboard and thus would result in an error.',
+    'HELP_SHOP_MODULE_blStripeRemoveByBillingCountry'   => 'Removes the payment types from the frontend payment selection which are not supported for the billing country given by the customer and thus would result in an error.',
+    'HELP_SHOP_MODULE_blStripeRemoveByBasketCurrency'   => 'Removes the payment types from the frontend payment selection which are not supported for the basket currency given by the customer and thus would result in an error.',
+
+    'HELP_SHOP_MODULE_blStripeProvideCustomerEmailAddress' => 'If this option is activated, the customer email address will also be passed on for a Stripe order. This overwrites the standard email settings in the Stripe account for this order. This means that notifications for this order are sent to the customer email address instead of to the Stripe account email address.',
+
+    // Capture Mode Settings
+    'SHOP_MODULE_sStripeCaptureMode'                    => 'Capture Mode',
+    'SHOP_MODULE_sStripeCaptureMode_automatic'          => 'Automatic (capture immediately)',
+    'SHOP_MODULE_sStripeCaptureMode_manual'             => 'Manual (authorize only, capture later)',
+    'HELP_SHOP_MODULE_sStripeCaptureMode'               => 'Choose when to capture payments. Automatic mode captures funds immediately when the customer completes checkout. Manual mode only authorizes the payment - you must capture it manually from the order admin page within 7 days.',
+
+    // Logging Settings (Phase 2 — logging-control sprint)
+    // sStripeLogLevel controls how much the backend file channels write.
+    // blStripeLogWebhooks is independent so merchants can silence chatty
+    // webhook traffic without going dark on other channels.
+    // Real log files: log/stripe/stripe_<channel>_<date>.log
+    'SHOP_MODULE_GROUP_STRIPE_LOGGING'                  => 'Logging',
+    'SHOP_MODULE_sStripeLogLevel'                       => 'Log level',
+    'SHOP_MODULE_sStripeLogLevel_off'                   => 'Off (no logging)',
+    'SHOP_MODULE_sStripeLogLevel_errors'                => 'Errors only',
+    'SHOP_MODULE_sStripeLogLevel_normal'                => 'Normal (requests + reconciliation)',
+    'SHOP_MODULE_sStripeLogLevel_debug'                 => 'Debug (all channels + frontend console)',
+    'HELP_SHOP_MODULE_sStripeLogLevel'                  => 'Controls how much the Stripe module writes to its file-based audit logs (log/stripe/stripe_*_&lt;date&gt;.log). "Off" suppresses all file writes. "Errors" logs exception details only. "Normal" logs full request/response cycles and reconciliation events. "Debug" enables all channels including event flow and browser console output. Webhook logging is controlled separately by the "Log webhooks" setting.',
+    'SHOP_MODULE_blStripeLogWebhooks'                   => 'Log webhooks',
+    'HELP_SHOP_MODULE_blStripeLogWebhooks'              => 'When enabled, incoming Stripe webhook events are written to log/stripe/stripe_webhooks_&lt;date&gt;.log. This is independent of the Log Level setting so you can silence chatty webhook traffic without affecting request or reconciliation logs. The webhook idempotency record is always written regardless of this setting.',
+
+    'STRIPE_YES'                                        => 'Yes',
+    'STRIPE_NO'                                         => 'No',
+    'STRIPE_DAY'                                        => 'day',
+    'STRIPE_DAYS'                                       => 'days',
+    'STRIPE_IS_STRIPE'                                  => 'This is a Stripe payment type',
+    'STRIPE_IS_METHOD_ACTIVATED'                        => 'This payment type is not activated in your Stripe account!',
+    'STRIPE_TOKEN_NOT_CONFIGURED'                       => 'Your Stripe access token was not configured yet! Please proceed to onboarding.',
+    'STRIPE_KEY_NOT_CONFIGURED'                         => 'Your Stripe private key was not configured yet! Please configure it in the Basic configuration.',
+    'STRIPE_DUE_DATE'                                   => 'Due days',
+    'STRIPE_BANKTRANSFER_PENDING'                       => 'Status Pending',
+    'STRIPE_ORDER_REFUND'                               => 'Stripe',
+    'STRIPE_REFUND_SUCCESSFUL'                          => 'Refund was successful.',
+    'STRIPE_NO_STRIPE_PAYMENT'                          => 'This order was not payed with Stripe.',
+    'STRIPE_REFUND_QUANTITY'                            => 'Refund quantity',
+    'STRIPE_REFUND_AMOUNT'                              => 'Refund amount',
+    'STRIPE_TYPE_SELECT_LABEL'                          => 'Refund by',
+    'STRIPE_QUANTITY'                                   => 'Quantity',
+    'STRIPE_NOTICE'                                     => 'Notice',
+    'STRIPE_AMOUNT'                                     => 'Amount',
+    'STRIPE_HEADER_ORDERED'                             => 'Ordered',
+    'STRIPE_HEADER_REFUNDED'                            => 'Refunded',
+    'STRIPE_HEADER_SINGLE_PRICE'                        => 'Unitprice',
+    'STRIPE_SHIPPINGCOST'                               => "Shipping cost",
+    'STRIPE_PAYMENTTYPESURCHARGE'                       => "Payment surcharge",
+    'STRIPE_WRAPPING'                                   => "Giftwrapping",
+    'STRIPE_GIFTCARD'                                   => "Greeting card",
+    'STRIPE_VOUCHER'                                    => 'Voucher',
+    'STRIPE_DISCOUNT'                                   => 'Discount',
+    'STRIPE_REFUND_SUBMIT'                              => 'Execute refund',
+    'STRIPE_API_ERROR'                                  => 'Stripe API Error',
+    'STRIPE_APPLE_PAY_BUTTON_ONLY_LIVE_MODE'            => 'Please note: Payment with the Apple Pay Button is only available in live-mode.',
+    'STRIPE_APIKEY_CONNECTED'                           => 'Connection successful',
+    'STRIPE_APIKEY_DISCONNECTED'                        => 'Connection not successful',
+    'STRIPE_KEY_MISMATCH_WARNING'                       => 'API Key Mismatch Warning',
+    'STRIPE_DEACTIVATED'                                => 'Deactivated',
+    'STRIPE_CONNECTION_DATA'                            => 'Access your connection data here:',
+    'STRIPE_ORDER_PAYMENT_URL'                          => 'Link to payment completion',
+    'STRIPE_SEND_SECOND_CHANCE_MAIL'                    => 'Send Second Chance Email',
+    'STRIPE_SECOND_CHANCE_MAIL_ALREADY_SENT'            => 'The email has already been sent.',
+    'STRIPE_SUBSEQUENT_ORDER_COMPLETION'                => 'Subsequent order completion',
+    'STRIPE_PAYMENT_DESCRIPTION'                        => 'Payment description',
+    'STRIPE_PAYMENT_DESCRIPTION_HELP'                   => 'This will be shown to your customer on their card or bank statement when possible.<br><br>You can use the following parameters:<br>{orderId}<br>{orderNumber}<br>{storeName}<br>{customer.firstname}<br>{customer.lastname}<br>{customer.company}',
+    'STRIPE_MODULE_VERSION_OUTDATED'                    => 'Caution! The current module version is',
+    'STRIPE_PAYMENT_LIMITATION'                         => 'Stripe limitation',
+    'STRIPE_PAYMENT_LIMITATION_FROM'                    => 'From',
+    'STRIPE_PAYMENT_LIMITATION_TO'                      => 'to',
+    'STRIPE_PAYMENT_LIMITATION_UNLIMITED'               => 'unlimited',
+    'STRIPE_PAYMENT_DETAILS'                            => 'Payment details',
+    'STRIPE_ORDER_NUMBER'                               => 'Order No.',
+    'STRIPE_CONTRACT_ID'                                => 'Contract ID',
+    'STRIPE_ORDER_ID'                                   => 'Order ID',
+    'STRIPE_PAYMENT_TYPE'                               => 'Payment type',
+    'STRIPE_TRANSACTION_ID'                             => 'Stripe Transaction ID',
+    'STRIPE_EXTERNAL_TRANSACTION_ID'                    => 'External Transaction ID',
+    'STRIPE_TRANSACTION_HISTORY'                        => 'Transaction History',
+    'STRIPE_TRANSACTION_TYPE'                           => 'Type',
+    'STRIPE_TRANSACTION_STATUS'                         => 'Status',
+    'STRIPE_TRANSACTION_AMOUNT'                         => 'Amount',
+    'STRIPE_TRANSACTION_CURRENCY'                       => 'Currency',
+    'STRIPE_TRANSACTION_PROVIDER_ID'                    => 'Provider Transaction ID',
+    'STRIPE_TRANSACTION_DATE'                           => 'Date',
+    'STRIPE_NO_TRANSACTIONS'                            => 'No transactions recorded.',
+    'STRIPE_PARTIAL_CAPTURE_NOTE'                       => 'Partial capture releases the remaining amount to the customer. This cannot be undone.',
+    'STRIPE_REFUND'                                     => 'Refund',
+    'STRIPE_REFUNDABLE_AMOUNT'                          => 'Available for refund',
+    'STRIPE_FACTUAL_CAPTURED_AMOUNT'                    => 'Factual Captured Amount',
+    'STRIPE_REFUNDED_AMOUNT'                            => 'Refunded Amount',
+    'STRIPE_ORDER_EXTRA_INFO'                           => 'Additional information',
+    'STRIPE_CONNECT_SUCCESS'                            => 'Stripe Onboarding successful.',
+    'STRIPE_CONNECT_ERROR'                              => 'An error occurred during Stripe Onboarding.',
+    'STRIPE_BTN_TO_ADMIN'                               => 'To Admin Area',
+    'STRIPE_WEBHOOK_CREATE_ERROR'                       => 'The Webhook Endpoint could not be created.',
+    'STRIPE_REFUND_REASON'                              => 'Refund reason (optional)',
+    'STRIPE_PLEASE_SELECT'                              => '-- Please select --',
+    'STRIPE_REFUND_DUPLICATE'                           => 'Duplicate',
+    'STRIPE_REFUND_CUSTOMER'                            => 'Requested by customer',
+    'STRIPE_REFUND_FRAUD'                               => 'Fraud',
+    'STRIPE_IS_NOT_STRIPE_ORDER'                        => 'This is not a Stripe order',
+
+    // Connect Button & Webhook Status
+    'STRIPE_CONNECT_WITH'                               => 'Connect with',
+    'STRIPE_WEBHOOK_CONFIGURED'                         => 'Configured',
+    'STRIPE_WEBHOOK_NOT_SET'                            => 'Not set - copy from Stripe Dashboard',
+
+    // Webhook setup (Create / Clear buttons in module_config)
+    'STRIPE_WEBHOOK_CREATE_BUTTON'                      => 'Create webhooks',
+    'STRIPE_WEBHOOK_PLATFORM_KEY_MISSING'               => 'Paste your platform secret key in Module Configuration first (sStripeTestKey / sStripeLiveKey).',
+    'STRIPE_WEBHOOK_NOT_CONFIGURED'                     => 'Not configured',
+    'STRIPE_WEBHOOK_CLEAR_ALL_BUTTON'                   => 'Clear all webhooks',
+    'STRIPE_WEBHOOK_CLEAR_ALL_CONFIRM'                  => 'This will delete the webhook endpoints registered for this shop on your Stripe platform account. Continue?',
+    'STRIPE_WEBHOOK_CLEAR_ALL_ERROR'                    => 'Failed to clear webhooks.',
+    'STRIPE_WEBHOOK_SESSION_EXPIRED'                    => 'Session expired. Please reload the page and try again.',
+
+    // Platform key setting labels (used in Module Configuration)
+    'SHOP_MODULE_sStripeTestKey'                        => 'Test Platform Secret Key (for webhook management)',
+    'SHOP_MODULE_sStripeLiveKey'                        => 'Live Platform Secret Key (for webhook management)',
+    'HELP_SHOP_MODULE_sStripeTestKey'                   => 'Paste your Stripe platform standard secret key (sk_test_…) from Stripe Dashboard → Developers → API keys. Used only for registering Connect webhooks — distinct from the connected-account access token. Ensure test and live mode keys match the correct environment.',
+    'HELP_SHOP_MODULE_sStripeLiveKey'                   => 'Paste your Stripe platform standard secret key (sk_live_…) from Stripe Dashboard → Developers → API keys. Used only for registering Connect webhooks — distinct from the connected-account access token. Ensure test and live mode keys match the correct environment.',
+
+    // Capture (Manual Capture Mode)
+    'STRIPE_CAPTURE_PAYMENT'                            => 'Capture Payment',
+    'STRIPE_CAPTURE_REQUIRED'                           => 'Payment Capture Required',
+    'STRIPE_CAPTURE_REQUIRED_TEXT'                      => 'This payment has been authorized but not yet captured. You must capture the payment to complete the transaction.',
+    'STRIPE_CAPTURE_AMOUNT_TEXT'                        => 'Authorized amount to capture',
+    'STRIPE_CAPTURE_REASON'                             => 'Capture note (optional)',
+    'STRIPE_CAPTURE_REASON_PLACEHOLDER'                 => 'e.g., Order ready to ship',
+    'STRIPE_CAPTURE_SUBMIT'                             => 'Capture Payment',
+    'STRIPE_CAPTURE_SUCCESSFUL'                         => 'Payment capture was successful.',
+    'STRIPE_CAPTURE_FAILED'                             => 'Payment capture failed.',
+    'STRIPE_CAPTURE_NO_ORDER'                           => 'Order not found.',
+    'STRIPE_CAPTURE_NO_TRANSACTION'                     => 'No transaction ID found for this order.',
+
+    // Cancel Authorization (Manual Capture Mode)
+    'STRIPE_CANCEL_AUTHORIZATION'                       => 'Cancel Authorization',
+    'STRIPE_CANCEL_AUTHORIZATION_TEXT'                  => 'Cancel this authorization to release the funds held on the customer\'s card. This action cannot be undone.',
+    'STRIPE_CANCEL_REASON'                              => 'Cancellation reason (optional)',
+    'STRIPE_CANCEL_DUPLICATE'                           => 'Duplicate',
+    'STRIPE_CANCEL_CUSTOMER'                            => 'Requested by customer',
+    'STRIPE_CANCEL_FRAUD'                               => 'Fraudulent',
+    'STRIPE_CANCEL_ABANDONED'                           => 'Abandoned',
+    'STRIPE_CANCEL_SUBMIT'                              => 'Cancel Authorization',
+    'STRIPE_CANCEL_CONFIRM'                             => 'Are you sure you want to cancel this authorization? This action cannot be undone.',
+    'STRIPE_CAPTURE_CONFIRM'                            => 'Are you sure you want to capture this payment?',
+    'STRIPE_REFUND_CONFIRM'                             => 'Are you sure you want to refund this payment?',
+    'STRIPE_CANCEL_SUCCESSFUL'                          => 'Authorization was cancelled successfully.',
+    'STRIPE_CANCEL_FAILED'                              => 'Authorization cancellation failed.',
+    'STRIPE_CANCEL_NO_ORDER'                            => 'Order not found.',
+    'STRIPE_CANCEL_NO_TRANSACTION'                      => 'No transaction ID found for this order.',
+
+    // Sprint 113 — masked API-key fields with eye-toggle
+    'STRIPE_REVEAL_API_KEY'                             => 'Reveal API key',
+    'STRIPE_HIDE_API_KEY'                               => 'Hide API key',
+    // Sprint 120 (STRP-129) — admin capture-reason validation messages.
+    // Mirrors the storefront keys in translations/en — admin context
+    // resolves translateString() from views/admin_twig, not translations/.
+    'STRIPE_VALIDATION_FIELD_INVALID'                   => 'The %1$s field is not valid. Allowed symbols are: %2$s',
+    'STRIPE_VALIDATION_LABEL_CAPTUREREASON'             => 'capture reason',
+    'STRIPE_VALIDATION_CLASS_LETTERS'                   => 'letters',
+    'STRIPE_VALIDATION_CLASS_DIGITS'                    => 'digits',
+    'STRIPE_VALIDATION_CLASS_SPACES'                    => 'spaces',
+
+    // Sprint 121 (STRP-129) — semantic amount validation + refund description.
+    'STRIPE_VALIDATION_LABEL_REFUNDDESCRIPTION'         => 'refund description',
+    'STRIPE_VALIDATION_AMOUNT_MALFORMED'                => 'The amount is not a valid number. Use a format like 12.50.',
+    'STRIPE_VALIDATION_AMOUNT_NOT_POSITIVE'             => 'The amount must be greater than zero.',
+    'STRIPE_VALIDATION_AMOUNT_PRECISION'                => 'The amount has too many decimal places for this currency.',
+    'STRIPE_VALIDATION_AMOUNT_EXCEEDS_BOUND'            => 'The amount exceeds the maximum available for this action.',
+    'STRIPE_VALIDATION_AMOUNT_BOUND_UNAVAILABLE'        => 'The available amount could not be verified with Stripe. Please try again.',
+);

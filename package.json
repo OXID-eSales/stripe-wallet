@@ -1,0 +1,29 @@
+{
+  "name": "oxid-stripe-wallet",
+  "version": "1.0.0",
+  "description": "Stripe Payment Module with Stimulus.js for OXID eShop",
+  "main": "assets/js/stripe-frontend.min.js",
+  "scripts": {
+    "build": "npm run build:prod",
+    "build:prod": "node resources/build.js production && chmod -R 755 assets/js 2>/dev/null || true",
+    "build:dev": "node resources/build.js development && chmod -R 755 assets/js 2>/dev/null || true",
+    "watch": "node resources/build.js watch",
+    "dev": "npm run build:dev",
+    "postinstall": "npm run build:prod"
+  },
+  "keywords": [
+    "oxid",
+    "stripe",
+    "payment",
+    "stimulus"
+  ],
+  "author": "OXID Solution Catalysts",
+  "license": "MIT",
+  "dependencies": {
+    "@hotwired/stimulus": "^3.2.2"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "esbuild": "^0.19.12"
+  }
+}

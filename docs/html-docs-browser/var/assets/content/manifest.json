@@ -1,0 +1,26 @@
+{
+  "$schema": "../../src/core/schema/manifest.schema.json",
+  "title": "OXID Stripe Wallet — Smart-Contract Payments on Payment Base",
+  "languages": ["en", "de"],
+  "default": "en",
+  "slides": [
+    { "anchor": "cover",                       "step": 0 },
+    { "anchor": "wallet-overview",             "step": 1 },
+    { "anchor": "smart-contract-lifecycle",    "step": 1 },
+    { "anchor": "event-system",                "step": 1 },
+    { "anchor": "adapter-architecture",        "step": 1 },
+    { "anchor": "checkout-session-flow",       "step": 2 },
+    { "anchor": "payment-intents",             "step": 2 },
+    { "anchor": "capture-flow",                "step": 2 },
+    { "anchor": "refund-flow",                 "step": 2 },
+    { "anchor": "webhook-processing",          "step": 2 },
+    { "anchor": "three-d-secure",              "step": 2 },
+    { "anchor": "admin-stripe-tab",            "step": 2 },
+    { "anchor": "module-setup",                "step": 3 },
+    { "anchor": "configuration",               "step": 3 },
+    { "anchor": "extending-events",            "step": 3 },
+    { "anchor": "extending-webhooks",          "step": 3 },
+    { "anchor": "testing-strategy",            "step": 3 },
+    { "anchor": "closing",                     "step": 0 }
+  ]
+}

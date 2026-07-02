@@ -1,0 +1,8 @@
+[submodule "recipe/parts"]
+	path = recipe/parts
+	url = https://github.com/OXID-eSales/docker-eshop-sdk-recipe-parts.git
+	branch = detached
+[submodule "tests/e2e/playwright"]
+	path = tests/e2e/playwright
+	url = https://github.com/OXID-eSales/e2e-tests-playwright.git
+	branch = projects/Stripe

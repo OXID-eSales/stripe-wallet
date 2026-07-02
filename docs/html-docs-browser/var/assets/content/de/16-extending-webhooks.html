@@ -1,0 +1,95 @@
+        <div class="s-head">
+          <div class="badge"><span class="dot"></span><span class="step-label">Developer-Docs &middot; 4 von 5 &middot; Erweitern &middot; Webhooks</span></div>
+          <div class="deck">Auf ein Stripe-Event reagieren, das wir noch nicht behandeln</div>
+        </div>
+
+        <h2 class="h-2">Ein eigener Webhook-Handler.<br/><em class="acc">Gleiches Muster: implementieren, taggen, testen.</em></h2>
+
+        <p class="lede" style="margin-bottom: 14px;">
+          Standardm&auml;&szlig;ig behandelt das Modul <code>payment_intent.succeeded</code>, <code>payment_intent.payment_failed</code>
+          und <code>charge.refunded</code>. Um auf alles andere zu reagieren &mdash; <code>charge.dispute.created</code>,
+          <code>radar.early_fraud_warning.created</code>, <code>payout.paid</code> &mdash; legt man einen Webhook-Handler an.
+        </p>
+
+        <div class="cols cols-2" style="gap: 18px; flex: 1 1 0;">
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 10px;">WebhookHandlerInterface</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(67, 56, 202, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0 0 16px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+namespace OxidEsales\Payments\Stripe\WebhookHandler;
+
+interface WebhookHandlerInterface
+{
+    /** Stripe-Event-Typen, auf die der Handler reagiert. */
+    public static function supportedTypes(): array;
+
+    public function handle(
+        \Stripe\Event $event,
+        EventContext $ctx
+    ): void;
+}
+</pre>
+
+            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 10px;">Beispiel: Dispute er&ouml;ffnet</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(67, 56, 202, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+final class DisputeOpenedHandler
+    implements WebhookHandlerInterface
+{
+    public function __construct(
+        private ContractRepositoryInterface $contracts,
+        private EventDispatcherInterface $dispatcher,
+    ) {}
+
+    public static function supportedTypes(): array
+    {
+        return ['charge.dispute.created'];
+    }
+
+    public function handle(
+        \Stripe\Event $event,
+        EventContext $ctx
+    ): void {
+        $charge = $event-&gt;data-&gt;object-&gt;charge;
+        $contract = $this-&gt;contracts
+            -&gt;findByChargeId($charge);
+        if ($contract === null) return;
+
+        $this-&gt;dispatcher-&gt;dispatch(
+            new DisputeOpenedEvent($contract, $event)
+        );
+    }
+}
+</pre>
+          </div>
+
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 10px;">Taggen</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(67, 56, 202, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0 0 16px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+Acme\Stripe\DisputeOpenedHandler:
+    arguments:
+      - '@OxidEsales\Payments\Component\
+            Repository\ContractRepositoryInterface'
+      - '@Psr\EventDispatcher\
+            EventDispatcherInterface'
+    tags:
+        - { name: stripe.webhook_handler }
+</pre>
+
+            <div class="eyebrow" style="color: var(--s3-accent); margin-bottom: 10px;">Was Sie kostenlos bekommen</div>
+            <ul class="small" style="margin: 0 0 14px;">
+              <li>Die Pr&uuml;fungen f&uuml;r Signatur, Payload-Gr&ouml;&szlig;e, Rate-Limit und Idempotenz sind bereits durchgelaufen, bevor Ihr <code>handle()</code> aufgerufen wird.</li>
+              <li>Das dekodierte <code>\Stripe\Event</code> ist hydratisiert &mdash; kein roher JSON-Blob.</li>
+              <li>Der Webhook-Controller loggt Start + Ende mit Timings &mdash; sichtbar in <code>oe_payments_webhooklogs</code>.</li>
+              <li>Wenn Ihr Handler wirft, antwortet der Controller trotzdem mit 200; die Exception wird geloggt und das Event f&uuml;r Ops markiert.</li>
+            </ul>
+
+            <div class="callout" style="margin: 0; padding: 12px 14px; font-size: var(--t-12);">
+              <strong>In Produktion nie mehr als einen Handler pro Stripe-Typ registrieren</strong> &mdash; die Reihenfolge ist undefiniert.
+              Wer mehrere Effekte braucht, dispatcht aus dem einen Webhook-Handler ein Payment-Base-Event und l&auml;sst die Listener fan-out machen.
+            </div>
+          </div>
+        </div>
+
+        <div class="s-foot">
+          <div>OXID Stripe Wallet &middot; Erweitern &middot; Webhooks</div>
+          <div class="page-num">16 / 18</div>
+        </div>

@@ -1,0 +1,7 @@
+# Runtime artifacts produced by load runs / charting / local venvs.
+load-report/
+load-charts/
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc

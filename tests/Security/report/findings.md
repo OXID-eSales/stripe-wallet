@@ -1,0 +1,29 @@
+# Stripe module — black-box pentest findings
+
+| | |
+|--|--|
+| Target | `https://localhost.local` |
+| Profile | `standard` |
+| Findings | 19 (17 pass · 0 fail · 2 skip) |
+
+| ID | Severity | Status | Title | Evidence |
+|----|----------|--------|-------|----------|
+| M8-size | med | pass | Webhook rejects oversized payload | 413 (size guard) |
+| M8-normal | info | pass | Normal payload not size-rejected | 400 |
+| SIG-verify | high | pass | Invalid webhook signature rejected | 400 |
+| C3-replay | high | skip | Replay dedup not observable | needs a valid signature to reach the idempotency layer |
+| TLS-webhook | low | pass | Cleartext webhook not served | 400 |
+| H8-checkout | high | pass | createCheckoutSession rejects missing stoken | 403 |
+| H8-admin | high | pass | Admin refund not directly accessible | 302 |
+| F14-redirect | high | pass | No off-host redirect on tested params | tried 7 params x 3 endpoints |
+| F18-adminauth | crit | pass | Admin redirected to login (no session) | 302 |
+| F12-mcp | high | pass | No secret/JWT disclosed on MCP routes | tried 3 routes |
+| HDR-hsts | low | pass | HSTS header present |  |
+| HDR-nosniff | low | pass | X-Content-Type-Options: nosniff present |  |
+| HDR-frame | low | pass | Clickjacking guard present | X-Frame-Options or CSP frame-ancestors |
+| HDR-banner | low | pass | No version banner leaked | Server='Apache' |
+| INFO-git | high | pass | .git not exposed | 301 |
+| INFO-composer | med | pass | composer.json not exposed | 403 |
+| INFO-config | crit | pass | config.inc.php not disclosed | no source/credentials in response |
+| INFO-debug | med | pass | No verbose error output | errors suppressed |
+| F15-tamper | high | skip | Amount-tamper check skipped | login did not establish a session (theme/flow differs) |

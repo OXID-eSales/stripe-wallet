@@ -1,0 +1,468 @@
+{#
+ # Stripe Checkout Footer Widget Template
+ #
+ # Self-contained: OPC knows nothing about Stripe.
+ # Self-registers a Stimulus controller with OPC's exported Controller base class.
+ #
+ # Flow:
+ # 1. Widget loaded by OPC FooterWidgetService (AJAX)
+ # 2. Script self-registers stripe-checkout-footer controller with OPC's Stimulus app
+ # 3. User clicks Pay → processCheckout API → gets redirectUrl → redirect to Stripe
+ # 4. After payment, Stripe redirects back to shop's checkoutSuccess handler
+ #}
+
+<div class="checkout-footer-stripe"
+     data-controller="stripe-checkout-footer stripe-user-data-validator"
+     data-stripe-checkout-footer-payment-method-value="{{ checkoutData.paymentMethodId }}"
+     data-stripe-checkout-footer-csrf-token-value="{{ checkoutData.csrfToken }}"
+     data-stripe-user-data-validator-url-value="{{ checkoutData.validationUrl }}"
+     data-stripe-user-data-validator-plugin-id-value="{{ checkoutData.pluginModuleId }}"
+     data-stripe-user-data-validator-csrf-value="{{ checkoutData.csrfToken }}"
+     data-stripe-user-data-validator-allowed-value="{{ checkoutData.fieldAllowed|json_encode|e('html_attr') }}"
+     data-stripe-user-data-validator-review-message-value="{{ translate({ ident: 'STRIPE_VALIDATION_REVIEW_ADDRESS' }) }}">
+
+    <div class="alert alert-danger mt-2"
+         data-stripe-checkout-footer-target="error"
+         style="display: none;" role="alert">
+        <i class="fas fa-exclamation-circle me-2"></i>
+        <span data-stripe-checkout-footer-target="errorMessage"></span>
+    </div>
+
+    <div class="d-flex justify-content-end align-items-center mt-3">
+        <button type="button" class="btn btn-primary btn-lg"
+                data-stripe-checkout-footer-target="submitButton"
+                data-checkout-footer-manager-target="submitButton"
+                data-action="click->stripe-checkout-footer#submitPayment"
+                disabled>
+            <span class="button-content">
+                <i class="fas fa-lock me-2"></i>
+                <span class="button-text">Pay with Stripe</span>
+            </span>
+            <span class="button-spinner d-none">
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                Redirecting to Stripe...
+            </span>
+        </button>
+    </div>
+
+    <div data-stripe-checkout-footer-target="loader"
+         class="stripe-loading-overlay" style="display: none;">
+        <div class="loading-content">
+            <div class="spinner-border text-primary mb-3" role="status"></div>
+            <p class="mb-0 text-muted">Redirecting to Stripe...</p>
+            <p class="small text-muted mt-2">Please do not close this window.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  var opc = window.OnepageCheckout;
+  if (!opc || !opc.stimulus || !opc.Controller) {
+    console.error('[StripeCheckoutFooter] OnepageCheckout not found - stimulus:', !!opc?.stimulus, 'Controller:', !!opc?.Controller);
+    return;
+  }
+
+  // Frontend debug gate — only logs when the module log level is 'debug'
+  // (surfaced as window.oStripe.debug by stripe_i18n.html.twig). console.error
+  // stays unconditional; log/warn diagnostics are silent unless debug is on.
+  var sdbg = function() {
+    if (window.oStripe && window.oStripe.debug === true) {
+      console.log.apply(console, arguments);
+    }
+  };
+
+  // Always register (idempotent) — needed for dynamic widget loading
+  var BaseController = opc.Controller;
+
+  class StripeCheckoutFooterController extends BaseController {
+    static values = {
+      paymentMethod: String,
+      csrfToken: String
+    }
+
+    static targets = [
+      'submitButton', 'error', 'errorMessage', 'loader'
+    ]
+
+    connect() {
+      sdbg('[StripeCheckoutFooter] Connected (redirect mode)');
+      if (this.hasSubmitButtonTarget) {
+        this.submitButtonTarget.disabled = false;
+      }
+    }
+
+    async submitPayment(event) {
+      if (event) event.preventDefault();
+
+      this._showLoading();
+      this._hideError();
+
+      try {
+        // Step 1: Create checkout session via processCheckout API
+        var checkoutResult = await this._processCheckout();
+
+        if (!checkoutResult.success) {
+          throw new Error(checkoutResult.error || 'Failed to create checkout session');
+        }
+
+        // Step 2: Get redirect URL from metadata
+        var redirectUrl = checkoutResult.metadata && checkoutResult.metadata.redirectUrl;
+        if (!redirectUrl) {
+          throw new Error('No redirect URL returned from Stripe');
+        }
+
+        sdbg('[StripeCheckoutFooter] Redirecting to Stripe checkout:', redirectUrl);
+
+        // Step 3: Redirect to Stripe hosted checkout page
+        window.location.href = redirectUrl;
+
+      } catch (err) {
+        console.error('[StripeCheckoutFooter] Payment failed:', err);
+        this._showError(err.message);
+        this._hideLoading();
+      }
+    }
+
+    async _processCheckout() {
+      // OPC-47 cross-module follow-up: the OPC CheckoutService since v1.3.9
+      // server-side-rejects processCheckout when either consent flag is
+      // false (CONSENTS_NOT_ACCEPTED), so the Stripe footer must forward
+      // the actual checkbox state. The OPC modal renders
+      // #confirmTermsCheckout + #confirmPrivacyCheckout in its shared
+      // modal-footer fragment; the Stripe footer is AJAX-loaded INSIDE the
+      // same modal, so the IDs are reachable via document.getElementById.
+      // Missing checkbox defaults to `true` (covers payment-base flows
+      // that omit the checkboxes — not the OPC modal where both render).
+      var termsEl = document.getElementById('confirmTermsCheckout');
+      var privacyEl = document.getElementById('confirmPrivacyCheckout');
+      var termsAccepted = termsEl ? !!termsEl.checked : true;
+      var privacyAccepted = privacyEl ? !!privacyEl.checked : true;
+
+      var resp = await fetch('/index.php?cl=OeCheckoutApi&fnc=processCheckout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': this.csrfTokenValue
+        },
+        body: JSON.stringify({
+          paymentMethodId: this.paymentMethodValue,
+          confirmTermsAndConditions: termsAccepted,
+          confirmPrivacyPolicy: privacyAccepted
+        })
+      });
+      if (!resp.ok) throw new Error('HTTP error: ' + resp.status);
+      var text = await resp.text();
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        console.error('[StripeCheckoutFooter] Invalid JSON response:', text.substring(0, 200));
+        throw new Error('Server returned invalid response. Please try again.');
+      }
+    }
+
+    _showError(msg) {
+      if (this.hasErrorTarget && this.hasErrorMessageTarget) {
+        this.errorMessageTarget.textContent = msg;
+        this.errorTarget.style.display = 'block';
+      }
+    }
+    _hideError() { if (this.hasErrorTarget) this.errorTarget.style.display = 'none'; }
+    _showLoading() {
+      if (this.hasSubmitButtonTarget) {
+        this.submitButtonTarget.disabled = true;
+        this.submitButtonTarget.classList.add('processing');
+      }
+      if (this.hasLoaderTarget) this.loaderTarget.style.display = 'flex';
+    }
+    _hideLoading() {
+      if (this.hasSubmitButtonTarget) {
+        this.submitButtonTarget.disabled = false;
+        this.submitButtonTarget.classList.remove('processing');
+      }
+      if (this.hasLoaderTarget) this.loaderTarget.style.display = 'none';
+    }
+  }
+
+  opc.stimulus.register('stripe-checkout-footer', StripeCheckoutFooterController);
+  sdbg('[StripeCheckoutFooter] Registered with OnepageCheckout.stimulus');
+
+  // -----------------------------------------------------------------------
+  // stripe-user-data-validator Stimulus controller
+  //
+  // Intercepts the Stripe footer submit, POSTs live OPC form values to the
+  // central payment-base validation endpoint, renders per-field inline
+  // errors on `valid:false`, and releases submit on `valid:true`.
+  //
+  // Fail-open policy: on HTTP 4xx/5xx (guard failure or transient backend
+  // error) we LOG and RELEASE the submit. The standard-checkout path
+  // (StripeOrderController) is the synchronous source of truth; OPC
+  // fail-open is the explicitly accepted residual risk for this path
+  // (see sprint-119 §8 Risks).
+  //
+  // OPC submit-event contract (documented here after grepping OPC source):
+  //   The Stripe footer widget has its OWN submit button. It is NOT triggered
+  //   by an OPC-level submit event. The button's data-action is:
+  //     click->stripe-checkout-footer#submitPayment
+  //   There is no published "opc:submit-attempt" or equivalent event that
+  //   fires before submitPayment. Intercept strategy: at connect() time,
+  //   wrap `submitPayment` on the stripe-checkout-footer controller instance
+  //   via Stimulus's cross-controller lookup. The wrapper runs validation
+  //   first, then delegates to the original method on success.
+  //
+  // OPC field selectors (verified from delivery-address.html.twig):
+  //   id="buyNowFirstName"  name="firstName"
+  //   id="buyNowLastName"   name="lastName"
+  //   id="buyNowStreet"     name="street"
+  //   id="buyNowStreetNr"   name="streetNr"
+  //   id="buyNowZip"        name="zip"
+  //   id="buyNowCity"       name="city"
+  //   Additional fields (phone, company, etc.) use name="oxuser__ox*" from
+  //   OXID core templates — included defensively; missing = silently skipped.
+  // -----------------------------------------------------------------------
+
+  class StripeUserDataValidatorController extends BaseController {
+    static values = {
+      url:           String,
+      pluginId:      String,
+      csrf:          String,
+      allowed:       Object,
+      reviewMessage: String
+    }
+
+    connect() {
+      sdbg('[StripeUserDataValidator] Connected — wrapping stripe-checkout-footer#submitPayment');
+      this._wrapSubmitPayment();
+      this._attachClearOnInputListeners();
+    }
+
+    disconnect() {
+      this._unwrapSubmitPayment();
+      this._detachClearOnInputListeners();
+    }
+
+    // Logical-field → OPC Stimulus address-target.
+    // Single source of truth shared by _collectFields, _renderErrors,
+    // _clearErrors and _attachClearOnInputListeners — keep in sync.
+    _fieldTargetMap() {
+      return {
+        firstName:   'firstName',
+        lastName:    'lastName',
+        street:      'street',
+        houseNumber: 'streetNumber',
+        postalCode:  'zipCode',
+        city:        'city'
+      };
+    }
+
+    _fieldNodes(target) {
+      return document.querySelectorAll(
+        '[data-billing-address-target="' + target + '"], ' +
+        '[data-delivery-address-target="' + target + '"]'
+      );
+    }
+
+    // ---- private helpers ----
+
+    _wrapSubmitPayment() {
+      var footerCtrl = this.application.getControllerForElementAndIdentifier(
+        this.element,
+        'stripe-checkout-footer'
+      );
+
+      if (!footerCtrl) {
+        sdbg('[StripeUserDataValidator] stripe-checkout-footer not found — skipping wrap');
+        return;
+      }
+
+      // Store originals for disconnect-time restoration.
+      this._footerCtrl          = footerCtrl;
+      this._originalSubmit      = footerCtrl.submitPayment.bind(footerCtrl);
+      footerCtrl.submitPayment  = this._interceptSubmit.bind(this);
+      sdbg('[StripeUserDataValidator] submitPayment wrapped');
+    }
+
+    _unwrapSubmitPayment() {
+      if (this._footerCtrl && this._originalSubmit) {
+        this._footerCtrl.submitPayment = this._originalSubmit;
+        sdbg('[StripeUserDataValidator] submitPayment restored');
+      }
+    }
+
+    async _interceptSubmit(event) {
+      if (event) event.preventDefault();
+
+      this._clearErrors();
+
+      var fields = this._collectFields();
+      if (Object.keys(fields).length === 0) {
+        // Nothing to validate — release immediately.
+        this._originalSubmit(event);
+        return;
+      }
+
+      try {
+        var body = new FormData();
+        body.append('pluginModuleId', this.pluginIdValue);
+        body.append('stoken',         this.csrfValue);
+        for (var [k, v] of Object.entries(fields)) {
+          body.append(k, v);
+        }
+
+        var resp = await fetch(this.urlValue, {
+          method:      'POST',
+          credentials: 'same-origin',
+          headers:     { 'X-Requested-With': 'XMLHttpRequest' },
+          body:        body
+        });
+
+        if (!resp.ok) {
+          // Fail open — see header comment.
+          sdbg('[StripeUserDataValidator] backend returned', resp.status, '— releasing submit');
+          this._originalSubmit(event);
+          return;
+        }
+
+        var data = await resp.json();
+        if (data.valid) {
+          this._originalSubmit(event);
+          return;
+        }
+
+        this._renderErrors(data.errors || []);
+
+      } catch (err) {
+        sdbg('[StripeUserDataValidator] fetch error, failing open:', err);
+        this._originalSubmit(event);
+      }
+    }
+
+    _collectFields() {
+      // Reads whichever OPC address form is on the page (billing or delivery).
+      // A field-target rename in one-page-checkout/.../shared/address-form-fields.html.twig
+      // surfaces as "no fields collected → validation skipped" rather than a silent error.
+      var out = {};
+      for (var [logical, target] of Object.entries(this._fieldTargetMap())) {
+        for (var el of this._fieldNodes(target)) {
+          var v = el && typeof el.value === 'string' ? el.value.trim() : '';
+          if (v !== '') { out[logical] = v; break; }
+        }
+      }
+      return out;
+    }
+
+    // OPC-90 (was STRP-129): for each rejected field, paint the corresponding
+    // OPC address input with `.is-invalid` + sibling `.invalid-feedback` carrying
+    // the SPECIFIC server-formatted message ("The first name field is not valid.
+    // Allowed symbols are: letters" — produced by UserDataValidationMessageFormatter).
+    // The generic `reviewMessageValue` continues to drive OPC's notification box
+    // via the `oe:payment:error` event so an unobservant shopper still gets the
+    // global cue — but the actionable detail lives next to the field they typed.
+    _renderErrors(errors) {
+      if (!Array.isArray(errors) || errors.length === 0) {
+        return;
+      }
+
+      var allowedMap = this.allowedValue || {};
+      var targetMap = this._fieldTargetMap();
+      var violatedFieldsList = [];
+
+      for (var err of errors) {
+        violatedFieldsList.push({ field: err.field, allowed: allowedMap[err.field] || '' });
+        var target = err && err.field ? targetMap[err.field] : null;
+        if (!target) {
+          continue;
+        }
+        for (var el of this._fieldNodes(target)) {
+          el.classList.add('is-invalid');
+          var existing = el.parentElement
+            && el.parentElement.querySelector('.invalid-feedback[data-stripe-validation]');
+          if (existing) {
+            existing.remove();
+          }
+          var feedback = document.createElement('div');
+          feedback.className = 'invalid-feedback d-block';
+          feedback.setAttribute('data-stripe-validation', 'true');
+          feedback.textContent = (err.message || '').toString().trim() || 'Invalid value';
+          el.insertAdjacentElement('afterend', feedback);
+        }
+      }
+
+      // Generic notice for OPC's notification system (unchanged contract).
+      document.dispatchEvent(new CustomEvent('oe:payment:error', {
+        detail: {
+          message: this.reviewMessageValue || 'Please review your address details.',
+          fields: violatedFieldsList
+        }
+      }));
+    }
+
+    // Wipe every `.is-invalid` + stripe-validation feedback we own. Called
+    // at the start of every submit attempt so stale errors from a previous
+    // attempt do not linger when the user resubmits.
+    _clearErrors() {
+      for (var target of Object.values(this._fieldTargetMap())) {
+        for (var el of this._fieldNodes(target)) {
+          el.classList.remove('is-invalid');
+          var fb = el.parentElement
+            && el.parentElement.querySelector('.invalid-feedback[data-stripe-validation]');
+          if (fb) {
+            fb.remove();
+          }
+        }
+      }
+    }
+
+    // Auto-clear per-field error as soon as the shopper starts editing the
+    // field — removes the red border + the inline message without waiting
+    // for the next submit cycle. Listeners are tracked in _inputListeners
+    // and removed on disconnect to prevent leaks when the widget is torn
+    // down and re-rendered (OPC reloads the footer widget on payment-method
+    // change).
+    _attachClearOnInputListeners() {
+      this._inputListeners = [];
+      for (var target of Object.values(this._fieldTargetMap())) {
+        for (var el of this._fieldNodes(target)) {
+          var handler = this._handleFieldInput.bind(this, el);
+          el.addEventListener('input', handler);
+          this._inputListeners.push({ el: el, handler: handler });
+        }
+      }
+    }
+
+    _detachClearOnInputListeners() {
+      if (!Array.isArray(this._inputListeners)) {
+        return;
+      }
+      for (var rec of this._inputListeners) {
+        rec.el.removeEventListener('input', rec.handler);
+      }
+      this._inputListeners = [];
+    }
+
+    _handleFieldInput(el) {
+      el.classList.remove('is-invalid');
+      var fb = el.parentElement
+        && el.parentElement.querySelector('.invalid-feedback[data-stripe-validation]');
+      if (fb) {
+        fb.remove();
+      }
+    }
+
+  }
+
+  opc.stimulus.register('stripe-user-data-validator', StripeUserDataValidatorController);
+  sdbg('[StripeUserDataValidator] Registered with OnepageCheckout.stimulus');
+})();
+</script>
+
+<style>
+  .stripe-loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+  .stripe-loading-overlay .loading-content { background: #fff; padding: 2rem 3rem; border-radius: 8px; text-align: center; max-width: 400px; }
+  .checkout-footer-stripe button[disabled] { opacity: 0.6; cursor: not-allowed; }
+  .checkout-footer-stripe .button-spinner { display: none; }
+  .checkout-footer-stripe button.processing .button-content { display: none; }
+  .checkout-footer-stripe button.processing .button-spinner { display: inline-flex; align-items: center; }
+</style>

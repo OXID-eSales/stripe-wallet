@@ -1,0 +1,182 @@
+<?php
+
+/**
+ * Copyright © OXID eSales AG. All rights reserved.
+ * See LICENSE file for license details.
+ */
+
+declare(strict_types=1);
+
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Adapter;
+
+use OxidEsales\Eshop\Application\Model\Order;
+use OxidEsales\Eshop\Core\Exception\ArticleInputException;
+use OxidEsales\PaymentBase\Adapter\Exception\ShopOrderException;
+use OxidEsales\PaymentBase\Adapter\Request\CreateOrderRequest;
+use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
+use OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService;
+use PHPUnit\Framework\TestCase;
+
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService::class)]
+final class OxidShopOrderServiceTest extends TestCase
+{
+    private OxidShopOrderService $service;
+    private TransactionRepositoryInterface $transactionRepository;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Mock dependencies
+        $this->transactionRepository = $this->createMock(TransactionRepositoryInterface::class);
+
+        $this->service = new OxidShopOrderService(
+            $this->transactionRepository
+        );
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('orderStateProvider')]
+    public function testOrderStateMapping(int $orderState, string $expectedStatus): void
+    {
+        // Use reflection to test private mapping method
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('mapOrderStateToStatus');
+        $method->setAccessible(true);
+
+        // Act
+        $actualStatus = $method->invoke($this->service, $orderState);
+
+        // Assert
+        $this->assertSame($expectedStatus, $actualStatus);
+    }
+
+    public static function orderStateProvider(): array
+    {
+        return [
+            'OK' => [Order::ORDER_STATE_OK, 'completed'],
+            'Order exists' => [Order::ORDER_STATE_ORDEREXISTS, 'completed'],
+            'Mailing error' => [Order::ORDER_STATE_MAILINGERROR, 'completed'],
+            'Payment error' => [Order::ORDER_STATE_PAYMENTERROR, 'payment_error'],
+            'Invalid payment' => [Order::ORDER_STATE_INVALIDPAYMENT, 'invalid_payment'],
+            'Invalid delivery' => [Order::ORDER_STATE_INVALIDDELIVERY, 'invalid_delivery'],
+            'Below minimum' => [Order::ORDER_STATE_BELOWMINPRICE, 'below_minimum'],
+            'Invalid delivery address' => [Order::ORDER_STATE_INVALIDDELADDRESSCHANGED, 'invalid_delivery'],
+            'Voucher error' => [Order::ORDER_STATE_VOUCHERERROR, 'voucher_error'],
+            'Unknown state' => [999, 'unknown'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('errorCodeProvider')]
+    public function testErrorCodeMapping(int $orderState, string $expectedErrorCode): void
+    {
+        // Use reflection to test private mapping method
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('mapOrderStateToErrorCode');
+        $method->setAccessible(true);
+
+        // Act
+        $actualErrorCode = $method->invoke($this->service, $orderState);
+
+        // Assert
+        $this->assertSame($expectedErrorCode, $actualErrorCode);
+    }
+
+    public static function errorCodeProvider(): array
+    {
+        return [
+            'Payment error' => [Order::ORDER_STATE_PAYMENTERROR, 'payment_error'],
+            'Below minimum' => [Order::ORDER_STATE_BELOWMINPRICE, 'below_minimum_price'],
+            'Invalid payment' => [Order::ORDER_STATE_INVALIDPAYMENT, 'invalid_payment_method'],
+            'Invalid delivery' => [Order::ORDER_STATE_INVALIDDELIVERY, 'invalid_delivery_method'],
+            'Invalid delivery address' => [Order::ORDER_STATE_INVALIDDELADDRESSCHANGED, 'invalid_delivery_address'],
+            'Voucher error' => [Order::ORDER_STATE_VOUCHERERROR, 'voucher_error'],
+            'Unknown error' => [999, 'order_creation_failed'],
+        ];
+    }
+
+    // ==========================================
+    // CreateOrderRequest initialStatus TESTS
+    // ==========================================
+
+    public function testCreateOrderRequestAcceptsInitialStatus(): void
+    {
+        $request = new CreateOrderRequest(
+            sessionId: 'sess123',
+            userId: 'user123',
+            paymentId: 'oe_payments_stripe_wallet',
+            initialStatus: 'NOT_FINISHED'
+        );
+
+        $this->assertSame('NOT_FINISHED', $request->initialStatus);
+    }
+
+    public function testCreateOrderRequestInitialStatusDefaultsToNull(): void
+    {
+        $request = new CreateOrderRequest(
+            sessionId: 'sess123',
+            userId: 'user123',
+            paymentId: 'oe_payments_stripe_wallet'
+        );
+
+        $this->assertNull($request->initialStatus);
+    }
+
+    public function testServiceImplementsDeleteNotFinishedOrder(): void
+    {
+        $this->assertTrue(
+            method_exists($this->service, 'deleteNotFinishedOrder'),
+            'OxidShopOrderService must implement deleteNotFinishedOrder()'
+        );
+    }
+
+    // ==========================================
+    // Story 3 (unbuyable-article-checkout): mapping an OXID ArticleException
+    // thrown during finalizeOrder to a typed ShopOrderException, so the
+    // controller can surface a structured 409 instead of a raw 500.
+    // ==========================================
+
+    public function testCreateOrder_WhenFinalizeThrowsArticleInputException_WrapsAsShopOrderExceptionWithArticleNotBuyableCode(): void
+    {
+        $request   = $this->orderRequest();
+        $articleEx = new ArticleInputException('ERROR_MESSAGE_ARTICLE_ARTICLE_NOT_BUYABLE');
+
+        $result = $this->invokeWrapOrderCreationError($articleEx, $request);
+
+        $this->assertInstanceOf(ShopOrderException::class, $result);
+        $this->assertSame('article_not_buyable', $result->getErrorCode());
+        $this->assertSame('ERROR_MESSAGE_ARTICLE_ARTICLE_NOT_BUYABLE', $result->getMessage());
+        $this->assertSame($articleEx, $result->getPrevious());
+    }
+
+    public function testCreateOrder_WhenFinalizeThrowsGenericThrowable_KeepsUnexpectedErrorCode(): void
+    {
+        $request = $this->orderRequest();
+        $generic = new \RuntimeException('boom');
+
+        $result = $this->invokeWrapOrderCreationError($generic, $request);
+
+        $this->assertSame('unexpected_error', $result->getErrorCode());
+        $this->assertStringContainsString('boom', $result->getMessage());
+        $this->assertSame($generic, $result->getPrevious());
+    }
+
+    private function orderRequest(): CreateOrderRequest
+    {
+        return new CreateOrderRequest(
+            sessionId: 'sess123',
+            userId: 'user123',
+            paymentId: 'oe_payments_stripe_wallet',
+        );
+    }
+
+    private function invokeWrapOrderCreationError(\Throwable $e, CreateOrderRequest $request): ShopOrderException
+    {
+        $method = new \ReflectionMethod(OxidShopOrderService::class, 'wrapOrderCreationError');
+        $method->setAccessible(true);
+
+        /** @var ShopOrderException $result */
+        $result = $method->invoke($this->service, $e, $request);
+
+        return $result;
+    }
+}

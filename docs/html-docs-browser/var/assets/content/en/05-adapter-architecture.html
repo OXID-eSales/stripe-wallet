@@ -1,0 +1,68 @@
+        <div class="s-head">
+          <div class="badge"><span class="dot"></span><span class="step-label">Architecture &middot; adapters</span></div>
+          <div class="deck">The seam between OXID, the Stripe SDK, and the contract spine</div>
+        </div>
+
+        <h2 class="h-2">Three adapters do all the dirty work.<br/><em class="acc">Everything testable. Nothing global.</em></h2>
+
+        <p class="lede" style="margin-bottom: 14px;">
+          Stripe's PHP SDK uses <code>final</code> classes and static config. OXID uses virtual parent classes and
+          <code>Registry::get()</code>. Payment Base sits between them &mdash; constructor-injected DI all the way down.
+          The adapter layer is the only place those three worlds meet.
+        </p>
+
+        <div class="cols cols-3" style="gap: 14px; flex: 1 1 0;">
+          <div class="col" style="background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 8px; padding: 16px; justify-content: flex-start;">
+            <div class="eyebrow" style="color: #4338ca; margin-bottom: 10px;">StripeAdapter / LazyStripeAdapter</div>
+            <p class="small" style="margin: 0 0 10px;">
+              Wraps the Stripe SDK&rsquo;s static config (API key, version) behind <code>PaymentAdapterInterface</code>.
+              Lazy variant constructs the SDK client only on first call &mdash; safe to inject into long-lived services.
+            </p>
+            <ul class="small" style="margin: 0;">
+              <li><code>createCheckoutSession()</code></li>
+              <li><code>capturePaymentIntent()</code></li>
+              <li><code>refundCharge()</code></li>
+              <li><code>cancelPaymentIntent()</code></li>
+              <li><code>retrievePaymentIntent()</code></li>
+            </ul>
+          </div>
+
+          <div class="col" style="background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 8px; padding: 16px; justify-content: flex-start;">
+            <div class="eyebrow" style="color: #047857; margin-bottom: 10px;">OxidShopAdapter</div>
+            <p class="small" style="margin: 0 0 10px;">
+              Implements <code>ShopAdapterInterface</code>. The only place Stripe code is allowed to touch
+              <code>oxNew()</code>, <code>Registry::getConfig()</code>, or any other OXID global. Everywhere else uses this seam.
+            </p>
+            <ul class="small" style="margin: 0;">
+              <li><code>getOrderById($oxid): ?Order</code></li>
+              <li><code>getActiveBasket(): Basket</code></li>
+              <li><code>getActiveUser(): ?User</code></li>
+              <li><code>getViewConfig()</code></li>
+              <li><code>getShopUrl(): string</code></li>
+            </ul>
+          </div>
+
+          <div class="col" style="background: rgba(245, 158, 11, 0.06); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; padding: 16px; justify-content: flex-start;">
+            <div class="eyebrow" style="color: #b45309; margin-bottom: 10px;">Helper trio</div>
+            <p class="small" style="margin: 0 0 10px;">
+              <code>Adapter/Helper/</code> &mdash; small pure-function classes that translate between
+              Stripe data shapes and OXID amounts. No state, fully testable.
+            </p>
+            <ul class="small" style="margin: 0;">
+              <li><code>PaymentIntentHelper</code> &mdash; intent &harr; contract state mapping</li>
+              <li><code>RefundHelper</code> &mdash; refundable validation, partial bookkeeping</li>
+              <li><code>CheckoutHelper</code> &mdash; success/cancel URL construction, locale, line-items</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout" style="margin-top: 14px;">
+          <strong>Final classes are not enemies.</strong> Where the Stripe SDK ships final classes
+          (e.g. <code>\Stripe\Service\PaymentIntentService</code>), the helper trio wraps the only methods we call.
+          Tests inject real instances with mocked dependencies (the &ldquo;final-class seam&rdquo; pattern) &mdash; never <code>createMock(FinalClass::class)</code>.
+        </div>
+
+        <div class="s-foot">
+          <div>OXID Stripe Wallet &middot; Adapter architecture</div>
+          <div class="page-num">05 / 18</div>
+        </div>

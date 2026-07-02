@@ -1,0 +1,445 @@
+{# ============================================================================
+   Sprint I — Stripe panel body for payment-base's shared "Payment" tab.
+
+   Body-only: the PC wrapper (`payment_admin_tab.html.twig`) owns the head,
+   transfer form, and admin-layout closes. The visual styling is the
+   original Stripe admin-tab CSS, restored verbatim from the pre-Sprint-I
+   template so the UX is identical to what the team had before the
+   unification. The outer `.stripe-admin` class scopes all rules so no
+   rule bleeds into other PSP panels rendered in the same shared wrapper.
+
+   View-data keys (see `StripePanelViewDataBuilder`): contractId, orderId,
+   orderNumber, paymentType, transactionId, externalTransId, currency,
+   amount, capturedAmount, refundedAmount, hasRefunds, capturableAmount,
+   capturableRaw, remainingRefundable, remainingRefundableRaw,
+   isCapturable, isRefundable, isCancellable, dashboardPrefix, isTestMode,
+   hasApiError, apiError, transactions[].
+   ============================================================================ #}
+
+<style>
+    /* Reset OXID admin styles within our container */
+    .stripe-admin,
+    .stripe-admin * {
+        box-sizing: border-box !important;
+    }
+    .stripe-admin {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+        font-size: 13px !important;
+        color: #1a1a2e !important;
+        padding: 16px !important;
+        max-width: 960px !important;
+        background: transparent !important;
+        position: relative;
+    }
+    .stripe-admin table { border: none !important; background: none !important; }
+    .stripe-admin td, .stripe-admin th { border: none !important; background: none !important; }
+    .stripe-admin input[type="text"], .stripe-admin select { margin: 0 !important; }
+
+    /* Cards */
+    .stripe-admin .s-card {
+        background: #fff !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 8px !important;
+        margin-bottom: 16px !important;
+        overflow: hidden !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,.04) !important;
+    }
+    .stripe-admin .s-card-header {
+        padding: 12px 16px !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        color: #1a1a2e !important;
+        border-bottom: 1px solid #e5e7eb !important;
+        background: #f9fafb !important;
+    }
+    .stripe-admin .s-card-body {
+        padding: 16px !important;
+    }
+
+    /* Alerts */
+    .stripe-admin .s-alert {
+        padding: 12px 16px !important;
+        border-radius: 8px !important;
+        margin-bottom: 12px !important;
+        font-size: 13px !important;
+        display: flex !important;
+        align-items: flex-start !important;
+        gap: 10px !important;
+    }
+    .stripe-admin .s-alert-success { background: #ecfdf5 !important; border: 1px solid #a7f3d0 !important; color: #065f46 !important; }
+    .stripe-admin .s-alert-danger  { background: #fef2f2 !important; border: 1px solid #fecaca !important; color: #991b1b !important; }
+    .stripe-admin .s-alert-warning { background: #fffbeb !important; border: 1px solid #fde68a !important; color: #92400e !important; }
+    .stripe-admin .s-alert-info    { background: #eff6ff !important; border: 1px solid #bfdbfe !important; color: #1e40af !important; }
+    .stripe-admin .s-alert strong  { font-weight: 600 !important; }
+
+    /* Detail table (key-value pairs) */
+    .stripe-admin .s-details { width: 100%; border-collapse: collapse; }
+    .stripe-admin .s-details td { padding: 8px 16px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+    .stripe-admin .s-details tr:last-child td { border-bottom: none; }
+    .stripe-admin .s-details .s-label { font-weight: 500; color: #6b7280; width: 200px; white-space: nowrap; }
+    .stripe-admin .s-details .s-value { color: #111827; }
+
+    /* Data table (transaction history) */
+    .stripe-admin .s-table { width: 100% !important; border-collapse: collapse !important; }
+    .stripe-admin .s-table th {
+        padding: 8px 12px !important;
+        text-align: left !important;
+        font-weight: 600 !important;
+        font-size: 11px !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        color: #6b7280 !important;
+        background: #f9fafb !important;
+        border-bottom: 1px solid #e5e7eb !important;
+    }
+    .stripe-admin .s-table th.text-right { text-align: right !important; }
+    .stripe-admin .s-table td { padding: 10px 12px !important; border-bottom: 1px solid #f3f4f6 !important; vertical-align: middle !important; }
+    .stripe-admin .s-table tr:last-child td { border-bottom: none !important; }
+    .stripe-admin .s-table tr:hover td { background: #f9fafb !important; }
+
+    /* Badges */
+    .stripe-admin .s-badge {
+        display: inline-block !important;
+        padding: 2px 8px !important;
+        border-radius: 4px !important;
+        font-size: 12px !important;
+        font-weight: 500 !important;
+        text-transform: capitalize !important;
+        line-height: 18px !important;
+    }
+    .stripe-admin .s-badge-blue   { background: #dbeafe !important; color: #1e40af !important; }
+    .stripe-admin .s-badge-green  { background: #dcfce7 !important; color: #166534 !important; }
+    .stripe-admin .s-badge-orange { background: #fef3c7 !important; color: #92400e !important; }
+    .stripe-admin .s-badge-gray   { background: #f3f4f6 !important; color: #4b5563 !important; }
+
+    /* Status colors */
+    .stripe-admin .s-status-ok   { color: #059669 !important; font-weight: 500 !important; }
+    .stripe-admin .s-status-warn { color: #d97706 !important; font-weight: 500 !important; }
+    .stripe-admin .s-status-fail { color: #dc2626 !important; font-weight: 500 !important; }
+
+    /* Code / monospace */
+    .stripe-admin .s-code {
+        font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+        font-size: 12px;
+        color: #6b7280;
+    }
+    .stripe-admin .s-muted { color: #9ca3af; }
+    .stripe-admin .s-amount { text-align: right; font-weight: 500; font-variant-numeric: tabular-nums; }
+    .stripe-admin .s-currency { text-transform: uppercase; color: #9ca3af; font-size: 12px; }
+    .stripe-admin .s-empty { padding: 24px 16px; color: #9ca3af; }
+
+    /* Links */
+    .stripe-admin a { color: #635bff; text-decoration: none; }
+    .stripe-admin a:hover { color: #4b45c6; text-decoration: underline; }
+    .stripe-admin .s-external-icon { vertical-align: middle; margin-left: 4px; opacity: .5; }
+
+    /* Forms */
+    .stripe-admin .s-form-group { margin-bottom: 12px; }
+    .stripe-admin .s-form-label { display: block; font-weight: 500; color: #374151; margin-bottom: 4px; }
+    .stripe-admin .s-form-input,
+    .stripe-admin .s-form-select {
+        width: 100%;
+        max-width: 400px;
+        padding: 6px 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 13px;
+        font-family: inherit;
+        color: #1a1a2e;
+        background: #fff;
+        box-sizing: border-box;
+    }
+    .stripe-admin .s-form-input:focus,
+    .stripe-admin .s-form-select:focus { border-color: #635bff; outline: none; box-shadow: 0 0 0 2px rgba(99,91,255,.15); }
+    .stripe-admin .s-form-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .stripe-admin .s-form-row .s-form-group { flex: 1; min-width: 200px; }
+
+    /* Buttons */
+    .stripe-admin .s-btn {
+        display: inline-block !important;
+        padding: 8px 16px !important;
+        border: none !important;
+        border-radius: 6px !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        font-family: inherit !important;
+        cursor: pointer !important;
+        text-decoration: none !important;
+        margin-top: 8px !important;
+    }
+    .stripe-admin .s-btn-primary { background: #635bff !important; color: #fff !important; }
+    .stripe-admin .s-btn-primary:hover { background: #4b45c6 !important; }
+    .stripe-admin .s-btn-warning { background: #f59e0b !important; color: #fff !important; }
+    .stripe-admin .s-btn-warning:hover { background: #d97706 !important; }
+    .stripe-admin .s-btn-danger-outline { background: #fff !important; color: #dc2626 !important; border: 1px solid #fca5a5 !important; }
+    .stripe-admin .s-btn-danger-outline:hover { background: #fef2f2 !important; }
+</style>
+
+<div class="stripe-admin" id="stripeContent" data-testid="stripe-panel-card">
+    {# Sprint 05 (2026-05-19): busy/spinner overlay machinery moved to
+       payment-base's outer template `payment_admin_tab.html.twig`.
+       This panel marks its action forms with `.js-payment-action-form`
+       (PSP-agnostic) so the shared JS handles the overlay. #}
+
+    {% if hasApiError is defined and hasApiError %}
+        <div class="s-alert s-alert-danger" data-testid="stripe-panel-api-error">
+            <strong>{{ translate({ ident: "STRIPE_NOTICE" }) }}</strong> &mdash;
+            {{ translate({ ident: "STRIPE_API_ERROR" }) }}: {{ apiError }}
+        </div>
+    {% endif %}
+
+    {# Sprint 120 (STRP-129): admin validation failures (capture-reason gate).
+       Filled from the session-backed feedback channel; consume-once means the
+       alert disappears on the next render. Twig auto-escaping keeps the
+       offending input inert. #}
+    {% if validationErrors is defined and validationErrors is not empty %}
+        <div class="s-alert s-alert-danger" data-testid="stripe-admin-validation-error">
+            {% for message in validationErrors %}
+                <div>{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {# ===== Payment Details ===== #}
+    <div class="s-card">
+        <div class="s-card-header">{{ translate({ ident: "STRIPE_PAYMENT_DETAILS" }) }}</div>
+        <table class="s-details">
+            <tr>
+                <td class="s-label">{{ translate({ ident: "STRIPE_ORDER_NUMBER" }) }}</td>
+                <td class="s-value" data-testid="order-number">
+                    {% if orderNumber is defined and orderNumber and orderNumber != '0' %}
+                        <strong>{{ orderNumber }}</strong>
+                    {% else %}
+                        <span class="s-muted">&ndash;</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td class="s-label">{{ translate({ ident: "STRIPE_CONTRACT_ID" }) }}</td>
+                <td class="s-value" data-testid="contract-id">
+                    {% if contractId is defined and contractId %}
+                        <span class="s-code">{{ contractId }}</span>
+                    {% else %}
+                        <span class="s-muted">&ndash;</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td class="s-label">{{ translate({ ident: "STRIPE_ORDER_ID" }) }}</td>
+                <td class="s-value" data-testid="order-id">
+                    {% if orderId is defined and orderId %}
+                        <span class="s-code">{{ orderId }}</span>
+                    {% else %}
+                        <span class="s-muted">&ndash;</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td class="s-label">{{ translate({ ident: "STRIPE_PAYMENT_TYPE" }) }}</td>
+                <td class="s-value">{{ paymentType|default('') }}</td>
+            </tr>
+            <tr>
+                <td class="s-label">{{ translate({ ident: "STRIPE_TRANSACTION_ID" }) }}</td>
+                <td class="s-value">
+                    {% if transactionId is defined and transactionId starts with 'pi_' %}
+                        <a href="https://dashboard.stripe.com{{ dashboardPrefix|default('') }}/payments/{{ transactionId }}"
+                           target="_blank" rel="noopener" data-testid="stripe-dashboard-link">
+                            {{ transactionId }}
+                            <svg class="s-external-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0z"/></svg>
+                        </a>
+                    {% else %}
+                        {{ transactionId|default('') }}
+                    {% endif %}
+                </td>
+            </tr>
+            {% if externalTransId is defined and externalTransId %}
+                <tr>
+                    <td class="s-label">{{ translate({ ident: "STRIPE_EXTERNAL_TRANSACTION_ID" }) }}</td>
+                    <td class="s-value">{{ externalTransId }}</td>
+                </tr>
+            {% endif %}
+            {% if capturedAmount is defined and capturedAmount %}
+                <tr>
+                    <td class="s-label" style="padding-top: 16px; border-top: 1px solid #e5e7eb;">{{ translate({ ident: "STRIPE_FACTUAL_CAPTURED_AMOUNT" }) }}</td>
+                    <td class="s-value" style="padding-top: 16px; border-top: 1px solid #e5e7eb;" data-testid="captured-amount">
+                        <strong>{{ capturedAmount }} {{ currency|default('') }}</strong>
+                    </td>
+                </tr>
+            {% endif %}
+            {% if hasRefunds is defined and hasRefunds %}
+                <tr>
+                    <td class="s-label">{{ translate({ ident: "STRIPE_REFUNDED_AMOUNT" }) }}</td>
+                    <td class="s-value" data-testid="refunded-amount">
+                        <strong style="color: #dc2626;">{{ refundedAmount }} {{ currency|default('') }}</strong>
+                    </td>
+                </tr>
+            {% endif %}
+        </table>
+    </div>
+
+    {# ===== Transaction History ===== #}
+    <div class="s-card">
+        <div class="s-card-header">{{ translate({ ident: "STRIPE_TRANSACTION_HISTORY" }) }}</div>
+        {% if transactions is defined and transactions is not empty %}
+            <table class="s-table" data-testid="transaction-history-table">
+                <thead>
+                    <tr>
+                        <th>{{ translate({ ident: "STRIPE_TRANSACTION_TYPE" }) }}</th>
+                        <th>{{ translate({ ident: "STRIPE_TRANSACTION_STATUS" }) }}</th>
+                        <th class="text-right">{{ translate({ ident: "STRIPE_TRANSACTION_AMOUNT" }) }}</th>
+                        <th>{{ translate({ ident: "STRIPE_TRANSACTION_CURRENCY" }) }}</th>
+                        <th>{{ translate({ ident: "STRIPE_TRANSACTION_PROVIDER_ID" }) }}</th>
+                        <th>{{ translate({ ident: "STRIPE_TRANSACTION_DATE" }) }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tx in transactions %}
+                        <tr>
+                            <td>
+                                {% if tx.type == 'authorization' %}
+                                    <span class="s-badge s-badge-blue">{{ tx.type }}</span>
+                                {% elseif tx.type == 'capture' %}
+                                    <span class="s-badge s-badge-green">{{ tx.type }}</span>
+                                {% elseif tx.type == 'refund' %}
+                                    <span class="s-badge s-badge-orange">{{ tx.type }}</span>
+                                {% else %}
+                                    <span class="s-badge s-badge-gray">{{ tx.type }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if tx.status == 'completed' or tx.status == 'succeeded' %}
+                                    <span class="s-status-ok">{{ tx.status }}</span>
+                                {% elseif tx.status == 'pending' or tx.status == 'authorized' %}
+                                    <span class="s-status-warn">{{ tx.status }}</span>
+                                {% elseif tx.status == 'failed' or tx.status == 'cancelled' %}
+                                    <span class="s-status-fail">{{ tx.status }}</span>
+                                {% else %}
+                                    {{ tx.status }}
+                                {% endif %}
+                            </td>
+                            <td class="s-amount">{{ tx.amount }}</td>
+                            <td><span class="s-currency">{{ tx.currency }}</span></td>
+                            <td><span class="s-code">{{ tx.transactionId ?: '-' }}</span></td>
+                            <td class="s-muted">{{ tx.createdAt }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="s-empty">{{ translate({ ident: "STRIPE_NO_TRANSACTIONS" }) }}</div>
+        {% endif %}
+    </div>
+
+    {# ===== Capture Section ===== #}
+    {% if isCapturable is defined and isCapturable %}
+        <div class="s-alert s-alert-info">
+            <strong>{{ translate({ ident: "STRIPE_CAPTURE_REQUIRED" }) }}</strong> &mdash;
+            {{ translate({ ident: "STRIPE_CAPTURE_REQUIRED_TEXT" }) }}
+        </div>
+
+        <div class="s-card">
+            <div class="s-card-header">{{ translate({ ident: "STRIPE_CAPTURE_PAYMENT" }) }}</div>
+            <div class="s-card-body">
+                <form name="captureForm" id="captureForm" class="js-payment-action-form" action="{{ oViewConf.getSelfLink() }}" method="post">
+                    {{ oViewConf.getHiddenSid()|raw }}
+                    <input type="hidden" name="cl" value="PaymentAdmin">
+                    <input type="hidden" name="oxid" value="{{ orderId }}">
+                    <input type="hidden" name="fnc" value="dispatchAction">
+                    <input type="hidden" name="payment_admin_action" value="capture">
+
+                    <p>{{ translate({ ident: "STRIPE_CAPTURE_AMOUNT_TEXT" }) }}: <strong>{{ capturableAmount }} {{ currency }}</strong></p>
+                    <p class="s-muted" style="font-size: 12px; margin-top: -4px;">{{ translate({ ident: "STRIPE_PARTIAL_CAPTURE_NOTE" }) }}</p>
+
+                    <div class="s-form-row">
+                        <div class="s-form-group">
+                            <label class="s-form-label" for="capture_amount">{{ translate({ ident: "STRIPE_AMOUNT" }) }} ({{ currency }})</label>
+                            <input type="number" class="s-form-input" id="capture_amount" name="capture_amount"
+                                   value="{{ capturableRaw }}" step="0.01" min="0.01" max="{{ capturableRaw }}">
+                        </div>
+                        <div class="s-form-group">
+                            <label class="s-form-label" for="capture_reason">{{ translate({ ident: "STRIPE_CAPTURE_REASON" }) }}</label>
+                            <input type="text" class="s-form-input" id="capture_reason" name="capture_reason" maxlength="140"
+                                   placeholder="{{ translate({ ident: "STRIPE_CAPTURE_REASON_PLACEHOLDER" }) }}">
+                        </div>
+                    </div>
+
+                    <input type="submit" class="s-btn s-btn-primary captureSubmit"
+                           value="{{ translate({ ident: "STRIPE_CAPTURE_SUBMIT" }) }}"
+                           onclick="return confirm('{{ translate({ ident: "STRIPE_CAPTURE_CONFIRM" }) }}');">
+                </form>
+            </div>
+        </div>
+
+        {# Cancel Authorization #}
+        {% if isCancellable is defined and isCancellable %}
+            <div class="s-card">
+                <div class="s-card-header">{{ translate({ ident: "STRIPE_CANCEL_AUTHORIZATION" }) }}</div>
+                <div class="s-card-body">
+                    <form name="cancelForm" id="cancelForm" class="js-payment-action-form" action="{{ oViewConf.getSelfLink() }}" method="post">
+                        {{ oViewConf.getHiddenSid()|raw }}
+                        <input type="hidden" name="cl" value="PaymentAdmin">
+                        <input type="hidden" name="oxid" value="{{ orderId }}">
+                        <input type="hidden" name="fnc" value="dispatchAction">
+                        <input type="hidden" name="payment_admin_action" value="cancel">
+
+                        <p>{{ translate({ ident: "STRIPE_CANCEL_AUTHORIZATION_TEXT" }) }}</p>
+
+                        <div class="s-form-group">
+                            <label class="s-form-label" for="cancel_reason">{{ translate({ ident: "STRIPE_CANCEL_REASON" }) }}</label>
+                            <select class="s-form-select" id="cancel_reason" name="cancel_reason">
+                                <option value="">{{ translate({ ident: "STRIPE_PLEASE_SELECT" }) }}</option>
+                                <option value="duplicate">{{ translate({ ident: "STRIPE_CANCEL_DUPLICATE" }) }}</option>
+                                <option value="requested_by_customer">{{ translate({ ident: "STRIPE_CANCEL_CUSTOMER" }) }}</option>
+                                <option value="fraudulent">{{ translate({ ident: "STRIPE_CANCEL_FRAUD" }) }}</option>
+                                <option value="abandoned">{{ translate({ ident: "STRIPE_CANCEL_ABANDONED" }) }}</option>
+                            </select>
+                        </div>
+
+                        <input type="submit" class="s-btn s-btn-danger-outline cancelSubmit"
+                               value="{{ translate({ ident: "STRIPE_CANCEL_SUBMIT" }) }}"
+                               onclick="return confirm('{{ translate({ ident: "STRIPE_CANCEL_CONFIRM" }) }}');">
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+    {% endif %}
+
+    {# ===== Refund Section ===== #}
+    {% if isRefundable is defined and isRefundable %}
+        <div class="s-card">
+            <div class="s-card-header">{{ translate({ ident: "STRIPE_REFUND" }) }}</div>
+            <div class="s-card-body">
+                <form name="refundForm" id="refundForm" class="js-payment-action-form" action="{{ oViewConf.getSelfLink() }}" method="post">
+                    {{ oViewConf.getHiddenSid()|raw }}
+                    <input type="hidden" name="cl" value="PaymentAdmin">
+                    <input type="hidden" name="oxid" value="{{ orderId }}">
+                    <input type="hidden" name="fnc" value="dispatchAction">
+                    <input type="hidden" name="payment_admin_action" value="refund">
+
+                    <p>{{ translate({ ident: "STRIPE_REFUNDABLE_AMOUNT" }) }}: <strong>{{ remainingRefundable }} {{ currency }}</strong></p>
+
+                    <div class="s-form-row">
+                        <div class="s-form-group">
+                            <label class="s-form-label" for="refund_amount">{{ translate({ ident: "STRIPE_AMOUNT" }) }} ({{ currency }})</label>
+                            <input type="number" class="s-form-input" id="refund_amount" name="refund_amount"
+                                   value="{{ remainingRefundableRaw }}" step="0.01" min="0.01" max="{{ remainingRefundableRaw }}">
+                        </div>
+                        <div class="s-form-group">
+                            <label class="s-form-label" for="refund_reason">{{ translate({ ident: "STRIPE_REFUND_REASON" }) }}</label>
+                            <select class="s-form-select" id="refund_reason" name="refund_reason">
+                                <option value="">{{ translate({ ident: "STRIPE_PLEASE_SELECT" }) }}</option>
+                                <option value="duplicate">{{ translate({ ident: "STRIPE_REFUND_DUPLICATE" }) }}</option>
+                                <option value="requested_by_customer">{{ translate({ ident: "STRIPE_REFUND_CUSTOMER" }) }}</option>
+                                <option value="fraudulent">{{ translate({ ident: "STRIPE_REFUND_FRAUD" }) }}</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <input type="submit" class="s-btn s-btn-warning refundSubmit"
+                           value="{{ translate({ ident: "STRIPE_REFUND_SUBMIT" }) }}"
+                           onclick="return confirm('{{ translate({ ident: "STRIPE_REFUND_CONFIRM" }) }}');">
+                </form>
+            </div>
+        </div>
+    {% endif %}
+</div>

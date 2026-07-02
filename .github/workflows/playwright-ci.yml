@@ -1,0 +1,161 @@
+name: Playwright E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Shop base URL to test against (no trailing slash)'
+        required: true
+        default: 'https://pay1.oxid.dev'
+        type: string
+      branch:
+        description: 'stripe-wallet branch to deploy (composer ref, e.g. dev-b-7.4.x)'
+        required: true
+        default: 'dev-b-7.4.x'
+        type: string
+      test_suite:
+        description: 'Which tests to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - checkout
+          - discounts
+          - admin
+          - capture
+      screenshots:
+        description: 'Capture screenshots during the run'
+        required: false
+        default: true
+        type: boolean
+      video:
+        description: 'Capture video during the run'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  SHOP_PATH: /var/www/oxid/oxid75
+  PLAYWRIGHT_PATH: tests/e2e/playwright/playwright
+  SHOP_HOME_URL: ${{ inputs.url }}
+
+jobs:
+  deploy:
+    name: Deploy & activate module
+    runs-on: [arc-runner-set]
+    steps:
+      - name: Require chosen branch and update dependencies
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SHOP_HOST }}
+          username: ${{ secrets.SHOP_SSH_USER }}
+          key: ${{ secrets.SHOP_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ env.SHOP_PATH }}
+            make php CMD="composer require oxid-esales/stripe-wallet:${{ inputs.branch }} --no-update --no-interaction"
+            make php CMD="composer update oxid-esales/stripe-wallet --with-all-dependencies --no-interaction"
+
+      - name: Reinstall and activate module
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SHOP_HOST }}
+          username: ${{ secrets.SHOP_SSH_USER }}
+          key: ${{ secrets.SHOP_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ env.SHOP_PATH }}
+            make php CMD="bin/oe-console oe:module:install vendor/oxid-esales/stripe-wallet"
+            make php CMD="bin/oe-console oe:module:deactivate oe_payments_stripe_wallet"
+            make php CMD="bin/oe-console oe:module:activate oe_payments_stripe_wallet"
+            make php CMD="bin/oe-console o:c:c"
+
+  playwright:
+    name: Run Playwright tests
+    needs: deploy
+    runs-on: [arc-runner-set]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          submodules: false
+          persist-credentials: false
+          token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN }}
+
+      - name: Check out private Playwright submodule
+        env:
+          GH_PAT_PLAYWRIGHT: ${{ secrets.GH_PAT_PLAYWRIGHT }}
+        run: |
+          git submodule sync -- tests/e2e/playwright
+          git -c "url.https://x-access-token:${GH_PAT_PLAYWRIGHT}@github.com/.insteadOf=https://github.com/" \
+            submodule update --init --depth=1 -- tests/e2e/playwright
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cache node_modules
+        id: cache-node
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PLAYWRIGHT_PATH }}/node_modules
+          key: playwright-node-${{ hashFiles(format('{0}/package-lock.json', env.PLAYWRIGHT_PATH)) }}
+
+      - name: Cache Playwright browsers
+        id: cache-pw
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ hashFiles(format('{0}/package-lock.json', env.PLAYWRIGHT_PATH)) }}
+
+      - name: Install dependencies
+        if: steps.cache-node.outputs.cache-hit != 'true'
+        working-directory: ${{ env.PLAYWRIGHT_PATH }}
+        run: npm ci
+
+      - name: Install Playwright browsers
+        if: steps.cache-pw.outputs.cache-hit != 'true'
+        working-directory: ${{ env.PLAYWRIGHT_PATH }}
+        run: npx playwright install --with-deps chromium
+
+      - name: Create .env
+        working-directory: ${{ env.PLAYWRIGHT_PATH }}
+        run: |
+          cat <<EOF > .env
+          SHOP_URL=${{ env.SHOP_HOME_URL }}
+          ADMIN_URL=${{ env.SHOP_HOME_URL }}/admin/
+          TEST_USER_EMAIL=${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD=${{ secrets.TEST_USER_PASSWORD }}
+          HEADLESS=true
+          EOF
+
+      - name: Run Playwright tests
+        working-directory: ${{ env.PLAYWRIGHT_PATH }}
+        env:
+          CI: true
+          TEST_SUITE: ${{ inputs.test_suite }}
+          PW_SCREENSHOT: ${{ inputs.screenshots && 'on' || 'off' }}
+          PW_VIDEO: ${{ inputs.video && 'on' || 'off' }}
+        run: |
+          case "$TEST_SUITE" in
+            checkout)  args="--project=checkout-tests" ;;
+            admin)     args="--project=admin-tests" ;;
+            discounts) args="--project=chromium tests/e2e/StripeStandard/CouponsDiscounts.spec.ts" ;;
+            capture)   args="--project=admin-tests tests/admin/stripe-admin-capture.spec.ts tests/admin/stripe-manual-capture-fix.spec.ts" ;;
+            all|*)     args="" ;;
+          esac
+          echo "Suite: $TEST_SUITE -> npx playwright test ${args:-(all projects)}"
+          echo "Screenshots: $PW_SCREENSHOT | Video: $PW_VIDEO"
+          npx playwright test $args
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            ${{ env.PLAYWRIGHT_PATH }}/reports/html-report/
+            ${{ env.PLAYWRIGHT_PATH }}/reports/test-results/
+          retention-days: 2

@@ -1,0 +1,376 @@
+name: Load Test (k6 scenarios)
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Shop URL the load test runs against (no trailing slash). Leave empty for the default pay1 shop.'
+        required: false
+        default: ''
+        type: string
+      target_vus:
+        description: 'Target virtual users per minute'
+        required: true
+        default: '100'
+        type: choice
+        options:
+          - '10'
+          - '25'
+          - '50'
+          - '100'
+          - '200'
+      duration:
+        description: 'Steady-state duration (minutes)'
+        required: true
+        default: '10'
+        type: choice
+        options:
+          - '2'
+          - '5'
+          - '10'
+          - '20'
+          - '30'
+      ramp_up:
+        description: 'Ramp-up duration (minutes)'
+        required: true
+        default: '2'
+        type: choice
+        options:
+          - '1'
+          - '2'
+          - '3'
+          - '5'
+      scenario:
+        description: 'Scenario to run (all = full mix)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - 'all'
+          - 'happy_path'
+          - 'cancellation'
+          - 'guest_coupon'
+          - 'payment_failure'
+          - 'threeds'
+      dry_run:
+        description: 'Dry run (1 VU, 1 iteration per scenario)'
+        required: false
+        default: false
+        type: boolean
+      chart_yscale:
+        description: 'Capacity-chart Y axis (response time).'
+        required: true
+        default: 'log10'
+        type: choice
+        options: [log10, linear, ln]
+      chart_xscale:
+        description: 'Capacity-chart X axis (concurrent users).'
+        required: true
+        default: 'linear'
+        type: choice
+        options: [linear, log10, ln]
+
+env:
+  SHOP_PATH: /var/www/oxid/oxid75
+  MODULE_PATH: /var/www/oxid/oxid75/source/extensions/stripe
+  # HTTP target for the load run: the `url` input when given, else the pay1 shop.
+  # NB: the seed/validate jobs reach the shop over SSH via the SHOP_HOST secret —
+  # point `url` at that same host, or seeding/DB checks will target a different box.
+  SHOP_URL: ${{ inputs.url != '' && inputs.url || 'https://pay1.oxid.dev' }}
+  K6_VERSION: '0.54.0'
+
+jobs:
+  pre-flight:
+    name: Pre-flight checks
+    runs-on: [arc-runner-set]
+    outputs:
+      shop_healthy: ${{ steps.health.outputs.healthy }}
+    steps:
+      - name: Check shop is reachable
+        id: health
+        run: |
+          STATUS=$(curl -sk -o /dev/null -w "%{http_code}" ${{ env.SHOP_URL }})
+          echo "Shop responded with HTTP $STATUS"
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
+            echo "healthy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "healthy=false" >> "$GITHUB_OUTPUT"
+            echo "::error::Shop is not healthy (HTTP $STATUS)"
+            exit 1
+          fi
+
+  seed-data:
+    name: Seed test data
+    needs: pre-flight
+    runs-on: [arc-runner-set]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Seed load test users and coupons
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SHOP_HOST }}
+          username: ${{ secrets.SHOP_SSH_USER }}
+          key: ${{ secrets.SHOP_SSH_KEY }}
+          script: |
+            cd ${{ env.SHOP_PATH }}
+
+            # Seed test users (idempotent — skips existing)
+            make php CMD="php -r \"
+              require 'source/bootstrap.php';
+              \\\$db = \\OxidEsales\\Eshop\\Core\\DatabaseProvider::getDb();
+
+              for (\\\$i = 1; \\\$i <= 200; \\\$i++) {
+                \\\$num = str_pad(\\\$i, 3, '0', STR_PAD_LEFT);
+                \\\$email = 'loadtest_user_' . \\\$num . '@oxid-esales.dev';
+                \\\$exists = \\\$db->getOne('SELECT COUNT(*) FROM oxuser WHERE OXUSERNAME = ?', [\\\$email]);
+                if (\\\$exists > 0) continue;
+
+                \\\$userId = md5(\\\$email);
+                \\\$passHash = password_hash('useruser', PASSWORD_DEFAULT);
+                \\\$db->execute(
+                  'INSERT INTO oxuser (OXID, OXACTIVE, OXUSERNAME, OXPASSWORD, OXFNAME, OXLNAME, OXSTREET, OXSTREETNR, OXZIP, OXCITY, OXCOUNTRYID, OXSAL)
+                   VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                  [\\\$userId, \\\$email, \\\$passHash, 'Load', 'Test'.\\\$num, 'Bertoldstr.', \\\$num, '79098', 'Freiburg', 'a7c40f631fc920687.20179984', 'MR']
+                );
+              }
+              echo 'Seeded 200 load test users';
+            \""
+
+            # Set high stock on test products
+            make php CMD="php -r \"
+              require 'source/bootstrap.php';
+              \\\$db = \\OxidEsales\\Eshop\\Core\\DatabaseProvider::getDb();
+              \\\$db->execute('UPDATE oxarticles SET OXSTOCK = 99999 WHERE OXACTIVE = 1 AND OXSTOCK < 99999');
+              echo 'Stock set to 99999 for all active products';
+            \""
+
+  load-test:
+    name: "k6 (${{ inputs.target_vus }} VU/min, ${{ inputs.duration }}min)"
+    needs: seed-data
+    runs-on: [arc-runner-set]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install k6 with browser support
+        run: |
+          curl -sSL https://github.com/grafana/k6/releases/download/v${{ env.K6_VERSION }}/k6-v${{ env.K6_VERSION }}-linux-amd64.tar.gz \
+            | tar xz --strip-components=1
+          chmod +x k6
+          ./k6 version
+
+      - name: Install Google Chrome (for k6 browser module)
+        run: |
+          # The k6 browser module drives a REAL Chrome — it does not bundle or
+          # auto-download one, so a browser binary must exist on the runner or
+          # every iteration dies at IterStart with "couldn't detect ... chrome".
+          # Installing the official .deb lets apt resolve all the shared-library
+          # dependencies automatically (no need to hand-list libnss3 etc.).
+          sudo apt-get update -qq
+          curl -sSL -o /tmp/chrome.deb \
+            https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y --no-install-recommends /tmp/chrome.deb
+          rm -f /tmp/chrome.deb
+          google-chrome --version
+
+      - name: Run k6 load test (browser mode)
+        working-directory: tests/load
+        env:
+          K6_BROWSER_ENABLED: 'true'
+          K6_BROWSER_EXECUTABLE_PATH: /usr/bin/google-chrome
+          # no-sandbox: Chrome won't start as root (CI containers) without it.
+          K6_BROWSER_ARGS: 'no-sandbox,ignore-certificate-errors'
+          K6_BASE_URL: ${{ env.SHOP_URL }}
+          K6_TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+          LOAD_TARGET_VUS: ${{ inputs.target_vus }}
+          LOAD_DURATION: ${{ inputs.duration }}
+          LOAD_RAMP_UP: ${{ inputs.ramp_up }}
+          LOAD_SCENARIO: ${{ inputs.scenario }}
+          LOAD_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          # p(75) is included so the report can show Core Web Vitals at their
+          # conventional p75, alongside p95/p99 for the tail.
+          ../../k6 run \
+            --out json=results.json \
+            --summary-export=summary.json \
+            --summary-trend-stats="avg,min,med,max,p(75),p(90),p(95),p(99)" \
+            k6.config.js \
+            2>&1 | tee k6-output.txt
+
+      # ── Statistics + capacity charts (same report shape as the Locust run) ────
+      # The charting tool lives under tests/load/locust/chart and is reused
+      # verbatim: a k6 adapter (chart.k6) folds the k6 NDJSON time series into the
+      # same Sample shape the Locust history parser yields, so the identical chart
+      # set + embedded HTML report is produced. Steps run from the locust dir
+      # (where the package is) and read the k6 outputs one level up (../).
+      - name: Setup Python
+        if: always()
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: tests/load/locust/requirements-chart.txt
+
+      - name: Install charting deps
+        if: always()
+        working-directory: tests/load/locust
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest -r requirements-chart.txt
+
+      # Gate on the charting unit tests: a bad parse/embed silently produces a
+      # blank report. Fail fast here, not after parsing a multi-GB results.json.
+      - name: Unit-test charting tools
+        if: always()
+        working-directory: tests/load/locust
+        run: python -m pytest tests/test_k6_parse.py tests/test_chart_parse.py -q
+
+      - name: Generate capacity report (X=${{ inputs.chart_xscale }} Y=${{ inputs.chart_yscale }})
+        if: always()
+        continue-on-error: true
+        working-directory: tests/load/locust
+        run: |
+          if [ ! -f ../results.json ]; then
+            echo "no k6 results.json — skipping report"
+            exit 0
+          fi
+          python -m chart.k6_render \
+            --results ../results.json \
+            --summary ../summary.json \
+            --out ../k6-report \
+            --xscale "${{ inputs.chart_xscale }}" \
+            --yscale "${{ inputs.chart_yscale }}" \
+            --title "k6 — ${{ inputs.scenario }} · ${{ inputs.target_vus }} VU/min · ${{ inputs.duration }}min" \
+            --param "Target VUs=${{ inputs.target_vus }}/min" \
+            --param "Duration=${{ inputs.duration }} min" \
+            --param "Ramp-up=${{ inputs.ramp_up }} min" \
+            --param "Scenario=${{ inputs.scenario }}" \
+            --param "Dry run=${{ inputs.dry_run }}" \
+            --param "Shop URL=${{ env.SHOP_URL }}"
+
+      - name: Step summary
+        if: always()
+        run: |
+          {
+            echo "## k6 Load Test"
+            echo ""
+            echo "| Parameter | Value |"
+            echo "|-----------|-------|"
+            echo "| Target VUs | ${{ inputs.target_vus }}/min |"
+            echo "| Duration | ${{ inputs.duration }} min |"
+            echo "| Ramp-up | ${{ inputs.ramp_up }} min |"
+            echo "| Scenario | ${{ inputs.scenario }} |"
+            echo "| Dry run | ${{ inputs.dry_run }} |"
+            echo "| Shop URL | ${{ env.SHOP_URL }} |"
+            echo ""
+            if [ -f tests/load/k6-report/summary.md ]; then
+              echo "### Aggregated statistics"
+              cat tests/load/k6-report/summary.md
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload k6 results + report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results-${{ github.run_number }}
+          path: |
+            tests/load/results.json
+            tests/load/summary.json
+            tests/load/k6-output.txt
+            tests/load/k6-report/
+          retention-days: 30
+
+  post-validation:
+    name: DB consistency validation
+    needs: load-test
+    if: always() && needs.load-test.result != 'cancelled'
+    runs-on: [arc-runner-set]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Run DB validation queries
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SHOP_HOST }}
+          username: ${{ secrets.SHOP_SSH_USER }}
+          key: ${{ secrets.SHOP_SSH_KEY }}
+          script: |
+            cd ${{ env.SHOP_PATH }}
+
+            echo "=== ORPHAN ORDERS (orders without contracts) ==="
+            make php CMD="php -r \"
+              require 'source/bootstrap.php';
+              \\\$db = \\OxidEsales\\Eshop\\Core\\DatabaseProvider::getDb(\\OxidEsales\\Eshop\\Core\\DatabaseProvider::FETCH_MODE_ASSOC);
+              \\\$rows = \\\$db->getAll(
+                'SELECT o.OXID, o.OXORDERNR, o.OXTOTALORDERSUM
+                 FROM oxorder o
+                 LEFT JOIN oe_payments_contract c ON c.OXORDERID = o.OXID
+                 WHERE o.OXORDERDATE > DATE_SUB(NOW(), INTERVAL 1 HOUR)
+                   AND c.OXID IS NULL'
+              );
+              echo count(\\\$rows) . ' orphan orders found';
+              if (count(\\\$rows) > 0) { print_r(\\\$rows); exit(1); }
+            \""
+
+            echo "=== STUCK CONTRACTS (draft/pending > 5 min) ==="
+            make php CMD="php -r \"
+              require 'source/bootstrap.php';
+              \\\$db = \\OxidEsales\\Eshop\\Core\\DatabaseProvider::getDb(\\OxidEsales\\Eshop\\Core\\DatabaseProvider::FETCH_MODE_ASSOC);
+              \\\$rows = \\\$db->getAll(
+                'SELECT OXID, OXSTATUS, OXORDERID, OXCREATEDAT
+                 FROM oe_payments_contract
+                 WHERE OXCREATEDAT > DATE_SUB(NOW(), INTERVAL 1 HOUR)
+                   AND OXSTATUS IN (\\\"draft\\\", \\\"pending\\\")
+                   AND TIMESTAMPDIFF(MINUTE, OXCREATEDAT, NOW()) > 5'
+              );
+              echo count(\\\$rows) . ' stuck contracts found';
+              if (count(\\\$rows) > 0) { print_r(\\\$rows); }
+            \""
+
+            echo "=== DOUBLE-USED SINGLE-USE COUPONS ==="
+            make php CMD="php -r \"
+              require 'source/bootstrap.php';
+              \\\$db = \\OxidEsales\\Eshop\\Core\\DatabaseProvider::getDb(\\OxidEsales\\Eshop\\Core\\DatabaseProvider::FETCH_MODE_ASSOC);
+              \\\$rows = \\\$db->getAll(
+                'SELECT OXVOUCHERNR, COUNT(*) as cnt
+                 FROM oxvouchers
+                 WHERE OXDATEUSED > DATE_SUB(NOW(), INTERVAL 1 HOUR)
+                   AND OXVOUCHERSERIEID IN (SELECT OXID FROM oxvoucherseries WHERE OXALLOWUSEDAGAIN = 0)
+                 GROUP BY OXVOUCHERNR HAVING COUNT(*) > 1'
+              );
+              echo count(\\\$rows) . ' double-used coupons found';
+              if (count(\\\$rows) > 0) { print_r(\\\$rows); exit(1); }
+            \""
+
+            echo "=== CONTRACT STATE DISTRIBUTION ==="
+            make php CMD="php -r \"
+              require 'source/bootstrap.php';
+              \\\$db = \\OxidEsales\\Eshop\\Core\\DatabaseProvider::getDb(\\OxidEsales\\Eshop\\Core\\DatabaseProvider::FETCH_MODE_ASSOC);
+              \\\$rows = \\\$db->getAll(
+                'SELECT OXSTATUS, COUNT(*) as cnt
+                 FROM oe_payments_contract
+                 WHERE OXCREATEDAT > DATE_SUB(NOW(), INTERVAL 1 HOUR)
+                 GROUP BY OXSTATUS ORDER BY cnt DESC'
+              );
+              foreach (\\\$rows as \\\$r) { echo \\\$r['OXSTATUS'] . ': ' . \\\$r['cnt'] . PHP_EOL; }
+            \""
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Load Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Target VUs | ${{ inputs.target_vus }}/min |" >> $GITHUB_STEP_SUMMARY
+          echo "| Duration | ${{ inputs.duration }} min |" >> $GITHUB_STEP_SUMMARY
+          echo "| Ramp-up | ${{ inputs.ramp_up }} min |" >> $GITHUB_STEP_SUMMARY
+          echo "| Scenario | ${{ inputs.scenario }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dry run | ${{ inputs.dry_run }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Shop URL | ${{ env.SHOP_URL }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See artifacts for detailed k6 results and DB validation output." >> $GITHUB_STEP_SUMMARY

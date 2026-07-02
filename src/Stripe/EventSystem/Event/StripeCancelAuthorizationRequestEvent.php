@@ -1,0 +1,97 @@
+<?php
+
+declare(strict_types=1);
+
+namespace OxidEsales\Payments\Stripe\EventSystem\Event;
+
+use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\EventSystem\Event\EventInterface;
+
+/**
+ * Event dispatched when admin requests to cancel a payment authorization.
+ *
+ * This event is used for manual capture mode orders where the payment
+ * has been authorized but not yet captured, and the merchant wants to
+ * release the authorization instead of capturing.
+ *
+ * Context data:
+ * INPUT (set by trigger):
+ * - orderId: ?string - OXID order ID
+ * - paymentIntentId: ?string - Stripe PaymentIntent ID to cancel (admin Stripe-tab path sets it explicitly)
+ * - contractId: ?string - Payment contract ID; handler falls back to contract->getProviderOrderId() when paymentIntentId is absent (opalreturns provider-agnostic path)
+ * - cancellationReason: ?string - Stripe reason (requested_by_customer, duplicate, fraudulent, abandoned)
+ * - initiator: string - Who triggered the cancel (admin, webhook, api, return_credit)
+ *
+ * OUTPUT (set by handler):
+ * - cancelSuccess: bool - Whether cancel succeeded
+ * - cancelledPaymentIntentId: ?string - Cancelled PaymentIntent ID
+ * - error: ?string - Error message if failed
+ *
+ * @since 2.0.0
+ */
+readonly class StripeCancelAuthorizationRequestEvent implements EventInterface
+{
+    public function __construct(
+        private EventContext $context
+    ) {
+    }
+
+    public function getContext(): EventContext
+    {
+        return $this->context;
+    }
+
+    /**
+     * Get the PaymentIntent ID to cancel.
+     */
+    public function getPaymentIntentId(): ?string
+    {
+        $id = $this->context->get('paymentIntentId');
+        return is_string($id) ? $id : null;
+    }
+
+    /**
+     * Get the cancellation reason.
+     *
+     * Valid Stripe reasons: 'duplicate', 'fraudulent', 'requested_by_customer', 'abandoned'
+     */
+    public function getCancellationReason(): ?string
+    {
+        $reason = $this->context->get('cancellationReason');
+        return is_string($reason) ? $reason : null;
+    }
+
+    /**
+     * Get the OXID order ID (if available).
+     */
+    public function getOrderId(): ?string
+    {
+        $orderId = $this->context->get('orderId');
+        return is_string($orderId) ? $orderId : null;
+    }
+
+    /**
+     * Get the payment contract ID (if available).
+     *
+     * Used by the handler to resolve the PaymentIntent ID from
+     * `$contract->getProviderOrderId()` when the event context does
+     * not carry an explicit `paymentIntentId` — the provider-agnostic
+     * opalreturns dispatch path.
+     */
+    public function getContractId(): ?string
+    {
+        $contractId = $this->context->get('contractId');
+        return is_string($contractId) ? $contractId : null;
+    }
+
+    /**
+     * Get the initiator of the cancel request.
+     *
+     * @return string One of: admin, webhook, api
+     */
+    public function getInitiator(): string
+    {
+        $initiator = $this->context->get('initiator');
+        return is_string($initiator) ? $initiator : 'admin';
+    }
+}

@@ -1,0 +1,121 @@
+id: oe_payments_stripe_wallet
+moduleSource: extensions/stripe
+version: 3.0.0
+activated: true
+title:
+  de: 'Stripe Wallet'
+  en: 'Stripe Wallet'
+description:
+  de: 'Stripe-Zahlungsintegration mit Smart Contracts für OXID eShop 7'
+  en: 'Stripe payment integration with Smart Contracts for OXID eShop 7'
+lang: ''
+thumbnail: img/stripe_logo.png
+author: 'OXID eSales AG'
+url: 'https://www.oxid-esales.com'
+email: info@oxid-esales.com
+classExtensions:
+  OxidEsales\Eshop\Application\Controller\Admin\ModuleConfiguration: OxidEsales\Payments\Stripe\Controller\Admin\ModuleConfiguration
+  OxidEsales\Eshop\Core\ViewConfig: OxidEsales\Payments\Stripe\Core\ViewConfig
+  OxidEsales\Eshop\Application\Model\Payment: OxidEsales\Payments\Stripe\Model\Payment
+  OxidEsales\Eshop\Application\Model\Order: OxidEsales\Payments\Stripe\Model\Order
+  OxidEsales\Eshop\Application\Controller\PaymentController: OxidEsales\Payments\Stripe\Controller\PaymentController
+  OxidEsales\Eshop\Application\Controller\OrderController: OxidEsales\Payments\Stripe\Controller\StripeOrderController
+controllers:
+  StripeWebhookController: OxidEsales\Payments\Stripe\Controller\Webhook\WebhookController
+  StripeConnect: OxidEsales\Payments\Stripe\Controller\Admin\StripeConnect
+events:
+  onActivate: 'OxidEsales\Payments\Stripe\Core\Events::onActivate'
+  onDeactivate: 'OxidEsales\Payments\Stripe\Core\Events::onDeactivate'
+moduleSettings:
+  sStripeMode:
+    group: STRIPE_GENERAL
+    type: select
+    value: test
+    constraints:
+      - live
+      - test
+    position: 10
+  sStripeTestToken:
+    group: STRIPE_GENERAL
+    type: str
+    value: sk_test_51OyDwdAeMx6SN5PNeL8XyKC5jMmYe7POR6qc7FnNDOwfopbIqzY8B6qfPQIxogZfXAYht7yn7yCqy8xNxh5Zu4Sl00hf7YFxBk
+    position: 20
+  sStripeTestPk:
+    group: STRIPE_GENERAL
+    type: str
+    value: pk_test_51OyDwdAeMx6SN5PNLOOPTaCgbPOL9oWBdVCFpqd7SEHXaOdaO4bCsy12HzLDukOoY1kEWaonMastv1YiTGXQGyMH00u0hJnjjf
+    position: 21
+  sStripeLiveToken:
+    group: STRIPE_GENERAL
+    type: str
+    value: ''
+    position: 30
+  sStripeLivePk:
+    group: STRIPE_GENERAL
+    type: str
+    value: ''
+    position: 31
+  blStripeLogTransactionInfo:
+    group: STRIPE_GENERAL
+    type: bool
+    value: true
+    position: 34
+  blStripeRemoveByBillingCountry:
+    group: STRIPE_GENERAL
+    type: bool
+    value: true
+    position: 35
+  blStripeRemoveByBasketCurrency:
+    group: STRIPE_GENERAL
+    type: bool
+    value: true
+    position: 36
+  blStripeProvideCustomerEmailAddress:
+    group: STRIPE_GENERAL
+    type: bool
+    value: false
+    position: 37
+  sStripeCaptureMode:
+    group: STRIPE_GENERAL
+    type: select
+    value: automatic
+    constraints:
+      - automatic
+      - manual
+    position: 39
+  # Sprint 29: Status mappings moved to StatusMappingConfig class
+  sStripeCronFinishOrdersActive:
+    group: STRIPE_CRONJOBS
+    type: bool
+    value: false
+    position: 80
+  sStripeCronSecondChanceActive:
+    group: STRIPE_CRONJOBS
+    type: bool
+    value: false
+    position: 90
+  iStripeCronSecondChanceTimeDiff:
+    group: STRIPE_CRONJOBS
+    type: select
+    value: '1'
+    position: 100
+  sStripeCronOrderShipmentActive:
+    group: STRIPE_CRONJOBS
+    type: bool
+    value: false
+    position: 110
+  sStripeCronSecureKey:
+    group: STRIPE_CRONJOBS
+    type: str
+    value: ''
+    position: 120
+  sStripeWebhookEndpoint:
+    group: STRIPE_WEBHOOKS
+    type: str
+    value: ''
+    position: 130
+  sStripeWebhookEndpointSecret:
+    group: STRIPE_WEBHOOKS
+    type: str
+    value: whsec_A5lTk0JAO08iUCSf0jQZud6VksACGhC7
+    position: 140

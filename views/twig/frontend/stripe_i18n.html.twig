@@ -1,0 +1,39 @@
+{#
+    Stripe Module - JavaScript Internationalization
+    Provides translation strings for JavaScript controllers
+#}
+
+<script>
+    var oStripe = oStripe || {};
+    // Frontend debug flag — driven by the module log level (sStripeLogLevel === 'debug').
+    // Read by app.js to gate Stimulus.debug and all module console output at runtime.
+    oStripe.debug = {{ oViewConf.isStripeDebug() ? 'true' : 'false' }};
+    oStripe.i18n = {
+        // AGB Validation
+        AGB_REQUIRED: "{{ translate({ ident: 'STRIPE_JS_AGB_REQUIRED' }) }}",
+
+        // General Errors
+        CONFIG_ERROR: "{{ translate({ ident: 'STRIPE_JS_CONFIG_ERROR' }) }}",
+        INIT_FAILED: "{{ translate({ ident: 'STRIPE_JS_INIT_FAILED' }) }}",
+        PAYMENT_FAILED: "{{ translate({ ident: 'STRIPE_JS_PAYMENT_FAILED' }) }}",
+
+        // Stripe.js Errors
+        JS_NOT_LOADED: "{{ translate({ ident: 'STRIPE_JS_NOT_LOADED' }) }}",
+        KEY_NOT_CONFIGURED: "{{ translate({ ident: 'STRIPE_JS_KEY_NOT_CONFIGURED' }) }}",
+
+        // Checkout Session
+        CREATING_SESSION: "{{ translate({ ident: 'STRIPE_JS_CREATING_SESSION' }) }}",
+        SESSION_FAILED: "{{ translate({ ident: 'STRIPE_JS_SESSION_FAILED' }) }}",
+        SESSION_INVALID: "{{ translate({ ident: 'STRIPE_JS_SESSION_INVALID' }) }}",
+
+        // Payment Form
+        CONTROLLER_NOT_FOUND: "{{ translate({ ident: 'STRIPE_JS_CONTROLLER_NOT_FOUND' }) }}",
+        FORM_NOT_READY: "{{ translate({ ident: 'STRIPE_JS_FORM_NOT_READY' }) }}",
+        PAYMENT_NOT_COMPLETED: "{{ translate({ ident: 'STRIPE_JS_PAYMENT_NOT_COMPLETED' }) }}",
+        URL_NOT_CONFIGURED: "{{ translate({ ident: 'STRIPE_JS_URL_NOT_CONFIGURED' }) }}",
+        INTENT_INVALID: "{{ translate({ ident: 'STRIPE_JS_INTENT_INVALID' }) }}",
+
+        // Button States
+        PROCESSING: "{{ translate({ ident: 'STRIPE_JS_PROCESSING' }) }}"
+    };
+</script>

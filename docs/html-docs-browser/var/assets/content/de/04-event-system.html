@@ -1,0 +1,70 @@
+        <div class="s-head">
+          <div class="badge"><span class="dot"></span><span class="step-label">Architektur &middot; Events &amp; Handler</span></div>
+          <div class="deck">Durchg&auml;ngig PSR-14 &middot; getaggte Service-Discovery</div>
+        </div>
+
+        <h2 class="h-2">8 Stripe-Events. 9 Handler.<br/><em class="acc">Dispatchen, nicht mutieren.</em></h2>
+
+        <p class="lede" style="margin-bottom: 14px;">
+          Jede Aktion eines Stripe-Controllers nimmt denselben Weg: <code>$dispatcher-&gt;dispatch($event)</code>.
+          Handler mit dem Tag <code>payment.event_handler</code> werden vom <code>EventListenerProvider</code> automatisch eingesammelt
+          und in Priorit&auml;tsreihenfolge aufgerufen. Eine neue Verhaltensweise hinzuzuf&uuml;gen hei&szlig;t,
+          einen neuen Handler zu registrieren &mdash; niemals einen Controller zu patchen.
+        </p>
+
+        <div class="cols cols-2" style="gap: 18px; flex: 1 1 0;">
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s1-accent); margin-bottom: 10px;">Stripe-spezifische Events</div>
+            <ul class="small" style="margin: 0 0 14px;">
+              <li><code>StripeCheckoutSessionRequestEvent</code> &mdash; startet Stripe Checkout</li>
+              <li><code>StripeCheckoutReturnEvent</code> &mdash; Kunde kehrt von Stripe zur&uuml;ck</li>
+              <li><code>StripeCaptureRequestEvent</code> &mdash; Admin bucht (unterst&uuml;tzt <code>?float $amount</code> f&uuml;r Teil-Capture)</li>
+              <li><code>StripeRefundRequestEvent</code> &mdash; Admin erstattet (unterst&uuml;tzt Teilerstattungen)</li>
+              <li><code>StripeCancelAuthorizationRequestEvent</code> &mdash; gibt nicht gebuchte Autorisierung frei</li>
+              <li><code>StripePaymentExecuteEvent</code> / <code>StripePaymentReturnEvent</code></li>
+              <li><code>Stripe3DSRequiredEvent</code> &mdash; SCA-Challenge erforderlich</li>
+            </ul>
+
+            <div class="eyebrow" style="color: var(--s1-accent); margin-bottom: 10px;">Wiederverwendete Payment-Base-Events</div>
+            <ul class="small" style="margin: 0;">
+              <li><code>ContractCreatedEvent</code> &middot; <code>ContractTransitionedToPendingEvent</code></li>
+              <li><code>PaymentAuthorizedEvent</code> &middot; <code>PaymentCapturedEvent</code> &middot; <code>PaymentRefundedEvent</code></li>
+              <li><code>OrderCreatedEvent</code> &middot; <code>OrderCompletedEvent</code></li>
+            </ul>
+          </div>
+
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s1-accent); margin-bottom: 10px;">Handler-Registrierung &middot; services.yaml</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(67, 56, 202, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0 0 14px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-12);">
+OxidEsales\Payments\Stripe\EventSystem\Handler\CaptureHandler:
+    arguments:
+        - '@OxidEsales\Payments\Stripe\Service\CaptureService'
+        - '@Psr\Log\LoggerInterface'
+    tags:
+        - { name: payment.event_handler,
+            event: StripeCaptureRequestEvent,
+            priority: 100 }
+</pre>
+
+            <div class="eyebrow" style="color: var(--s1-accent); margin-bottom: 10px;">Discovery zur Laufzeit</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(67, 56, 202, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-12);">
+$provider = $container-&gt;get(
+    EventListenerProvider::class
+);
+foreach ($provider-&gt;getListeners($evt) as $h) {
+    $h-&gt;handle($evt, $context);
+}
+</pre>
+          </div>
+        </div>
+
+        <div class="callout" style="margin-top: 14px;">
+          <strong>Handler-Priorit&auml;ten sind explizit.</strong> Reservierung l&auml;uft mit <code>priority: 1000</code>, Capture mit <code>100</code>,
+          Notifications mit <code>10</code>. <em>Reihenfolge ist Daten, kein Zufall.</em>
+          Ein Dritt-Handler bei <code>priority: 50</code> braucht keine weiteren &Auml;nderungen.
+        </div>
+
+        <div class="s-foot">
+          <div>OXID Stripe Wallet &middot; Event-System</div>
+          <div class="page-num">04 / 18</div>
+        </div>

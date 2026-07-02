@@ -1,0 +1,88 @@
+        <div class="s-head">
+          <div class="badge"><span class="dot"></span><span class="step-label">Features &middot; 3 von 7 &middot; Capture</span></div>
+          <div class="deck">Voll oder teilweise &middot; automatisch oder manuell</div>
+        </div>
+
+        <h2 class="h-2">Capture: voll, teilweise oder nie.<br/><em class="acc">Der Vertrag bildet die Realit&auml;t ab, nicht die Absicht.</em></h2>
+
+        <p class="lede" style="margin-bottom: 14px;">
+          Stripe autorisiert die Karte des Kunden w&auml;hrend des Checkouts; <em>Capture</em> verschiebt das Geld.
+          Im <strong>Automatik-Modus</strong> erfolgt das sofort. Im <strong>Manual-Modus</strong> bleibt der Vertrag
+          in <code>AUTHORIZED</code>, bis ein Admin bucht &mdash; teilweise, in voller H&ouml;he oder gar nicht.
+        </p>
+
+        <div class="cols cols-2" style="gap: 18px; flex: 1 1 0;">
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">CaptureService &middot; der Pfad</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 12px 14px; line-height: 1.45; margin: 0 0 16px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+public function capture(
+    PaymentContract $contract,
+    ?float $amount = null
+): CaptureResult {
+    $intent = $this-&gt;adapter-&gt;retrievePaymentIntent(
+        $contract-&gt;getProviderIntentId()
+    );
+
+    $captureAmount = $amount === null
+        ? $intent-&gt;amount
+        : (int) round($amount * 100);
+
+    $this-&gt;validator-&gt;assertCanCapture(
+        $intent, $captureAmount
+    );
+
+    $captured = $this-&gt;adapter-&gt;capturePaymentIntent(
+        $intent-&gt;id,
+        amount_to_capture: $captureAmount
+    );
+
+    $this-&gt;dispatcher-&gt;dispatch(
+        new PaymentCapturedEvent($contract, $captured)
+    );
+
+    return CaptureResult::fromIntent($captured);
+}
+</pre>
+
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Validator-Gates</div>
+            <ul class="small" style="margin: 0;">
+              <li>Intent muss <code>requires_capture</code> (manuell) oder <code>succeeded</code> (automatisch) sein</li>
+              <li>Capture-Betrag &le; <code>intent.amount_capturable</code></li>
+              <li>Capture-Betrag &gt; 0 (Stripe lehnt Null-Captures ab)</li>
+              <li>Vertrag muss Eigent&uuml;mer dieser <code>provider_intent_id</code> sein (keine Cross-Vertrags-Drift)</li>
+            </ul>
+          </div>
+
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Teil-Capture &mdash; die Nebenwirkungen</div>
+            <ul class="small" style="margin: 0 0 16px;">
+              <li><strong>Autorisierungsfreigabe.</strong> Stripe gibt den nicht gebuchten Rest dem Kunden zur&uuml;ck, sobald eine Teil-Buchung erfolgt.</li>
+              <li><strong>Vertragsfeld <code>captured_amount</code></strong> wird vom <code>PaymentCapturedHandler</code> aktualisiert &mdash; Quelle der Wahrheit f&uuml;r den Admin-Tab.</li>
+              <li><strong>OXPAID-Spalte</strong> wird auf der verkn&uuml;pften Bestellung gesetzt. Die Reconciliation heilt sp&auml;ter automatisch, falls sie auf <code>0000-00-00</code> stehen geblieben ist.</li>
+              <li><strong>Transaktionszeile</strong> wird in <code>oe_payments_transaction</code> eingef&uuml;gt: Typ <code>capture</code>, Intent-ID, Betrag, Admin-Benutzer-ID.</li>
+            </ul>
+
+            <div class="eyebrow" style="color: var(--s2-accent); margin-bottom: 10px;">Admin-UI</div>
+            <pre class="small" style="background: rgba(11, 20, 36, 0.06); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; padding: 10px 12px; line-height: 1.4; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--t-11);">
+[Stripe-Tab]
+
+Autorisiert:  &euro; 262,00
+Gebucht:      &euro;   0,00
+Erstattet:    &euro;   0,00
+
+  &lt;input name="amount" placeholder="262,00"&gt;
+  &lt;button name="capture"&gt;Buchen&lt;/button&gt;
+  &lt;button name="cancel"&gt;Autorisierung stornieren&lt;/button&gt;
+</pre>
+          </div>
+        </div>
+
+        <div class="callout" style="margin-top: 14px;">
+          <strong>Leeres Betragsfeld = vollst&auml;ndig buchen.</strong> Wer das einfache Verhalten will, tippt nichts ein.
+          Ein versehentliches Teil-Capture ist nicht still m&ouml;glich &mdash; die Warnung &bdquo;der nicht gebuchte Rest wird freigegeben&ldquo; erscheint vor dem Absenden.
+        </div>
+
+        <div class="s-foot">
+          <div>OXID Stripe Wallet &middot; Capture-Ablauf</div>
+          <div class="page-num">08 / 18</div>
+        </div>

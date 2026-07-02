@@ -1,0 +1,14 @@
+{
+  "production": [
+    "build:production"
+  ],
+  "development": [
+    "build:development"
+  ],
+  "watch": [
+    "watch:development"
+  ],
+  "default": [
+    "production"
+  ]
+}

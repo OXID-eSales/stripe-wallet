@@ -1,0 +1,14 @@
+.idea
+.DS_Store
+
+vendor/
+
+.php_cs.cache
+tests/.phpunit.result.cache
+tests/.phpunit.cache
+/source/
+node_modules
+/out/js/controllers/
+/tests/e2e/playwright/
+/load_reports/
+/stripe-dev-logs/

@@ -1,0 +1,77 @@
+        <div class="s-head">
+          <div class="badge"><span class="dot"></span><span class="step-label">Architektur &middot; die Vertrags-Zustandsmaschine</span></div>
+          <div class="deck">&bdquo;Bestellen&ldquo; erzeugt einen Vertrag, nicht direkt eine Bestellung</div>
+        </div>
+
+        <h2 class="h-2">Der Smart-Contract-Lebenszyklus.<br/><em class="acc">Acht Zust&auml;nde. Drei Endzust&auml;nde. Keine Unklarheiten.</em></h2>
+
+        <p class="lede" style="margin-bottom: 14px;">
+          Klassischer Checkout: <em>Bestellen-Klick &rarr; Bestellung anlegen &rarr; bezahlen &rarr; Bestellung aktualisieren.</em>
+          Smart-Contract: <em>Bestellen-Klick &rarr; Vertrag <code>DRAFT</code> &rarr; Bestellung <code>NOT_FINISHED</code>
+          &rarr; Stripe-Session &rarr; Kunde zahlt &rarr; Vertrag wandert weiter &rarr; Bestellung wird finalisiert.</em>
+          Die Bestellnummer existiert <strong>vor</strong> dem Stripe-Redirect &mdash; R&uuml;ckerstattungen und Audits laufen nie ins Leere.
+        </p>
+
+        <div class="cols split-7-5" style="gap: 18px; flex: 1 1 0;">
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s1-accent); margin-bottom: 10px;">Zustands&uuml;berg&auml;nge</div>
+            <div class="diagram-host" style="min-height: 360px;">
+              <div class="mermaid">
+flowchart LR
+    DRAFT --> NOT_FINISHED
+    NOT_FINISHED --> PENDING
+    PENDING -->|automatisches Capture| READY_TO_COMMIT
+    PENDING -->|manuelles Capture| AUTHORIZED
+    AUTHORIZED -->|Admin bucht| READY_TO_COMMIT
+    READY_TO_COMMIT --> COMMITTED
+    COMMITTED --> FULFILLED
+    PENDING -.->|Kunde bricht ab| EXPIRED
+    PENDING -.->|Zahlung fehlgeschlagen| FAILED
+    AUTHORIZED -.->|Admin storniert| CANCELLED
+
+    style DRAFT fill:#e0e7ff,stroke:#4338ca,color:#0b1424
+    style NOT_FINISHED fill:#e0e7ff,stroke:#4338ca,color:#0b1424
+    style PENDING fill:#fef3c7,stroke:#b45309,color:#0b1424
+    style AUTHORIZED fill:#fef3c7,stroke:#b45309,color:#0b1424
+    style READY_TO_COMMIT fill:#dcfce7,stroke:#047857,color:#0b1424
+    style COMMITTED fill:#dcfce7,stroke:#047857,color:#0b1424
+    style FULFILLED fill:#dcfce7,stroke:#047857,color:#0b1424
+    style EXPIRED fill:#fee2e2,stroke:#b91c1c,color:#0b1424
+    style FAILED fill:#fee2e2,stroke:#b91c1c,color:#0b1424
+    style CANCELLED fill:#fee2e2,stroke:#b91c1c,color:#0b1424
+              </div>
+            </div>
+            <button type="button" class="zoom-trigger" data-stripe-zoom-open
+                    data-zoom-title="Smart-Contract lifecycle"
+                    data-zoom-title-de="Smart-Contract-Lebenszyklus">&#128269; Diagramm vergr&ouml;&szlig;ern</button>
+          </div>
+
+          <div class="col" style="justify-content: flex-start;">
+            <div class="eyebrow" style="color: var(--s1-accent); margin-bottom: 10px;">Bedingungen am Vertrag</div>
+            <ul class="small" style="margin: 0 0 16px;">
+              <li><code>payment_authorized</code> &mdash; wird gesetzt, sobald Stripe den PaymentIntent best&auml;tigt</li>
+              <li><code>stock_reserved</code> &mdash; der Reservierungs-Handler h&auml;ngt an <code>ContractCreatedEvent</code></li>
+              <li><code>fraud_check</code> &mdash; optionaler Hookpunkt f&uuml;r Drittsysteme</li>
+            </ul>
+
+            <div class="eyebrow" style="color: var(--s1-accent); margin-bottom: 10px;">Warum das f&uuml;r Stripe wichtig ist</div>
+            <ul class="small" style="margin: 0;">
+              <li><strong>Bestellnummer vor dem Redirect</strong> &mdash; wird an Stripe als <code>metadata.order_id</code> &uuml;bergeben</li>
+              <li><strong>BasketSnapshot</strong> unver&auml;nderlich als JSON in <code>OXBASKETDATA</code> gespeichert</li>
+              <li><strong>OXORDERID bleibt NULL</strong> bis zum Status <code>COMMITTED</code> &mdash; keine Waisen-Bestellungen</li>
+              <li>Recovery-Flows h&auml;ngen am <em>Vertrag</em>, nicht an der Bestellung &mdash; gleiches Vokabular f&uuml;r jeden PSP</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout" style="margin-top: 14px;">
+          <strong>Das Stripe-Modul mutiert nichts direkt.</strong> Es <em>dispatcht Events</em> &mdash;
+          <code>StripeCaptureRequestEvent</code>, <code>StripeRefundRequestEvent</code> &mdash; und Payment-Base-Handler
+          schalten den Vertragszustand weiter. Ein Pre-Commit-Grep-Guard l&auml;sst den Build scheitern, sobald ein Stripe-Controller
+          direkt <code>$contract-&gt;transitionTo()</code> aufruft.
+        </div>
+
+        <div class="s-foot">
+          <div>OXID Stripe Wallet &middot; Smart-Contract-Lebenszyklus</div>
+          <div class="page-num">03 / 18</div>
+        </div>

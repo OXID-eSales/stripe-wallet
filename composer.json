@@ -1,0 +1,84 @@
+{
+  "name": "oxid-esales/stripe-wallet",
+  "description": "Stripe Payment Module for Oxid 7",
+  "type": "oxideshop-module",
+  "keywords": [
+    "oxid",
+    "modules",
+    "eShop"
+  ],
+  "homepage": "https://www.oxid-esales.com",
+  "license": [
+    "proprietary"
+  ],
+  "conflict": {
+    "oxid-esales/oxideshop-ce": "<7.4"
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "require": {
+    "php": "^8.2",
+    "oxid-esales/payment-base": "^v1.0",
+    "stripe/stripe-php": "^19.3",
+    "doctrine/dbal": "^2.13"
+  },
+  "require-dev": {
+    "symfony/filesystem": "^6.4",
+    "phpstan/phpstan": "^2.0.2",
+    "squizlabs/php_codesniffer": "^3.10",
+    "phpmd/phpmd": "^2.15",
+    "oxid-esales/oxideshop-ce": "dev-b-7.4.x",
+    "phpunit/phpunit": "^11.4",
+    "mikey179/vfsstream": "~1.6.8",
+    "oxid-esales/developer-tools": "dev-b-7.4.x",
+    "infection/infection": "^0.31.9"
+  },
+  "autoload": {
+    "psr-4": {
+      "OxidEsales\\Payments\\Stripe\\": "./src/Stripe",
+      "OxidEsales\\Payments\\Stripe\\Tests\\": "./tests"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "OxidEsales\\EshopCommunity\\Tests\\": "./vendor/oxid-esales/oxideshop-ce/tests"
+    }
+  },
+  "scripts": {
+    "phpmd": "./.github/scripts/codestyle_check.sh phpmd",
+    "phpmd-commit": "./.github/scripts/codestyle_check.sh phpmd commit",
+    "phpmd-generate-baseline": "phpmd src ansi tests/PhpMd/standard.xml --generate-baseline",
+    "phpmd-report": "phpmd src json tests/PhpMd/standard.xml --reportfile tests/reports/phpmd.report.json --baseline tests/PhpMd/phpmd.baseline.xml",
+    "phpstan": "./.github/scripts/codestyle_check.sh phpstan",
+    "phpstan-commit": "./.github/scripts/codestyle_check.sh phpstan commit",
+    "phpstan-generate-baseline": "phpstan -ctests/PhpStan/phpstan.neon --level=max analyse src/ --generate-baseline tests/PhpStan/phpstan-baseline.neon",
+    "phpstan-report": "phpstan -ctests/PhpStan/phpstan.neon --level=max analyse src/ --error-format=json > tests/reports/phpstan.report.json",
+    "phpcs": "./.github/scripts/codestyle_check.sh phpcs",
+    "phpcs-commit": "./.github/scripts/codestyle_check.sh phpcs commit",
+    "style": "./.github/scripts/codestyle_check.sh all",
+    "style-commit":  "./.github/scripts/codestyle_check.sh all commit || exit 1",
+    "phpcbf": "phpcbf --standard=tests/phpcs.xml",
+    "static": [
+      "@phpcs",
+      "@phpstan",
+      "@phpmd"
+    ],
+    "phpunit": "XDEBUG_MODE=coverage vendor/bin/phpunit -c tests/phpunit.xml",
+
+    "generate-reports": [
+      "@phpstan-report",
+      "@phpmd-report"
+    ],
+    "generate-baselines": [
+      "@phpstan-generate-baseline",
+      "@phpmd-generate-baseline"
+    ]
+  },
+  "config": {
+    "allow-plugins": {
+      "oxid-esales/oxideshop-composer-plugin": true,
+      "oxid-esales/oxideshop-unified-namespace-generator": true,
+      "infection/extension-installer": true
+    }
+  }
+}

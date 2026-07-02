@@ -1,0 +1,208 @@
+<?php
+
+/**
+ * Copyright © OXID eSales AG. All rights reserved.
+ * See LICENSE file for license details.
+ */
+
+declare(strict_types=1);
+
+namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Command;
+
+use OxidEsales\Payments\Stripe\Command\ReconcileOxpaidCommand;
+use OxidEsales\Payments\Stripe\Service\OxpaidReconciliationServiceInterface;
+use OxidEsales\Payments\Stripe\Service\Result\ReconciliationResult;
+use PHPUnit\Framework\TestCase;
+use Symfony\Component\Console\Application;
+use Symfony\Component\Console\Tester\CommandTester;
+
+/**
+ * Unit tests for ReconcileOxpaidCommand
+ */
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Command\ReconcileOxpaidCommand::class)]
+#[\PHPUnit\Framework\Attributes\Group('sprint-10')]
+#[\PHPUnit\Framework\Attributes\Group('reconciliation')]
+#[\PHPUnit\Framework\Attributes\Group('command')]
+class ReconcileOxpaidCommandTest extends TestCase
+{
+    private OxpaidReconciliationServiceInterface $service;
+    private ReconcileOxpaidCommand $command;
+    private CommandTester $tester;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->service = $this->createMock(OxpaidReconciliationServiceInterface::class);
+        $this->command = new ReconcileOxpaidCommand($this->service);
+
+        $application = new Application();
+        $application->add($this->command);
+
+        $this->tester = new CommandTester($this->command);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function commandHasCorrectName(): void
+    {
+        $this->assertEquals('stripe:reconcile-oxpaid', $this->command->getName());
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function commandHasDescription(): void
+    {
+        $this->assertNotEmpty($this->command->getDescription());
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function commandHasDryRunOption(): void
+    {
+        $definition = $this->command->getDefinition();
+        $this->assertTrue($definition->hasOption('dry-run'));
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function commandHasMaxAgeOption(): void
+    {
+        $definition = $this->command->getDefinition();
+        $this->assertTrue($definition->hasOption('max-age'));
+        $this->assertEquals('7', $definition->getOption('max-age')->getDefault());
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function executeWithNoUnpaidOrders(): void
+    {
+        $this->service
+            ->method('findUnpaidOrders')
+            ->willReturn([]);
+
+        $exitCode = $this->tester->execute([]);
+
+        $this->assertEquals(0, $exitCode);
+        $this->assertStringContainsString('No unpaid orders', $this->tester->getDisplay());
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function executeWithDryRun(): void
+    {
+        $this->service
+            ->method('findUnpaidOrders')
+            ->with(7)
+            ->willReturn([
+                ['OXID' => 'order1', 'OXTRANSID' => 'pi_123', 'OXORDERNR' => 1, 'OXORDERDATE' => '2025-12-05'],
+            ]);
+
+        $this->service
+            ->method('reconcileAll')
+            ->with(7, true)
+            ->willReturn([
+                new ReconciliationResult('order1', 'pi_123', true, 'dry_run', 'Would check order')
+            ]);
+
+        $exitCode = $this->tester->execute(['--dry-run' => true]);
+
+        $this->assertEquals(0, $exitCode);
+        $this->assertStringContainsString('DRY RUN MODE', $this->tester->getDisplay());
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function executeWithCustomMaxAge(): void
+    {
+        $this->service
+            ->method('findUnpaidOrders')
+            ->with(14)
+            ->willReturn([]);
+
+        $exitCode = $this->tester->execute(['--max-age' => '14']);
+
+        $this->assertEquals(0, $exitCode);
+        $this->assertStringContainsString('last 14 days', $this->tester->getDisplay());
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function executeWithSuccessfulReconciliation(): void
+    {
+        $this->service
+            ->method('findUnpaidOrders')
+            ->willReturn([
+                ['OXID' => 'order1', 'OXTRANSID' => 'pi_123', 'OXORDERNR' => 1, 'OXORDERDATE' => '2025-12-05'],
+                ['OXID' => 'order2', 'OXTRANSID' => 'pi_456', 'OXORDERNR' => 2, 'OXORDERDATE' => '2025-12-04'],
+            ]);
+
+        $this->service
+            ->method('reconcileAll')
+            ->willReturn([
+                new ReconciliationResult('order1', 'pi_123', true, 'updated', 'OXPAID updated'),
+                new ReconciliationResult('order2', 'pi_456', true, 'updated', 'OXPAID updated'),
+            ]);
+
+        $exitCode = $this->tester->execute([]);
+
+        $this->assertEquals(0, $exitCode);
+        $this->assertStringContainsString('Successfully reconciled 2 order(s)', $this->tester->getDisplay());
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function executeWithErrors(): void
+    {
+        $this->service
+            ->method('findUnpaidOrders')
+            ->willReturn([
+                ['OXID' => 'order1', 'OXTRANSID' => 'pi_123', 'OXORDERNR' => 1, 'OXORDERDATE' => '2025-12-05'],
+            ]);
+
+        $this->service
+            ->method('reconcileAll')
+            ->willReturn([
+                new ReconciliationResult('order1', 'pi_123', false, 'error', 'API Error'),
+            ]);
+
+        $exitCode = $this->tester->execute([]);
+
+        $this->assertEquals(1, $exitCode); // FAILURE
+        $this->assertStringContainsString('error(s)', $this->tester->getDisplay());
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function executeShowsSkippedOrders(): void
+    {
+        $this->service
+            ->method('findUnpaidOrders')
+            ->willReturn([
+                ['OXID' => 'order1', 'OXTRANSID' => 'pi_123', 'OXORDERNR' => 1, 'OXORDERDATE' => '2025-12-05'],
+            ]);
+
+        $this->service
+            ->method('reconcileAll')
+            ->willReturn([
+                new ReconciliationResult('order1', 'pi_123', false, 'skipped', 'Payment not captured'),
+            ]);
+
+        $exitCode = $this->tester->execute([]);
+
+        $this->assertEquals(0, $exitCode);
+        $this->assertStringContainsString('Skipped: 1', $this->tester->getDisplay());
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function executeShowsContractUpdates(): void
+    {
+        $this->service
+            ->method('findUnpaidOrders')
+            ->willReturn([
+                ['OXID' => 'order1', 'OXTRANSID' => 'pi_123', 'OXORDERNR' => 1, 'OXORDERDATE' => '2025-12-05'],
+            ]);
+
+        $this->service
+            ->method('reconcileAll')
+            ->willReturn([
+                new ReconciliationResult('order1', 'pi_123', true, 'updated', 'OXPAID updated', true),
+            ]);
+
+        $exitCode = $this->tester->execute([]);
+
+        $this->assertEquals(0, $exitCode);
+        $output = $this->tester->getDisplay();
+        $this->assertStringContainsString('Yes', $output); // Contract column shows Yes
+    }
+}

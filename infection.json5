@@ -1,0 +1,26 @@
+{
+    "$schema": "https://raw.githubusercontent.com/infection/infection/0.27.0/resources/schema.json",
+    "source": {
+        "directories": [
+            "src/Stripe/EventSystem/Handler"
+        ]
+    },
+    "timeout": 30,
+    "logs": {
+        "text": "reports/infection.log",
+        "html": "reports/infection.html",
+        "summary": "reports/infection-summary.log"
+    },
+    "tmpDir": "var/cache/infection",
+    "phpUnit": {
+        "configDir": "tests",
+        "customPath": "../../vendor/bin/phpunit"
+    },
+    "mutators": {
+        "@default": true,
+        "CastInt": false,
+        "CastString": false
+    },
+    "testFramework": "phpunit",
+    "testFrameworkOptions": "--testsuite=Unit --filter=Handler"
+}
