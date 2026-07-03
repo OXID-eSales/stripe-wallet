@@ -12,3 +12,4 @@ node_modules
 /tests/e2e/playwright/
 /load_reports/
 /stripe-dev-logs/
+docs/dev_logs/
