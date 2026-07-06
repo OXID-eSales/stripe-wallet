@@ -25,9 +25,15 @@ use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
  */
 class EventFileLoggerFactory extends AbstractFileLoggerFactory
 {
-    public function __construct(ModuleConfigurationServiceInterface $config)
-    {
-        parent::__construct(static fn (): bool => $config->isEventLoggingEnabled());
+    public function __construct(
+        // Kept for DI resolvability + potential future gating restore;
+        // the parent::__construct(callable) call was removed here because
+        // AbstractFileLoggerFactory no longer defines a constructor after
+        // Sprint 27's Template-Method refactor. Keeping `parent::__construct`
+        // triggered `Error: Cannot call constructor` at DI validation.
+        // See docs/plans/datagen-rest sprint-10 impl notes 2026-07-06.
+        private readonly ModuleConfigurationServiceInterface $config,
+    ) {
     }
 
     protected function getLogFile(): string
