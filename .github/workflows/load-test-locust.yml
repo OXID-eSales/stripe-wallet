@@ -182,13 +182,13 @@ jobs:
 
       # Needed in BOTH modes — this is where the Locust files live (LOCUST_DIR).
       - name: Checkout current module
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           path: source/test-module
 
       - name: Checkout payment-base (private dependency)
         if: inputs.url == ''
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: OXID-eSales/payment-base
           ref: ${{ env.PAYMENT_BASE_BRANCH }}

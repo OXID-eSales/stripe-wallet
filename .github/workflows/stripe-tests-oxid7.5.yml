@@ -93,12 +93,12 @@ jobs:
           sleep 2
 
       - name: Checkout current module
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           path: source/test-module
 
       - name: Checkout payment-base (private dependency)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: OXID-eSales/payment-base
           ref: ${{ env.PAYMENT_BASE_BRANCH }}
@@ -258,7 +258,7 @@ jobs:
     runs-on: [arc-runner-set]
     steps:
       - name: Checkout current module
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           path: source/test-module
           fetch-depth: 0  # Fetch all commits for accurate diff
@@ -271,7 +271,7 @@ jobs:
           extensions: gd, zip
 
       - name: Checkout payment-base (private dependency)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: OXID-eSales/payment-base
           ref: ${{ env.PAYMENT_BASE_BRANCH }}
@@ -339,7 +339,7 @@ jobs:
           sleep 2
 
       - name: Checkout payment-base (private dependency)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: OXID-eSales/payment-base
           ref: ${{ env.PAYMENT_BASE_BRANCH }}
@@ -399,7 +399,7 @@ jobs:
           sleep 2
 
       - name: Checkout payment-base (private dependency)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: OXID-eSales/payment-base
           ref: ${{ env.PAYMENT_BASE_BRANCH }}
