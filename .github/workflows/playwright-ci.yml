@@ -92,7 +92,7 @@ jobs:
             submodule update --init --depth=1 -- tests/e2e/playwright
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 20
 
