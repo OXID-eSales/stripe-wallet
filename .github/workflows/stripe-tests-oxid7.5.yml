@@ -44,7 +44,7 @@ jobs:
         # sole writer of this key. Using actions/cache@v4 here would ALSO save in its post-step,
         # and two saves of the same key now race ("Unable to reserve … another job may be
         # creating this cache"), leaving the entry unrestorable for downstream jobs.
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             ./*
@@ -232,7 +232,7 @@ jobs:
           sleep 2
 
       - name: Save cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             ./*
@@ -320,7 +320,7 @@ jobs:
     runs-on: [arc-runner-set]
     steps:
       - name: Load current installation from cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             ./*
@@ -380,7 +380,7 @@ jobs:
     runs-on: [arc-runner-set]
     steps:
       - name: Load current installation from cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             ./*

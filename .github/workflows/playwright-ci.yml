@@ -98,14 +98,14 @@ jobs:
 
       - name: Cache node_modules
         id: cache-node
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.PLAYWRIGHT_PATH }}/node_modules
           key: playwright-node-${{ hashFiles(format('{0}/package-lock.json', env.PLAYWRIGHT_PATH)) }}
 
       - name: Cache Playwright browsers
         id: cache-pw
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-browsers-${{ hashFiles(format('{0}/package-lock.json', env.PLAYWRIGHT_PATH)) }}
