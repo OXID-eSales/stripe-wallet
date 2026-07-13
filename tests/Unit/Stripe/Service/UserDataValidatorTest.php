@@ -88,7 +88,7 @@ final class UserDataValidatorTest extends TestCase
             'fax'            => '',
         ], deliveryFields: null);
 
-        $failures = (new UserDataValidator($validationBase))->validateForUser($reader);
+        $failures = $this->createFactoryWithMock($validationBase)->validateForUser($reader);
 
         $this->assertSame([], $failures);
     }
@@ -110,7 +110,7 @@ final class UserDataValidatorTest extends TestCase
             deliveryFields: null,
         );
 
-        $failures = (new UserDataValidator($validationBase))->validateForUser($reader);
+        $failures = $this->createFactoryWithMock($validationBase)->validateForUser($reader);
 
         $this->assertCount(1, $failures);
         $this->assertSame('firstName', $failures[0]->field);
@@ -136,7 +136,7 @@ final class UserDataValidatorTest extends TestCase
             deliveryFields: null,
         );
 
-        $failures = (new UserDataValidator($validationBase))->validateForUser($reader);
+        $failures = $this->createFactoryWithMock($validationBase)->validateForUser($reader);
 
         $this->assertCount(1, $failures);
         $this->assertSame('street', $failures[0]->field);
@@ -164,7 +164,7 @@ final class UserDataValidatorTest extends TestCase
             deliveryFields: ['city' => 'München!'],
         );
 
-        $failures = (new UserDataValidator($validationBase))->validateForUser($reader);
+        $failures = $this->createFactoryWithMock($validationBase)->validateForUser($reader);
 
         $this->assertCount(1, $failures);
         $this->assertSame('delivery', $failures[0]->addressKind);
@@ -185,7 +185,7 @@ final class UserDataValidatorTest extends TestCase
             deliveryFields: null,
         );
 
-        $failures = (new UserDataValidator($validationBase))->validateForUser($reader);
+        $failures = $this->createFactoryWithMock($validationBase)->validateForUser($reader);
 
         $this->assertSame([], $failures);
     }
@@ -199,7 +199,7 @@ final class UserDataValidatorTest extends TestCase
         $validationBase = $this->createMock(ValidationBaseInterface::class);
         $validationBase->method('validateField')->willReturn(FieldValidationResult::valid());
 
-        $failures = (new UserDataValidator($validationBase))
+        $failures = $this->createFactoryWithMock($validationBase)
             ->validateFieldMap(['firstName' => 'Alice'], 'billing');
 
         $this->assertSame([], $failures);
@@ -210,7 +210,7 @@ final class UserDataValidatorTest extends TestCase
         $validationBase = $this->createMock(ValidationBaseInterface::class);
         $validationBase->method('validateField')->willReturn(FieldValidationResult::blocked(':'));
 
-        $failures = (new UserDataValidator($validationBase))
+        $failures = $this->createFactoryWithMock($validationBase)
             ->validateFieldMap(['firstName' => 'O:Connor'], 'billing');
 
         $this->assertCount(1, $failures);
@@ -242,7 +242,7 @@ final class UserDataValidatorTest extends TestCase
         );
 
         // "O'Connor" is valid per the Stripe firstName rule (allow UNICODE_LETTERS SPACES ' - .)
-        $failures = (new UserDataValidator($validationBase))->validateForUser($reader);
+        $failures = $this->createFactoryWithMock($validationBase)->validateForUser($reader);
 
         $this->assertSame([], $failures);
     }
@@ -265,7 +265,7 @@ final class UserDataValidatorTest extends TestCase
             deliveryFields: null,
         );
 
-        $failures = (new UserDataValidator($validationBase))->validateForUser($reader);
+        $failures = $this->createFactoryWithMock($validationBase)->validateForUser($reader);
 
         $this->assertCount(1, $failures);
         $this->assertSame(FieldValidationResult::CODE_BLOCKED_CHARACTER, $failures[0]->code);
@@ -382,7 +382,7 @@ final class UserDataValidatorTest extends TestCase
 
         $this->assertInstanceOf(
             UserDataValidatorInterface::class,
-            new UserDataValidator($validationBase)
+            $this->createFactoryWithMock($validationBase)
         );
     }
 
@@ -408,7 +408,7 @@ final class UserDataValidatorTest extends TestCase
         $loader = new FilesystemValidationRuleLoader($pathResolver);
 
         return new UserDataValidator(
-            new ValidationBase(StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, $loader)
+            new ValidationBaseFactory($loader)  // Creates real ValidationBase for Stripe
         );
     }
 
@@ -438,5 +438,16 @@ final class UserDataValidatorTest extends TestCase
         }
 
         return $reader;
+    }
+
+    /**
+     * Create a ValidationBaseFactory that returns a specific mock.
+     */
+    private function createFactoryWithMock(ValidationBaseInterface $mock): ValidationBaseFactory
+    {
+        $factory = $this->createMock(ValidationBaseFactory::class);
+        $factory->method('create')->willReturn($mock);
+
+        return $factory;
     }
 }
