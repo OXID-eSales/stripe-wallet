@@ -107,6 +107,7 @@ jobs:
 
       - name: Configure path repository for payment-base
         run: |
+          docker compose exec -T php composer config repositories.payment-base --unset 2>/dev/null || true
           docker compose exec -T php composer config repositories.payment-base \
             --json '{"type":"path","url":"./payment-base","options":{"symlink":true}}'
 
@@ -350,6 +351,9 @@ jobs:
         run: |
           docker compose exec -T php bash -c "cd /var/www/test-module && composer config repositories --unset"
           docker compose exec -T php bash -c "cd /var/www/test-module && composer config repositories.payment-base --json '{\"type\":\"path\",\"url\":\"/var/www/payment-base\",\"options\":{\"symlink\":true}}'"
+          docker compose exec -T php composer config repositories.payment-base --unset 2>/dev/null || true
+          docker compose exec -T php composer config repositories.payment-base \
+            --json '{"type":"path","url":"./payment-base","options":{"symlink":true}}'
 
       - name: Pin payment-base
         run: |
@@ -410,6 +414,7 @@ jobs:
         run: |
           docker compose exec -T php bash -c "cd /var/www/test-module && composer config repositories --unset"
           docker compose exec -T php bash -c "cd /var/www/test-module && composer config repositories.payment-base --json '{\"type\":\"path\",\"url\":\"/var/www/payment-base\",\"options\":{\"symlink\":true}}'"
+          docker compose exec -T php composer config repositories.payment-base --unset 2>/dev/null || true
           docker compose exec -T php composer config repositories.payment-base \
             --json '{"type":"path","url":"./payment-base","options":{"symlink":true}}'
 
