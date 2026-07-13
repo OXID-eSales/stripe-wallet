@@ -1313,15 +1313,9 @@ services:
 
   # ---- Sprint 119 Phase B: user-data character-level validation (STRP-129) ----
 
-  # ValidationBase bound for the Stripe plugin. The module id is a YAML literal
-  # because YAML cannot reference PHP constants; StripeDefinitions::STRIPE_WALLET_PAYMENT_ID
-  # resolves to the same value ('oe_payments_stripe_wallet').
-  OxidEsales\PaymentBase\Validation\ValidationBaseInterface:
-    class: OxidEsales\PaymentBase\Validation\ValidationBase
-    arguments:
-      $pluginModuleId: 'oe_payments_stripe_wallet'
-      $loader: '@OxidEsales\PaymentBase\Validation\ValidationRuleLoaderInterface'
-    public: false
+  # ValidationBase is created per-module via ValidationBaseFactory (defined in payment-base).
+  # Each provider gets an isolated instance with their specific module ID to avoid
+  # conflicts when multiple providers are active in the same shop.
 
   # UserDataValidator facade — stateless singleton; receives UserFieldReaderInterface
   # as a validateForUser() method argument so it can be DI-singleton while the
@@ -1329,7 +1323,7 @@ services:
   OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface:
     class: OxidEsales\Payments\Stripe\Service\UserDataValidator
     arguments:
-      - '@OxidEsales\PaymentBase\Validation\ValidationBaseInterface'
+      - '@OxidEsales\PaymentBase\Validation\ValidationBaseFactory'
     public: true
 
   # Sprint 119 Phase E (STRP-129) — narrow language-translation seam for testability.
