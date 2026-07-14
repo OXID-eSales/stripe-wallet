@@ -77,14 +77,24 @@ class OpcExternalReturnCleanupHandler implements HandlerInterface
         try {
             $this->cleanupService->cleanupPreviousAttempt($contractId);
         } catch (\Throwable $e) {
-            Registry::getLogger()->error('OPC-96: RetryCleanupService failed', [
-                'error'      => $e->getMessage(),
-                'contractId' => $contractId,
-            ]);
+            $this->logCleanupFailure($e, $contractId);
             return;
         }
 
         $this->clearStripeSessionVariables();
+    }
+
+    /**
+     * Testability seam: log a swallowed cleanup failure. Kept as a seam (like
+     * the session seams below) so the handler's unit tests need no OXID
+     * bootstrap / DI container to exercise the best-effort catch branch.
+     */
+    protected function logCleanupFailure(\Throwable $e, string $contractId): void
+    {
+        Registry::getLogger()->error('OPC-96: RetryCleanupService failed', [
+            'error'      => $e->getMessage(),
+            'contractId' => $contractId,
+        ]);
     }
 
     /**

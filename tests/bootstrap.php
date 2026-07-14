@@ -41,20 +41,6 @@ if ($shopBootstrap === null) {
 // Load shop bootstrap (includes shop's autoloader and oxfunctions.php which defines oxNew())
 require_once $shopBootstrap;
 
-// The one-page-checkout integration is optional — Stripe declares no composer
-// dependency on it (the OpcExternalReturnCleanupHandler touches its event only
-// via ::class / instanceof, both safe when the class is absent). In the isolated
-// unit-test job that module is not installed, so provide a stub under the real
-// FQCN when the genuine class is unavailable, letting the handler's unit tests
-// instantiate the event and exercise its instanceof branch.
-if (
-    !class_exists(
-        \OxidEsales\OnePageCheckout\EventSystem\Event\OpcModalReopenedAfterExternalReturnEvent::class
-    )
-) {
-    require_once __DIR__ . '/Fixtures/OnePageCheckout/OpcModalReopenedAfterExternalReturnEvent.php';
-}
-
 // Register autoloader for test classes (autoload-dev may not be loaded in some contexts)
 $testDir = __DIR__;
 spl_autoload_register(static function (string $class) use ($testDir): void {

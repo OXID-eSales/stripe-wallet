@@ -39,6 +39,32 @@ use PHPUnit\Framework\TestCase;
 #[\PHPUnit\Framework\Attributes\CoversClass(OpcExternalReturnCleanupHandler::class)]
 class OpcExternalReturnCleanupHandlerTest extends TestCase
 {
+    /**
+     * The one-page-checkout integration is optional — Stripe declares no composer
+     * dependency on it (the handler references the event only via ::class /
+     * instanceof, both safe when the class is absent), so the isolated unit-test
+     * job has no OpcModalReopenedAfterExternalReturnEvent on the autoload path.
+     * When the genuine class is unavailable, load a stub under its real FQCN so
+     * these tests can instantiate the event and drive the handler's instanceof
+     * branch. Done here rather than in tests/bootstrap.php because the isolated
+     * job invokes phpunit with --bootstrap=<shop>/bootstrap.php, bypassing the
+     * module bootstrap entirely.
+     */
+    public static function setUpBeforeClass(): void
+    {
+        parent::setUpBeforeClass();
+
+        if (
+            !class_exists(
+                \OxidEsales\OnePageCheckout\EventSystem\Event\OpcModalReopenedAfterExternalReturnEvent::class
+            )
+        ) {
+            // __DIR__ = tests/Unit/Stripe/EventSystem/Handler → 4 levels up = tests/
+            require_once dirname(__DIR__, 4)
+                . '/Fixtures/OnePageCheckout/OpcModalReopenedAfterExternalReturnEvent.php';
+        }
+    }
+
     public function testHandlerImplementsHandlerInterface(): void
     {
         $handler = $this->makeHandler(cleanupService: $this->makeCleanupSpy());
@@ -168,6 +194,11 @@ class OpcExternalReturnCleanupHandlerTest extends TestCase
             protected function clearStripeSessionVariables(): void
             {
                 $this->cleared++;
+            }
+            protected function logCleanupFailure(\Throwable $e, string $contractId): void
+            {
+                // no-op seam override: keep the swallow test free of the OXID
+                // Registry / DI container.
             }
             public function clearedSessionCallCount(): int
             {
