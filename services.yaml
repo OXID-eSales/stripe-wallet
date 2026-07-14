@@ -404,6 +404,17 @@ services:
     tags:
       - { name: payment.event_handler }
 
+  # OPC-96: release Stripe reservations (voucher un-mark, NOT_FINISHED order
+  # storno, contract cancel) when the OPC modal is re-opened after an
+  # external-payment round-trip. Subscribes to the OPC-owned event
+  # OpcModalReopenedAfterExternalReturnEvent — the OPC module never
+  # references Stripe.
+  OxidEsales\Payments\Stripe\EventSystem\Handler\OpcExternalReturnCleanupHandler:
+    arguments:
+      $cleanupService: '@OxidEsales\Payments\Stripe\Service\RetryCleanupService'
+    tags:
+      - { name: payment.event_handler }
+
   # ==========================================
   # Stripe Customer Service (Sprint 45)
   # ==========================================
