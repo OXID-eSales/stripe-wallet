@@ -25,13 +25,9 @@ use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
  */
 class ReconciliationFileLoggerFactory extends AbstractFileLoggerFactory
 {
-    public function __construct(
-        // Kept for DI resolvability; parent::__construct(callable) removed
-        // because AbstractFileLoggerFactory no longer defines a constructor
-        // after Sprint 27's Template-Method refactor. See EventFileLoggerFactory
-        // for the equivalent fix + rationale.
-        private readonly ModuleConfigurationServiceInterface $config,
-    ) {
+    public function __construct(ModuleConfigurationServiceInterface $config)
+    {
+        parent::__construct(static fn (): bool => $config->isReconciliationLoggingEnabled());
     }
 
     protected function getLogFile(): string

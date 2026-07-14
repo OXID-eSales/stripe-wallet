@@ -8,6 +8,7 @@ use OxidEsales\PaymentBase\Validation\FieldValidationResult;
 use OxidEsales\PaymentBase\Validation\FilesystemValidationRuleLoader;
 use OxidEsales\PaymentBase\Validation\PluginPathResolverInterface;
 use OxidEsales\PaymentBase\Validation\ValidationBase;
+use OxidEsales\PaymentBase\Validation\ValidationBaseFactory;
 use OxidEsales\PaymentBase\Validation\ValidationBaseInterface;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\FieldValidationFailure;
@@ -88,7 +89,7 @@ final class UserDataValidatorTest extends TestCase
             'fax'            => '',
         ], deliveryFields: null);
 
-        $failures = $this->createFactoryWithMock($validationBase)->validateForUser($reader);
+        $failures = $this->createValidatorWithMockBase($validationBase)->validateForUser($reader);
 
         $this->assertSame([], $failures);
     }
@@ -110,7 +111,7 @@ final class UserDataValidatorTest extends TestCase
             deliveryFields: null,
         );
 
-        $failures = $this->createFactoryWithMock($validationBase)->validateForUser($reader);
+        $failures = $this->createValidatorWithMockBase($validationBase)->validateForUser($reader);
 
         $this->assertCount(1, $failures);
         $this->assertSame('firstName', $failures[0]->field);
@@ -136,7 +137,7 @@ final class UserDataValidatorTest extends TestCase
             deliveryFields: null,
         );
 
-        $failures = $this->createFactoryWithMock($validationBase)->validateForUser($reader);
+        $failures = $this->createValidatorWithMockBase($validationBase)->validateForUser($reader);
 
         $this->assertCount(1, $failures);
         $this->assertSame('street', $failures[0]->field);
@@ -164,7 +165,7 @@ final class UserDataValidatorTest extends TestCase
             deliveryFields: ['city' => 'München!'],
         );
 
-        $failures = $this->createFactoryWithMock($validationBase)->validateForUser($reader);
+        $failures = $this->createValidatorWithMockBase($validationBase)->validateForUser($reader);
 
         $this->assertCount(1, $failures);
         $this->assertSame('delivery', $failures[0]->addressKind);
@@ -185,7 +186,7 @@ final class UserDataValidatorTest extends TestCase
             deliveryFields: null,
         );
 
-        $failures = $this->createFactoryWithMock($validationBase)->validateForUser($reader);
+        $failures = $this->createValidatorWithMockBase($validationBase)->validateForUser($reader);
 
         $this->assertSame([], $failures);
     }
@@ -199,7 +200,7 @@ final class UserDataValidatorTest extends TestCase
         $validationBase = $this->createMock(ValidationBaseInterface::class);
         $validationBase->method('validateField')->willReturn(FieldValidationResult::valid());
 
-        $failures = $this->createFactoryWithMock($validationBase)
+        $failures = $this->createValidatorWithMockBase($validationBase)
             ->validateFieldMap(['firstName' => 'Alice'], 'billing');
 
         $this->assertSame([], $failures);
@@ -210,7 +211,7 @@ final class UserDataValidatorTest extends TestCase
         $validationBase = $this->createMock(ValidationBaseInterface::class);
         $validationBase->method('validateField')->willReturn(FieldValidationResult::blocked(':'));
 
-        $failures = $this->createFactoryWithMock($validationBase)
+        $failures = $this->createValidatorWithMockBase($validationBase)
             ->validateFieldMap(['firstName' => 'O:Connor'], 'billing');
 
         $this->assertCount(1, $failures);
@@ -242,7 +243,7 @@ final class UserDataValidatorTest extends TestCase
         );
 
         // "O'Connor" is valid per the Stripe firstName rule (allow UNICODE_LETTERS SPACES ' - .)
-        $failures = $this->createFactoryWithMock($validationBase)->validateForUser($reader);
+        $failures = $this->createValidatorWithMockBase($validationBase)->validateForUser($reader);
 
         $this->assertSame([], $failures);
     }
@@ -265,7 +266,7 @@ final class UserDataValidatorTest extends TestCase
             deliveryFields: null,
         );
 
-        $failures = $this->createFactoryWithMock($validationBase)->validateForUser($reader);
+        $failures = $this->createValidatorWithMockBase($validationBase)->validateForUser($reader);
 
         $this->assertCount(1, $failures);
         $this->assertSame(FieldValidationResult::CODE_BLOCKED_CHARACTER, $failures[0]->code);
@@ -382,7 +383,7 @@ final class UserDataValidatorTest extends TestCase
 
         $this->assertInstanceOf(
             UserDataValidatorInterface::class,
-            $this->createFactoryWithMock($validationBase)
+            $this->createValidatorWithMockBase($validationBase)
         );
     }
 
@@ -441,13 +442,15 @@ final class UserDataValidatorTest extends TestCase
     }
 
     /**
-     * Create a ValidationBaseFactory that returns a specific mock.
+     * Build a UserDataValidator whose ValidationBaseFactory yields the given
+     * ValidationBase mock — the seam that lets each test drive validateField()
+     * outcomes without touching the filesystem rule loader.
      */
-    private function createFactoryWithMock(ValidationBaseInterface $mock): ValidationBaseFactory
+    private function createValidatorWithMockBase(ValidationBaseInterface $mock): UserDataValidator
     {
         $factory = $this->createMock(ValidationBaseFactory::class);
         $factory->method('create')->willReturn($mock);
 
-        return $factory;
+        return new UserDataValidator($factory);
     }
 }
