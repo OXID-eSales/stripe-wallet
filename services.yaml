@@ -83,6 +83,9 @@ services:
   # ===========================================
 
   OxidEsales\Payments\Stripe\PaymentHandler\StripePaymentHandler:
+    arguments:
+      # Concrete Stripe token service (see ContractTokenService note) — not the shared interface.
+      $tokenService: '@OxidEsales\Payments\Stripe\Service\ContractTokenService'
     tags:
       - { name: oe.payment.handler }
     public: true
@@ -338,13 +341,16 @@ services:
 
   # Token Service Interface - Bind to implementation
   # Derives secret from ModuleConfigurationService (no extra env var needed)
-  OxidEsales\PaymentBase\Service\TokenServiceInterface:
-    class: OxidEsales\Payments\Stripe\Service\ContractTokenService
-    public: true
-
-  # Stripe Contract Token Service
+  # Return-URL HMAC token service (secret derived from the Stripe API key). Bound as a CONCRETE
+  # service and injected directly into Stripe's own consumers — NEVER via the shared PaymentBase
+  # TokenServiceInterface. That interface is single-valued in the merged DI container, so when
+  # another PSP module (Mollie/PayPal) is active it resolves to that provider's token service
+  # (wrong API-key HMAC). The interface alias below is kept only for a Stripe-only shop / generic
+  # lookups; Stripe's own code always references the concrete class.
   OxidEsales\Payments\Stripe\Service\ContractTokenService:
-    alias: OxidEsales\PaymentBase\Service\TokenServiceInterface
+    public: true
+  OxidEsales\PaymentBase\Service\TokenServiceInterface:
+    alias: OxidEsales\Payments\Stripe\Service\ContractTokenService
     public: true
 
   # ==========================================
@@ -477,7 +483,7 @@ services:
     arguments:
       $checkoutSessionService: '@OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
-      $tokenService: '@OxidEsales\PaymentBase\Service\TokenServiceInterface'
+      $tokenService: '@OxidEsales\Payments\Stripe\Service\ContractTokenService'
       $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
       $customerService: '@OxidEsales\Payments\Stripe\Service\StripeCustomerServiceInterface'
       $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
@@ -509,7 +515,7 @@ services:
     class: OxidEsales\Payments\Stripe\Service\CheckoutReturnService
     arguments:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
-      $tokenService: '@OxidEsales\PaymentBase\Service\TokenServiceInterface'
+      $tokenService: '@OxidEsales\Payments\Stripe\Service\ContractTokenService'
       $logger: '@oxid_esales.monolog.logger'
     public: false
 
