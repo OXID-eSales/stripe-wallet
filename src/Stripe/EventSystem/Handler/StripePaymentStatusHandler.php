@@ -11,6 +11,7 @@ use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use OxidEsales\PaymentBase\EventSystem\Event\Payment\PaymentAuthorizedEvent;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\FileLoggerInterface;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
 use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
@@ -55,6 +56,10 @@ class StripePaymentStatusHandler implements HandlerInterface
 
         $context = $event->getContext();
         $paymentIntentId = $event->getPaymentIntentId();
+
+        // Declare the provider identity for downstream agnostic handlers
+        // (e.g. PaymentAuthorizedEventHandler) so they never have to guess it.
+        $context->set('providerName', StripeDefinitions::PROVIDER);
 
         $this->logEvent('StripePaymentStatusHandler: Processing', [
             'paymentIntentId' => $paymentIntentId,

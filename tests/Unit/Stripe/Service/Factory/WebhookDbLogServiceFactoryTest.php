@@ -71,7 +71,7 @@ final class WebhookDbLogServiceFactoryTest extends TestCase
         $factory = new WebhookDbLogServiceFactory($this->repository, $this->logger, $this->config);
         $service = $factory->create();
 
-        $service->logEventReceived('evt_on', 'payment_intent.succeeded', ['key' => 'val']);
+        $service->logEventReceived('evt_on', 'payment_intent.succeeded', ['key' => 'val'], 'stripe');
 
         $this->assertNotNull($savedLog);
         $this->assertSame(['key' => 'val'], $savedLog->getPayload());
@@ -90,7 +90,7 @@ final class WebhookDbLogServiceFactoryTest extends TestCase
         $factory = new WebhookDbLogServiceFactory($this->repository, $this->logger, $this->config);
         $service = $factory->create();
 
-        $service->logEventReceived('evt_psr3_on', 'payment_intent.succeeded', []);
+        $service->logEventReceived('evt_psr3_on', 'payment_intent.succeeded', [], 'stripe');
     }
 
     public function testWithLoggingDisabledRowIsStillSaved(): void
@@ -106,7 +106,7 @@ final class WebhookDbLogServiceFactoryTest extends TestCase
         $factory = new WebhookDbLogServiceFactory($this->repository, $this->logger, $this->config);
         $service = $factory->create();
 
-        $service->logEventReceived('evt_off', 'payment_intent.succeeded', ['secret' => 'data']);
+        $service->logEventReceived('evt_off', 'payment_intent.succeeded', ['secret' => 'data'], 'stripe');
     }
 
     public function testWithLoggingDisabledPayloadIsOmitted(): void
@@ -124,7 +124,7 @@ final class WebhookDbLogServiceFactoryTest extends TestCase
         $factory = new WebhookDbLogServiceFactory($this->repository, $this->logger, $this->config);
         $service = $factory->create();
 
-        $service->logEventReceived('evt_nopayload', 'checkout.session.completed', ['amount' => 500]);
+        $service->logEventReceived('evt_nopayload', 'checkout.session.completed', ['amount' => 500], 'stripe');
 
         $this->assertNotNull($savedLog);
         $this->assertNull($savedLog->getPayload(), 'OXPAYLOAD must be null when webhook logging is disabled');
@@ -142,7 +142,7 @@ final class WebhookDbLogServiceFactoryTest extends TestCase
         $factory = new WebhookDbLogServiceFactory($this->repository, $this->logger, $this->config);
         $service = $factory->create();
 
-        $service->logEventReceived('evt_silent', 'payment_intent.succeeded', []);
+        $service->logEventReceived('evt_silent', 'payment_intent.succeeded', [], 'stripe');
     }
 
     public function testConfigIsConsultedAtCallTimeNotConstructTime(): void
@@ -170,8 +170,8 @@ final class WebhookDbLogServiceFactoryTest extends TestCase
         $factory = new WebhookDbLogServiceFactory($this->repository, $this->logger, $this->config);
         $service = $factory->create();
 
-        $service->logEventReceived('evt_first', 'payment_intent.succeeded', ['a' => 1]);
-        $service->logEventReceived('evt_second', 'payment_intent.succeeded', ['b' => 2]);
+        $service->logEventReceived('evt_first', 'payment_intent.succeeded', ['a' => 1], 'stripe');
+        $service->logEventReceived('evt_second', 'payment_intent.succeeded', ['b' => 2], 'stripe');
 
         $this->assertSame(['a' => 1], $savedLogs[0]->getPayload(), 'First call: logging ON, payload set');
         $this->assertNull($savedLogs[1]->getPayload(), 'Second call: logging OFF, payload null');

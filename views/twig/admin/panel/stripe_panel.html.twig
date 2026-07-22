@@ -17,6 +17,10 @@
    ============================================================================ #}
 
 <style>
+    /* Stripe brand color for the shared .pc-btn-primary (base tab holds only a
+       neutral fallback; each provider owns its brand via --pc-brand). */
+    .pc-admin[data-provider="stripe"] { --pc-brand: #635bff; }
+
     /* Reset OXID admin styles within our container */
     .stripe-admin,
     .stripe-admin * {
