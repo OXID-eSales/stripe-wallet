@@ -56,6 +56,7 @@ class StripeObjectMapper
         $metadata = $session->metadata !== null ? $session->metadata->toArray() : [];
 
         $url = $session->url ?? null;
+        $clientSecret = $session->client_secret ?? null;
 
         return new StripeCheckoutSessionDto(
             id: (string) ($session->id ?? ''),
@@ -66,6 +67,7 @@ class StripeObjectMapper
             amountTotal: (int) ($session->amount_total ?? 0),
             currency: (string) ($session->currency ?? 'eur'),
             url: $url !== null ? (string) $url : null,
+            clientSecret: $clientSecret !== null ? (string) $clientSecret : null,
         );
     }
 

@@ -29,7 +29,8 @@ readonly class CheckoutSessionResult
         private ?string $sessionId,
         private ?string $checkoutUrl,
         private ?string $errorMessage,
-        private ?string $errorCode
+        private ?string $errorCode,
+        private ?string $clientSecret = null
     ) {
     }
 
@@ -44,6 +45,23 @@ readonly class CheckoutSessionResult
             checkoutUrl: $checkoutUrl,
             errorMessage: null,
             errorCode: null
+        );
+    }
+
+    /**
+     * Create a successful embedded-checkout result (Stripe ui_mode=embedded).
+     *
+     * Carries the client secret the frontend mounts inline; no hosted URL.
+     */
+    public static function embedded(string $sessionId, string $clientSecret): self
+    {
+        return new self(
+            successful: true,
+            sessionId: $sessionId,
+            checkoutUrl: null,
+            errorMessage: null,
+            errorCode: null,
+            clientSecret: $clientSecret
         );
     }
 
@@ -84,5 +102,15 @@ readonly class CheckoutSessionResult
     public function getErrorCode(): ?string
     {
         return $this->errorCode;
+    }
+
+    public function getClientSecret(): ?string
+    {
+        return $this->clientSecret;
+    }
+
+    public function isEmbedded(): bool
+    {
+        return $this->clientSecret !== null;
     }
 }

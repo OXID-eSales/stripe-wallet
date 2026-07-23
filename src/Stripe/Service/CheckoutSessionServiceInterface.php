@@ -52,7 +52,8 @@ interface CheckoutSessionServiceInterface
         string $captureMode = StripeDefinitions::CAPTURE_MODE_AUTOMATIC,
         ?string $orderId = null,
         ?string $orderNumber = null,
-        ?string $stripeCustomerId = null
+        ?string $stripeCustomerId = null,
+        bool $embedded = false
     ): CheckoutSessionResult;
 
     /**

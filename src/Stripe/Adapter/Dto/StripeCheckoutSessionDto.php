@@ -31,6 +31,7 @@ readonly class StripeCheckoutSessionDto
      * @param int                 $amountTotal          Total session amount in Stripe minor units
      * @param string              $currency             ISO-4217 currency code, lowercase
      * @param string|null         $url                  Stripe-hosted Checkout page URL; null for return-mode sessions
+     * @param string|null         $clientSecret         Embedded Checkout client secret (ui_mode=embedded); null for hosted sessions
      */
     public function __construct(
         public string $id,
@@ -41,6 +42,7 @@ readonly class StripeCheckoutSessionDto
         public int $amountTotal,
         public string $currency,
         public ?string $url = null,
+        public ?string $clientSecret = null,
     ) {
     }
 }

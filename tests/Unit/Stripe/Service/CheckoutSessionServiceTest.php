@@ -806,11 +806,119 @@ class CheckoutSessionServiceTest extends TestCase
         $this->assertEquals('Shipping', $lineItems[1]['price_data']['product_data']['name']);
     }
 
+    // --- IFRAME-02: Embedded Checkout Tests ---
+
+    public function testCheckoutSessionResultEmbeddedCreation(): void
+    {
+        $result = CheckoutSessionResult::embedded('cs_emb_1', 'cs_emb_1_secret_abc');
+
+        $this->assertTrue($result->isSuccessful());
+        $this->assertTrue($result->isEmbedded());
+        $this->assertSame('cs_emb_1', $result->getSessionId());
+        $this->assertSame('cs_emb_1_secret_abc', $result->getClientSecret());
+        $this->assertNull($result->getCheckoutUrl());
+    }
+
+    public function testRedirectResultIsNotEmbedded(): void
+    {
+        $result = CheckoutSessionResult::success('cs_1', 'https://checkout.stripe.com/pay/cs_1');
+
+        $this->assertFalse($result->isEmbedded());
+        $this->assertNull($result->getClientSecret());
+    }
+
+    public function testDefaultCreateSessionIsRedirectMode(): void
+    {
+        $basketSnapshot = $this->createBasketSnapshot();
+        $session = $this->buildSessionDto('cs_redir', 'https://checkout.stripe.com/pay/cs_redir');
+
+        $capturedParams = null;
+        $this->stripeAdapter
+            ->method('createCheckoutSession')
+            ->willReturnCallback(function ($params) use ($session, &$capturedParams) {
+                $capturedParams = $params;
+                return $session;
+            });
+
+        $result = $this->createService()->createSession(
+            'contract_redir',
+            $basketSnapshot,
+            'https://shop.example.com/return',
+            'https://shop.example.com/cancel'
+        );
+
+        $this->assertArrayHasKey('success_url', $capturedParams);
+        $this->assertArrayHasKey('cancel_url', $capturedParams);
+        $this->assertArrayNotHasKey('ui_mode', $capturedParams);
+        $this->assertArrayNotHasKey('return_url', $capturedParams);
+        $this->assertFalse($result->isEmbedded());
+    }
+
+    public function testEmbeddedCreateSessionUsesUiModeAndReturnUrl(): void
+    {
+        $basketSnapshot = $this->createBasketSnapshot();
+        $session = $this->buildSessionDto('cs_emb', null, 'cs_emb_secret_xyz');
+
+        $capturedParams = null;
+        $this->stripeAdapter
+            ->method('createCheckoutSession')
+            ->willReturnCallback(function ($params) use ($session, &$capturedParams) {
+                $capturedParams = $params;
+                return $session;
+            });
+
+        $this->createService()->createSession(
+            'contract_emb',
+            $basketSnapshot,
+            'https://shop.example.com/return',
+            'https://shop.example.com/cancel',
+            '1',
+            'automatic',
+            null,
+            null,
+            null,
+            true
+        );
+
+        $this->assertSame('embedded', $capturedParams['ui_mode']);
+        $this->assertSame('https://shop.example.com/return', $capturedParams['return_url']);
+        $this->assertArrayNotHasKey('success_url', $capturedParams);
+        $this->assertArrayNotHasKey('cancel_url', $capturedParams);
+    }
+
+    public function testEmbeddedCreateSessionReturnsClientSecret(): void
+    {
+        $basketSnapshot = $this->createBasketSnapshot();
+        $session = $this->buildSessionDto('cs_emb2', null, 'cs_emb2_secret_123');
+
+        $this->stripeAdapter
+            ->method('createCheckoutSession')
+            ->willReturn($session);
+
+        $result = $this->createService()->createSession(
+            'contract_emb2',
+            $basketSnapshot,
+            'https://shop.example.com/return',
+            'https://shop.example.com/cancel',
+            '1',
+            'automatic',
+            null,
+            null,
+            null,
+            true
+        );
+
+        $this->assertTrue($result->isSuccessful());
+        $this->assertTrue($result->isEmbedded());
+        $this->assertSame('cs_emb2', $result->getSessionId());
+        $this->assertSame('cs_emb2_secret_123', $result->getClientSecret());
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
-    private function buildSessionDto(string $id, string $url): StripeCheckoutSessionDto
+    private function buildSessionDto(string $id, ?string $url, ?string $clientSecret = null): StripeCheckoutSessionDto
     {
         return new StripeCheckoutSessionDto(
             id: $id,
@@ -821,6 +929,7 @@ class CheckoutSessionServiceTest extends TestCase
             amountTotal: 0,
             currency: 'eur',
             url: $url,
+            clientSecret: $clientSecret,
         );
     }
 

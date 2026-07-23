@@ -58,7 +58,8 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
         string $captureMode = StripeDefinitions::CAPTURE_MODE_AUTOMATIC,
         ?string $orderId = null,
         ?string $orderNumber = null,
-        ?string $stripeCustomerId = null
+        ?string $stripeCustomerId = null,
+        bool $embedded = false
     ): CheckoutSessionResult {
         try {
             $lineItems = $this->buildLineItems($basketSnapshot);
@@ -86,14 +87,22 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
             $params = [
                 'mode' => 'payment',
                 'line_items' => $lineItems,
-                'success_url' => $successUrl,
-                'cancel_url' => $cancelUrl,
                 'metadata' => $sessionMetadata,
                 'payment_intent_data' => [
                     'capture_method' => $captureMode,
                     'metadata' => $paymentIntentMetadata,
                 ],
             ];
+
+            // Stripe Embedded Checkout renders inline in an iframe (ui_mode=embedded).
+            // ui_mode/return_url and success_url/cancel_url are mutually exclusive.
+            if ($embedded) {
+                $params['ui_mode'] = 'embedded';
+                $params['return_url'] = $successUrl;
+            } else {
+                $params['success_url'] = $successUrl;
+                $params['cancel_url'] = $cancelUrl;
+            }
 
             // Sprint 45: Add customer for email prefill and saved cards
             if ($stripeCustomerId !== null) {
@@ -110,6 +119,10 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
                 'contract_id' => $contractId,
                 'order_number' => $orderNumber,
             ]);
+
+            if ($embedded) {
+                return CheckoutSessionResult::embedded($session->id, (string) $session->clientSecret);
+            }
 
             return CheckoutSessionResult::success($session->id, $session->url);
         } catch (PaymentAdapterException $e) {
