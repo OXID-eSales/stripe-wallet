@@ -24,11 +24,12 @@ import { createDebugLogger } from '../debug.js'
  * When true (level=debug in admin), console output is enabled at runtime.
  */
 export default class extends Controller {
-  static targets = ["status"]
+  static targets = ["status", "embedded"]
   static values = {
     url: String,
     paymentType: String,
     publishableKey: String,
+    renderMode: { type: String, default: "redirect" },
     stripeDebug: { type: Boolean, default: false }
   }
 
@@ -173,6 +174,13 @@ export default class extends Controller {
     this._debug('Checkout Session created:', data.id, 'URL:', data.url)
     this._debug('Debug info:', data._debug)
 
+    // IFRAME-02e: inline Embedded Checkout instead of redirect.
+    const clientSecret = data.client_secret || data.clientSecret
+    if (this.renderModeValue === 'iframe' && clientSecret) {
+      await this.mountEmbeddedCheckout(stripe, clientSecret)
+      return
+    }
+
     // Redirect to Stripe Checkout using direct URL (more reliable)
     if (data.url) {
       window.location.href = data.url
@@ -187,6 +195,30 @@ export default class extends Controller {
     if (error) {
       throw error
     }
+  }
+
+  /**
+   * IFRAME-02e: mount Stripe Embedded Checkout inline instead of redirecting.
+   * The order page already loads Stripe.js and passes the publishable key.
+   * @param {Stripe} stripe - the initialised Stripe instance
+   * @param {string} clientSecret - Embedded Checkout client secret
+   */
+  async mountEmbeddedCheckout(stripe, clientSecret) {
+    const mount = this.hasEmbeddedTarget
+      ? this.embeddedTarget
+      : document.getElementById('stripe-embedded-checkout')
+    if (!mount) {
+      throw new Error('Embedded checkout mount point not found')
+    }
+
+    this.setStatus(window.oStripe?.i18n?.CREATING_SESSION || '')
+    this._embeddedCheckout = await stripe.initEmbeddedCheckout({ clientSecret })
+    mount.style.display = 'block'
+    this._embeddedCheckout.mount(mount)
+
+    // Embedded Checkout renders its own Pay button; hide the order button.
+    this.element.style.display = 'none'
+    this._debug('Embedded Checkout mounted (iframe mode)')
   }
 
   /**

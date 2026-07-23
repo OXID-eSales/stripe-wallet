@@ -490,6 +490,7 @@ services:
       $customerService: '@OxidEsales\Payments\Stripe\Service\StripeCustomerServiceInterface'
       $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
       $eventLogger: '@stripe.events.file_logger'
+      $iframeSettings: '@OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface'
     tags:
       - { name: payment.event_handler, priority: 0 }
     public: false

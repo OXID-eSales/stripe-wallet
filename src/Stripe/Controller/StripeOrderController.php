@@ -309,9 +309,11 @@ class StripeOrderController extends StripeOrderController_parent
     private function emitSessionResponse(EventContext $context): void
     {
         echo json_encode([
-            'id'          => $context->get('checkoutSessionId'),
-            'url'         => $context->get('checkoutUrl'),
-            'contract_id' => $context->get('contractId'),
+            'id'            => $context->get('checkoutSessionId'),
+            'url'           => $context->get('checkoutUrl'),
+            'contract_id'   => $context->get('contractId'),
+            'client_secret' => $context->get('clientSecret'),
+            'render_mode'   => $context->get('renderMode'),
         ]);
     }
 

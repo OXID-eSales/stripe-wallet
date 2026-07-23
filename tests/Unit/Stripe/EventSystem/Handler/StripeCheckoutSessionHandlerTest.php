@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Handler;
 
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
+use OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeCheckoutSessionHandler;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
@@ -66,16 +67,53 @@ class StripeCheckoutSessionHandlerTest extends TestCase
             });
     }
 
-    private function createHandler(): StripeCheckoutSessionHandler
+    private function createHandler(bool $iframeEnabled = false): StripeCheckoutSessionHandler
     {
+        $iframeSettings = $this->createMock(IframeCheckoutSettingsInterface::class);
+        $iframeSettings->method('isEnabled')->willReturn($iframeEnabled);
+
         return new StripeCheckoutSessionHandler(
             $this->checkoutSessionService,
             $this->contractRepository,
             $this->tokenService,
             $this->shopAdapter,
             $this->customerService,
-            $this->config
+            $this->config,
+            null,
+            $iframeSettings
         );
+    }
+
+    public function testEmbeddedModeSetsClientSecretAndIframeRenderMode(): void
+    {
+        $contract = $this->createContractMock('contract_emb');
+        $context = $this->createContextWithContract($contract);
+        $event = new StripeCheckoutSessionRequestEvent($context);
+
+        $this->checkoutSessionService
+            ->method('createSession')
+            ->willReturn(CheckoutSessionResult::embedded('cs_emb', 'cs_emb_secret'));
+
+        $this->createHandler(iframeEnabled: true)->handle($event);
+
+        $this->assertSame('iframe', $context->get('renderMode'));
+        $this->assertSame('cs_emb_secret', $context->get('clientSecret'));
+    }
+
+    public function testDefaultModeSetsRedirectRenderModeAndNoClientSecret(): void
+    {
+        $contract = $this->createContractMock('contract_redir');
+        $context = $this->createContextWithContract($contract);
+        $event = new StripeCheckoutSessionRequestEvent($context);
+
+        $this->checkoutSessionService
+            ->method('createSession')
+            ->willReturn(CheckoutSessionResult::success('cs_redir', 'https://checkout.stripe.com/pay/cs_redir'));
+
+        $this->createHandler()->handle($event);
+
+        $this->assertSame('redirect', $context->get('renderMode'));
+        $this->assertNull($context->get('clientSecret'));
     }
 
     public function testHandlerIgnoresNonStripeCheckoutSessionRequestEvent(): void

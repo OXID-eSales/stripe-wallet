@@ -184,6 +184,21 @@ class ViewConfig extends ViewConfig_parent
         return $config !== null ? $config->getPublishableKey() : '';
     }
 
+    /**
+     * True when the payment-base "Use iframe instead of checkout button" flag is on.
+     * Drives embedded (inline iframe) checkout on the standard order page.
+     */
+    public function isStripeIframeCheckout(): bool
+    {
+        try {
+            return $this->getServiceFromContainer(
+                \OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface::class
+            )->isEnabled();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     protected function getServerName(): string
     {
         $serverName = $_SERVER['SERVER_NAME'] ?? '';

@@ -100,6 +100,7 @@
                         data-order-submit-url-value="{{ createCheckoutSessionUrl | raw }}"
                         data-order-submit-payment-type-value="wallet"
                         data-order-submit-publishable-key-value="{{ oViewConf.getStripePublishableKey() | raw }}"
+                        data-order-submit-render-mode-value="{{ oViewConf.isStripeIframeCheckout() ? 'iframe' : 'redirect' }}"
                         data-order-submit-stripe-debug-value="{{ oViewConf.isStripeDebug() ? 'true' : 'false' }}"
                         data-order-submit-target="button"
                         data-agb-validation-target="submitButton"
@@ -110,6 +111,8 @@
                     {{ translate({ ident: "SUBMIT_ORDER" }) }}
                 </button>
                 <div data-order-submit-target="status" class="mt-2 text-center"></div>
+                {# IFRAME-02e: inline Stripe Embedded Checkout mount (used when render-mode=iframe) #}
+                <div id="stripe-embedded-checkout" data-order-submit-target="embedded" class="stripe-embedded-checkout mt-3" style="display: none; min-height: 300px;"></div>
             </div>
         {% endif %}
     {% endif %}

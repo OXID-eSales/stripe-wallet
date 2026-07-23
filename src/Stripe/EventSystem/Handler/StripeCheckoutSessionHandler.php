@@ -10,6 +10,7 @@ use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use OxidEsales\PaymentBase\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\FileLoggerInterface;
+use OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface;
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
@@ -43,7 +44,8 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         private readonly ShopAdapterInterface $shopAdapter,
         private readonly StripeCustomerServiceInterface $customerService,
         private readonly ModuleConfigurationServiceInterface $config,
-        private readonly ?FileLoggerInterface $eventLogger = null
+        private readonly ?FileLoggerInterface $eventLogger = null,
+        private readonly ?IframeCheckoutSettingsInterface $iframeSettings = null
     ) {
     }
 
@@ -85,6 +87,8 @@ class StripeCheckoutSessionHandler implements HandlerInterface
             'stripeCustomerId' => $stripeCustomerId,
         ]);
 
+        $embedded = $this->iframeSettings?->isEnabled() ?? false;
+
         $result = $this->checkoutSessionService->createSession(
             $params['contractId'],
             $contract->getBasketSnapshot(),
@@ -94,7 +98,8 @@ class StripeCheckoutSessionHandler implements HandlerInterface
             $params['captureMode'],
             $params['orderId'],
             $params['orderNumber'],
-            $stripeCustomerId
+            $stripeCustomerId,
+            $embedded
         );
 
         if (!$result->isSuccessful()) {
@@ -118,6 +123,8 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         // Update context for controller
         $context->set('checkoutSessionId', $result->getSessionId());
         $context->set('checkoutUrl', $result->getCheckoutUrl());
+        $context->set('clientSecret', $result->getClientSecret());
+        $context->set('renderMode', $embedded ? 'iframe' : 'redirect');
 
         $this->logEvent('StripeCheckoutSessionHandler::handle() END', [
             'checkoutSessionId' => $result->getSessionId(),
