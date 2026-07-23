@@ -50,6 +50,30 @@ export default class extends Controller {
 
     this._onPageShow = (e) => { if (e.persisted) this.hideLoading() }
     window.addEventListener('pageshow', this._onPageShow)
+
+    // IFRAME-02e: eager mode — replace the button with the embedded Stripe sheet
+    // on page load (creates the session + order immediately). Falls back to the
+    // button if session creation fails (e.g. AGB not accepted, validation error).
+    if (this.renderModeValue === 'iframe' && this.paymentTypeValue === 'wallet') {
+      this.element.style.display = 'none'
+      this.autoMountEmbedded()
+    }
+  }
+
+  /**
+   * IFRAME-02e eager mode: create the checkout session and mount the embedded
+   * sheet on load. Restores the button if nothing mounted (error / validation).
+   */
+  async autoMountEmbedded() {
+    try {
+      await this.handleStripeCheckout()
+    } catch (error) {
+      console.error('[order-submit] eager embedded mount failed', error)
+      this.showError(error.message || window.oStripe?.i18n?.PAYMENT_FAILED || 'Payment processing failed')
+    }
+    if (!this._embeddedCheckout) {
+      this.element.style.display = ''
+    }
   }
 
   /**
@@ -125,6 +149,7 @@ export default class extends Controller {
    * Used for wallet payments (Apple Pay, Google Pay)
    */
   async handleStripeCheckout() {
+    await this._ensureStripeJs()
     if (!window.Stripe) {
       throw new Error(window.oStripe?.i18n?.JS_NOT_LOADED || 'Stripe.js not loaded')
     }
@@ -195,6 +220,29 @@ export default class extends Controller {
     if (error) {
       throw error
     }
+  }
+
+  /**
+   * Load Stripe.js (js.stripe.com/v3) on demand if it is not already present.
+   * Needed for eager embedded mount before any card element initialises it.
+   * @returns {Promise<void>}
+   */
+  _ensureStripeJs() {
+    return new Promise((resolve, reject) => {
+      if (window.Stripe) { resolve(); return }
+      const existing = document.querySelector('script[src="https://js.stripe.com/v3/"]')
+      if (existing) {
+        existing.addEventListener('load', () => resolve())
+        existing.addEventListener('error', () => reject(new Error('Failed to load Stripe.js')))
+        return
+      }
+      const s = document.createElement('script')
+      s.src = 'https://js.stripe.com/v3/'
+      s.async = true
+      s.onload = () => resolve()
+      s.onerror = () => reject(new Error('Failed to load Stripe.js'))
+      document.head.appendChild(s)
+    })
   }
 
   /**
