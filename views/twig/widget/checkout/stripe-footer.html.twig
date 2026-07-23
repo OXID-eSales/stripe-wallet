@@ -15,6 +15,8 @@
      data-controller="stripe-checkout-footer stripe-user-data-validator"
      data-stripe-checkout-footer-payment-method-value="{{ checkoutData.paymentMethodId }}"
      data-stripe-checkout-footer-csrf-token-value="{{ checkoutData.csrfToken }}"
+     data-stripe-checkout-footer-publishable-key-value="{{ stripeConfig.publishableKey }}"
+     data-stripe-checkout-footer-render-mode-value="{{ stripeConfig.renderMode|default('redirect') }}"
      data-stripe-user-data-validator-url-value="{{ checkoutData.validationUrl }}"
      data-stripe-user-data-validator-plugin-id-value="{{ checkoutData.pluginModuleId }}"
      data-stripe-user-data-validator-csrf-value="{{ checkoutData.csrfToken }}"
@@ -44,6 +46,9 @@
             </span>
         </button>
     </div>
+
+    <div data-stripe-checkout-footer-target="embedded"
+         class="stripe-embedded-checkout mt-3" style="display: none;"></div>
 
     <div data-stripe-checkout-footer-target="loader"
          class="stripe-loading-overlay" style="display: none;">
@@ -80,11 +85,13 @@
   class StripeCheckoutFooterController extends BaseController {
     static values = {
       paymentMethod: String,
-      csrfToken: String
+      csrfToken: String,
+      publishableKey: String,
+      renderMode: String
     }
 
     static targets = [
-      'submitButton', 'error', 'errorMessage', 'loader'
+      'submitButton', 'error', 'errorMessage', 'loader', 'embedded'
     ]
 
     connect() {
@@ -108,8 +115,16 @@
           throw new Error(checkoutResult.error || 'Failed to create checkout session');
         }
 
-        // Step 2: Get redirect URL from metadata
-        var redirectUrl = checkoutResult.metadata && checkoutResult.metadata.redirectUrl;
+        var meta = checkoutResult.metadata || {};
+
+        // Step 2 (iframe mode): mount Stripe Embedded Checkout inline instead of redirecting.
+        if (meta.renderMode === 'iframe' && meta.clientSecret) {
+          await this._mountEmbedded(meta.clientSecret);
+          return;
+        }
+
+        // Step 2 (redirect mode): get redirect URL from metadata
+        var redirectUrl = meta.redirectUrl;
         if (!redirectUrl) {
           throw new Error('No redirect URL returned from Stripe');
         }
@@ -123,6 +138,52 @@
         console.error('[StripeCheckoutFooter] Payment failed:', err);
         this._showError(err.message);
         this._hideLoading();
+      }
+    }
+
+    async _mountEmbedded(clientSecret) {
+      await this._loadStripeJs();
+      if (!window.Stripe) {
+        throw new Error('Stripe.js is unavailable');
+      }
+      var stripe = window.Stripe(this.publishableKeyValue);
+      this._embedded = await stripe.initEmbeddedCheckout({ clientSecret: clientSecret });
+
+      if (this.hasEmbeddedTarget) {
+        this.embeddedTarget.style.display = 'block';
+        this._embedded.mount(this.embeddedTarget);
+      }
+
+      // Stripe Embedded Checkout renders its own Pay button; hide ours.
+      if (this.hasSubmitButtonTarget) {
+        this.submitButtonTarget.style.display = 'none';
+      }
+      this._hideLoading();
+      sdbg('[StripeCheckoutFooter] Embedded Checkout mounted (iframe mode)');
+    }
+
+    _loadStripeJs() {
+      return new Promise(function(resolve, reject) {
+        if (window.Stripe) { resolve(); return; }
+        var existing = document.querySelector('script[src="https://js.stripe.com/v3/"]');
+        if (existing) {
+          existing.addEventListener('load', function() { resolve(); });
+          existing.addEventListener('error', function() { reject(new Error('Failed to load Stripe.js')); });
+          return;
+        }
+        var s = document.createElement('script');
+        s.src = 'https://js.stripe.com/v3/';
+        s.async = true;
+        s.onload = function() { resolve(); };
+        s.onerror = function() { reject(new Error('Failed to load Stripe.js')); };
+        document.head.appendChild(s);
+      });
+    }
+
+    disconnect() {
+      if (this._embedded && typeof this._embedded.destroy === 'function') {
+        try { this._embedded.destroy(); } catch (e) { /* already torn down */ }
+        this._embedded = null;
       }
     }
 
@@ -465,4 +526,5 @@
   .checkout-footer-stripe .button-spinner { display: none; }
   .checkout-footer-stripe button.processing .button-content { display: none; }
   .checkout-footer-stripe button.processing .button-spinner { display: inline-flex; align-items: center; }
+  .stripe-embedded-checkout { min-height: 300px; }
 </style>

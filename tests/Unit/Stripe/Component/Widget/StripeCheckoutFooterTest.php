@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Component\Widget;
 
 use OxidEsales\Payments\Stripe\Component\Widget\StripeCheckoutFooter;
+use OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface;
 use OxidEsales\Payments\Stripe\Module;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -154,6 +155,51 @@ final class StripeCheckoutFooterTest extends TestCase
         self::assertSame('', $config['publishableKey']);
     }
 
+    // --- getStripeConfig(): renderMode (IFRAME-02) ---
+
+    public function testGetStripeConfigRenderModeDefaultsToRedirect(): void
+    {
+        $config = $this->buildFooter([], 'pk_x')->exposedGetStripeConfig();
+
+        self::assertSame('redirect', $config['renderMode']);
+    }
+
+    public function testGetStripeConfigRenderModeIsIframeWhenFlagEnabled(): void
+    {
+        $config = $this->buildFooterWithIframe([], 'pk_x', true)->exposedGetStripeConfig();
+
+        self::assertSame('iframe', $config['renderMode']);
+    }
+
+    public function testGetStripeConfigRenderModeIsRedirectWhenFlagDisabled(): void
+    {
+        $config = $this->buildFooterWithIframe([], 'pk_x', false)->exposedGetStripeConfig();
+
+        self::assertSame('redirect', $config['renderMode']);
+    }
+
+    /**
+     * @param array<string, mixed> $viewParams
+     */
+    private function buildFooterWithIframe(array $viewParams, string $publishableKey, bool $enabled): TestableStripeCheckoutFooter
+    {
+        $configService = $this->createMock(ModuleConfigurationServiceInterface::class);
+        $configService->method('getPublishableKey')->willReturn($publishableKey);
+
+        $iframeSettings = new class ($enabled) implements IframeCheckoutSettingsInterface {
+            public function __construct(private bool $enabled)
+            {
+            }
+
+            public function isEnabled(): bool
+            {
+                return $this->enabled;
+            }
+        };
+
+        return new TestableStripeCheckoutFooter($viewParams, $configService, 'https://localhost.local/', $iframeSettings);
+    }
+
     // --- helpers ---
 
     /**
@@ -217,6 +263,7 @@ final class TestableStripeCheckoutFooter extends StripeCheckoutFooter
         private readonly array $viewParams,
         private readonly ModuleConfigurationServiceInterface $configService,
         private readonly string $shopUrl = 'https://localhost.local/',
+        private readonly ?IframeCheckoutSettingsInterface $iframeSettings = null,
     ) {
         // Skip OXID parent constructor
     }
@@ -253,6 +300,14 @@ final class TestableStripeCheckoutFooter extends StripeCheckoutFooter
 
     protected function getServiceFromContainer(string $serviceName): object
     {
+        if ($serviceName === IframeCheckoutSettingsInterface::class) {
+            if ($this->iframeSettings === null) {
+                throw new \RuntimeException('iframe settings unavailable');
+            }
+
+            return $this->iframeSettings;
+        }
+
         return $this->configService;
     }
 

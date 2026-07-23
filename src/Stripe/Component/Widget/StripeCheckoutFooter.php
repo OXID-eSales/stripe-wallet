@@ -107,22 +107,44 @@ class StripeCheckoutFooter extends WidgetController
      */
     protected function getStripeConfig(): array
     {
+        return [
+            'publishableKey' => $this->resolvePublishableKey(),
+            'renderMode' => $this->resolveRenderMode(),
+        ];
+    }
+
+    private function resolvePublishableKey(): string
+    {
         try {
             $configService = $this->getServiceFromContainer(
                 \OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface::class
             );
 
-            return [
-                'publishableKey' => $configService->getPublishableKey(),
-            ];
+            return $configService->getPublishableKey();
         } catch (\Throwable $e) {
             Registry::getLogger()->error('[StripeCheckoutFooter] Failed to get config', [
                 'error' => $e->getMessage(),
             ]);
 
-            return [
-                'publishableKey' => '',
-            ];
+            return '';
+        }
+    }
+
+    /**
+     * Provider-agnostic render mode: 'iframe' when the payment-base
+     * "Use iframe instead of checkout button" flag is on, else 'redirect'.
+     * Defaults to 'redirect' if the flag cannot be read (never throws).
+     */
+    private function resolveRenderMode(): string
+    {
+        try {
+            $iframeSettings = $this->getServiceFromContainer(
+                \OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface::class
+            );
+
+            return $iframeSettings->isEnabled() ? 'iframe' : 'redirect';
+        } catch (\Throwable $e) {
+            return 'redirect';
         }
     }
 }
