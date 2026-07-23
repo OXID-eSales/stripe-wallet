@@ -86,6 +86,8 @@ services:
     arguments:
       # Concrete Stripe token service (see ContractTokenService note) — not the shared interface.
       $tokenService: '@OxidEsales\Payments\Stripe\Service\ContractTokenService'
+      # IFRAME-02: provider-agnostic "Use iframe instead of checkout button" flag (payment-base).
+      $iframeSettings: '@OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface'
     tags:
       - { name: oe.payment.handler }
     public: true

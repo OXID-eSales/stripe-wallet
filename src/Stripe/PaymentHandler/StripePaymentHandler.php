@@ -20,6 +20,7 @@ use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractServiceInterface;
+use OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface;
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
@@ -56,7 +57,8 @@ class StripePaymentHandler implements PaymentHandlerInterface
         private readonly ModuleConfigurationServiceInterface $config,
         private readonly TokenServiceInterface $tokenService,
         private readonly ?LoggerInterface $logger = null,
-        ?LanguageResolverInterface $languageResolver = null
+        ?LanguageResolverInterface $languageResolver = null,
+        private readonly ?IframeCheckoutSettingsInterface $iframeSettings = null
     ) {
         $this->languageResolver = $languageResolver ?? new OxidLanguageResolver();
     }
@@ -106,12 +108,15 @@ class StripePaymentHandler implements PaymentHandlerInterface
                 'state' => $contract->getStateValue(),
             ]);
 
+            $embedded = $sessionResult->isEmbedded();
+
             return PaymentHandlerResult::success(
                 contractId: $contractId,
-                clientSecret: null,
+                clientSecret: $embedded ? $sessionResult->getClientSecret() : null,
                 metadata: [
                     'handler' => StripeDefinitions::PROVIDER,
-                    'requiresRedirect' => true,
+                    'renderMode' => $embedded ? 'iframe' : 'redirect',
+                    'requiresRedirect' => !$embedded,
                     'redirectUrl' => $sessionResult->getCheckoutUrl(),
                     'sessionId' => $sessionResult->getSessionId(),
                 ]
@@ -138,12 +143,23 @@ class StripePaymentHandler implements PaymentHandlerInterface
 
     public function getFrontendConfig(): array
     {
+        $embedded = $this->isIframeMode();
+
         return [
             'type' => StripeDefinitions::PROVIDER,
             'publishableKey' => $this->config->getPublishableKey(),
-            'requiresRedirect' => true,
+            'renderMode' => $embedded ? 'iframe' : 'redirect',
+            'requiresRedirect' => !$embedded,
             'footerWidget' => 'stripecheckoutfooter',
         ];
+    }
+
+    /**
+     * True when the merchant enabled inline iframe checkout (payment-base flag).
+     */
+    private function isIframeMode(): bool
+    {
+        return $this->iframeSettings?->isEnabled() ?? false;
     }
 
     private function createContract(PaymentContextInterface $context): PaymentContractInterface
@@ -268,6 +284,7 @@ class StripePaymentHandler implements PaymentHandlerInterface
             captureMode: $captureMode,
             orderId: $orderId,
             orderNumber: $orderNumber,
+            embedded: $this->isIframeMode(),
         );
     }
 

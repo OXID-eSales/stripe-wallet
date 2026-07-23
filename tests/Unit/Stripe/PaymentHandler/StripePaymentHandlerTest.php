@@ -9,6 +9,7 @@ use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractServiceInterface;
+use OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface;
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\PaymentHandler\StripePaymentHandler;
@@ -45,8 +46,11 @@ class StripePaymentHandlerTest extends TestCase
         $this->config->method('isConfigured')->willReturn(true);
     }
 
-    private function createHandler(): StripePaymentHandler
+    private function createHandler(bool $iframeEnabled = false): StripePaymentHandler
     {
+        $iframeSettings = $this->createMock(IframeCheckoutSettingsInterface::class);
+        $iframeSettings->method('isEnabled')->willReturn($iframeEnabled);
+
         return new StripePaymentHandler(
             $this->contractService,
             $this->checkoutSessionService,
@@ -54,7 +58,8 @@ class StripePaymentHandlerTest extends TestCase
             $this->shopAdapter,
             $this->shopOrderService,
             $this->config,
-            $this->tokenService
+            $this->tokenService,
+            iframeSettings: $iframeSettings
         );
     }
 
@@ -145,6 +150,23 @@ class StripePaymentHandlerTest extends TestCase
         $this->assertSame('pk_test_123', $frontendConfig['publishableKey']);
         $this->assertSame('stripe', $frontendConfig['type']);
         $this->assertTrue($frontendConfig['requiresRedirect']);
+    }
+
+    public function testGetFrontendConfigDefaultsToRedirectMode(): void
+    {
+        $frontendConfig = $this->createHandler()->getFrontendConfig();
+
+        $this->assertSame('redirect', $frontendConfig['renderMode']);
+        $this->assertTrue($frontendConfig['requiresRedirect']);
+    }
+
+    public function testGetFrontendConfigUsesIframeModeWhenFlagEnabled(): void
+    {
+        $frontendConfig = $this->createHandler(iframeEnabled: true)->getFrontendConfig();
+
+        $this->assertSame('iframe', $frontendConfig['renderMode']);
+        $this->assertFalse($frontendConfig['requiresRedirect']);
+        $this->assertSame('pk_test_123', $frontendConfig['publishableKey']);
     }
 
     // ── Helpers ──
