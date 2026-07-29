@@ -85,25 +85,38 @@
         {% set displayBasketOrderButton = oViewConf.getViewThemeParam('basketLowOrderDisplayOrderButton') %}
         {% if not oView.isLowOrderPrice() or (displayBasketOrderButton == 'show' or displayBasketOrderButton == 'disabled') %}
             {% set createCheckoutSessionUrl = oViewConf.getSslSelfLink() ~ "cl=order&fnc=createCheckoutSession" %}
+            {% set stripeIframe = oViewConf.isStripeIframeCheckout() %}
+            {# IFRAME-02f: eager (button-less) embedded mount only when the iframe flag is on
+               AND AGB does not gate the request. When AGB confirmation is required and not yet
+               given, keep the button as the consent gate + trigger — eager-mounting there would
+               400 on load (StripeOrderController::ensureAgbAccepted). #}
+            {% set agbGating = oView.isConfirmAGBActive() and not oView.isPriorAgbConsent() %}
+            {% set eagerIframe = stripeIframe and not agbGating %}
             {# CSRF token for AJAX requests (Sprint 64f: H8 frontend CSRF protection) #}
             <input type="hidden" name="stoken" value="{{ oViewConf.getSessionChallengeToken() }}" />
             {# Sprint 101: AGB validation Stimulus controller — resolves #checkAgbTop from apex
-               via connect(); disabled if blConfirmAGB is off. #}
-            <div data-controller="agb-validation"
+               via connect(); disabled if blConfirmAGB is off.
+               IFRAME-02f: order-submit re-hosted here (was on the button) so the embedded sheet
+               mounts without the button being painted first (kills the button→iframe flash). #}
+            <div data-controller="agb-validation order-submit"
                  data-agb-validation-enabled-value="{{ oView.isConfirmAGBActive() ? 'true' : 'false' }}"
-                 data-agb-validation-prior-consent-value="{{ oView.isPriorAgbConsent() ? 'true' : 'false' }}">
+                 data-agb-validation-prior-consent-value="{{ oView.isPriorAgbConsent() ? 'true' : 'false' }}"
+                 data-order-submit-url-value="{{ createCheckoutSessionUrl | raw }}"
+                 data-order-submit-payment-type-value="wallet"
+                 data-order-submit-publishable-key-value="{{ oViewConf.getStripePublishableKey() | raw }}"
+                 data-order-submit-render-mode-value="{{ stripeIframe ? 'iframe' : 'redirect' }}"
+                 data-order-submit-eager-value="{{ eagerIframe ? 'true' : 'false' }}"
+                 data-order-submit-stripe-debug-value="{{ oViewConf.isStripeDebug() ? 'true' : 'false' }}">
+                {# Place-Order button. In eager iframe mode it renders hidden and is revealed by
+                   order-submit only if the eager mount cannot proceed (AGB / validation / error).
+                   In redirect mode and AGB-gated iframe mode it is the visible trigger. #}
                 <button id="stripe-checkout-btn"
                         type="button"
                         class="btn btn-highlight btn-lg w-100"
-                        data-controller="order-submit"
                         data-action="click->order-submit#handleSubmit"
-                        data-order-submit-url-value="{{ createCheckoutSessionUrl | raw }}"
-                        data-order-submit-payment-type-value="wallet"
-                        data-order-submit-publishable-key-value="{{ oViewConf.getStripePublishableKey() | raw }}"
-                        data-order-submit-render-mode-value="{{ oViewConf.isStripeIframeCheckout() ? 'iframe' : 'redirect' }}"
-                        data-order-submit-stripe-debug-value="{{ oViewConf.isStripeDebug() ? 'true' : 'false' }}"
                         data-order-submit-target="button"
                         data-agb-validation-target="submitButton"
+                        {% if eagerIframe %}hidden{% endif %}
                         {% if oView.isLowOrderPrice() and displayBasketOrderButton == 'disabled' %}
                             disabled="disabled"
                         {% endif %}
@@ -111,7 +124,7 @@
                     {{ translate({ ident: "SUBMIT_ORDER" }) }}
                 </button>
                 <div data-order-submit-target="status" class="mt-2 text-center"></div>
-                {# IFRAME-02e: inline Stripe Embedded Checkout mount (used when render-mode=iframe) #}
+                {# IFRAME-02e/f: inline Stripe Embedded Checkout mount (used when render-mode=iframe) #}
                 <div id="stripe-embedded-checkout" data-order-submit-target="embedded" class="stripe-embedded-checkout mt-3" style="display: none; min-height: 300px;"></div>
             </div>
         {% endif %}

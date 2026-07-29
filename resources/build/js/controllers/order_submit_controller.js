@@ -9,27 +9,32 @@ import { createDebugLogger } from '../debug.js'
  * 1. Stripe Checkout (hosted page) - for wallet payments
  * 2. Payment Intent (card element) - for card payments
  *
- * Usage in Twig:
- * <button data-controller="order-submit"
- *         data-action="click->order-submit#handleSubmit"
- *         data-order-submit-url-value="..."
- *         data-order-submit-payment-type-value="wallet|card"
- *         data-order-submit-stripe-debug-value="false"
- *         type="button">
- *   Submit Order
- * </button>
+ * Usage in Twig (IFRAME-02f: controller hosted on a wrapper so the embedded
+ * sheet can mount without the button being painted first):
+ * <div data-controller="order-submit"
+ *      data-order-submit-url-value="..."
+ *      data-order-submit-payment-type-value="wallet|card"
+ *      data-order-submit-render-mode-value="iframe|redirect"
+ *      data-order-submit-eager-value="true|false"
+ *      data-order-submit-stripe-debug-value="false">
+ *   <button data-order-submit-target="button"
+ *           data-action="click->order-submit#handleSubmit"
+ *           type="button">Submit Order</button>
+ *   <div data-order-submit-target="embedded"></div>
+ * </div>
  *
  * Phase 5: stripeDebug Stimulus value drives the shared debug() logger.
  * When false (production default), all debug() calls are no-ops.
  * When true (level=debug in admin), console output is enabled at runtime.
  */
 export default class extends Controller {
-  static targets = ["status", "embedded"]
+  static targets = ["status", "embedded", "button"]
   static values = {
     url: String,
     paymentType: String,
     publishableKey: String,
     renderMode: { type: String, default: "redirect" },
+    eager: { type: Boolean, default: false },
     stripeDebug: { type: Boolean, default: false }
   }
 
@@ -46,23 +51,23 @@ export default class extends Controller {
     this._debug = createDebugLogger(() => this.stripeDebugValue)
 
     this._debug('Order Submit controller connected')
-    this._debug('Button element:', this.element)
 
     this._onPageShow = (e) => { if (e.persisted) this.hideLoading() }
     window.addEventListener('pageshow', this._onPageShow)
 
-    // IFRAME-02e: eager mode — replace the button with the embedded Stripe sheet
-    // on page load (creates the session + order immediately). Falls back to the
-    // button if session creation fails (e.g. AGB not accepted, validation error).
-    if (this.renderModeValue === 'iframe' && this.paymentTypeValue === 'wallet') {
-      this.element.style.display = 'none'
+    // IFRAME-02f: eager (button-less) embedded mount. The template already
+    // renders the button hidden in this mode, so the embedded sheet loads
+    // directly with no button→iframe flash. If the eager mount cannot proceed
+    // (AGB not accepted, validation error), revealButton() surfaces the button
+    // as a fallback trigger.
+    if (this.eagerValue && this.renderModeValue === 'iframe' && this.paymentTypeValue === 'wallet') {
       this.autoMountEmbedded()
     }
   }
 
   /**
-   * IFRAME-02e eager mode: create the checkout session and mount the embedded
-   * sheet on load. Restores the button if nothing mounted (error / validation).
+   * IFRAME-02f eager mode: create the checkout session and mount the embedded
+   * sheet on load. Reveals the fallback button if nothing mounted (error / validation).
    */
   async autoMountEmbedded() {
     try {
@@ -72,7 +77,25 @@ export default class extends Controller {
       this.showError(error.message || window.oStripe?.i18n?.PAYMENT_FAILED || 'Payment processing failed')
     }
     if (!this._embeddedCheckout) {
-      this.element.style.display = ''
+      this.revealButton()
+    }
+  }
+
+  /**
+   * Reveal the fallback Place-Order button (eager mount failed).
+   */
+  revealButton() {
+    if (this.hasButtonTarget) {
+      this.buttonTarget.hidden = false
+    }
+  }
+
+  /**
+   * Hide the Place-Order button (embedded sheet renders its own Pay button).
+   */
+  hideButton() {
+    if (this.hasButtonTarget) {
+      this.buttonTarget.hidden = true
     }
   }
 
@@ -122,7 +145,7 @@ export default class extends Controller {
     event.preventDefault()
 
     this._debug('Order submit button clicked', {
-      buttonId: this.element.id,
+      buttonId: this.hasButtonTarget ? this.buttonTarget.id : null,
       paymentType: this.paymentTypeValue,
       timestamp: new Date().toISOString()
     })
@@ -265,7 +288,7 @@ export default class extends Controller {
     this._embeddedCheckout.mount(mount)
 
     // Embedded Checkout renders its own Pay button; hide the order button.
-    this.element.style.display = 'none'
+    this.hideButton()
     this._debug('Embedded Checkout mounted (iframe mode)')
   }
 
@@ -396,9 +419,11 @@ export default class extends Controller {
    * via the mirror 'oe:stripe:submit-end' event established in Sprint 122.
    */
   showLoading() {
-    this.element.disabled = true
-    this.originalText = this.element.textContent
-    this.element.textContent = window.oStripe?.i18n?.PROCESSING || 'Processing...'
+    if (this.hasButtonTarget) {
+      this.buttonTarget.disabled = true
+      this.originalText = this.buttonTarget.textContent
+      this.buttonTarget.textContent = window.oStripe?.i18n?.PROCESSING || 'Processing...'
+    }
     document.dispatchEvent(new CustomEvent('oe:stripe:submit-start'))
   }
 
@@ -417,9 +442,11 @@ export default class extends Controller {
    * because hideLoading() and updateButtonStates() are idempotent.
    */
   hideLoading() {
-    this.element.disabled = false
-    if (this.originalText) {
-      this.element.textContent = this.originalText
+    if (this.hasButtonTarget) {
+      this.buttonTarget.disabled = false
+      if (this.originalText) {
+        this.buttonTarget.textContent = this.originalText
+      }
     }
     document.dispatchEvent(new CustomEvent('oe:stripe:submit-end'))
   }
