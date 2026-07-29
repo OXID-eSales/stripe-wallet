@@ -12,7 +12,7 @@ env:
   TEMPLATE_ENGINE: 'twig'
   # Branch of OXID-eSales/payment-base to test against. Change in sync with
   # the stripe branch when the two repos co-evolve (Sprint 119/STRP-129).
-  PAYMENT_BASE_BRANCH: 'b-7.4.x'
+  PAYMENT_BASE_BRANCH: 'b-7.4.x-iframe-checkout'
 
 jobs:
   install_shop_with_module:
