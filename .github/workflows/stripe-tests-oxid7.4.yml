@@ -12,7 +12,7 @@ env:
   TEMPLATE_ENGINE: 'twig'
   # Branch of OXID-eSales/payment-base to test against. Change in sync with
   # the stripe branch when the two repos co-evolve (Sprint 119/STRP-129).
-  PAYMENT_BASE_BRANCH: 'b-7.4.x-iframe-checkout'
+  PAYMENT_BASE_BRANCH: 'b-7.4.x'
   # Branch of OXID-eSales/one-page-checkout. Its source is scanned by PHPStan
   # (scanDirectories in tests/PhpStan/phpstan.neon) so the OPC integration
   # handlers resolve OPC event classes — it is not a composer dependency.
