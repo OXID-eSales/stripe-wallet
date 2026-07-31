@@ -13,6 +13,10 @@ env:
   # Branch of OXID-eSales/payment-base to test against. Change in sync with
   # the stripe branch when the two repos co-evolve (Sprint 119/STRP-129).
   PAYMENT_BASE_BRANCH: 'b-7.4.x-iframe-checkout'
+  # Branch of OXID-eSales/one-page-checkout. Its source is scanned by PHPStan
+  # (scanDirectories in tests/PhpStan/phpstan.neon) so the OPC integration
+  # handlers resolve OPC event classes — it is not a composer dependency.
+  ONE_PAGE_CHECKOUT_BRANCH: 'b-7.4.x'
 
 jobs:
   install_shop_with_module:
@@ -277,6 +281,14 @@ jobs:
           repository: OXID-eSales/payment-base
           ref: ${{ env.PAYMENT_BASE_BRANCH }}
           path: source/payment-base
+          token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
+
+      - name: Checkout one-page-checkout (PHPStan symbol resolution)
+        uses: actions/checkout@v5
+        with:
+          repository: OXID-eSales/one-page-checkout
+          ref: ${{ env.ONE_PAGE_CHECKOUT_BRANCH }}
+          path: source/one-page-checkout
           token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
 
       - name: Configure path repository for payment-base

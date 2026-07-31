@@ -95,9 +95,105 @@
     ]
 
     connect() {
+      // IFRAME mode (OPC): mirror the classic checkout's button-less embedded
+      // mount — render Stripe Embedded Checkout inline instead of exposing a
+      // "Pay with Stripe" redirect button. See _initIframeMode for the consent gate.
+      if (this.renderModeValue === 'iframe') {
+        sdbg('[StripeCheckoutFooter] Connected (iframe mode)');
+        this._initIframeMode();
+        return;
+      }
       sdbg('[StripeCheckoutFooter] Connected (redirect mode)');
       if (this.hasSubmitButtonTarget) {
         this.submitButtonTarget.disabled = false;
+      }
+    }
+
+    // ---- IFRAME (OPC) eager embedded mount --------------------------------
+    //
+    // Renders Stripe Embedded Checkout inline, mirroring the classic checkout's
+    // button-less mount (IFRAME-02f). The OPC CheckoutService hard-rejects
+    // processCheckout unless BOTH consent flags are true, so the eager mount is
+    // gated on the live consent checkboxes: while they are unticked the Pay
+    // button stays as the visible trigger; ticking both auto-mounts the
+    // embedded sheet with no extra click.
+
+    _initIframeMode() {
+      if (this.hasSubmitButtonTarget) {
+        this.submitButtonTarget.disabled = false;
+      }
+      this._armConsentWatchers();
+      this._tryEagerMount();
+    }
+
+    _consentCheckboxes() {
+      return [
+        document.getElementById('confirmTermsCheckout'),
+        document.getElementById('confirmPrivacyCheckout')
+      ].filter(function(el) { return el; });
+    }
+
+    // Absent checkboxes default to satisfied (non-OPC embeddings) — matches
+    // _processCheckout's own missing-checkbox default.
+    _consentReady() {
+      return this._consentCheckboxes().every(function(el) { return el.checked; });
+    }
+
+    _armConsentWatchers() {
+      var boxes = this._consentCheckboxes();
+      if (boxes.length === 0) {
+        return;
+      }
+      this._consentHandler = function() {
+        if (this._consentReady()) {
+          this._tryEagerMount();
+        }
+      }.bind(this);
+      boxes.forEach(function(el) {
+        el.addEventListener('change', this._consentHandler);
+      }, this);
+    }
+
+    _detachConsentWatchers() {
+      if (!this._consentHandler) {
+        return;
+      }
+      this._consentCheckboxes().forEach(function(el) {
+        el.removeEventListener('change', this._consentHandler);
+      }, this);
+      this._consentHandler = null;
+    }
+
+    async _tryEagerMount() {
+      if (this._embedded || this._mounting) {
+        return;
+      }
+      if (!this._consentReady()) {
+        // Keep the Pay button as the consent gate; the watcher retries on tick.
+        return;
+      }
+      this._mounting = true;
+      this._hideError();
+      try {
+        var checkoutResult = await this._processCheckout();
+        if (!checkoutResult.success) {
+          throw new Error(checkoutResult.error || 'Failed to create checkout session');
+        }
+        var meta = checkoutResult.metadata || {};
+        var clientSecret = checkoutResult.clientSecret || meta.clientSecret;
+        if (meta.renderMode === 'iframe' && clientSecret) {
+          await this._mountEmbedded(clientSecret);
+          return;
+        }
+        // Server did not return an embedded session — honour a redirect if given.
+        if (meta.redirectUrl) {
+          window.location.href = meta.redirectUrl;
+        }
+      } catch (err) {
+        console.error('[StripeCheckoutFooter] Eager embedded mount failed:', err);
+        this._showError(err.message);
+      } finally {
+        this._mounting = false;
       }
     }
 
@@ -116,10 +212,14 @@
         }
 
         var meta = checkoutResult.metadata || {};
+        // The OPC CheckoutResult returns the Embedded Checkout secret at the
+        // TOP LEVEL (clientSecret), not inside metadata — read both so the
+        // iframe branch fires regardless of which shape the backend returns.
+        var clientSecret = checkoutResult.clientSecret || meta.clientSecret;
 
         // Step 2 (iframe mode): mount Stripe Embedded Checkout inline instead of redirecting.
-        if (meta.renderMode === 'iframe' && meta.clientSecret) {
-          await this._mountEmbedded(meta.clientSecret);
+        if (meta.renderMode === 'iframe' && clientSecret) {
+          await this._mountEmbedded(clientSecret);
           return;
         }
 
@@ -181,6 +281,7 @@
     }
 
     disconnect() {
+      this._detachConsentWatchers();
       if (this._embedded && typeof this._embedded.destroy === 'function') {
         try { this._embedded.destroy(); } catch (e) { /* already torn down */ }
         this._embedded = null;

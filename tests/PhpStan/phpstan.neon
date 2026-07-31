@@ -7,6 +7,13 @@ parameters:
     level: 6
     paths:
         - ../../src
+    # one-page-checkout is an optional sibling integration (OpcExternalReturnCleanupHandler
+    # subscribes to its events) but is NOT a composer dependency, so its classes are not on the
+    # module autoloader. Index its source for symbol resolution. The relative path resolves in both
+    # layouts: locally extensions/one-page-checkout, and in CI source/one-page-checkout (checked out
+    # as a sibling of the module, mirroring payment-base).
+    scanDirectories:
+        - ../../../one-page-checkout/src
     excludePaths:
         - ../../vendor
         - ../../var (?)
