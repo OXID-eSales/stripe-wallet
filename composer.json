@@ -18,7 +18,7 @@
   "prefer-stable": true,
   "require": {
     "php": "^8.2",
-    "oxid-esales/payment-base": "^v1.0",
+    "oxid-esales/payment-base": "^1.1",
     "stripe/stripe-php": "^19.3",
     "doctrine/dbal": "^2.13"
   },
