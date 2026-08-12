@@ -103,6 +103,14 @@ $aModule = [
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeRemoveByBasketCurrency',     'type' => 'bool',       'value' => '1',         'position' => 36],
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeProvideCustomerEmailAddress','type' => 'bool',       'value' => '0',         'position' => 37],
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeCaptureMode',                 'type' => 'select',     'value' => 'automatic', 'position' => 39, 'constraints' => 'automatic|manual'],
+        // @since opc-125 rev-56 — declare the OPC UI topology for the Stripe
+        // handler. Stripe Elements always renders a self-contained iframe
+        // (method selector + card input + trigger button all inside), so the
+        // constraints list holds a single option. When Stripe grows another
+        // rendering mode (e.g. Checkout Sessions redirect), extend constraints
+        // and add the handler-side branch — the admin then gets a real
+        // choice. Until then the select is effectively locked.
+        ['group' => 'STRIPE_GENERAL',           'name' => 'sPaymentHandlerUiTopology',          'type' => 'select',     'value' => 'iframe',    'position' => 45, 'constraints' => 'iframe'],
         ['group' => 'STRIPE_WEBHOOKS',          'name' => 'sStripeWebhookEndpoint',             'type' => 'str',        'value' => '',          'position' => 130],
         ['group' => 'STRIPE_WEBHOOKS',          'name' => 'sStripeWebhookEndpointSecret',       'type' => 'str',        'value' => '',          'position' => 140],
         // Sprint 109/111: per-mode endpoint ID and signing secret are stored in oxconfig

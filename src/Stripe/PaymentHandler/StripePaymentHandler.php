@@ -68,6 +68,21 @@ class StripePaymentHandler implements PaymentHandlerInterface
         return StripeDefinitions::PROVIDER;
     }
 
+    /**
+     * OXID module id — read by OPC's `PaymentHandlerRegistry` (rev-56) to
+     * resolve which module's settings to consult for this handler's
+     * UI-topology declaration (`sPaymentHandlerUiTopology`). Not part of
+     * PaymentHandlerInterface — that lives in payment-base and remains
+     * untouched. OPC picks the value up via `method_exists()` on the
+     * concrete class.
+     *
+     * @since opc-125 rev-56
+     */
+    public function getModuleId(): string
+    {
+        return \OxidEsales\Payments\Stripe\Module::MODULE_ID;
+    }
+
     public function getName(): string
     {
         return 'Stripe Payment';
