@@ -247,7 +247,42 @@
         throw new Error('Stripe.js is unavailable');
       }
       var stripe = window.Stripe(this.publishableKeyValue);
-      this._embedded = await stripe.initEmbeddedCheckout({ clientSecret: clientSecret });
+
+      // FIX (OPC-132): Stripe allows exactly ONE Embedded Checkout object
+      // per page, but the OPC footer widget's HTML is REPLACED on every
+      // payment-method change (footer_widget_controller.replaceFooterContent)
+      // — and a replace can land while a previous instance's
+      // initEmbeddedCheckout() is still in flight. That instance's
+      // disconnect() sees no `_embedded` yet, destroys nothing, the init
+      // promise resolves ownerless, and the next mount throws
+      // "You cannot have multiple Embedded Checkout objects".
+      //
+      // Page-global registry + mount serialisation: every mount (a) waits
+      // for any in-flight init, (b) destroys whatever instance is alive —
+      // regardless of which controller generation created it — and only
+      // then (c) inits its own. The registry also lets a late-resolving
+      // init be retired when its controller died while awaiting.
+      var g = window.__oeStripeEmbeddedRegistry = window.__oeStripeEmbeddedRegistry || { chain: null, instance: null };
+      g.chain = (g.chain || Promise.resolve()).then(function () {
+        if (g.instance && typeof g.instance.destroy === 'function') {
+          try { g.instance.destroy(); } catch (e) { /* already torn down */ }
+        }
+        g.instance = null;
+        return stripe.initEmbeddedCheckout({ clientSecret: clientSecret });
+      }).then(function (embedded) {
+        g.instance = embedded;
+        return embedded;
+      });
+      this._embedded = await g.chain;
+
+      // The widget may have been torn down while we awaited — retire the
+      // fresh instance instead of mounting into a dead subtree.
+      if (!this.element.isConnected) {
+        try { this._embedded.destroy(); } catch (e) { /* noop */ }
+        if (g.instance === this._embedded) { g.instance = null; }
+        this._embedded = null;
+        return;
+      }
 
       if (this.hasEmbeddedTarget) {
         this.embeddedTarget.style.display = 'block';
@@ -284,6 +319,10 @@
       this._detachConsentWatchers();
       if (this._embedded && typeof this._embedded.destroy === 'function') {
         try { this._embedded.destroy(); } catch (e) { /* already torn down */ }
+        // FIX (OPC-132): clear the page-global registry slot too, so the
+        // next generation's mount doesn't destroy a dead handle.
+        var g = window.__oeStripeEmbeddedRegistry;
+        if (g && g.instance === this._embedded) { g.instance = null; }
         this._embedded = null;
       }
     }
