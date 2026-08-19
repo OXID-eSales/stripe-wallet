@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Adapter;
 
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\Payments\Stripe\Core\ShopCurrency;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 
 /**
@@ -80,10 +81,17 @@ class OxidShopAdapter implements ShopAdapterInterface
         return $shop->oxshops__oxname->value ?? 'OXID eShop';
     }
 
+    /**
+     * @throws \RuntimeException when the shop currency cannot be determined.
+     *         Sprint 133 (F7): this used to fall back to 'EUR', which billed a
+     *         CHF amount in EUR on a non-EUR shop.
+     */
     public function getShopCurrency(): string
     {
-        $currency = Registry::getConfig()->getActShopCurrencyObject();
-        return $currency->name ?? 'EUR';
+        return ShopCurrency::nameOf(
+            Registry::getConfig()->getActShopCurrencyObject(),
+            'active shop currency'
+        );
     }
 
     public function isTestMode(): bool

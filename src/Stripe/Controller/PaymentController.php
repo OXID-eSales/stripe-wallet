@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Controller;
 
+use OxidEsales\Payments\Stripe\Core\ShopCurrency;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\ContractTokenService;
@@ -121,10 +122,11 @@ class PaymentController extends PaymentController_parent
             $minimumAmount = $this->getStripeConfig()->getMinimumOrderAmount();
 
             if ($total < $minimumAmount) {
-                /** @var string $currencyName */
-                $currencyName = $basket->getBasketCurrency()->name ?? 'EUR';
+                // Sprint 133 (F7): display-only, so an unknown currency shows no
+                // code rather than a wrong one.
+                $currencyName = ShopCurrency::nameOrEmpty($basket->getBasketCurrency());
                 Registry::getUtilsView()->addErrorToDisplay(
-                    sprintf('Minimum order amount is %.2f %s', $minimumAmount, $currencyName)
+                    rtrim(sprintf('Minimum order amount is %.2f %s', $minimumAmount, $currencyName))
                 );
                 return 'payment';
             }

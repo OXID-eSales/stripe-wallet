@@ -11,6 +11,7 @@ namespace OxidEsales\Payments\Stripe\Component\Widget;
 
 use OxidEsales\Eshop\Application\Component\Widget\WidgetController;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\Payments\Stripe\Core\ShopCurrency;
 use OxidEsales\Payments\Stripe\Module;
 use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
 
@@ -51,12 +52,27 @@ class StripeCheckoutFooter extends WidgetController
         return [
             'paymentMethodId' => (string) $this->getViewParameter('paymentMethodId'),
             'totalPrice' => (float) $this->getViewParameter('totalPrice'),
-            'currency' => (string) ($this->getViewParameter('currency') ?: 'EUR'),
+            'currency' => $this->resolveCurrency(),
             'csrfToken' => (string) $this->getViewParameter('csrfToken'),
             'validationUrl' => $this->getShopUrl() . 'index.php?cl=oepaymentvalidationapi&fnc=validate',
             'pluginModuleId' => Module::MODULE_ID,
             'fieldAllowed' => $this->getValidationFieldAllowed(),
         ];
+    }
+
+    /**
+     * Sprint 133 (F7): the caller's view parameter, else the shop's actual
+     * currency, else nothing. Never a hardcoded 'EUR', which mislabels the
+     * checkout footer on any non-EUR shop.
+     */
+    protected function resolveCurrency(): string
+    {
+        $fromView = (string) $this->getViewParameter('currency');
+        if ($fromView !== '') {
+            return $fromView;
+        }
+
+        return ShopCurrency::nameOrEmpty(Registry::getConfig()->getActShopCurrencyObject());
     }
 
     /**

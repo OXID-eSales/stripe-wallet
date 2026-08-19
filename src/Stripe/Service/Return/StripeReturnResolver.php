@@ -72,18 +72,21 @@ class StripeReturnResolver implements ReturnResolverInterface
             return ReturnResolution::failed('missing_payment_intent', 'Stripe returned no payment_intent_id');
         }
 
-        return $result->isRequiresCapture()
-            ? ReturnResolution::authorized(
-                $paymentIntentId,
-                $paymentIntentId,
-                (float) ($result->getAmount() ?? 0.0),
-                (string) ($result->getCurrency() ?? 'EUR'),
-            )
-            : ReturnResolution::readyToCommit(
-                $paymentIntentId,
-                $paymentIntentId,
-                (float) ($result->getAmount() ?? 0.0),
-                (string) ($result->getCurrency() ?? 'EUR'),
+        // Sprint 133 (F7): a successful CheckoutReturnResult always carries an
+        // amount and a currency, so the previous `?? 0.0` / `?? 'EUR'` were
+        // unreachable — they documented an impossible state and would have
+        // masked a real regression by booking a 0.00 EUR authorisation.
+        $amount = $result->getAmount();
+        $currency = $result->getCurrency();
+        if ($amount === null || $currency === null || $currency === '') {
+            return ReturnResolution::failed(
+                'missing_amount_or_currency',
+                'Stripe returned no amount or currency for a completed payment'
             );
+        }
+
+        return $result->isRequiresCapture()
+            ? ReturnResolution::authorized($paymentIntentId, $paymentIntentId, $amount, $currency)
+            : ReturnResolution::readyToCommit($paymentIntentId, $paymentIntentId, $amount, $currency);
     }
 }

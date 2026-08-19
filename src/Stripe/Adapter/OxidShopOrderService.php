@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Adapter;
 
+use OxidEsales\Payments\Stripe\Core\ShopCurrency;
 use DateTimeImmutable;
 use Exception;
 use OxidEsales\Eshop\Application\Model\Basket;
@@ -130,9 +131,12 @@ class OxidShopOrderService implements ShopOrderServiceInterface
         CreateOrderRequest $request
     ): OrderResponse {
         $price = $basket->getPrice();
-        $currency = $basket->getBasketCurrency();
-        /** @var string $currencyName */
-        $currencyName = $currency->name ?? 'EUR';
+        // Sprint 133 (F7): no 'EUR' fallback — a mis-stamped currency on the
+        // order response is worse than a loud failure.
+        $currencyName = ShopCurrency::nameOf(
+            $basket->getBasketCurrency(),
+            'basket currency during order creation'
+        );
 
         return new OrderResponse(
             orderId: (string) $order->getId(),

@@ -181,7 +181,9 @@ class CaptureService implements CaptureServiceInterface
             type: StripeDefinitions::TRANSACTION_TYPE_CAPTURE,
             status: StripeDefinitions::TRANSACTION_STATUS_COMPLETED,
             amount: $result->amountCaptured ?? 0,
-            currency: $result->currency ?? StripeDefinitions::DEFAULT_CURRENCY
+            // Sprint 133 (F7): fall back to the contract's own currency rather
+            // than a hardcoded 'EUR' — an audit row must not invent a currency.
+            currency: $result->currency ?? $contract->getCurrency()
         );
         $transaction->setTransactionId($result->captureId);
         $transaction->setProviderOrderId($contract->getProviderOrderId());
