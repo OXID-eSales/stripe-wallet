@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
+use OxidEsales\Payments\Stripe\Core\ShopId;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use OxidEsales\PaymentBase\Adapter\Response\CancellationResponse;
@@ -143,7 +144,7 @@ class StripeCancelAuthorizationRequestHandler extends AbstractStripeRequestHandl
                 'reason' => $event->getCancellationReason(),
             ],
             referenceId: $event->getOrderId() ?? $result->providerPaymentId ?? '',
-            shopId: (int) $this->shopAdapter->getShopId()
+            shopId: ShopId::of($this->shopAdapter->getShopId(), 'cancel-authorization audit row')
         );
     }
 
@@ -188,7 +189,7 @@ class StripeCancelAuthorizationRequestHandler extends AbstractStripeRequestHandl
             action: 'cancel_authorization',
             exception: $e,
             referenceId: $paymentIntentId,
-            shopId: (int) $this->shopAdapter->getShopId()
+            shopId: ShopId::of($this->shopAdapter->getShopId(), 'cancel-authorization audit row')
         );
     }
 }

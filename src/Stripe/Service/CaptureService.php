@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use OxidEsales\Payments\Stripe\Core\ShopId;
 use OxidEsales\PaymentBase\Adapter\Request\CapturePaymentRequest;
 use OxidEsales\PaymentBase\Adapter\Response\CaptureResponse;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
@@ -189,7 +190,7 @@ class CaptureService implements CaptureServiceInterface
 
         $transaction = new Transaction(
             id: 'cap_' . bin2hex(random_bytes(16)),
-            shopId: (int) $this->shopAdapter->getShopId(),
+            shopId: ShopId::of($this->shopAdapter->getShopId(), 'capture audit row'),
             orderId: $contract->getOrderId() ?? '',
             contractId: $contract->getId(),
             provider: StripeDefinitions::PROVIDER,

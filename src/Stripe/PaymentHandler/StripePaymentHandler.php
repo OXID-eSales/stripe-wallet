@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\PaymentHandler;
 
+use OxidEsales\Payments\Stripe\Core\ShopId;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentBase\Adapter\PaymentContextInterface;
 use OxidEsales\PaymentBase\Adapter\PaymentHandlerInterface;
@@ -310,7 +311,8 @@ class StripePaymentHandler implements PaymentHandlerInterface
         $captureMode = $this->config->getCaptureMode();
         $sessionId = Registry::getSession()->getId();
         $languageId = $this->languageResolver->getActiveLanguageId();
-        $shopIdInt = is_numeric($shopId) ? (int) $shopId : 1;
+        // Sprint 133 (F14): no silent fallback to shop 1 on EE multishop.
+        $shopIdInt = ShopId::of($shopId, 'checkout session creation');
 
         $orderId = $contract->getOrderId();
         $rawOrderNumber = $contract->getMetadata('order_number');

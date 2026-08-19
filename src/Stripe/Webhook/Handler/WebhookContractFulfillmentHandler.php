@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Webhook\Handler;
 
+use OxidEsales\Payments\Stripe\Core\ShopId;
 use Psr\Log\LoggerInterface;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
@@ -151,7 +152,7 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
     {
         $transaction = new Transaction(
             id: $type . '_' . bin2hex(random_bytes(16)),
-            shopId: (int) $this->shopAdapter->getShopId(),
+            shopId: ShopId::of($this->shopAdapter->getShopId(), 'webhook audit row'),
             orderId: $contract->getOrderId() ?? '',
             contractId: $contract->getId(),
             provider: StripeDefinitions::PROVIDER,

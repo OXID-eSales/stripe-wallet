@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
+use OxidEsales\Payments\Stripe\Core\ShopId;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
@@ -146,7 +147,8 @@ class StripeCheckoutSessionHandler implements HandlerInterface
 
         $rawLangId = $context->get('languageId');
         $languageId = is_numeric($rawLangId) ? (int) $rawLangId : 0;
-        $shopIdInt = is_numeric($shopId) ? (int) $shopId : 1;
+        // Sprint 133 (F14): no silent fallback to shop 1 on EE multishop.
+        $shopIdInt = ShopId::of($shopId, 'checkout session handler');
 
         $contractToken = $this->tokenService->generateToken($contractId);
         $successUrl = $this->checkoutSessionService->buildSuccessUrl($shopUrl, $contractId, $contractToken, $sessionId, $languageId, $shopIdInt);
