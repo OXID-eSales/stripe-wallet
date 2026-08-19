@@ -90,25 +90,6 @@ readonly class CheckoutReturnResult
         );
     }
 
-    /**
-     * Create a security failure result.
-     */
-    public static function securityFailure(string $errorMessage): self
-    {
-        return new self(
-            successful: false,
-            contractId: null,
-            paymentIntentId: null,
-            amountCents: null,
-            currency: null,
-            paymentStatus: null,
-            paymentIntentStatus: null,
-            errorMessage: $errorMessage,
-            errorCode: 'security_check_failed',
-            redirectTarget: 'payment'
-        );
-    }
-
     public function isSuccessful(): bool
     {
         return $this->successful;

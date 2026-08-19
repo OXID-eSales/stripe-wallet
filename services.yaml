@@ -537,6 +537,11 @@ services:
   OxidEsales\Payments\Stripe\Service\Return\StripeReturnResolver:
     arguments:
       $checkoutReturnService: '@OxidEsales\Payments\Stripe\Service\CheckoutReturnServiceInterface'
+      # Sprint 133 (F5): the return-session scorer was DI-bound but never called.
+      # Advisory by default — see payment.return_security.enforce.
+      $securityValidator: '@OxidEsales\PaymentBase\Service\ReturnSecurityValidatorInterface'
+      $enforceSecurityCheck: '%payment.return_security.enforce%'
+      $logger: '@oxid_esales.monolog.logger'
     public: true
 
   # Stripe Event Translator - maps abstract request events onto Stripe's
@@ -1397,6 +1402,11 @@ parameters:
   # contract now records that no screening happened either way. Set false to
   # block unscreenable orders instead.
   payment.fraud_check.fail_open_on_error: true
+
+  # Sprint 133 (F5): enforce the returning-session risk score? Rejecting happens
+  # after Stripe authorised the payment, so a false positive strands a paying
+  # customer with no order. Off by default: score is recorded and logged only.
+  payment.return_security.enforce: false
 
   # Sprint 68b (M9): Server-side secret for address hash HMAC
   # Derived from a fixed salt — unique per installation via Stripe secret key injection at runtime

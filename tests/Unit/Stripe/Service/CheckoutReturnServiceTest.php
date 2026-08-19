@@ -86,15 +86,6 @@ class CheckoutReturnServiceTest extends TestCase
         $this->assertEquals('payment', $result->getRedirectTarget());
     }
 
-    public function testCheckoutReturnResultSecurityFailure(): void
-    {
-        $result = CheckoutReturnResult::securityFailure('Security validation failed');
-
-        $this->assertFalse($result->isSuccessful());
-        $this->assertEquals('security_check_failed', $result->getErrorCode());
-        $this->assertEquals('payment', $result->getRedirectTarget());
-    }
-
     // --- Service Interface Tests ---
 
     public function testServiceImplementsInterface(): void

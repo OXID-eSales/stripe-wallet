@@ -13,7 +13,10 @@ use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContextInterface;
 use OxidEsales\PaymentBase\Return\ReturnResolution;
 use OxidEsales\PaymentBase\Return\ReturnResolverInterface;
+use OxidEsales\PaymentBase\Service\ReturnSecurityValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutReturnServiceInterface;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult;
 use Throwable;
 
@@ -31,9 +34,26 @@ use Throwable;
  */
 class StripeReturnResolver implements ReturnResolverInterface
 {
+    private readonly LoggerInterface $logger;
+
+    /**
+     * @param ReturnSecurityValidatorInterface $securityValidator Scores the returning
+     *        session (IP / timing / user-agent). Sprint 133 · Story 5 (F5): this
+     *        validator existed, was DI-bound and unit-tested, and had NO production
+     *        caller — a session-hijack defence that never ran, invisible in CI
+     *        because its own tests were green.
+     * @param bool $enforceSecurityCheck Advisory by default. Rejecting a return
+     *        happens *after* Stripe authorised the payment, so a false positive
+     *        strands a paying customer with no order; the score is therefore
+     *        recorded and logged, and only blocks when a merchant opts in.
+     */
     public function __construct(
         private readonly CheckoutReturnServiceInterface $checkoutReturnService,
+        private readonly ReturnSecurityValidatorInterface $securityValidator,
+        private readonly bool $enforceSecurityCheck = false,
+        ?LoggerInterface $logger = null,
     ) {
+        $this->logger = $logger ?? new NullLogger();
     }
 
     public function resolve(
@@ -85,8 +105,73 @@ class StripeReturnResolver implements ReturnResolverInterface
             );
         }
 
+        $securityFailure = $this->applyReturnSecurity($contract, $context);
+        if ($securityFailure !== null) {
+            return $securityFailure;
+        }
+
         return $result->isRequiresCapture()
             ? ReturnResolution::authorized($paymentIntentId, $paymentIntentId, $amount, $currency)
             : ReturnResolution::readyToCommit($paymentIntentId, $paymentIntentId, $amount, $currency);
+    }
+
+    /**
+     * Score the returning session, record the outcome on the contract, and only
+     * reject when the merchant enabled enforcement.
+     */
+    private function applyReturnSecurity(
+        PaymentContractInterface $contract,
+        EventContextInterface $context,
+    ): ?ReturnResolution {
+        $result = $this->securityValidator->validateReturn($contract, $this->buildSecurityContext($context));
+
+        $contract->setMetadata('return_security_score', $result->getScore());
+        $contract->setMetadata('return_security_warnings', $result->getWarnings());
+
+        if ($result->isAllowed()) {
+            return null;
+        }
+
+        $this->logger->warning('Suspicious Stripe return session', [
+            'contract_id' => $contract->getId(),
+            'score' => $result->getScore(),
+            'warnings' => $result->getWarnings(),
+            'enforced' => $this->enforceSecurityCheck,
+        ]);
+
+        if (!$this->enforceSecurityCheck) {
+            return null;
+        }
+
+        return ReturnResolution::failed(
+            'security_check_failed',
+            sprintf('Return session rejected (score %d)', $result->getScore())
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildSecurityContext(EventContextInterface $context): array
+    {
+        return [
+            'ip' => $this->stringFrom($context, 'ip') ?? $this->serverValue('REMOTE_ADDR'),
+            'user_agent' => $this->stringFrom($context, 'user_agent') ?? $this->serverValue('HTTP_USER_AGENT'),
+            'country' => $this->stringFrom($context, 'country'),
+        ];
+    }
+
+    private function stringFrom(EventContextInterface $context, string $key): ?string
+    {
+        $value = $context->get($key);
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    private function serverValue(string $key): ?string
+    {
+        $value = $_SERVER[$key] ?? null;
+
+        return is_string($value) && $value !== '' ? $value : null;
     }
 }
