@@ -12,7 +12,17 @@ env:
   TEMPLATE_ENGINE: 'twig'
   # Branch of OXID-eSales/payment-base to test against. Change in sync with
   # the stripe branch when the two repos co-evolve (Sprint 119/STRP-129).
-  PAYMENT_BASE_BRANCH: 'b-7.4.x'
+  # Sprint 133: temporarily points at the matching payment-base branch, which
+  # carries the FraudCheckResponse::unscreened() / RefundPaymentRequest
+  # $idempotencyKey additions this branch depends on. REVERT to 'b-7.4.x' once
+  # payment-base b-7.4.x-honest-failure-paths is merged and tagged.
+  PAYMENT_BASE_BRANCH: 'b-7.4.x-honest-failure-paths'
+  # Version the payment-base path repository is aliased as. It MUST satisfy the
+  # "oxid-esales/payment-base" constraint in this module's composer.json, or
+  # composer cannot resolve the module at shop level. It was pinned to v1.0.0
+  # while composer.json moved to ^1.1 with payment-base v1.1.0 (2026-08-11),
+  # which is what broke every b-7.4.x run since.
+  PAYMENT_BASE_ALIAS: 'v1.1.0'
   # Branch of OXID-eSales/one-page-checkout. Its source is scanned by PHPStan
   # (scanDirectories in tests/PhpStan/phpstan.neon) so the OPC integration
   # handlers resolve OPC event classes — it is not a composer dependency.
@@ -117,7 +127,7 @@ jobs:
 
       - name: Install payment-base at shop level
         run: |
-          docker compose exec -T php composer require "oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH} as v1.0.0" --no-interaction --no-update
+          docker compose exec -T php composer require "oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH} as ${PAYMENT_BASE_ALIAS}" --no-interaction --no-update
 
       - name: Install module
         run: |
@@ -125,7 +135,7 @@ jobs:
             php composer config repositories.${{ env.PACKAGE_NAME }} \
             --json '{"type":"path", "url":"./test-module", "options": {"symlink": true}}'
           docker compose exec -T \
-            php composer require ${{ env.PACKAGE_NAME }}:* --no-interaction --no-update
+            php composer require "${{ env.PACKAGE_NAME }}:*@dev" --no-interaction --no-update
 
       - name: Install demodata
         run: |
@@ -300,7 +310,7 @@ jobs:
 
       - name: Pin payment-base
         working-directory: source/test-module
-        run: composer require "oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH} as v1.0.0" --no-update --no-interaction
+        run: composer require "oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH} as ${PAYMENT_BASE_ALIAS}" --no-update --no-interaction
 
       - name: Install module dependencies
         id: dependencies
@@ -369,7 +379,7 @@ jobs:
 
       - name: Pin payment-base
         run: |
-          docker compose exec -T php bash -c "cd /var/www/test-module && composer require 'oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH} as v1.0.0' --no-update --no-interaction"
+          docker compose exec -T php bash -c "cd /var/www/test-module && composer require 'oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH} as ${PAYMENT_BASE_ALIAS}' --no-update --no-interaction"
 
       - name: Install module dependencies
         run: |
@@ -432,7 +442,7 @@ jobs:
 
       - name: Install payment-base at shop level
         run: |
-          docker compose exec -T php composer require "oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH} as v1.0.0" --no-interaction --no-update
+          docker compose exec -T php composer require "oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH} as ${PAYMENT_BASE_ALIAS}" --no-interaction --no-update
 
       - name: Install testing dependencies
         run: |
