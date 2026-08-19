@@ -85,10 +85,17 @@ class StripeRadarFraudCheckServiceTest extends TestCase
         $result = $this->service->check($contract);
 
         $this->assertTrue($result->isSuccessful());
-        $this->assertEquals(0.0, $result->score);
+        $this->assertFalse($result->isScreened(), 'Nothing was screened, so no score may be claimed.');
+        $this->assertSame('no_payment_intent', $result->getReason());
     }
 
-    public function testPassesWhenRiskScoreNotAvailable(): void
+    /**
+     * Sprint 133 · Story 4 (F1) — rewritten. This asserted score === 0.0 for
+     * "Radar returned no score", i.e. it conflated *unknown* with *maximally
+     * clean* on the DTO's documented 0..1 scale. Payment still proceeds, but
+     * the response now says screening did not happen.
+     */
+    public function testReportsUnscreenedWhenRiskScoreNotAvailable(): void
     {
         $contract = $this->createMockContractWithPaymentIntent('pi_123');
 
@@ -99,11 +106,20 @@ class StripeRadarFraudCheckServiceTest extends TestCase
 
         $result = $this->service->check($contract);
 
-        $this->assertTrue($result->isSuccessful());
-        $this->assertEquals(0.0, $result->score);
+        $this->assertTrue($result->isSuccessful(), 'An unscoreable payment must not be blocked.');
+        $this->assertFalse($result->isScreened(), 'No screening happened, so it must not read as a clean score.');
+        $this->assertSame('score_unavailable', $result->getReason());
     }
 
-    public function testPassesOnApiError(): void
+    /**
+     * Sprint 133 · Story 4 (F1) — rewritten; supersedes testPassesOnApiError,
+     * which asserted the fail-open forgery: on any Throwable the service
+     * returned success(0.0) and FraudCheckHandler then wrote
+     * "passed: true, score: 0.0" into the contract for an order Radar never
+     * saw. The honest signal is FraudCheckResponse::error(); whether such an
+     * order may still proceed is now FraudCheckHandler's documented policy.
+     */
+    public function testReturnsErrorResponseOnApiError(): void
     {
         $contract = $this->createMockContractWithPaymentIntent('pi_123');
 
@@ -114,9 +130,34 @@ class StripeRadarFraudCheckServiceTest extends TestCase
 
         $result = $this->service->check($contract);
 
-        // Should pass on error to not block legitimate transactions
-        $this->assertTrue($result->isSuccessful());
-        $this->assertEquals(0.0, $result->score);
+        $this->assertFalse($result->isSuccessful());
+        $this->assertFalse($result->isScreened());
+        $this->assertSame(1.0, $result->score, 'A failed check is highest risk, not zero risk.');
+        $this->assertNotNull($result->getErrorMessage());
+    }
+
+    public function testLogsTheErrorWithPaymentIntentIdOnApiError(): void
+    {
+        $contract = $this->createMockContractWithPaymentIntent('pi_123');
+
+        $this->adapter->method('getPaymentIntentRiskScore')
+            ->willThrowException(new \RuntimeException('API error'));
+
+        // The old code carried the comment "Log the error for debugging" while
+        // having no logger at all: $e was captured and discarded.
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('error')
+            ->with(
+                $this->stringContains('fraud check'),
+                $this->callback(static fn (array $c): bool =>
+                    ($c['payment_intent_id'] ?? null) === 'pi_123'
+                    && ($c['error'] ?? null) === 'API error')
+            );
+
+        $service = new StripeRadarFraudCheckService($this->adapterFactory, 0.7, $logger);
+
+        $service->check($contract);
     }
 
     // =========================================================================

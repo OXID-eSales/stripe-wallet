@@ -1282,6 +1282,7 @@ services:
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $fraudCheckService: '@OxidEsales\PaymentBase\Service\FraudCheckServiceInterface'
       $enabled: '%payment.fraud_check.enabled%'
+      $failOpenOnCheckError: '%payment.fraud_check.fail_open_on_error%'
     tags:
       - { name: payment.event_handler, priority: 85 }
     public: false
@@ -1294,6 +1295,7 @@ services:
     arguments:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
       $threshold: '%payment.fraud_check.threshold%'
+      $logger: '@oxid_esales.monolog.logger'
     public: false
 
 # ==========================================
@@ -1386,6 +1388,12 @@ parameters:
   # Fraud check threshold (default: 0.7 = 70% risk score)
   # Scores >= threshold fail the fraud check
   payment.fraud_check.threshold: 0.7
+
+  # Sprint 133 (F1): may an order proceed when the fraud check could not run at
+  # all (Stripe outage, revoked key)? True preserves the historical outcome; the
+  # contract now records that no screening happened either way. Set false to
+  # block unscreenable orders instead.
+  payment.fraud_check.fail_open_on_error: true
 
   # Sprint 68b (M9): Server-side secret for address hash HMAC
   # Derived from a fixed salt — unique per installation via Stripe secret key injection at runtime
