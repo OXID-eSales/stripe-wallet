@@ -40,6 +40,7 @@ class WebhookController extends FrontendController
     protected ?WebhookLogServiceInterface $webhookLogger = null;
     protected ?RetryCleanupService $cleanupService = null;
     private ?WebhookRequestGuardInterface $guard = null;
+    private bool $guardChainDegraded = false;
 
     /**
      * Initialize services.
@@ -63,9 +64,18 @@ class WebhookController extends FrontendController
             $guard = $container->get(WebhookRequestGuardInterface::class);
             $this->guard = $guard instanceof WebhookRequestGuardInterface ? $guard : null;
         } catch (Exception $e) {
-            Registry::getLogger()->warning('Webhook guard chain unavailable — processing without rate limiting/IP checks', [
-                'error' => $e->getMessage(),
-            ]);
+            // Sprint 133 · Story 5 (F4): this used to log one warning and leave
+            // the guard null, and render()'s null-safe call then skipped HTTPS,
+            // IP allowlist, payload size AND rate limiting for every request.
+            // A security control that cannot be built fails the request, not
+            // the control: install the guards that need no container, and mark
+            // the endpoint degraded so it answers 503 instead of processing.
+            Registry::getLogger()->error(
+                'Webhook guard chain unavailable — endpoint degraded, refusing to process',
+                ['error' => $e->getMessage()]
+            );
+            $this->guard = $this->buildMinimalGuardChain();
+            $this->guardChainDegraded = true;
         }
 
         try {
@@ -91,12 +101,38 @@ class WebhookController extends FrontendController
         [$payload, $signature, $remoteIp] = $this->extractWebhookInput();
 
         // Sprint 64d: Run guard chain BEFORE any processing
-        $guardResult = $this->getGuard()?->check($payload, $signature, $remoteIp);
+        $guard = $this->getGuard();
+        $guardResult = $guard?->check($payload, $signature, $remoteIp);
         if ($guardResult !== null) {
             $this->sendErrorResponse($payload, $guardResult->message, $guardResult->httpStatusCode, $guardResult->reason);
         }
 
-        $this->webhookLogger?->logReceived($payload, $signature, $remoteIp);
+        // Sprint 133 (F4): no guards, or only the minimal fallback ones, means
+        // the endpoint is not fully protected — answer 503 so Stripe retries
+        // rather than processing unguarded traffic.
+        if ($guard === null || $this->guardChainDegraded) {
+            $this->sendErrorResponse(
+                $payload,
+                'Webhook guards unavailable',
+                503,
+                'GUARD_CHAIN_UNAVAILABLE'
+            );
+        }
+
+        $this->processWebhook($payload, $signature, $remoteIp);
+
+        return '';
+    }
+
+    /**
+     * Everything after the guard chain: audit log, validation, dispatch.
+     *
+     * Protected seam (module CLAUDE.md testable-subclass pattern) so the
+     * guard/fail-closed decision above can be unit-tested without a shop.
+     */
+    protected function processWebhook(string $payload, string $signature, string $remoteIp): void
+    {
+        $this->logReceived($payload, $signature, $remoteIp);
 
         if ($payload === '') {
             $this->sendErrorResponse('', 'Empty payload', 400, 'EMPTY_PAYLOAD');
@@ -130,13 +166,62 @@ class WebhookController extends FrontendController
         // STRP-100: Clean up stale NOT_FINISHED orders (>30 min) after each webhook
         $this->cleanupStaleNotFinishedOrders();
 
-        $this->webhookLogger?->logResult($payload, "SUCCESS: {$result->action}", 200);
+        $this->logResult($payload, "SUCCESS: {$result->action}", 200);
         http_response_code(200);
         echo json_encode(['received' => true, 'action' => $result->action]);
         exit;
+    }
 
-        // @phpstan-ignore-next-line - unreachable but required for return type
-        return '';
+    /**
+     * Sprint 133 (F4): the audit trail used to vanish silently when
+     * WebhookLogServiceInterface could not be built (`$this->webhookLogger?->`),
+     * leaving zero oe_payments_webhooklogs rows while processing continued.
+     * Mirrors the $fallbackLogger idiom already used by RequestLogService.
+     */
+    private function logReceived(string $payload, string $signature, string $remoteIp): void
+    {
+        if ($this->webhookLogger !== null) {
+            $this->webhookLogger->logReceived($payload, $signature, $remoteIp);
+            return;
+        }
+
+        Registry::getLogger()->warning('Webhook received but the webhook log service is unavailable', [
+            'remote_ip' => $remoteIp,
+            'payload_bytes' => strlen($payload),
+        ]);
+    }
+
+    private function logResult(string $payload, string $action, int $statusCode): void
+    {
+        if ($this->webhookLogger !== null) {
+            $this->webhookLogger->logResult($payload, $action, $statusCode);
+            return;
+        }
+
+        Registry::getLogger()->warning('Webhook result not persisted: log service unavailable', [
+            'action' => $action,
+            'status' => $statusCode,
+        ]);
+    }
+
+    /**
+     * Guards that need no container and no database, so the cheap invariants
+     * still hold when DI is broken.
+     */
+    /**
+     * Seam for the testable subclass; production sets this from init().
+     */
+    protected function setGuardChainDegraded(bool $degraded): void
+    {
+        $this->guardChainDegraded = $degraded;
+    }
+
+    protected function buildMinimalGuardChain(): WebhookRequestGuardInterface
+    {
+        return new WebhookGuardChain([
+            new WebhookHttpsGuard(),
+            new WebhookPayloadSizeGuard(),
+        ]);
     }
 
     /**
@@ -216,7 +301,7 @@ class WebhookController extends FrontendController
      */
     protected function sendErrorResponse(string $payload, string $message, int $statusCode, ?string $logAction = null): never
     {
-        $this->webhookLogger?->logResult($payload, $logAction ?? "FAILED: {$message}", $statusCode);
+        $this->logResult($payload, $logAction ?? "FAILED: {$message}", $statusCode);
         http_response_code($statusCode);
         echo json_encode(['error' => $message]);
         exit;

@@ -93,19 +93,23 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
         }
     }
 
+    /**
+     * Sprint 133 · Story 5 (F4) — DELIBERATE BEHAVIOUR CHANGE. This asserted
+     * that the endpoint keeps working with no guard chain at all, i.e. that a
+     * public endpoint may run unprotected. It now fails closed.
+     */
     #[\PHPUnit\Framework\Attributes\Test]
-    public function controllerWorksWithoutGuard(): void
+    public function controllerRefusesToProcessWithoutGuard(): void
     {
         $controller = new TestableWebhookControllerForGuard();
-        // No guard set — getGuard() returns null; render() must not hard-fail on this
+        // No guard set — getGuard() returns null.
         $controller->setWebhookInput('', 'sig_test', '1.2.3.4');
 
         try {
             $controller->render();
             $this->fail('Expected render() to terminate via sendErrorResponse()');
         } catch (WebhookTestResponseSent $response) {
-            // No guard → proceeds to empty payload check → 400 (not a guard-related code)
-            $this->assertSame(400, $response->statusCode);
+            $this->assertSame(503, $response->statusCode);
         }
     }
 
@@ -133,15 +137,20 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
     }
 
     /**
-     * Guard chain unavailable (init() sets guard=null via exception path in production).
+     * Guard chain unavailable (init() cannot resolve it from the container).
      *
-     * Production init() catches the container exception and logs a warning, leaving guard=null.
-     * render() must then CONTINUE without the guard (warn-and-continue), not return HTTP 500.
+     * Sprint 133 · Story 5 (F4) — DELIBERATE BEHAVIOUR CHANGE. This test used to
+     * assert warn-and-continue: it documented that render() proceeds past a null
+     * guard, which meant HTTPS enforcement, the IP allowlist, the payload-size
+     * cap and rate limiting were all skipped for every request after a single DI
+     * error, with only one warning at init() and no per-request trace.
+     *
+     * A security control that cannot be built now fails the request. Stripe
+     * retries on 503, so no event is lost.
      */
     #[\PHPUnit\Framework\Attributes\Test]
-    public function guardChainUnavailableRendersWarnsAndContinues(): void
+    public function guardChainUnavailableFailsClosedInsteadOfWarnAndContinue(): void
     {
-        // Guard is null (simulates the production case where container throws on guard resolution)
         $controller = new TestableWebhookControllerForGuard();
         // testGuard not set → getGuard() returns null
         $controller->setWebhookInput('{"event":"test"}', 'sig_header', '5.6.7.8');
@@ -150,12 +159,11 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
             $controller->render();
             $this->fail('Expected render() to terminate via sendErrorResponse()');
         } catch (WebhookTestResponseSent $response) {
-            // render() continued past the null guard and hit PROCESSOR_UNAVAILABLE (500),
-            // not a guard-specific rejection — proving warn-and-continue behaviour.
-            // (Empty guard → no guard check → payload non-empty → sig non-empty →
-            // processor=null → 500 PROCESSOR_UNAVAILABLE)
-            $this->assertSame(500, $response->statusCode);
-            $this->assertStringContainsString('processor unavailable', strtolower($response->body));
+            $this->assertSame(503, $response->statusCode);
+            $this->assertFalse(
+                $controller->wasProcessorCalled(),
+                'Unguarded traffic must not reach the processor.'
+            );
         }
     }
 
