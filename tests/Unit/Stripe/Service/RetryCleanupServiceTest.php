@@ -30,6 +30,54 @@ class RetryCleanupServiceTest extends TestCase
         $this->service = new RetryCleanupService($this->contractRepository, $this->orderService);
     }
 
+
+    // =========================================================================
+    // Sprint 133 · Story 15 (F15)
+    //
+    // cancelContractAndDeleteOrder() returned a bare false for three different
+    // situations — wrong concrete type, already-terminal contract, nothing found
+    // — so the caller (cleanupStaleContracts(), run after EVERY webhook) could
+    // not tell "nothing to do" from "could not act", and a contract that can
+    // never satisfy the guard was re-fetched forever in silence. The sibling
+    // check in StripePaymentHandler throws a LogicException naming the class:
+    // one invariant, two opposite reactions.
+    // =========================================================================
+
+    public function testCleanupLogsWhenItSkipsAnAlreadyTerminalContract(): void
+    {
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('info')
+            ->with($this->stringContains('skipped'), $this->anything());
+
+        $contract = $this->createContract('contract_term');
+        $contract->cancel('earlier');
+
+        $this->contractRepository->method('findById')->willReturn($contract);
+
+        $service = new RetryCleanupService($this->contractRepository, $this->orderService, $logger);
+
+        $this->assertFalse($service->cleanupPreviousAttempt($contract->getId()));
+    }
+
+    public function testCleanupWorksWithAnyPaymentContractInterfaceImplementation(): void
+    {
+        // Every method this service needs — getState(), getOrderId(), cancel() —
+        // is on PaymentContractInterface, so depending on the concrete class was
+        // an unnecessary DIP break that silently rejected other implementations.
+        $contract = $this->createMock(\OxidEsales\PaymentBase\Contract\PaymentContractInterface::class);
+        $contract->method('getId')->willReturn('c1');
+        $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::pending());
+        $contract->method('getOrderId')->willReturn(null);
+        $contract->expects($this->once())->method('cancel')->with('checkout_retry');
+
+        $this->contractRepository->method('findById')->willReturn($contract);
+
+        $service = new RetryCleanupService($this->contractRepository, $this->orderService);
+
+        $this->assertTrue($service->cleanupPreviousAttempt('c1'));
+    }
+
     private function createContract(string $id = 'contract_123'): PaymentContract
     {
         $basket = BasketSnapshot::fromArray([

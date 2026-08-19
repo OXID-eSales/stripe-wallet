@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
-use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * Handles cleanup of previous checkout attempts on retry.
@@ -19,10 +20,14 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
  */
 class RetryCleanupService
 {
+    private readonly LoggerInterface $logger;
+
     public function __construct(
         private readonly ContractRepositoryInterface $contractRepository,
-        private readonly ShopOrderServiceInterface $orderService
+        private readonly ShopOrderServiceInterface $orderService,
+        ?LoggerInterface $logger = null
     ) {
+        $this->logger = $logger ?? new NullLogger();
     }
 
     /**
@@ -79,13 +84,27 @@ class RetryCleanupService
         return $cleaned;
     }
 
+    /**
+     * Sprint 133 · Story 15 (F15): this narrowed to the concrete PaymentContract
+     * and returned a bare false for a type mismatch, so a contract that could
+     * never satisfy the guard was silently re-fetched after every webhook and
+     * never cleaned or reported. Every method used here — getState(), getOrderId(),
+     * cancel() — is on PaymentContractInterface, so the narrowing was an
+     * unnecessary DIP break; it is gone, and a genuine skip is now logged rather
+     * than being indistinguishable from "nothing to do".
+     */
     private function cancelContractAndDeleteOrder(?PaymentContractInterface $contract): bool
     {
-        if (!$contract instanceof PaymentContract) {
+        if ($contract === null) {
             return false;
         }
 
         if ($contract->getState()->isTerminal() || $contract->getState()->isCommitted()) {
+            $this->logger->info('Checkout retry cleanup skipped: contract is already settled', [
+                'contract_id' => $contract->getId(),
+                'state' => $contract->getStateValue(),
+            ]);
+
             return false;
         }
 

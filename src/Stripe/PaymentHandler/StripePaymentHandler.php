@@ -17,7 +17,6 @@ use OxidEsales\PaymentBase\Adapter\PaymentHandlerResult;
 use OxidEsales\PaymentBase\Adapter\Request\CreateOrderRequest;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
-use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractServiceInterface;
@@ -275,15 +274,11 @@ class StripePaymentHandler implements PaymentHandlerInterface
 
         $contract->setMetadata('order_number', (string) $orderResponse->orderNumber);
 
-        // State-machine transitions are declared on the concrete PaymentContract,
-        // not the interface (intentional: payment-base keeps the abstract surface
-        // narrow). Narrow the type here so the calls are statically checkable.
-        if (!$contract instanceof PaymentContract) {
-            throw new \LogicException(
-                'createEarlyOrderAndTransition requires a concrete PaymentContract; got '
-                . $contract::class
-            );
-        }
+        // Sprint 133 (F15): transitionToNotFinished() is now on
+        // PaymentContractInterface alongside transitionToPending(), so this no
+        // longer has to narrow to the concrete PaymentContract. The old comment
+        // claimed the narrow abstract surface was intentional, but every other
+        // transition this module uses was already on the interface.
 
         // DRAFT → NOT_FINISHED
         $contract->transitionToNotFinished($orderId);
