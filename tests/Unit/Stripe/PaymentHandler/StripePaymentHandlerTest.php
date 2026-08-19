@@ -46,7 +46,7 @@ class StripePaymentHandlerTest extends TestCase
         $this->config->method('isConfigured')->willReturn(true);
     }
 
-    private function createHandler(bool $iframeEnabled = false): StripePaymentHandler
+    private function createHandler(bool $iframeEnabled = false, ?\OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface $adapterFactory = null): StripePaymentHandler
     {
         $iframeSettings = $this->createMock(IframeCheckoutSettingsInterface::class);
         $iframeSettings->method('isEnabled')->willReturn($iframeEnabled);
@@ -59,7 +59,8 @@ class StripePaymentHandlerTest extends TestCase
             $this->shopOrderService,
             $this->config,
             $this->tokenService,
-            iframeSettings: $iframeSettings
+            iframeSettings: $iframeSettings,
+            adapterFactory: $adapterFactory
         );
     }
 
@@ -133,9 +134,21 @@ class StripePaymentHandlerTest extends TestCase
 
     // ── confirmPayment() ──
 
-    public function testConfirmPaymentReturnsSuccessForContractId(): void
+    /**
+     * Sprint 133 · Story 6 (F6) — DELIBERATE BEHAVIOUR CHANGE. This asserted
+     * that confirmPayment() reports success for any id without contacting
+     * Stripe, which was the defect: PaymentHandlerInterface documents the method
+     * as "Confirm payment with provider / Result with confirmation status".
+     * Confirmation now requires a provider round-trip; the contract id is still
+     * echoed back, but only on a genuinely confirmed payment.
+     */
+    public function testConfirmPaymentEchoesContractIdOnlyWhenProviderConfirms(): void
     {
-        $result = $this->createHandler()->confirmPayment('contract_abc');
+        $handler = $this->createHandler(false, $this->adapterReturningStatus(
+            \OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper::STATUS_CAPTURED
+        ));
+
+        $result = $handler->confirmPayment('contract_abc');
 
         $this->assertTrue($result->isSuccess());
         $this->assertSame('contract_abc', $result->getContractId());
@@ -194,5 +207,91 @@ class StripePaymentHandlerTest extends TestCase
         });
 
         return $context;
+    }
+
+    // =========================================================================
+    // Sprint 133 · Story 6 (F6) — confirmPayment must consult the provider
+    //
+    // It used to return PaymentHandlerResult::success() unconditionally, with no
+    // provider call, against an interface documented as "Confirm payment with
+    // provider / Result with confirmation status". A caller written to the
+    // interface could not tell that answer from a real confirmation.
+    // =========================================================================
+
+    private function adapterReturningStatus(string $status): \OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface
+    {
+        // PaymentDetailsResponse is readonly, so build a real one.
+        $details = new \OxidEsales\PaymentBase\Adapter\Response\PaymentDetailsResponse(
+            providerPaymentId: 'pi_x',
+            status: $status,
+            amount: 100.0,
+            currency: 'EUR',
+            amountCaptured: 100.0,
+            amountRefunded: 0.0,
+            isCaptured: true,
+            isRefunded: false,
+            isCancelled: false,
+            createdAt: new \DateTimeImmutable(),
+        );
+
+        $adapter = $this->createMock(\OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface::class);
+        $adapter->method('getPaymentDetails')->willReturn($details);
+
+        $factory = $this->createMock(\OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface::class);
+        $factory->method('getStripeAdapter')->willReturn($adapter);
+
+        return $factory;
+    }
+
+    public function testConfirmPaymentWhenPaymentIntentCapturedReturnsSuccess(): void
+    {
+        $handler = $this->createHandler(false, $this->adapterReturningStatus(
+            \OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper::STATUS_CAPTURED
+        ));
+
+        $result = $handler->confirmPayment('pi_captured');
+
+        $this->assertTrue($result->isSuccess());
+    }
+
+    public function testConfirmPaymentWhenPaymentIntentAuthorizedReturnsSuccess(): void
+    {
+        $handler = $this->createHandler(false, $this->adapterReturningStatus(
+            \OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper::STATUS_AUTHORIZED
+        ));
+
+        $result = $handler->confirmPayment('pi_authorized');
+
+        $this->assertTrue($result->isSuccess());
+    }
+
+    public function testConfirmPaymentWhenPaymentIntentNotCompletedReturnsFailure(): void
+    {
+        $handler = $this->createHandler(false, $this->adapterReturningStatus('requires_action'));
+
+        $result = $handler->confirmPayment('pi_pending');
+
+        $this->assertFalse($result->isSuccess(), 'An unconfirmed payment must not report success.');
+    }
+
+    public function testConfirmPaymentWhenAdapterThrowsReturnsFailure(): void
+    {
+        $adapter = $this->createMock(\OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface::class);
+        $adapter->method('getPaymentDetails')->willThrowException(new \RuntimeException('API down'));
+
+        $factory = $this->createMock(\OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface::class);
+        $factory->method('getStripeAdapter')->willReturn($adapter);
+
+        $result = $this->createHandler(false, $factory)->confirmPayment('pi_boom');
+
+        $this->assertFalse($result->isSuccess());
+    }
+
+    public function testConfirmPaymentNeverReportsSuccessWithoutQueryingTheProvider(): void
+    {
+        // No adapter wired at all: an explicit failure, never a free yes.
+        $result = $this->createHandler()->confirmPayment('pi_whatever');
+
+        $this->assertFalse($result->isSuccess());
     }
 }

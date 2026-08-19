@@ -88,6 +88,9 @@ services:
       $tokenService: '@OxidEsales\Payments\Stripe\Service\ContractTokenService'
       # IFRAME-02: provider-agnostic "Use iframe instead of checkout button" flag (payment-base).
       $iframeSettings: '@OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface'
+      # Sprint 133 (F6): confirmPayment() asks Stripe for the PaymentIntent state
+      # instead of returning an unconditional success.
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
     tags:
       - { name: oe.payment.handler }
     public: true

@@ -24,6 +24,8 @@ use OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface;
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
+use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
 use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
@@ -58,7 +60,8 @@ class StripePaymentHandler implements PaymentHandlerInterface
         private readonly TokenServiceInterface $tokenService,
         private readonly ?LoggerInterface $logger = null,
         ?LanguageResolverInterface $languageResolver = null,
-        private readonly ?IframeCheckoutSettingsInterface $iframeSettings = null
+        private readonly ?IframeCheckoutSettingsInterface $iframeSettings = null,
+        private readonly ?StripeAdapterFactoryInterface $adapterFactory = null
     ) {
         $this->languageResolver = $languageResolver ?? new OxidLanguageResolver();
     }
@@ -133,11 +136,62 @@ class StripePaymentHandler implements PaymentHandlerInterface
         }
     }
 
+    /**
+     * Confirm a payment by asking Stripe what state the PaymentIntent is in.
+     *
+     * Sprint 133 · Story 6 (F6): this returned success() unconditionally, with
+     * no provider call, while PaymentHandlerInterface documents it as "Confirm
+     * payment with provider / Result with confirmation status" — so any caller
+     * written to the interface received a confirmation that was structurally
+     * indistinguishable from a real one. Nothing called it yet, which is the
+     * only reason it was not already an incident.
+     *
+     * Reuses the normalized status mapping that StripePaymentCaptureStatusQuery
+     * already owns rather than deriving a second one.
+     */
     public function confirmPayment(string $transactionId): PaymentHandlerResult
     {
+        if ($this->adapterFactory === null) {
+            return PaymentHandlerResult::error(
+                'Stripe confirmation unavailable: no payment adapter configured',
+                'STRIPE_CONFIRM_UNAVAILABLE'
+            );
+        }
+
+        try {
+            $details = $this->adapterFactory->getStripeAdapter()->getPaymentDetails($transactionId);
+        } catch (\Throwable $e) {
+            $this->logger?->error('[StripePaymentHandler] confirmPayment failed', [
+                'transactionId' => $transactionId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return PaymentHandlerResult::error(
+                'Stripe confirmation failed: ' . $e->getMessage(),
+                'STRIPE_CONFIRM_FAILED'
+            );
+        }
+
+        $confirmed = in_array(
+            $details->status,
+            [StripeStatusMapper::STATUS_CAPTURED, StripeStatusMapper::STATUS_AUTHORIZED],
+            true
+        );
+
+        if (!$confirmed) {
+            return PaymentHandlerResult::error(
+                sprintf('Stripe payment not confirmed (status: %s)', $details->status),
+                'STRIPE_NOT_CONFIRMED'
+            );
+        }
+
         return PaymentHandlerResult::success(
             contractId: $transactionId,
-            metadata: ['note' => 'Stripe confirms via redirect return + webhooks']
+            metadata: [
+                'handler' => StripeDefinitions::PROVIDER,
+                'providerStatus' => $details->status,
+                'captured' => $details->status === StripeStatusMapper::STATUS_CAPTURED,
+            ]
         );
     }
 
