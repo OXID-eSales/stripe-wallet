@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
+use Psr\Log\LoggerInterface;
 use OxidEsales\PaymentBase\EventSystem\Handler\HandlerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeSuccessUrlBuildEvent;
 
@@ -27,6 +28,7 @@ class OpcModalSuccessUrlHandler implements HandlerInterface
 {
     public function __construct(
         private readonly OpcModalSessionReader $sessionReader,
+        private readonly ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -38,6 +40,12 @@ class OpcModalSuccessUrlHandler implements HandlerInterface
     public function handle(object $event): void
     {
         if (!$event instanceof StripeSuccessUrlBuildEvent) {
+            // Sprint 133 (F16): a wiring regression must not be silent.
+            $this->logger?->warning('OpcModalSuccessUrlHandler received an unexpected event type; skipping', [
+                'expected' => StripeSuccessUrlBuildEvent::class,
+                'received' => $event::class,
+            ]);
+
             return;
         }
 

@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
+use Psr\Log\LoggerInterface;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\OnePageCheckout\EventSystem\Event\OpcModalReopenedAfterExternalReturnEvent;
 use OxidEsales\PaymentBase\EventSystem\Handler\HandlerInterface;
@@ -55,6 +56,7 @@ class OpcExternalReturnCleanupHandler implements HandlerInterface
 
     public function __construct(
         private readonly RetryCleanupService $cleanupService,
+        private readonly ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -66,6 +68,12 @@ class OpcExternalReturnCleanupHandler implements HandlerInterface
     public function handle(object $event): void
     {
         if (!$event instanceof OpcModalReopenedAfterExternalReturnEvent) {
+            // Sprint 133 (F16): a wiring regression must not be silent.
+            $this->logger?->warning('OpcExternalReturnCleanupHandler received an unexpected event type; skipping', [
+                'expected' => OpcModalReopenedAfterExternalReturnEvent::class,
+                'received' => $event::class,
+            ]);
+
             return;
         }
 

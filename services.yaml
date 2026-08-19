@@ -35,6 +35,12 @@ services:
   OxidEsales\Payments\Stripe\Service\ModuleDescriptionProvider:
     public: false
 
+  # Sprint 133 (F15): logs when it skips an already-settled contract, so a
+  # sweep that can never act stops being indistinguishable from a quiet one.
+  OxidEsales\Payments\Stripe\Service\RetryCleanupService:
+    arguments:
+      $logger: '@oxid_esales.monolog.logger'
+
   # Sprint 133 (F13): logs when it refuses an untrustworthy legacy webhook
   # secret, so a mode switch cannot silently stop orders being marked paid.
   OxidEsales\Payments\Stripe\Service\ModuleConfigurationService:
@@ -412,12 +418,14 @@ services:
   OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalSuccessUrlHandler:
     arguments:
       $sessionReader: '@OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalSessionReader'
+      $logger: '@oxid_esales.monolog.logger'
     tags:
       - { name: payment.event_handler }
 
   OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalCancelUrlHandler:
     arguments:
       $sessionReader: '@OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalSessionReader'
+      $logger: '@oxid_esales.monolog.logger'
     tags:
       - { name: payment.event_handler }
 
@@ -429,6 +437,7 @@ services:
   OxidEsales\Payments\Stripe\EventSystem\Handler\OpcExternalReturnCleanupHandler:
     arguments:
       $cleanupService: '@OxidEsales\Payments\Stripe\Service\RetryCleanupService'
+      $logger: '@oxid_esales.monolog.logger'
     tags:
       - { name: payment.event_handler }
 
