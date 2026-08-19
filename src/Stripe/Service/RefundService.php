@@ -13,6 +13,7 @@ use DateTimeImmutable;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
 use OxidEsales\PaymentBase\Service\StockRestorationServiceInterface;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripePaymentIntentDto;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeRefundDto;
 use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
@@ -58,21 +59,43 @@ class RefundService implements RefundServiceInterface
             return RefundResponse::failure('Payment intent ID is required for refund');
         }
 
-        $chargeId = $this->getChargeIdFromPaymentIntent($paymentIntentId);
-        if ($chargeId === null) {
+        $paymentIntent = $this->retrievePaymentIntent($paymentIntentId);
+        $chargeId = $paymentIntent !== null ? $this->extractChargeId($paymentIntent) : null;
+        if ($paymentIntent === null || $chargeId === null) {
             return RefundResponse::failure('No charge found for payment intent');
+        }
+
+        // Sprint 133 · Story 1 (F3): the PaymentIntent we just retrieved already
+        // carries its currency, so the minor-unit conversion is currency-correct
+        // without an extra API call. Passing '' here (the previous behaviour)
+        // always assumed 2 decimals and refunded 100x on zero-decimal currencies.
+        $currency = $paymentIntent->currency;
+        if ($amount !== null && $currency === '') {
+            $this->logger->error('Refund aborted: PaymentIntent carries no currency', [
+                'payment_intent_id' => $paymentIntentId,
+                'order_id' => $orderId,
+            ]);
+
+            return RefundResponse::failure(
+                'Cannot convert refund amount: no currency on payment intent',
+                'currency_unresolvable'
+            );
         }
 
         $metadata = $this->buildMetadata($orderId, $initiator, $description);
         $validReason = $this->validateReason($reason);
-        // currency is sourced from the charge returned by createRefundByCharge;
-        // processRefund callers pass the amount in major units. The charge's currency
-        // is not available here without an extra API call — pass '' to default to 2 decimals.
-        // Sprint 114.7: full currency threading would require adding currency to RefundService
-        // callers; safe for EUR-primary shops.
-        $amountInCents = $amount !== null ? AmountConverter::toMinorUnits($amount, '') : null;
+        $amountInMinorUnits = $amount !== null
+            ? AmountConverter::toMinorUnits($amount, $currency)
+            : null;
 
-        return $this->executeRefundByCharge($chargeId, $orderId, $paymentIntentId, $validReason, $metadata, $amountInCents);
+        return $this->executeRefundByCharge(
+            $chargeId,
+            $orderId,
+            $paymentIntentId,
+            $validReason,
+            $metadata,
+            $amountInMinorUnits
+        );
     }
 
     public function processRefundByCharge(
@@ -113,18 +136,19 @@ class RefundService implements RefundServiceInterface
         }
     }
 
-    private function getChargeIdFromPaymentIntent(string $paymentIntentId): ?string
+    /**
+     * Retrieve the PaymentIntent DTO once, so callers can use every field it
+     * carries (charge id AND currency) instead of discarding all but one.
+     *
+     * Sprint 133 · Story 1 (F3): replaces getChargeIdFromPaymentIntent(), which
+     * threw away the currency and forced a 2-decimal guess downstream.
+     */
+    private function retrievePaymentIntent(string $paymentIntentId): ?StripePaymentIntentDto
     {
         try {
-            $piDto = $this->adapterFactory
+            return $this->adapterFactory
                 ->getStripeAdapter()
                 ->retrievePaymentIntent($paymentIntentId);
-
-            if ($piDto->charge !== null) {
-                return $piDto->charge->id;
-            }
-
-            return $piDto->latestChargeId;
         } catch (PaymentAdapterException $e) {
             $this->logger->error('Failed to retrieve payment intent', [
                 'payment_intent_id' => $paymentIntentId,
@@ -132,6 +156,20 @@ class RefundService implements RefundServiceInterface
             ]);
             return null;
         }
+    }
+
+    /**
+     * Resolve the charge id from an already-retrieved PaymentIntent.
+     *
+     * Prefers the expanded charge object, falls back to the id-only field.
+     */
+    private function extractChargeId(StripePaymentIntentDto $paymentIntent): ?string
+    {
+        if ($paymentIntent->charge !== null) {
+            return $paymentIntent->charge->id;
+        }
+
+        return $paymentIntent->latestChargeId;
     }
 
     /**

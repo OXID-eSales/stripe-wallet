@@ -592,15 +592,103 @@ class RefundServiceTest extends TestCase
         );
     }
 
-    private function buildPiDto(string $id, ?string $latestChargeId): StripePaymentIntentDto
-    {
+    private function buildPiDto(
+        string $id,
+        ?string $latestChargeId,
+        string $currency = 'eur'
+    ): StripePaymentIntentDto {
         return new StripePaymentIntentDto(
             id: $id,
             status: 'succeeded',
             amount: 10000,
-            currency: 'eur',
+            currency: $currency,
             created: 1700000000,
             latestChargeId: $latestChargeId,
         );
+    }
+
+    // =========================================================================
+    // Sprint 133 · Story 1 (F3) — partial-refund currency threading
+    //
+    // The pre-existing testProcessRefundJpyPreservesZeroDecimalAmount in
+    // RefundServiceDtoCharacterizationTest only exercises the FULL-refund path
+    // (amount === null), where no major->minor conversion happens at all, so it
+    // could never catch this. The two-decimal regression is already covered by
+    // the EUR partial test above (5.50 => 550), so it is not duplicated here.
+    // =========================================================================
+
+    public function testProcessRefund_WhenZeroDecimalCurrency_ConvertsWithoutMultiplier(): void
+    {
+        $this->stripeAdapter
+            ->method('retrievePaymentIntent')
+            ->willReturn($this->buildPiDto('pi_jpy', 'ch_jpy', 'jpy'));
+
+        // JPY minor unit IS the yen: 1000 yen must reach Stripe as 1000, not 100000.
+        $this->stripeAdapter
+            ->expects($this->once())
+            ->method('createRefundByCharge')
+            ->with('ch_jpy', 1000, $this->anything(), $this->anything())
+            ->willReturn($this->buildRefundDto('re_jpy', 1000, 'jpy', 'succeeded'));
+
+        $result = $this->createService()
+            ->processRefund('order_jpy', 'pi_jpy', null, null, 'admin', 1000.0);
+
+        $this->assertTrue($result->isSuccessful());
+    }
+
+    public function testProcessRefund_WhenThreeDecimalCurrency_UsesThousandths(): void
+    {
+        $this->stripeAdapter
+            ->method('retrievePaymentIntent')
+            ->willReturn($this->buildPiDto('pi_bhd', 'ch_bhd', 'bhd'));
+
+        $this->stripeAdapter
+            ->expects($this->once())
+            ->method('createRefundByCharge')
+            ->with('ch_bhd', 1234, $this->anything(), $this->anything())
+            ->willReturn($this->buildRefundDto('re_bhd', 1234, 'bhd', 'succeeded'));
+
+        $result = $this->createService()
+            ->processRefund('order_bhd', 'pi_bhd', null, null, 'admin', 1.234);
+
+        $this->assertTrue($result->isSuccessful());
+    }
+
+    public function testProcessRefund_WhenCurrencyUnresolvable_FailsInsteadOfGuessing(): void
+    {
+        $this->stripeAdapter
+            ->method('retrievePaymentIntent')
+            ->willReturn($this->buildPiDto('pi_nocur', 'ch_nocur', ''));
+
+        // A partial amount cannot be converted without knowing the currency's
+        // exponent. Guessing 2 decimals is what produced the 100x defect.
+        $this->stripeAdapter
+            ->expects($this->never())
+            ->method('createRefundByCharge');
+
+        $result = $this->createService()
+            ->processRefund('order_nocur', 'pi_nocur', null, null, 'admin', 10.0);
+
+        $this->assertFalse($result->isSuccessful());
+        $this->assertStringContainsString('currency', (string) $result->errorMessage);
+    }
+
+    public function testProcessRefund_WhenFullRefundAndCurrencyUnresolvable_StillProceeds(): void
+    {
+        // Full refund sends no amount, so the currency is irrelevant -- the
+        // guard must not turn an unrelated edge case into a refund outage.
+        $this->stripeAdapter
+            ->method('retrievePaymentIntent')
+            ->willReturn($this->buildPiDto('pi_nocur2', 'ch_nocur2', ''));
+
+        $this->stripeAdapter
+            ->expects($this->once())
+            ->method('createRefundByCharge')
+            ->with('ch_nocur2', null, $this->anything(), $this->anything())
+            ->willReturn($this->buildRefundDto('re_full', 10000, 'eur', 'succeeded'));
+
+        $result = $this->createService()->processRefund('order_nocur2', 'pi_nocur2');
+
+        $this->assertTrue($result->isSuccessful());
     }
 }
