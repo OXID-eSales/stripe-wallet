@@ -104,9 +104,18 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
         $this->assertSame('failure', $tx->getType());
     }
 
+    /**
+     * Sprint 133 · Story 9 (F9): this asserted only the row's *type*, so it
+     * silently accepted the amount 0.00 that `getCapturedAmount() ?? 0.0`
+     * produced for every capture whose amount was not recorded. It now asserts
+     * the recorded amount too.
+     */
     public function testHandlePaymentSucceededWritesCaptureAuditRowOnSuccessfulFulfillment(): void
     {
-        $contract = $this->nonTerminalContractWithOrderId('order-cap');
+        // setCapturedAmount is state-guarded (rejects draft/not_finished), so
+        // use a contract that has actually been through checkout.
+        $contract = $this->fulfilledContractWithOrderId('order-cap');
+        $contract->setCapturedAmount(42.50);
         $this->contractFulfillmentService
             ->method('fulfillByProviderOrderId')
             ->willReturn(true);
@@ -121,6 +130,26 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
         $this->assertCount(1, $this->transactionRepository->saved);
         $tx = $this->transactionRepository->saved[0];
         $this->assertSame('capture', $tx->getType());
+        $this->assertSame(42.50, $tx->getAmount());
+    }
+
+    public function testHandlePaymentSucceededDoesNotWriteAZeroAuditRowWhenTheAmountIsUnknown(): void
+    {
+        // No captured amount on the contract: an audit trail carrying 0.00 for a
+        // real capture is worse than a missing row plus a loud log line.
+        $contract = $this->nonTerminalContractWithOrderId('order-noamount');
+        $this->contractFulfillmentService
+            ->method('fulfillByProviderOrderId')
+            ->willReturn(true);
+        $this->contractRepository
+            ->method('findByProviderOrderId')
+            ->willReturn($contract);
+
+        $handler = $this->makeHandler();
+        $result = $handler->handlePaymentSucceeded('pi_noamount');
+
+        $this->assertTrue($result, 'Fulfillment itself still succeeded.');
+        $this->assertSame([], $this->transactionRepository->saved);
     }
 
     public function testHandlePaymentSucceededDoesNotWriteAuditRowWhenFulfillmentReturnsFalseOrNull(): void

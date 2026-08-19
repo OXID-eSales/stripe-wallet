@@ -172,6 +172,21 @@ class CaptureService implements CaptureServiceInterface
         PaymentContractInterface $contract,
         CaptureResponse $result
     ): void {
+        // Sprint 133 · Story 9 (F9): `?? 0` here would have written an audit row
+        // claiming 0.00 was captured. It is unreachable by construction —
+        // CaptureResponse::success() requires a float amount and this method only
+        // runs on a successful response — so if the invariant ever breaks, say so
+        // instead of recording a fiction.
+        $capturedAmount = $result->amountCaptured;
+        if ($capturedAmount === null) {
+            $this->logger->error('Capture audit row skipped: successful capture reported no amount', [
+                'contract_id' => $contract->getId(),
+                'capture_id' => $result->captureId,
+            ]);
+
+            return;
+        }
+
         $transaction = new Transaction(
             id: 'cap_' . bin2hex(random_bytes(16)),
             shopId: (int) $this->shopAdapter->getShopId(),
@@ -180,7 +195,7 @@ class CaptureService implements CaptureServiceInterface
             provider: StripeDefinitions::PROVIDER,
             type: StripeDefinitions::TRANSACTION_TYPE_CAPTURE,
             status: StripeDefinitions::TRANSACTION_STATUS_COMPLETED,
-            amount: $result->amountCaptured ?? 0,
+            amount: $capturedAmount,
             // Sprint 133 (F7): fall back to the contract's own currency rather
             // than a hardcoded 'EUR' — an audit row must not invent a currency.
             currency: $result->currency ?? $contract->getCurrency()

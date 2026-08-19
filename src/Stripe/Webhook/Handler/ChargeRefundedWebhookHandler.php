@@ -49,6 +49,19 @@ class ChargeRefundedWebhookHandler extends AbstractStripeWebhookHandler
         }
 
         $refundedAmount = $this->parser->extractAmountInCurrencyUnits($event, 'amount_refunded');
+        if ($refundedAmount === null) {
+            // Sprint 133 (F9): recording a 0.00 refund for an event whose amount
+            // we could not read would be a fiction; fail so Stripe retries.
+            $this->logger->error('charge.refunded carries no readable amount_refunded', [
+                'payment_intent_id' => $paymentIntentId,
+                'event_id' => $event->id,
+            ]);
+
+            return StripeWebhookOutcome::of(
+                WebhookResult::failure('invalid_event', 'Missing or malformed amount_refunded in charge')
+            );
+        }
+
         $this->logger->info('Processing charge.refunded', [
             'payment_intent_id' => $paymentIntentId,
             'refunded_amount' => $refundedAmount,

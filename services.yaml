@@ -890,6 +890,9 @@ services:
       $transactionRepository: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
       $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
       $refundRecorder: '@OxidEsales\Payments\Stripe\Service\ContractRefundRecorder'
+      # Sprint 133 (F9): reports a capture whose amount the contract does not
+      # carry, instead of writing a 0.00 audit row for it.
+      $logger: '@oxid_esales.monolog.logger'
     public: false
 
   # Sprint 112 / G1: mirrors contract cancel/fail transitions onto linked oxorder.

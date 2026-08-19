@@ -108,6 +108,46 @@ final class ChargeRefundedWebhookHandlerTest extends TestCase
     /**
      * @param array<string, mixed> $objectData
      */
+
+    /**
+     * Sprint 133 · Story 9 (F9): an unparseable amount used to arrive as 0.00
+     * and be recorded as a real refund of nothing. It is now a processing
+     * failure, so the controller answers 500 and Stripe retries the event.
+     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function missingRefundedAmount_returnsFailureAndDoesNotFulfil(): void
+    {
+        $this->fulfillmentHandler->expects($this->never())->method('handleChargeRefunded');
+
+        $outcome = $this->handler->handle($this->makeEvent([
+            'id' => 'ch_1',
+            'payment_intent' => 'pi_1',
+            'currency' => 'eur',
+            // no amount_refunded
+        ]));
+
+        $this->assertTrue($outcome->result->isFailure());
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function zeroRefundedAmountIsStillProcessed(): void
+    {
+        // A genuine zero must stay distinguishable from "unknown".
+        $this->fulfillmentHandler->expects($this->once())
+            ->method('handleChargeRefunded')
+            ->with('pi_zero', 0.0)
+            ->willReturn(true);
+
+        $outcome = $this->handler->handle($this->makeEvent([
+            'id' => 'ch_zero',
+            'payment_intent' => 'pi_zero',
+            'amount_refunded' => 0,
+            'currency' => 'eur',
+        ]));
+
+        $this->assertFalse($outcome->result->isFailure());
+    }
+
     private function makeEvent(array $objectData): WebhookEvent
     {
         return new WebhookEvent(

@@ -78,14 +78,19 @@ class StripeWebhookEventParser
      * Sprint 114.7: uses AmountConverter so zero-decimal currencies (JPY, KRW, …)
      * are handled correctly. The currency field must be present in the event object
      * alongside the amount field; defaults to 2 decimals if absent (safe for EUR).
+     *
+     * Sprint 133 · Story 9 (F9): returns null when the amount is absent or not an
+     * integer. It used to return 0.0, which is indistinguishable from a genuine
+     * zero — so a renamed field or an unexpected payload silently recorded a 0.00
+     * capture/refund and left the full amount looking capturable.
      */
-    public function extractAmountInCurrencyUnits(WebhookEvent $event, string $field): float
+    public function extractAmountInCurrencyUnits(WebhookEvent $event, string $field): ?float
     {
         $object = $event->getObject();
-        $amount = $object[$field] ?? 0;
+        $amount = $object[$field] ?? null;
 
         if (!is_int($amount)) {
-            return 0.0;
+            return null;
         }
 
         $currency = isset($object['currency']) && is_string($object['currency'])
