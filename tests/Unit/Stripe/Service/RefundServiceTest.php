@@ -691,4 +691,57 @@ class RefundServiceTest extends TestCase
 
         $this->assertTrue($result->isSuccessful());
     }
+
+    public function testProcessRefund_PartialRefundPassesPriorRefundedStateAsRequestReference(): void
+    {
+        // Charge already has 1000 minor units refunded; that pre-state is what
+        // makes a *retry* of this submit identical and a *later* identical
+        // partial refund distinct. See Sprint 133 Story 0 findings.
+        $charge = new StripeChargeDto(
+            id: 'ch_state',
+            amount: 10000,
+            amountCaptured: 10000,
+            amountRefunded: 1000,
+            currency: 'eur',
+            captured: true,
+            created: 1700000000,
+        );
+
+        $this->stripeAdapter
+            ->method('retrievePaymentIntent')
+            ->willReturn(new StripePaymentIntentDto(
+                id: 'pi_state',
+                status: 'succeeded',
+                amount: 10000,
+                currency: 'eur',
+                created: 1700000000,
+                latestChargeId: 'ch_state',
+                charge: $charge,
+            ));
+
+        $seenReference = 'not-called';
+        $this->stripeAdapter
+            ->method('createRefundByCharge')
+            ->willReturnCallback(function (
+                string $chargeId,
+                ?int $amount = null,
+                ?string $reason = null,
+                ?array $metadata = null,
+                ?string $requestReference = null
+            ) use (&$seenReference): StripeRefundDto {
+                $seenReference = $requestReference;
+                return $this->buildRefundDto('re_state', 500, 'eur', 'succeeded');
+            });
+
+        $result = $this->createService()
+            ->processRefund('order_state', 'pi_state', null, null, 'admin', 5.0);
+
+        $this->assertTrue($result->isSuccessful());
+        $this->assertIsString($seenReference, 'A request reference must be threaded to the adapter.');
+        $this->assertStringContainsString(
+            '1000',
+            $seenReference,
+            'The reference must encode the prior refunded total.'
+        );
+    }
 }

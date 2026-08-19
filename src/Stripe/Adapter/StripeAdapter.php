@@ -304,9 +304,17 @@ class StripeAdapter implements StripeAdapterInterface
         string $chargeId,
         ?int $amount = null,
         ?string $reason = null,
-        ?array $metadata = null
+        ?array $metadata = null,
+        ?string $requestReference = null
     ): StripeRefundDto {
-        $raw = $this->refundHelper->createRefundByCharge($this->stripeClient, $chargeId, $amount, $reason, $metadata);
+        $raw = $this->refundHelper->createRefundByCharge(
+            $this->stripeClient,
+            $chargeId,
+            $amount,
+            $reason,
+            $metadata,
+            $requestReference
+        );
         return StripeObjectMapper::fromRefund($raw);
     }
 

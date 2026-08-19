@@ -59,10 +59,18 @@ class RefundHelper
         string $chargeId,
         ?int $amount = null,
         ?string $reason = null,
-        ?array $metadata = null
+        ?array $metadata = null,
+        ?string $requestReference = null
     ): Refund {
         if ($this->idempotencyRepository !== null) {
-            return $this->refundByChargeWithIdempotency($client, $chargeId, $amount, $reason, $metadata);
+            return $this->refundByChargeWithIdempotency(
+                $client,
+                $chargeId,
+                $amount,
+                $reason,
+                $metadata,
+                $requestReference
+            );
         }
 
         return $this->executeCreateRefundByCharge($client, $chargeId, $amount, $reason, $metadata);
@@ -152,7 +160,12 @@ class RefundHelper
         /** @var IdempotentExecutor $executor */
         $executor = $this->idempotentExecutor;
         $result = $executor->execute(
-            key: 'refund:' . $request->providerPaymentId,
+            key: IdempotencyKeyFactory::forRefund(
+                $request->providerPaymentId,
+                $this->refundAmountInMinorUnits($request),
+                $request->reason,
+                $request->idempotencyKey
+            ),
             referenceId: $request->providerPaymentId,
             operation: 'refund',
             callable: fn () => $this->executeRefundPayment($client, $request),
@@ -169,38 +182,82 @@ class RefundHelper
     /**
      * @param array<string, string>|null $metadata
      */
+    /**
+     * Sprint 133 · Story 2 (F2): routed through IdempotentExecutor like the
+     * PaymentIntent path. It previously ran its own PROCESSING/COMPLETED/FAILED
+     * flow which never checked for a completed record and never stored a
+     * result, so a retried request refunded a second time for real.
+     *
+     * @param array<string, string>|null $metadata
+     */
     private function refundByChargeWithIdempotency(
         StripeClient $client,
         string $chargeId,
         ?int $amount,
         ?string $reason,
-        ?array $metadata
+        ?array $metadata,
+        ?string $requestReference
     ): Refund {
-        $key = 'refund_charge:' . $chargeId;
-        /** @var IdempotencyRepositoryInterface $repository */
-        $repository = $this->idempotencyRepository;
-        $existing = $repository->findByKey($key);
+        /** @var IdempotentExecutor $executor */
+        $executor = $this->idempotentExecutor;
+        $result = $executor->execute(
+            key: IdempotencyKeyFactory::forRefundByCharge($chargeId, $amount, $reason, $requestReference),
+            referenceId: $chargeId,
+            operation: 'refund_charge',
+            callable: fn () => $this->executeCreateRefundByCharge($client, $chargeId, $amount, $reason, $metadata),
+            serialize: function (mixed $r): string {
+                assert($r instanceof Refund);
+                return $this->serializeRefund($r);
+            },
+            deserialize: fn (string $j) => $this->deserializeRefund($j)
+        );
+        /** @var Refund $result */
+        return $result;
+    }
 
-        if ($existing !== null && !$existing->isExpired()) {
-            if ($existing->getStatus() === IdempotentExecutor::STATUS_PROCESSING) {
-                throw new \RuntimeException('Refund by charge operation already in progress for: ' . $chargeId);
-            }
+    /**
+     * Serialize only the fields StripeObjectMapper::fromRefund() consumes, so a
+     * replayed refund is indistinguishable from a freshly retrieved one.
+     */
+    private function serializeRefund(Refund $refund): string
+    {
+        return (string) json_encode([
+            'id' => $refund->id,
+            'amount' => $refund->amount,
+            'currency' => $refund->currency,
+            'status' => $refund->status,
+            'reason' => $refund->reason,
+            'created' => $refund->created,
+        ]);
+    }
+
+    private function deserializeRefund(string $json): Refund
+    {
+        /** @var array{id?: string, amount?: int, currency?: string, status?: string, reason?: string|null, created?: int} $data */
+        $data = json_decode($json, true);
+
+        return Refund::constructFrom([
+            'id' => $data['id'] ?? '',
+            'amount' => $data['amount'] ?? 0,
+            'currency' => $data['currency'] ?? '',
+            'status' => $data['status'] ?? 'unknown',
+            'reason' => $data['reason'] ?? null,
+            'created' => $data['created'] ?? 0,
+        ]);
+    }
+
+    /**
+     * The request carries the amount in major units; the idempotency key must
+     * use the same minor-unit value that reaches Stripe, so two refunds that
+     * differ only by sub-unit rounding cannot collide.
+     */
+    private function refundAmountInMinorUnits(RefundPaymentRequest $request): ?int
+    {
+        if ($request->amount === null) {
+            return null;
         }
 
-        $record = IdempotencyHelper::reuseOrCreate($existing, $key, $chargeId, 'refund_charge', $this->ttlSeconds);
-        $repository->save($record);
-
-        try {
-            $result = $this->executeCreateRefundByCharge($client, $chargeId, $amount, $reason, $metadata);
-            $record->setStatus(IdempotentExecutor::STATUS_COMPLETED);
-            $repository->save($record);
-            return $result;
-        } catch (\Throwable $e) {
-            $record->setStatus(IdempotentExecutor::STATUS_FAILED);
-            $record->setResult(json_encode(['error' => $e->getMessage()]) ?: null);
-            $repository->save($record);
-            throw $e;
-        }
+        return AmountConverter::toMinorUnits($request->amount, $request->currency ?? '');
     }
 
     private static function mapRefundReason(string $reason): string

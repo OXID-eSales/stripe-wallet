@@ -13,6 +13,7 @@ use DateTimeImmutable;
 use OxidEsales\PaymentBase\Adapter\Request\RefundPaymentRequest;
 use OxidEsales\PaymentBase\Contract\IdempotencyRecord;
 use OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface;
+use OxidEsales\Payments\Stripe\Adapter\Helper\IdempotencyKeyFactory;
 use OxidEsales\Payments\Stripe\Adapter\Helper\RefundHelper;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -24,6 +25,13 @@ use Stripe\StripeClient;
  * Unit tests for RefundHelper idempotency logic.
  *
  * Sprint 46: Idempotency moved from IdempotentStripeAdapter into helper.
+ *
+ * Sprint 133 · Story 2 (F2) — DELIBERATE BEHAVIOUR CHANGE. This file previously
+ * asserted the defect: keys were payment-scoped ('refund:pi_abc123'), so a
+ * second legitimate partial refund replayed the first one's stored response as
+ * a fresh success, while the by-charge path had no completed-check at all and
+ * re-refunded for real. Keys are now request-scoped via IdempotencyKeyFactory
+ * and both paths share IdempotentExecutor.
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Adapter\Helper\RefundHelper::class)]
 #[\PHPUnit\Framework\Attributes\Group('sprint-46')]
@@ -54,7 +62,7 @@ final class RefundHelperIdempotencyTest extends TestCase
         $this->repository
             ->expects($this->once())
             ->method('findByKey')
-            ->with('refund:pi_abc123')
+            ->with(IdempotencyKeyFactory::forRefund('pi_abc123', 2500, null, null))
             ->willReturn(null);
 
         $this->repository
@@ -91,7 +99,7 @@ final class RefundHelperIdempotencyTest extends TestCase
 
         $existingRecord = new IdempotencyRecord(
             'id_existing',
-            'refund:pi_abc123',
+            IdempotencyKeyFactory::forRefund('pi_abc123', 2500, null, null),
             'pi_abc123',
             'refund',
             'completed',
@@ -119,7 +127,7 @@ final class RefundHelperIdempotencyTest extends TestCase
 
         $existingRecord = new IdempotencyRecord(
             'id_processing',
-            'refund:pi_abc123',
+            IdempotencyKeyFactory::forRefund('pi_abc123', 2500, null, null),
             'pi_abc123',
             'refund',
             'processing',
@@ -151,7 +159,7 @@ final class RefundHelperIdempotencyTest extends TestCase
 
         $existingRecord = new IdempotencyRecord(
             'id_failed_cache',
-            'refund:pi_abc123',
+            IdempotencyKeyFactory::forRefund('pi_abc123', 2500, null, null),
             'pi_abc123',
             'refund',
             'completed',
@@ -197,7 +205,7 @@ final class RefundHelperIdempotencyTest extends TestCase
         $this->repository
             ->expects($this->once())
             ->method('findByKey')
-            ->with('refund_charge:ch_abc')
+            ->with(IdempotencyKeyFactory::forRefundByCharge('ch_abc', 5000, 'duplicate', null))
             ->willReturn(null);
 
         $this->mockRefundCreate($refund);
@@ -212,7 +220,7 @@ final class RefundHelperIdempotencyTest extends TestCase
     {
         $existingRecord = new IdempotencyRecord(
             'id_processing',
-            'refund_charge:ch_abc',
+            IdempotencyKeyFactory::forRefundByCharge('ch_abc', null, null, null),
             'ch_abc',
             'refund_charge',
             'processing',
@@ -229,6 +237,123 @@ final class RefundHelperIdempotencyTest extends TestCase
         $this->expectExceptionMessage('already in progress');
 
         $this->helper->createRefundByCharge($this->stripeClient, 'ch_abc');
+    }
+
+
+    // ==========================================
+    // Sprint 133 · Story 2 (F2) — request-scoped keys
+    // ==========================================
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function refundPaymentUsesDifferentKeysForDifferentAmounts(): void
+    {
+        $seenKeys = [];
+        $this->repository
+            ->method('findByKey')
+            ->willReturnCallback(function (string $key) use (&$seenKeys) {
+                $seenKeys[] = $key;
+                return null;
+            });
+
+        $this->mockRefundCreate($this->createStripeRefund('re_a', 1000, 'eur', 'succeeded'));
+
+        $this->helper->refundPayment($this->stripeClient, new RefundPaymentRequest('pi_same', 10.0));
+        $this->helper->refundPayment($this->stripeClient, new RefundPaymentRequest('pi_same', 20.0));
+
+        $this->assertCount(2, $seenKeys);
+        $this->assertNotSame(
+            $seenKeys[0],
+            $seenKeys[1],
+            'Two different partial refund amounts must not share an idempotency key.'
+        );
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function refundPaymentUsesDifferentKeysForDifferentRequestReferences(): void
+    {
+        $seenKeys = [];
+        $this->repository
+            ->method('findByKey')
+            ->willReturnCallback(function (string $key) use (&$seenKeys) {
+                $seenKeys[] = $key;
+                return null;
+            });
+
+        $this->mockRefundCreate($this->createStripeRefund('re_b', 1000, 'eur', 'succeeded'));
+
+        // Same amount, same reason: only the caller's request reference (the
+        // pre-refund state of the charge) distinguishes them.
+        $this->helper->refundPayment(
+            $this->stripeClient,
+            new RefundPaymentRequest('pi_same', 10.0, null, [], null, 'refunded:0')
+        );
+        $this->helper->refundPayment(
+            $this->stripeClient,
+            new RefundPaymentRequest('pi_same', 10.0, null, [], null, 'refunded:1000')
+        );
+
+        $this->assertNotSame($seenKeys[0], $seenKeys[1]);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function createRefundByChargeReplaysStoredResultWhenCompleted(): void
+    {
+        $cached = json_encode([
+            'id' => 're_cached_charge',
+            'amount' => 5000,
+            'currency' => 'eur',
+            'status' => 'succeeded',
+            'reason' => null,
+            'created' => 1700000000,
+        ]);
+
+        $existing = new IdempotencyRecord(
+            'id_done',
+            IdempotencyKeyFactory::forRefundByCharge('ch_abc', 5000, null, null),
+            'ch_abc',
+            'refund_charge',
+            'completed',
+            new DateTimeImmutable(),
+            new DateTimeImmutable('+1 day')
+        );
+        $existing->setResult($cached);
+
+        $this->repository->method('findByKey')->willReturn($existing);
+
+        // The whole point: Stripe must NOT be called again for the same request.
+        $refundService = $this->createMock(\Stripe\Service\RefundService::class);
+        $refundService->expects($this->never())->method('create');
+        $this->stripeClient->refunds = $refundService;
+
+        $result = $this->helper->createRefundByCharge($this->stripeClient, 'ch_abc', 5000);
+
+        $this->assertSame('re_cached_charge', $result->id);
+        $this->assertSame(5000, $result->amount);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function createRefundByChargeStoresSerializedResultOnCompletion(): void
+    {
+        $this->repository->method('findByKey')->willReturn(null);
+
+        $saved = [];
+        $this->repository
+            ->method('save')
+            ->willReturnCallback(function (IdempotencyRecord $record) use (&$saved) {
+                $saved[] = ['status' => $record->getStatus(), 'result' => $record->getResult()];
+            });
+
+        $this->mockRefundCreate($this->createStripeRefund('re_stored', 5000, 'eur', 'succeeded'));
+
+        $this->helper->createRefundByCharge($this->stripeClient, 'ch_abc', 5000);
+
+        $completed = array_values(array_filter($saved, static fn (array $r): bool => $r['status'] === 'completed'));
+        $this->assertNotEmpty($completed, 'A completed record must be persisted.');
+        $this->assertNotNull(
+            $completed[0]['result'],
+            'Without a stored result the completed record can never be replayed.'
+        );
+        $this->assertStringContainsString('re_stored', (string) $completed[0]['result']);
     }
 
     private function createStripeRefund(string $id, int $amount, string $currency, string $status): Refund

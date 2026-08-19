@@ -94,7 +94,8 @@ class RefundService implements RefundServiceInterface
             $paymentIntentId,
             $validReason,
             $metadata,
-            $amountInMinorUnits
+            $amountInMinorUnits,
+            $this->buildRequestReference($paymentIntent)
         );
     }
 
@@ -123,12 +124,13 @@ class RefundService implements RefundServiceInterface
         ?string $paymentIntentId,
         ?string $reason,
         ?array $metadata,
-        ?int $amountInCents = null
+        ?int $amountInCents = null,
+        ?string $requestReference = null
     ): RefundResponse {
         try {
             $refundDto = $this->adapterFactory
                 ->getStripeAdapter()
-                ->createRefundByCharge($chargeId, $amountInCents, $reason, $metadata);
+                ->createRefundByCharge($chargeId, $amountInCents, $reason, $metadata, $requestReference);
 
             return $this->handleRefundResponse($refundDto, $chargeId, $orderId, $paymentIntentId);
         } catch (PaymentAdapterException $e) {
@@ -148,7 +150,7 @@ class RefundService implements RefundServiceInterface
         try {
             return $this->adapterFactory
                 ->getStripeAdapter()
-                ->retrievePaymentIntent($paymentIntentId);
+                ->retrievePaymentIntent($paymentIntentId, ['latest_charge']);
         } catch (PaymentAdapterException $e) {
             $this->logger->error('Failed to retrieve payment intent', [
                 'payment_intent_id' => $paymentIntentId,
@@ -170,6 +172,29 @@ class RefundService implements RefundServiceInterface
         }
 
         return $paymentIntent->latestChargeId;
+    }
+
+    /**
+     * Identify THIS refund attempt by the charge's pre-refund state.
+     *
+     * Sprint 133 · Story 2 (F2): a retry of one admin submit sees the same
+     * already-refunded total and is therefore deduplicated, while a second,
+     * legitimate partial refund of the same amount sees a larger total and is
+     * treated as a distinct request. Server-side truth, so no client-supplied
+     * token has to be trusted, and it costs nothing: the charge is expanded on
+     * the PaymentIntent retrieve we already perform.
+     *
+     * Returns null when the charge was not expanded — the key then falls back to
+     * (payment, amount, reason), which is safe but deduplicates two identical
+     * partial refunds inside the TTL.
+     */
+    private function buildRequestReference(StripePaymentIntentDto $paymentIntent): ?string
+    {
+        if ($paymentIntent->charge === null) {
+            return null;
+        }
+
+        return 'refunded:' . $paymentIntent->charge->amountRefunded;
     }
 
     /**

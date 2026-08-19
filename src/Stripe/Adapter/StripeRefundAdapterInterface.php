@@ -25,11 +25,17 @@ interface StripeRefundAdapterInterface
     /**
      * @param array<string, string>|null $metadata
      */
+    /**
+     * @param string|null $requestReference Identifies THIS refund attempt so a retry is
+     *                                      deduplicated while a second legitimate partial
+     *                                      refund of the same amount is not. Sprint 133 (F2).
+     */
     public function createRefundByCharge(
         string $chargeId,
         ?int $amount = null,
         ?string $reason = null,
-        ?array $metadata = null
+        ?array $metadata = null,
+        ?string $requestReference = null
     ): StripeRefundDto;
 
     public function retrieveCharge(string $chargeId): StripeChargeDto;
