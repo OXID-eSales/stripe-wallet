@@ -9,6 +9,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Adapter;
 
+use OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface;
+use OxidEsales\Payments\Stripe\Adapter\Helper\RefundHelper;
+use OxidEsales\Payments\Stripe\Adapter\Helper\PaymentIntentHelper;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeCheckoutSessionDto;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripePaymentIntentDto;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeRefundDto;
@@ -43,7 +46,12 @@ final class StripeAdapterTest extends TestCase
         parent::setUp();
 
         $this->stripeClient = $this->createMock(StripeClient::class);
-        $this->adapter = new StripeAdapter($this->stripeClient);
+        $idempotencyRepository = $this->createMock(IdempotencyRepositoryInterface::class);
+        $this->adapter = new StripeAdapter(
+            $this->stripeClient,
+            new PaymentIntentHelper($idempotencyRepository),
+            new RefundHelper($idempotencyRepository)
+        );
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

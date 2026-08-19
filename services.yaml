@@ -1251,6 +1251,15 @@ services:
       - { name: 'console.command', command: 'stripe:reconcile-oxpaid' }
     public: true
 
+  # Console Command: stripe:prune-idempotency (Sprint 133, F8)
+  # deleteExpired() had no production caller before this; schedule daily.
+  OxidEsales\Payments\Stripe\Command\PruneIdempotencyCommand:
+    arguments:
+      $idempotencyRepository: '@OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface'
+    tags:
+      - { name: 'console.command', command: 'stripe:prune-idempotency' }
+    public: true
+
   # ==========================================
   # Sprint 2: Condition Handlers (Fraud Check)
   # ==========================================

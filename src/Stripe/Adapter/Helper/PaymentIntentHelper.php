@@ -38,15 +38,18 @@ class PaymentIntentHelper
 {
     private const DEFAULT_TTL_SECONDS = 86400;
 
-    private readonly ?IdempotentExecutor $idempotentExecutor;
+    private readonly IdempotentExecutor $idempotentExecutor;
 
+    /**
+     * Sprint 133 · Story 3 (F8): the repository is required. It used to default
+     * to null, and capturePaymentIntent() then skipped all duplicate-capture
+     * protection with no signal at the call site or in the logs.
+     */
     public function __construct(
-        private readonly ?IdempotencyRepositoryInterface $idempotencyRepository = null,
+        IdempotencyRepositoryInterface $idempotencyRepository,
         int $ttlSeconds = self::DEFAULT_TTL_SECONDS
     ) {
-        $this->idempotentExecutor = $idempotencyRepository !== null
-            ? new IdempotentExecutor($idempotencyRepository, $ttlSeconds)
-            : null;
+        $this->idempotentExecutor = new IdempotentExecutor($idempotencyRepository, $ttlSeconds);
     }
 
     public function createPaymentIntent(StripeClient $client, CreatePaymentRequest $request): PaymentResponse
@@ -81,11 +84,7 @@ class PaymentIntentHelper
 
     public function capturePaymentIntent(StripeClient $client, CapturePaymentRequest $request): CaptureResponse
     {
-        if ($this->idempotencyRepository !== null) {
-            return $this->captureWithIdempotency($client, $request);
-        }
-
-        return $this->executeCapturePaymentIntent($client, $request);
+        return $this->captureWithIdempotency($client, $request);
     }
 
     public function getPaymentDetails(StripeClient $client, string $providerPaymentId): PaymentDetailsResponse
@@ -269,15 +268,27 @@ class PaymentIntentHelper
         return $params;
     }
 
+    /**
+     * Stripe's own idempotency layer — the local DB record cannot protect
+     * against a lost response, only against a duplicate local invocation.
+     *
+     * @return array{idempotency_key: string}|null
+     */
+    private static function requestOptions(?string $idempotencyKey): ?array
+    {
+        return $idempotencyKey === null ? null : ['idempotency_key' => $idempotencyKey];
+    }
+
     private function captureWithIdempotency(StripeClient $client, CapturePaymentRequest $request): CaptureResponse
     {
         /** @var IdempotentExecutor $executor */
         $executor = $this->idempotentExecutor;
+        $key = IdempotencyKeyFactory::forCapture($request->providerPaymentId);
         $result = $executor->execute(
-            key: 'capture:' . $request->providerPaymentId,
+            key: $key,
             referenceId: $request->providerPaymentId,
             operation: 'capture',
-            callable: fn () => $this->executeCapturePaymentIntent($client, $request),
+            callable: fn () => $this->executeCapturePaymentIntent($client, $request, $key),
             serialize: function (mixed $r): string {
                 assert($r instanceof CaptureResponse);
                 return $this->serializeCaptureResponse($r);
@@ -288,8 +299,11 @@ class PaymentIntentHelper
         return $result;
     }
 
-    private function executeCapturePaymentIntent(StripeClient $client, CapturePaymentRequest $request): CaptureResponse
-    {
+    private function executeCapturePaymentIntent(
+        StripeClient $client,
+        CapturePaymentRequest $request,
+        ?string $idempotencyKey = null
+    ): CaptureResponse {
         try {
             $params = [];
             if ($request->amount !== null) {
@@ -302,8 +316,10 @@ class PaymentIntentHelper
                 $params['metadata'] = $request->metadata;
             }
 
+            $options = self::requestOptions($idempotencyKey);
+
             /** @phpstan-ignore argument.type (capture params are conditionally built) */
-            $client->paymentIntents->capture($request->providerPaymentId, $params);
+            $client->paymentIntents->capture($request->providerPaymentId, $params, $options);
 
             $paymentIntent = $client->paymentIntents->retrieve(
                 $request->providerPaymentId,

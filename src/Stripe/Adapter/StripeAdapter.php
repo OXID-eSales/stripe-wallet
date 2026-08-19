@@ -63,15 +63,22 @@ class StripeAdapter implements StripeAdapterInterface
     private readonly CheckoutSessionHelper $checkoutSessionHelper;
     private readonly PaymentMethodHelper $paymentMethodHelper;
 
+    /**
+     * Sprint 133 · Story 3 (F8): the two helpers that carry duplicate-charge
+     * protection are required. They used to default to `new XHelper()`, i.e. an
+     * instance with no idempotency repository, so an adapter built without them
+     * performed unprotected captures and refunds indistinguishably from a
+     * protected one.
+     */
     public function __construct(
         private readonly StripeClient $stripeClient,
-        ?PaymentIntentHelper $paymentIntentHelper = null,
-        ?RefundHelper $refundHelper = null,
+        PaymentIntentHelper $paymentIntentHelper,
+        RefundHelper $refundHelper,
         ?CheckoutSessionHelper $checkoutSessionHelper = null,
         ?PaymentMethodHelper $paymentMethodHelper = null
     ) {
-        $this->paymentIntentHelper = $paymentIntentHelper ?? new PaymentIntentHelper();
-        $this->refundHelper = $refundHelper ?? new RefundHelper();
+        $this->paymentIntentHelper = $paymentIntentHelper;
+        $this->refundHelper = $refundHelper;
         $this->checkoutSessionHelper = $checkoutSessionHelper ?? new CheckoutSessionHelper();
         $this->paymentMethodHelper = $paymentMethodHelper ?? new PaymentMethodHelper();
     }
@@ -300,6 +307,9 @@ class StripeAdapter implements StripeAdapterInterface
         return StripeObjectMapper::fromPaymentIntent($raw);
     }
 
+    /**
+     * @param array<string, string>|null $metadata
+     */
     public function createRefundByCharge(
         string $chargeId,
         ?int $amount = null,

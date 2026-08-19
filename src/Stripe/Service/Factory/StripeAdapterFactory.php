@@ -27,6 +27,8 @@ use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
  * and implements StripeAdapterFactoryInterface for Stripe-specific methods.
  *
  * Sprint 46: Idempotency moved into helpers; factory injects repository directly.
+ * Sprint 133 (F8): the repository is required — a null one silently produced
+ * helpers with no duplicate-charge protection.
  *
  * @since 1.0.0
  */
@@ -35,7 +37,7 @@ class StripeAdapterFactory extends PaymentAdapterFactory implements StripeAdapte
     public function __construct(
         private readonly ModuleConfigurationServiceInterface $configurationService,
         private readonly StripeClientFactory $clientFactory,
-        private readonly ?IdempotencyRepositoryInterface $idempotencyRepository = null
+        private readonly IdempotencyRepositoryInterface $idempotencyRepository
     ) {
     }
 

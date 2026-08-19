@@ -31,24 +31,23 @@ class RefundHelper
 {
     private const DEFAULT_TTL_SECONDS = 86400;
 
-    private readonly ?IdempotentExecutor $idempotentExecutor;
+    private readonly IdempotentExecutor $idempotentExecutor;
 
+    /**
+     * Sprint 133 · Story 3 (F8): the repository is required. It used to default
+     * to null, and every mutating method silently skipped all duplicate-charge
+     * protection in that case — same class, same API, no log line.
+     */
     public function __construct(
-        private readonly ?IdempotencyRepositoryInterface $idempotencyRepository = null,
-        private readonly int $ttlSeconds = self::DEFAULT_TTL_SECONDS
+        IdempotencyRepositoryInterface $idempotencyRepository,
+        int $ttlSeconds = self::DEFAULT_TTL_SECONDS
     ) {
-        $this->idempotentExecutor = $idempotencyRepository !== null
-            ? new IdempotentExecutor($idempotencyRepository, $ttlSeconds)
-            : null;
+        $this->idempotentExecutor = new IdempotentExecutor($idempotencyRepository, $ttlSeconds);
     }
 
     public function refundPayment(StripeClient $client, RefundPaymentRequest $request): RefundResponse
     {
-        if ($this->idempotencyRepository !== null) {
-            return $this->refundWithIdempotency($client, $request);
-        }
-
-        return $this->executeRefundPayment($client, $request);
+        return $this->refundWithIdempotency($client, $request);
     }
 
     /**
@@ -62,18 +61,14 @@ class RefundHelper
         ?array $metadata = null,
         ?string $requestReference = null
     ): Refund {
-        if ($this->idempotencyRepository !== null) {
-            return $this->refundByChargeWithIdempotency(
-                $client,
-                $chargeId,
-                $amount,
-                $reason,
-                $metadata,
-                $requestReference
-            );
-        }
-
-        return $this->executeCreateRefundByCharge($client, $chargeId, $amount, $reason, $metadata);
+        return $this->refundByChargeWithIdempotency(
+            $client,
+            $chargeId,
+            $amount,
+            $reason,
+            $metadata,
+            $requestReference
+        );
     }
 
     public function retrieveCharge(StripeClient $client, string $chargeId): Charge
@@ -85,8 +80,11 @@ class RefundHelper
         }
     }
 
-    private function executeRefundPayment(StripeClient $client, RefundPaymentRequest $request): RefundResponse
-    {
+    private function executeRefundPayment(
+        StripeClient $client,
+        RefundPaymentRequest $request,
+        ?string $idempotencyKey = null
+    ): RefundResponse {
         try {
             $params = ['payment_intent' => $request->providerPaymentId];
 
@@ -105,7 +103,7 @@ class RefundHelper
                 $params['metadata'] = $request->metadata;
             }
 
-            $refund = $client->refunds->create($params);
+            $refund = $client->refunds->create($params, self::requestOptions($idempotencyKey));
 
             /** @var array<string, mixed> $providerData */
             $providerData = $refund->toArray();
@@ -134,7 +132,8 @@ class RefundHelper
         string $chargeId,
         ?int $amount,
         ?string $reason,
-        ?array $metadata
+        ?array $metadata,
+        ?string $idempotencyKey = null
     ): Refund {
         try {
             $params = ['charge' => $chargeId];
@@ -149,7 +148,7 @@ class RefundHelper
                 $params['metadata'] = $metadata;
             }
 
-            return $client->refunds->create($params);
+            return $client->refunds->create($params, self::requestOptions($idempotencyKey));
         } catch (ApiErrorException $e) {
             throw StripeExceptionConverter::convert($e);
         }
@@ -159,16 +158,17 @@ class RefundHelper
     {
         /** @var IdempotentExecutor $executor */
         $executor = $this->idempotentExecutor;
+        $key = IdempotencyKeyFactory::forRefund(
+            $request->providerPaymentId,
+            $this->refundAmountInMinorUnits($request),
+            $request->reason,
+            $request->idempotencyKey
+        );
         $result = $executor->execute(
-            key: IdempotencyKeyFactory::forRefund(
-                $request->providerPaymentId,
-                $this->refundAmountInMinorUnits($request),
-                $request->reason,
-                $request->idempotencyKey
-            ),
+            key: $key,
             referenceId: $request->providerPaymentId,
             operation: 'refund',
-            callable: fn () => $this->executeRefundPayment($client, $request),
+            callable: fn () => $this->executeRefundPayment($client, $request, $key),
             serialize: function (mixed $r): string {
                 assert($r instanceof RefundResponse);
                 return $this->serializeRefundResponse($r);
@@ -200,11 +200,12 @@ class RefundHelper
     ): Refund {
         /** @var IdempotentExecutor $executor */
         $executor = $this->idempotentExecutor;
+        $key = IdempotencyKeyFactory::forRefundByCharge($chargeId, $amount, $reason, $requestReference);
         $result = $executor->execute(
-            key: IdempotencyKeyFactory::forRefundByCharge($chargeId, $amount, $reason, $requestReference),
+            key: $key,
             referenceId: $chargeId,
             operation: 'refund_charge',
-            callable: fn () => $this->executeCreateRefundByCharge($client, $chargeId, $amount, $reason, $metadata),
+            callable: fn () => $this->executeCreateRefundByCharge($client, $chargeId, $amount, $reason, $metadata, $key),
             serialize: function (mixed $r): string {
                 assert($r instanceof Refund);
                 return $this->serializeRefund($r);
@@ -258,6 +259,18 @@ class RefundHelper
         }
 
         return AmountConverter::toMinorUnits($request->amount, $request->currency ?? '');
+    }
+
+    /**
+     * Stripe's own idempotency layer. The local DB record cannot help when the
+     * request reaches Stripe but the response is lost — Stripe replays the
+     * original result for a repeated key instead of refunding twice.
+     *
+     * @return array{idempotency_key: string}|null
+     */
+    private static function requestOptions(?string $idempotencyKey): ?array
+    {
+        return $idempotencyKey === null ? null : ['idempotency_key' => $idempotencyKey];
     }
 
     private static function mapRefundReason(string $reason): string

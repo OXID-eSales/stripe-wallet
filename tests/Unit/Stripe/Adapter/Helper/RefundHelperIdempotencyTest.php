@@ -179,19 +179,68 @@ final class RefundHelperIdempotencyTest extends TestCase
         $this->assertSame('Refund declined', $result->errorMessage);
     }
 
+    /**
+     * Sprint 133 · Story 3 (F8) — replaces refundPaymentWithoutIdempotencyCallsStripeDirectly,
+     * which asserted that a RefundHelper built without a repository silently
+     * performs unprotected refunds. Same class, same API, no signal: removed.
+     */
     #[\PHPUnit\Framework\Attributes\Test]
-    public function refundPaymentWithoutIdempotencyCallsStripeDirectly(): void
+    public function cannotBeConstructedWithoutAnIdempotencyRepository(): void
     {
-        $helperNoIdempotency = new RefundHelper();
-        $request = new RefundPaymentRequest('pi_abc123', 25.0);
+        $this->expectException(\ArgumentCountError::class);
 
-        $refund = $this->createStripeRefund('re_direct', 2500, 'eur', 'succeeded');
-        $this->mockRefundCreate($refund);
+        /** @phpstan-ignore-next-line intentionally wrong: proves the dependency is required */
+        new RefundHelper();
+    }
 
-        $result = $helperNoIdempotency->refundPayment($this->stripeClient, $request);
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function refundPaymentPassesNativeIdempotencyKeyToStripe(): void
+    {
+        $this->repository->method('findByKey')->willReturn(null);
 
-        $this->assertTrue($result->successful);
-        $this->assertSame('re_direct', $result->refundId);
+        $seenOptions = 'not-called';
+        $refund = $this->createStripeRefund('re_native', 2500, 'eur', 'succeeded');
+        $refundService = $this->createMock(\Stripe\Service\RefundService::class);
+        $refundService->method('create')->willReturnCallback(
+            function (?array $params = null, ?array $opts = null) use (&$seenOptions, $refund) {
+                $seenOptions = $opts;
+                return $refund;
+            }
+        );
+        $this->stripeClient->refunds = $refundService;
+
+        $this->helper->refundPayment($this->stripeClient, new RefundPaymentRequest('pi_abc123', 25.0));
+
+        $this->assertIsArray($seenOptions);
+        $this->assertSame(
+            IdempotencyKeyFactory::forRefund('pi_abc123', 2500, null, null),
+            $seenOptions['idempotency_key'] ?? null
+        );
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function createRefundByChargePassesNativeIdempotencyKeyToStripe(): void
+    {
+        $this->repository->method('findByKey')->willReturn(null);
+
+        $seenOptions = 'not-called';
+        $refund = $this->createStripeRefund('re_native_charge', 5000, 'eur', 'succeeded');
+        $refundService = $this->createMock(\Stripe\Service\RefundService::class);
+        $refundService->method('create')->willReturnCallback(
+            function (?array $params = null, ?array $opts = null) use (&$seenOptions, $refund) {
+                $seenOptions = $opts;
+                return $refund;
+            }
+        );
+        $this->stripeClient->refunds = $refundService;
+
+        $this->helper->createRefundByCharge($this->stripeClient, 'ch_abc', 5000, null, null, 'refunded:0');
+
+        $this->assertIsArray($seenOptions);
+        $this->assertSame(
+            IdempotencyKeyFactory::forRefundByCharge('ch_abc', 5000, null, 'refunded:0'),
+            $seenOptions['idempotency_key'] ?? null
+        );
     }
 
     // ==========================================

@@ -208,4 +208,77 @@ final class IdempotentExecutorTest extends TestCase
 
         $this->assertSame('fresh-value', $result);
     }
+
+    // =========================================================================
+    // Sprint 133 · Story 3 (F8) — abandoned locks
+    //
+    // A PROCESSING record is a lock, not a cache. When the PHP process dies
+    // mid-operation (timeout, OOM, deploy restart) the record stayed PROCESSING
+    // for the full 24h result TTL and every retry threw "already in progress"
+    // while nothing was running: capture/refund impossible for a day.
+    // =========================================================================
+
+    public function testExecuteWhenProcessingRecordOlderThanLockTimeoutTreatsItAsAbandoned(): void
+    {
+        $abandoned = new IdempotencyRecord(
+            'id_abandoned',
+            'capture:pi_1',
+            'pi_1',
+            'capture',
+            'processing',
+            new DateTimeImmutable('-10 minutes'),
+            new DateTimeImmutable('+23 hours')
+        );
+
+        $repository = $this->createMock(IdempotencyRepositoryInterface::class);
+        $repository->method('findByKey')->willReturn($abandoned);
+
+        $executor = new IdempotentExecutor($repository, 86400, 120);
+
+        $called = false;
+        $result = $executor->execute(
+            'capture:pi_1',
+            'pi_1',
+            'capture',
+            function () use (&$called) {
+                $called = true;
+                return 'fresh';
+            },
+            static fn (mixed $r): string => (string) $r,
+            static fn (string $j): string => $j
+        );
+
+        $this->assertTrue($called, 'An abandoned lock must not block the retry forever.');
+        $this->assertSame('fresh', $result);
+    }
+
+    public function testExecuteWhenProcessingRecordWithinLockTimeoutStillThrows(): void
+    {
+        $inFlight = new IdempotencyRecord(
+            'id_inflight',
+            'capture:pi_2',
+            'pi_2',
+            'capture',
+            'processing',
+            new DateTimeImmutable(),
+            new DateTimeImmutable('+1 day')
+        );
+
+        $repository = $this->createMock(IdempotencyRepositoryInterface::class);
+        $repository->method('findByKey')->willReturn($inFlight);
+
+        $executor = new IdempotentExecutor($repository, 86400, 120);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('already in progress');
+
+        $executor->execute(
+            'capture:pi_2',
+            'pi_2',
+            'capture',
+            static fn (): string => 'should not run',
+            static fn (mixed $r): string => (string) $r,
+            static fn (string $j): string => $j
+        );
+    }
 }

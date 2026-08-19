@@ -225,19 +225,47 @@ final class PaymentIntentHelperIdempotencyTest extends TestCase
         $this->assertSame('card_declined', $result->errorCode);
     }
 
+    /**
+     * Sprint 133 · Story 3 (F8) — replaces captureWithoutIdempotencyCallsStripeDirectly,
+     * which asserted that the helper silently drops ALL duplicate-charge protection
+     * when constructed without a repository. That mode was invisible at the call
+     * site and in the logs, so it is gone: the collaborator is now required.
+     */
     #[\PHPUnit\Framework\Attributes\Test]
-    public function captureWithoutIdempotencyCallsStripeDirectly(): void
+    public function cannotBeConstructedWithoutAnIdempotencyRepository(): void
     {
-        $helperNoIdempotency = new PaymentIntentHelper();
+        $this->expectException(\ArgumentCountError::class);
+
+        /** @phpstan-ignore-next-line intentionally wrong: proves the dependency is required */
+        new PaymentIntentHelper();
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function capturePassesNativeIdempotencyKeyToStripe(): void
+    {
         $request = new CapturePaymentRequest('pi_abc123', 50.0);
 
-        $paymentIntent = $this->createCapturedPaymentIntent('pi_abc123', 5000, 'eur', 'ch_direct');
-        $this->mockCaptureAndRetrieve($paymentIntent);
+        $this->repository->method('findByKey')->willReturn(null);
 
-        $result = $helperNoIdempotency->capturePaymentIntent($this->stripeClient, $request);
+        $seenOptions = 'not-called';
+        $paymentIntent = $this->createCapturedPaymentIntent('pi_abc123', 5000, 'eur', 'ch_native');
+        $piService = $this->createMock(PaymentIntentService::class);
+        $piService->method('capture')->willReturnCallback(
+            function (string $id, ?array $params = null, ?array $opts = null) use (&$seenOptions, $paymentIntent) {
+                $seenOptions = $opts;
+                return $paymentIntent;
+            }
+        );
+        $piService->method('retrieve')->willReturn($paymentIntent);
+        $this->stripeClient->paymentIntents = $piService;
 
-        $this->assertTrue($result->successful);
-        $this->assertSame('ch_direct', $result->captureId);
+        $this->helper->capturePaymentIntent($this->stripeClient, $request);
+
+        // A local DB record cannot protect against a lost response: Stripe must
+        // see the key too, or a timed-out capture is retried as a new operation.
+        $this->assertIsArray($seenOptions, 'Stripe must receive request options.');
+        $this->assertArrayHasKey('idempotency_key', $seenOptions);
+        $this->assertSame('capture:pi_abc123', $seenOptions['idempotency_key']);
     }
 
     private function createCapturedPaymentIntent(string $id, int $amountReceived, string $currency, string $chargeId): PaymentIntent
