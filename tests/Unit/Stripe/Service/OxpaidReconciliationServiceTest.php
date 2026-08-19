@@ -522,6 +522,133 @@ class OxpaidReconciliationServiceTest extends TestCase
         $this->assertEquals('dry_run', $results[0]->action);
     }
 
+
+    // =========================================================================
+    // Sprint 133 · Stories 11 & 12 (F11, F12)
+    // =========================================================================
+
+    /**
+     * F11: OXPAID is the payment date used for accounting exports and dunning.
+     * `$capturedAt?->format(...) ?? date(...)` stamped the reconciliation cron's
+     * OWN run time when Stripe reported no capture timestamp, moving payment
+     * dates by days -- into the wrong accounting period -- with nothing marking
+     * the row as estimated.
+     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function reconcileDoesNotWriteOxpaidWhenStripeReportsNoCaptureTimestamp(): void
+    {
+        $orderId = 'order_nocapts';
+        $paymentIntentId = 'pi_nocapts';
+
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getState')->willReturn(ContractState::committed());
+        $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
+
+        $adapter = $this->createMock(PaymentAdapterInterface::class);
+        $this->adapterFactory->method('createDefaultAdapter')->willReturn($adapter);
+        $adapter->method('getPaymentDetails')->willReturn(new PaymentDetailsResponse(
+            providerPaymentId: $paymentIntentId,
+            status: 'succeeded',
+            amount: 100.00,
+            currency: 'EUR',
+            amountCaptured: 100.00,
+            amountRefunded: 0.0,
+            isCaptured: true,
+            isRefunded: false,
+            isCancelled: false,
+            createdAt: new \DateTimeImmutable(),
+            capturedAt: null
+        ));
+
+        $this->connection->expects($this->never())->method('update');
+        $this->contractFulfillmentService->expects($this->never())->method('fulfill');
+
+        $result = $this->service->reconcileOrder($orderId, $paymentIntentId);
+
+        $this->assertFalse($result->success);
+        $this->assertEquals('skipped', $result->action);
+        $this->assertStringContainsString('capture timestamp', $result->reason);
+    }
+
+    /**
+     * F12: a dry run performs no work, so reporting success:true let any caller
+     * counting successes over-report.
+     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function dryRunDoesNotReportSuccess(): void
+    {
+        $this->connection->method('fetchAllAssociative')->willReturn([
+            ['OXID' => 'o1', 'OXTRANSID' => 'pi_1', 'OXORDERNR' => 1, 'OXORDERDATE' => '2026-01-01'],
+        ]);
+
+        $results = $this->service->reconcileAll(7, true);
+
+        $this->assertEquals('dry_run', $results[0]->action);
+        $this->assertFalse($results[0]->success, 'A dry run did no work; it cannot be a success.');
+    }
+
+    /**
+     * F12: the audit line printed NO_CONTRACT whenever fulfill() returned false,
+     * even though reconcileOrder() returns early when no contract exists -- so
+     * the one artefact you consult to explain a payment discrepancy actively
+     * misdirected.
+     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function auditLineSaysContractUnchangedNotNoContractWhenTheContractWasFound(): void
+    {
+        $logged = [];
+        $this->fileLogger->method('log')->willReturnCallback(
+            function (string $message) use (&$logged): void {
+                $logged[] = $message;
+            }
+        );
+
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getState')->willReturn(ContractState::committed());
+        $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
+
+        // Contract found, but fulfillment reports "nothing changed".
+        $this->contractFulfillmentService->method('fulfill')->willReturn(false);
+
+        $adapter = $this->createMock(PaymentAdapterInterface::class);
+        $this->adapterFactory->method('createDefaultAdapter')->willReturn($adapter);
+        $adapter->method('getPaymentDetails')->willReturn(new PaymentDetailsResponse(
+            providerPaymentId: 'pi_unchanged',
+            status: 'succeeded',
+            amount: 10.0,
+            currency: 'EUR',
+            amountCaptured: 10.0,
+            amountRefunded: 0.0,
+            isCaptured: true,
+            isRefunded: false,
+            isCancelled: false,
+            createdAt: new \DateTimeImmutable(),
+            capturedAt: new \DateTimeImmutable('2026-02-02 08:00:00')
+        ));
+
+        $this->service->reconcileOrder('order_unchanged', 'pi_unchanged');
+
+        $joined = implode("\n", $logged);
+        $this->assertStringNotContainsString('NO_CONTRACT', $joined);
+        $this->assertStringContainsString('CONTRACT_UNCHANGED', $joined);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function cannotBeConstructedWithoutAFileLogger(): void
+    {
+        // F12: the financial audit trail was an optional constructor argument;
+        // logReconciliation() returned silently when it was absent.
+        $this->expectException(\ArgumentCountError::class);
+
+        /** @phpstan-ignore-next-line intentionally wrong: proves the dependency is required */
+        new OxpaidReconciliationService(
+            $this->connection,
+            $this->adapterFactory,
+            $this->contractRepository,
+            $this->contractFulfillmentService
+        );
+    }
+
     /**
      * Helper to assert string contains substring
      */

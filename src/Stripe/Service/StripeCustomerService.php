@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use DateTimeImmutable;
+use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Contract\PaymentCustomer;
 use OxidEsales\PaymentBase\Repository\PaymentCustomerRepositoryInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
@@ -25,6 +26,9 @@ use Psr\Log\NullLogger;
  */
 class StripeCustomerService implements StripeCustomerServiceInterface
 {
+    /** Stripe's error code for "this object does not exist". */
+    private const STRIPE_ERROR_RESOURCE_MISSING = 'resource_missing';
+
     private LoggerInterface $logger;
 
     public function __construct(
@@ -86,14 +90,35 @@ class StripeCustomerService implements StripeCustomerServiceInterface
         return $stripeCustomer->id;
     }
 
+    /**
+     * Sprint 133 · Story 10 (F10): only Stripe's `resource_missing` proves the
+     * customer is gone. This used to catch \Throwable and answer false, so one
+     * transient error — a timeout, a 429, a 500 — was read as "stale", a second
+     * Stripe Customer was created, and the stored mapping was overwritten. Saved
+     * payment methods, mandates and Radar history on the old Customer became
+     * unreachable for that user, and the shop could not undo it.
+     *
+     * Anything that is not a definitive 404 is rethrown, so checkout fails
+     * loudly and retryably instead of mutating durable state on a guess.
+     */
     private function stripeCustomerExists(string $customerId): bool
     {
         try {
-            $adapter = $this->adapterFactory->getStripeAdapter();
-            $adapter->retrieveStripeCustomer($customerId);
+            $this->adapterFactory->getStripeAdapter()->retrieveStripeCustomer($customerId);
+
             return true;
-        } catch (\Throwable $e) {
-            return false;
+        } catch (PaymentAdapterException $e) {
+            if ($e->getErrorCode() === self::STRIPE_ERROR_RESOURCE_MISSING) {
+                return false;
+            }
+
+            $this->logger->error('Could not verify the Stripe Customer; refusing to assume it is gone', [
+                'customerId' => $customerId,
+                'errorCode' => $e->getErrorCode(),
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
         }
     }
 }

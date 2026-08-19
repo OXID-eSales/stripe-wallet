@@ -40,7 +40,7 @@ class OxpaidReconciliationService implements OxpaidReconciliationServiceInterfac
         private readonly StripeAdapterFactoryInterface $adapterFactory,
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ContractFulfillmentServiceInterface $contractFulfillmentService,
-        private readonly ?FileLoggerInterface $fileLogger = null
+        private readonly FileLoggerInterface $fileLogger
     ) {
     }
 
@@ -83,7 +83,14 @@ class OxpaidReconciliationService implements OxpaidReconciliationServiceInterfac
             $contract = $this->contractRepository->findByProviderOrderId($paymentIntentId);
 
             if ($contract === null) {
-                $this->logReconciliation($orderId, $paymentIntentId, 'ERROR', false, 'No contract found');
+                $this->logReconciliation(
+                    $orderId,
+                    $paymentIntentId,
+                    'ERROR',
+                    false,
+                    'No contract found',
+                    contractFound: false
+                );
                 return new ReconciliationResult(
                     orderId: $orderId,
                     paymentIntentId: $paymentIntentId,
@@ -105,6 +112,28 @@ class OxpaidReconciliationService implements OxpaidReconciliationServiceInterfac
                     success: false,
                     action: 'skipped',
                     reason: "Payment not captured. Status: {$paymentDetails->status}"
+                );
+            }
+
+            // Sprint 133 · Story 11 (F11): OXPAID is the payment date used by
+            // accounting exports and dunning. If the PSP cannot say when money
+            // moved, do not invent it — a catch-up cron used to stamp its own run
+            // time, shifting payment dates by days into the wrong period.
+            if ($paymentDetails->capturedAt === null) {
+                $this->logReconciliation(
+                    $orderId,
+                    $paymentIntentId,
+                    'SKIPPED',
+                    false,
+                    'Stripe reported no capture timestamp'
+                );
+
+                return new ReconciliationResult(
+                    orderId: $orderId,
+                    paymentIntentId: $paymentIntentId,
+                    success: false,
+                    action: 'skipped',
+                    reason: 'Payment is captured but Stripe reported no capture timestamp; needs manual review'
                 );
             }
 
@@ -157,7 +186,9 @@ class OxpaidReconciliationService implements OxpaidReconciliationServiceInterfac
                 $results[] = new ReconciliationResult(
                     orderId: $orderId,
                     paymentIntentId: $transId,
-                    success: true,
+                    // Sprint 133 (F12): a dry run performs no work, so reporting
+                    // success let callers counting successes over-report.
+                    success: false,
                     action: 'dry_run',
                     reason: "Would check order #{$order['OXORDERNR']} from {$order['OXORDERDATE']}"
                 );
@@ -173,9 +204,14 @@ class OxpaidReconciliationService implements OxpaidReconciliationServiceInterfac
     /**
      * Update OXPAID timestamp on order.
      */
-    private function updateOrderPaidTimestamp(string $orderId, ?\DateTimeInterface $capturedAt): void
+    /**
+     * Sprint 133 (F11): takes a non-nullable timestamp — the caller decides what
+     * to do when the PSP did not supply one, instead of this method silently
+     * substituting "now".
+     */
+    private function updateOrderPaidTimestamp(string $orderId, \DateTimeInterface $capturedAt): void
     {
-        $timestamp = $capturedAt?->format('Y-m-d H:i:s') ?? date('Y-m-d H:i:s');
+        $timestamp = $capturedAt->format('Y-m-d H:i:s');
 
         $this->connection->update(
             'oxorder',
@@ -192,13 +228,19 @@ class OxpaidReconciliationService implements OxpaidReconciliationServiceInterfac
         string $paymentIntentId,
         string $status,
         bool $contractUpdated,
-        ?string $error = null
+        ?string $error = null,
+        bool $contractFound = true
     ): void {
-        if ($this->fileLogger === null) {
-            return;
-        }
-
-        $contractFlag = $contractUpdated ? 'CONTRACT_FULFILLED' : 'NO_CONTRACT';
+        // Sprint 133 · Story 12 (F12): this printed NO_CONTRACT whenever
+        // fulfill() returned false, although reconcileOrder() returns early when
+        // no contract exists — so the one artefact you consult to explain a
+        // payment discrepancy claimed the opposite of what happened. Three
+        // states, not two.
+        $contractFlag = match (true) {
+            !$contractFound => 'NO_CONTRACT',
+            $contractUpdated => 'CONTRACT_FULFILLED',
+            default => 'CONTRACT_UNCHANGED',
+        };
         $errorMsg = $error !== null ? " Error: {$error}" : '';
 
         $message = sprintf(

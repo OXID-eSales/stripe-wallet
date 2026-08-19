@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
+use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Contract\PaymentCustomer;
 use OxidEsales\PaymentBase\Repository\PaymentCustomerRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeCustomerDto;
@@ -94,11 +95,19 @@ class StripeCustomerServiceTest extends TestCase
             ->with('user_abc')
             ->willReturn($existing);
 
+        // Sprint 133 · Story 10 (F10): only Stripe's resource_missing means the
+        // customer is really gone. This test used to throw a generic \Exception,
+        // which is what allowed ANY error -- a timeout, a 429, a 500 -- to be read
+        // as "stale" and to permanently repoint the stored mapping.
         $this->adapter
             ->expects($this->once())
             ->method('retrieveStripeCustomer')
             ->with('cus_stale_123')
-            ->willThrowException(new \Exception('No such customer'));
+            ->willThrowException(new PaymentAdapterException(
+                providerName: 'stripe',
+                errorCode: 'resource_missing',
+                message: 'No such customer'
+            ));
 
         $stripeCustomer = $this->createStripeCustomerObject('cus_new_999');
 
@@ -207,6 +216,48 @@ class StripeCustomerServiceTest extends TestCase
         $this->assertSame('john@example.com', $capturedParams['email']);
         $this->assertSame('John Doe', $capturedParams['name']);
         $this->assertSame('user_xyz', $capturedParams['metadata']['oxid_user_id']);
+    }
+
+
+    public function testTransientApiErrorIsRethrownAndTheMappingIsLeftAlone(): void
+    {
+        $existing = $this->createExistingCustomer('cus_live_123');
+
+        $this->customerRepo->method('findByUserId')->willReturn($existing);
+
+        $this->adapter
+            ->method('retrieveStripeCustomer')
+            ->willThrowException(new PaymentAdapterException(
+                providerName: 'stripe',
+                errorCode: 'api_connection_error',
+                message: 'Network unreachable'
+            ));
+
+        // A blip must not create a duplicate Stripe Customer, and must not
+        // overwrite the stored mapping -- that loses saved payment methods,
+        // mandates and Radar history for this user, irreversibly.
+        $this->adapter->expects($this->never())->method('createStripeCustomer');
+        $this->customerRepo->expects($this->never())->method('save');
+
+        $this->expectException(PaymentAdapterException::class);
+
+        $this->service->resolveStripeCustomerId('user_abc', 'a@b.c', 'A B');
+    }
+
+    public function testGenericThrowableIsAlsoRethrown(): void
+    {
+        $existing = $this->createExistingCustomer('cus_live_456');
+        $this->customerRepo->method('findByUserId')->willReturn($existing);
+
+        $this->adapter
+            ->method('retrieveStripeCustomer')
+            ->willThrowException(new \RuntimeException('boom'));
+
+        $this->adapter->expects($this->never())->method('createStripeCustomer');
+
+        $this->expectException(\RuntimeException::class);
+
+        $this->service->resolveStripeCustomerId('user_abc', 'a@b.c', 'A B');
     }
 
     private function createExistingCustomer(?string $paymentCustomerId): PaymentCustomer

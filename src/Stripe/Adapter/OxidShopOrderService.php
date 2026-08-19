@@ -346,21 +346,36 @@ class OxidShopOrderService implements ShopOrderServiceInterface
     }
 
     /**
-     * Get order creation date.
+     * Get order creation date, or null when it cannot be determined.
+     *
+     * Sprint 133 · Story 11 (F11): an unparseable oxorderdate used to fall back
+     * to "now" behind a bare comment, so a corrupt date silently became the
+     * current time on the order response. OrderResponse::$createdAt is nullable,
+     * so unknown can be represented honestly.
      */
-    private function getOrderCreationDate(Order $order): DateTimeImmutable
+    private function getOrderCreationDate(Order $order): ?DateTimeImmutable
     {
         $dateStr = $order->getFieldData('oxorderdate');
 
-        if ($dateStr && is_string($dateStr)) {
-            try {
-                return new DateTimeImmutable($dateStr);
-            } catch (Exception $e) {
-                // Fallback to current time if date parsing fails
-            }
+        if (!is_string($dateStr) || $dateStr === '') {
+            Registry::getLogger()->warning('Order has no oxorderdate; reporting creation date as unknown', [
+                'order_id' => $order->getId(),
+            ]);
+
+            return null;
         }
 
-        return new DateTimeImmutable();
+        try {
+            return new DateTimeImmutable($dateStr);
+        } catch (Exception $e) {
+            Registry::getLogger()->warning('Order has an unparseable oxorderdate; reporting it as unknown', [
+                'order_id' => $order->getId(),
+                'oxorderdate' => $dateStr,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     /**
