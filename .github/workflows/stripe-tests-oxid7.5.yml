@@ -12,11 +12,7 @@ env:
   TEMPLATE_ENGINE: 'twig'
   # Branch of OXID-eSales/payment-base to test against. Change in sync with
   # the stripe branch when the two repos co-evolve (Sprint 119/STRP-129).
-  # Sprint 133: temporarily points at the matching payment-base branch, which
-  # carries the FraudCheckResponse::unscreened() / RefundPaymentRequest
-  # $idempotencyKey additions this branch depends on. REVERT to 'b-7.4.x' once
-  # payment-base b-7.4.x-honest-failure-paths is merged and tagged.
-  PAYMENT_BASE_BRANCH: 'b-7.4.x-honest-failure-paths'
+  PAYMENT_BASE_BRANCH: 'b-7.4.x'
   # Version the payment-base path repository is aliased as. It MUST satisfy the
   # "oxid-esales/payment-base" constraint in this module's composer.json, or
   # composer cannot resolve the module at shop level. It was pinned to v1.0.0
