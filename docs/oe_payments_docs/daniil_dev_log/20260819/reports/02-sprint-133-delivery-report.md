@@ -4,7 +4,7 @@
 **Sprint:** [133 — Honest failure paths](../sprints/sprint-133-honest-failure-paths.md)
 **Source review:** [01 — SOLID violations & misleading fallbacks](01-solid-violations-and-misleading-fallbacks.md)
 **Branch (both repos):** `b-7.4.x-honest-failure-paths`, from `b-7.4.x` @ v3.2.0
-**Status:** Phases A + B delivered (F1–F16). Phase C (F17–F20) not started. CI green on 7.4 and 7.5. Nothing merged; two policy defaults await product sign-off.
+**Status:** F1–F16 and F18–F20 delivered. **F17 skipped by request** (controller extraction). CI green on 7.4 and 7.5. Nothing merged; two policy defaults await product sign-off.
 
 ---
 
@@ -43,13 +43,16 @@ switched off every pre-authentication protection on a public webhook endpoint.
 | F14 | `shopId` silently 1 (or 0) | Medium | S14 | `aa7409e` |
 | F15 | Same invariant, opposite reactions | Medium | S15 | `2500d13` + `67a6531` |
 | F16 | Fail-silent handlers | Medium | S16 | `9cd704d` + `d91413e` |
-| F17–F20 | God controller · activation cleanup · empty publishable key · `isTestMode()` clash | Low | — | **not started** |
+| F17 | God controller + service location instead of DI | Low | — | **skipped by request** |
+| F18 | Activation events hide their failures | Low | S18 | `5fbafec` |
+| F19 | Empty publishable key, unreported and re-retried | Low | S19 | `5fbafec` |
+| F20 | `isTestMode()` name clash · duplicated DTO API | Low | S20 | `5fbafec` + `d18f2a8` |
 
 Plus one unplanned item: **CI was broken for everyone** and had to be fixed to
 validate any of this (§6).
 
-**Volume:** stripe 69 files, +5097/−283 (33 src, 27 tests, 6 docs, CI, `services.yaml`);
-payment-base 6 files, +309/−2. 21 commits total.
+**Volume:** 24 commits across two repos. stripe: ~78 files touched (source, tests,
+docs, CI, DI config and one Twig widget); payment-base: 8 files.
 
 ## 3. Evidence
 
@@ -58,7 +61,7 @@ payment-base 6 files, +309/−2. 21 commits total.
 | `phpcs` (PSR-12) | clean | clean |
 | `phpstan` level max | **0 errors**, identical to the v3.2.0 baseline, no new baseline entries | 0 errors |
 | `phpmd` (with baseline) | clean | clean |
-| Unit (CI, full suite) | **1499 tests / 3915 assertions** | **1128 tests** / 6 skipped (was 1122) |
+| Unit (CI, full suite) | **1509 tests / 3934 assertions** | **1128 tests** / 6 skipped (was 1122) |
 | Integration | **89/89 local · 80/80 CI**, both PHP matrices | — |
 | Container compile | `install_shop_with_module` green — module activates with the new required constructor args | — |
 
@@ -151,6 +154,22 @@ five places:
    truncate `'12abc'` to shop 12.
 5. **F7 had two more sites** than the four reported: `CaptureService`'s transaction
    audit row and the checkout footer widget.
+6. **F19 was half wrong.** An empty publishable key does *not* fail silently on the
+   main checkout path — `stripe_order_controller.js` guards it and shows a
+   translated configuration error. What was genuinely missing: nothing was logged
+   **server-side**, so the merchant could not learn why checkout was dead; the
+   failed container lookup was retried on **every** template call; and the
+   embedded/footer path did not guard, passing `''` into `window.Stripe()`.
+7. **F20's "contradiction" was not one.** `ShopAdapterInterface::isTestMode()` is
+   documented as the **shop's** dev mode, which `blDebugMode` implements faithfully;
+   `ModuleConfigurationServiceInterface::isTestMode()` is the **Stripe key** mode.
+   Two legitimate contracts sharing an unfortunate name. Renaming would break the
+   PayPal and Mollie adapters, which implement the same interface, so it belongs to
+   a payment-base major — both sides are now documented instead.
+8. **F18's empty method had to be deleted, not implemented.** Switching `oxactive`
+   off on deactivation would have left payment methods off after the next activate,
+   because `ensureStripePaymentMethods()` deliberately preserves the admin's
+   `oxactive` choice. The name was the lie, not the missing behaviour.
 
 One coverage-shape lesson worth keeping: the suite *looked* JPY-safe. A green
 `testProcessRefundJpyPreservesZeroDecimalAmount` existed — but it exercised the
@@ -211,7 +230,9 @@ never have caught the 100× partial-refund bug.
 7. **Behaviour changes to announce:** a `charge.refunded` webhook with an unreadable
    amount now returns 500 (Stripe retries) instead of recording a 0.00 refund; an
    unresolvable shop id or currency now throws instead of quietly using shop 1 or
-   EUR.
+   EUR; deactivating the module from the CLI now clears the file cache (it silently
+   did not before); and `getShopName()` returns `''` rather than the literal
+   `'OXID eShop'` when the shop name is unset.
 
 ## 11. Environment caveat
 
