@@ -7,6 +7,7 @@ namespace OxidEsales\Payments\Stripe\Core;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
+use OxidEsales\Payments\Stripe\Service\PublishableKeyProvider;
 use Throwable;
 
 /**
@@ -20,6 +21,16 @@ class ViewConfig extends ViewConfig_parent
     use ServiceContainer;
 
     private ?ModuleConfigurationServiceInterface $stripeConfig = null;
+    private ?PublishableKeyProvider $keyProvider = null;
+
+    /**
+     * Set once the container could not build the module's services at all — the
+     * module is being deactivated or is misinstalled.
+     *
+     * Sprint 133 · Story 19 (F19): without this the failed lookup was retried on
+     * every single template call, because the memo field stayed null.
+     */
+    private bool $stripeServicesUnavailable = false;
 
     /**
      * Get the ModuleConfigurationServiceInterface lazily.
@@ -27,15 +38,41 @@ class ViewConfig extends ViewConfig_parent
      */
     private function getStripeConfig(): ?ModuleConfigurationServiceInterface
     {
+        if ($this->stripeServicesUnavailable) {
+            return null;
+        }
+
         if ($this->stripeConfig === null) {
             try {
                 $this->stripeConfig = $this->getServiceFromContainer(ModuleConfigurationServiceInterface::class);
             } catch (Throwable $e) {
                 // Service not available (module being deactivated)
+                $this->stripeServicesUnavailable = true;
                 return null;
             }
         }
         return $this->stripeConfig;
+    }
+
+    /**
+     * Resolves the publishable key, or reports that it is not configured.
+     * Null only when the module's services cannot be built at all.
+     */
+    private function getPublishableKeyProvider(): ?PublishableKeyProvider
+    {
+        if ($this->stripeServicesUnavailable) {
+            return null;
+        }
+
+        if ($this->keyProvider === null) {
+            try {
+                $this->keyProvider = $this->getServiceFromContainer(PublishableKeyProvider::class);
+            } catch (Throwable $e) {
+                $this->stripeServicesUnavailable = true;
+                return null;
+            }
+        }
+        return $this->keyProvider;
     }
 
     /**
@@ -174,14 +211,28 @@ class ViewConfig extends ViewConfig_parent
     }
 
     /**
-     * Get Stripe publishable key for JavaScript integration
+     * Get Stripe publishable key for JavaScript integration.
      *
-     * @return string
+     * Returns '' when the key is unavailable — the templates and the Stimulus
+     * controllers treat that as "cannot render Stripe" — but unlike before, the
+     * missing-key case is now reported server-side by PublishableKeyProvider, so
+     * a merchant has a log line explaining the dead checkout. Ask
+     * isStripePaymentAvailable() when you need to branch in a template.
      */
     public function getStripePublishableKey(): string
     {
-        $config = $this->getStripeConfig();
-        return $config !== null ? $config->getPublishableKey() : '';
+        return $this->getPublishableKeyProvider()?->resolve() ?? '';
+    }
+
+    /**
+     * True when Stripe checkout can actually be rendered.
+     *
+     * Sprint 133 (F19): gives templates an explicit state to branch on instead
+     * of inferring it from an empty string.
+     */
+    public function isStripePaymentAvailable(): bool
+    {
+        return $this->getPublishableKeyProvider()?->isAvailable() ?? false;
     }
 
     /**

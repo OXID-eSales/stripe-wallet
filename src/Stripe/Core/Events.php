@@ -82,12 +82,20 @@ class Events
      *
      * @return void
      */
+    /**
+     * Sprint 133 · Story 18 (F18): the body used to sit behind isAdmin(), so
+     * `oe-console oe:module:deactivate` — the documented CLI path — skipped the
+     * file-cache reset and left stale templates and config behind.
+     *
+     * Stripe payment methods intentionally survive deactivation: activation's
+     * ensureStripePaymentMethods() deliberately leaves `oxactive` untouched to
+     * preserve admin changes, so switching them off here would silently keep
+     * them off after the next activate. The former deactivatePaymentMethods()
+     * had an empty body under a name that promised otherwise, and is gone.
+     */
     public static function onDeactivate(): void
     {
-        if (Registry::getConfig()->isAdmin()) {
-            self::deactivatePaymentMethods();
-            self::clearTmp();
-        }
+        self::clearTmp();
     }
 
     /**
@@ -160,18 +168,14 @@ class Events
                 'DELETE FROM oxpayments WHERE oxid = ?',
                 [$sPaymentId]
             );
-        } catch (Exception) {
-            // do nothing
+        } catch (Exception $e) {
+            // Sprint 133 · Story 18 (F18): this swallowed everything, so a
+            // failed cleanup left the removed payment method in oxpayments and
+            // visible in admin with no trace of why.
+            Registry::getLogger()->error('Failed to delete a removed Stripe payment method', [
+                'payment_id' => $sPaymentId,
+                'error' => $e->getMessage(),
+            ]);
         }
-    }
-
-    /**
-     * Deactivates Stripe payment methods on module deactivation
-     *
-     * @return void
-     */
-    protected static function deactivatePaymentMethods(): void
-    {
-        // Payment methods remain in database but can be deactivated if needed
     }
 }

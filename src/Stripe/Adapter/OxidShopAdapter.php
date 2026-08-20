@@ -11,6 +11,7 @@ namespace OxidEsales\Payments\Stripe\Adapter;
 
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Core\ShopCurrency;
+use OxidEsales\Payments\Stripe\Core\ShopName;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 
 /**
@@ -74,11 +75,14 @@ class OxidShopAdapter implements ShopAdapterInterface
         return Registry::getConfig()->getCurrentShopUrl();
     }
 
+    /**
+     * Sprint 133 (F20): returns '' when unset rather than the literal
+     * 'OXID eShop' — this value reaches Stripe as session branding, so guessing
+     * it shows customers a name the merchant never chose.
+     */
     public function getShopName(): string
     {
-        $shop = Registry::getConfig()->getActiveShop();
-        /** @phpstan-ignore-next-line OXID core: magic property oxshops__oxname->value */
-        return $shop->oxshops__oxname->value ?? 'OXID eShop';
+        return ShopName::of(Registry::getConfig()->getActiveShop());
     }
 
     /**
@@ -94,6 +98,19 @@ class OxidShopAdapter implements ShopAdapterInterface
         );
     }
 
+    /**
+     * Whether the SHOP is in test/development mode, per
+     * {@see \OxidEsales\PaymentBase\Adapter\ShopAdapterInterface::isTestMode()}
+     * — i.e. OXID's blDebugMode.
+     *
+     * Sprint 133 (F20): NOT the Stripe test/live mode. That is
+     * {@see \OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface::isTestMode()},
+     * which reads sStripeMode and decides which API keys are used. The review
+     * called these two a contradiction; they are two different contracts that
+     * unfortunately share a name. The interface method is implemented by the
+     * PayPal and Mollie adapters as well, so renaming it belongs to a
+     * payment-base major version — until then this docblock is the guard rail.
+     */
     public function isTestMode(): bool
     {
         return (bool) Registry::getConfig()->getConfigParam('blDebugMode');

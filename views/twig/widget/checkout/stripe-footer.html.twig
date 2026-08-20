@@ -246,6 +246,12 @@
       if (!window.Stripe) {
         throw new Error('Stripe.js is unavailable');
       }
+      /* Sprint 133 (F19): the redirect controller already refuses an empty
+         publishable key; this path used to pass it to window.Stripe() and throw
+         an opaque SDK error instead. */
+      if (!this.publishableKeyValue) {
+        throw new Error('Stripe publishable key is not configured');
+      }
       var stripe = window.Stripe(this.publishableKeyValue);
       this._embedded = await stripe.initEmbeddedCheckout({ clientSecret: clientSecret });
 

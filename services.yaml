@@ -35,6 +35,14 @@ services:
   OxidEsales\Payments\Stripe\Service\ModuleDescriptionProvider:
     public: false
 
+  # Sprint 133 (F19): reports a missing publishable key server-side instead of
+  # handing the frontend an empty string with no trace.
+  OxidEsales\Payments\Stripe\Service\PublishableKeyProvider:
+    arguments:
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: true
+
   # Sprint 133 (F15): logs when it skips an already-settled contract, so a
   # sweep that can never act stops being indistinguishable from a quiet one.
   OxidEsales\Payments\Stripe\Service\RetryCleanupService:

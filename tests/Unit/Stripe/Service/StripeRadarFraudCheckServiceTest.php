@@ -86,7 +86,7 @@ class StripeRadarFraudCheckServiceTest extends TestCase
 
         $this->assertTrue($result->isSuccessful());
         $this->assertFalse($result->isScreened(), 'Nothing was screened, so no score may be claimed.');
-        $this->assertSame('no_payment_intent', $result->getReason());
+        $this->assertSame('no_payment_intent', $result->reason);
     }
 
     /**
@@ -108,7 +108,7 @@ class StripeRadarFraudCheckServiceTest extends TestCase
 
         $this->assertTrue($result->isSuccessful(), 'An unscoreable payment must not be blocked.');
         $this->assertFalse($result->isScreened(), 'No screening happened, so it must not read as a clean score.');
-        $this->assertSame('score_unavailable', $result->getReason());
+        $this->assertSame('score_unavailable', $result->reason);
     }
 
     /**
@@ -133,7 +133,7 @@ class StripeRadarFraudCheckServiceTest extends TestCase
         $this->assertFalse($result->isSuccessful());
         $this->assertFalse($result->isScreened());
         $this->assertSame(1.0, $result->score, 'A failed check is highest risk, not zero risk.');
-        $this->assertNotNull($result->getErrorMessage());
+        $this->assertNotNull($result->errorMessage);
     }
 
     public function testLogsTheErrorWithPaymentIntentIdOnApiError(): void
