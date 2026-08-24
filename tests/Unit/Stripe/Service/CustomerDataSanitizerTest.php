@@ -91,4 +91,83 @@ final class CustomerDataSanitizerTest extends TestCase
     {
         $this->assertSame('', $this->sanitizer->sanitize(''));
     }
+
+    // ---------------------------------------------------------------------
+    // Sprint 135 (S5) — mutation-hardening for the GDPR redaction path.
+    // Boundary and multibyte behaviour was previously unasserted, so the
+    // truncation arithmetic and the mb_* calls could be mutated undetected.
+    // ---------------------------------------------------------------------
+
+    /**
+     * Kills GreaterThan at CustomerDataSanitizer:42 — a value of exactly
+     * $maxLength characters must pass through untouched (`>` not `>=`).
+     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-135')]
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function valueOfExactlyMaxLengthIsNotTruncated(): void
+    {
+        $value = str_repeat('a', 10);
+
+        $this->assertSame($value, $this->sanitizer->sanitize($value, 10));
+    }
+
+    /**
+     * Kills IncrementInteger at :43 — truncation must keep exactly $maxLength
+     * characters, not $maxLength + 1.
+     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-135')]
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function overlongValueIsTruncatedToExactlyMaxLength(): void
+    {
+        $result = $this->sanitizer->sanitize(str_repeat('a', 11), 10);
+
+        $this->assertSame(10, mb_strlen($result, 'UTF-8'));
+        $this->assertSame(str_repeat('a', 10), $result);
+    }
+
+    /**
+     * Kills IncrementInteger and DecrementInteger at :25 — the documented
+     * default limit is 255 characters, and the default must be used when the
+     * caller omits it.
+     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-135')]
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function defaultMaxLengthIsTwoHundredFiftyFiveCharacters(): void
+    {
+        $this->assertSame(255, mb_strlen($this->sanitizer->sanitize(str_repeat('a', 300)), 'UTF-8'));
+        $this->assertSame(255, mb_strlen($this->sanitizer->sanitize(str_repeat('a', 255)), 'UTF-8'));
+    }
+
+    /**
+     * Kills MBString at :42 and :43 — length and truncation must count
+     * characters, not bytes. "ä" is two bytes and one character, so a
+     * byte-based implementation truncates this value early.
+     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-135')]
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function truncationCountsCharactersNotBytes(): void
+    {
+        $value = str_repeat('ä', 10);
+
+        $result = $this->sanitizer->sanitize($value, 10);
+
+        $this->assertSame($value, $result);
+        $this->assertSame(10, mb_strlen($result, 'UTF-8'));
+        $this->assertSame(20, strlen($result));
+    }
+
+    /**
+     * Kills MBString at :43 — truncating a multibyte value must cut at a
+     * character boundary and never emit a broken sequence.
+     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-135')]
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function multibyteTruncationCutsAtCharacterBoundary(): void
+    {
+        $result = $this->sanitizer->sanitize(str_repeat('ä', 12), 10);
+
+        $this->assertSame(str_repeat('ä', 10), $result);
+        $this->assertTrue(mb_check_encoding($result, 'UTF-8'));
+    }
+
 }

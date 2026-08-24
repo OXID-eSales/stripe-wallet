@@ -22,17 +22,19 @@ use Psr\Log\LoggerInterface;
 final class CheckoutSessionExpiredWebhookHandlerTest extends TestCase
 {
     private WebhookContractFulfillmentHandlerInterface&MockObject $fulfillmentHandler;
+    private LoggerInterface&MockObject $logger;
     private CheckoutSessionExpiredWebhookHandler $handler;
 
     protected function setUp(): void
     {
         $this->fulfillmentHandler = $this->createMock(WebhookContractFulfillmentHandlerInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->handler = new CheckoutSessionExpiredWebhookHandler(
             new StripeWebhookEventParser(),
             $this->fulfillmentHandler,
             $this->createMock(ContractRepositoryInterface::class),
-            $this->createMock(LoggerInterface::class)
+            $this->logger
         );
     }
 
@@ -111,4 +113,45 @@ final class CheckoutSessionExpiredWebhookHandlerTest extends TestCase
             created: time()
         );
     }
+
+    // ---------------------------------------------------------------------
+    // Sprint 135 (S6) — mutation-hardening. The webhook path is the source of
+    // truth for payment state; a deletable log call here is a silent loss of
+    // the only forensic record that a state transition was attempted.
+    // ---------------------------------------------------------------------
+
+    /**
+     * Kills MethodCallRemoval at CheckoutSessionExpiredWebhookHandler:50.
+     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-135')]
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function missingContractIdIsRecordedInTheLog(): void
+    {
+        $this->logger
+            ->expects($this->once())
+            ->method('debug')
+            ->with('No contract ID in expired session metadata');
+
+        $this->handler->handle($this->makeEvent(null));
+    }
+
+    /**
+     * Kills MethodCallRemoval and ArrayItemRemoval at :54 — the contract id must
+     * reach the log line, not merely the call.
+     */
+    #[\PHPUnit\Framework\Attributes\Group('sprint-135')]
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function processedExpiryIsLoggedWithTheContractId(): void
+    {
+        $this->logger
+            ->expects($this->once())
+            ->method('info')
+            ->with(
+                'Processing checkout.session.expired',
+                ['contract_id' => 'contract_123']
+            );
+
+        $this->handler->handle($this->makeEvent('contract_123'));
+    }
+
 }
