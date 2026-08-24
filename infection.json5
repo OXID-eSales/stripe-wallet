@@ -1,14 +1,18 @@
 {
-    "$schema": "https://raw.githubusercontent.com/infection/infection/0.27.0/resources/schema.json",
+    "$schema": "https://raw.githubusercontent.com/infection/infection/0.31.9/resources/schema.json",
+    // Sprint 135 (S8). Widened from EventSystem/Handler to the four directories
+    // that carry the payment logic.
     "source": {
         "directories": [
-            "src/Stripe/EventSystem/Handler"
+            "src/Stripe/EventSystem/Handler",
+            "src/Stripe/Core",
+            "src/Stripe/Webhook",
+            "src/Stripe/Service"
         ]
     },
-    "timeout": 30,
+    "timeout": 300,
     "logs": {
         "text": "reports/infection.log",
-        "html": "reports/infection.html",
         "summary": "reports/infection-summary.log"
     },
     "tmpDir": "var/cache/infection",
@@ -22,5 +26,5 @@
         "CastString": false
     },
     "testFramework": "phpunit",
-    "testFrameworkOptions": "--testsuite=Unit --filter=Handler"
+    "testFrameworkOptions": "--testsuite=Unit"
 }

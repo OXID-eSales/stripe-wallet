@@ -15,7 +15,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Unit tests for ReconciliationResult DTO
  */
-#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\ReconciliationResult::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\Result\ReconciliationResult::class)]
 #[\PHPUnit\Framework\Attributes\Group('sprint-10')]
 #[\PHPUnit\Framework\Attributes\Group('reconciliation')]
 class ReconciliationResultTest extends TestCase
