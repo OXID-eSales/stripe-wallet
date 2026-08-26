@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { createDebugLogger } from '../debug.js'
+import { initEmbeddedCheckoutOnce, forgetEmbeddedCheckout } from '../embedded_checkout_registry.js'
 
 /**
  * Stimulus Controller for Order Submit Button
@@ -74,7 +75,7 @@ export default class extends Controller {
       await this.handleStripeCheckout()
     } catch (error) {
       console.error('[order-submit] eager embedded mount failed', error)
-      this.showError(error.message || window.oStripe?.i18n?.PAYMENT_FAILED || 'Payment processing failed')
+      this.presentError(error)
     }
     if (!this._embeddedCheckout) {
       this.revealButton()
@@ -106,6 +107,8 @@ export default class extends Controller {
    * reference stored in connect() — symmetric, leak-free.
    */
   disconnect() {
+    forgetEmbeddedCheckout(this._embeddedCheckout)
+
     this._debug('Order Submit controller disconnected')
 
     window.removeEventListener('pageshow', this._onPageShow)
@@ -161,7 +164,7 @@ export default class extends Controller {
       }
     } catch (error) {
       console.error('Order submission failed', error)
-      this.showError(error.message || window.oStripe?.i18n?.PAYMENT_FAILED || 'Payment processing failed')
+      this.presentError(error)
     } finally {
       this.hideLoading()
     }
@@ -283,7 +286,9 @@ export default class extends Controller {
     }
 
     this.setStatus(window.oStripe?.i18n?.CREATING_SESSION || '')
-    this._embeddedCheckout = await stripe.initEmbeddedCheckout({ clientSecret })
+    // Through the page-wide registry, not directly: the OPC footer widget can
+    // host an embedded sheet on this same page, and Stripe permits exactly one.
+    this._embeddedCheckout = await initEmbeddedCheckoutOnce(stripe, clientSecret)
     mount.style.display = 'block'
     this._embeddedCheckout.mount(mount)
 
@@ -585,6 +590,30 @@ export default class extends Controller {
    * Show error message
    * @param {string} message - Error message to display
    */
+  /**
+   * Show a failure to the customer.
+   *
+   * Messages our own server sent (declined payment, missing consent) are for the
+   * customer and are shown as they are. A Stripe library error is not: "You
+   * cannot have multiple Embedded Checkout objects" is written for developers,
+   * and putting that in front of a shopper is worse than saying nothing. Those
+   * go to the console and the customer gets the generic wording.
+   *
+   * @param {Error|{name?: string, message?: string}} error
+   */
+  presentError(error) {
+    const message = error?.message || ''
+    const isLibraryError = error?.name === 'IntegrationError' || /Embedded Checkout/i.test(message)
+
+    if (isLibraryError) {
+      console.error('[order-submit] Stripe library error', error)
+      this.showError(window.oStripe?.i18n?.PAYMENT_FAILED || 'Payment processing failed')
+      return
+    }
+
+    this.showError(message || window.oStripe?.i18n?.PAYMENT_FAILED || 'Payment processing failed')
+  }
+
   showError(message) {
     if (this.hasStatusTarget) {
       this.statusTarget.textContent = message

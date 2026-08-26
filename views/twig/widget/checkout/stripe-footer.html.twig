@@ -126,6 +126,11 @@
       this._tryEagerMount();
     }
 
+    _genericErrorText() {
+      return (window.oStripe && window.oStripe.i18n && window.oStripe.i18n.PAYMENT_FAILED)
+        || 'Payment processing failed';
+    }
+
     _consentCheckboxes() {
       return [
         document.getElementById('confirmTermsCheckout'),
@@ -191,7 +196,11 @@
         }
       } catch (err) {
         console.error('[StripeCheckoutFooter] Eager embedded mount failed:', err);
-        this._showError(err.message);
+        // Stripe's own wording is written for developers — the customer gets the
+        // generic message, the detail stays in the console.
+        var isLibraryError = err && (err.name === 'IntegrationError'
+          || /Embedded Checkout/i.test(err.message || ''));
+        this._showError(isLibraryError ? this._genericErrorText() : err.message);
       } finally {
         this._mounting = false;
       }
@@ -268,6 +277,8 @@
       // regardless of which controller generation created it — and only
       // then (c) inits its own. The registry also lets a late-resolving
       // init be retired when its controller died while awaiting.
+      // Same registry the order page's order-submit controller uses; the shared
+      // contract is documented in resources/build/js/embedded_checkout_registry.js.
       var g = window.__oeStripeEmbeddedRegistry = window.__oeStripeEmbeddedRegistry || { chain: null, instance: null };
       g.chain = (g.chain || Promise.resolve()).then(function () {
         if (g.instance && typeof g.instance.destroy === 'function') {
