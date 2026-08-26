@@ -29,7 +29,9 @@ CI green on 7.4 and 7.5.
 - The last two sessions are one per checkout UI (OPC accordion, classic order page).
   Collapsing them is a decision about which UI owns the session.
 - Stripe does not distinguish a pending return from a failed one; Mollie does.
-- Two PSP widgets initialise on the same order page when both providers are active
-  (Stripe's embedded sheet and Mollie's Components). Nothing observed broken; unexamined.
+- ~~Two PSP widgets on one order page~~ — **checked, not a defect.** Each provider's
+  widget renders only for its own order (Stripe order: 0 Mollie hosts, 1 Stripe sheet;
+  Mollie order: 1 Mollie host, 0 Stripe sheets), and Mollie's own single-mount spec
+  passes. See report 04 §6.
 - The stripe unit suite cannot be built in this shop (OXID class-chain recursion
   under PHPUnit) — run tests per file.

@@ -79,12 +79,28 @@ The spec also asserts that no Stripe library wording ever appears on the page.
 | E2E `stripe-eager-mount-single-session` | passes |
 | E2E `single-active-payment` | passes |
 
-## 6. Noticed while looking
+## 6. Checked afterwards: the two providers do not collide — earlier note withdrawn
 
-The order page's frame list shows Mollie's Components mounting alongside Stripe's
-sheet (`mollie-components-controller-iframe`, `cardNumber-input`, …) when both
-providers are active. Nothing is broken by it here, but two PSP widgets
-initialising on one order page is worth a look of its own.
+While fixing this I noted that the order page's frame list showed Mollie's
+Components (`mollie-components-controller-iframe`, `cardNumber-input`, …) next to
+Stripe's sheet, and flagged "two PSP widgets on one order page" as worth a look.
+**That was wrong.** Measured on the order page, both ways, with both providers
+active:
+
+| Selected payment | Mollie controller hosts | Mollie card iframes | Stripe embedded sheets |
+|---|---|---|---|
+| Stripe Wallet | 0 | 0 | **1** |
+| Mollie | **1** | **1** | 0 |
+
+Each provider's widget renders only for its own order. The Mollie frames in that
+earlier dump were transient — the OPC footer manager loads a widget per payment
+method and swaps its content, so frames from a previously selected method can
+still be listed for a moment.
+
+Mollie's own guard for the standard checkout also passes unchanged:
+`mollie-standard-inline-card.spec.ts` — each of the four Components fields
+(`cardNumber`, `cardHolder`, `expiryDate`, `verificationCode`) mounts exactly
+once on `cl=order`, no doubling.
 
 ## 7. Commits
 
