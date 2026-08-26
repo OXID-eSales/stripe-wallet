@@ -81,12 +81,36 @@ class StripePaymentHandler implements PaymentHandlerInterface
     public function processPayment(PaymentContextInterface $context): PaymentHandlerResult
     {
         try {
-            // 1. Create contract in DRAFT state
-            $contract = $this->createContract($context);
+            // 1. Reuse the open contract for this basket if there is one,
+            //    otherwise create a fresh one in DRAFT.
+            //
+            //    OPC-175 / OPC-176: this method used to create a NEW contract on
+            //    EVERY call, and step 2 finalises a shop order — number, stock,
+            //    confirmation mail. `processCheckout` is reachable from the OPC
+            //    footer widget's eager mount, which fires more than once, so one
+            //    shopper produced one contract and one complete order PER CALL.
+            //
+            //    Traced on pay1 2026-08-27 with a backtrace on
+            //    Order::finalizeOrder(): two finalisations 21s apart from an
+            //    identical stack, both through this method. The database showed
+            //    14 contracts in one hour, every one `pending`, each with its own
+            //    OXORDERID, and 495 orders with OXTRANSSTATUS=OK and no OXPAID.
+            $contract = $this->findReusableContract($context) ?? $this->createContract($context);
             $contractId = $contract->getId() ?? '';
 
-            // 2. Create early order and transition DRAFT → NOT_FINISHED → PENDING
-            $this->createEarlyOrderAndTransition($contract, $context);
+            // 2. Create the early order only when this contract has none yet.
+            //    A reused contract is already past DRAFT, so transitioning it
+            //    again would throw — and creating a second order for it is the
+            //    defect above.
+            if (($contract->getOrderId() ?? '') === '') {
+                $this->createEarlyOrderAndTransition($contract, $context);
+            } else {
+                $this->logger?->info('[StripePaymentHandler] Reusing contract and its order', [
+                    'contractId' => $contractId,
+                    'orderId' => $contract->getOrderId(),
+                    'state' => $contract->getStateValue(),
+                ]);
+            }
 
             // 3. Create Stripe Checkout Session
             $sessionResult = $this->createCheckoutSession($contract);
@@ -160,6 +184,134 @@ class StripePaymentHandler implements PaymentHandlerInterface
     private function isIframeMode(): bool
     {
         return $this->iframeSettings?->isEnabled() ?? false;
+    }
+
+    /**
+     * The still-open contract for this shopper and this basket, if any.
+     *
+     * Deliberately narrower than `findActiveByUserId()`, which also returns
+     * `ready_to_commit` and `committed` contracts. Reusing one of those would
+     * attach a second purchase to a contract whose payment is already in flight
+     * or done, so only DRAFT and PENDING qualify.
+     *
+     * The basket must still match, too: a shopper who changed the cart is
+     * legitimately starting a new contract, and reusing the old order would
+     * charge them for the wrong thing. The comparison is on the snapshot the
+     * contract captured — item count, per-item article and amount, and the gross
+     * total — because that is what the order was created from.
+     *
+     * @since STRP idempotency fix (OPC-175 / OPC-176)
+     */
+    private function findReusableContract(PaymentContextInterface $context): ?PaymentContractInterface
+    {
+        $userId = $this->resolveUserId($context->getUser());
+        if ($userId === '') {
+            return null;
+        }
+
+        $candidate = $this->contractRepository->findActiveByUserId($userId);
+        if ($candidate === null) {
+            return null;
+        }
+
+        $state = $candidate->getState();
+        if (!$state->isDraft() && !$state->isPending()) {
+            return null;
+        }
+
+        if (!$this->basketMatchesSnapshot($context, $candidate)) {
+            return null;
+        }
+
+        return $candidate;
+    }
+
+    /**
+     * Does the contract's captured basket still describe what is in the basket
+     * now?
+     *
+     * Both sides are compared through the shape each one actually has: the
+     * snapshot stores items as arrays with `productId` and `quantity` (see
+     * ContractService::extractItems), while the live basket is an OXID Basket
+     * whose contents are BasketItem objects. `PaymentContextInterface::getBasket()`
+     * is typed `object`, so every call is guarded the same way ContractService
+     * guards its own.
+     */
+    private function basketMatchesSnapshot(
+        PaymentContextInterface $context,
+        PaymentContractInterface $contract
+    ): bool {
+        try {
+            $snapshot = $contract->getBasketSnapshot();
+        } catch (\Throwable) {
+            return false;
+        }
+
+        $basket = $context->getBasket();
+
+        $liveTotal = 0.0;
+        if (method_exists($basket, 'getPrice')) {
+            $price = $basket->getPrice();
+            if (is_object($price) && method_exists($price, 'getBruttoPrice')) {
+                $liveTotal = (float) $price->getBruttoPrice();
+            }
+        }
+
+        if (abs($snapshot->getTotalGross() - $liveTotal) > 0.001) {
+            return false;
+        }
+
+        return $this->snapshotFingerprint($snapshot->getItems()) === $this->basketFingerprint($basket);
+    }
+
+    /**
+     * Order-independent fingerprint of the captured items.
+     *
+     * @param array<int, array<string, mixed>> $items
+     */
+    private function snapshotFingerprint(array $items): string
+    {
+        $parts = [];
+        foreach ($items as $item) {
+            $parts[] = (string) ($item['productId'] ?? '') . 'x' . (string) ($item['quantity'] ?? '');
+        }
+
+        return $this->joinFingerprint($parts);
+    }
+
+    /**
+     * The same fingerprint, taken from a live OXID basket.
+     */
+    private function basketFingerprint(object $basket): string
+    {
+        if (!method_exists($basket, 'getContents')) {
+            return '';
+        }
+
+        $parts = [];
+        foreach ((array) $basket->getContents() as $basketItem) {
+            if (!is_object($basketItem)) {
+                continue;
+            }
+            $productId = '';
+            if (method_exists($basketItem, 'getProductId')) {
+                $productId = (string) $basketItem->getProductId();
+            }
+            $amount = method_exists($basketItem, 'getAmount') ? (int) $basketItem->getAmount() : 1;
+            $parts[] = $productId . 'x' . $amount;
+        }
+
+        return $this->joinFingerprint($parts);
+    }
+
+    /**
+     * @param list<string> $parts
+     */
+    private function joinFingerprint(array $parts): string
+    {
+        sort($parts);
+
+        return implode('|', $parts);
     }
 
     private function createContract(PaymentContextInterface $context): PaymentContractInterface
