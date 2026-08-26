@@ -1,5 +1,8 @@
 # 2026-08-26 — Stripe
 
+**Day summary: [reports/03-day-summary.md](reports/03-day-summary.md)** — three latent defects exposed by a container recompile, plus one template trap.
+CI green on 7.4 and 7.5.
+
 ## Done
 
 - [Checkout return and container fixes](reports/01-checkout-return-and-container-fixes.md)
