@@ -7,6 +7,7 @@ namespace OxidEsales\Payments\Stripe\Service;
 use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
@@ -25,7 +26,8 @@ class RetryCleanupService
     public function __construct(
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ShopOrderServiceInterface $orderService,
-        ?LoggerInterface $logger = null
+        ?LoggerInterface $logger = null,
+        private readonly ?CheckoutInFlightGuard $inFlightGuard = null
     ) {
         $this->logger = $logger ?? new NullLogger();
     }
@@ -111,6 +113,21 @@ class RetryCleanupService
         $orderId = $contract->getOrderId();
         if ($orderId !== null) {
             $this->orderService->deleteNotFinishedOrder($orderId);
+        }
+
+        // Not every previous attempt is stale. The OPC checkout API prepares a
+        // Stripe session before the customer reaches the payment or order page,
+        // and cancelling it on the next page render meant the session they were
+        // about to pay in was thrown away and replaced — several times per
+        // checkout. Keep it while it still matches the basket and nobody has
+        // paid it; the guard answers null whenever it cannot tell, which leaves
+        // the old cancel-always behaviour in place.
+        if ($this->inFlightGuard?->inspect($contract) !== null) {
+            $this->logger->info('Keeping the checkout in flight instead of cancelling it', [
+                'contractId' => $contract->getId(),
+            ]);
+
+            return false;
         }
 
         $contract->cancel('checkout_retry');

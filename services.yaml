@@ -56,9 +56,16 @@ services:
   # compile-time consumer (the retry event handler) and deletes the id — the
   # runtime get then throws "removed or inlined" and checkout dies with
   # "Payment processing failed". Keep it public as long as anything fetches it by id.
+  OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard:
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+
   OxidEsales\Payments\Stripe\Service\RetryCleanupService:
     arguments:
       $logger: '@oxid_esales.monolog.logger'
+      # Keeps the cleanup from cancelling a checkout the customer is about to pay
+      # in — see CheckoutInFlightGuard.
+      $inFlightGuard: '@OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard'
     public: true
 
   # Same reason: fetched by id from the Order model extension (admin order tab).
@@ -130,6 +137,9 @@ services:
       # Sprint 133 (F6): confirmPayment() asks Stripe for the PaymentIntent state
       # instead of returning an unconditional success.
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      # One checkout, one Stripe session: hands back the session already in
+      # flight instead of preparing another on every OPC processCheckout call.
+      $inFlightGuard: '@OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard'
     tags:
       - { name: oe.payment.handler }
     public: true

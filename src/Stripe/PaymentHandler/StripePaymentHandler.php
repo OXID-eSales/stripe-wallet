@@ -21,6 +21,7 @@ use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractServiceInterface;
 use OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface;
+use OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard;
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
@@ -61,7 +62,8 @@ class StripePaymentHandler implements PaymentHandlerInterface
         private readonly ?LoggerInterface $logger = null,
         ?LanguageResolverInterface $languageResolver = null,
         private readonly ?IframeCheckoutSettingsInterface $iframeSettings = null,
-        private readonly ?StripeAdapterFactoryInterface $adapterFactory = null
+        private readonly ?StripeAdapterFactoryInterface $adapterFactory = null,
+        private readonly ?CheckoutInFlightGuard $inFlightGuard = null
     ) {
         $this->languageResolver = $languageResolver ?? new OxidLanguageResolver();
     }
@@ -83,6 +85,16 @@ class StripePaymentHandler implements PaymentHandlerInterface
 
     public function processPayment(PaymentContextInterface $context): PaymentHandlerResult
     {
+        // The OPC checkout API calls this repeatedly while the customer works
+        // through the accordion. Preparing a whole new checkout each time leaves
+        // several Stripe sessions, contracts and early orders behind for one
+        // basket, and lets the customer pay in a sheet the shop has moved on
+        // from. Hand back the one already in flight when it still fits.
+        $reused = $this->reuseCheckoutInFlight($context);
+        if ($reused !== null) {
+            return $reused;
+        }
+
         try {
             // 1. Create contract in DRAFT state
             $contract = $this->createContract($context);
@@ -294,6 +306,53 @@ class StripePaymentHandler implements PaymentHandlerInterface
             'orderNumber' => $orderResponse->orderNumber,
             'state' => $contract->getStateValue(),
         ]);
+    }
+
+    /**
+     * The checkout this shopper already has in flight, if it can still be used.
+     *
+     * Returns the same result shape processPayment() would have produced, so the
+     * caller cannot tell a reused checkout from a fresh one.
+     */
+    private function reuseCheckoutInFlight(PaymentContextInterface $context): ?PaymentHandlerResult
+    {
+        $contract = $this->findContractInFlight($context);
+        $session = $this->checkoutInFlightGuard()->inspect($contract);
+        if ($contract === null || $session === null) {
+            return null;
+        }
+
+        $this->logger?->info('[StripePaymentHandler] Reusing checkout session', [
+            'contractId' => $contract->getId(),
+            'sessionId' => $session->id,
+        ]);
+
+        $embedded = $this->isIframeMode();
+
+        return PaymentHandlerResult::success(
+            contractId: (string) $contract->getId(),
+            clientSecret: $embedded ? $session->clientSecret : null,
+            metadata: [
+                'handler' => StripeDefinitions::PROVIDER,
+                'renderMode' => $embedded ? 'iframe' : 'redirect',
+                'requiresRedirect' => !$embedded,
+                'redirectUrl' => $session->url,
+                'sessionId' => $session->id,
+                'reused' => true,
+            ]
+        );
+    }
+
+    protected function findContractInFlight(PaymentContextInterface $context): ?PaymentContractInterface
+    {
+        $userId = $this->resolveUserId($context->getUser());
+
+        return $userId === '' ? null : $this->contractRepository->findActiveByUserId($userId);
+    }
+
+    protected function checkoutInFlightGuard(): CheckoutInFlightGuard
+    {
+        return $this->inFlightGuard ?? new CheckoutInFlightGuard($this->adapterFactory);
     }
 
     private function createCheckoutSession(
