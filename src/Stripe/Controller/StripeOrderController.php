@@ -14,6 +14,9 @@ use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\Helper\ResponseHeaders;
+use OxidEsales\Payments\Stripe\Service\Return\CheckoutReturnInputs;
+use OxidEsales\Payments\Stripe\Service\Return\CheckoutReturnInputsResolver;
+use OxidEsales\Payments\Stripe\Service\Return\CheckoutReturnRejection;
 use OxidEsales\Payments\Stripe\Service\Return\StripeReturnResolver;
 use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
@@ -171,6 +174,7 @@ class StripeOrderController extends StripeOrderController_parent
      */
     public function createCheckoutSession(): void
     {
+
         $helper = $this->getRequestHelper();
         $this->sendSecureJsonHeaders();
 
@@ -351,30 +355,47 @@ class StripeOrderController extends StripeOrderController_parent
     public function checkoutSuccess(): string
     {
         $helper = $this->getRequestHelper();
-        $inputs = $this->readReturnInputs($helper);
-        if ($inputs === null) {
-            return 'payment';
+        $inputs = $this->resolveReturnInputs($helper);
+        if ($inputs instanceof CheckoutReturnRejection) {
+            return $this->rejectReturn($helper, $inputs);
         }
 
-        $contract = $this->loadReturnContract($inputs['contractId'], $helper);
+        $contract = $this->findReturnContract($inputs->contractId);
         if ($contract === null) {
-            return 'payment';
+            return $this->rejectReturn(
+                $helper,
+                CheckoutReturnRejection::ContractNotFound,
+                ['contractId' => $inputs->contractId]
+            );
         }
 
         /** @var \OxidEsales\PaymentBase\Contract\PaymentContractInterface $contract */
+        $ownershipRejection = (new CheckoutReturnInputsResolver())
+            ->checkOwnership($contract->getUserId(), $this->readCurrentUserId());
+        if ($ownershipRejection !== null) {
+            return $this->rejectReturn(
+                $helper,
+                $ownershipRejection,
+                ['contractId' => $inputs->contractId, 'contractUserId' => $contract->getUserId()]
+            );
+        }
+
         $orderId = $this->dispatchCheckoutReturn(
             providerName: StripeDefinitions::PROVIDER,
             contract: $contract,
             resolver: $this->getServiceFromContainer(StripeReturnResolver::class),
             extraContextKeys: [
-                'checkoutSessionId' => $inputs['sessionId'],
-                'contract_token' => $inputs['contractToken'],
+                'checkoutSessionId' => $inputs->sessionId,
+                'contract_token' => $inputs->contractToken,
             ],
         );
 
         if ($orderId === null) {
-            $helper->addErrorToDisplay('Payment verification failed');
-            return 'payment';
+            return $this->rejectReturn(
+                $helper,
+                CheckoutReturnRejection::NoOrderCreated,
+                ['contractId' => $inputs->contractId, 'checkoutSessionId' => $inputs->sessionId]
+            );
         }
 
         $helper->clearStripeSessionVariables();
@@ -382,47 +403,59 @@ class StripeOrderController extends StripeOrderController_parent
         return 'thankyou';
     }
 
-    /**
-     * @return array{sessionId: string, contractId: string, contractToken: string}|null
-     */
-    private function readReturnInputs(ControllerRequestHelper $helper): ?array
-    {
-        $sessionId = $helper->getCheckoutSessionIdFromRequest();
-        if ($sessionId === null) {
-            $helper->addErrorToDisplay('Payment information missing');
-            return null;
-        }
-
+    private function resolveReturnInputs(
+        ControllerRequestHelper $helper
+    ): CheckoutReturnInputs|CheckoutReturnRejection {
         $contractId = $helper->getContractIdFromRequest();
         $contractToken = $helper->getContractTokenFromRequest();
-        if (!is_string($contractId) || !is_string($contractToken)) {
-            $helper->addErrorToDisplay('Payment verification failed');
-            return null;
-        }
 
-        if (!$helper->validateContractToken($contractId, $contractToken)) {
-            $helper->addErrorToDisplay('Payment verification failed');
-            return null;
-        }
-
-        $sessionContractId = $helper->getContractIdFromSession();
-        if (is_string($sessionContractId) && $contractId !== $sessionContractId) {
-            $helper->addErrorToDisplay('Payment verification failed');
-            return null;
-        }
-
-        return ['sessionId' => $sessionId, 'contractId' => $contractId, 'contractToken' => $contractToken];
+        return (new CheckoutReturnInputsResolver())->resolve(
+            sessionId: $helper->getCheckoutSessionIdFromRequest(),
+            contractId: $contractId,
+            contractToken: $contractToken,
+            contractTokenValid: $helper->validateContractToken($contractId, $contractToken)
+        );
     }
 
-    private function loadReturnContract(string $contractId, ControllerRequestHelper $helper): ?object
+    /**
+     * Turns the customer away with a message that gives nothing away, and
+     * records in the log which check refused — without the log line a support
+     * request about "Payment verification failed" is unanswerable.
+     *
+     * @param array<string, mixed> $context
+     */
+    private function rejectReturn(
+        ControllerRequestHelper $helper,
+        CheckoutReturnRejection $rejection,
+        array $context = []
+    ): string {
+        $helper->logReturnRejected($rejection, $context);
+        $helper->addErrorToDisplay($rejection->customerMessage());
+
+        return 'payment';
+    }
+
+    /**
+     * The shopper this request belongs to, or null when the session has none.
+     */
+    private function readCurrentUserId(): ?string
+    {
+        $user = $this->getUser();
+        if (!is_object($user)) {
+            return null;
+        }
+
+        $userId = (string) $user->getId();
+
+        return $userId === '' ? null : $userId;
+    }
+
+    private function findReturnContract(string $contractId): ?object
     {
         /** @var ContractRepositoryInterface $repo */
         $repo = $this->getServiceFromContainer(ContractRepositoryInterface::class);
-        $contract = $repo->findById($contractId);
-        if ($contract === null) {
-            $helper->addErrorToDisplay('Payment verification failed');
-        }
-        return $contract;
+
+        return $repo->findById($contractId);
     }
 
     /**

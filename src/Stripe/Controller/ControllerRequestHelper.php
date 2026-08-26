@@ -8,6 +8,8 @@ use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
+use OxidEsales\Payments\Stripe\Service\Return\CheckoutReturnRejection;
+use Psr\Log\LoggerInterface;
 use OxidEsales\Payments\Stripe\Service\OxidLanguageResolver;
 
 /**
@@ -242,9 +244,37 @@ class ControllerRequestHelper
 
     public function logError(string $message, \Throwable $e): void
     {
-        Registry::getLogger()->error($message, [
+        $this->logger()->error($message, [
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString(),
         ]);
+    }
+
+    /**
+     * Records why a return from Stripe was refused.
+     *
+     * The customer only ever sees {@see CheckoutReturnRejection::customerMessage()},
+     * which is intentionally vague; without this line a refused return leaves no
+     * trace at all and cannot be diagnosed afterwards. The reason is written last
+     * so a caller's context cannot overwrite it, and the contract token is never
+     * logged — it is a credential.
+     *
+     * @param array<string, mixed> $context
+     */
+    public function logReturnRejected(CheckoutReturnRejection $rejection, array $context = []): void
+    {
+        $this->logger()->error(
+            'STRP: checkout return rejected',
+            array_merge($context, ['reason' => $rejection->logReason()])
+        );
+    }
+
+    /**
+     * Seam over OXID's logger so the log lines above are assertable without a
+     * booted shop.
+     */
+    protected function logger(): LoggerInterface
+    {
+        return Registry::getLogger();
     }
 }
