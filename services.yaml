@@ -18,6 +18,11 @@ services:
       - 'src/Stripe/Service/FieldValidationFailure.php'
       # unbuyable-article-checkout Story 1: VO with scalar constructor args — not a service
       - 'src/Stripe/Service/BuyabilityFailure.php'
+      # Checkout-return diagnostics: a VO with scalar constructor args and an enum.
+      # Left in the sweep, the VO breaks container compilation ("you should configure
+      # its value explicitly") and takes every page that touches the container with it.
+      - 'src/Stripe/Service/Return/CheckoutReturnInputs.php'
+      - 'src/Stripe/Service/Return/CheckoutReturnRejection.php'
       - 'src/Stripe/Service/UserDataValidatorInterface.php'
       - 'src/Stripe/Service/UserFieldReaderInterface.php'
       - 'src/Stripe/Service/OxidUserFieldReader.php'
@@ -45,9 +50,23 @@ services:
 
   # Sprint 133 (F15): logs when it skips an already-settled contract, so a
   # sweep that can never act stops being indistinguishable from a quiet one.
+  # Fetched at runtime via ServiceContainer::getServiceFromContainer() from
+  # StripeOrderController / PaymentController. A runtime get() is NOT a reference,
+  # so without `public: true` Symfony inlines this service into its only
+  # compile-time consumer (the retry event handler) and deletes the id — the
+  # runtime get then throws "removed or inlined" and checkout dies with
+  # "Payment processing failed". Keep it public as long as anything fetches it by id.
   OxidEsales\Payments\Stripe\Service\RetryCleanupService:
     arguments:
       $logger: '@oxid_esales.monolog.logger'
+    public: true
+
+  # Same reason: fetched by id from the Order model extension (admin order tab).
+  # Nothing references it at compile time, so a private definition would be
+  # removed outright — and the caller catches Throwable, which turned the failure
+  # into a silently empty Stripe transaction history instead of an error.
+  OxidEsales\Payments\Stripe\Service\StripeOrderApiService:
+    public: true
 
   # Sprint 133 (F13): logs when it refuses an untrustworthy legacy webhook
   # secret, so a mode switch cannot silently stop orders being marked paid.
