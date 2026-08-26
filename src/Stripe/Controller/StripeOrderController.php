@@ -436,11 +436,20 @@ class StripeOrderController extends StripeOrderController_parent
     }
 
     /**
-     * The shopper this request belongs to, or null when the session has none.
+     * The shopper this request belongs to, or null when it cannot be determined.
+     *
+     * Failure is deliberately not an error: this feeds the ownership check, and a
+     * check that cannot be made must let a paid return through rather than throw
+     * a charged customer out of the flow.
      */
     private function readCurrentUserId(): ?string
     {
-        $user = $this->getUser();
+        try {
+            $user = $this->getUser();
+        } catch (Throwable) {
+            return null;
+        }
+
         if (!is_object($user)) {
             return null;
         }

@@ -550,7 +550,44 @@ class StripeOrderControllerTest extends TestCase
         $this->assertEquals('payment', $result);
     }
 
-    public function testCheckoutSuccessReturnsPaymentOnContractIdMismatch(): void
+    /**
+     * A checkout can end up with several contracts — the OPC payment-handler path
+     * creates its own, and each embedded sheet carries the one it was opened with,
+     * while the session pointer only ever names the last one the order page made.
+     * Returning with any of the others must still work: the customer has already
+     * been charged at this point, and refusing here loses the payment.
+     */
+    public function testCheckoutSuccessProceedsWhenTheSessionPointsAtAnotherContract(): void
+    {
+        $dispatched = [];
+        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $eventDispatcher
+            ->method('dispatch')
+            ->willReturnCallback(function ($event) use (&$dispatched) {
+                $dispatched[] = $event;
+                return $event;
+            });
+
+        [$controller] = $this->createControllerWithMocks($eventDispatcher, [
+            'sessionId' => 'cs_test',
+            'contractIdFromRequest' => 'contract_from_url',
+            'contractIdFromSession' => 'contract_from_session',
+            'contractToken' => 'valid_token',
+            'basketNotEmpty' => true,
+            // the stub repository hands back a contract owned by user_1
+            'userId' => 'user_1',
+        ]);
+
+        $controller->checkoutSuccess();
+
+        $this->assertNotEmpty($dispatched, 'the return must reach the handler chain');
+    }
+
+    /**
+     * What the discarded session-pointer check was actually reaching for: a
+     * contract that is not this shopper's is not theirs to complete.
+     */
+    public function testCheckoutSuccessReturnsPaymentForAnotherShoppersContract(): void
     {
         $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
         $eventDispatcher->expects($this->never())->method('dispatch');
@@ -558,8 +595,10 @@ class StripeOrderControllerTest extends TestCase
         [$controller] = $this->createControllerWithMocks($eventDispatcher, [
             'sessionId' => 'cs_test',
             'contractIdFromRequest' => 'contract_from_url',
-            'contractIdFromSession' => 'contract_from_session',
             'contractToken' => 'valid_token',
+            'basketNotEmpty' => true,
+            // the stub repository's contract belongs to user_1, not to this shopper
+            'userId' => 'someone_else',
         ]);
 
         $result = $controller->checkoutSuccess();

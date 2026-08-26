@@ -378,7 +378,9 @@ class StripeOrderControllerAgbConsentTest extends TestCase
                         {
                             return new PaymentContract(
                                 1,
-                                'user_1',
+                                // must match the shopper getUser() returns — the
+                                // return path checks the contract is theirs
+                                'user_123',
                                 BasketSnapshot::fromArray([
                                     'items'      => [],
                                     'totalGross' => 1.0,

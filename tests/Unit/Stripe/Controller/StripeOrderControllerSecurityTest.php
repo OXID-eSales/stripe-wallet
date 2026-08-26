@@ -238,13 +238,20 @@ class StripeOrderControllerSecurityTest extends TestCase
     }
 
     // ==========================================
-    // B4: session contract id mismatches request contract id
+    // B4: the returned contract is not this shopper's
     // ==========================================
 
     /**
-     * Branch B4: contract_id in URL differs from the one stored in the session.
+     * Branch B4: the contract named in the return belongs to someone else.
+     *
+     * This used to be a comparison against the session's stripe_contract_id, which
+     * refused *any* contract but the last one the order page created — including
+     * the customer's own, after Stripe had charged them. Ownership is what that
+     * check was reaching for, and it is what is enforced here: the contract id is
+     * already authenticated by its token, so the remaining question is whose
+     * contract it is.
      */
-    public function testCheckoutSuccessB4RejectsMismatchedContractId(): void
+    public function testCheckoutSuccessB4RejectsAnotherShoppersContract(): void
     {
         $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
         $eventDispatcher->expects($this->never())->method('dispatch');
@@ -252,15 +259,46 @@ class StripeOrderControllerSecurityTest extends TestCase
         [$controller, $helper] = $this->createCheckoutSuccessController($eventDispatcher, [
             'sessionId' => 'cs_test_b4',
             'contractIdFromRequest' => 'contract_from_url',
-            'contractIdFromSession' => 'contract_from_session',
             'contractToken' => 'valid_token',
             'tokenValidationResult' => true,
+            // the repository hands back a contract owned by user_1
+            'currentUserId' => 'a_different_shopper',
         ]);
 
         $result = $controller->checkoutSuccess();
 
         $this->assertEquals('payment', $result);
         $this->assertEquals('Payment verification failed', $helper->lastError);
+    }
+
+    /**
+     * The other half of B4, and the regression this replaced: the shopper's own
+     * contract goes through even when the session points at a different one —
+     * which it routinely does, because a checkout creates several.
+     */
+    public function testCheckoutSuccessB4AcceptsOwnContractWhenTheSessionPointsElsewhere(): void
+    {
+        $dispatched = [];
+        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $eventDispatcher
+            ->method('dispatch')
+            ->willReturnCallback(function ($event) use (&$dispatched) {
+                $dispatched[] = $event;
+                return $event;
+            });
+
+        [$controller] = $this->createCheckoutSuccessController($eventDispatcher, [
+            'sessionId' => 'cs_test_b4b',
+            'contractIdFromRequest' => 'contract_from_url',
+            'contractIdFromSession' => 'contract_from_session',
+            'contractToken' => 'valid_token',
+            'tokenValidationResult' => true,
+            'currentUserId' => 'user_1',
+        ]);
+
+        $controller->checkoutSuccess();
+
+        $this->assertNotEmpty($dispatched, 'the return must reach the handler chain');
     }
 
     // ==========================================
@@ -487,6 +525,16 @@ class StripeOrderControllerSecurityTest extends TestCase
             ? $options['contractIdFromSession']
             : ($options['contractId'] ?? 'contract_default');
         $helper->tokenValidationResult = $options['tokenValidationResult'] ?? true;
+
+        // The shopper this request belongs to. getUser() reads it through the
+        // basket, the same way production does; absent means "no user in session".
+        if (isset($options['currentUserId'])) {
+            $user = $this->createMock(User::class);
+            $user->method('getId')->willReturn($options['currentUserId']);
+            $basket = $this->createMock(Basket::class);
+            $basket->method('getBasketUser')->willReturn($user);
+            $helper->basket = $basket;
+        }
 
         $contractExistsInRepo = $options['contractExistsInRepo'] ?? true;
         $dispatchOrderId = $options['dispatchOrderId'] ?? 'order_123';
