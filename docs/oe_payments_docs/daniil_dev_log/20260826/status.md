@@ -9,11 +9,16 @@
   six checks refused. Includes why Mollie never hit either. Commits `9189b6f`,
   `bfac6ca`, `cbc174c`, `800dc9f`.
 
+- [One checkout, one Stripe session](reports/02-duplicate-checkout-sessions.md) — the OPC
+  handler prepared a new contract + early order + Stripe session on every accordion step
+  while the stale-checkout cleanup cancelled whatever was in flight. Both now consult
+  `CheckoutInFlightGuard`; five sessions per walkthrough down to two. Commits `745a193`,
+  `9235f8c`.
+
 ## Open
 
-- Duplicate checkout sessions per order-page load: `createCheckoutSession()` and
-  `StripePaymentHandler` both create them, each with a contract and an early order.
-  No longer able to cost a payment, still wasteful. Needs a sprint.
+- The last two sessions are one per checkout UI (OPC accordion, classic order page).
+  Collapsing them is a decision about which UI owns the session.
 - Stripe does not distinguish a pending return from a failed one; Mollie does.
 - The stripe unit suite cannot be built in this shop (OXID class-chain recursion
   under PHPUnit) — run tests per file.
