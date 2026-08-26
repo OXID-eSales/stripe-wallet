@@ -18,10 +18,18 @@ CI green on 7.4 and 7.5.
   `CheckoutInFlightGuard`; five sessions per walkthrough down to two. Commits `745a193`,
   `9235f8c`.
 
+- [One embedded sheet per page](reports/04-embedded-single-mount.md) — the order page's
+  host called `stripe.initEmbeddedCheckout()` directly, bypassing the OPC-132 registry the
+  footer widget serialises through; collisions showed the shopper Stripe's own
+  `IntegrationError` text. Both hosts now share the registry, and library errors no longer
+  reach the page. Commits `a88bfd4`, `68f70b1`.
+
 ## Open
 
 - The last two sessions are one per checkout UI (OPC accordion, classic order page).
   Collapsing them is a decision about which UI owns the session.
 - Stripe does not distinguish a pending return from a failed one; Mollie does.
+- Two PSP widgets initialise on the same order page when both providers are active
+  (Stripe's embedded sheet and Mollie's Components). Nothing observed broken; unexamined.
 - The stripe unit suite cannot be built in this shop (OXID class-chain recursion
   under PHPUnit) — run tests per file.
