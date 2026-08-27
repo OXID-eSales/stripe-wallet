@@ -31,6 +31,15 @@ readonly class StripeChargeDto
      * @param bool                $captured        Whether the charge has been captured
      * @param int                 $created         Unix timestamp of charge creation
      * @param array<StripeRefundDto> $refunds      Refund sub-objects (populated when expanded)
+     * @param string|null         $paymentMethodType The method the customer actually paid with, as
+     *                                             Stripe reports it in `payment_method_details.type`
+     *                                             ('card', 'klarna', 'paypal', 'sepa_debit', ...).
+     *                                             Null when the Charge was mapped from a shape that
+     *                                             carries no `payment_method_details` sub-object.
+     * @param string|null         $cardBrand       Card brand ('visa', 'mastercard', ...) — card only
+     * @param string|null         $cardLast4       Last four digits of the card — card only
+     * @param string|null         $walletType      Wallet that fronted the card ('apple_pay',
+     *                                             'google_pay', 'link') — card only
      */
     public function __construct(
         public string $id,
@@ -41,6 +50,10 @@ readonly class StripeChargeDto
         public bool $captured,
         public int $created,
         public array $refunds = [],
+        public ?string $paymentMethodType = null,
+        public ?string $cardBrand = null,
+        public ?string $cardLast4 = null,
+        public ?string $walletType = null,
     ) {
     }
 }

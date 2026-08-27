@@ -113,6 +113,8 @@ class StripeObjectMapper
      */
     public static function fromCharge(Charge $charge): StripeChargeDto
     {
+        $method = self::mapPaymentMethodDetails($charge);
+
         return new StripeChargeDto(
             id: (string) ($charge->id ?? ''),
             amount: (int) ($charge->amount ?? 0),
@@ -122,6 +124,10 @@ class StripeObjectMapper
             captured: (bool) ($charge->captured ?? false),
             created: (int) ($charge->created ?? 0),
             refunds: self::mapRefunds($charge),
+            paymentMethodType: $method['type'],
+            cardBrand: $method['brand'],
+            cardLast4: $method['last4'],
+            walletType: $method['wallet'],
         );
     }
 
@@ -183,6 +189,64 @@ class StripeObjectMapper
         }
 
         return ['', 'unknown'];
+    }
+
+    /**
+     * Read `payment_method_details` off a Charge — the method the customer
+     * actually paid with, plus card brand/last4/wallet when the method is a card.
+     *
+     * Sprint 136: a Charge retrieved without the sub-object (or a non-card
+     * method) must yield nulls, never an error — every field is optional in the
+     * API response and the admin panel renders an em dash for null.
+     *
+     * @return array{type: ?string, brand: ?string, last4: ?string, wallet: ?string}
+     */
+    private static function mapPaymentMethodDetails(Charge $charge): array
+    {
+        $details = $charge->payment_method_details ?? null;
+        $card    = self::readSubObject($details, 'card');
+        $wallet  = self::readSubObject($card, 'wallet');
+
+        return [
+            'type'   => self::readStringField($details, 'type'),
+            'brand'  => self::readStringField($card, 'brand'),
+            'last4'  => self::readStringField($card, 'last4'),
+            'wallet' => self::readStringField($wallet, 'type'),
+        ];
+    }
+
+    /**
+     * Nested Stripe sub-objects are absent, not null-valued, whenever the parent
+     * method has no such facet — so `is_object` is the only safe gate.
+     */
+    private static function readSubObject(mixed $source, string $property): ?object
+    {
+        if (!is_object($source)) {
+            return null;
+        }
+
+        $value = $source->{$property} ?? null;
+
+        return is_object($value) ? $value : null;
+    }
+
+    /**
+     * An empty string collapses to null: the panel treats "unknown" and "the API
+     * sent an empty value" identically, and only null reaches the em-dash branch.
+     */
+    private static function readStringField(mixed $source, string $property): ?string
+    {
+        if (!is_object($source)) {
+            return null;
+        }
+
+        $value = $source->{$property} ?? null;
+
+        if (!is_scalar($value) || (string) $value === '') {
+            return null;
+        }
+
+        return (string) $value;
     }
 
     /**

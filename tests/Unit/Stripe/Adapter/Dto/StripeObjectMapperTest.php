@@ -381,4 +381,148 @@ final class StripeObjectMapperTest extends TestCase
         self::assertSame(0, $dto->amountRefunded);
         self::assertSame('jpy', $dto->currency);
     }
+
+    // -------------------------------------------------------------------------
+    // Sprint 136 (STRP-TBD): payment_method_details survives the boundary
+    // -------------------------------------------------------------------------
+
+    public function testFromChargeMapsKlarnaPaymentMethodType(): void
+    {
+        // Arrange — a Klarna charge carries no card sub-object
+        $charge = Charge::constructFrom([
+            'id'                     => 'ch_klarna',
+            'amount'                 => 12500,
+            'amount_captured'        => 12500,
+            'amount_refunded'        => 0,
+            'currency'               => 'eur',
+            'captured'               => true,
+            'created'                => 1700001000,
+            'payment_method_details' => [
+                'type'   => 'klarna',
+                'klarna' => ['payment_method_category' => 'pay_later'],
+            ],
+        ]);
+
+        // Act
+        $dto = StripeObjectMapper::fromCharge($charge);
+
+        // Assert
+        self::assertSame('klarna', $dto->paymentMethodType);
+        self::assertNull($dto->cardBrand);
+        self::assertNull($dto->cardLast4);
+        self::assertNull($dto->walletType);
+    }
+
+    public function testFromChargeMapsCardBrandLast4AndWallet(): void
+    {
+        // Arrange — Apple Pay is a card charge with a wallet sub-object
+        $charge = Charge::constructFrom([
+            'id'                     => 'ch_card_wallet',
+            'amount'                 => 4200,
+            'amount_captured'        => 4200,
+            'amount_refunded'        => 0,
+            'currency'               => 'eur',
+            'captured'               => true,
+            'created'                => 1700001100,
+            'payment_method_details' => [
+                'type' => 'card',
+                'card' => [
+                    'brand'  => 'visa',
+                    'last4'  => '4242',
+                    'wallet' => ['type' => 'apple_pay'],
+                ],
+            ],
+        ]);
+
+        // Act
+        $dto = StripeObjectMapper::fromCharge($charge);
+
+        // Assert
+        self::assertSame('card', $dto->paymentMethodType);
+        self::assertSame('visa', $dto->cardBrand);
+        self::assertSame('4242', $dto->cardLast4);
+        self::assertSame('apple_pay', $dto->walletType);
+    }
+
+    public function testFromChargeMapsPlainCardWithoutWallet(): void
+    {
+        // Arrange
+        $charge = Charge::constructFrom([
+            'id'                     => 'ch_card_plain',
+            'amount'                 => 9900,
+            'amount_captured'        => 9900,
+            'amount_refunded'        => 0,
+            'currency'               => 'eur',
+            'captured'               => true,
+            'created'                => 1700001200,
+            'payment_method_details' => [
+                'type' => 'card',
+                'card' => ['brand' => 'mastercard', 'last4' => '0007'],
+            ],
+        ]);
+
+        // Act
+        $dto = StripeObjectMapper::fromCharge($charge);
+
+        // Assert
+        self::assertSame('card', $dto->paymentMethodType);
+        self::assertSame('mastercard', $dto->cardBrand);
+        self::assertSame('0007', $dto->cardLast4);
+        self::assertNull($dto->walletType);
+    }
+
+    public function testFromChargeWithoutPaymentMethodDetailsYieldsNulls(): void
+    {
+        // Arrange — a Charge shape that predates / omits the sub-object must not throw
+        $charge = Charge::constructFrom([
+            'id'              => 'ch_no_details',
+            'amount'          => 1000,
+            'amount_captured' => 1000,
+            'amount_refunded' => 0,
+            'currency'        => 'eur',
+            'captured'        => true,
+            'created'         => 1700001300,
+        ]);
+
+        // Act
+        $dto = StripeObjectMapper::fromCharge($charge);
+
+        // Assert
+        self::assertNull($dto->paymentMethodType);
+        self::assertNull($dto->cardBrand);
+        self::assertNull($dto->cardLast4);
+        self::assertNull($dto->walletType);
+    }
+
+    public function testPaymentMethodDetailsSurviveTheExpandedPaymentIntent(): void
+    {
+        // Arrange — this is the shape the admin panel actually receives:
+        // getPaymentIntentWithRefunds() expands latest_charge.refunds, and
+        // payment_method_details rides along inside the expanded Charge.
+        $pi = PaymentIntent::constructFrom([
+            'id'            => 'pi_expanded_pm',
+            'status'        => 'succeeded',
+            'amount'        => 12500,
+            'currency'      => 'eur',
+            'created'       => 1700001400,
+            'latest_charge' => [
+                'id'                     => 'ch_expanded_pm',
+                'object'                 => 'charge',
+                'amount'                 => 12500,
+                'amount_captured'        => 12500,
+                'amount_refunded'        => 0,
+                'currency'               => 'eur',
+                'captured'               => true,
+                'created'                => 1700001400,
+                'payment_method_details' => ['type' => 'paypal'],
+            ],
+        ]);
+
+        // Act
+        $dto = StripeObjectMapper::fromPaymentIntent($pi);
+
+        // Assert — no extra API call and no expand-list change is needed
+        self::assertNotNull($dto->charge);
+        self::assertSame('paypal', $dto->charge->paymentMethodType);
+    }
 }
