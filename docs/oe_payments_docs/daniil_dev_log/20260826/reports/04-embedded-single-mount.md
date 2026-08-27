@@ -110,3 +110,50 @@ once on `cl=order`, no doubling.
 | `68f70b1` | chore(e2e): bump submodule — embedded single-mount spec |
 
 Submodule `e2e-tests-playwright` (`projects/Stripe`): the spec itself.
+
+---
+
+## 8. Follow-up 2026-08-27: the first fix broke paying — reversed
+
+Sharing the *creation* of the sheet was wrong, and it made the order page worse
+than the bug it fixed. A single instance handed between hosts is mounted by
+whichever calls `mount()` last, and that was the OPC footer widget — whose
+container on the order page is **0 pixels tall**. Measured on the order page:
+
+| Container | Owner | iframes | height |
+|---|---|---|---|
+| `#stripe-embedded-checkout` | order page (visible) | **0** | 300 |
+| `.stripe-embedded-checkout` | OPC footer | **1** | **0** |
+
+With the Place-Order button hidden in eager mode, that is a checkout with **no way
+to pay** — reported as "the iframe is not loaded". No server error; the shop log
+was empty.
+
+**Reversed the ownership instead of sharing creation.** The `order-submit` host
+creates and mounts its own sheet; the footer widget stands down when the order
+page hosts one (an order-submit host in iframe mode with the mount container
+present). Only one host ever initialises, so the collision the registry was
+guarding against cannot arise. What is still shared is only the *record* of the
+live instance, on the same window key the footer's OPC-132 serialisation already
+used, so it can retire an instance the other host created.
+
+After: the sheet mounts in `#stripe-embedded-checkout` at 825px, the footer's
+container stays empty. On OPC pages, where the footer is the only host, nothing
+changes.
+
+### Why the spec let it through
+
+It asserted "at most one sheet". A page with the sheet in the wrong container
+satisfies that — as does a page with no sheet at all. It now asserts a **usable**
+sheet: mounted, in the order page's own container, tall enough to be seen, and
+recorded page-wide. Verified against the broken arrangement, where it fails with
+*"the order page hosts the sheet, not the footer widget"*.
+
+The lesson is the useful part: an assertion phrased as an upper bound (`≤ 1`,
+`not.toContain`) passes on an empty page. Pair it with the positive one.
+
+### Commits
+
+| Commit | Subject |
+|---|---|
+| `169bc95` | fix(checkout): the order page owns its embedded sheet — regression fix |

@@ -21,8 +21,10 @@ CI green on 7.4 and 7.5.
 - [One embedded sheet per page](reports/04-embedded-single-mount.md) — the order page's
   host called `stripe.initEmbeddedCheckout()` directly, bypassing the OPC-132 registry the
   footer widget serialises through; collisions showed the shopper Stripe's own
-  `IntegrationError` text. Both hosts now share the registry, and library errors no longer
-  reach the page. Commits `a88bfd4`, `68f70b1`.
+  `IntegrationError` text. **Corrected 2026-08-27** (report §8): sharing the *creation*
+  put the sheet in the footer's zero-height container and left the order page unpayable,
+  so ownership was reversed — the order page mounts its own sheet and the footer stands
+  down there. Commits `a88bfd4`, `68f70b1`, `169bc95`.
 
 ## Open
 
