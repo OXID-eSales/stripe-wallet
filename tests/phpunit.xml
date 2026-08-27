@@ -42,6 +42,7 @@
          Container-boot failures in this suite are hard errors (not skips). -->
     <testsuite name="Integration-with-container">
       <file>Integration/Admin/PaymentPanelRegistryIntegrationTest.php</file>
+      <file>Integration/Admin/PaymentMethodRowRenderTest.php</file>
       <file>Integration/Module/ModuleLifecycleTest.php</file>
     </testsuite>
   </testsuites>
