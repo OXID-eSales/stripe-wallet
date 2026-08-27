@@ -142,6 +142,26 @@
         || 'Payment processing failed';
     }
 
+    /**
+     * OPC-153: read the reason a failed processCheckout actually gave.
+     *
+     * OPC answers with CheckoutResult::toArray(), whose failure key is
+     * `errorMessage` — never `error`. Reading only `error` therefore discarded
+     * every server-side reason and painted one generic sentence for all of
+     * them: consents rejected, payment method unsupported, invalid address,
+     * handler failure. Three tickets (OPC-153, OPC-171, OPC-181) describe that
+     * one sentence and cannot be told apart from the UI, and OPC-47 hid behind
+     * it before them.
+     *
+     * `error` stays in the chain because non-OPC embeddings (the classic order
+     * page endpoint) answer with that key instead.
+     */
+    _failureTextFrom(result) {
+      var payload = result || {};
+
+      return payload.errorMessage || payload.error || 'Failed to create checkout session';
+    }
+
     _consentCheckboxes() {
       return [
         document.getElementById('confirmTermsCheckout'),
@@ -202,7 +222,9 @@
       try {
         var checkoutResult = await this._processCheckout();
         if (!checkoutResult.success) {
-          throw new Error(checkoutResult.error || 'Failed to create checkout session');
+          console.error('[StripeCheckoutFooter] processCheckout rejected the eager mount:',
+            checkoutResult.errorCode || 'no code', checkoutResult.errorMessage || 'no message');
+          throw new Error(this._failureTextFrom(checkoutResult));
         }
         var meta = checkoutResult.metadata || {};
         var clientSecret = checkoutResult.clientSecret || meta.clientSecret;
@@ -237,7 +259,9 @@
         var checkoutResult = await this._processCheckout();
 
         if (!checkoutResult.success) {
-          throw new Error(checkoutResult.error || 'Failed to create checkout session');
+          console.error('[StripeCheckoutFooter] processCheckout rejected the payment:',
+            checkoutResult.errorCode || 'no code', checkoutResult.errorMessage || 'no message');
+          throw new Error(this._failureTextFrom(checkoutResult));
         }
 
         var meta = checkoutResult.metadata || {};
