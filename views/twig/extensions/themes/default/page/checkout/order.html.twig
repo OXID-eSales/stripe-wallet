@@ -30,25 +30,37 @@
     {% if payment.isStripePaymentMethod() == false %}
         {{ parent() }}
     {% else %}
-        <form action="{{ oViewConf.getSslSelfLink()|raw }}" method="post"
-              id="orderShipping">
-            {{ oViewConf.getHiddenSid()|raw }}
-            <input type="hidden" name="cl" value="payment">
-            <input type="hidden" name="fnc" value="">
-            <h4 class="card-header card-title card-header-edit d-flex justify-content-between align-items-center">
-                {{ translate({ ident: "SHIPPING_CARRIER" }) }}
-                <button type="submit" class="btn"
-                        title="{{ translate({ ident: "EDIT" }) }}">
-                    <svg aria-hidden="true">
-                        <use xlink:href="#pencil"></use>
-                    </svg>
-                </button>
-            </h4>
-            {% set oShipSet = oView.getShipSet() %}
-            <div class="card-body">
-                {{ oShipSet.oxdeliveryset__oxtitle.value }}
-            </div>
-        </form>
+        {# payment-base Sprint 07: with exactly one delivery set there is nothing to
+           confirm and nowhere for the pencil to lead — the payment step no longer
+           offers a carrier selector. This block replaces core's, so it has to honour
+           the same decision itself instead of inheriting it, exactly like the payment
+           block below.
+
+           The `is defined` guard keeps the page alive if payment-base's OrderController
+           extension is ever absent from the class chain: without it Twig would raise a
+           runtime error here instead of simply showing the block. #}
+        {% if oView.isSingleShippingAutoAssigned is not defined
+              or not oView.isSingleShippingAutoAssigned() %}
+            <form action="{{ oViewConf.getSslSelfLink()|raw }}" method="post"
+                  id="orderShipping">
+                {{ oViewConf.getHiddenSid()|raw }}
+                <input type="hidden" name="cl" value="payment">
+                <input type="hidden" name="fnc" value="">
+                <h4 class="card-header card-title card-header-edit d-flex justify-content-between align-items-center">
+                    {{ translate({ ident: "SHIPPING_CARRIER" }) }}
+                    <button type="submit" class="btn"
+                            title="{{ translate({ ident: "EDIT" }) }}">
+                        <svg aria-hidden="true">
+                            <use xlink:href="#pencil"></use>
+                        </svg>
+                    </button>
+                </h4>
+                {% set oShipSet = oView.getShipSet() %}
+                <div class="card-body">
+                    {{ oShipSet.oxdeliveryset__oxtitle.value }}
+                </div>
+            </form>
+        {% endif %}
         {# payment-base Sprint 06: with exactly one usable payment method there is
            nothing to confirm and nowhere for the pencil to lead — the payment step
            no longer offers a selection. This block replaces core's, so it has to
