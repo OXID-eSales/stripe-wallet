@@ -143,23 +143,36 @@
     }
 
     /**
-     * OPC-153: read the reason a failed processCheckout actually gave.
+     * OPC-153: resolve a translated, shopper-facing label for a failed
+     * processCheckout, keyed by the server's errorCode.
      *
-     * OPC answers with CheckoutResult::toArray(), whose failure key is
-     * `errorMessage` — never `error`. Reading only `error` therefore discarded
-     * every server-side reason and painted one generic sentence for all of
-     * them: consents rejected, payment method unsupported, invalid address,
-     * handler failure. Three tickets (OPC-153, OPC-171, OPC-181) describe that
-     * one sentence and cannot be told apart from the UI, and OPC-47 hid behind
-     * it before them.
+     * This widget used to read `checkoutResult.error` — a key OPC's
+     * CheckoutResult::toArray() does not emit (it names the field
+     * `errorMessage`) — so 'Failed to create checkout session' was painted for
+     * every refusal alike: consents rejected, payment method unsupported,
+     * invalid address, handler failure. Three tickets describe that one
+     * sentence (OPC-153, OPC-171, OPC-181) and OPC-47 hid behind it earlier.
      *
-     * `error` stays in the chain because non-OPC embeddings (the classic order
-     * page endpoint) answer with that key instead.
+     * The fix is NOT to display `errorMessage`: OPC's PROCESSING_ERROR
+     * interpolates `$e->getMessage()`, and its wording is hardcoded English.
+     * The label is chosen by code and translated by the shop.
+     *
+     * The mapping lives in ONE place — OPC's utils/checkout_error_catalog.js,
+     * published as `window.OnepageCheckout.checkoutErrorText`. This widget is
+     * inline JS outside that bundle, so it consumes the published resolver
+     * rather than carrying a second copy of the code table that drifts the
+     * moment OPC adds a code. When the widget renders outside OPC (no global),
+     * the local i18n string stands in.
      */
     _failureTextFrom(result) {
       var payload = result || {};
+      var opcResolver = window.OnepageCheckout && window.OnepageCheckout.checkoutErrorText;
+      if (typeof opcResolver === 'function') {
+        return opcResolver(payload);
+      }
 
-      return payload.errorMessage || payload.error || 'Failed to create checkout session';
+      return (window.oStripe && window.oStripe.i18n && window.oStripe.i18n.SESSION_FAILED)
+        || 'Failed to create checkout session';
     }
 
     _consentCheckboxes() {
