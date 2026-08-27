@@ -248,6 +248,88 @@ final class StripePanelViewDataBuilderTest extends TestCase
     }
 
     // ---------------------------------------------------------------------------
+    // Sprint 136 (STRP-TBD): the method the customer actually paid with
+    // ---------------------------------------------------------------------------
+
+    public function testProjectsCardMethodWithBrandAndLast4(): void
+    {
+        $viewData = $this->builderWithCharge(
+            $this->chargeWithMethod('card', 'visa', '4242')
+        );
+
+        self::assertTrue($viewData['paymentMethod']['isKnown']);
+        self::assertSame('Credit card', $viewData['paymentMethod']['label']);
+        self::assertSame('Visa •••• 4242', $viewData['paymentMethod']['detail']);
+        self::assertSame('card', $viewData['paymentMethod']['raw']);
+    }
+
+    public function testProjectsKlarnaWithoutCardDetail(): void
+    {
+        $viewData = $this->builderWithCharge($this->chargeWithMethod('klarna'));
+
+        self::assertSame('Klarna', $viewData['paymentMethod']['label']);
+        self::assertNull($viewData['paymentMethod']['detail']);
+    }
+
+    public function testProjectsWalletAsTheLabelWithTheCardDemoted(): void
+    {
+        $viewData = $this->builderWithCharge(
+            $this->chargeWithMethod('card', 'mastercard', '0007', 'apple_pay')
+        );
+
+        self::assertSame('Apple Pay', $viewData['paymentMethod']['label']);
+        self::assertSame('Mastercard •••• 0007', $viewData['paymentMethod']['detail']);
+    }
+
+    /**
+     * Nothing charged yet (or Stripe unreachable): the panel must render an em
+     * dash, so the projection has to report not-known rather than invent a label.
+     */
+    public function testUnknownWhenThePaymentIntentHasNoCharge(): void
+    {
+        $viewData = $this->builderWithCharge(null);
+
+        self::assertFalse($viewData['paymentMethod']['isKnown']);
+        self::assertSame('', $viewData['paymentMethod']['label']);
+        self::assertNull($viewData['paymentMethod']['detail']);
+        self::assertNull($viewData['paymentMethod']['raw']);
+    }
+
+    public function testUnmappedMethodShowsTheRawStripeCode(): void
+    {
+        $viewData = $this->builderWithCharge($this->chargeWithMethod('boleto'));
+
+        self::assertTrue($viewData['paymentMethod']['isKnown']);
+        self::assertSame('boleto', $viewData['paymentMethod']['label']);
+    }
+
+    /**
+     * OXID returns the ident itself when a key has no translation. That must not
+     * reach the operator as "STRIPE_PAYMENT_METHOD_KLARNA".
+     */
+    public function testUntranslatedKeyFallsBackToTheRawCode(): void
+    {
+        $translator = $this->createMock(LanguageTranslatorInterface::class);
+        $translator->method('translateString')->willReturnArgument(0);
+
+        $feedback = $this->createMock(AdminValidationFeedbackInterface::class);
+        $feedback->method('consume')->willReturn([]);
+
+        $builder = new StripePanelViewDataBuilder(
+            viewDataProvider: $this->realProviderWithPi($this->piWithCharge($this->chargeWithMethod('klarna'))),
+            contractResolver: $this->createMock(OrderContractResolver::class),
+            moduleConfig: $this->createMock(ModuleConfigurationServiceInterface::class),
+            validationFeedback: $feedback,
+            messageFormatter: $this->realFormatter($translator),
+            translator: $translator,
+        );
+
+        $viewData = $builder->build($this->orderStub());
+
+        self::assertSame('klarna', $viewData['paymentMethod']['label']);
+    }
+
+    // ---------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------
 
@@ -282,6 +364,10 @@ final class StripePanelViewDataBuilderTest extends TestCase
             ['STRIPE_VALIDATION_AMOUNT_PRECISION', 'The amount has too many decimal places for this currency.'],
             ['STRIPE_VALIDATION_AMOUNT_EXCEEDS_BOUND', 'The amount exceeds the maximum available for this action.'],
             ['STRIPE_VALIDATION_AMOUNT_BOUND_UNAVAILABLE', 'The available amount could not be verified with Stripe. Please try again.'],
+            // Sprint 136
+            ['STRIPE_PAYMENT_METHOD_CARD', 'Credit card'],
+            ['STRIPE_PAYMENT_METHOD_KLARNA', 'Klarna'],
+            ['STRIPE_PAYMENT_METHOD_APPLE_PAY', 'Apple Pay'],
         ]);
 
         return $translator;
@@ -381,5 +467,54 @@ final class StripePanelViewDataBuilderTest extends TestCase
                 return $this->stubPi;
             }
         };
+    }
+
+    /**
+     * Sprint 136: view-data assembled from a PI carrying the given charge.
+     *
+     * @return array<string, mixed>
+     */
+    private function builderWithCharge(?StripeChargeDto $charge): array
+    {
+        $feedback = $this->createMock(AdminValidationFeedbackInterface::class);
+        $feedback->method('consume')->willReturn([]);
+
+        return $this->builderWithProvider($feedback, $this->realProviderWithPi($this->piWithCharge($charge)))
+            ->build($this->orderStub());
+    }
+
+    private function piWithCharge(?StripeChargeDto $charge): StripePaymentIntentDto
+    {
+        return new StripePaymentIntentDto(
+            id: 'pi_test',
+            status: 'succeeded',
+            amount: 10000,
+            currency: 'eur',
+            created: 0,
+            latestChargeId: $charge?->id,
+            charge: $charge,
+            amountCapturable: 0,
+        );
+    }
+
+    private function chargeWithMethod(
+        string $type,
+        ?string $brand = null,
+        ?string $last4 = null,
+        ?string $wallet = null,
+    ): StripeChargeDto {
+        return new StripeChargeDto(
+            id: 'ch_test',
+            amount: 10000,
+            amountCaptured: 10000,
+            amountRefunded: 0,
+            currency: 'eur',
+            captured: true,
+            created: 0,
+            paymentMethodType: $type,
+            cardBrand: $brand,
+            cardLast4: $last4,
+            walletType: $wallet,
+        );
     }
 }

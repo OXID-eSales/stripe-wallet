@@ -9,7 +9,7 @@
    rule bleeds into other PSP panels rendered in the same shared wrapper.
 
    View-data keys (see `StripePanelViewDataBuilder`): contractId, orderId,
-   orderNumber, paymentType, transactionId, externalTransId, currency,
+   orderNumber, paymentType, paymentMethod, transactionId, externalTransId, currency,
    amount, capturedAmount, refundedAmount, hasRefunds, capturableAmount,
    capturableRaw, remainingRefundable, remainingRefundableRaw,
    isCapturable, isRefundable, isCancellable, dashboardPrefix, isTestMode,
@@ -241,6 +241,22 @@
             <tr>
                 <td class="s-label">{{ translate({ ident: "STRIPE_PAYMENT_TYPE" }) }}</td>
                 <td class="s-value">{{ paymentType|default('') }}</td>
+            </tr>
+            {# Sprint 136: the method the customer actually paid with, from the
+               Stripe charge. The row above is the shop's payment-method id and
+               is identical for every Stripe order. #}
+            <tr>
+                <td class="s-label">{{ translate({ ident: "STRIPE_PAYMENT_METHOD_USED" }) }}</td>
+                <td class="s-value" data-testid="payment-method-used">
+                    {% if paymentMethod is defined and paymentMethod.isKnown %}
+                        <strong>{{ paymentMethod.label }}</strong>
+                        {%- if paymentMethod.detail %}
+                            <span class="s-muted">&middot; {{ paymentMethod.detail }}</span>
+                        {%- endif %}
+                    {% else %}
+                        <span class="s-muted">&ndash;</span>
+                    {% endif %}
+                </td>
             </tr>
             <tr>
                 <td class="s-label">{{ translate({ ident: "STRIPE_TRANSACTION_ID" }) }}</td>

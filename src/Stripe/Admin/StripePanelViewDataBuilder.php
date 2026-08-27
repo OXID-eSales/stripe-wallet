@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Admin;
 
 use OxidEsales\Eshop\Application\Model\Order;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeChargeDto;
 use OxidEsales\PaymentBase\Validation\Message\MessageFormatterInterface;
 use OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
@@ -67,6 +68,10 @@ class StripePanelViewDataBuilder
             'orderNumber'         => $this->readField($order, 'oxorder__oxordernr'),
             'contractId'          => (string) $this->contractResolver->getContractIdFromOrder($order),
             'paymentType'         => $this->readField($order, 'oxorder__oxpaymenttype'),
+            // Sprint 136: what the customer actually paid with. 'paymentType'
+            // above is the shop's method id and reads 'oscstripe' for every
+            // order the module ever touched; this is the PSP's answer.
+            'paymentMethod'       => $this->buildPaymentMethod($paymentIntent?->charge),
             'transactionId'       => $this->readField($order, 'oxorder__oxtransid'),
             'externalTransId'     => $this->readField($order, 'oxorder__stripeexternaltransid'),
             'currency'            => $this->readField($order, 'oxorder__oxcurrency'),
@@ -111,6 +116,50 @@ class StripePanelViewDataBuilder
             // session-backed feedback channel, rendered as translated messages.
             'validationErrors'    => $this->buildValidationErrors((string) $order->getId()),
         ];
+    }
+
+    /**
+     * Project the charge's payment-method facts onto the four values the panel
+     * row needs. An unknown method is a first-class outcome (nothing charged
+     * yet, or the API read failed) and is signalled by `isKnown: false`, which
+     * the template renders as an em dash.
+     *
+     * @return array{isKnown: bool, label: string, detail: ?string, raw: ?string}
+     */
+    private function buildPaymentMethod(?StripeChargeDto $charge): array
+    {
+        $descriptor = PaymentMethodDescriptor::fromCharge($charge);
+
+        return [
+            'isKnown' => $descriptor->isKnown(),
+            'label'   => $this->paymentMethodLabel($descriptor),
+            'detail'  => $descriptor->detail(),
+            'raw'     => $descriptor->rawType,
+        ];
+    }
+
+    /**
+     * Translated method name, falling back to the raw PSP code whenever there
+     * is no key for it or the key has no translation — OXID returns the ident
+     * itself in that case, and "STRIPE_PAYMENT_METHOD_KLARNA" must never reach
+     * an operator.
+     */
+    private function paymentMethodLabel(PaymentMethodDescriptor $descriptor): string
+    {
+        $fallback = (string) $descriptor->displayType();
+        $key      = $descriptor->labelKey();
+
+        if ($key === null) {
+            return $fallback;
+        }
+
+        $translated = $this->translator->translateString($key);
+
+        if ($translated === '' || $translated === $key) {
+            return $fallback;
+        }
+
+        return $translated;
     }
 
     /**
