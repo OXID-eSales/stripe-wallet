@@ -1,58 +1,32 @@
 /**
- * One Stripe Embedded Checkout per page, whoever asks.
+ * The page-wide record of who holds Stripe's one Embedded Checkout.
  *
  * Stripe allows a single Embedded Checkout object per document, and two hosts can
- * sit on the same checkout page: the classic order page's order-submit
- * controller and the OPC footer widget. Each used to call
- * initEmbeddedCheckout() on its own, so the page ended up with two live sheets —
- * or, when the second attempt lost the race, with
- * `IntegrationError: You cannot have multiple Embedded Checkout objects`
- * rendered where the shopper reads error messages.
+ * sit on the same checkout page: the classic order page's order-submit controller
+ * and the OPC footer widget. On the order page the order-submit host owns the
+ * sheet — its container is the visible one and its Place-Order button is hidden
+ * in eager mode — so the footer widget stands down there
+ * (see views/twig/widget/checkout/stripe-footer.html.twig).
  *
- * This is the OPC-132 registry the footer widget already used to serialise its
- * own re-mounts, lifted out so both hosts share it. Every mount (a) waits for any
- * in-flight init, (b) destroys whatever instance is alive — no matter which host
- * created it — and only then (c) inits its own.
+ * What is shared is only the *record* of the live instance, on the same window key
+ * the footer widget's OPC-132 mount serialisation already uses, so that
+ * serialisation can retire an instance this host created rather than trip over it.
  *
- * The registry lives on `window` because the two hosts are built separately: this
- * module is bundled, the footer widget's copy is inline in
- * views/twig/widget/checkout/stripe-footer.html.twig. Both must use this key.
+ * Sharing the creation itself was tried and reverted: one instance handed between
+ * hosts gets mounted by whichever calls mount() last, and the order page's visible
+ * container was left empty while the sheet sat in the footer's zero-height one.
  */
 const REGISTRY_KEY = '__oeStripeEmbeddedRegistry'
 
-function registry() {
-  window[REGISTRY_KEY] = window[REGISTRY_KEY] || { chain: null, instance: null }
-  return window[REGISTRY_KEY]
-}
-
 /**
- * Create the page's Embedded Checkout, replacing any instance already there.
+ * Record an instance this host created, so the OPC footer widget's mount
+ * serialisation can find and retire it instead of tripping over it.
  *
- * @param {Stripe} stripe
- * @param {string} clientSecret
- * @returns {Promise<object>} the embedded checkout instance
+ * @param {object|null} instance
  */
-export function initEmbeddedCheckoutOnce(stripe, clientSecret) {
-  const g = registry()
-
-  g.chain = (g.chain || Promise.resolve())
-    .then(() => {
-      if (g.instance && typeof g.instance.destroy === 'function') {
-        try {
-          g.instance.destroy()
-        } catch (e) {
-          /* already torn down */
-        }
-      }
-      g.instance = null
-      return stripe.initEmbeddedCheckout({ clientSecret })
-    })
-    .then((embedded) => {
-      g.instance = embedded
-      return embedded
-    })
-
-  return g.chain
+export function registerEmbeddedCheckout(instance) {
+  window[REGISTRY_KEY] = window[REGISTRY_KEY] || { chain: null, instance: null }
+  window[REGISTRY_KEY].instance = instance
 }
 
 /**

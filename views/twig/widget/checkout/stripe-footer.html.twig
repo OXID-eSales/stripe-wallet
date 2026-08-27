@@ -126,6 +126,17 @@
       this._tryEagerMount();
     }
 
+    /**
+     * True when the classic order page hosts its own embedded checkout, which it
+     * does in iframe render mode.
+     */
+    _orderPageOwnsTheSheet() {
+      var host = document.querySelector('[data-controller~="order-submit"]');
+      return Boolean(host)
+        && host.getAttribute('data-order-submit-render-mode-value') === 'iframe'
+        && Boolean(document.getElementById('stripe-embedded-checkout'));
+    }
+
     _genericErrorText() {
       return (window.oStripe && window.oStripe.i18n && window.oStripe.i18n.PAYMENT_FAILED)
         || 'Payment processing failed';
@@ -171,6 +182,15 @@
 
     async _tryEagerMount() {
       if (this._embedded || this._mounting) {
+        return;
+      }
+      // On the classic order page the order-submit controller owns the embedded
+      // sheet: its container is the one the customer sees and its Place-Order
+      // button is hidden in eager mode. Two hosts cannot both mount — Stripe
+      // permits one per page — and a sheet that lands in this widget's container
+      // there is invisible (height 0), leaving no way to pay. So stand down and
+      // let that host do it.
+      if (this._orderPageOwnsTheSheet()) {
         return;
       }
       if (!this._consentReady()) {

@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { createDebugLogger } from '../debug.js'
-import { initEmbeddedCheckoutOnce, forgetEmbeddedCheckout } from '../embedded_checkout_registry.js'
+import { registerEmbeddedCheckout, forgetEmbeddedCheckout } from '../embedded_checkout_registry.js'
 
 /**
  * Stimulus Controller for Order Submit Button
@@ -286,9 +286,14 @@ export default class extends Controller {
     }
 
     this.setStatus(window.oStripe?.i18n?.CREATING_SESSION || '')
-    // Through the page-wide registry, not directly: the OPC footer widget can
-    // host an embedded sheet on this same page, and Stripe permits exactly one.
-    this._embeddedCheckout = await initEmbeddedCheckoutOnce(stripe, clientSecret)
+    // This host creates and mounts its own sheet. It must: its container is the
+    // visible one on the order page, and its Place-Order button is hidden in
+    // eager mode, so a sheet mounted anywhere else leaves the customer with no
+    // way to pay. The OPC footer widget stands down on this page instead of
+    // competing (see stripe-footer.html.twig), which is what keeps Stripe's
+    // one-per-page rule satisfied.
+    this._embeddedCheckout = await stripe.initEmbeddedCheckout({ clientSecret })
+    registerEmbeddedCheckout(this._embeddedCheckout)
     mount.style.display = 'block'
     this._embeddedCheckout.mount(mount)
 
