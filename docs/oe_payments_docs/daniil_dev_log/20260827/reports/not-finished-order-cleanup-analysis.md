@@ -187,8 +187,17 @@ commit path (`ContractCommitmentHandler` should flip the order to `OK`), worth i
 > "Stale checkout timeout (minutes)" setting (`iPaymentBaseStaleCheckoutMinutes`,
 > default 30) instead of a hardcoded property, and `findStaleNotFinished()` takes a
 > `LIMIT` that the webhook sweep passes, so a backlog is no longer paid for out of
-> the webhook's response time. Only item 6 (`ContractService::cleanupExpiredContracts()`
-> dead code) is still open.
+> the webhook's response time. Item 6 is closed as well, and the recommendation there
+> was too mild: `cleanupExpiredContracts()` was not merely dead, it was dangerous.
+> `expire()` guarded only `isTerminal()`, and `committed` is not terminal — so wiring
+> the method to cron would have transitioned contracts whose payment had already been
+> taken to EXPIRED (32 of them on the dev shop). `expire()` now refuses a committed
+> contract, `findExpired()` no longer returns one, and the method is deleted rather
+> than wired. **All six recommendations are now implemented.**
+>
+> Still outstanding, found along the way and outside this report's scope: Mollie's
+> `handlePaymentExpired()` carries the same `isTerminal()`-only guard and needs the
+> `isCommitted()` skip the Stripe handler received.
 
 
 The mechanism that exists is sound; what is missing is a trigger that does not depend on a

@@ -163,6 +163,29 @@ class WebhookContractFulfillmentHandlerCancelOrderTest extends TestCase
         $this->assertSame([], $this->orderUpdater->calls);
     }
 
+    /**
+     * STRP-168 item 6. `committed` is not a terminal state, so a late or
+     * duplicate checkout.session.expired for an already-paid contract used to
+     * sail past the guard. With the mirror in place that would have stornoed a
+     * paid order; the state machine now refuses the transition outright, so the
+     * handler has to skip it rather than throw out of a webhook.
+     */
+    public function testHandleSessionExpiredSkipsAContractWhosePaymentWasTaken(): void
+    {
+        $contract = $this->makeContractWithOrderId('order-uuid-paid');
+        $contract->transitionToPending();
+        $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED);
+        $contract->commitToOrder('order-uuid-paid');
+        $this->contractRepository->method('findById')->willReturn($contract);
+
+        $handler = $this->makeHandler();
+        $result = $handler->handleSessionExpired('contract-committed');
+
+        $this->assertFalse($result);
+        $this->assertSame('committed', $contract->getStateValue(), 'a paid contract keeps its state');
+        $this->assertSame([], $this->orderUpdater->calls, 'and its order is left alone');
+    }
+
     private function makeHandler(): WebhookContractFulfillmentHandler
     {
         return new WebhookContractFulfillmentHandler(

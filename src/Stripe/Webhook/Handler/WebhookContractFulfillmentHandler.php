@@ -206,6 +206,19 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
             return false;
         }
 
+        // STRP-168: `committed` is not terminal. A late or duplicate expiry for
+        // a contract whose payment has already been taken must be skipped, not
+        // acted on — it would now throw from the state machine, and before the
+        // mirror was added it would have quietly stornoed a paid order.
+        if ($contract->getState()->isCommitted()) {
+            $this->logger?->info('Ignoring an expiry for a contract whose payment was already taken', [
+                'contract_id' => $contract->getId(),
+                'state' => $contract->getStateValue(),
+            ]);
+
+            return false;
+        }
+
         // Mark contract as expired
         $contract->expire();
         $this->contractRepository->save($contract);
