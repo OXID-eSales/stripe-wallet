@@ -209,6 +209,11 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
         // Mark contract as expired
         $contract->expire();
         $this->contractRepository->save($contract);
+        // STRP-168: mirror onto the order, exactly as the cancel and fail paths
+        // do. Without this the order stayed at NOT_FINISHED, and since every
+        // contract-keyed cleanup path skips terminal states, expiring the
+        // contract was what made the order unreachable.
+        $this->mirrorCancellationOnLinkedOrder($contract);
         return true;
     }
 

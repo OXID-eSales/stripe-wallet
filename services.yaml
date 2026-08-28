@@ -950,6 +950,11 @@ services:
   # Sprint 112 / G1: mirrors contract cancel/fail transitions onto linked oxorder.
   OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface:
     class: OxidEsales\Payments\Stripe\Service\OxidContractLinkedOrderUpdater
+    arguments:
+      # STRP-168 — a mirrored ending hands the customer their vouchers back,
+      # so the order lands where the cleanup command would have left it.
+      $voucherReleaser: '@OxidEsales\PaymentBase\Repository\VoucherReleaseInterface'
+      $logger: '@?Psr\Log\LoggerInterface'
     public: false
 
   OxidEsales\Payments\Stripe\Service\OxidContractLinkedOrderUpdater:

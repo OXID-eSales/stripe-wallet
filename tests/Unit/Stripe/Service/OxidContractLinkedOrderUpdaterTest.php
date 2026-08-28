@@ -12,6 +12,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Core\Field;
 use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
+use OxidEsales\PaymentBase\Repository\VoucherReleaseInterface;
 use OxidEsales\Payments\Stripe\Service\OxidContractLinkedOrderUpdater;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -27,6 +28,15 @@ use PHPUnit\Framework\TestCase;
 #[\PHPUnit\Framework\Attributes\Group('sprint-114-13')]
 final class OxidContractLinkedOrderUpdaterTest extends TestCase
 {
+    private RecordingVoucherReleaser $voucherReleaser;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->voucherReleaser = new RecordingVoucherReleaser();
+    }
+
     public function testImplementsInterface(): void
     {
         $updater = $this->buildUpdater(null);
@@ -98,6 +108,74 @@ final class OxidContractLinkedOrderUpdaterTest extends TestCase
         $updater->markFailed('nonexistent-order', 'declined');
     }
 
+    // --- STRP-168: a mirrored ending must leave the order where the cron would ---
+
+    /**
+     * markCancelled set the status and nothing else, so the order was never
+     * stornoed and its vouchers stayed spent. Worse, the cleanup command only
+     * collects orders still at NOT_FINISHED — once this ran, the row was past
+     * it forever, and the customer's voucher with it.
+     */
+    public function testMarkCancelledStornosTheOrder(): void
+    {
+        $order = $this->createMockOrder();
+
+        $updater = $this->buildUpdater($order);
+        $updater->markCancelled('order-123');
+
+        self::assertSame(1, (int) $order->oxorder__oxstorno->value);
+    }
+
+    public function testMarkCancelledReleasesTheVouchers(): void
+    {
+        $updater = $this->buildUpdater($this->createMockOrder());
+        $updater->markCancelled('order-123');
+
+        self::assertSame(['order-123'], $this->voucherReleaser->released);
+    }
+
+    public function testMarkFailedStornosTheOrderAndReleasesVouchers(): void
+    {
+        $order = $this->createMockOrder();
+
+        $updater = $this->buildUpdater($order);
+        $updater->markFailed('order-456', 'card_declined');
+
+        self::assertSame(1, (int) $order->oxorder__oxstorno->value);
+        self::assertSame(['order-456'], $this->voucherReleaser->released);
+    }
+
+    public function testNoVouchersAreReleasedWhenTheOrderDoesNotExist(): void
+    {
+        $updater = $this->buildUpdater(null);
+        $updater->markCancelled('nonexistent-order');
+
+        self::assertSame([], $this->voucherReleaser->released);
+    }
+
+    public function testNoVouchersAreReleasedForAnEmptyOrderId(): void
+    {
+        $updater = $this->buildUpdater($this->createMockOrder());
+        $updater->markCancelled('');
+
+        self::assertSame([], $this->voucherReleaser->released);
+    }
+
+    /**
+     * Handing the voucher back is a courtesy on top of recording the ending.
+     * If it throws, the order must still end up cancelled.
+     */
+    public function testTheOrderIsStillCancelledWhenReleasingVouchersFails(): void
+    {
+        $order = $this->createMockOrder();
+        $this->voucherReleaser->throw = true;
+
+        $updater = $this->buildUpdater($order);
+        $updater->markCancelled('order-123');
+
+        self::assertSame('CANCELLED', $order->oxorder__oxtransstatus->value);
+    }
+
     // --- helpers ---
 
     /**
@@ -107,9 +185,10 @@ final class OxidContractLinkedOrderUpdaterTest extends TestCase
      */
     private function buildUpdater(?Order $orderStub): OxidContractLinkedOrderUpdater
     {
-        return new class ($orderStub) extends OxidContractLinkedOrderUpdater {
-            public function __construct(private readonly ?Order $stub)
+        return new class ($orderStub, $this->voucherReleaser) extends OxidContractLinkedOrderUpdater {
+            public function __construct(private readonly ?Order $stub, VoucherReleaseInterface $voucherReleaser)
             {
+                parent::__construct($voucherReleaser);
             }
 
             protected function loadOrder(string $orderId): ?Order
@@ -139,5 +218,27 @@ final class OxidContractLinkedOrderUpdaterTest extends TestCase
             ->getMock();
 
         return $order;
+    }
+}
+
+/**
+ * @internal
+ */
+final class RecordingVoucherReleaser implements VoucherReleaseInterface
+{
+    /** @var list<string> */
+    public array $released = [];
+
+    public bool $throw = false;
+
+    public function releaseVouchers(string $orderId): int
+    {
+        if ($this->throw) {
+            throw new \RuntimeException('vouchers table is locked');
+        }
+
+        $this->released[] = $orderId;
+
+        return 1;
     }
 }

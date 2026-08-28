@@ -173,11 +173,17 @@ commit path (`ContractCommitmentHandler` should flip the order to `OK`), worth i
 
 > **Status update 2026-08-28 —** recommendation 1 is implemented:
 > `bin/oe-console oe:payments:not_finished:cleanup` now exists in **payment-base**
-> (branch `feature/not-finished-order-cleanup-command`, commit `a974ad5`), driven by a
+> (STRP-168, merged to `b-7.4.x` as `f31daf7`), driven by a
 > new "Cleanup period" module setting (`iPaymentBaseCleanupPeriod`, days, default 7)
 > and keyed on `oxorder`, which also covers the 72 contract-less orders of item 5.
-> Items 2 (`handleSessionExpired` does not mirror onto the order), 3, 4 and 6 are
-> still open.
+> Item 2 is implemented too: `handleSessionExpired()` now mirrors onto the linked
+> order via the same path the cancel and fail branches use, and that mirror was
+> given storno + voucher release so an ended order lands exactly where the cleanup
+> command would have left it. That second half fixed a leak this report had not
+> spotted — `markCancelled()`/`markFailed()` set `OXTRANSSTATUS` only, and since
+> the cleanup command collects only orders still at `NOT_FINISHED`, moving the
+> status was what put the row beyond its reach, stranding the customer's vouchers
+> permanently. Items 3, 4 and 6 are still open.
 
 
 The mechanism that exists is sound; what is missing is a trigger that does not depend on a

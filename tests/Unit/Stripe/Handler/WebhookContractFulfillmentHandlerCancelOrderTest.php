@@ -104,6 +104,65 @@ class WebhookContractFulfillmentHandlerCancelOrderTest extends TestCase
         $this->assertSame([], $this->orderUpdater->calls);
     }
 
+    /**
+     * STRP-168. checkout.session.expired used to expire the contract and stop
+     * there, unlike its cancel and fail siblings which both mirror onto the
+     * order. The order stayed at NOT_FINISHED with its vouchers spent — and
+     * because every contract-keyed cleanup path skips terminal states, the act
+     * of recording the expiry was what put the order out of reach.
+     */
+    public function testHandleSessionExpiredMarksLinkedOrderAsCancelled(): void
+    {
+        $contract = $this->makeContractWithOrderId('order-uuid-expired');
+        $this->contractRepository->method('findById')->willReturn($contract);
+
+        $handler = $this->makeHandler();
+        $result = $handler->handleSessionExpired('contract-expired');
+
+        $this->assertTrue($result);
+        $this->assertSame(['cancelled:order-uuid-expired'], $this->orderUpdater->calls);
+    }
+
+    public function testHandleSessionExpiredOnContractWithoutLinkedOrderSkipsUpdater(): void
+    {
+        $contract = $this->makeContractWithoutOrder();
+        $this->contractRepository->method('findById')->willReturn($contract);
+
+        $handler = $this->makeHandler();
+        $result = $handler->handleSessionExpired('contract-no-order');
+
+        $this->assertTrue($result);
+        $this->assertSame([], $this->orderUpdater->calls, 'no linked order -> updater not called');
+    }
+
+    /**
+     * An already-settled contract keeps its ending; a late duplicate webhook
+     * must not reach in and storno an order that was paid for.
+     */
+    public function testHandleSessionExpiredDoesNotTouchOrderWhenContractAlreadyTerminal(): void
+    {
+        $contract = $this->makeContractWithOrderId('order-uuid');
+        $contract->cancel('already cancelled earlier');
+        $this->contractRepository->method('findById')->willReturn($contract);
+
+        $handler = $this->makeHandler();
+        $result = $handler->handleSessionExpired('contract-terminal');
+
+        $this->assertFalse($result);
+        $this->assertSame([], $this->orderUpdater->calls);
+    }
+
+    public function testHandleSessionExpiredWithoutMatchingContractDoesNotCallUpdater(): void
+    {
+        $this->contractRepository->method('findById')->willReturn(null);
+
+        $handler = $this->makeHandler();
+        $result = $handler->handleSessionExpired('contract-missing');
+
+        $this->assertNull($result);
+        $this->assertSame([], $this->orderUpdater->calls);
+    }
+
     private function makeHandler(): WebhookContractFulfillmentHandler
     {
         return new WebhookContractFulfillmentHandler(
