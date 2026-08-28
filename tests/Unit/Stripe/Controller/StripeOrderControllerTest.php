@@ -862,7 +862,7 @@ class StripeOrderControllerTest extends TestCase
                         {
                             return [];
                         }
-                        public function findStaleNotFinished(int $minutesOld): array
+                        public function findStaleNotFinished(int $minutesOld, ?int $limit = null): array
                         {
                             return [];
                         }

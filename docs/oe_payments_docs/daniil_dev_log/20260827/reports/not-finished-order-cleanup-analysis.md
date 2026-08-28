@@ -183,7 +183,12 @@ commit path (`ContractCommitmentHandler` should flip the order to `OK`), worth i
 > spotted — `markCancelled()`/`markFailed()` set `OXTRANSSTATUS` only, and since
 > the cleanup command collects only orders still at `NOT_FINISHED`, moving the
 > status was what put the row beyond its reach, stranding the customer's vouchers
-> permanently. Items 3, 4 and 6 are still open.
+> permanently. Items 3 and 4 are implemented as well: the sweep horizon is now the
+> "Stale checkout timeout (minutes)" setting (`iPaymentBaseStaleCheckoutMinutes`,
+> default 30) instead of a hardcoded property, and `findStaleNotFinished()` takes a
+> `LIMIT` that the webhook sweep passes, so a backlog is no longer paid for out of
+> the webhook's response time. Only item 6 (`ContractService::cleanupExpiredContracts()`
+> dead code) is still open.
 
 
 The mechanism that exists is sound; what is missing is a trigger that does not depend on a

@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller\Webhook;
 
 use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookController;
+use OxidEsales\PaymentBase\Service\NotFinishedOrderCleanupSettingsInterface;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -32,7 +33,7 @@ final class WebhookControllerCleanupTest extends TestCase
         $cleanupService
             ->expects($this->once())
             ->method('cleanupStaleContracts')
-            ->with(30)
+            ->with(30, 50)
             ->willReturn(0);
 
         $controller = new TestableWebhookControllerForCleanup($cleanupService);
@@ -54,6 +55,66 @@ final class WebhookControllerCleanupTest extends TestCase
         // Must not throw
         $controller->exposeCleanup();
         $this->addToAssertionCount(1);
+    }
+
+    /**
+     * STRP-168 item 3. The horizon was a hardcoded 30 minutes, so a shop whose
+     * customers legitimately take longer — bank transfer, Klarna — had the
+     * sweep cancelling checkouts they were still in, with no way to raise it
+     * short of a code change.
+     */
+    public function testSweepUsesTheConfiguredStaleCheckoutTimeout(): void
+    {
+        $cleanupService = $this->createMock(RetryCleanupService::class);
+        $cleanupService
+            ->expects($this->once())
+            ->method('cleanupStaleContracts')
+            ->with(120, 50)
+            ->willReturn(0);
+
+        $settings = $this->createMock(NotFinishedOrderCleanupSettingsInterface::class);
+        $settings->method('getStaleCheckoutMinutes')->willReturn(120);
+
+        (new TestableWebhookControllerForCleanup($cleanupService, $settings))->exposeCleanup();
+    }
+
+    /**
+     * The setting lives behind the container. If it cannot be read the sweep
+     * still has to run — on the horizon it had before it was configurable.
+     */
+    public function testSweepFallsBackToThirtyMinutesWhenTheSettingIsUnavailable(): void
+    {
+        $cleanupService = $this->createMock(RetryCleanupService::class);
+        $cleanupService
+            ->expects($this->once())
+            ->method('cleanupStaleContracts')
+            ->with(30, 50)
+            ->willReturn(0);
+
+        (new TestableWebhookControllerForCleanup($cleanupService))->exposeCleanup();
+    }
+
+    /**
+     * STRP-168 item 4. The sweep runs inline in the webhook request, so one
+     * pass must be bounded: an unbounded backlog is paid for out of the
+     * response time, and a provider that times out retries.
+     */
+    public function testSweepIsBoundedToOneBatch(): void
+    {
+        $observed = null;
+        $cleanupService = $this->createMock(RetryCleanupService::class);
+        $cleanupService
+            ->method('cleanupStaleContracts')
+            ->willReturnCallback(function (int $minutes, ?int $limit) use (&$observed): int {
+                $observed = $limit;
+
+                return 0;
+            });
+
+        (new TestableWebhookControllerForCleanup($cleanupService))->exposeCleanup();
+
+        $this->assertNotNull($observed, 'the sweep must pass a bound, not null');
+        $this->assertLessThanOrEqual(200, $observed, 'the bound must actually bound something');
     }
 
     /**
@@ -84,10 +145,13 @@ final class WebhookControllerCleanupTest extends TestCase
  */
 class TestableWebhookControllerForCleanup extends WebhookController
 {
-    public function __construct(RetryCleanupService $cleanupService)
-    {
+    public function __construct(
+        RetryCleanupService $cleanupService,
+        ?NotFinishedOrderCleanupSettingsInterface $cleanupSettings = null
+    ) {
         // Skip OXID parent bootstrap — not needed for these unit tests.
         $this->cleanupService = $cleanupService;
+        $this->cleanupSettings = $cleanupSettings;
     }
 
     public function exposeCleanup(): void

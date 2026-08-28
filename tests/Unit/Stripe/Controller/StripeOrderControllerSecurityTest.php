@@ -630,7 +630,7 @@ class StripeOrderControllerSecurityTest extends TestCase
 
                         public function findExpired(): array { return []; }
 
-                        public function findStaleNotFinished(int $minutesOld): array { return []; }
+                        public function findStaleNotFinished(int $minutesOld, ?int $limit = null): array { return []; }
                     };
                 }
                 if ($serviceName === StripeReturnResolver::class) {

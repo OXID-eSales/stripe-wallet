@@ -17,6 +17,7 @@ use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\PaymentBase\Webhook\WebhookRequest;
 use OxidEsales\Payments\Stripe\Adapter\Helper\ResponseHeaders;
+use OxidEsales\PaymentBase\Service\NotFinishedOrderCleanupSettingsInterface;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use OxidEsales\Payments\Stripe\Service\WebhookLogServiceInterface;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;
@@ -34,11 +35,22 @@ use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;
  */
 class WebhookController extends FrontendController
 {
-    protected int $staleThresholdMinutes = 30;
+    /**
+     * STRP-168 item 4: one sweep is bounded. It runs inline in this request, so
+     * an unbounded backlog would be paid for out of the webhook's response time
+     * — and a provider that times out retries, which grows the backlog it was
+     * already struggling with. The remainder waits for the next webhook or for
+     * oe:payments:not_finished:cleanup; nothing is dropped, only deferred.
+     */
+    protected const STALE_SWEEP_BATCH = 50;
+
+    /** Used when the module setting cannot be read; the value it had when hardcoded. */
+    protected const DEFAULT_STALE_MINUTES = 30;
 
     protected ?StripeWebhookProcessor $processor = null;
     protected ?WebhookLogServiceInterface $webhookLogger = null;
     protected ?RetryCleanupService $cleanupService = null;
+    protected ?NotFinishedOrderCleanupSettingsInterface $cleanupSettings = null;
     private ?WebhookRequestGuardInterface $guard = null;
     private bool $guardChainDegraded = false;
 
@@ -86,6 +98,20 @@ class WebhookController extends FrontendController
             Registry::getLogger()->warning('Stale-order cleanup service unavailable', [
                 'error' => $e->getMessage(),
             ]);
+        }
+
+        try {
+            /** @var NotFinishedOrderCleanupSettingsInterface $cleanupSettings */
+            $cleanupSettings = $container->get(NotFinishedOrderCleanupSettingsInterface::class);
+            $this->cleanupSettings = $cleanupSettings;
+        } catch (Exception $e) {
+            // The sweep still runs, on the default horizon — but say so, rather
+            // than letting a shop that raised the setting quietly keep sweeping
+            // at 30 minutes and cancelling checkouts its customers are still in.
+            Registry::getLogger()->warning(
+                'Stale-checkout timeout setting unavailable — sweeping on the default horizon',
+                ['error' => $e->getMessage(), 'defaultMinutes' => self::DEFAULT_STALE_MINUTES]
+            );
         }
     }
 
@@ -274,6 +300,18 @@ class WebhookController extends FrontendController
      *
      * @since 2.0.0 STRP-100
      */
+    /**
+     * How long a checkout may sit in flight before this sweep releases it.
+     *
+     * STRP-168 item 3: was a hardcoded 30, which a shop selling by bank transfer
+     * or Klarna could not raise without a code change — so the sweep cancelled
+     * checkouts its customers were still legitimately in.
+     */
+    protected function getStaleThresholdMinutes(): int
+    {
+        return $this->cleanupSettings?->getStaleCheckoutMinutes() ?? self::DEFAULT_STALE_MINUTES;
+    }
+
     protected function cleanupStaleNotFinishedOrders(): void
     {
         if ($this->cleanupService === null) {
@@ -281,7 +319,10 @@ class WebhookController extends FrontendController
         }
 
         try {
-            $cleaned = $this->cleanupService->cleanupStaleContracts($this->staleThresholdMinutes);
+            $cleaned = $this->cleanupService->cleanupStaleContracts(
+                $this->getStaleThresholdMinutes(),
+                self::STALE_SWEEP_BATCH
+            );
             if ($cleaned > 0) {
                 Registry::getLogger()->info('Cleaned up ' . $cleaned . ' stale NOT_FINISHED order(s)');
             }
