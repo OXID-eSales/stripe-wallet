@@ -70,13 +70,12 @@
              style="display: none;" role="status" aria-live="polite">
             <div class="stripe-sheet-stale__panel">
                 <p class="mb-2">
-                    {{ translate({ ident: 'STRIPE_SHEET_STALE' })
-                        | default('Your basket changed, so this payment form is out of date.') }}
+                    {{ translate({ ident: 'STRIPE_SHEET_STALE' }) }}
                 </p>
                 <button type="button" class="btn btn-primary"
                         data-stripe-checkout-footer-target="refreshButton"
                         data-action="click->stripe-checkout-footer#refreshSheet">
-                    {{ translate({ ident: 'STRIPE_SHEET_REFRESH' }) | default('Refresh payment form') }}
+                    {{ translate({ ident: 'STRIPE_SHEET_REFRESH' }) }}
                 </button>
             </div>
         </div>

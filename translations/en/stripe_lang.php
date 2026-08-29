@@ -210,4 +210,11 @@ $aLang = [
     'STRIPE_VALIDATION_FAX_BLOCKED_CHARACTER'                => "The fax number may not contain the character '%s'.",
     'STRIPE_VALIDATION_FAX_DISALLOWED_CHARACTER'             => "The fax number may not contain the character '%s'.",
     'STRIPE_VALIDATION_FAX_CONTROL_CHARACTER'                => 'The fax number contains an invisible or control character. Please re-type the value.',
+
+    // OPC-192: the embedded sheet quotes the basket its session was built
+    // from, so a changed basket makes it stale. These name that state and
+    // the action that resolves it.
+    'STRIPE_SHEET_STALE'                                      => "Your basket changed, so this payment form is out of date.",
+    'STRIPE_SHEET_REFRESH'                                    => "Refresh payment form",
+    'STRIPE_BASKET_UNSETTLED'                                 => "Your basket is still updating. Please try again in a moment.",
 ];

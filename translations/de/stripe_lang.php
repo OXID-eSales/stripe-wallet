@@ -209,4 +209,11 @@ $aLang = [
     'STRIPE_VALIDATION_FAX_BLOCKED_CHARACTER'                => "Die Faxnummer darf das Zeichen '%s' nicht enthalten.",
     'STRIPE_VALIDATION_FAX_DISALLOWED_CHARACTER'             => "Die Faxnummer darf das Zeichen '%s' nicht enthalten.",
     'STRIPE_VALIDATION_FAX_CONTROL_CHARACTER'                => 'Die Faxnummer enthält ein unsichtbares oder Steuerzeichen. Bitte geben Sie den Wert erneut ein.',
+
+    // OPC-192: the embedded sheet quotes the basket its session was built
+    // from, so a changed basket makes it stale. These name that state and
+    // the action that resolves it.
+    'STRIPE_SHEET_STALE'                                      => "Ihr Warenkorb hat sich geändert, dieses Zahlungsformular ist nicht mehr aktuell.",
+    'STRIPE_SHEET_REFRESH'                                    => "Zahlungsformular aktualisieren",
+    'STRIPE_BASKET_UNSETTLED'                                 => "Ihr Warenkorb wird noch aktualisiert. Bitte versuchen Sie es gleich noch einmal.",
 ];
