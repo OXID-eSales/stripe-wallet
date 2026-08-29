@@ -47,8 +47,60 @@
         </button>
     </div>
 
-    <div data-stripe-checkout-footer-target="embedded"
-         class="stripe-embedded-checkout mt-3" style="display: none;"></div>
+    {#
+        The sheet, and the notice that covers it once the basket has moved on.
+
+        A mounted sheet quotes the basket its Stripe session was built from. If
+        the shopper then changes the basket, that quote is stale — so the sheet
+        is VEILED rather than removed or silently rebuilt. Removing it makes the
+        checkout appear to break; rebuilding it creates a payment contract the
+        shopper never asked for and swaps the amount under them. Veiling states
+        the situation and offers the one action that resolves it.
+
+        The overlay is a SIBLING of the iframe container, not a child: an iframe
+        owns its own event surface, so anything meant to block it has to sit
+        above it in the stacking order rather than inside it.
+    #}
+    <div class="stripe-embedded-wrap position-relative mt-3"
+         data-stripe-checkout-footer-target="embeddedWrap">
+        <div data-stripe-checkout-footer-target="embedded"
+             class="stripe-embedded-checkout" style="display: none;"></div>
+
+        <div class="stripe-sheet-stale" data-stripe-checkout-footer-target="staleOverlay"
+             style="display: none;" role="status" aria-live="polite">
+            <div class="stripe-sheet-stale__panel">
+                <p class="mb-2">
+                    {{ translate({ ident: 'STRIPE_SHEET_STALE' })
+                        | default('Your basket changed, so this payment form is out of date.') }}
+                </p>
+                <button type="button" class="btn btn-primary"
+                        data-stripe-checkout-footer-target="refreshButton"
+                        data-action="click->stripe-checkout-footer#refreshSheet">
+                    {{ translate({ ident: 'STRIPE_SHEET_REFRESH' }) | default('Refresh payment form') }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .stripe-sheet-stale {
+            position: absolute;
+            inset: 0;
+            /* Above the iframe: an iframe swallows pointer events, so a veil
+               that merely dims it would still let the shopper pay a stale
+               amount. */
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.88);
+            text-align: center;
+        }
+        .stripe-sheet-stale__panel {
+            max-width: 22rem;
+            padding: 1rem;
+        }
+    </style>
 
     <div data-stripe-checkout-footer-target="loader"
          class="stripe-loading-overlay" style="display: none;">
@@ -91,13 +143,13 @@
     }
 
     static targets = [
-      'submitButton', 'error', 'errorMessage', 'loader', 'embedded'
+      'submitButton', 'error', 'errorMessage', 'loader', 'embedded',
+      'embeddedWrap', 'staleOverlay', 'refreshButton'
     ]
 
     connect() {
-      // IFRAME mode (OPC): mirror the classic checkout's button-less embedded
-      // mount — render Stripe Embedded Checkout inline instead of exposing a
-      // "Pay with Stripe" redirect button. See _initIframeMode for the consent gate.
+      // IFRAME mode (OPC): the embedded sheet is mounted when the shopper
+      // presses Pay, not on arrival. See _initIframeMode.
       if (this.renderModeValue === 'iframe') {
         sdbg('[StripeCheckoutFooter] Connected (iframe mode)');
         this._initIframeMode();
@@ -109,40 +161,42 @@
       }
     }
 
-    // ---- IFRAME (OPC) eager embedded mount --------------------------------
+    // ---- IFRAME (OPC): mount on demand ------------------------------------
     //
-    // Renders Stripe Embedded Checkout inline, mirroring the classic checkout's
-    // button-less mount (IFRAME-02f). The OPC CheckoutService hard-rejects
-    // processCheckout unless BOTH consent flags are true, so the eager mount is
-    // gated on the live consent checkboxes: while they are unticked the Pay
-    // button stays as the visible trigger; ticking both auto-mounts the
-    // embedded sheet with no extra click.
+    // The sheet used to mount eagerly as soon as both consent boxes were
+    // ticked, which read as a convenience — one less click — and cost more than
+    // it saved.
+    //
+    // A Stripe checkout session freezes the basket and its price at the moment
+    // it is created. Mounting on arrival meant creating it before the shopper
+    // had finished changing their basket, so the sheet could quote a total that
+    // was no longer true; chasing that with remounts meant a new payment
+    // contract each time, and one was even created by a plain page reload
+    // (OPC-193).
+    //
+    // Mounting on the button removes the problem rather than tracking it: the
+    // session is built from the basket as it stands at the moment the shopper
+    // commits to paying, so it is current by construction.
 
     _initIframeMode() {
       if (this.hasSubmitButtonTarget) {
         this.submitButtonTarget.disabled = false;
       }
-      this._armConsentWatchers();
+
+      // Still watched, but to DISMISS a mounted sheet rather than to create
+      // one — see _markSheetStale.
       this._armBasketWatcher();
-      this._tryEagerMount();
     }
 
     /**
-     * OPC-192: remount when the basket has SETTLED at a new value.
+     * OPC-192: veil a mounted sheet when the basket settles at a new value.
      *
-     * The embedded sheet is created from a checkout session that carries the
-     * basket and its price at the moment of mounting, and nothing invalidated
-     * it afterwards — a shopper could remove items and still be looking at a
-     * sheet quoting the old total.
+     * A sheet already on screen quotes the basket its session was built from.
+     * If the shopper then changes the basket, that quote is wrong.
      *
-     * The trigger is OPC's `onBasketSettled`, not a basket event, and the
-     * difference matters. Every mount calls processCheckout and creates a
-     * payment contract (OPC-193), so remounting per change is expensive:
-     * measured on pay1, a delete run of 25 items is a single settled change but
-     * dozens of basket events. `onBasketSettled` fires once when the basket has
-     * come to rest at a value different from the last one announced — after a
-     * delete series finishes flushing, or after a recalculation moved the total
-     * — and stays silent when a snapshot merely re-reports the same basket.
+     * It is VEILED rather than silently replaced, and the difference is the
+     * shopper's consent: a rebuild would create a payment contract nobody asked
+     * for and change the amount under them. See `_markSheetStale`.
      */
     _armBasketWatcher() {
       var opc = window.OnepageCheckout;
@@ -153,168 +207,77 @@
 
       var self = this;
       this._offBasketSettled = opc.onBasketSettled(function (data) {
-        sdbg('[StripeCheckoutFooter] basket settled at a new revision — remounting', data);
-        self._remountForNewBasket();
+        sdbg('[StripeCheckoutFooter] basket settled at a new revision — veiling the sheet', data);
+        self._markSheetStale();
       });
     }
 
     /**
-     * Tear the sheet down and mount a fresh one for the current basket.
+     * Veil a mounted sheet whose basket has moved on, and offer to rebuild it.
      *
-     * Only when one is actually up: with no sheet mounted there is nothing
-     * quoting a stale price, and mounting here would create a payment contract
-     * for a shopper who has not asked to pay.
+     * Three options existed and only one of them is honest. REBUILDING it
+     * silently creates a payment contract the shopper never asked for and
+     * changes the amount under them without their noticing. REMOVING it makes
+     * the checkout look broken at the moment they were about to pay. VEILING it
+     * says what happened and offers the single action that fixes it, so the
+     * next session is created by a deliberate click against a total they have
+     * had a chance to read.
+     *
+     * Blocking has to be real: the sheet is an iframe and owns its own event
+     * surface, so the overlay sits above it in the stacking order rather than
+     * dimming it from underneath. A shopper must not be able to pay a stale
+     * amount through a form that merely looks disabled.
      */
-    async _remountForNewBasket() {
+    _markSheetStale() {
       if (!this._embedded || this._mounting) {
         return;
       }
 
-      try {
-        this._embedded.destroy();
-      } catch (e) { /* already torn down */ }
-
-      var g = window.__oeStripeEmbeddedRegistry;
-      if (g && g.instance === this._embedded) { g.instance = null; }
-      this._embedded = null;
-
-      await this._tryEagerMount();
+      this._sheetStale = true;
+      if (this.hasStaleOverlayTarget) {
+        this.staleOverlayTarget.style.display = 'flex';
+      }
+      sdbg('[StripeCheckoutFooter] sheet marked stale — awaiting an explicit refresh');
     }
 
     /**
-     * True when the classic order page hosts its own embedded checkout, which it
-     * does in iframe render mode.
+     * Rebuild the sheet for the basket as it now stands.
+     *
+     * Goes through `submitPayment`, which is the only path that creates a
+     * session. Two paths that both build one is how they end up disagreeing
+     * about which basket they were built from — the bug this whole change
+     * exists to remove.
      */
-    _orderPageOwnsTheSheet() {
-      var host = document.querySelector('[data-controller~="order-submit"]');
-      return Boolean(host)
-        && host.getAttribute('data-order-submit-render-mode-value') === 'iframe'
-        && Boolean(document.getElementById('stripe-embedded-checkout'));
-    }
+    async refreshSheet(event) {
+      if (event) event.preventDefault();
 
-    _genericErrorText() {
-      return (window.oStripe && window.oStripe.i18n && window.oStripe.i18n.PAYMENT_FAILED)
-        || 'Payment processing failed';
-    }
+      if (this._embedded) {
+        try {
+          this._embedded.destroy();
+        } catch (e) { /* already torn down */ }
 
-    /**
-     * OPC-153: resolve a translated, shopper-facing label for a failed
-     * processCheckout, keyed by the server's errorCode.
-     *
-     * This widget used to read `checkoutResult.error` — a key OPC's
-     * CheckoutResult::toArray() does not emit (it names the field
-     * `errorMessage`) — so 'Failed to create checkout session' was painted for
-     * every refusal alike: consents rejected, payment method unsupported,
-     * invalid address, handler failure. Three tickets describe that one
-     * sentence (OPC-153, OPC-171, OPC-181) and OPC-47 hid behind it earlier.
-     *
-     * The fix is NOT to display `errorMessage`: OPC's PROCESSING_ERROR
-     * interpolates `$e->getMessage()`, and its wording is hardcoded English.
-     * The label is chosen by code and translated by the shop.
-     *
-     * The mapping lives in ONE place — OPC's utils/checkout_error_catalog.js,
-     * published as `window.OnepageCheckout.checkoutErrorText`. This widget is
-     * inline JS outside that bundle, so it consumes the published resolver
-     * rather than carrying a second copy of the code table that drifts the
-     * moment OPC adds a code. When the widget renders outside OPC (no global),
-     * the local i18n string stands in.
-     */
-    _failureTextFrom(result) {
-      var payload = result || {};
-      var opcResolver = window.OnepageCheckout && window.OnepageCheckout.checkoutErrorText;
-      if (typeof opcResolver === 'function') {
-        return opcResolver(payload);
+        var g = window.__oeStripeEmbeddedRegistry;
+        if (g && g.instance === this._embedded) { g.instance = null; }
+        this._embedded = null;
       }
 
-      return (window.oStripe && window.oStripe.i18n && window.oStripe.i18n.SESSION_FAILED)
-        || 'Failed to create checkout session';
+      this._clearSheetStale();
+      await this.submitPayment();
     }
 
-    _consentCheckboxes() {
-      return [
-        document.getElementById('confirmTermsCheckout'),
-        document.getElementById('confirmPrivacyCheckout')
-      ].filter(function(el) { return el; });
+    _clearSheetStale() {
+      this._sheetStale = false;
+      if (this.hasStaleOverlayTarget) {
+        this.staleOverlayTarget.style.display = 'none';
+      }
     }
 
-    // Absent checkboxes default to satisfied (non-OPC embeddings) — matches
-    // _processCheckout's own missing-checkbox default.
-    _consentReady() {
-      return this._consentCheckboxes().every(function(el) { return el.checked; });
-    }
+    // The consent watchers and the eager mount that used to live here are
+    // gone with it: they existed only to decide WHEN to mount without a
+    // click, and `submitPayment` is now the single mount path. Two paths that
+    // both create a checkout session is how one of them ends up building it
+    // from a different basket than the other.
 
-    _armConsentWatchers() {
-      var boxes = this._consentCheckboxes();
-      if (boxes.length === 0) {
-        return;
-      }
-      this._consentHandler = function() {
-        if (this._consentReady()) {
-          this._tryEagerMount();
-        }
-      }.bind(this);
-      boxes.forEach(function(el) {
-        el.addEventListener('change', this._consentHandler);
-      }, this);
-    }
-
-    _detachConsentWatchers() {
-      if (!this._consentHandler) {
-        return;
-      }
-      this._consentCheckboxes().forEach(function(el) {
-        el.removeEventListener('change', this._consentHandler);
-      }, this);
-      this._consentHandler = null;
-    }
-
-    async _tryEagerMount() {
-      if (this._embedded || this._mounting) {
-        return;
-      }
-      // On the classic order page the order-submit controller owns the embedded
-      // sheet: its container is the one the customer sees and its Place-Order
-      // button is hidden in eager mode. Two hosts cannot both mount — Stripe
-      // permits one per page — and a sheet that lands in this widget's container
-      // there is invisible (height 0), leaving no way to pay. So stand down and
-      // let that host do it.
-      if (this._orderPageOwnsTheSheet()) {
-        return;
-      }
-      if (!this._consentReady()) {
-        // Keep the Pay button as the consent gate; the watcher retries on tick.
-        return;
-      }
-      this._mounting = true;
-      this._hideError();
-      try {
-        var checkoutResult = await this._processCheckout();
-        if (!checkoutResult.success) {
-          console.error('[StripeCheckoutFooter] processCheckout rejected the eager mount:',
-            checkoutResult.errorCode || 'no code', checkoutResult.errorMessage || 'no message');
-          throw new Error(this._failureTextFrom(checkoutResult));
-        }
-        var meta = checkoutResult.metadata || {};
-        var clientSecret = checkoutResult.clientSecret || meta.clientSecret;
-        if (meta.renderMode === 'iframe' && clientSecret) {
-          await this._mountEmbedded(clientSecret);
-          return;
-        }
-        // Server did not return an embedded session — honour a redirect if given.
-        if (meta.redirectUrl) {
-          window.location.href = meta.redirectUrl;
-        }
-      } catch (err) {
-        console.error('[StripeCheckoutFooter] Eager embedded mount failed:', err);
-        // Stripe's own wording is written for developers — the customer gets the
-        // generic message, the detail stays in the console.
-        var isLibraryError = err && (err.name === 'IntegrationError'
-          || /Embedded Checkout/i.test(err.message || ''));
-        this._showError(isLibraryError ? this._genericErrorText() : err.message);
-      } finally {
-        this._mounting = false;
-      }
-    }
 
     async submitPayment(event) {
       if (event) event.preventDefault();
@@ -418,6 +381,9 @@
         this._embedded.mount(this.embeddedTarget);
       }
 
+      // A freshly mounted sheet is current by definition.
+      this._clearSheetStale();
+
       // Stripe Embedded Checkout renders its own Pay button; hide ours.
       if (this.hasSubmitButtonTarget) {
         this.submitButtonTarget.style.display = 'none';
@@ -445,7 +411,6 @@
     }
 
     disconnect() {
-      this._detachConsentWatchers();
       if (typeof this._offBasketSettled === 'function') {
         this._offBasketSettled();
         this._offBasketSettled = null;
