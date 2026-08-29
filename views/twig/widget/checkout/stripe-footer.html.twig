@@ -20,7 +20,6 @@
      {# OPC-192: manual — the shopper presses Pay; auto — the sheet appears on
         its own once the basket settles. Every mount creates a Stripe session,
         so this chooses between one per settled change and one per click. #}
-     data-stripe-checkout-footer-mount-mode-value="{{ stripeConfig.mountMode|default('manual') }}"
      data-stripe-user-data-validator-url-value="{{ checkoutData.validationUrl }}"
      data-stripe-user-data-validator-plugin-id-value="{{ checkoutData.pluginModuleId }}"
      data-stripe-user-data-validator-csrf-value="{{ checkoutData.csrfToken }}"
@@ -163,8 +162,7 @@
       paymentMethod: String,
       csrfToken: String,
       publishableKey: String,
-      renderMode: String,
-      mountMode: { type: String, default: 'manual' }
+      renderMode: String
     }
 
     static targets = [
@@ -186,22 +184,23 @@
       }
     }
 
-    // ---- IFRAME (OPC): mount on demand ------------------------------------
-    //
-    // The sheet used to mount eagerly as soon as both consent boxes were
-    // ticked, which read as a convenience — one less click — and cost more than
-    // it saved.
+    // ---- IFRAME (OPC): mount when the basket is settled --------------------
     //
     // A Stripe checkout session freezes the basket and its price at the moment
-    // it is created. Mounting on arrival meant creating it before the shopper
-    // had finished changing their basket, so the sheet could quote a total that
-    // was no longer true; chasing that with remounts meant a new payment
-    // contract each time, and one was even created by a plain page reload
-    // (OPC-193).
+    // it is created, so WHEN it is created is the whole problem. The sheet used
+    // to mount as soon as both consent boxes were ticked — on arrival, before
+    // the shopper had finished changing anything — which is how it came to
+    // quote a total that was no longer true, and how a plain page reload
+    // created a payment contract nobody asked for (OPC-193).
     //
-    // Mounting on the button removes the problem rather than tracking it: the
-    // session is built from the basket as it stands at the moment the shopper
-    // commits to paying, so it is current by construction.
+    // Choosing the render mode already chose this: `iframe` means the sheet is
+    // part of the page, and a sheet that is part of the page has to appear on
+    // its own. A second setting asking whether it should was the same decision
+    // spelled twice, and two settings that can disagree eventually do.
+    //
+    // What replaces the eager mount is not a click but a CONDITION: the sheet
+    // is built only once the checkout is payable AND the basket has settled, so
+    // the amount it freezes is one the shopper has finished deciding.
 
     _initIframeMode() {
       if (this.hasSubmitButtonTarget) {
@@ -209,26 +208,17 @@
       }
 
       this._armBasketWatcher();
-
-      // In `auto` the sheet appears without being asked for — but only once the
-      // basket has settled, never on arrival. That distinction is what makes it
-      // safe now and unsafe before: the old eager mount fired on page load and
-      // froze an amount the shopper had not finished deciding, which is how a
-      // reload alone created a payment contract (OPC-193).
-      if (this._autoMount()) {
-        this._armPayableWatcher();
-        this._mountWhenSettled();
-      }
+      this._armPayableWatcher();
+      this._mountWhenSettled();
     }
 
     /**
-     * In auto mode, mount as soon as the checkout BECOMES payable.
+     * Mount as soon as the checkout BECOMES payable.
      *
      * `connect()` runs long before the shopper has ticked the consents, so a
      * single attempt at start-up mounts nothing and nothing retries: a basket
      * change is the only other trigger, and ticking a consent is not one.
-     * Measured on pay1 exactly that way — mode read as `auto`, sheet never
-     * appeared.
+     * Measured on pay1 exactly that way — the sheet never appeared.
      *
      * The Pay button's disabled state is the signal, rather than the consent
      * boxes the old eager mount watched. It is the one place every requirement
@@ -252,16 +242,12 @@
       });
     }
 
-    _autoMount() {
-      return this.mountModeValue === 'auto';
-    }
-
     /**
      * Mount as soon as the checkout is payable and nothing is in flight.
      *
      * Waits for OPC to report the basket quiet rather than mounting straight
      * away: a session created mid-change quotes an amount that is about to be
-     * wrong, which is the whole reason the manual mode exists.
+     * wrong, which is the entire failure this guards against.
      */
     _mountWhenSettled() {
       var self = this;
@@ -343,36 +329,29 @@
 
       var self = this;
       this._offBasketSettled = opc.onBasketSettled(function (data) {
-        if (self._autoMount()) {
-          // The shop chose to have the sheet keep itself current, so rebuild it
-          // rather than asking the shopper to. One rebuild per SETTLED change,
-          // never per click — that is what makes auto affordable at all, since
-          // each mount creates a Stripe session.
-          sdbg('[StripeCheckoutFooter] basket settled — rebuilding the sheet', data);
-          if (self._embedded) {
-            self.refreshSheet(null, { quiet: true });
-          } else {
-            self._mountWhenSettled();
-          }
+        // Rebuild against the basket as it now stands. One rebuild per SETTLED
+        // change, never per click — that is what makes this affordable at all,
+        // since every mount creates a Stripe session.
+        sdbg('[StripeCheckoutFooter] basket settled — rebuilding the sheet', data);
 
+        if (!self._embedded) {
+          self._mountWhenSettled();
           return;
         }
 
-        sdbg('[StripeCheckoutFooter] basket settled at a new revision — veiling the sheet', data);
-        self._markSheetStale();
+        self.refreshSheet(null, { quiet: true });
       });
     }
 
     /**
      * Veil a mounted sheet whose basket has moved on, and offer to rebuild it.
      *
-     * Three options existed and only one of them is honest. REBUILDING it
-     * silently creates a payment contract the shopper never asked for and
-     * changes the amount under them without their noticing. REMOVING it makes
-     * the checkout look broken at the moment they were about to pay. VEILING it
-     * says what happened and offers the single action that fixes it, so the
-     * next session is created by a deliberate click against a total they have
-     * had a chance to read.
+     * This is the FAILURE path, not the ordinary one: a settled basket rebuilds
+     * the sheet by itself. It runs when that rebuild could not happen, and what
+     * it must never do is leave the old sheet payable — the amount it quotes
+     * belongs to a basket that no longer exists. Removing the sheet would make
+     * the checkout look broken at the moment the shopper was about to pay;
+     * veiling it says what happened and offers the one action that fixes it.
      *
      * Blocking has to be real: the sheet is an iframe and owns its own event
      * surface, so the overlay sits above it in the stacking order rather than
@@ -401,6 +380,18 @@
      */
     async refreshSheet(event, options) {
       if (event) event.preventDefault();
+
+      // Settle BEFORE tearing anything down. The old order destroyed the sheet
+      // and only then asked whether a new one could be built, so a basket that
+      // would not settle left the shopper with no sheet at all — a working
+      // quote thrown away to discover we could not replace it. Ask first; if
+      // the answer is no, veil what is there and keep it un-payable.
+      var settlement = await this._settleBasket();
+      if (settlement && settlement.settled === false) {
+        sdbg('[StripeCheckoutFooter] basket would not settle — veiling instead of rebuilding');
+        this._markSheetStale();
+        return;
+      }
 
       if (this._embedded) {
         try {

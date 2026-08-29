@@ -210,10 +210,4 @@ $aLang = array(
     'STRIPE_VALIDATION_AMOUNT_PRECISION'                => 'The amount has too many decimal places for this currency.',
     'STRIPE_VALIDATION_AMOUNT_EXCEEDS_BOUND'            => 'The amount exceeds the maximum available for this action.',
     'STRIPE_VALIDATION_AMOUNT_BOUND_UNAVAILABLE'        => 'The available amount could not be verified with Stripe. Please try again.',
-    // OPC-192: every mount creates a Stripe checkout session, which freezes
-    // an amount — so this chooses between one per settled change and one
-    // per deliberate click.
-    'SHOP_MODULE_sStripeEmbeddedMountMode'                => 'Embedded checkout: when to show the payment form',
-    'SHOP_MODULE_sStripeEmbeddedMountMode_manual'         => 'On demand (customer presses Pay)',
-    'SHOP_MODULE_sStripeEmbeddedMountMode_auto'           => 'Automatically, once the basket settles',
 );
