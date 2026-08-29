@@ -165,6 +165,11 @@
   // settles into one rebuild rather than one per batch.
   var SHEET_REBUILD_DEBOUNCE_MS = 1200;
 
+  // How long the widget churn at start-up is given to settle before the
+  // automatic mount runs. OPC re-renders the footer several times within a few
+  // hundred milliseconds; this only has to outlast that.
+  var QUIET_MOUNT_DEBOUNCE_MS = 900;
+
   // Always register (idempotent) — needed for dynamic widget loading
   var BaseController = opc.Controller;
 
@@ -265,7 +270,37 @@
      * away: a session created mid-change quotes an amount that is about to be
      * wrong, which is the entire failure this guards against.
      */
+    /**
+     * Ask for the automatic mount ONCE per page, however many widgets ask.
+     *
+     * OPC replaces the footer widget several times while the checkout starts
+     * up, and every generation connects and asks to mount. They are separate
+     * controller objects, so `_mounting` — an instance field — cannot see the
+     * others: measured on pay1 as FOUR processCheckout calls for one arrival.
+     * They did not multiply contracts (CheckoutInFlightGuard hands the same one
+     * back, and the database confirms a single row), but three of the four were
+     * pure waste: a Stripe API round trip each, on every checkout opened.
+     *
+     * The timer lives on the page-global registry rather than on `this`, so the
+     * generations share it and the churn collapses into one mount, performed by
+     * whichever generation is still attached when it fires. A shopper pressing
+     * Pay does not come through here and is never delayed.
+     */
     _mountWhenSettled() {
+      var self = this;
+      var g = window.__oeStripeEmbeddedRegistry = window.__oeStripeEmbeddedRegistry || { chain: null, instance: null };
+
+      clearTimeout(g.quietMountTimer);
+      g.quietMountTimer = setTimeout(function () {
+        // The generation that armed this may have been replaced meanwhile;
+        // mounting from a detached controller would put the sheet nowhere.
+        if (!self.element || !self.element.isConnected) return;
+
+        self._mountNow();
+      }, QUIET_MOUNT_DEBOUNCE_MS);
+    }
+
+    _mountNow() {
       var self = this;
       var opc = window.OnepageCheckout;
 
