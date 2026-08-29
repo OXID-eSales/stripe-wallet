@@ -198,11 +198,49 @@
      * shopper's consent: a rebuild would create a payment contract nobody asked
      * for and change the amount under them. See `_markSheetStale`.
      */
+    /**
+     * Ask OPC to settle the basket, if it can.
+     *
+     * Absent hook — an older OPC, or a bundle without it — is reported as
+     * settled: this widget also runs outside OPC on the classic order page,
+     * where there is no batching to wait for and refusing every payment would
+     * be a far worse failure than the one being guarded against.
+     */
+    async _settleBasket() {
+      var opc = window.OnepageCheckout;
+      if (!opc || typeof opc.settleBasket !== 'function') {
+        return { settled: true };
+      }
+
+      try {
+        return await opc.settleBasket();
+      } catch (e) {
+        sdbg('[StripeCheckoutFooter] settleBasket threw — treating as unsettled', e);
+        return { settled: false };
+      }
+    }
+
+    _basketUnsettledText() {
+      return (window.oStripe && window.oStripe.i18n && window.oStripe.i18n.BASKET_UNSETTLED)
+        || 'Your basket is still updating. Please try again in a moment.';
+    }
+
     _armBasketWatcher() {
       var opc = window.OnepageCheckout;
       if (!opc || typeof opc.onBasketSettled !== 'function') {
-        sdbg('[StripeCheckoutFooter] OPC settled hook unavailable — sheet will not auto-remount');
+        sdbg('[StripeCheckoutFooter] OPC settled hook unavailable — sheet will not be veiled on change');
         return;
+      }
+
+      // Keep the Pay button out of reach while the server is catching up, so
+      // the refusal above is a last resort rather than the ordinary path.
+      var self = this;
+      if (typeof opc.onBasketPending === 'function') {
+        this._offBasketPending = opc.onBasketPending(function (data) {
+          if (!self.hasSubmitButtonTarget || self._embedded) return;
+
+          self.submitButtonTarget.disabled = Boolean(data && data.pending);
+        });
       }
 
       var self = this;
@@ -286,6 +324,22 @@
       this._hideError();
 
       try {
+        // Step 0: make the server agree with the screen before pricing anything.
+        //
+        // OPC removes basket rows optimistically and sends them in batches, so
+        // between a click and the server catching up the browser shows a basket
+        // the server does not have yet. A checkout session created in that
+        // window freezes the WRONG amount — the mismatch between the summary and
+        // this sheet that was reported.
+        //
+        // Refusing is the only safe answer when it cannot be settled: proceeding
+        // charges for items the shopper removed, and there is no way to detect
+        // that afterwards from inside the sheet.
+        var settlement = await this._settleBasket();
+        if (settlement && settlement.settled === false) {
+          throw new Error(this._basketUnsettledText());
+        }
+
         // Step 1: Create checkout session via processCheckout API
         var checkoutResult = await this._processCheckout();
 
@@ -414,6 +468,10 @@
       if (typeof this._offBasketSettled === 'function') {
         this._offBasketSettled();
         this._offBasketSettled = null;
+      }
+      if (typeof this._offBasketPending === 'function') {
+        this._offBasketPending();
+        this._offBasketPending = null;
       }
       if (this._embedded && typeof this._embedded.destroy === 'function') {
         try { this._embedded.destroy(); } catch (e) { /* already torn down */ }
