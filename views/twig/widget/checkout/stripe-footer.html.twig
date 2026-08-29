@@ -123,7 +123,62 @@
         this.submitButtonTarget.disabled = false;
       }
       this._armConsentWatchers();
+      this._armBasketWatcher();
       this._tryEagerMount();
+    }
+
+    /**
+     * OPC-192: remount when the basket has SETTLED at a new value.
+     *
+     * The embedded sheet is created from a checkout session that carries the
+     * basket and its price at the moment of mounting, and nothing invalidated
+     * it afterwards — a shopper could remove items and still be looking at a
+     * sheet quoting the old total.
+     *
+     * The trigger is OPC's `onBasketSettled`, not a basket event, and the
+     * difference matters. Every mount calls processCheckout and creates a
+     * payment contract (OPC-193), so remounting per change is expensive:
+     * measured on pay1, a delete run of 25 items is a single settled change but
+     * dozens of basket events. `onBasketSettled` fires once when the basket has
+     * come to rest at a value different from the last one announced — after a
+     * delete series finishes flushing, or after a recalculation moved the total
+     * — and stays silent when a snapshot merely re-reports the same basket.
+     */
+    _armBasketWatcher() {
+      var opc = window.OnepageCheckout;
+      if (!opc || typeof opc.onBasketSettled !== 'function') {
+        sdbg('[StripeCheckoutFooter] OPC settled hook unavailable — sheet will not auto-remount');
+        return;
+      }
+
+      var self = this;
+      this._offBasketSettled = opc.onBasketSettled(function (data) {
+        sdbg('[StripeCheckoutFooter] basket settled at a new revision — remounting', data);
+        self._remountForNewBasket();
+      });
+    }
+
+    /**
+     * Tear the sheet down and mount a fresh one for the current basket.
+     *
+     * Only when one is actually up: with no sheet mounted there is nothing
+     * quoting a stale price, and mounting here would create a payment contract
+     * for a shopper who has not asked to pay.
+     */
+    async _remountForNewBasket() {
+      if (!this._embedded || this._mounting) {
+        return;
+      }
+
+      try {
+        this._embedded.destroy();
+      } catch (e) { /* already torn down */ }
+
+      var g = window.__oeStripeEmbeddedRegistry;
+      if (g && g.instance === this._embedded) { g.instance = null; }
+      this._embedded = null;
+
+      await this._tryEagerMount();
     }
 
     /**
@@ -391,6 +446,10 @@
 
     disconnect() {
       this._detachConsentWatchers();
+      if (typeof this._offBasketSettled === 'function') {
+        this._offBasketSettled();
+        this._offBasketSettled = null;
+      }
       if (this._embedded && typeof this._embedded.destroy === 'function') {
         try { this._embedded.destroy(); } catch (e) { /* already torn down */ }
         // FIX (OPC-132): clear the page-global registry slot too, so the
