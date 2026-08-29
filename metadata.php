@@ -103,6 +103,20 @@ $aModule = [
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeRemoveByBasketCurrency',     'type' => 'bool',       'value' => '1',         'position' => 36],
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeProvideCustomerEmailAddress','type' => 'bool',       'value' => '0',         'position' => 37],
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeCaptureMode',                 'type' => 'select',     'value' => 'automatic', 'position' => 39, 'constraints' => 'automatic|manual'],
+        // OPC-192: when the embedded sheet appears.
+        //
+        //   manual — the shopper presses Pay and the sheet is built from the
+        //            basket as it stands at that moment. A later basket change
+        //            veils the sheet and offers a Refresh button.
+        //   auto   — the sheet appears on its own once the checkout is payable,
+        //            and rebuilds itself when the basket settles at a new value.
+        //
+        // The distinction is not cosmetic: every mount creates a Stripe
+        // checkout session, which freezes an amount. `auto` therefore creates
+        // one per settled change, and `manual` one per deliberate click.
+        // Defaults to `manual` because it is the mode whose amount cannot drift
+        // ahead of the shopper's intent.
+        ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeEmbeddedMountMode',           'type' => 'select',     'value' => 'manual',    'position' => 40, 'constraints' => 'manual|auto'],
         ['group' => 'STRIPE_WEBHOOKS',          'name' => 'sStripeWebhookEndpoint',             'type' => 'str',        'value' => '',          'position' => 130],
         ['group' => 'STRIPE_WEBHOOKS',          'name' => 'sStripeWebhookEndpointSecret',       'type' => 'str',        'value' => '',          'position' => 140],
         // Sprint 109/111: per-mode endpoint ID and signing secret are stored in oxconfig

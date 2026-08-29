@@ -17,6 +17,10 @@
      data-stripe-checkout-footer-csrf-token-value="{{ checkoutData.csrfToken }}"
      data-stripe-checkout-footer-publishable-key-value="{{ stripeConfig.publishableKey }}"
      data-stripe-checkout-footer-render-mode-value="{{ stripeConfig.renderMode|default('redirect') }}"
+     {# OPC-192: manual — the shopper presses Pay; auto — the sheet appears on
+        its own once the basket settles. Every mount creates a Stripe session,
+        so this chooses between one per settled change and one per click. #}
+     data-stripe-checkout-footer-mount-mode-value="{{ stripeConfig.mountMode|default('manual') }}"
      data-stripe-user-data-validator-url-value="{{ checkoutData.validationUrl }}"
      data-stripe-user-data-validator-plugin-id-value="{{ checkoutData.pluginModuleId }}"
      data-stripe-user-data-validator-csrf-value="{{ checkoutData.csrfToken }}"
@@ -66,6 +70,21 @@
         <div data-stripe-checkout-footer-target="embedded"
              class="stripe-embedded-checkout" style="display: none;"></div>
 
+        {#
+            Shown while an AUTOMATIC mount is being prepared.
+
+            The full-screen loader below is right when the shopper pressed Pay:
+            they asked for something and are owed a clear "working on it". An
+            automatic mount was not asked for, so blacking out the whole
+            checkout for it is an interruption with no cause. This occupies only
+            the space the sheet is about to fill.
+        #}
+        <div class="stripe-sheet-preparing" data-stripe-checkout-footer-target="preparing"
+             style="display: none;" role="status" aria-live="polite">
+            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            <span class="text-muted small">{{ translate({ ident: 'STRIPE_SHEET_PREPARING' }) }}</span>
+        </div>
+
         <div class="stripe-sheet-stale" data-stripe-checkout-footer-target="staleOverlay"
              style="display: none;" role="status" aria-live="polite">
             <div class="stripe-sheet-stale__panel">
@@ -98,6 +117,12 @@
         .stripe-sheet-stale__panel {
             max-width: 22rem;
             padding: 1rem;
+        }
+        .stripe-sheet-preparing {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.25rem;
         }
     </style>
 
@@ -138,12 +163,13 @@
       paymentMethod: String,
       csrfToken: String,
       publishableKey: String,
-      renderMode: String
+      renderMode: String,
+      mountMode: { type: String, default: 'manual' }
     }
 
     static targets = [
       'submitButton', 'error', 'errorMessage', 'loader', 'embedded',
-      'embeddedWrap', 'staleOverlay', 'refreshButton'
+      'embeddedWrap', 'staleOverlay', 'refreshButton', 'preparing'
     ]
 
     connect() {
@@ -182,9 +208,83 @@
         this.submitButtonTarget.disabled = false;
       }
 
-      // Still watched, but to DISMISS a mounted sheet rather than to create
-      // one — see _markSheetStale.
       this._armBasketWatcher();
+
+      // In `auto` the sheet appears without being asked for — but only once the
+      // basket has settled, never on arrival. That distinction is what makes it
+      // safe now and unsafe before: the old eager mount fired on page load and
+      // froze an amount the shopper had not finished deciding, which is how a
+      // reload alone created a payment contract (OPC-193).
+      if (this._autoMount()) {
+        this._armPayableWatcher();
+        this._mountWhenSettled();
+      }
+    }
+
+    /**
+     * In auto mode, mount as soon as the checkout BECOMES payable.
+     *
+     * `connect()` runs long before the shopper has ticked the consents, so a
+     * single attempt at start-up mounts nothing and nothing retries: a basket
+     * change is the only other trigger, and ticking a consent is not one.
+     * Measured on pay1 exactly that way — mode read as `auto`, sheet never
+     * appeared.
+     *
+     * The Pay button's disabled state is the signal, rather than the consent
+     * boxes the old eager mount watched. It is the one place every requirement
+     * ends up — consents, address, validation — so a new requirement added
+     * later cannot quietly bypass this.
+     */
+    _armPayableWatcher() {
+      if (!this.hasSubmitButtonTarget || typeof MutationObserver === 'undefined') {
+        return;
+      }
+
+      var self = this;
+      this._payableObserver = new MutationObserver(function () {
+        if (self.submitButtonTarget.disabled) return;
+
+        self._mountWhenSettled();
+      });
+      this._payableObserver.observe(this.submitButtonTarget, {
+        attributes: true,
+        attributeFilter: ['disabled'],
+      });
+    }
+
+    _autoMount() {
+      return this.mountModeValue === 'auto';
+    }
+
+    /**
+     * Mount as soon as the checkout is payable and nothing is in flight.
+     *
+     * Waits for OPC to report the basket quiet rather than mounting straight
+     * away: a session created mid-change quotes an amount that is about to be
+     * wrong, which is the whole reason the manual mode exists.
+     */
+    _mountWhenSettled() {
+      var self = this;
+      var opc = window.OnepageCheckout;
+
+      var attempt = function () {
+        if (self._embedded || self._mounting) return;
+        if (self.hasSubmitButtonTarget && self.submitButtonTarget.disabled) return;
+
+        // Nobody asked for this one.
+        self._quietMount = true;
+        self.submitPayment();
+      };
+
+      if (opc && typeof opc.settleBasket === 'function') {
+        opc.settleBasket().then(function (r) {
+          if (r && r.settled === false) return;
+          attempt();
+        }).catch(function () { /* leave the button as the way in */ });
+        return;
+      }
+
+      attempt();
     }
 
     /**
@@ -244,6 +344,22 @@
 
       var self = this;
       this._offBasketSettled = opc.onBasketSettled(function (data) {
+        if (self._autoMount()) {
+          // The shop chose to have the sheet keep itself current, so rebuild it
+          // rather than asking the shopper to. One rebuild per SETTLED change,
+          // never per click — that is what makes auto affordable at all, since
+          // each mount creates a Stripe session.
+          sdbg('[StripeCheckoutFooter] basket settled — rebuilding the sheet', data);
+          if (self._embedded) {
+            self._quietMount = true;
+            self.refreshSheet();
+          } else {
+            self._mountWhenSettled();
+          }
+
+          return;
+        }
+
         sdbg('[StripeCheckoutFooter] basket settled at a new revision — veiling the sheet', data);
         self._markSheetStale();
       });
@@ -472,6 +588,10 @@
         this._offBasketPending();
         this._offBasketPending = null;
       }
+      if (this._payableObserver) {
+        this._payableObserver.disconnect();
+        this._payableObserver = null;
+      }
       if (this._embedded && typeof this._embedded.destroy === 'function') {
         try { this._embedded.destroy(); } catch (e) { /* already torn down */ }
         // FIX (OPC-132): clear the page-global registry slot too, so the
@@ -526,7 +646,23 @@
       }
     }
     _hideError() { if (this.hasErrorTarget) this.errorTarget.style.display = 'none'; }
+    /**
+     * Say that something is happening, at the weight the shopper's own action
+     * earned.
+     *
+     * A press of Pay earns the full-screen loader: they asked for something,
+     * they are owed an unambiguous answer, and stopping them from changing the
+     * basket mid-session is a feature. An AUTOMATIC mount earns none of that —
+     * nobody asked, so blacking out the checkout (the overlay is fixed,
+     * full-viewport, 70% black at z-index 9999) is an interruption with no
+     * cause. Reported from pay1 as exactly that.
+     */
     _showLoading() {
+      if (this._quietMount) {
+        if (this.hasPreparingTarget) this.preparingTarget.style.display = 'flex';
+        return;
+      }
+
       if (this.hasSubmitButtonTarget) {
         this.submitButtonTarget.disabled = true;
         this.submitButtonTarget.classList.add('processing');
@@ -534,11 +670,16 @@
       if (this.hasLoaderTarget) this.loaderTarget.style.display = 'flex';
     }
     _hideLoading() {
+      if (this.hasPreparingTarget) this.preparingTarget.style.display = 'none';
       if (this.hasSubmitButtonTarget) {
         this.submitButtonTarget.disabled = false;
         this.submitButtonTarget.classList.remove('processing');
       }
       if (this.hasLoaderTarget) this.loaderTarget.style.display = 'none';
+      // Cleared here rather than at the call site: every mount path ends in
+      // `_hideLoading`, and a flag left set would make the NEXT mount — the one
+      // the shopper actually pressed for — silently discreet.
+      this._quietMount = false;
     }
   }
 

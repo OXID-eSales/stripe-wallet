@@ -126,7 +126,29 @@ class StripeCheckoutFooter extends WidgetController
         return [
             'publishableKey' => $this->resolvePublishableKey(),
             'renderMode' => $this->resolveRenderMode(),
+            'mountMode' => $this->resolveMountMode(),
         ];
+    }
+
+    /**
+     * When the embedded sheet appears: on the Pay button, or on its own.
+     *
+     * Falls back to `manual` on any failure, and that direction is deliberate.
+     * Every mount creates a Stripe checkout session, which freezes an amount —
+     * so the safe default when the setting cannot be read is the mode where a
+     * session only exists because the shopper asked for one.
+     */
+    private function resolveMountMode(): string
+    {
+        try {
+            $configService = $this->getServiceFromContainer(
+                \OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface::class
+            );
+
+            return $configService->get('sStripeEmbeddedMountMode') === 'auto' ? 'auto' : 'manual';
+        } catch (\Throwable $e) {
+            return 'manual';
+        }
     }
 
     private function resolvePublishableKey(): string

@@ -210,4 +210,10 @@ $aLang = array(
     'STRIPE_VALIDATION_AMOUNT_PRECISION'                => 'Der Betrag hat zu viele Nachkommastellen für diese Währung.',
     'STRIPE_VALIDATION_AMOUNT_EXCEEDS_BOUND'            => 'Der Betrag überschreitet das verfügbare Maximum für diese Aktion.',
     'STRIPE_VALIDATION_AMOUNT_BOUND_UNAVAILABLE'        => 'Der verfügbare Betrag konnte nicht mit Stripe verifiziert werden. Bitte versuchen Sie es erneut.',
+    // OPC-192: every mount creates a Stripe checkout session, which freezes
+    // an amount — so this chooses between one per settled change and one
+    // per deliberate click.
+    'SHOP_MODULE_sStripeEmbeddedMountMode'                => 'Embedded Checkout: wann das Zahlungsformular erscheint',
+    'SHOP_MODULE_sStripeEmbeddedMountMode_manual'         => 'Auf Anforderung (Kunde klickt Bezahlen)',
+    'SHOP_MODULE_sStripeEmbeddedMountMode_auto'           => 'Automatisch, sobald der Warenkorb feststeht',
 );

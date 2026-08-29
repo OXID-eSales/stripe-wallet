@@ -217,4 +217,5 @@ $aLang = [
     'STRIPE_SHEET_STALE'                                      => "Your basket changed, so this payment form is out of date.",
     'STRIPE_SHEET_REFRESH'                                    => "Refresh payment form",
     'STRIPE_BASKET_UNSETTLED'                                 => "Your basket is still updating. Please try again in a moment.",
+    'STRIPE_SHEET_PREPARING'                                  => "Preparing the payment form…",
 ];

@@ -216,4 +216,5 @@ $aLang = [
     'STRIPE_SHEET_STALE'                                      => "Ihr Warenkorb hat sich geändert, dieses Zahlungsformular ist nicht mehr aktuell.",
     'STRIPE_SHEET_REFRESH'                                    => "Zahlungsformular aktualisieren",
     'STRIPE_BASKET_UNSETTLED'                                 => "Ihr Warenkorb wird noch aktualisiert. Bitte versuchen Sie es gleich noch einmal.",
+    'STRIPE_SHEET_PREPARING'                                  => "Zahlungsformular wird vorbereitet…",
 ];
