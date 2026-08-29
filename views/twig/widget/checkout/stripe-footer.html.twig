@@ -272,8 +272,7 @@
         if (self.hasSubmitButtonTarget && self.submitButtonTarget.disabled) return;
 
         // Nobody asked for this one.
-        self._quietMount = true;
-        self.submitPayment();
+        self.submitPayment(null, { quiet: true });
       };
 
       if (opc && typeof opc.settleBasket === 'function') {
@@ -351,8 +350,7 @@
           // each mount creates a Stripe session.
           sdbg('[StripeCheckoutFooter] basket settled — rebuilding the sheet', data);
           if (self._embedded) {
-            self._quietMount = true;
-            self.refreshSheet();
+            self.refreshSheet(null, { quiet: true });
           } else {
             self._mountWhenSettled();
           }
@@ -401,7 +399,7 @@
      * about which basket they were built from — the bug this whole change
      * exists to remove.
      */
-    async refreshSheet(event) {
+    async refreshSheet(event, options) {
       if (event) event.preventDefault();
 
       if (this._embedded) {
@@ -415,7 +413,7 @@
       }
 
       this._clearSheetStale();
-      await this.submitPayment();
+      await this.submitPayment(null, options);
     }
 
     _clearSheetStale() {
@@ -432,10 +430,17 @@
     // from a different basket than the other.
 
 
-    async submitPayment(event) {
+    /**
+     * @param {Event|null} event
+     * @param {{quiet?: boolean}} [options] quiet = the shopper did not ask for
+     *        this mount, so it must not announce itself like a payment they
+     *        pressed for.
+     */
+    async submitPayment(event, options) {
       if (event) event.preventDefault();
 
-      this._showLoading();
+      var quiet = Boolean(options && options.quiet);
+      this._showLoading(quiet);
       this._hideError();
 
       try {
@@ -657,8 +662,14 @@
      * full-viewport, 70% black at z-index 9999) is an interruption with no
      * cause. Reported from pay1 as exactly that.
      */
-    _showLoading() {
-      if (this._quietMount) {
+    _showLoading(quiet) {
+      // Passed in rather than read from a flag on the controller. It WAS a
+      // flag, and `_hideLoading` cleared it — so when a remount ran
+      // `submitPayment` twice in one window, the second call had already lost
+      // the intent and blacked out the page. Measured on pay1: the discreet
+      // notice and the full-screen "Redirecting to Stripe" overlay both
+      // appeared during a single rebuild.
+      if (quiet) {
         if (this.hasPreparingTarget) this.preparingTarget.style.display = 'flex';
         return;
       }
@@ -676,10 +687,6 @@
         this.submitButtonTarget.classList.remove('processing');
       }
       if (this.hasLoaderTarget) this.loaderTarget.style.display = 'none';
-      // Cleared here rather than at the call site: every mount path ends in
-      // `_hideLoading`, and a flag left set would make the NEXT mount — the one
-      // the shopper actually pressed for — silently discreet.
-      this._quietMount = false;
     }
   }
 
@@ -774,6 +781,14 @@
         return;
       }
 
+      // OPC-192: this wrapper REPLACES submitPayment, so anything the caller
+      // passed has to survive the trip. It did not — the footer's automatic
+      // mount asks for a discreet indicator via `{ quiet: true }`, the wrapper
+      // dropped it, and every auto-remount blacked the page out with
+      // "Redirecting to Stripe… Please do not close this window" for a mount
+      // nobody had asked for. Traced on pay1: three quiet calls in, three
+      // non-quiet `_showLoading` out, all of them through here.
+      //
       // Store originals for disconnect-time restoration.
       this._footerCtrl          = footerCtrl;
       this._originalSubmit      = footerCtrl.submitPayment.bind(footerCtrl);
@@ -788,7 +803,12 @@
       }
     }
 
-    async _interceptSubmit(event) {
+    /**
+     * @param {Event|null} event
+     * @param {{quiet?: boolean}} [options] forwarded untouched to the wrapped
+     *        submit — see below.
+     */
+    async _interceptSubmit(event, options) {
       if (event) event.preventDefault();
 
       this._clearErrors();
@@ -796,7 +816,7 @@
       var fields = this._collectFields();
       if (Object.keys(fields).length === 0) {
         // Nothing to validate — release immediately.
-        this._originalSubmit(event);
+        this._originalSubmit(event, options);
         return;
       }
 
@@ -818,13 +838,13 @@
         if (!resp.ok) {
           // Fail open — see header comment.
           sdbg('[StripeUserDataValidator] backend returned', resp.status, '— releasing submit');
-          this._originalSubmit(event);
+          this._originalSubmit(event, options);
           return;
         }
 
         var data = await resp.json();
         if (data.valid) {
-          this._originalSubmit(event);
+          this._originalSubmit(event, options);
           return;
         }
 
@@ -832,7 +852,7 @@
 
       } catch (err) {
         sdbg('[StripeUserDataValidator] fetch error, failing open:', err);
-        this._originalSubmit(event);
+        this._originalSubmit(event, options);
       }
     }
 
