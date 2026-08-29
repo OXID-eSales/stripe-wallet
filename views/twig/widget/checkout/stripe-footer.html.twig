@@ -154,6 +154,17 @@
     }
   };
 
+  // How long the address form must sit still before an owed mount is retried.
+  // Long enough that typing a house number is one attempt rather than three,
+  // short enough that a shopper who fixed a name is not left staring at a gap
+  // where the payment sheet belongs.
+  var MOUNT_RETRY_DEBOUNCE_MS = 700;
+
+  // How long the basket must stay still before the sheet is rebuilt against it.
+  // Comfortably wider than OPC's 500ms write window, so a burst of removals
+  // settles into one rebuild rather than one per batch.
+  var SHEET_REBUILD_DEBOUNCE_MS = 1200;
+
   // Always register (idempotent) — needed for dynamic widget loading
   var BaseController = opc.Controller;
 
@@ -203,10 +214,15 @@
     // the amount it freezes is one the shopper has finished deciding.
 
     _initIframeMode() {
-      if (this.hasSubmitButtonTarget) {
-        this.submitButtonTarget.disabled = false;
-      }
-
+      // Deliberately NOT enabling the button here. Redirect mode does that
+      // because there the button is only a trigger, but in iframe mode it is
+      // the payability signal this whole path reads: the server renders it
+      // `disabled` and the validator lifts that once the requirements are met.
+      // Forcing it open at connect made `_mountWhenSettled` see a payable
+      // checkout immediately and mount on arrival — the eager mount, back by
+      // another name, creating a Stripe session before the shopper had ticked
+      // anything. Caught on pay1: one session logged purely from opening the
+      // checkout.
       this._armBasketWatcher();
       this._armPayableWatcher();
       this._mountWhenSettled();
@@ -323,16 +339,58 @@
         this._offBasketPending = opc.onBasketPending(function (data) {
           if (!self.hasSubmitButtonTarget || self._embedded) return;
 
-          self.submitButtonTarget.disabled = Boolean(data && data.pending);
+          // Disable freely, but never enable on our own authority: clearing
+          // `pending` says the server caught up, not that the shopper met the
+          // requirements. Assigning the flag directly conflated the two and
+          // opened the button — and therefore the mount — the moment a basket
+          // settled, consents or not. Remember what the validator had decided
+          // and hand that back.
+          if (data && data.pending) {
+            if (self._payableBeforePending === undefined) {
+              self._payableBeforePending = !self.submitButtonTarget.disabled;
+            }
+            self.submitButtonTarget.disabled = true;
+            return;
+          }
+
+          if (self._payableBeforePending !== undefined) {
+            self.submitButtonTarget.disabled = !self._payableBeforePending;
+            self._payableBeforePending = undefined;
+          }
         });
       }
 
-      var self = this;
       this._offBasketSettled = opc.onBasketSettled(function (data) {
-        // Rebuild against the basket as it now stands. One rebuild per SETTLED
-        // change, never per click — that is what makes this affordable at all,
-        // since every mount creates a Stripe session.
-        sdbg('[StripeCheckoutFooter] basket settled — rebuilding the sheet', data);
+        self._scheduleSheetRebuild(data);
+      });
+    }
+
+    /**
+     * Collapse a burst of settles into ONE rebuild.
+     *
+     * "One rebuild per settled change, never per click" was the rule, and it
+     * was not enough. OPC batches basket writes on a 500ms window, so four
+     * deletes made in one go arrive as TWO settled revisions — two rebuilds,
+     * two Stripe sessions, two payment contracts, for a single decision the
+     * shopper made once. Measured on pay1 exactly that way.
+     *
+     * So the trigger is the basket coming to REST, not each revision on the way
+     * there: wait for it to stop moving, then rebuild once, against the last
+     * revision seen. A rebuild still in flight pushes the timer out rather than
+     * queueing a second session behind the first.
+     */
+    _scheduleSheetRebuild(data) {
+      this._lastSettled = data;
+      clearTimeout(this._rebuildTimer);
+
+      var self = this;
+      this._rebuildTimer = setTimeout(function () {
+        if (self._mounting) {
+          self._scheduleSheetRebuild(self._lastSettled);
+          return;
+        }
+
+        sdbg('[StripeCheckoutFooter] basket at rest — rebuilding the sheet', self._lastSettled);
 
         if (!self._embedded) {
           self._mountWhenSettled();
@@ -340,7 +398,7 @@
         }
 
         self.refreshSheet(null, { quiet: true });
-      });
+      }, SHEET_REBUILD_DEBOUNCE_MS);
     }
 
     /**
@@ -434,6 +492,12 @@
       this._showLoading(quiet);
       this._hideError();
 
+      // Two overlapping session creations are two payment contracts. Both
+      // `_mountWhenSettled` and `_markSheetStale` have always guarded on this
+      // flag — and nothing ever set it, so the guard could not fire and a
+      // second mount was free to start while the first was still in the air.
+      this._mounting = true;
+
       try {
         // Step 0: make the server agree with the screen before pricing anything.
         //
@@ -487,6 +551,8 @@
         console.error('[StripeCheckoutFooter] Payment failed:', err);
         this._showError(err.message);
         this._hideLoading();
+      } finally {
+        this._mounting = false;
       }
     }
 
@@ -576,6 +642,7 @@
     }
 
     disconnect() {
+      clearTimeout(this._rebuildTimer);
       if (typeof this._offBasketSettled === 'function') {
         this._offBasketSettled();
         this._offBasketSettled = null;
@@ -734,6 +801,7 @@
     }
 
     disconnect() {
+      clearTimeout(this._mountRetryTimer);
       this._unwrapSubmitPayment();
       this._detachClearOnInputListeners();
     }
@@ -802,7 +870,11 @@
     async _interceptSubmit(event, options) {
       if (event) event.preventDefault();
 
-      this._clearErrors();
+      // A quiet attempt is the automatic mount, which nobody pressed for. It
+      // must not wipe the errors a real Pay click left on screen, and it must
+      // not paint new ones — see the invalid branch below.
+      var quiet = Boolean(options && options.quiet);
+      if (!quiet) this._clearErrors();
 
       var fields = this._collectFields();
       if (Object.keys(fields).length === 0) {
@@ -835,11 +907,20 @@
 
         var data = await resp.json();
         if (data.valid) {
+          this._mountOwed = false;
+          this._clearErrors();
           this._originalSubmit(event, options);
           return;
         }
 
-        this._renderErrors(data.errors || []);
+        // Refused — but a refusal is not the end of it. Nothing else will ask
+        // again: payability is watched through the Pay button's `disabled`
+        // attribute and this validator never touches it, so the correction the
+        // shopper is about to make would leave the sheet absent until some
+        // unrelated basket change happened to retry. Remember that a mount is
+        // owed, and let the next edit deliver it.
+        this._mountOwed = true;
+        if (!quiet) this._renderErrors(data.errors || []);
 
       } catch (err) {
         sdbg('[StripeUserDataValidator] fetch error, failing open:', err);
@@ -957,6 +1038,43 @@
       if (fb) {
         fb.remove();
       }
+
+      this._scheduleMountRetry();
+    }
+
+    /**
+     * Deliver a mount this validator refused, once the address validates.
+     *
+     * The retry goes back through the footer's `_mountWhenSettled`, not
+     * straight to the submit underneath: that is the path that re-checks
+     * whether a sheet already exists, whether one is mid-build, and whether the
+     * basket has settled. Landing below it would let an edit mount a second
+     * sheet, and a second sheet is a second payment contract.
+     *
+     * `_mountWhenSettled` calls back through this wrapper, so an address that
+     * is still wrong simply re-arms — no separate validity check to keep in
+     * step with the one above, and no retry storm: only a keystroke schedules
+     * this, and only while a mount is actually owed.
+     */
+    _scheduleMountRetry() {
+      if (!this._mountOwed || !this._footerCtrl) {
+        return;
+      }
+
+      if (this._footerCtrl._embedded) {
+        this._mountOwed = false;
+        return;
+      }
+
+      clearTimeout(this._mountRetryTimer);
+      var self = this;
+      this._mountRetryTimer = setTimeout(function () {
+        if (!self._mountOwed || !self._footerCtrl) return;
+        if (typeof self._footerCtrl._mountWhenSettled !== 'function') return;
+
+        sdbg('[StripeUserDataValidator] address edited — retrying the owed mount');
+        self._footerCtrl._mountWhenSettled();
+      }, MOUNT_RETRY_DEBOUNCE_MS);
     }
 
   }
