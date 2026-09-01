@@ -349,14 +349,14 @@ services:
   # - Stores order metadata
   #
 
-  # Shop Order Service Interface - Bind to OXID implementation
-  OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface:
+  # 2026-09-01 — this module no longer binds ShopOrderServiceInterface.
+  # payment-base owns order finalization; four modules aliasing one container
+  # id meant a single winner finalized every provider's orders.
+  # The class stays registered under its own id so anything referencing it
+  # directly keeps resolving; it is no longer what the shared contract points at.
+  OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService:
     class: OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService
     public: true
-
-  # OXID Shop Order Service - OXID eShop specific implementation
-  OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService:
-    alias: OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface
 
   # ==========================================
   # Contract Repository (Data Access Layer)
