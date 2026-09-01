@@ -137,30 +137,40 @@ final class StripeFooterFailureMessageContractTest extends TestCase
         );
     }
 
-    public function testBothProcessCheckoutFailureBranchesUseTheSharedResolver(): void
+    /**
+     * Counts updated 2026-09-01: OPC-192 merged the eager mount and submitPayment
+     * into a single processCheckout call, so there is now one failure branch
+     * rather than two. What is still pinned is that the branch resolves its text
+     * through the shared resolver instead of inline — and that the resolver is
+     * actually declared. OPC-192 deleted it and left this call site behind, so
+     * every refusal threw "_failureTextFrom is not a function"; the count below
+     * is what caught that.
+     */
+    public function testTheProcessCheckoutFailureBranchUsesTheSharedResolver(): void
     {
         $code = $this->templateCode();
 
         self::assertSame(
             1,
             preg_match_all('/_failureTextFrom\(result\)/', $code),
-            '_failureTextFrom() must be declared exactly once.'
+            '_failureTextFrom() must be declared exactly once — a call site without a'
+            . ' declaration turns every refusal into a TypeError.'
         );
 
         self::assertSame(
-            2,
+            1,
             preg_match_all('/this\._failureTextFrom\(/', $code),
-            'Both failure branches — the eager mount and submitPayment — must go'
-            . ' through _failureTextFrom() rather than resolving the text inline.'
+            'The failure branch must go through _failureTextFrom() rather than'
+            . ' resolving the text inline.'
         );
     }
 
-    public function testFailureBranchesLogTheErrorCodeForDiagnosis(): void
+    public function testTheFailureBranchLogsTheErrorCodeForDiagnosis(): void
     {
         self::assertSame(
-            2,
+            1,
             preg_match_all('/errorCode\s*\|\|\s*\'no code\'/', $this->templateCode()),
-            'Each failure branch must log the errorCode, so a repro names the guard'
+            'The failure branch must log the errorCode, so a repro names the guard'
             . ' that rejected the checkout instead of leaving QA to guess.'
         );
     }

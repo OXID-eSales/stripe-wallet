@@ -360,6 +360,33 @@
         || 'Your basket is still updating. Please try again in a moment.';
     }
 
+    /**
+     * The label for a refused checkout.
+     *
+     * OPC-192 removed this method while leaving its call site below, so every
+     * refusal threw "this._failureTextFrom is not a function" instead of telling
+     * the shopper why — the failure path was the one path the refactor could not
+     * exercise.
+     *
+     * The code → label mapping has exactly one owner: OPC's
+     * `utils/checkout_error_catalog.js`, published as
+     * `window.OnepageCheckout.checkoutErrorText`. This widget is inline JS
+     * outside that bundle, so it consumes the published resolver rather than
+     * keeping a second copy of the table that would drift the day OPC adds a
+     * code. Rendered outside the OPC modal there is no resolver, hence the
+     * translated fallback of our own.
+     */
+    _failureTextFrom(result) {
+      var payload = result || {};
+      var opcResolver = window.OnepageCheckout && window.OnepageCheckout.checkoutErrorText;
+      if (typeof opcResolver === 'function') {
+        return opcResolver(payload);
+      }
+
+      return (window.oStripe && window.oStripe.i18n && window.oStripe.i18n.SESSION_FAILED)
+        || 'Failed to create checkout session';
+    }
+
     _armBasketWatcher() {
       var opc = window.OnepageCheckout;
       if (!opc || typeof opc.onBasketSettled !== 'function') {
