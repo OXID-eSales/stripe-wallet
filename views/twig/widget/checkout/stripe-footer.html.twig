@@ -33,7 +33,35 @@
         <span data-stripe-checkout-footer-target="errorMessage"></span>
     </div>
 
-    <div class="d-flex justify-content-end align-items-center mt-3">
+    {#
+        OPC-205 — in iframe mode this button is never the shopper's.
+
+        The embedded sheet renders Stripe's own Pay control, so ours starts
+        nothing that can finish: it was already hidden the moment the sheet
+        mounted (see `_mountEmbedded`). What was left was the window BEFORE the
+        mount, where it sat there enabled-looking and inert. Hiding it at mount
+        time was half the job; it should never have been visible in this mode
+        at all.
+
+        The node STAYS in the DOM, hidden, and that is deliberate. In iframe
+        mode this button is the payability signal: `_armPayableWatcher`
+        observes its `disabled` attribute — flipped by
+        `checkout-footer-manager` once every section validates — and mounts the
+        sheet when it clears. Deleting the element would remove the trigger
+        that makes the sheet appear at all. Hiding the wrapper rather than the
+        button also drops the `mt-3` gap that an empty flex row would leave.
+
+        Rewiring the mount onto something other than a button's disabled
+        attribute is worth doing (see the OPC-192 note about it not being the
+        single requirement sink), but it is a different change from this one.
+    #}
+    {# Swap the class rather than adding `style="display:none"`: `.d-flex` is
+       `display: flex !important`, so an inline style loses to it. Measured on
+       pay1 — the attribute said `display: none` while the computed value was
+       `flex` and the button was 169x48 and plainly visible. #}
+    <div class="{{ stripeConfig.renderMode|default('redirect') == 'iframe'
+                   ? 'd-none'
+                   : 'd-flex justify-content-end align-items-center mt-3' }}">
         <button type="button" class="btn btn-primary btn-lg"
                 data-stripe-checkout-footer-target="submitButton"
                 data-checkout-footer-manager-target="submitButton"
@@ -78,11 +106,10 @@
             checkout for it is an interruption with no cause. This occupies only
             the space the sheet is about to fill.
         #}
-        <div class="stripe-sheet-preparing" data-stripe-checkout-footer-target="preparing"
-             style="display: none;" role="status" aria-live="polite">
-            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-            <span class="text-muted small">{{ translate({ ident: 'STRIPE_SHEET_PREPARING' }) }}</span>
-        </div>
+        {# OPC-205 — the "preparing the sheet" notice is gone: the accordion
+           section shows it is loading, in the same place and shape as every
+           other section. The target is dropped with it; `_showLoading(quiet)`
+           now drives the section instead. #}
 
         <div class="stripe-sheet-stale" data-stripe-checkout-footer-target="staleOverlay"
              style="display: none;" role="status" aria-live="polite">
@@ -116,12 +143,6 @@
         .stripe-sheet-stale__panel {
             max-width: 22rem;
             padding: 1rem;
-        }
-        .stripe-sheet-preparing {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 1.25rem;
         }
     </style>
 
@@ -183,7 +204,7 @@
 
     static targets = [
       'submitButton', 'error', 'errorMessage', 'loader', 'embedded',
-      'embeddedWrap', 'staleOverlay', 'refreshButton', 'preparing'
+      'embeddedWrap', 'staleOverlay', 'refreshButton'
     ]
 
     connect() {
@@ -790,7 +811,13 @@
       // notice and the full-screen "Redirecting to Stripe" overlay both
       // appeared during a single rebuild.
       if (quiet) {
-        if (this.hasPreparingTarget) this.preparingTarget.style.display = 'flex';
+        // OPC-205: the accordion owns the waiting state. A quiet mount is the
+        // automatic one — nobody pressed for it — so it belongs in the section
+        // loader every other section uses, not in a sentence of our own next
+        // to the sheet. Dispatched on `document` because OPC's EventBus bridges
+        // every `oe:*` document event onto the bus; this widget is inline JS
+        // outside that bundle and has no other way in.
+        this._sectionLoading(true);
         return;
       }
 
@@ -801,12 +828,27 @@
       if (this.hasLoaderTarget) this.loaderTarget.style.display = 'flex';
     }
     _hideLoading() {
-      if (this.hasPreparingTarget) this.preparingTarget.style.display = 'none';
+      this._sectionLoading(false);
       if (this.hasSubmitButtonTarget) {
         this.submitButtonTarget.disabled = false;
         this.submitButtonTarget.classList.remove('processing');
       }
       if (this.hasLoaderTarget) this.loaderTarget.style.display = 'none';
+    }
+
+    /**
+     * Drive the OPC accordion section's own loading state.
+     *
+     * Safe outside OPC: with no bus listening the event is simply unheard, and
+     * the sheet still mounts. `payment-execution` is the section this widget
+     * is rendered into.
+     */
+    _sectionLoading(loading) {
+      try {
+        document.dispatchEvent(new CustomEvent('oe:accordion:section-loading', {
+          detail: { sectionId: 'payment-execution', loading: !!loading }
+        }));
+      } catch (e) { /* no bus, no section — nothing to drive */ }
     }
   }
 
