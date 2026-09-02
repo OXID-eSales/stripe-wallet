@@ -33,7 +33,35 @@
         <span data-stripe-checkout-footer-target="errorMessage"></span>
     </div>
 
-    <div class="d-flex justify-content-end align-items-center mt-3">
+    {#
+        OPC-205 — in iframe mode this button is never the shopper's.
+
+        The embedded sheet renders Stripe's own Pay control, so ours starts
+        nothing that can finish: it was already hidden the moment the sheet
+        mounted (see `_mountEmbedded`). What was left was the window BEFORE the
+        mount, where it sat there enabled-looking and inert. Hiding it at mount
+        time was half the job; it should never have been visible in this mode
+        at all.
+
+        The node STAYS in the DOM, hidden, and that is deliberate. In iframe
+        mode this button is the payability signal: `_armPayableWatcher`
+        observes its `disabled` attribute — flipped by
+        `checkout-footer-manager` once every section validates — and mounts the
+        sheet when it clears. Deleting the element would remove the trigger
+        that makes the sheet appear at all. Hiding the wrapper rather than the
+        button also drops the `mt-3` gap that an empty flex row would leave.
+
+        Rewiring the mount onto something other than a button's disabled
+        attribute is worth doing (see the OPC-192 note about it not being the
+        single requirement sink), but it is a different change from this one.
+    #}
+    {# Swap the class rather than adding `style="display:none"`: `.d-flex` is
+       `display: flex !important`, so an inline style loses to it. Measured on
+       pay1 — the attribute said `display: none` while the computed value was
+       `flex` and the button was 169x48 and plainly visible. #}
+    <div class="{{ stripeConfig.renderMode|default('redirect') == 'iframe'
+                   ? 'd-none'
+                   : 'd-flex justify-content-end align-items-center mt-3' }}">
         <button type="button" class="btn btn-primary btn-lg"
                 data-stripe-checkout-footer-target="submitButton"
                 data-checkout-footer-manager-target="submitButton"
