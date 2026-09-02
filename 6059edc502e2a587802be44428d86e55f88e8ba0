@@ -1,0 +1,13 @@
+---
+captured-by: gaad-memory-correction
+date: 2026-09-02T07:23:16Z
+session-id: dd166a63-a4a7-4a58-8dc0-8ea3d3ce43db
+confidence: 0.6
+tag: feedback
+access-count: 0
+extracted-rule: null
+---
+
+## Operator correction
+
+zamiast komunikatow z werbalna informacja ze jakis panel jest ladowany jak stripe iframe np czy mollie embed to uzyj istniejacego juz w naszym akordeonie stanu loading i locked. niech to bedzie proces spojnyc  akoedeonem wypelniony zewnetrznymi danymi a nie na odwrot
