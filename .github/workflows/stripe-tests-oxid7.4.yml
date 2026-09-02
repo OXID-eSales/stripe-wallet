@@ -250,6 +250,9 @@ jobs:
 
 
       - name: Upload configuration artifacts
+        # OPC-209 — this is diagnostics, not installation. The evidence run
+        # failed the whole install job here, which skipped every test job.
+        continue-on-error: true
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -471,3 +474,35 @@ jobs:
             source/data/php/logs/error_log.txt
             source/composer.lock
             source/composer.json
+
+  test_gate:
+    # OPC-209 — a red run has to say which kind of red it is. The two test jobs
+    # need `install_shop_with_module`, so when the install breaks they are
+    # SKIPPED and the run still goes red — indistinguishable from a test
+    # catching a defect. b-7.4.x went three days that way (7f76c18, 0ab1d57,
+    # 0dafa6a): every unit and integration job skipped, nobody told. This job
+    # exists only to name the case.
+    needs: [ styles, isolated_unit_tests, integration_tests ]
+    if: always()
+    runs-on: [arc-runner-set]
+    steps:
+      - name: Report which kind of red this run is
+        run: |
+          styles='${{ needs.styles.result }}'
+          unit='${{ needs.isolated_unit_tests.result }}'
+          integration='${{ needs.integration_tests.result }}'
+          echo "styles=$styles isolated_unit_tests=$unit integration_tests=$integration"
+
+          never_ran=''
+          for pair in "styles:$styles" "isolated_unit_tests:$unit" "integration_tests:$integration"; do
+            case "${pair#*:}" in
+              skipped|cancelled) never_ran="$never_ran ${pair%%:*}" ;;
+            esac
+          done
+
+          if [ -n "$never_ran" ]; then
+            echo "::error title=No tests were executed::These jobs never ran:$never_ran. The shop install almost certainly broke, so this run says nothing about the code. Repair the pipeline and re-run before reading this red as a test failure."
+            exit 1
+          fi
+
+          echo "Every test job reached a verdict — a red above is a real finding, not a broken pipeline."
