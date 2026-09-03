@@ -248,6 +248,10 @@ services:
       $shopOrderService: '@OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface'
       $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
       $eventLogger: '@stripe.events.file_logger'
+      # STRP-171 - retire the NOT_FINISHED order this session already
+      # left behind, instead of stacking another one beside it.
+      $previousAttemptCleaner: '@OxidEsales\PaymentBase\Checkout\PreviousCheckoutAttemptCleanerInterface'
+      $openAttempts: '@OxidEsales\PaymentBase\Checkout\OpenCheckoutAttemptRegistryInterface'
     tags:
       - { name: payment.event_handler, priority: 100 }
     public: false
