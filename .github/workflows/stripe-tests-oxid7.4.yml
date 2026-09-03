@@ -26,7 +26,7 @@ env:
 
 jobs:
   install_shop_with_module:
-    runs-on: [arc-runner-set]
+    runs-on: ubuntu-latest
     steps:
       - name: Print run parameters
         run: |
@@ -43,8 +43,9 @@ jobs:
           sudo rm -rf ./.??* || true
           ls -la ./
 
-      # Both repositories are public, but an *anonymous* clone from
-      # arc-runner-set fails: GitHub answers the ref listing with a credential
+      # Kept authenticated after the move to ubuntu-latest. Both repositories
+      # are public, but an *anonymous* clone from arc-runner-set failed: GitHub
+      # answered the ref listing with a credential
       # challenge, git has no terminal to prompt on, and the step dies with
       # "could not read Username for 'https://github.com': No such device or
       # address" (exit 128) about 12s in, before anything is installed. The
@@ -291,7 +292,7 @@ jobs:
     strategy:
       matrix:
         php: [ '8.2' ]
-    runs-on: [arc-runner-set]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout current module
         uses: actions/checkout@v5
@@ -361,7 +362,7 @@ jobs:
         php: [  '8.2' ]
         mysql: [ '5.7' ]
     needs: [ install_shop_with_module ]
-    runs-on: [arc-runner-set]
+    runs-on: ubuntu-latest
     steps:
       - name: Load current installation from cache
         uses: actions/cache/restore@v4
@@ -421,7 +422,7 @@ jobs:
         php:  [ '8.2',  '8.4' ]
         mysql: [ '8.1' ]
     needs: [ install_shop_with_module ]
-    runs-on: [arc-runner-set]
+    runs-on: ubuntu-latest
     steps:
       - name: Load current installation from cache
         uses: actions/cache/restore@v4
@@ -507,7 +508,7 @@ jobs:
     # exists only to name the case.
     needs: [ styles, isolated_unit_tests, integration_tests ]
     if: always()
-    runs-on: [arc-runner-set]
+    runs-on: ubuntu-latest
     steps:
       - name: Report which kind of red this run is
         run: |

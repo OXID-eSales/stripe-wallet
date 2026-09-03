@@ -112,7 +112,7 @@ env:
 jobs:
   load:
     name: "Locust — ${{ inputs.scenarios }} · ${{ inputs.users }} VU · ${{ inputs.duration }} · ${{ inputs.url == '' && inputs.shop_branch || 'external' }}"
-    runs-on: [arc-runner-set]
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
       LOAD_FAIL_P95_MS: ${{ inputs.fail_p95_ms }}

@@ -43,7 +43,7 @@ env:
 jobs:
   deploy:
     name: Deploy & activate module
-    runs-on: [arc-runner-set]
+    runs-on: ubuntu-latest
     steps:
       - name: Require chosen branch and update dependencies
         uses: appleboy/ssh-action@v1
@@ -74,7 +74,7 @@ jobs:
   playwright:
     name: Run Playwright tests
     needs: deploy
-    runs-on: [arc-runner-set]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
