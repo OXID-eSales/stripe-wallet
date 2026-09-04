@@ -40,10 +40,10 @@ regexes = [
   '''whsec_(replace_with|your_)[A-Za-z0-9_]*''',
   # Fixture keys in unit tests: spelled-out words and repeated digits, never
   # the shape of a real key.
-  '''(sk|pk|rk)_(test|live)_51?(ABC|XYZ|abc|xyz)[A-Za-z0-9]{0,20}''',
+  '''(?i)(sk|pk|rk)_(test|live)_(51)?(abc|xyz)[a-z0-9]{0,20}''',
   '''(sk|pk|rk)_(test|live)_(4242)+''',
-  '''(sk|pk|rk)_(test|live)_(dummy|example|placeholder|fake|test|key|secret|alias)[A-Za-z0-9_]*''',
-  '''whsec_(test|dummy|example|fake|placeholder|abc|xyz)[A-Za-z0-9_]*''',
+  '''(?i)(sk|pk|rk)_(test|live)_(dummy|example|placeholder|fake|test|key|secret|alias)[a-z0-9_]*''',
+  '''(?i)whsec_(test|dummy|example|fake|placeholder|abc|xyz|live)[a-z0-9_]*''',
   # Stripe client secrets in fixtures, e.g. pi_test_123_secret_xyz.
   '''(pi|seti|cs)_(test|live)_[A-Za-z0-9]{0,12}_secret_[A-Za-z0-9_]*''',
 ]
@@ -54,6 +54,12 @@ regexes = [
 # signing secret is not covered at all - and of the two values that were
 # published here, it is the one that matters most: it lets anyone forge a
 # signed webhook, and this module advances order state on webhooks.
+
+# Note on capture groups in the rules below: gitleaks reports capture group 1
+# as the finding's *secret*, and an allowlist regex is matched against that
+# secret by default. A capturing (test|live) would therefore reduce the secret
+# to the word "test" and no fixture allowlist above could ever match it. Keep
+# these groups non-capturing.
 
 [[rules]]
 id = "stripe-webhook-signing-secret"
@@ -66,5 +72,5 @@ id = "stripe-publishable-key"
 description = "Stripe publishable key (pk_live_/pk_test_)"
 # Public by design, so not an emergency - but it names the account and has no
 # business being committed. Shaped match only: pk_ + mode + 51 + ~100 chars.
-regex = '''pk_(test|live)_51[A-Za-z0-9]{80,}'''
+regex = '''pk_(?:test|live)_51[A-Za-z0-9]{80,}'''
 keywords = ["pk_test_51", "pk_live_51"]

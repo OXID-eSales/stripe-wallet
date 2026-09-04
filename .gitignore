@@ -24,3 +24,6 @@ docs/dev_logs/
 # rules do not apply to files git already tracks. It carries placeholders and
 # a warning header instead.
 tests/.env
+
+# Secret-scan reports produced by .github/workflows/gitleaks.yml
+gitleaks-*.sarif
