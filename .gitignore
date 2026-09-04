@@ -27,3 +27,7 @@ tests/.env
 
 # Secret-scan reports produced by .github/workflows/gitleaks.yml
 gitleaks-*.sarif
+
+# Local git worktrees created by Claude Code. A worktree committed as a
+# gitlink with no .gitmodules entry makes actions/checkout die with exit 128.
+.claude/worktrees/
