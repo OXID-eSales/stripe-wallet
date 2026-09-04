@@ -13,3 +13,14 @@ node_modules
 /load_reports/
 /stripe-dev-logs/
 docs/dev_logs/
+
+# tests/.env is a developer's working copy of tests/.env.dist and holds
+# whatever keys they run against. It was tracked until 2026-09-04 and carried
+# a real Stripe publishable key.
+#
+# The recipe's module configuration is deliberately NOT listed here: it has to
+# stay tracked, because setup-twig-dev.sh copies that exact path into the
+# provisioned shop. A gitignore entry would not protect it anyway - ignore
+# rules do not apply to files git already tracks. It carries placeholders and
+# a warning header instead.
+tests/.env

@@ -1,3 +1,14 @@
+# PLACEHOLDER CREDENTIALS - DO NOT COMMIT REAL KEYS INTO THIS FILE.
+#
+# setup-twig-dev.sh copies this into the provisioned shop, so it has to stay
+# tracked and cannot be gitignored. That makes it easy to paste a working key
+# in "just to get the shop running" and commit it by accident - which is what
+# happened: a real sk_test secret key and webhook signing secret were pushed
+# here and had to be rotated (2026-09-04).
+#
+# Put real keys in the running shop instead: admin > Extensions > Modules >
+# Stripe, or bin/oe-console module settings. They belong in the shop's own
+# configuration, never in the repository.
 id: oe_payments_stripe_wallet
 moduleSource: extensions/stripe
 version: 3.0.0
@@ -38,12 +49,12 @@ moduleSettings:
   sStripeTestToken:
     group: STRIPE_GENERAL
     type: str
-    value: sk_test_51OyDwdAeMx6SN5PNeL8XyKC5jMmYe7POR6qc7FnNDOwfopbIqzY8B6qfPQIxogZfXAYht7yn7yCqy8xNxh5Zu4Sl00hf7YFxBk
+    value: sk_test_replace_with_your_own_test_secret_key
     position: 20
   sStripeTestPk:
     group: STRIPE_GENERAL
     type: str
-    value: pk_test_51OyDwdAeMx6SN5PNLOOPTaCgbPOL9oWBdVCFpqd7SEHXaOdaO4bCsy12HzLDukOoY1kEWaonMastv1YiTGXQGyMH00u0hJnjjf
+    value: pk_test_replace_with_your_own_test_publishable_key
     position: 21
   sStripeLiveToken:
     group: STRIPE_GENERAL
@@ -117,5 +128,5 @@ moduleSettings:
   sStripeWebhookEndpointSecret:
     group: STRIPE_WEBHOOKS
     type: str
-    value: whsec_A5lTk0JAO08iUCSf0jQZud6VksACGhC7
+    value: whsec_replace_with_your_own_webhook_signing_secret
     position: 140
