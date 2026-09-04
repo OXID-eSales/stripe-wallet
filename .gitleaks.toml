@@ -1,0 +1,70 @@
+# gitleaks configuration
+#
+# Added 2026-09-04 after an audit found a real Stripe test secret key and
+# webhook signing secret committed to this repository. The point of this file
+# is that the next one fails CI instead of being found months later.
+#
+# The allowlist below is deliberately made of narrow, fixture-shaped patterns
+# rather than blanket path exclusions: a real key pasted into a unit test must
+# still trip the scan. A real Stripe key is `(sk|pk)_(test|live)_51` followed
+# by ~100 mixed characters; none of the patterns here can match one.
+
+title = "OXID Stripe module"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Vendored code, generated artefacts, and obvious test fixtures"
+
+paths = [
+  # Third-party and generated. Not ours to police, and huge.
+  '''(^|/)vendor/''',
+  '''(^|/)node_modules/''',
+  '''\.min\.(js|css)$''',
+  '''(^|/)package-lock\.json$''',
+  # Local scratch: worktrees and Playwright/report output are not part of a
+  # checkout, but a developer running gitleaks locally would drown in them.
+  '''(^|/)\.claude/''',
+  '''(^|/)(playwright-report|test-results|reports)/''',
+  '''gitleaks-report\.json$''',
+  # Gitignored, local-only development notes. Prose about API keys, not keys:
+  # checked 2026-09-04, nothing of a real key's shape in there. Excluded so a
+  # developer running gitleaks by hand gets the same clean signal CI does.
+  '''(^|/)docs/dev_logs/''',
+]
+
+regexes = [
+  # Placeholders this repo ships on purpose.
+  '''(sk|pk|rk)_(test|live)_(replace_with|your_)[A-Za-z0-9_]*''',
+  '''whsec_(replace_with|your_)[A-Za-z0-9_]*''',
+  # Fixture keys in unit tests: spelled-out words and repeated digits, never
+  # the shape of a real key.
+  '''(sk|pk|rk)_(test|live)_51?(ABC|XYZ|abc|xyz)[A-Za-z0-9]{0,20}''',
+  '''(sk|pk|rk)_(test|live)_(4242)+''',
+  '''(sk|pk|rk)_(test|live)_(dummy|example|placeholder|fake|test|key|secret|alias)[A-Za-z0-9_]*''',
+  '''whsec_(test|dummy|example|fake|placeholder|abc|xyz)[A-Za-z0-9_]*''',
+  # Stripe client secrets in fixtures, e.g. pi_test_123_secret_xyz.
+  '''(pi|seti|cs)_(test|live)_[A-Za-z0-9]{0,12}_secret_[A-Za-z0-9_]*''',
+]
+
+# Two things the default rules miss, and this repository leaked both.
+#
+# gitleaks' stripe-access-token rule covers sk_/rk_ keys only. The webhook
+# signing secret is not covered at all - and of the two values that were
+# published here, it is the one that matters most: it lets anyone forge a
+# signed webhook, and this module advances order state on webhooks.
+
+[[rules]]
+id = "stripe-webhook-signing-secret"
+description = "Stripe webhook signing secret (whsec_)"
+regex = '''whsec_[A-Za-z0-9]{24,}'''
+keywords = ["whsec_"]
+
+[[rules]]
+id = "stripe-publishable-key"
+description = "Stripe publishable key (pk_live_/pk_test_)"
+# Public by design, so not an emergency - but it names the account and has no
+# business being committed. Shaped match only: pk_ + mode + 51 + ~100 chars.
+regex = '''pk_(test|live)_51[A-Za-z0-9]{80,}'''
+keywords = ["pk_test_51", "pk_live_51"]

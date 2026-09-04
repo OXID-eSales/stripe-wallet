@@ -1,0 +1,59 @@
+name: Secret scan
+
+# Added 2026-09-04 after a real Stripe test secret key and webhook signing
+# secret were found committed to this repository, on the default branch and 16
+# others. This job exists so the next one fails a check instead of being found
+# by an audit months later.
+#
+# Deliberately NOT gitleaks/gitleaks-action: that action requires a
+# GITLEAKS_LICENSE for repositories owned by an organisation, and this one is.
+# The scanner itself is free, so it runs from its own container image.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current module
+        uses: actions/checkout@v5
+        with:
+          # Full history so the pull-request step below can scan the range of
+          # commits the PR actually adds.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Scan the working tree
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+            dir /repo --config /repo/.gitleaks.toml --redact --no-banner \
+            --report-format sarif --report-path /repo/gitleaks-worktree.sarif
+
+      # A secret added and then deleted inside the same pull request never
+      # appears in the working tree, but it is still published the moment the
+      # branch is pushed. So scan the commits themselves.
+      #
+      # Only the PR's own range. A full-history scan would fail on every run
+      # until the pre-rotation leak is rewritten out of the 16 branches that
+      # carry it, and a check that is always red teaches people to ignore it.
+      # Once that history is cleaned, drop --log-opts and scan everything.
+      - name: Scan the commits this pull request adds
+        if: github.event_name == 'pull_request'
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+            git /repo --config /repo/.gitleaks.toml --redact --no-banner \
+            --log-opts="--no-merges ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+
+      - name: Upload the findings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-sarif
+          path: gitleaks-*.sarif
+          if-no-files-found: ignore
