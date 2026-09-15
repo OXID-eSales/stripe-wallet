@@ -46,6 +46,15 @@ All tests run inside Docker from the project root (parent of extensions/stripe).
 docker compose exec php php vendor/bin/phpunit -c extensions/stripe/tests/phpunit.xml --testsuite Unit
 ```
 
+**Unit Tests, standalone (no shop, no database — what CI runs):**
+```bash
+composer install                       # inside the module
+vendor/bin/phpunit -c tests/phpunit-unit.xml
+```
+`tests/bootstrap-unit.php` supplies what only an activated module in a booted shop would
+otherwise provide: the `*_parent` classes, the shop's global functions and an in-memory `Config`.
+Add a stub there when a new extension class or shop seam enters the unit suite.
+
 **Integration Tests:**
 ```bash
 docker compose exec php php vendor/bin/phpunit -c extensions/stripe/tests/phpunit.xml --testsuite Integration

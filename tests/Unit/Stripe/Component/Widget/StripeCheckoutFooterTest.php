@@ -82,13 +82,21 @@ final class StripeCheckoutFooterTest extends TestCase
         self::assertSame('csrf_abc', $data['csrfToken']);
     }
 
-    public function testGetCheckoutDataDefaultsCurrencyToEurWhenMissing(): void
+    /**
+     * The name of this test used to promise a default of 'EUR'. It only ever
+     * passed because the suite ran against a booted shop whose currency
+     * happened to be EUR — resolveCurrency() deliberately invents nothing:
+     * "Never a hardcoded 'EUR', which mislabels the checkout footer on any
+     * non-EUR shop." With neither a view parameter nor a shop currency, the
+     * field stays empty and the frontend decides what to do with that.
+     */
+    public function testGetCheckoutDataLeavesCurrencyEmptyWhenNothingProvidesOne(): void
     {
         $footer = $this->buildFooter(['currency' => null], 'pk_test');
 
         $data = $footer->exposedGetCheckoutData();
 
-        self::assertSame('EUR', $data['currency']);
+        self::assertSame('', $data['currency']);
     }
 
     public function testGetCheckoutDataCastsTotalPriceToFloat(): void

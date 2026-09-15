@@ -59,8 +59,13 @@ final class ShopCurrency
     /**
      * Same resolution, but for display-only callers that must not break the
      * page when the currency is unknown. Never invents a code.
+     *
+     * `false` is part of the contract, not defensive padding:
+     * Config::getActShopCurrencyObject() ends in `reset($currencies)`, and
+     * reset() on an empty array returns false. A shop with no currency row
+     * would otherwise take a TypeError through this display-only path.
      */
-    public static function nameOrEmpty(?object $currency): string
+    public static function nameOrEmpty(object|false|null $currency): string
     {
         /** @var mixed $name */
         $name = $currency->name ?? null;

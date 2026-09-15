@@ -2,6 +2,7 @@
   "name": "oxid-stripe-wallet",
   "version": "1.0.0",
   "description": "Stripe Payment Module with Stimulus.js for OXID eShop",
+  "private": true,
   "main": "assets/js/stripe-frontend.min.js",
   "scripts": {
     "build": "npm run build:prod",
@@ -17,8 +18,8 @@
     "payment",
     "stimulus"
   ],
-  "author": "OXID Solution Catalysts",
-  "license": "MIT",
+  "author": "OXID eSales AG",
+  "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
     "@hotwired/stimulus": "^3.2.2"
   },

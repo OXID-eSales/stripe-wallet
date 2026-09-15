@@ -43,8 +43,8 @@ $aModule = [
         'de' => 'Stripe-Zahlungsintegration mit Smart Contracts für OXID eShop 7',
         'en' => 'Stripe payment integration with Smart Contracts for OXID eShop 7',
     ],
-    'thumbnail' => 'img/stripe_logo.png',
-    'version' => '3.1.0',
+    'thumbnail' => 'img/logo.png',
+    'version' => '3.3.0',
     'author' => 'OXID eSales AG',
     'url' => 'https://www.oxid-esales.com',
     'email' => 'info@oxid-esales.com',
@@ -57,25 +57,13 @@ $aModule = [
         OrderController::class => StripeOrderController::class,
     ],
     'controllers' => [
-        // Note: PaymentController and OrderController are class extensions, not standalone controllers.
-        // They should NOT be registered here to avoid namespace duplication errors.
         'StripeWebhookController' => StripeWebhookController::class,
         'StripeConnect' => StripeConnect::class,
         'stripecheckoutfooter' => StripeCheckoutFooter::class,
-        // Sprint I (2026-04-23): `OrderRefund` removed. The admin Payment
-        // tab is now owned by `oe_payment_base`; Stripe contributes
-        // a `StripePaymentPanelProvider` tagged service.
     ],
     'events' => [
         'onActivate' => StripeEvents::class . '::onActivate',
         'onDeactivate' => StripeEvents::class . '::onDeactivate',
-    ],
-    'templates' => [
-        '@oe_payments_stripe_wallet/admin/stripe_connect' => 'views/twig/admin/stripe_connect.html.twig',
-        // Sprint I — Stripe panel body rendered inside payment-base's shared "Payment" admin tab.
-        // Both aliases registered so `{% include %}` works with or without the `.html.twig` suffix.
-        '@oe_payments_stripe_wallet/admin/panel/stripe_panel' => 'views/twig/admin/panel/stripe_panel.html.twig',
-        '@oe_payments_stripe_wallet/admin/panel/stripe_panel.html.twig' => 'views/twig/admin/panel/stripe_panel.html.twig',
     ],
     'settings'      => [
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeMode',                        'type' => 'select',     'value' => 'test',      'position' => 10, 'constraints' => 'live|test'],

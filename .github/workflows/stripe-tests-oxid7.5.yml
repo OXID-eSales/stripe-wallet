@@ -18,7 +18,10 @@ env:
   # composer cannot resolve the module at shop level. It was pinned to v1.0.0
   # while composer.json moved to ^1.1 with payment-base v1.1.0 (2026-08-11),
   # which is what broke every b-7.4.x run since.
-  PAYMENT_BASE_ALIAS: 'v1.1.0'
+  # No version alias here on purpose: payment-base declares
+  # extra.branch-alias (dev-b-7.4.x => 1.2.x-dev), so the branch under test
+  # satisfies this module's `>=v1.2` constraint on its own. An explicit
+  # `as <version>` would override that alias and go stale on every release.
   # Branch of OXID-eSales/one-page-checkout. Its source is scanned by PHPStan
   # (scanDirectories in tests/PhpStan/phpstan.neon) so the OPC integration
   # handlers resolve OPC event classes — it is not a composer dependency.
@@ -147,7 +150,7 @@ jobs:
 
       - name: Install payment-base at shop level
         run: |
-          docker compose exec -T php composer require "oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH} as ${PAYMENT_BASE_ALIAS}" --no-interaction --no-update
+          docker compose exec -T php composer require "oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH}" --no-interaction --no-update
 
       - name: Install module
         run: |
@@ -333,7 +336,7 @@ jobs:
 
       - name: Pin payment-base
         working-directory: source/test-module
-        run: composer require "oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH} as ${PAYMENT_BASE_ALIAS}" --no-update --no-interaction
+        run: composer require "oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH}" --no-update --no-interaction
 
       - name: Install module dependencies
         id: dependencies
@@ -402,21 +405,20 @@ jobs:
 
       - name: Pin payment-base
         run: |
-          docker compose exec -T php bash -c "cd /var/www/test-module && composer require 'oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH} as ${PAYMENT_BASE_ALIAS}' --no-update --no-interaction"
+          docker compose exec -T php bash -c "cd /var/www/test-module && composer require 'oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH}' --no-update --no-interaction"
 
       - name: Install module dependencies
         run: |
           docker compose exec -T php bash -c "cd /var/www/test-module && composer update --no-interaction"
 
       - name: Run isolated unit tests
-        # Use the SHOP's PHPUnit binary (/var/www/vendor), not the module's own
-        # (test-module/vendor). The test bootstrap loads the shop, which registers
-        # the shop's PHPUnit autoloader; running the module's separately-pinned
-        # PHPUnit alongside it puts two PHPUnit versions on the classpath and
-        # fatals ("Subscriber … does not implement any known interface"). The shop
-        # ships PHPUnit 12 on b-7.5.x, so we align by always using its binary.
+        # Genuinely isolated: the module's own PHPUnit against
+        # tests/phpunit-unit.xml, which boots nothing but composer's autoloader
+        # (see tests/bootstrap-unit.php). No shop, no database — so the PHPUnit
+        # version mismatch between module and shop (12 on b-7.5.x) cannot bite
+        # here any more, which is why this job used to borrow the shop's binary.
         run: |
-          docker compose exec -T php bash -c "cd /var/www/test-module && /var/www/vendor/bin/phpunit -c tests/phpunit.xml --testsuite Unit --bootstrap=/var/www/source/bootstrap.php"
+          docker compose exec -T php bash -c "cd /var/www/test-module && vendor/bin/phpunit -c tests/phpunit-unit.xml"
 
   integration_tests:
     strategy:
@@ -465,7 +467,7 @@ jobs:
 
       - name: Install payment-base at shop level
         run: |
-          docker compose exec -T php composer require "oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH} as ${PAYMENT_BASE_ALIAS}" --no-interaction --no-update
+          docker compose exec -T php composer require "oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH}" --no-interaction --no-update
 
       - name: Install testing dependencies
         run: |
