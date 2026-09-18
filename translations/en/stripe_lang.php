@@ -97,6 +97,7 @@ $aLang = [
     'OSC_STRIPE_CONTINUE_TO_NEXT_STEP'          => 'Continue',
 
     // JavaScript Controller Translations
+    'STRIPE_AGB_CONTINUE_TO_PAYMENT'            => 'Please accept the Terms and Conditions above to continue to the payment form.',
     'STRIPE_JS_AGB_REQUIRED'                    => 'Please accept the terms and conditions',
     'STRIPE_JS_CONFIG_ERROR'                    => 'Stripe configuration error. Please contact support.',
     'STRIPE_JS_INIT_FAILED'                     => 'Failed to initialize payment form. Please refresh the page.',

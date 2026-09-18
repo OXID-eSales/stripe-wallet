@@ -29,13 +29,14 @@ import { registerEmbeddedCheckout, forgetEmbeddedCheckout } from '../embedded_ch
  * When true (level=debug in admin), console output is enabled at runtime.
  */
 export default class extends Controller {
-  static targets = ["status", "embedded", "button"]
+  static targets = ["status", "embedded", "button", "consentHint"]
   static values = {
     url: String,
     paymentType: String,
     publishableKey: String,
     renderMode: { type: String, default: "redirect" },
     eager: { type: Boolean, default: false },
+    mountOnConsent: { type: Boolean, default: false },
     stripeDebug: { type: Boolean, default: false }
   }
 
@@ -61,8 +62,66 @@ export default class extends Controller {
     // directly with no button→iframe flash. If the eager mount cannot proceed
     // (AGB not accepted, validation error), revealButton() surfaces the button
     // as a fallback trigger.
-    if (this.eagerValue && this.renderModeValue === 'iframe' && this.paymentTypeValue === 'wallet') {
+    if (this.renderModeValue !== 'iframe' || this.paymentTypeValue !== 'wallet') {
+      return
+    }
+    if (this.eagerValue) {
       this.autoMountEmbedded()
+      return
+    }
+    if (this.mountOnConsentValue) {
+      this.armConsentMount()
+    }
+  }
+
+  /**
+   * IFRAME-05 (Sprint 137): blConfirmAGB is on and this session holds no consent
+   * yet, so the sheet is mounted the moment Terms are ticked — never on a button.
+   *
+   * The signal is the hidden Place-Order button's `disabled` attribute, not the
+   * checkbox itself: agb-validation is the authority on that attribute and every
+   * requirement (consent today, anything added later) ends up there. The server
+   * renders the button `disabled`, so the sync at arm-time cannot mount before
+   * agb-validation has connected.
+   */
+  armConsentMount() {
+    if (!this.hasButtonTarget || typeof MutationObserver === 'undefined') {
+      return
+    }
+    this._consentObserver = new MutationObserver(() => this.mountWhenPayable())
+    this._consentObserver.observe(this.buttonTarget, { attributes: true, attributeFilter: ['disabled'] })
+    this.mountWhenPayable()
+  }
+
+  /**
+   * Mount once, the first time the checkout becomes payable. The request
+   * carries ord_agb=1 (appendAgbState reads the ticked checkbox), so the server
+   * records the consent exactly as it did for a button click. A failed mount
+   * reveals the button as the fallback, like the eager path.
+   */
+  async mountWhenPayable() {
+    if (this._embeddedCheckout || this._mounting || this.buttonTarget.disabled) {
+      return
+    }
+    this._mounting = true
+    this._consentObserver?.disconnect()
+    this.hideConsentHint()
+    try {
+      await this.handleStripeCheckout()
+    } catch (error) {
+      console.error('[order-submit] mount on consent failed', error)
+      this.presentError(error)
+    } finally {
+      this._mounting = false
+    }
+    if (!this._embeddedCheckout) {
+      this.revealButton()
+    }
+  }
+
+  hideConsentHint() {
+    if (this.hasConsentHintTarget) {
+      this.consentHintTarget.hidden = true
     }
   }
 
@@ -112,6 +171,7 @@ export default class extends Controller {
     this._debug('Order Submit controller disconnected')
 
     window.removeEventListener('pageshow', this._onPageShow)
+    this._consentObserver?.disconnect()
   }
 
   /**

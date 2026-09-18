@@ -97,6 +97,7 @@ $aLang = [
     'OSC_STRIPE_CONTINUE_TO_NEXT_STEP'          => 'Weiter',
 
     // JavaScript Controller Translations
+    'STRIPE_AGB_CONTINUE_TO_PAYMENT'            => 'Bitte akzeptieren Sie oben die AGB, um zum Zahlungsformular zu gelangen.',
     'STRIPE_JS_AGB_REQUIRED'                    => 'Bitte akzeptieren Sie die AGB',
     'STRIPE_JS_CONFIG_ERROR'                    => 'Stripe Konfigurationsfehler. Bitte kontaktieren Sie den Support.',
     'STRIPE_JS_INIT_FAILED'                     => 'Zahlungsformular konnte nicht initialisiert werden. Bitte laden Sie die Seite neu.',

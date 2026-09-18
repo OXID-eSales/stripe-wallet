@@ -109,12 +109,20 @@
         {% if not oView.isLowOrderPrice() or (displayBasketOrderButton == 'show' or displayBasketOrderButton == 'disabled') %}
             {% set createCheckoutSessionUrl = oViewConf.getSslSelfLink() ~ "cl=order&fnc=createCheckoutSession" %}
             {% set stripeIframe = oViewConf.isStripeIframeCheckout() %}
-            {# IFRAME-02f: eager (button-less) embedded mount only when the iframe flag is on
-               AND AGB does not gate the request. When AGB confirmation is required and not yet
-               given, keep the button as the consent gate + trigger — eager-mounting there would
-               400 on load (StripeOrderController::ensureAgbAccepted). #}
+            {# IFRAME-05 (Sprint 137): in iframe mode the Place-Order button is never the
+               shopper's control — the Stripe sheet carries its own Pay control. Two ways to
+               get the sheet on the page:
+                 - eager:            consent is not gated (blConfirmAGB off, or already given in
+                                     this session) → mount on load.
+                 - mount-on-consent: blConfirmAGB on and no consent yet (every fresh session) →
+                                     mount the moment Terms are ticked. The tick carries
+                                     ord_agb=1, so StripeOrderController::ensureAgbAccepted
+                                     records the consent exactly as a button click did.
+               Before this sprint the second case painted the button as a "consent gate", so a
+               shopper in a new browser session saw a button where a returning one saw the sheet. #}
             {% set agbGating = oView.isConfirmAGBActive() and not oView.isPriorAgbConsent() %}
             {% set eagerIframe = stripeIframe and not agbGating %}
+            {% set mountOnConsent = stripeIframe and agbGating %}
             {# CSRF token for AJAX requests (Sprint 64f: H8 frontend CSRF protection) #}
             <input type="hidden" name="stoken" value="{{ oViewConf.getSessionChallengeToken() }}" />
             {# Sprint 101: AGB validation Stimulus controller — resolves #checkAgbTop from apex
@@ -129,23 +137,35 @@
                  data-order-submit-publishable-key-value="{{ oViewConf.getStripePublishableKey() | raw }}"
                  data-order-submit-render-mode-value="{{ stripeIframe ? 'iframe' : 'redirect' }}"
                  data-order-submit-eager-value="{{ eagerIframe ? 'true' : 'false' }}"
+                 data-order-submit-mount-on-consent-value="{{ mountOnConsent ? 'true' : 'false' }}"
                  data-order-submit-stripe-debug-value="{{ oViewConf.isStripeDebug() ? 'true' : 'false' }}">
-                {# Place-Order button. In eager iframe mode it renders hidden and is revealed by
-                   order-submit only if the eager mount cannot proceed (AGB / validation / error).
-                   In redirect mode and AGB-gated iframe mode it is the visible trigger. #}
+                {# Place-Order button. In redirect mode it is the visible trigger. In iframe mode it
+                   renders hidden in every session state and stays in the DOM on purpose:
+                   agb-validation keeps toggling its `disabled` attribute, and that attribute is the
+                   payability signal order-submit observes to mount the sheet (same signal the OPC
+                   footer reads). order-submit reveals it only as a fallback when a mount fails.
+                   In mount-on-consent mode it also starts `disabled`, so the JS never mistakes the
+                   moment before agb-validation connects for a given consent. #}
                 <button id="stripe-checkout-btn"
                         type="button"
                         class="btn btn-highlight btn-lg w-100"
                         data-action="click->order-submit#handleSubmit"
                         data-order-submit-target="button"
                         data-agb-validation-target="submitButton"
-                        {% if eagerIframe %}hidden{% endif %}
-                        {% if oView.isLowOrderPrice() and displayBasketOrderButton == 'disabled' %}
+                        {% if stripeIframe %}hidden{% endif %}
+                        {% if mountOnConsent or (oView.isLowOrderPrice() and displayBasketOrderButton == 'disabled') %}
                             disabled="disabled"
                         {% endif %}
                 >
                     {{ translate({ ident: "SUBMIT_ORDER" }) }}
                 </button>
+                {% if mountOnConsent %}
+                    {# IFRAME-05: what stands where the button used to, until Terms are ticked. #}
+                    <div class="alert alert-info mb-0" role="status" aria-live="polite"
+                         data-order-submit-target="consentHint">
+                        {{ translate({ ident: "STRIPE_AGB_CONTINUE_TO_PAYMENT" }) }}
+                    </div>
+                {% endif %}
                 <div data-order-submit-target="status" class="mt-2 text-center"></div>
                 {# IFRAME-02e/f: inline Stripe Embedded Checkout mount (used when render-mode=iframe) #}
                 <div id="stripe-embedded-checkout" data-order-submit-target="embedded" class="stripe-embedded-checkout mt-3" style="display: none; min-height: 300px;"></div>
