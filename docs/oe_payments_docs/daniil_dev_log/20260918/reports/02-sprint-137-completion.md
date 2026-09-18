@@ -54,6 +54,26 @@ now clears the status right after `mount()`; the redundant re-set before the mou
 `stripe-order-page-fresh-session-iframe.spec.ts` (RED with the exact text, GREEN after the rebuild)
 on both the tick path and the eager reload path.
 
+## Follow-up 2 (same day, Daniil): single payment method + single delivery set
+
+Both payment-base skip flags act only when the customer is offered exactly one payment method and
+one delivery set (confirmed: the payment step redirects straight to `cl=order` for the test user).
+On that page Stripe's private copy of `shippingAndPayment` dropped **both** cards entirely — so the
+page the customer confirms never named the carrier. payment-base's own template (non-Stripe orders)
+keeps the shipping heading + carrier name and drops only the form/pencil (Sprint 07, revised
+2026-08-31), and drops the payment card whole (Sprint 06).
+
+Stripe's copy now agrees, and mirrors core's structure (edit form inside the heading, body
+separate): `<h4 data-stripe-order-card="shipping">` always renders with the carrier name; the
+`#orderShipping` form + pencil only when several sets exist. `<h4 data-stripe-order-card="payment">`
++ `#orderPayment` + the Stripe method include render only when several methods exist.
+
+TDD: `SingleShippingOrderTemplateTest` gained the shown-not-changeable contract (3 tests RED → GREEN,
+probe ship set with a real title); Integration checkout tests 10/10. Live: new adaptive spec
+`stripe-order-page-single-method-cards.spec.ts` GREEN (shipping heading visible, 0 pencils, carrier
+named, 0 `#orderShipping`, 0 `#orderPayment`); `stripe-order-page-fresh-session-iframe` still GREEN.
+Not touched: Mollie's own order-template copy, if it has the same divergence.
+
 ## Deploy notes
 - JS: `npm run build:prod && npm run build:dev` in `extensions/stripe`; the shop serves
   `out/modules/oe_payments_stripe_wallet` → `extensions/stripe/assets` via symlink — no install-assets needed.

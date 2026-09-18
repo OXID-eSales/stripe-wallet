@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   browser session (no persisted Terms consent yet). The button is now never the shopper's control in
   iframe mode: the sheet mounts on load when consent is not gated, and the moment the Terms checkbox
   is ticked otherwise (Sprint 137, IFRAME-05).
+- With the payment-base "skip" flags on and exactly one payment method and one delivery set, the
+  Stripe order page dropped the shipping card entirely and so never named the carrier. It now shows
+  the shipping heading and carrier name without the edit pencil, and leaves the payment card out,
+  exactly as payment-base's own order template does for non-Stripe orders.
 - A Content-Security-Policy `<meta>` rendered inside `<body>` was ignored by browsers and logged an
   error on every Stripe-active page. Removed; CSP belongs in the shop's HTTP headers.
 

@@ -19,4 +19,6 @@
   suite aborts at collection on the Mollie `PaymentController_parent` chain crash with all PSPs
   active. Details in [reports/02](reports/02-sprint-137-completion.md).
 - ✅ **Review follow-up:** "Creating checkout session…" is cleared once the sheet renders (spec-pinned).
+- ✅ **Review follow-up 2:** single method + single set → shipping card shown read-only (heading +
+  carrier, no pencil), payment card not shown — parity with payment-base's template (spec-pinned).
 - Sprint file: [done/sprint-137](done/sprint-137-iframe-fresh-session-mounts-the-sheet.md).

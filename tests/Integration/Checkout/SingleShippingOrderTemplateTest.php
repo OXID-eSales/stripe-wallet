@@ -41,6 +41,11 @@ class StripeOrderProbeView
         return new StripeOrderProbePayment();
     }
 
+    public function getShipSet(): StripeOrderProbeShipSet
+    {
+        return new StripeOrderProbeShipSet();
+    }
+
     /** @param array<int, mixed> $args */
     public function __call(string $name, array $args): mixed
     {
@@ -68,6 +73,24 @@ class StripeOrderProbePayment
     public function __call(string $name, array $args): mixed
     {
         return null;
+    }
+}
+
+class StripeOrderProbeShipSet
+{
+    public const TITLE = 'Probe Carrier Express';
+
+    /** @var object{value: string} */
+    public object $oxdeliveryset__oxtitle;
+
+    public function __construct()
+    {
+        $this->oxdeliveryset__oxtitle = (object) ['value' => self::TITLE];
+    }
+
+    public function getId(): string
+    {
+        return 'probe-shipset';
     }
 }
 
@@ -117,12 +140,43 @@ final class SingleShippingOrderTemplateTest extends TestCase
         self::assertStringContainsString(self::SHIPPING_BLOCK_MARKER, $output);
     }
 
+    /**
+     * Sprint 07 (revised 2026-08-31) / Sprint 137 follow-up: with one delivery
+     * set there is nothing to decide but still something to know. The heading
+     * and the carrier's name stay; the form that posts back to cl=payment and
+     * its pencil go. Shown, not changeable — exactly what payment-base's own
+     * order template does for non-Stripe orders.
+     */
     public function testCarrierBlockIsLeftOutForASingleDeliverySet(): void
     {
         $output = $this->renderOrderPage(shippingAutoAssigned: true);
 
         self::assertStringNotContainsString(self::SHIPPING_BLOCK_MARKER, $output);
         self::assertStringContainsString(self::PAYMENT_BLOCK_MARKER, $output);
+
+        $heading = $this->extractCardHeading($output, 'shipping');
+        self::assertStringNotContainsString('pencil', $heading, 'no edit control for a single delivery set');
+        self::assertStringContainsString(StripeOrderProbeShipSet::TITLE, $output, 'the carrier is still named');
+    }
+
+    public function testCarrierHeadingKeepsThePencilWhenTheCustomerHadAChoice(): void
+    {
+        $output = $this->renderOrderPage(shippingAutoAssigned: false);
+
+        $heading = $this->extractCardHeading($output, 'shipping');
+        self::assertStringContainsString('pencil', $heading);
+        self::assertStringContainsString(self::SHIPPING_BLOCK_MARKER, $heading, 'the form lives inside the heading, as in core');
+        self::assertStringContainsString(StripeOrderProbeShipSet::TITLE, $output);
+    }
+
+    /** With one payment method the whole card goes, heading included (payment-base sprint 06). */
+    public function testPaymentCardDisappearsEntirelyForASinglePaymentMethod(): void
+    {
+        $output = $this->renderOrderPage(shippingAutoAssigned: false, paymentAutoAssigned: true);
+
+        self::assertStringNotContainsString(self::PAYMENT_BLOCK_MARKER, $output);
+        self::assertStringNotContainsString('data-stripe-order-card="payment"', $output);
+        self::assertStringContainsString('data-stripe-order-card="shipping"', $output);
     }
 
     /**
@@ -144,6 +198,16 @@ final class SingleShippingOrderTemplateTest extends TestCase
         self::assertStringNotContainsString(self::SHIPPING_BLOCK_MARKER, $output);
         self::assertStringNotContainsString(self::PAYMENT_BLOCK_MARKER, $output);
         self::assertStringContainsString('stripe-checkout-btn', $output);
+    }
+
+    /** The <h4 … data-stripe-order-card="…"> element for one card, tag to closing tag. */
+    private function extractCardHeading(string $output, string $card): string
+    {
+        $pattern = '/<h4[^>]*data-stripe-order-card="' . $card . '"(?:[^>"]|"[^"]*")*>.*?<\/h4>/s';
+        $matched = preg_match($pattern, $output, $m);
+        self::assertSame(1, $matched, "the {$card} card heading must render");
+
+        return $m[0];
     }
 
     private function renderOrderPage(bool $shippingAutoAssigned, bool $paymentAutoAssigned = false): string
