@@ -18,4 +18,5 @@
 - ⚠️ **Pre-existing, not ours:** PHPMD `TooManyMethods` on `StripeOrderController` (27>25); Unit
   suite aborts at collection on the Mollie `PaymentController_parent` chain crash with all PSPs
   active. Details in [reports/02](reports/02-sprint-137-completion.md).
+- ✅ **Review follow-up:** "Creating checkout session…" is cleared once the sheet renders (spec-pinned).
 - Sprint file: [done/sprint-137](done/sprint-137-iframe-fresh-session-mounts-the-sheet.md).

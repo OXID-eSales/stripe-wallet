@@ -345,7 +345,6 @@ export default class extends Controller {
       throw new Error('Embedded checkout mount point not found')
     }
 
-    this.setStatus(window.oStripe?.i18n?.CREATING_SESSION || '')
     // This host creates and mounts its own sheet. It must: its container is the
     // visible one on the order page, and its Place-Order button is hidden in
     // eager mode, so a sheet mounted anywhere else leaves the customer with no
@@ -357,7 +356,9 @@ export default class extends Controller {
     mount.style.display = 'block'
     this._embeddedCheckout.mount(mount)
 
-    // Embedded Checkout renders its own Pay button; hide the order button.
+    // The sheet is on the page: the "Creating checkout session…" line has
+    // done its job, and Embedded Checkout renders its own Pay button.
+    this.setStatus('')
     this.hideButton()
     this._debug('Embedded Checkout mounted (iframe mode)')
   }

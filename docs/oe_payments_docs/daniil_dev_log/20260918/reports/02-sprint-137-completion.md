@@ -47,6 +47,13 @@ Reported so nobody hunts them in this diff (`git diff b-7.4.x -- src/` is empty)
    `setUpBeforeClass()` guard Mollie already carries, or the suite must run with one PSP active.
    The Integration suite (which does not hit it) is green.
 
+## Follow-up (same day, Daniil's review)
+
+The "Creating checkout session…" status line stayed under the mounted sheet. `mountEmbeddedCheckout()`
+now clears the status right after `mount()`; the redundant re-set before the mount is gone. Pinned in
+`stripe-order-page-fresh-session-iframe.spec.ts` (RED with the exact text, GREEN after the rebuild)
+on both the tick path and the eager reload path.
+
 ## Deploy notes
 - JS: `npm run build:prod && npm run build:dev` in `extensions/stripe`; the shop serves
   `out/modules/oe_payments_stripe_wallet` → `extensions/stripe/assets` via symlink — no install-assets needed.
