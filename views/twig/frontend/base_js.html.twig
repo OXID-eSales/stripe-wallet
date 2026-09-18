@@ -1,9 +1,9 @@
 {% if oViewConf.isStripeCheckoutActive() %}
-    {# CSP: Restrict script sources on payment pages to self + Stripe domains.
-       SRI (integrity attribute) is NOT supported by Stripe — they deploy updates
-       to the same URL without version pinning. See: github.com/stripe/stripe-js#167
-       CSP script-src is the recommended alternative per Stripe documentation. #}
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://m.stripe.com;">
+    {# No Content-Security-Policy <meta> here (Sprint 137 S6): this block renders inside
+       <body>, where browsers ignore a CSP meta and log an error on every page. SRI is
+       not an option either — Stripe deploys js.stripe.com/v3 unpinned
+       (github.com/stripe/stripe-js#167). A real CSP is shop-wide and belongs in the web
+       server's HTTP headers; the merchant docs list the Stripe sources to allow. #}
     <script src="https://js.stripe.com/v3/"></script>
     {% set stripeJsPath = oViewConf.getStripeJsPath() %}
     {% set stripeVersion = oViewConf.getStripeModuleVersion() %}
