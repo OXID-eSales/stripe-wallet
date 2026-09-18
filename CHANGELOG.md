@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+- Iframe mode painted the Place-Order button instead of the embedded Stripe sheet in every fresh
+  browser session (no persisted Terms consent yet). The button is now never the shopper's control in
+  iframe mode: the sheet mounts on load when consent is not gated, and the moment the Terms checkbox
+  is ticked otherwise (Sprint 137, IFRAME-05).
+- A Content-Security-Policy `<meta>` rendered inside `<body>` was ignored by browsers and logged an
+  error on every Stripe-active page. Removed; CSP belongs in the shop's HTTP headers.
+
 ## [v3.3.0] - 2026-09-15
 
 Note: the `v3.2.0` tag sits on a commit that is not part of any branch. Its content is in
