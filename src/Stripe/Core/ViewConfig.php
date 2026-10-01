@@ -6,6 +6,7 @@ namespace OxidEsales\Payments\Stripe\Core;
 
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
+use OxidEsales\Payments\Stripe\Admin\StripeContractStateHelp;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\PublishableKeyProvider;
 use Throwable;
@@ -254,5 +255,15 @@ class ViewConfig extends ViewConfig_parent
     {
         $serverName = $_SERVER['SERVER_NAME'] ?? '';
         return is_string($serverName) ? $serverName : '';
+    }
+
+    /**
+     * MOL-10 (shared Help): Stripe's column of payment-base's contract-state Help. Admin templates
+     * see the shop's oViewConf and no Stripe view, so the Settings tab and the order panel take it
+     * from here.
+     */
+    public function getStripeContractStateHelp(): StripeContractStateHelp
+    {
+        return new StripeContractStateHelp();
     }
 }

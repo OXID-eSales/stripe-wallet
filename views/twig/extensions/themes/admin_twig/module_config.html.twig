@@ -233,6 +233,35 @@
     {% endif %}
 {% endblock %}
 
+{#
+    MOL-10 (shared Help) — a "Help" group after the last settings group: payment-base's contract-state
+    table (OXID Contract Status · Meaning) with Stripe's third column (PaymentIntent status). Rows,
+    meanings and markup are payment-base's; Stripe adds only its column via oViewConf. Every stock
+    group still renders through {{ parent() }} — several modules override this template.
+#}
+{% block admin_module_config_group %}
+    {{ parent() }}
+
+    {% if loop.last and oView.getEditObjectId() == 'oe_payments_stripe_wallet' %}
+        {% set help = oViewConf.getStripeContractStateHelp() %}
+        <div class="groupExp">
+            <div class="">
+                <a href="#" onclick="_groupExp(this);return false;" class="rc"><b>{{ translate({ ident: 'PAYMENT_ADMIN_HELP' }) }}</b></a>
+                <dl>
+                    <dd class="stripe-help">
+                        <p class="pc-help-intro">{{ translate({ ident: help.introIdent }) }}</p>
+                        {% include "@oe_payment_base/admin/help/contract_state_table.html.twig" with {
+                            providerLabel: help.columnIdent,
+                            providerStatuses: help.providerStatuses
+                        } %}
+                    </dd>
+                </dl>
+                <div class="spacer"></div>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}
+
 {% block admin_module_config_form %}
     {{ parent() }}
 

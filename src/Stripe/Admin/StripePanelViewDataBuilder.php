@@ -66,6 +66,9 @@ class StripePanelViewDataBuilder
             'orderId'             => (string) $order->getId(),
             'orderNumber'         => $this->readField($order, 'oxorder__oxordernr'),
             'contractId'          => (string) $this->contractResolver->getContractIdFromOrder($order),
+            // MOL-10 (shared Help): the OXID contract state, shown next to the "?" that explains it.
+            'contractState'       => (string) ($this->contractResolver->getContractForOrder($order)
+                ?->getStateValue() ?? ''),
             'paymentType'         => $this->readField($order, 'oxorder__oxpaymenttype'),
             'transactionId'       => $this->readField($order, 'oxorder__oxtransid'),
             'externalTransId'     => $this->readField($order, 'oxorder__stripeexternaltransid'),

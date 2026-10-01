@@ -112,6 +112,10 @@ $aLang = array(
     'STRIPE_PAYMENT_DETAILS'                            => 'Payment details',
     'STRIPE_ORDER_NUMBER'                               => 'Order No.',
     'STRIPE_CONTRACT_ID'                                => 'Contract ID',
+    // MOL-10 (shared Help): the OXID contract state and Stripe's column of payment-base's Help table.
+    'STRIPE_CONTRACT_STATE' => 'OXID Contract Status',
+    'STRIPE_HELP_CONTRACT_STATES_INTRO' => 'The Payment tab of an order shows the OXID Contract Status: the state of the payment contract the shop keeps for the order. This table explains each state and the Stripe PaymentIntent status it corresponds to.',
+    'STRIPE_HELP_COL_STRIPE_STATUS' => 'Stripe PaymentIntent status',
     'STRIPE_ORDER_ID'                                   => 'Order ID',
     'STRIPE_PAYMENT_TYPE'                               => 'Payment type',
     'STRIPE_TRANSACTION_ID'                             => 'Stripe Transaction ID',
