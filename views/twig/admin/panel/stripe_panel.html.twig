@@ -229,6 +229,19 @@
                 </td>
             </tr>
             <tr>
+                {# MOL-10 (shared Help): payment-base's "?" opens the contract-state Help with Stripe's column. #}
+                {% set help = oViewConf.getStripeContractStateHelp() %}
+                <td class="s-label">{{ translate({ ident: "STRIPE_CONTRACT_STATE" }) }}
+                    {% include "@oe_payment_base/admin/help/contract_state_hint.html.twig" with {
+                        intro: help.introIdent,
+                        providerLabel: help.columnIdent,
+                        providerStatuses: help.providerStatuses,
+                        id: 'stripe-contract-state'
+                    } %}
+                </td>
+                <td class="s-value" data-testid="contract-state">{{ contractState|default('—') }}</td>
+            </tr>
+            <tr>
                 <td class="s-label">{{ translate({ ident: "STRIPE_ORDER_ID" }) }}</td>
                 <td class="s-value" data-testid="order-id">
                     {% if orderId is defined and orderId %}

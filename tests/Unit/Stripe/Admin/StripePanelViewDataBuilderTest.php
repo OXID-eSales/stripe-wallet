@@ -26,6 +26,7 @@ use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\LanguageTranslatorInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\OrderContractResolver;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\Payments\Stripe\Service\StripeOrderApiService;
 use OxidEsales\Payments\Stripe\Service\UserDataValidationMessageFormatter;
 use OxidEsales\Payments\Stripe\Service\ValidationRulesProvider;
@@ -250,6 +251,31 @@ final class StripePanelViewDataBuilderTest extends TestCase
     // ---------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------
+
+    /** MOL-10 (shared Help): the panel shows the OXID contract state next to the contract id. */
+    public function testExposesTheContractStateForThePanel(): void
+    {
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getStateValue')->willReturn('committed');
+        $resolver = $this->createMock(OrderContractResolver::class);
+        $resolver->method('getContractForOrder')->willReturn($contract);
+        $translator = $this->translatorStub();
+        $builder = new StripePanelViewDataBuilder(
+            viewDataProvider: $this->createMock(OrderRefundViewDataProvider::class),
+            contractResolver: $resolver,
+            moduleConfig: $this->createMock(ModuleConfigurationServiceInterface::class),
+            validationFeedback: $this->createMock(AdminValidationFeedbackInterface::class),
+            messageFormatter: $this->realFormatter($translator),
+            translator: $translator,
+        );
+
+        $this->assertSame('committed', $builder->build($this->orderStub())['contractState']);
+    }
+
+    public function testContractStateIsEmptyWithoutAContract(): void
+    {
+        $this->assertSame('', $this->builder($this->createMock(AdminValidationFeedbackInterface::class))->build($this->orderStub())['contractState']);
+    }
 
     private function builder(AdminValidationFeedbackInterface $feedback): StripePanelViewDataBuilder
     {
