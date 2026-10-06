@@ -12,7 +12,15 @@ env:
   TEMPLATE_ENGINE: 'twig'
   # Branch of OXID-eSales/payment-base to test against. Change in sync with
   # the stripe branch when the two repos co-evolve (Sprint 119/STRP-129).
-  PAYMENT_BASE_BRANCH: 'b-7.4.x'
+  # TEMPORARY (GRAPH-QL, 2026-10-06): the Stripe GRAPH-QL story builds on
+  # payment-base's unmerged b-7.4.x-GRAPH-QL (Sprint 15). Revert to 'b-7.4.x'
+  # and drop PAYMENT_BASE_VERSION_ALIAS once payment-base has merged it.
+  PAYMENT_BASE_BRANCH: 'b-7.4.x-GRAPH-QL'
+  # payment-base's extra.branch-alias covers dev-b-7.4.x only; a feature
+  # branch needs an explicit alias to satisfy this module's `>=v1.2`
+  # constraint. Same version the branch alias resolves to, so nothing new to
+  # keep in sync. Empty once PAYMENT_BASE_BRANCH is back on 'b-7.4.x'.
+  PAYMENT_BASE_VERSION_ALIAS: ' as 1.2.x-dev'
   # Version the payment-base path repository is aliased as. It MUST satisfy the
   # "oxid-esales/payment-base" constraint in this module's composer.json, or
   # composer cannot resolve the module at shop level. It was pinned to v1.0.0
@@ -149,7 +157,7 @@ jobs:
 
       - name: Install payment-base at shop level
         run: |
-          docker compose exec -T php composer require "oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH}" --no-interaction --no-update
+          docker compose exec -T php composer require "oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH}${PAYMENT_BASE_VERSION_ALIAS}" --no-interaction --no-update
 
       - name: Install module
         run: |
@@ -462,7 +470,7 @@ jobs:
 
       - name: Install payment-base at shop level
         run: |
-          docker compose exec -T php composer require "oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH}" --no-interaction --no-update
+          docker compose exec -T php composer require "oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH}${PAYMENT_BASE_VERSION_ALIAS}" --no-interaction --no-update
 
       - name: Install testing dependencies
         run: |
