@@ -26,6 +26,10 @@ class WebhookEventCatalog
         'payment_intent.canceled',
         'charge.refunded',
         'checkout.session.expired',
+        // GRAPH-QL / PS2: a headless client may never come back from Stripe;
+        // the paid session commits the contract (payment-base
+        // ContractCommitService) from this event.
+        'checkout.session.completed',
     ];
 
     /**

@@ -20,6 +20,16 @@ class WebhookEventCatalogTest extends TestCase
         $this->assertContains('payment_intent.succeeded', (new WebhookEventCatalog())->all());
     }
 
+    /**
+     * GRAPH-QL / PS2: a headless client may never come back from Stripe, so the
+     * contract is committed from `checkout.session.completed` (payment-base
+     * ContractCommitService). The endpoint must be subscribed to it.
+     */
+    public function testCatalogIncludesCheckoutSessionCompleted(): void
+    {
+        $this->assertContains('checkout.session.completed', (new WebhookEventCatalog())->all());
+    }
+
     public function testCatalogIncludesChargeRefunded(): void
     {
         $this->assertContains('charge.refunded', (new WebhookEventCatalog())->all());

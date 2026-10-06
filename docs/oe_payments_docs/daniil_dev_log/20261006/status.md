@@ -6,8 +6,8 @@
 
 | Story | State | Notes |
 |---|---|---|
-| PS1 Headless-ready handler | IN PROGRESS | red tests being written |
-| PS2 Wiring + catalog | TODO | |
+| PS1 Headless-ready handler | **DONE** 2026-10-06 | [done/GRAPH-QL-PS1-headless-ready-handler.md](done/GRAPH-QL-PS1-headless-ready-handler.md) — Unit 1593, Integration 100, gates green |
+| PS2 Wiring + catalog | IN PROGRESS | resolver tag + open-attempt finder wired; catalog test red |
 | PS3 Webhooks commit + cleanup | TODO | |
 | PS4 GraphQL mutations | TODO | |
 | PS5 ACP service | TODO | |

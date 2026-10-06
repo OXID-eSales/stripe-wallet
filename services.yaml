@@ -252,6 +252,9 @@ services:
       # left behind, instead of stacking another one beside it.
       $previousAttemptCleaner: '@OxidEsales\PaymentBase\Checkout\PreviousCheckoutAttemptCleanerInterface'
       $openAttempts: '@OxidEsales\PaymentBase\Checkout\OpenCheckoutAttemptRegistryInterface'
+      # GRAPH-QL / PS2: a headless start with nothing in the registry retires the
+      # open attempt for the same user basket (payment-base S3).
+      $openAttemptFinder: '@OxidEsales\PaymentBase\Repository\OpenAttemptFinderInterface'
     tags:
       - { name: payment.event_handler, priority: 100 }
     public: false
@@ -599,6 +602,10 @@ services:
       $enforceSecurityCheck: '%payment.return_security.enforce%'
       $logger: '@oxid_esales.monolog.logger'
     public: true
+    tags:
+      # GRAPH-QL / PS2: payment-base's headless return (stripeCheckoutReturn) finds
+      # the resolver by provider name through ReturnResolverRegistry.
+      - { name: oe.payment.return_resolver, provider: stripe }
 
   # Stripe Event Translator - maps abstract request events onto Stripe's
   # concrete event classes. Collected by payment-base's EventBroker.
