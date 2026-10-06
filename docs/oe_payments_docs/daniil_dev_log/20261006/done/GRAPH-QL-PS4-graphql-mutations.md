@@ -49,3 +49,11 @@ re-enters OXID's module-chain autoloader for the `payment` controller, whose cha
 on its own branch). The same break stops Stripe's `tests/phpunit.xml` Unit suite and one OPC test (noted in payment-base's
 S8 report). The schema proof therefore uses a fixed class list as GraphQLite's finder. The real GraphQL endpoint in this
 dev shop is affected by the same chain break until the Mollie module is activated cleanly — PS6 depends on that.
+
+## Follow-up (2026-10-06, CI)
+
+`Integration\Stripe\GraphQL\SchemaContainsStripeMutationsTest` killed the whole Integration job on the bare CI shop
+(`Interface "Kcs\ClassFinder\Finder\FinderInterface" not found`, exit 255): the class-finder stand-in was a named
+class at file level, loaded before `setUp()` could skip. It is an anonymous class built after the guard now. Same
+lesson as the `NamespaceMapper` glue (PS6 report): nothing loaded on a shop without graphql-base may implement its
+interfaces at declaration time.

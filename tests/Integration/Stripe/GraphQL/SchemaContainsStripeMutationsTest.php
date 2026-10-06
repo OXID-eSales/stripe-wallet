@@ -25,103 +25,17 @@ use Symfony\Component\Cache\Psr16Cache;
 use TheCodingMachine\GraphQLite\SchemaFactory;
 
 /**
- * A class finder over a fixed list. GraphQLite's default (composer classmap)
- * finder reflects every class under a namespace prefix, which in this shop
- * re-enters OXID's module-chain autoloader for other modules' controllers;
- * the schema under test needs exactly these four classes.
- */
-final class FixedClassFinder implements FinderInterface
-{
-    /** @var list<string> */
-    private array $namespaces = [];
-
-    /** @param list<class-string> $classes */
-    public function __construct(private readonly array $classes)
-    {
-    }
-
-    public function getIterator(): Iterator
-    {
-        $found = [];
-        foreach ($this->classes as $class) {
-            foreach ($this->namespaces ?: [''] as $namespace) {
-                if (str_starts_with($class, $namespace)) {
-                    $found[$class] = new ReflectionClass($class);
-                    break;
-                }
-            }
-        }
-
-        return new ArrayIterator($found);
-    }
-
-    public function inNamespace(string|array $namespaces): self
-    {
-        $clone = clone $this;
-        $clone->namespaces = array_map(static fn(string $ns): string => rtrim($ns, '\\') . '\\', (array) $namespaces);
-
-        return $clone;
-    }
-
-    public function implementationOf(string|array $interface): self
-    {
-        return $this;
-    }
-
-    public function subclassOf(string|null $superClass): self
-    {
-        return $this;
-    }
-
-    public function annotatedBy(string|null $annotationClass): self
-    {
-        return $this;
-    }
-
-    public function withAttribute(string|null $attributeClass): self
-    {
-        return $this;
-    }
-
-    public function in(string|array $dirs): self
-    {
-        return $this;
-    }
-
-    public function notInNamespace(string|array $namespaces): self
-    {
-        return $this;
-    }
-
-    public function filter(callable|null $callback): self
-    {
-        return $this;
-    }
-
-    public function path(string $pattern): self
-    {
-        return $this;
-    }
-
-    public function notPath(string $pattern): self
-    {
-        return $this;
-    }
-
-    public function pathFilter(callable|null $callback): self
-    {
-        return $this;
-    }
-}
-
-/**
  * GRAPH-QL / PS4 against the real container: the Stripe controller resolves,
  * and GraphQLite builds a valid schema from it plus payment-base's result
  * types - the three mutations with the documented arguments and types. This
  * is what graphql-base's SchemaFactory does for every tagged namespace
  * mapper; it is built here for our two namespaces only, so the proof does
  * not depend on every other module's controllers loading in this shop.
- * Skipped where GraphQLite (graphql-base) is not installed.
+ * Skipped where GraphQLite (graphql-base) is not installed - which is why
+ * the class-finder stand-in below is an anonymous class built after the
+ * guard: a named class implementing kcs/class-finder's interface at file
+ * level is a fatal "Interface not found" on such a shop (CI), before any
+ * test could skip.
  */
 #[Group('integration')]
 final class SchemaContainsStripeMutationsTest extends IntegrationTestCase
@@ -145,7 +59,7 @@ final class SchemaContainsStripeMutationsTest extends IntegrationTestCase
     public function testGraphQliteBuildsTheThreeStripeCheckoutMutationsOverPaymentBasesTypes(): void
     {
         $factory = new SchemaFactory(new Psr16Cache(new ArrayAdapter()), ContainerFactory::getInstance()->getContainer());
-        $factory->setFinder(new FixedClassFinder([
+        $factory->setFinder($this->finderOver([
             StripeCheckout::class,
             CheckoutStartResult::class,
             CheckoutReturnResult::class,
@@ -178,5 +92,102 @@ final class SchemaContainsStripeMutationsTest extends IntegrationTestCase
             ['contractId', 'contractToken', 'providerName', 'orderNumber', 'redirectUrl', 'clientSecret', 'renderMode'],
             array_keys($startType->getFields())
         );
+    }
+
+    /**
+     * A class finder over a fixed list. GraphQLite's default (composer
+     * classmap) finder reflects every class under a namespace prefix, which
+     * in this shop re-enters OXID's module-chain autoloader for other
+     * modules' controllers; the schema under test needs exactly these classes.
+     *
+     * @param list<class-string> $classes
+     */
+    private function finderOver(array $classes): FinderInterface
+    {
+        return new class ($classes) implements FinderInterface {
+            /** @var list<string> */
+            private array $namespaces = [];
+
+            /** @param list<class-string> $classes */
+            public function __construct(private readonly array $classes)
+            {
+            }
+
+            public function getIterator(): Iterator
+            {
+                $found = [];
+                foreach ($this->classes as $class) {
+                    foreach ($this->namespaces ?: [''] as $namespace) {
+                        if (str_starts_with($class, $namespace)) {
+                            $found[$class] = new ReflectionClass($class);
+                            break;
+                        }
+                    }
+                }
+
+                return new ArrayIterator($found);
+            }
+
+            public function inNamespace(string|array $namespaces): self
+            {
+                $clone = clone $this;
+                $clone->namespaces = array_map(
+                    static fn(string $ns): string => rtrim($ns, '\\') . '\\',
+                    (array) $namespaces
+                );
+
+                return $clone;
+            }
+
+            public function implementationOf(string|array $interface): self
+            {
+                return $this;
+            }
+
+            public function subclassOf(string|null $superClass): self
+            {
+                return $this;
+            }
+
+            public function annotatedBy(string|null $annotationClass): self
+            {
+                return $this;
+            }
+
+            public function withAttribute(string|null $attributeClass): self
+            {
+                return $this;
+            }
+
+            public function in(string|array $dirs): self
+            {
+                return $this;
+            }
+
+            public function notInNamespace(string|array $namespaces): self
+            {
+                return $this;
+            }
+
+            public function filter(callable|null $callback): self
+            {
+                return $this;
+            }
+
+            public function path(string $pattern): self
+            {
+                return $this;
+            }
+
+            public function notPath(string $pattern): self
+            {
+                return $this;
+            }
+
+            public function pathFilter(callable|null $callback): self
+            {
+                return $this;
+            }
+        };
     }
 }
