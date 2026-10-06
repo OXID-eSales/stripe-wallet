@@ -166,7 +166,7 @@ cmd_return() {
     load_state "${2:-}" "${3:-}"
     say "stripeCheckoutReturn"
     login
-    data "$(gql "mutation { stripeCheckoutReturn(contractId: \"$CONTRACT_ID\", contractToken: \"$CONTRACT_TOKEN\", checkoutSessionId: \"$session_id\") { committed status contractState orderNumber } }")" stripeCheckoutReturn | jq .
+    data "$(gql "mutation { stripeCheckoutReturn(contractId: \"$CONTRACT_ID\", contractToken: \"$CONTRACT_TOKEN\", checkoutSessionId: \"$session_id\") { status orderId orderNumber contractState } }")" stripeCheckoutReturn | jq .
 }
 
 cmd_cancel() {
