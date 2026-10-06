@@ -9,9 +9,9 @@
 | PS1 Headless-ready handler | **DONE** 2026-10-06 | [done/GRAPH-QL-PS1-headless-ready-handler.md](done/GRAPH-QL-PS1-headless-ready-handler.md) — Unit 1593, Integration 100, gates green |
 | PS2 Wiring + catalog | **DONE** 2026-10-06 | [done/GRAPH-QL-PS2-wiring.md](done/GRAPH-QL-PS2-wiring.md) — resolver tag, open-attempt finder, `checkout.session.completed` |
 | PS3 Webhooks commit + cleanup | **DONE** 2026-10-06 | [done/GRAPH-QL-PS3-webhooks-commit-and-cleanup.md](done/GRAPH-QL-PS3-webhooks-commit-and-cleanup.md) — Unit 1607, Integration 100, gates green; cleanup asks Stripe first |
-| PS4 GraphQL mutations | IN PROGRESS | controller + mapper + stubs |
-| PS5 ACP service | TODO | |
-| PS6 Proof | TODO | |
+| PS4 GraphQL mutations | **DONE** 2026-10-06 | [done/GRAPH-QL-PS4-graphql-mutations.md](done/GRAPH-QL-PS4-graphql-mutations.md) — Unit 1615, Integration 102 (GraphQLite schema proof), gates green |
+| PS5 ACP service | **DONE** 2026-10-06 | [done/GRAPH-QL-PS5-acp-checkout-service.md](done/GRAPH-QL-PS5-acp-checkout-service.md) — Unit 1622, Integration 102, gates green; MCP transport is a separate feature |
+| PS6 Proof | IN PROGRESS | GraphQL harness end-to-end; depends on the dev shop's module chain |
 
 ## How to run (dev shop)
 

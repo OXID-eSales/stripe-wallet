@@ -26,6 +26,37 @@ services:
     autoconfigure: false
     tags: [ 'graphql_namespace_mapper' ]
 
+  # ===========================================
+  # GRAPH-QL / PS5 — ACP checkout service (payment-base MCP layer)
+  # ===========================================
+  # The provider half of the agentic-commerce layer: create_checkout on the
+  # headless path, complete_checkout charging the delegated token. The MCP /
+  # UCP transport (server, tools, auth guard, controllers) is a separate
+  # feature and wires AcpCheckoutServiceInterface to this service.
+  OxidEsales\PaymentBase\Mcp\Acp\AcpResponseFormatterInterface:
+    class: OxidEsales\PaymentBase\Mcp\Acp\AcpResponseFormatter
+    arguments:
+      $paymentProviders: [ 'stripe' ]
+
+  OxidEsales\Payments\Stripe\Mcp\StripeAcpCheckoutService:
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+      $contractService: '@OxidEsales\PaymentBase\Service\ContractServiceInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
+      $formatter: '@OxidEsales\PaymentBase\Mcp\Acp\AcpResponseFormatterInterface'
+      $contractOpening: '@OxidEsales\PaymentBase\Checkout\Headless\ContractOpeningServiceInterface'
+      $userBaskets: '@OxidEsales\PaymentBase\Checkout\Headless\UserBasketFactoryInterface'
+      $buyers: '@OxidEsales\PaymentBase\Checkout\Headless\GuestUserResolverInterface'
+      $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
+    public: true
+
+  OxidEsales\PaymentBase\Mcp\Acp\AcpCheckoutServiceInterface:
+    alias: OxidEsales\Payments\Stripe\Mcp\StripeAcpCheckoutService
+    public: true
+
   OxidEsales\Payments\Stripe\Service\:
     resource: 'src/Stripe/Service/*'
     exclude:
