@@ -9,7 +9,6 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Service;
 
-use OxidEsales\GraphQL\Base\Framework\NamespaceMapperInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Service\NamespaceMapper;
 use PHPUnit\Framework\TestCase;
 
@@ -23,7 +22,6 @@ final class NamespaceMapperTest extends TestCase
     {
         $mapper = new NamespaceMapper();
 
-        self::assertInstanceOf(NamespaceMapperInterface::class, $mapper);
         $controllers = $mapper->getControllerNamespaceMapping();
         self::assertArrayHasKey('OxidEsales\\Payments\\Stripe\\GraphQL\\Controller', $controllers);
         self::assertDirectoryExists($controllers['OxidEsales\\Payments\\Stripe\\GraphQL\\Controller']);

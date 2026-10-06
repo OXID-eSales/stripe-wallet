@@ -31,3 +31,14 @@ Twig and OPC checkouts stay byte-identical.
 - `uiMode=custom` (Payment Element on a Checkout Session client secret) is phase 4 of the epic — refused for now.
 - The module-local `SessionAdapterInterface` / `SessionWriterInterface` / `ContractServiceInterface` / dispatcher bindings
   stay in this story (payment-base defines the same ids; removing Stripe's is clean-up, done when both branches are merged).
+
+## Done (2026-10-06, stripe `b-7.4.x-GRAPH-QL`)
+
+PS1–PS6 delivered; reports in `../done/GRAPH-QL-PS*.md`, status in `../status.md`. The proof is the Playwright spec
+`tests/e2e/GraphQL/stripe-headless-checkout.spec.ts` (e2e submodule, `projects/Stripe`): 4/4 through the GraphQL
+mutations and Stripe's hosted test page. Found on the way and fixed: `cancel` answered the stale state (payment-base),
+bot user agents get an empty basket (spec sends a browser UA), Stripe's Card accordion (page object), and — the one
+that mattered for every shop — **module activation failed without graphql-base** because the glue implemented its
+interfaces; the glue now mirrors them (payment-base `9ebf3a3`, Stripe PS6). Deferred: the harness integration test
+(needs Stripe's API and a paid session; reason in the PS6 report), `uiMode=custom`, the MCP transport, and the
+module-local session bindings clean-up after both branches merge. CI pin `f164517` is TEMPORARY.

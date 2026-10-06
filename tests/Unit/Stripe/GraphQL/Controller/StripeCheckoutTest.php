@@ -59,6 +59,7 @@ final class StripeCheckoutTest extends TestCase
                 self::assertSame('https://app.example.com/return', $r->returnUrl);
                 self::assertSame('https://app.example.com/cancel', $r->cancelUrl);
                 self::assertSame('embedded', $r->uiMode);
+                self::assertSame('oe_payments_stripe_wallet', $r->paymentId, 'the mutation names its own payment');
 
                 return true;
             }))

@@ -21,6 +21,10 @@ services:
       $authentication: '@?OxidEsales\GraphQL\Base\Service\Authentication'
     public: true
 
+  # graphql-base is optional: the mapper mirrors NamespaceMapperInterface
+  # without implementing it, because the container reflects every service
+  # class at module activation and the interface is absent on a shop without
+  # GraphQL. The tag is inert until graphql-base is installed.
   OxidEsales\Payments\Stripe\GraphQL\Service\NamespaceMapper:
     autowire: false
     autoconfigure: false

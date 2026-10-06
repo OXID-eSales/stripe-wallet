@@ -17,6 +17,7 @@ use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutCancelResult;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutReturnResult;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutStartResult;
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\GraphQL\Exception\StripeCheckoutError;
 use RuntimeException;
 use TheCodingMachine\GraphQLite\Annotations\Logged;
@@ -69,6 +70,9 @@ final class StripeCheckout
                 returnUrl: $returnUrl,
                 cancelUrl: $cancelUrl,
                 uiMode: $uiMode,
+                // This mutation IS Stripe's: a basket the client never ran through
+                // basketSetPayment still starts; one set to another payment is refused.
+                paymentId: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID,
             )));
         } catch (HeadlessCheckoutException $e) {
             throw new StripeCheckoutError($e);
