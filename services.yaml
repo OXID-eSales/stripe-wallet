@@ -4,6 +4,28 @@ services:
     autoconfigure: true
     public: false
 
+  # ===========================================
+  # GRAPH-QL / PS4 — GraphQL Storefront mutations
+  # ===========================================
+  # Neither autowired nor autoconfigured: they implement graphql-base /
+  # GraphQLite contracts that are optional for this module. `@?` keeps the
+  # container compiling without graphql-base (the controller then throws a
+  # clear error if it is ever invoked, which it cannot be without graphql-base).
+  OxidEsales\Payments\Stripe\GraphQL\Controller\StripeCheckout:
+    autowire: false
+    autoconfigure: false
+    arguments:
+      $checkout: '@OxidEsales\PaymentBase\Checkout\Headless\HeadlessCheckoutServiceInterface'
+      # Stripe's own contract token for StripeReturnResolver (payment-base verified its headless token already)
+      $tokenService: '@OxidEsales\Payments\Stripe\Service\ContractTokenService'
+      $authentication: '@?OxidEsales\GraphQL\Base\Service\Authentication'
+    public: true
+
+  OxidEsales\Payments\Stripe\GraphQL\Service\NamespaceMapper:
+    autowire: false
+    autoconfigure: false
+    tags: [ 'graphql_namespace_mapper' ]
+
   OxidEsales\Payments\Stripe\Service\:
     resource: 'src/Stripe/Service/*'
     exclude:
