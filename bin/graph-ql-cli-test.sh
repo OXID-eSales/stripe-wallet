@@ -22,8 +22,11 @@ USER_PASSWORD="${USER_PASSWORD:-useruser}"
 PRODUCT_ID="${PRODUCT_ID:-5e6a374e212258abbfd76b6adf911772}"   # "Panorama", 20.90 EUR in the demo data
 DELIVERY_METHOD_ID="${DELIVERY_METHOD_ID:-oxidstandard}"
 STATE_FILE="${STATE_FILE:-${TMPDIR:-/tmp}/graph-ql-cli-test.state}"
-RETURN_URL="${RETURN_URL:-${SHOP_URL}headless/return}"
-CANCEL_URL="${CANCEL_URL:-${SHOP_URL}headless/cancel}"
+# The return / cancel URLs belong to the headless client; the shop does not
+# serve them. For a test by hand the shop's start page is a friendlier landing
+# than a 404: Stripe appends &session_id=... to it.
+RETURN_URL="${RETURN_URL:-${SHOP_URL}index.php?cl=start&headless=return}"
+CANCEL_URL="${CANCEL_URL:-${SHOP_URL}index.php?cl=start&headless=cancel}"
 # OXID empties the basket for user agents it takes for search engines (curl's
 # default is one). A real headless client is a browser or an app; look like one.
 USER_AGENT="${USER_AGENT:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36 graph-ql-cli-test}"
@@ -150,8 +153,11 @@ cmd_pay() {
     cmd_start hosted
     say "Now pay"
     note "1. open the redirectUrl above in a browser and pay with 4242 4242 4242 4242 (any future date, any CVC)"
-    note "2. Stripe sends the browser to $RETURN_URL?session_id=cs_test_... — copy the session_id"
-    note "3. run: $(basename "$0") return cs_test_..."
+    note "2. with a registered Stripe webhook the shop commits the order by itself (checkout.session.completed,"
+    note "   payment_intent.succeeded, or payment_intent.amount_capturable_updated for manual capture) — check the"
+    note "   order in the admin, or run '$(basename "$0") return <session_id>', which then only reports the state"
+    note "3. without a webhook: Stripe sends the browser to ${RETURN_URL}&session_id=cs_test_... — copy the"
+    note "   session_id and run: $(basename "$0") return cs_test_..."
 }
 
 cmd_return() {

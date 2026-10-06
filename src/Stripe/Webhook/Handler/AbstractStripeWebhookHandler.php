@@ -54,6 +54,10 @@ abstract class AbstractStripeWebhookHandler implements StripeWebhookEventHandler
      * now) so the caller continues, or an outcome that ends the handling
      * (commit refused or left pending: the fulfilment must not run).
      *
+     * `$requiresCapture` marks a manual-capture authorization (PS6 follow-up):
+     * the contract is committed, the order is created but not marked paid
+     * (payment-base's ContractCommitmentHandler reads it from the context).
+     *
      * @param array<string, mixed> $extraContext
      */
     protected function commitOpenContract(
@@ -62,7 +66,8 @@ abstract class AbstractStripeWebhookHandler implements StripeWebhookEventHandler
         string $providerOrderId,
         ?float $amount,
         string $currency,
-        array $extraContext = []
+        array $extraContext = [],
+        bool $requiresCapture = false
     ): ?StripeWebhookOutcome {
         if ($this->contractCommit === null || $contract === null) {
             return null;
@@ -89,7 +94,7 @@ abstract class AbstractStripeWebhookHandler implements StripeWebhookEventHandler
             providerOrderId: $providerOrderId,
             amount: $amount,
             currency: $currency,
-            requiresCapture: false,
+            requiresCapture: $requiresCapture,
             source: 'webhook',
             extraContext: $extraContext,
         ));

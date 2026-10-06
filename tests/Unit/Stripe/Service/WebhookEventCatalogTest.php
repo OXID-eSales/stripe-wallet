@@ -30,6 +30,16 @@ class WebhookEventCatalogTest extends TestCase
         $this->assertContains('checkout.session.completed', (new WebhookEventCatalog())->all());
     }
 
+    /**
+     * GRAPH-QL / PS6 follow-up: manual capture. The session completes
+     * `unpaid`, the intent is `requires_capture`; a headless client that never
+     * returns needs this event to commit the authorization.
+     */
+    public function testCatalogIncludesPaymentIntentAmountCapturableUpdated(): void
+    {
+        $this->assertContains('payment_intent.amount_capturable_updated', (new WebhookEventCatalog())->all());
+    }
+
     public function testCatalogIncludesChargeRefunded(): void
     {
         $this->assertContains('charge.refunded', (new WebhookEventCatalog())->all());

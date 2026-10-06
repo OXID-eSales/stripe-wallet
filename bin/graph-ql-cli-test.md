@@ -85,7 +85,7 @@ Environment (all optional):
 | `USER_EMAIL` / `USER_PASSWORD` | `headless.user@oxid-esales.dev` / `useruser` | the customer |
 | `PRODUCT_ID` | `5e6a374e212258abbfd76b6adf911772` | "Panorama", 20.90 EUR |
 | `DELIVERY_METHOD_ID` | `oxidstandard` | used by `guard` only |
-| `RETURN_URL` / `CANCEL_URL` | `${SHOP_URL}headless/return|cancel` | need not exist; Stripe appends `?session_id=…` |
+| `RETURN_URL` / `CANCEL_URL` | `${SHOP_URL}index.php?cl=start&headless=return|cancel` | the shop's start page, so a hand test does not land on a 404; a real client owns these URLs. Stripe appends `&session_id=…` |
 | `STATE_FILE` | `/tmp/graph-ql-cli-test.state` | the last start's contract id / token / basket id |
 | `VERBOSE` | `0` | `1` prints every raw JSON response to stderr |
 
@@ -135,7 +135,8 @@ Every `start` opens a real contract and a `NOT_FINISHED` order and creates a Str
 ```bash
 SHOP_URL=https://daniil.oxiddev.de/ bin/graph-ql-cli-test.sh pay
 # open the redirectUrl in a browser, pay with 4242 4242 4242 4242, any future date, any CVC
-# Stripe sends the browser to https://daniil.oxiddev.de/headless/return?session_id=cs_test_…
+# with a webhook the shop ends the order itself; without one, Stripe sends the browser to
+# https://daniil.oxiddev.de/index.php?cl=start&headless=return&session_id=cs_test_… — copy the session_id and
 SHOP_URL=https://daniil.oxiddev.de/ bin/graph-ql-cli-test.sh return cs_test_…
 ```
 
@@ -163,6 +164,33 @@ TOKEN=$(curl -s http://localhost.local/graphql/ -A 'Mozilla/5.0 cli' -H 'Content
 curl -s http://localhost.local/graphql/ -A 'Mozilla/5.0 cli' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN" \
   --data '{"query":"mutation { stripeCheckoutStart(basketId: \"<id>\", confirmTermsAndConditions: true, returnUrl: \"https://daniil.oxiddev.de/r\", cancelUrl: \"https://daniil.oxiddev.de/c\") { redirectUrl } }"}'
 ```
+
+## Finishing the order: webhook, not redirect
+
+The browser redirect is a courtesy. The order is ended by Stripe's webhook when the shop receives it:
+
+| Capture mode | Event that commits the headless contract | Order afterwards |
+|---|---|---|
+| automatic | `checkout.session.completed` (`payment_status = paid`) or `payment_intent.succeeded` | committed, paid |
+| manual (`sStripeCaptureMode = manual`) | `payment_intent.amount_capturable_updated` (`status = requires_capture`) — PS7 | committed, **not** paid until the merchant captures (admin Stripe tab) |
+
+`stripeCheckoutReturn` called after the webhook only reports the committed contract. Without any webhook, `return`
+does the commit itself (it accepts `paid` and `requires_capture`).
+
+For Stripe to call the shop, the shop's Stripe account needs an endpoint for
+`https://<shop>/index.php?cl=StripeWebhookController` with the events of `WebhookEventCatalog`, and the endpoint's
+signing secret in the module setting `sStripeWebhookEndpointSecret`:
+
+- **Standard connected account** (the dev shop, `acct_1TuDSd…`): the account owner creates the endpoint in
+  **Stripe Dashboard → Developers → Webhooks**, or a developer runs `stripe login` into that account and
+  `stripe listen --forward-to <URL> --events <catalog>`; the module's API key cannot do either
+  (`not permitted to configure webhook endpoints on a connected account`, `oauth_not_supported`).
+- **Own account:** the admin "Create webhooks" button (platform key, Connect webhook) or the Dashboard.
+
+Replaying a real event by hand, as PS7 did for order 794, is the quickest proof: retrieve the event by API, POST its JSON to
+the endpoint with `Stripe-Signature: t=<ts>,v1=HMAC_SHA256("<ts>.<payload>", secret)`. The webhook controller requires
+HTTPS (or `X-Forwarded-Proto: https`), so use the tunnel URL, not `localhost.local`. A `services.yaml` change is live
+only after `var/cache/container/` is cleared.
 
 ## Gotchas
 

@@ -30,6 +30,10 @@ class WebhookEventCatalog
         // the paid session commits the contract (payment-base
         // ContractCommitService) from this event.
         'checkout.session.completed',
+        // GRAPH-QL / PS6 follow-up: with manual capture the session completes
+        // "unpaid" and the intent is only authorized (requires_capture); this
+        // event is what commits the headless contract then, requiresCapture.
+        'payment_intent.amount_capturable_updated',
     ];
 
     /**

@@ -1072,6 +1072,18 @@ services:
     tags: [ { name: stripe.webhook_handler } ]
     public: false
 
+  # GRAPH-QL / PS6 follow-up: manual capture. The authorized intent commits
+  # the open contract with requiresCapture (order created, not paid yet).
+  OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentAmountCapturableUpdatedWebhookHandler:
+    arguments:
+      $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+      $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
+    tags: [ { name: stripe.webhook_handler } ]
+    public: false
+
   OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentFailedWebhookHandler:
     arguments:
       $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
