@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Webhook\Handler;
 
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
@@ -34,9 +35,10 @@ class CheckoutSessionCompletedWebhookHandler extends AbstractStripeWebhookHandle
         StripeWebhookEventParser $parser,
         WebhookContractFulfillmentHandlerInterface $fulfillmentHandler,
         ContractRepositoryInterface $contractRepository,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        ?ContractCommitServiceInterface $contractCommit = null
     ) {
-        parent::__construct($parser, $fulfillmentHandler, $contractRepository, $logger);
+        parent::__construct($parser, $fulfillmentHandler, $contractRepository, $logger, $contractCommit);
     }
 
     public function supports(string $eventType): bool
@@ -76,6 +78,24 @@ class CheckoutSessionCompletedWebhookHandler extends AbstractStripeWebhookHandle
         // Update provider order ID from session ID to payment intent ID
         $contract->setProvider(StripeDefinitions::PROVIDER, $paymentIntentId);
         $this->contractRepository->save($contract);
+
+        // GRAPH-QL / PS3: a paid session commits a PENDING contract right here,
+        // so a headless shopper who never comes back still gets their order.
+        if (($object['payment_status'] ?? null) === 'paid') {
+            $sessionId = is_string($object['id'] ?? null) ? $object['id'] : $paymentIntentId;
+            $currency = is_string($object['currency'] ?? null) ? strtoupper($object['currency']) : '';
+            $ended = $this->commitOpenContract(
+                $contract,
+                $paymentIntentId,
+                $sessionId,
+                $this->parser->extractAmountInCurrencyUnits($event, 'amount_total'),
+                $currency,
+                ['checkoutSessionId' => $sessionId]
+            );
+            if ($ended !== null) {
+                return $ended;
+            }
+        }
 
         // Attempt fulfillment if in correct state
         if ($contract->getState()->isCommitted()) {

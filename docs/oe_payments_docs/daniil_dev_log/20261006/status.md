@@ -7,9 +7,9 @@
 | Story | State | Notes |
 |---|---|---|
 | PS1 Headless-ready handler | **DONE** 2026-10-06 | [done/GRAPH-QL-PS1-headless-ready-handler.md](done/GRAPH-QL-PS1-headless-ready-handler.md) — Unit 1593, Integration 100, gates green |
-| PS2 Wiring + catalog | IN PROGRESS | resolver tag + open-attempt finder wired; catalog test red |
-| PS3 Webhooks commit + cleanup | TODO | |
-| PS4 GraphQL mutations | TODO | |
+| PS2 Wiring + catalog | **DONE** 2026-10-06 | [done/GRAPH-QL-PS2-wiring.md](done/GRAPH-QL-PS2-wiring.md) — resolver tag, open-attempt finder, `checkout.session.completed` |
+| PS3 Webhooks commit + cleanup | **DONE** 2026-10-06 | [done/GRAPH-QL-PS3-webhooks-commit-and-cleanup.md](done/GRAPH-QL-PS3-webhooks-commit-and-cleanup.md) — Unit 1607, Integration 100, gates green; cleanup asks Stripe first |
+| PS4 GraphQL mutations | IN PROGRESS | controller + mapper + stubs |
 | PS5 ACP service | TODO | |
 | PS6 Proof | TODO | |
 

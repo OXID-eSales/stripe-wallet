@@ -66,6 +66,8 @@ services:
       # Keeps the cleanup from cancelling a checkout the customer is about to pay
       # in — see CheckoutInFlightGuard.
       $inFlightGuard: '@OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard'
+      # GRAPH-QL / PS3: a session Stripe reports as paid is committed, never cancelled.
+      $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
     public: true
 
   # Same reason: fetched by id from the Order model extension (admin order tab).
@@ -1006,6 +1008,10 @@ services:
       $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
+      # GRAPH-QL / PS3: a paid intent / session commits a PENDING contract
+      # (payment-base ContractCommitService) - the return leg is no longer the
+      # only way.
+      $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
     tags: [ { name: stripe.webhook_handler } ]
     public: false
 
@@ -1051,6 +1057,10 @@ services:
       $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
+      # GRAPH-QL / PS3: a paid intent / session commits a PENDING contract
+      # (payment-base ContractCommitService) - the return leg is no longer the
+      # only way.
+      $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
     tags: [ { name: stripe.webhook_handler } ]
     public: false
 

@@ -45,6 +45,24 @@ class CheckoutInFlightGuard
      * usable for what is in the basket right now. Null means "no usable checkout
      * in flight".
      */
+    /**
+     * GRAPH-QL / PS3: the Stripe session of this contract whatever its payment
+     * status - the cleanup asks this first, because a session Stripe reports
+     * as paid is money, not garbage. Null when Stripe cannot answer.
+     */
+    public function sessionOf(?object $contract): ?StripeCheckoutSessionDto
+    {
+        if ($contract === null) {
+            return null;
+        }
+
+        try {
+            return $this->retrieveSession($this->readProviderOrderId($contract));
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
     public function inspect(?object $contract): ?StripeCheckoutSessionDto
     {
         if ($contract === null) {

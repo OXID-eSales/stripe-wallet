@@ -9,7 +9,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Webhook\Handler;
 
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
@@ -34,9 +36,10 @@ class PaymentIntentSucceededWebhookHandler extends AbstractStripeWebhookHandler
         StripeWebhookEventParser $parser,
         WebhookContractFulfillmentHandlerInterface $fulfillmentHandler,
         ContractRepositoryInterface $contractRepository,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        ?ContractCommitServiceInterface $contractCommit = null
     ) {
-        parent::__construct($parser, $fulfillmentHandler, $contractRepository, $logger);
+        parent::__construct($parser, $fulfillmentHandler, $contractRepository, $logger, $contractCommit);
     }
 
     public function supports(string $eventType): bool
@@ -55,6 +58,21 @@ class PaymentIntentSucceededWebhookHandler extends AbstractStripeWebhookHandler
             'payment_intent_id' => $paymentIntentId,
         ]);
 
+        // GRAPH-QL / PS3: a PENDING contract is committed from the paid intent
+        // before the fulfilment; the return leg is no longer the only way.
+        $ended = $this->commitOpenContract(
+            $this->findContract($event, $paymentIntentId),
+            $paymentIntentId,
+            $paymentIntentId,
+            $this->parser->extractAmountInCurrencyUnits($event, 'amount_received')
+                ?? $this->parser->extractAmountInCurrencyUnits($event, 'amount'),
+            $this->currencyOf($event),
+            ['paymentIntentId' => $paymentIntentId]
+        );
+        if ($ended !== null) {
+            return $ended;
+        }
+
         $result = $this->fulfillmentHandler->handlePaymentSucceeded($paymentIntentId);
 
         if ($result === null) {
@@ -67,6 +85,29 @@ class PaymentIntentSucceededWebhookHandler extends AbstractStripeWebhookHandler
             'contract_fulfilled',
             'Contract already fulfilled or not in COMMITTED state'
         );
+    }
+
+    /**
+     * The contract this intent belongs to: indexed by the intent id, or named
+     * in the intent's metadata (a Checkout Session contract before the id swap).
+     */
+    private function findContract(WebhookEvent $event, string $paymentIntentId): ?PaymentContractInterface
+    {
+        $contract = $this->contractRepository->findByProviderOrderId($paymentIntentId);
+        if ($contract !== null) {
+            return $contract;
+        }
+
+        $contractId = $this->parser->extractContractIdFromMetadata($event);
+
+        return $contractId !== null ? $this->contractRepository->findById($contractId) : null;
+    }
+
+    private function currencyOf(WebhookEvent $event): string
+    {
+        $currency = $event->getObject()['currency'] ?? '';
+
+        return is_string($currency) ? strtoupper($currency) : '';
     }
 
     /**
