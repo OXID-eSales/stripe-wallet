@@ -11,8 +11,8 @@ namespace OxidEsales\Payments\Stripe\PaymentHandler;
 
 use OxidEsales\Payments\Stripe\Core\ShopId;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\PaymentBase\Adapter\ContractFirstPaymentHandlerInterface;
 use OxidEsales\PaymentBase\Adapter\PaymentContextInterface;
-use OxidEsales\PaymentBase\Adapter\PaymentHandlerInterface;
 use OxidEsales\PaymentBase\Adapter\PaymentHandlerResult;
 use OxidEsales\PaymentBase\Adapter\Request\CreateOrderRequest;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
@@ -47,8 +47,11 @@ use Psr\Log\LoggerInterface;
  *
  * @since Sprint 80
  */
-class StripePaymentHandler implements PaymentHandlerInterface
+class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
 {
+    /** GRAPH-QL / PS1: the render modes a headless client may ask for; `custom` is phase 4 of the epic. */
+    private const HEADLESS_UI_MODES = ['hosted', 'embedded'];
+
     private readonly LanguageResolverInterface $languageResolver;
 
     public function __construct(
@@ -85,12 +88,28 @@ class StripePaymentHandler implements PaymentHandlerInterface
 
     public function processPayment(PaymentContextInterface $context): PaymentHandlerResult
     {
+        // GRAPH-QL / PS1: a headless context (payment-base's HeadlessCheckoutService)
+        // has no PHP session and names its render mode up front.
+        $headless = $this->isHeadless($context);
+        if ($headless && !in_array($this->uiModeOf($context), self::HEADLESS_UI_MODES, true)) {
+            return PaymentHandlerResult::error(
+                sprintf(
+                    'Stripe does not support uiMode "%s" yet (supported: %s)',
+                    $this->uiModeOf($context),
+                    implode(', ', self::HEADLESS_UI_MODES)
+                ),
+                'STRIPE_UI_MODE_UNSUPPORTED'
+            );
+        }
+
         // The OPC checkout API calls this repeatedly while the customer works
         // through the accordion. Preparing a whole new checkout each time leaves
         // several Stripe sessions, contracts and early orders behind for one
         // basket, and lets the customer pay in a sheet the shop has moved on
-        // from. Hand back the one already in flight when it still fits.
-        $reused = $this->reuseCheckoutInFlight($context);
+        // from. Hand back the one already in flight when it still fits. A
+        // headless start is one call per basket; payment-base's attempt guard
+        // and retire-by-basket own the duplicates there.
+        $reused = $headless ? null : $this->reuseCheckoutInFlight($context);
         if ($reused !== null) {
             return $reused;
         }
@@ -104,7 +123,7 @@ class StripePaymentHandler implements PaymentHandlerInterface
             $this->createEarlyOrderAndTransition($contract, $context);
 
             // 3. Create Stripe Checkout Session
-            $sessionResult = $this->createCheckoutSession($contract);
+            $sessionResult = $this->createCheckoutSession($contract, $context);
 
             if (!$sessionResult->isSuccessful()) {
                 return PaymentHandlerResult::error(
@@ -130,7 +149,9 @@ class StripePaymentHandler implements PaymentHandlerInterface
                 clientSecret: $embedded ? $sessionResult->getClientSecret() : null,
                 metadata: [
                     'handler' => StripeDefinitions::PROVIDER,
-                    'renderMode' => $embedded ? 'iframe' : 'redirect',
+                    // OPC's footer widget knows 'iframe'; a headless client gets the
+                    // name payment-base's result types use.
+                    'renderMode' => $embedded ? ($headless ? 'embedded' : 'iframe') : 'redirect',
                     'requiresRedirect' => !$embedded,
                     'redirectUrl' => $sessionResult->getCheckoutUrl(),
                     'sessionId' => $sessionResult->getSessionId(),
@@ -255,36 +276,38 @@ class StripePaymentHandler implements PaymentHandlerInterface
         PaymentContextInterface $context
     ): void {
         $paymentMethodId = $context->getPaymentMethodId();
-        $session = Registry::getSession();
-        $sessionId = $session->getId();
+        $headless = $this->isHeadless($context);
+        $basketId = $headless ? $this->basketIdOf($context) : null;
 
-        // CRITICAL: Set payment method in basket and session before finalizeOrder
-        // OXID validates payment method during order creation (ORDER_STATE_INVALIDPAYMENT = 5)
-        $basket = $session->getBasket();
-        $basket->setPayment($paymentMethodId);
-        $session->setVariable('paymentid', $paymentMethodId);
+        if (!$headless) {
+            // The OPC checkout lives in the PHP session: the session basket gets
+            // the payment and the address check is skipped (Stripe owns it).
+            $this->prepareSessionForOrder($paymentMethodId);
+        }
 
-        // OPC parity with StripeOrderController::createCheckoutSession: the OPC
-        // address is entered + saved via AJAX, so no sDeliveryAddressMD5 form
-        // param reaches finalizeOrder() and OXID's validateDeliveryAddress would
-        // reject the order (state 7, invalid_delivery_address). Stripe owns the
-        // address validation, so set the skip flag before finalizeOrder runs.
-        $session->setVariable(ControllerRequestHelper::SESSION_SKIP_ADDR_CHECK, true);
-
+        // GRAPH-QL / PS1: a headless checkout names the persisted basket it pays
+        // for; payment-base's order service then builds the shop basket from
+        // that row (no session) and the address hash is restored by it.
         $request = new CreateOrderRequest(
-            sessionId: $sessionId,
+            sessionId: $headless ? $this->headlessSessionId($context, $basketId) : $this->sessionId(),
             userId: $contract->getUserId(),
             paymentId: $paymentMethodId,
             paymentTransactionId: null,
             orderRemark: null,
             metadata: ['contract_id' => $contract->getId()],
-            initialStatus: 'NOT_FINISHED'
+            initialStatus: 'NOT_FINISHED',
+            basketId: $basketId
         );
 
         $orderResponse = $this->shopOrderService->createOrder($request);
         $orderId = $orderResponse->orderId;
 
         $contract->setMetadata('order_number', (string) $orderResponse->orderNumber);
+        if ($basketId !== null) {
+            // So the next start for this basket retires this attempt, and the
+            // basket is removed on commit (payment-base S3 / S6).
+            $contract->setMetadata('basket_id', $basketId);
+        }
 
         // Sprint 133 (F15): transitionToNotFinished() is now on
         // PaymentContractInterface alongside transitionToPending(), so this no
@@ -356,28 +379,50 @@ class StripePaymentHandler implements PaymentHandlerInterface
     }
 
     private function createCheckoutSession(
-        PaymentContractInterface $contract
+        PaymentContractInterface $contract,
+        PaymentContextInterface $context
     ): \OxidEsales\Payments\Stripe\Service\Result\CheckoutSessionResult {
         $contractId = $contract->getId() ?? '';
-        $snapshot = $contract->getBasketSnapshot();
-        $shopUrl = $this->shopAdapter->getShopUrl();
-        $shopId = $this->shopAdapter->getShopId();
-        $captureMode = $this->config->getCaptureMode();
-        $sessionId = Registry::getSession()->getId();
-        $languageId = $this->languageResolver->getActiveLanguageId();
-        // Sprint 133 (F14): no silent fallback to shop 1 on EE multishop.
-        $shopIdInt = ShopId::of($shopId, 'checkout session creation');
+        $headless = $this->isHeadless($context);
 
-        $orderId = $contract->getOrderId();
         $rawOrderNumber = $contract->getMetadata('order_number');
         $orderNumber = is_string($rawOrderNumber) ? $rawOrderNumber : null;
 
-        $contractToken = $this->tokenService->generateToken($contractId);
+        [$successUrl, $cancelUrl] = $headless
+            ? $this->headlessUrls($context)
+            : $this->shopUrls($contractId);
+
+        return $this->checkoutSessionService->createSession(
+            contractId: $contractId,
+            basketSnapshot: $contract->getBasketSnapshot(),
+            successUrl: $successUrl,
+            cancelUrl: $cancelUrl,
+            shopId: $this->shopAdapter->getShopId(),
+            captureMode: $this->config->getCaptureMode(),
+            orderId: $contract->getOrderId(),
+            orderNumber: $orderNumber,
+            embedded: $headless ? $this->uiModeOf($context) === 'embedded' : $this->isIframeMode(),
+        );
+    }
+
+    /**
+     * The Twig / OPC targets: the shop's own return controller (with the
+     * contract token and the shop session id) and its payment step.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function shopUrls(string $contractId): array
+    {
+        $shopUrl = $this->shopAdapter->getShopUrl();
+        $languageId = $this->languageResolver->getActiveLanguageId();
+        // Sprint 133 (F14): no silent fallback to shop 1 on EE multishop.
+        $shopIdInt = ShopId::of($this->shopAdapter->getShopId(), 'checkout session creation');
+
         $successUrl = $this->checkoutSessionService->buildSuccessUrl(
             $shopUrl,
             $contractId,
-            $contractToken,
-            $sessionId,
+            $this->tokenService->generateToken($contractId),
+            $this->sessionId(),
             $languageId,
             $shopIdInt
         );
@@ -385,17 +430,75 @@ class StripePaymentHandler implements PaymentHandlerInterface
             $shopUrl . 'index.php?cl=payment&lang=' . $languageId . '&shp=' . $shopIdInt
         );
 
-        return $this->checkoutSessionService->createSession(
-            contractId: $contractId,
-            basketSnapshot: $snapshot,
-            successUrl: $successUrl,
-            cancelUrl: $cancelUrl,
-            shopId: $shopId,
-            captureMode: $captureMode,
-            orderId: $orderId,
-            orderNumber: $orderNumber,
-            embedded: $this->isIframeMode(),
-        );
+        return [$successUrl, $cancelUrl];
+    }
+
+    /**
+     * GRAPH-QL / PS1: the client's URLs, already validated by payment-base's
+     * return-URL policy. Stripe appends the Checkout Session id to the return
+     * URL so the client can hand it to `stripeCheckoutReturn`. Hosted mode uses
+     * success/cancel URLs, embedded mode a single return URL - the same string
+     * serves both. Without a cancel URL the shopper comes back to the return
+     * URL and the client reads the contract state.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function headlessUrls(PaymentContextInterface $context): array
+    {
+        $returnUrl = (string) $context->getReturnUrl();
+        $successUrl = $returnUrl . (str_contains($returnUrl, '?') ? '&' : '?') . 'session_id={CHECKOUT_SESSION_ID}';
+        $cancelUrl = $context->getCancelUrl();
+
+        return [$successUrl, is_string($cancelUrl) && $cancelUrl !== '' ? $cancelUrl : $returnUrl];
+    }
+
+    private function isHeadless(PaymentContextInterface $context): bool
+    {
+        return $context->getMetadataValue('headless') === true;
+    }
+
+    private function uiModeOf(PaymentContextInterface $context): string
+    {
+        $uiMode = $context->getMetadataValue('uiMode', 'hosted');
+
+        return is_string($uiMode) && $uiMode !== '' ? $uiMode : 'hosted';
+    }
+
+    private function basketIdOf(PaymentContextInterface $context): ?string
+    {
+        $basketId = $context->getMetadataValue('basketId');
+
+        return is_string($basketId) && $basketId !== '' ? $basketId : null;
+    }
+
+    private function headlessSessionId(PaymentContextInterface $context, ?string $basketId): string
+    {
+        $sessionId = $context->getMetadataValue('sessionId');
+
+        return is_string($sessionId) && $sessionId !== '' ? $sessionId : 'headless:' . (string) $basketId;
+    }
+
+    /**
+     * Seam: the shop session id (Twig / OPC only).
+     */
+    protected function sessionId(): string
+    {
+        return (string) Registry::getSession()->getId();
+    }
+
+    /**
+     * Seam: what the OPC checkout needs in the session before finalizeOrder().
+     * OXID validates the payment during order creation (ORDER_STATE_INVALIDPAYMENT),
+     * and the OPC address is saved via AJAX, so no sDeliveryAddressMD5 reaches
+     * finalizeOrder() - Stripe owns the address validation, hence the skip flag.
+     */
+    protected function prepareSessionForOrder(string $paymentMethodId): void
+    {
+        $session = Registry::getSession();
+        $basket = $session->getBasket();
+        $basket->setPayment($paymentMethodId);
+        $session->setVariable('paymentid', $paymentMethodId);
+        $session->setVariable(ControllerRequestHelper::SESSION_SKIP_ADDR_CHECK, true);
     }
 
     private function resolveUserId(object $user): string
