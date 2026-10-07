@@ -4,6 +4,63 @@ services:
     autoconfigure: true
     public: false
 
+  # ===========================================
+  # GRAPH-QL / PS4 — GraphQL Storefront mutations
+  # ===========================================
+  # Neither autowired nor autoconfigured: they implement graphql-base /
+  # GraphQLite contracts that are optional for this module. `@?` keeps the
+  # container compiling without graphql-base (the controller then throws a
+  # clear error if it is ever invoked, which it cannot be without graphql-base).
+  OxidEsales\Payments\Stripe\GraphQL\Controller\StripeCheckout:
+    autowire: false
+    autoconfigure: false
+    arguments:
+      $checkout: '@OxidEsales\PaymentBase\Checkout\Headless\HeadlessCheckoutServiceInterface'
+      # Stripe's own contract token for StripeReturnResolver (payment-base verified its headless token already)
+      $tokenService: '@OxidEsales\Payments\Stripe\Service\ContractTokenService'
+      $authentication: '@?OxidEsales\GraphQL\Base\Service\Authentication'
+    public: true
+
+  # graphql-base is optional: the mapper mirrors NamespaceMapperInterface
+  # without implementing it, because the container reflects every service
+  # class at module activation and the interface is absent on a shop without
+  # GraphQL. The tag is inert until graphql-base is installed.
+  OxidEsales\Payments\Stripe\GraphQL\Service\NamespaceMapper:
+    autowire: false
+    autoconfigure: false
+    tags: [ 'graphql_namespace_mapper' ]
+
+  # ===========================================
+  # GRAPH-QL / PS5 — ACP checkout service (payment-base MCP layer)
+  # ===========================================
+  # The provider half of the agentic-commerce layer: create_checkout on the
+  # headless path, complete_checkout charging the delegated token. The MCP /
+  # UCP transport (server, tools, auth guard, controllers) is a separate
+  # feature and wires AcpCheckoutServiceInterface to this service.
+  OxidEsales\PaymentBase\Mcp\Acp\AcpResponseFormatterInterface:
+    class: OxidEsales\PaymentBase\Mcp\Acp\AcpResponseFormatter
+    arguments:
+      $paymentProviders: [ 'stripe' ]
+
+  OxidEsales\Payments\Stripe\Mcp\StripeAcpCheckoutService:
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+      $contractService: '@OxidEsales\PaymentBase\Service\ContractServiceInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
+      $formatter: '@OxidEsales\PaymentBase\Mcp\Acp\AcpResponseFormatterInterface'
+      $contractOpening: '@OxidEsales\PaymentBase\Checkout\Headless\ContractOpeningServiceInterface'
+      $userBaskets: '@OxidEsales\PaymentBase\Checkout\Headless\UserBasketFactoryInterface'
+      $buyers: '@OxidEsales\PaymentBase\Checkout\Headless\GuestUserResolverInterface'
+      $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
+    public: true
+
+  OxidEsales\PaymentBase\Mcp\Acp\AcpCheckoutServiceInterface:
+    alias: OxidEsales\Payments\Stripe\Mcp\StripeAcpCheckoutService
+    public: true
+
   OxidEsales\Payments\Stripe\Service\:
     resource: 'src/Stripe/Service/*'
     exclude:
@@ -66,6 +123,8 @@ services:
       # Keeps the cleanup from cancelling a checkout the customer is about to pay
       # in — see CheckoutInFlightGuard.
       $inFlightGuard: '@OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard'
+      # GRAPH-QL / PS3: a session Stripe reports as paid is committed, never cancelled.
+      $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
     public: true
 
   # Same reason: fetched by id from the Order model extension (admin order tab).
@@ -252,6 +311,9 @@ services:
       # left behind, instead of stacking another one beside it.
       $previousAttemptCleaner: '@OxidEsales\PaymentBase\Checkout\PreviousCheckoutAttemptCleanerInterface'
       $openAttempts: '@OxidEsales\PaymentBase\Checkout\OpenCheckoutAttemptRegistryInterface'
+      # GRAPH-QL / PS2: a headless start with nothing in the registry retires the
+      # open attempt for the same user basket (payment-base S3).
+      $openAttemptFinder: '@OxidEsales\PaymentBase\Repository\OpenAttemptFinderInterface'
     tags:
       - { name: payment.event_handler, priority: 100 }
     public: false
@@ -599,6 +661,10 @@ services:
       $enforceSecurityCheck: '%payment.return_security.enforce%'
       $logger: '@oxid_esales.monolog.logger'
     public: true
+    tags:
+      # GRAPH-QL / PS2: payment-base's headless return (stripeCheckoutReturn) finds
+      # the resolver by provider name through ReturnResolverRegistry.
+      - { name: oe.payment.return_resolver, provider: stripe }
 
   # Stripe Event Translator - maps abstract request events onto Stripe's
   # concrete event classes. Collected by payment-base's EventBroker.
@@ -999,6 +1065,22 @@ services:
       $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
+      # GRAPH-QL / PS3: a paid intent / session commits a PENDING contract
+      # (payment-base ContractCommitService) - the return leg is no longer the
+      # only way.
+      $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
+    tags: [ { name: stripe.webhook_handler } ]
+    public: false
+
+  # GRAPH-QL / PS6 follow-up: manual capture. The authorized intent commits
+  # the open contract with requiresCapture (order created, not paid yet).
+  OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentAmountCapturableUpdatedWebhookHandler:
+    arguments:
+      $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
+      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+      $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
     tags: [ { name: stripe.webhook_handler } ]
     public: false
 
@@ -1044,6 +1126,10 @@ services:
       $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
+      # GRAPH-QL / PS3: a paid intent / session commits a PENDING contract
+      # (payment-base ContractCommitService) - the return leg is no longer the
+      # only way.
+      $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
     tags: [ { name: stripe.webhook_handler } ]
     public: false
 

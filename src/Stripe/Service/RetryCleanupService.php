@@ -7,6 +7,10 @@ namespace OxidEsales\Payments\Stripe\Service;
 use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\Payments\Stripe\Core\AmountConverter;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\PaymentBase\Service\Commit\PaymentConfirmation;
+use OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -27,7 +31,9 @@ class RetryCleanupService
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ShopOrderServiceInterface $orderService,
         ?LoggerInterface $logger = null,
-        private readonly ?CheckoutInFlightGuard $inFlightGuard = null
+        private readonly ?CheckoutInFlightGuard $inFlightGuard = null,
+        // GRAPH-QL / PS3: a session Stripe reports as paid is committed, not cancelled.
+        private readonly ?ContractCommitServiceInterface $contractCommit = null
     ) {
         $this->logger = $logger ?? new NullLogger();
     }
@@ -118,9 +124,14 @@ class RetryCleanupService
             return false;
         }
 
-        $orderId = $contract->getOrderId();
-        if ($orderId !== null) {
-            $this->orderService->deleteNotFinishedOrder($orderId);
+        // GRAPH-QL / PS3: ask Stripe BEFORE anything is deleted. Until
+        // 2026-10-06 the order was deleted first and the in-flight guard asked
+        // afterwards - and the guard answers null for a paid session, so a
+        // shopper who paid but never reached the return leg lost their order
+        // (money taken, no order). A paid session is committed; a usable unpaid
+        // one is kept; only then may the attempt be retired.
+        if ($this->settlePaidSession($contract)) {
+            return false;
         }
 
         // Not every previous attempt is stale. The OPC checkout API prepares a
@@ -138,8 +149,59 @@ class RetryCleanupService
             return false;
         }
 
+        $orderId = $contract->getOrderId();
+        if ($orderId !== null) {
+            $this->orderService->deleteNotFinishedOrder($orderId);
+        }
+
         $contract->cancel('checkout_retry');
         $this->contractRepository->save($contract);
+
+        return true;
+    }
+
+    /**
+     * True when Stripe reports the contract's session as paid: the contract is
+     * then committed through payment-base's ContractCommitService (or, without
+     * one wired, left alone and logged) and must never be cancelled here.
+     */
+    private function settlePaidSession(PaymentContractInterface $contract): bool
+    {
+        $session = $this->inFlightGuard?->sessionOf($contract);
+        if ($session === null || $session->paymentStatus !== 'paid') {
+            return false;
+        }
+
+        if ($this->contractCommit === null) {
+            $this->logger->error('Stale checkout has a PAID Stripe session and no commit service; left untouched', [
+                'contractId' => $contract->getId(),
+                'sessionId' => $session->id,
+                'paymentIntentId' => $session->paymentIntentId,
+            ]);
+
+            return true;
+        }
+
+        $currency = strtoupper($session->currency);
+        $outcome = $this->contractCommit->commit(new PaymentConfirmation(
+            contractId: (string) $contract->getId(),
+            providerName: StripeDefinitions::PROVIDER,
+            authorizationId: $session->paymentIntentId,
+            providerOrderId: $session->id,
+            amount: AmountConverter::toMajorUnits($session->amountTotal, $currency),
+            currency: $currency,
+            requiresCapture: false,
+            source: 'cleanup',
+            extraContext: ['checkoutSessionId' => $session->id],
+        ));
+
+        $this->logger->info('Stale checkout had a paid Stripe session; committed instead of cancelled', [
+            'contractId' => $contract->getId(),
+            'sessionId' => $session->id,
+            'outcome' => $outcome->outcome,
+            'orderId' => $outcome->orderId,
+            'reason' => $outcome->reason,
+        ]);
 
         return true;
     }

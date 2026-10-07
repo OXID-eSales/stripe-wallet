@@ -39,6 +39,17 @@ OXID 7.x Module Commands:
 
 Stripe module doesn't have any migrations. All DB-dependancies are in the payment-component package.
 
+## GraphQL / headless checkout
+
+The module exposes `stripeCheckoutStart / stripeCheckoutReturn / stripeCheckoutCancel` to the GraphQL Storefront
+(payment-base's headless checkout, GRAPH-QL epic). Try it from the command line:
+
+```bash
+SHOP_URL=https://<your shop>/ bin/graph-ql-cli-test.sh demo
+```
+
+How it works, every command and example output: [bin/graph-ql-cli-test.md](bin/graph-ql-cli-test.md).
+
 ## Running Tests
 
 
