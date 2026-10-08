@@ -1,6 +1,6 @@
 # Status — dev_log 20261008 · Stripe webhook endpoint registration
 
-**Branch:** `b-7.4.x-stripe-webhook-endpoint` (from `b-7.4.x` after the GRAPH-QL merge). Merge on the product owner's word.
+**Branch:** `b-7.4.x-stripe-webhook-endpoint` (from `b-7.4.x` after the GRAPH-QL merge). **Merged into `b-7.4.x` 2026-10-08** (merge commit `6795f83`, at the user's request).
 
 | Story | State | Notes |
 |---|---|---|
