@@ -153,6 +153,7 @@ $aLang = array(
     // Webhook-Einrichtung (Buttons "Erstellen" / "Löschen" in der Modulkonfiguration)
     'STRIPE_WEBHOOK_CREATE_BUTTON'                      => 'Webhooks erstellen',
     'STRIPE_WEBHOOK_PLATFORM_KEY_MISSING'               => 'Bitte fügen Sie zuerst Ihren Platform-Secret-Key in der Modulkonfiguration ein (sStripeTestKey / sStripeLiveKey).',
+    'STRIPE_WEBHOOK_API_KEY_MISSING'                    => 'Bitte fügen Sie zuerst Ihren Stripe Secret Key (sStripeTestToken / sStripeLiveToken) in der Modulkonfiguration ein.',
     'STRIPE_WEBHOOK_NOT_CONFIGURED'                     => 'Nicht konfiguriert',
     'STRIPE_WEBHOOK_CLEAR_ALL_BUTTON'                   => 'Alle Webhooks löschen',
     'STRIPE_WEBHOOK_CLEAR_ALL_CONFIRM'                  => 'Dies löscht die für diesen Shop registrierten Webhook-Endpoints in Ihrem Stripe-Plattform-Account. Fortfahren?',
@@ -162,8 +163,8 @@ $aLang = array(
     // Platform-Key-Einstellungsbeschriftungen (in der Modulkonfiguration)
     'SHOP_MODULE_sStripeTestKey'                        => 'Test Platform-Secret-Key (für Webhook-Verwaltung)',
     'SHOP_MODULE_sStripeLiveKey'                        => 'Live Platform-Secret-Key (für Webhook-Verwaltung)',
-    'HELP_SHOP_MODULE_sStripeTestKey'                   => 'Fügen Sie Ihren Stripe-Platform-Standard-Secret-Key (sk_test_…) aus Stripe Dashboard → Entwickler → API-Schlüssel ein. Wird nur für die Registrierung von Connect-Webhooks verwendet — unterscheidet sich vom Connected-Account-Zugriffstoken. Test- und Live-Schlüssel müssen der richtigen Umgebung entsprechen.',
-    'HELP_SHOP_MODULE_sStripeLiveKey'                   => 'Fügen Sie Ihren Stripe-Platform-Standard-Secret-Key (sk_live_…) aus Stripe Dashboard → Entwickler → API-Schlüssel ein. Wird nur für die Registrierung von Connect-Webhooks verwendet — unterscheidet sich vom Connected-Account-Zugriffstoken. Test- und Live-Schlüssel müssen der richtigen Umgebung entsprechen.',
+    'HELP_SHOP_MODULE_sStripeTestKey'                   => 'Nur nötig, wenn Ihr Stripe-Konto ein Connect-Connected-Account ist UND Sie dessen Plattform besitzen: der Standard-Secret-Key der Plattform (sk_test_…) zur Registrierung eines Connect-Webhooks. Sonst leer lassen - "Webhooks erstellen" nutzt Ihren eigenen Secret Key; ein Connected Account ohne Plattform-Key legt den Endpunkt in seinem Dashboard an (der Button nennt URL und Events).',
+    'HELP_SHOP_MODULE_sStripeLiveKey'                   => 'Nur nötig, wenn Ihr Stripe-Konto ein Connect-Connected-Account ist UND Sie dessen Plattform besitzen: der Standard-Secret-Key der Plattform (sk_live_…) zur Registrierung eines Connect-Webhooks. Sonst leer lassen - "Webhooks erstellen" nutzt Ihren eigenen Secret Key; ein Connected Account ohne Plattform-Key legt den Endpunkt in seinem Dashboard an (der Button nennt URL und Events).',
 
     // Erfassung (Manueller Erfassungsmodus)
     'STRIPE_CAPTURE_PAYMENT'                            => 'Zahlung erfassen',

@@ -95,9 +95,9 @@ final class WebhookControllerCleanupTest extends TestCase
     }
 
     /**
-     * STRP-168 item 4. The sweep runs inline in the webhook request, so one
-     * pass must be bounded: an unbounded backlog is paid for out of the
-     * response time, and a provider that times out retries.
+     * STRP-168 item 4. The sweep runs on the webhook request (after the
+     * answer has left, see WebhookControllerRespondsBeforeSweepTest), so one
+     * pass must be bounded: an unbounded backlog would tie up the worker.
      */
     public function testSweepIsBoundedToOneBatch(): void
     {

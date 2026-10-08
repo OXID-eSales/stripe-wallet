@@ -230,12 +230,11 @@ class ModuleConfiguration extends ModuleConfiguration_parent
 
         $moduleConfig = $this->getModuleConfig();
         $mode         = $moduleConfig->getMode();
-        $platformKey  = $moduleConfig->getPlatformKey();
 
-        if ($platformKey === '') {
+        if ($moduleConfig->getToken() === '') {
             $this->respondJson(400, [
                 'success' => false,
-                'message' => $this->translate('STRIPE_WEBHOOK_PLATFORM_KEY_MISSING'),
+                'message' => $this->translate('STRIPE_WEBHOOK_API_KEY_MISSING'),
             ]);
             return;
         }
@@ -244,11 +243,15 @@ class ModuleConfiguration extends ModuleConfiguration_parent
             $existingId  = $this->readOxConfigVar($this->endpointIdKey($mode));
             $webhookUrl  = $moduleConfig->getWebhookUrl();
             $description = $moduleConfig->getModuleDescription();
-            $result      = $this->getWebhookRegistrar()->register(
-                $platformKey,
+            // The shop's own key first (every ordinary account); a Connect webhook on the
+            // platform only when the account is a connected one AND the platform really
+            // controls it; otherwise a message that tells the merchant what to do in the
+            // Dashboard (WebhookEndpointRegistrar::registerForShop()).
+            $result      = $this->getWebhookRegistrar()->registerForShop(
+                $moduleConfig->getToken(),
+                $moduleConfig->getPlatformKey(),
                 $webhookUrl,
                 $existingId,
-                true, // Connect webhook — connected-account tokens cannot create webhooks at all.
                 $description
             );
             $this->persistEndpoint($mode, $result, $webhookUrl);

@@ -189,12 +189,65 @@ class WebhookController extends FrontendController
             $this->sendErrorResponse($payload, $result->error ?? $result->action, $statusCode);
         }
 
-        // STRP-100: Clean up stale NOT_FINISHED orders (>30 min) after each webhook
-        $this->cleanupStaleNotFinishedOrders();
-
         $this->logResult($payload, "SUCCESS: {$result->action}", 200);
+        $this->sendSuccessResponse($result->action);
+
+        // STRP-100: sweep stale NOT_FINISHED orders after each webhook - on the
+        // released request, never before the answer. The sweep is up to two
+        // Stripe round trips per stale contract, and Stripe (like its CLI)
+        // abandons a delivery that has not answered within its timeout and
+        // retries it: with five stale contracts the dev shop took 32 s, so
+        // every webhook it had in fact handled counted as failed at Stripe.
+        $this->cleanupStaleNotFinishedOrders();
+        $this->terminate();
+    }
+
+    /**
+     * Answer 200 and release the client before any post-processing.
+     *
+     * Protected seam for the testable subclass.
+     */
+    protected function sendSuccessResponse(string $action): void
+    {
+        $body = (string) json_encode(['received' => true, 'action' => $action]);
+
         http_response_code(200);
-        echo json_encode(['received' => true, 'action' => $result->action]);
+        ignore_user_abort(true);
+        if (!function_exists('fastcgi_finish_request')) {
+            header('Content-Length: ' . strlen($body));
+            header('Connection: close');
+        }
+        echo $body;
+
+        $this->releaseClient();
+    }
+
+    /**
+     * Under PHP-FPM the request is finished outright and the worker keeps
+     * running; elsewhere the sized body is flushed, so a client honouring
+     * Content-Length stops waiting while the sweep still runs.
+     */
+    private function releaseClient(): void
+    {
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+            return;
+        }
+
+        while (ob_get_level() > 0) {
+            ob_end_flush();
+        }
+        flush();
+    }
+
+    /**
+     * The production end of a handled webhook. Protected seam, so a test can
+     * observe the order of answer, sweep and end instead of losing the process.
+     *
+     * @return never
+     */
+    protected function terminate(): never
+    {
         exit;
     }
 

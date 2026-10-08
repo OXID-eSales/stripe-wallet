@@ -136,6 +136,26 @@ class StripeWebhookEndpointApi implements StripeWebhookEndpointApiInterface
         }
     }
 
+    public function accountId(string $apiKey): string
+    {
+        try {
+            return (string) $this->client($apiKey)->accounts->retrieve()->id;
+        } catch (ApiErrorException $e) {
+            throw WebhookRegistrationException::fromApiError((string) $e->getStripeCode(), $e->getMessage(), $e);
+        }
+    }
+
+    public function platformControlsAccount(string $platformKey, string $accountId): bool
+    {
+        try {
+            return (string) $this->client($platformKey)->accounts->retrieve($accountId)->id === $accountId;
+        } catch (ApiErrorException) {
+            // "Only Stripe Connect platforms can work with other accounts" / resource_missing:
+            // the platform does not control this account.
+            return false;
+        }
+    }
+
     private function client(string $apiKey): StripeClient
     {
         return $this->clientProvider->forKey($apiKey);

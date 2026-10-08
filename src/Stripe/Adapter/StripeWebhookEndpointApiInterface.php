@@ -73,4 +73,18 @@ interface StripeWebhookEndpointApiInterface
      * @throws WebhookRegistrationException
      */
     public function delete(string $apiKey, string $endpointId): void;
+
+    /**
+     * The Stripe account the key belongs to (`acct_…`).
+     *
+     * @throws WebhookRegistrationException
+     */
+    public function accountId(string $apiKey): string;
+
+    /**
+     * Whether the platform behind $platformKey controls the connected account $accountId -
+     * i.e. whether a Connect webhook on that platform would receive the account's events.
+     * Answers false (never throws) when Stripe refuses the lookup.
+     */
+    public function platformControlsAccount(string $platformKey, string $accountId): bool;
 }
