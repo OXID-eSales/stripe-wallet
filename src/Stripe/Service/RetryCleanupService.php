@@ -76,11 +76,12 @@ class RetryCleanupService
      * Called after webhook processing to garbage-collect abandoned checkouts
      * (e.g. user hit browser back and never retried).
      *
-     * STRP-168 item 4: $limit bounds one pass. The sweep runs inline in the
-     * webhook request, so an unbounded backlog is paid for out of that
-     * request's response time — and a provider that times out retries, which
-     * only makes the backlog worse. Whatever is left over is picked up by the
-     * next webhook, or by oe:payments:not_finished:cleanup.
+     * STRP-168 item 4: $limit bounds one pass. The sweep runs on the webhook
+     * request after its answer has left (the controller releases the client
+     * first), so a backlog costs worker time, not response time - but one
+     * pass is still bounded so a worker is not tied up indefinitely. Whatever
+     * is left over is picked up by the next webhook, or by
+     * oe:payments:not_finished:cleanup.
      *
      * @param int|null $limit cap the batch, or null for no cap
      *
