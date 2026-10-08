@@ -53,4 +53,26 @@ interface WebhookEndpointRegistrarInterface
      *         may have occurred — caller should treat as fatal and re-list).
      */
     public function clearAll(string $accessToken, ?string $urlFilter = null): int;
+
+    /**
+     * Register the shop's webhook endpoint with whatever Stripe allows for this shop:
+     *
+     *  1. a plain endpoint on the shop's own account (`$accountKey`) - every ordinary Stripe
+     *     account; the common case, which the admin button never tried before;
+     *  2. if Stripe refuses because the account is a *connected* account: a Connect webhook on
+     *     the platform (`$platformKey`), but only after checking that this platform really
+     *     controls the account - a Connect endpoint on an unrelated account registers fine and
+     *     then never receives anything;
+     *  3. otherwise a {@see WebhookRegistrationException} that tells the merchant to create the
+     *     endpoint in their own Dashboard, with the URL and the events to copy.
+     *
+     * @throws WebhookRegistrationException
+     */
+    public function registerForShop(
+        string $accountKey,
+        string $platformKey,
+        string $webhookUrl,
+        ?string $existingEndpointId,
+        string $description = ''
+    ): WebhookEndpointRegistrationResult;
 }

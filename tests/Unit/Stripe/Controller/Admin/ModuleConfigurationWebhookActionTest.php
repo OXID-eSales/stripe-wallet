@@ -66,19 +66,21 @@ final class ModuleConfigurationWebhookActionTest extends TestCase
     public function testReturnsSuccessJsonAndPersistsEndpointWhenRegistrarSucceeds(): void
     {
         $this->moduleConfig->method('getMode')->willReturn('test');
+        $this->moduleConfig->method('getToken')->willReturn('sk_test_shop');
         $this->moduleConfig->method('getPlatformKey')->willReturn('sk_test_platform');
         $this->moduleConfig->method('getWebhookUrl')
             ->willReturn('https://shop.example.com/index.php?cl=StripeWebhookController');
         $this->moduleConfig->method('getModuleDescription')
             ->willReturn('OXID eShop Stripe wallet (test)');
 
+        // The shop's own key first, the platform key only as the verified Connect fallback.
         $this->registrar->expects($this->once())
-            ->method('register')
+            ->method('registerForShop')
             ->with(
+                'sk_test_shop',
                 'sk_test_platform',
                 'https://shop.example.com/index.php?cl=StripeWebhookController',
                 null,
-                true,
                 'OXID eShop Stripe wallet (test)',
             )
             ->willReturn(new WebhookEndpointRegistrationResult('we_123', 'whsec_abc'));
@@ -111,35 +113,53 @@ final class ModuleConfigurationWebhookActionTest extends TestCase
         );
     }
 
-    public function testReturnsErrorJsonWhenPlatformKeyMissing(): void
+    public function testWorksWithoutAPlatformKeyTheShopKeyIsEnough(): void
     {
         $this->moduleConfig->method('getMode')->willReturn('test');
+        $this->moduleConfig->method('getToken')->willReturn('sk_test_shop');
         $this->moduleConfig->method('getPlatformKey')->willReturn('');
-
-        $this->registrar->expects($this->never())->method('register');
+        $this->moduleConfig->method('getWebhookUrl')
+            ->willReturn('https://shop.example.com/index.php?cl=StripeWebhookController');
+        $this->moduleConfig->method('getModuleDescription')->willReturn('desc');
+        $this->registrar->expects($this->once())->method('registerForShop')
+            ->with('sk_test_shop', '', $this->anything(), null, 'desc')
+            ->willReturn(new WebhookEndpointRegistrationResult('we_1', 'whsec_1'));
 
         $stored = [];
         $controller = $this->createControllerWithOxConfigStore($stored);
-
         ob_start();
         $controller->stripeCreateWebhookEndpoint();
-        $output = ob_get_clean();
+        $decoded = json_decode((string) ob_get_clean(), true);
 
-        $this->assertNotFalse($output);
-        $decoded = json_decode($output, true);
+        $this->assertTrue($decoded['success']);
+    }
+
+    public function testReturnsErrorJsonWhenTheShopApiKeyIsMissing(): void
+    {
+        $this->moduleConfig->method('getMode')->willReturn('test');
+        $this->moduleConfig->method('getToken')->willReturn('');
+        $this->registrar->expects($this->never())->method('registerForShop');
+
+        $stored = [];
+        $controller = $this->createControllerWithOxConfigStore($stored);
+        ob_start();
+        $controller->stripeCreateWebhookEndpoint();
+        $decoded = json_decode((string) ob_get_clean(), true);
+
         $this->assertFalse($decoded['success']);
-        $this->assertSame('STRIPE_WEBHOOK_PLATFORM_KEY_MISSING', $decoded['message']);
+        $this->assertSame('STRIPE_WEBHOOK_API_KEY_MISSING', $decoded['message']);
     }
 
     public function testReturnsErrorJsonWhenRegistrarThrowsWebhookRegistrationException(): void
     {
         $this->moduleConfig->method('getMode')->willReturn('test');
+        $this->moduleConfig->method('getToken')->willReturn('sk_test_shop');
         $this->moduleConfig->method('getPlatformKey')->willReturn('sk_test_platform');
         $this->moduleConfig->method('getWebhookUrl')
             ->willReturn('https://shop.example.com/index.php?cl=StripeWebhookController');
         $this->moduleConfig->method('getModuleDescription')->willReturn('desc');
 
-        $this->registrar->method('register')
+        $this->registrar->method('registerForShop')
             ->willThrowException(
                 WebhookRegistrationException::fromApiError('rate_limit', 'too many requests')
             );
@@ -163,7 +183,7 @@ final class ModuleConfigurationWebhookActionTest extends TestCase
         $session->method('checkSessionChallenge')->willReturn(false);
         Registry::set(Session::class, $session);
 
-        $this->registrar->expects($this->never())->method('register');
+        $this->registrar->expects($this->never())->method('registerForShop');
 
         $stored = [];
         $controller = $this->createControllerWithOxConfigStore($stored);
@@ -181,6 +201,7 @@ final class ModuleConfigurationWebhookActionTest extends TestCase
     public function testPassesExistingEndpointIdFromOxConfigToRegistrar(): void
     {
         $this->moduleConfig->method('getMode')->willReturn('test');
+        $this->moduleConfig->method('getToken')->willReturn('sk_test_shop');
         $this->moduleConfig->method('getPlatformKey')->willReturn('sk_test_platform');
         $this->moduleConfig->method('getWebhookUrl')
             ->willReturn('https://shop.example.com/index.php?cl=StripeWebhookController');
@@ -189,12 +210,12 @@ final class ModuleConfigurationWebhookActionTest extends TestCase
         $stored = ['sStripeWebhookEndpointIdTest' => 'we_existing_123'];
 
         $this->registrar->expects($this->once())
-            ->method('register')
+            ->method('registerForShop')
             ->with(
+                'sk_test_shop',
                 'sk_test_platform',
                 $this->anything(),
                 'we_existing_123',
-                true,
                 'desc',
             )
             ->willReturn(new WebhookEndpointRegistrationResult('we_existing_123', null));

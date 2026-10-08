@@ -153,6 +153,7 @@ $aLang = array(
     // Webhook setup (Create / Clear buttons in module_config)
     'STRIPE_WEBHOOK_CREATE_BUTTON'                      => 'Create webhooks',
     'STRIPE_WEBHOOK_PLATFORM_KEY_MISSING'               => 'Paste your platform secret key in Module Configuration first (sStripeTestKey / sStripeLiveKey).',
+    'STRIPE_WEBHOOK_API_KEY_MISSING'                    => 'Paste your Stripe secret key (sStripeTestToken / sStripeLiveToken) in Module Configuration first.',
     'STRIPE_WEBHOOK_NOT_CONFIGURED'                     => 'Not configured',
     'STRIPE_WEBHOOK_CLEAR_ALL_BUTTON'                   => 'Clear all webhooks',
     'STRIPE_WEBHOOK_CLEAR_ALL_CONFIRM'                  => 'This will delete the webhook endpoints registered for this shop on your Stripe platform account. Continue?',
@@ -162,8 +163,8 @@ $aLang = array(
     // Platform key setting labels (used in Module Configuration)
     'SHOP_MODULE_sStripeTestKey'                        => 'Test Platform Secret Key (for webhook management)',
     'SHOP_MODULE_sStripeLiveKey'                        => 'Live Platform Secret Key (for webhook management)',
-    'HELP_SHOP_MODULE_sStripeTestKey'                   => 'Paste your Stripe platform standard secret key (sk_test_…) from Stripe Dashboard → Developers → API keys. Used only for registering Connect webhooks — distinct from the connected-account access token. Ensure test and live mode keys match the correct environment.',
-    'HELP_SHOP_MODULE_sStripeLiveKey'                   => 'Paste your Stripe platform standard secret key (sk_live_…) from Stripe Dashboard → Developers → API keys. Used only for registering Connect webhooks — distinct from the connected-account access token. Ensure test and live mode keys match the correct environment.',
+    'HELP_SHOP_MODULE_sStripeTestKey'                   => 'Only needed when your Stripe account is a Connect connected account AND you own its platform: the platform\'s standard secret key (sk_test_…), used to register a Connect webhook. Leave empty otherwise - "Create webhooks" uses your own secret key, and a connected account without a platform key creates the endpoint in its Dashboard (the button tells you the URL and events).',
+    'HELP_SHOP_MODULE_sStripeLiveKey'                   => 'Only needed when your Stripe account is a Connect connected account AND you own its platform: the platform\'s standard secret key (sk_live_…), used to register a Connect webhook. Leave empty otherwise - "Create webhooks" uses your own secret key, and a connected account without a platform key creates the endpoint in its Dashboard (the button tells you the URL and events).',
 
     // Capture (Manual Capture Mode)
     'STRIPE_CAPTURE_PAYMENT'                            => 'Capture Payment',

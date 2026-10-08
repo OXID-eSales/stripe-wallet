@@ -48,6 +48,40 @@ class WebhookEndpointRegistrar implements WebhookEndpointRegistrarInterface
         );
     }
 
+    public function registerForShop(
+        string $accountKey,
+        string $platformKey,
+        string $webhookUrl,
+        ?string $existingEndpointId,
+        string $description = ''
+    ): WebhookEndpointRegistrationResult {
+        try {
+            return $this->register($accountKey, $webhookUrl, $existingEndpointId, false, $description);
+        } catch (WebhookRegistrationException $refusal) {
+            // An endpoint id we hold may have been created on the platform side (the old flow):
+            // a missing resource on the account side is not the end either.
+            if (!$refusal->isConnectedAccountRefusal() && !$refusal->isMissingResource()) {
+                throw $refusal;
+            }
+        }
+
+        $shopAccountId = $this->api->accountId($accountKey);
+        $events = $this->eventCatalog->all();
+        if ($platformKey === '') {
+            throw WebhookRegistrationException::connectedAccountNeedsDashboardEndpoint($shopAccountId, $webhookUrl, $events);
+        }
+        if (!$this->api->platformControlsAccount($platformKey, $shopAccountId)) {
+            throw WebhookRegistrationException::platformDoesNotControlAccount(
+                $this->api->accountId($platformKey),
+                $shopAccountId,
+                $webhookUrl,
+                $events,
+            );
+        }
+
+        return $this->register($platformKey, $webhookUrl, $existingEndpointId, true, $description);
+    }
+
     public function clearAll(string $accessToken, ?string $urlFilter = null): int
     {
         $ids = $this->api->listAll($accessToken, $urlFilter);
