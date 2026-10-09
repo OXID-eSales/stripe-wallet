@@ -33,7 +33,7 @@
     "ext-json": "*",
     "ext-mbstring": "*",
     "doctrine/dbal": "^2.13 || ^3.0",
-    "oxid-esales/payment-base": ">=v1.2",
+    "oxid-esales/payment-base": ">=v1.3",
     "psr/log": "^1.0 || ^2.0 || ^3.0",
     "stripe/stripe-php": "^19.3",
     "symfony/console": "^6.4 || ^7.0"
