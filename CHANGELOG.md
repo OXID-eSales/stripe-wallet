@@ -4,13 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [v3.4.0] - 2026-10-09
 
 ### Added
 - A "Help" group at the end of the module Settings tab (MOL-10): payment-base's contract-state table
   (OXID Contract Status · Meaning) with Stripe's third column, the PaymentIntent status each state corresponds to
   (`Admin\StripeContractStateHelp`). The admin order Payment tab shows an "OXID Contract Status" row with a "?" that
   opens payment-base's Help layer (description + three-column table). Requires the matching payment-base version.
+- Headless functionality
 
 ### Fixed
 - Iframe mode painted the Place-Order button instead of the embedded Stripe sheet in every fresh
