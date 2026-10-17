@@ -17,4 +17,9 @@ class OxidLanguageResolver implements LanguageResolverInterface
     {
         return (int) Registry::getLang()->getBaseLanguage();
     }
+
+    public function getActiveLanguageAbbreviation(): string
+    {
+        return (string) Registry::getLang()->getLanguageAbbr();
+    }
 }

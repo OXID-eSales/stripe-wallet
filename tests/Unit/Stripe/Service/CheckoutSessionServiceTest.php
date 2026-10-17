@@ -11,6 +11,7 @@ use OxidEsales\Payments\Stripe\Service\Result\CheckoutSessionResult;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionService;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
+use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -99,6 +100,65 @@ class CheckoutSessionServiceTest extends TestCase
         $service = $this->createService();
 
         $this->assertInstanceOf(CheckoutSessionServiceInterface::class, $service);
+    }
+
+    // --- Checkout Session language ---
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function sessionParamsFor(?string $language, bool $embedded): array
+    {
+        $resolver = null;
+        if ($language !== null) {
+            $resolver = $this->createMock(LanguageResolverInterface::class);
+            $resolver->method('getActiveLanguageAbbreviation')->willReturn($language);
+        }
+
+        $captured = [];
+        $this->stripeAdapter
+            ->method('createCheckoutSession')
+            ->willReturnCallback(function (array $params) use (&$captured) {
+                $captured = $params;
+
+                return $this->buildSessionDto('cs_test_lang', 'https://checkout.stripe.com/pay/cs_test_lang');
+            });
+
+        $service = new CheckoutSessionService($this->adapterFactory, $this->logger, null, $resolver);
+        $service->createSession(
+            'contract_lang',
+            $this->createBasketSnapshot(),
+            'https://shop.example.com/success',
+            'https://shop.example.com/cancel',
+            '1',
+            'automatic',
+            null,
+            null,
+            null,
+            $embedded
+        );
+
+        return $captured;
+    }
+
+    public function testSessionIsCreatedInTheShopsActiveLanguage(): void
+    {
+        $this->assertSame('de', $this->sessionParamsFor('de', false)['locale']);
+    }
+
+    public function testEmbeddedSessionIsCreatedInTheShopsActiveLanguageToo(): void
+    {
+        $this->assertSame('de', $this->sessionParamsFor('de', true)['locale']);
+    }
+
+    public function testAnUnsupportedShopLanguageLetsStripeDecide(): void
+    {
+        $this->assertSame('auto', $this->sessionParamsFor('xx', false)['locale']);
+    }
+
+    public function testWithoutALanguageResolverNoLocaleIsSent(): void
+    {
+        $this->assertArrayNotHasKey('locale', $this->sessionParamsFor(null, false));
     }
 
     // --- createSession Tests ---

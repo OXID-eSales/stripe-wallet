@@ -42,6 +42,7 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
         private readonly StripeAdapterFactoryInterface $adapterFactory,
         ?LoggerInterface $logger = null,
         private readonly ?EventDispatcherInterface $eventDispatcher = null,
+        private readonly ?LanguageResolverInterface $languageResolver = null,
     ) {
         $this->logger = $logger ?? new NullLogger();
     }
@@ -93,6 +94,11 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
                     'metadata' => $paymentIntentMetadata,
                 ],
             ];
+
+            // Stripe renders in the session's locale; without one it follows the BROWSER's language.
+            if ($this->languageResolver !== null) {
+                $params['locale'] = StripeLocale::forLanguage($this->languageResolver->getActiveLanguageAbbreviation());
+            }
 
             // Stripe Embedded Checkout renders inline in an iframe (ui_mode=embedded).
             // ui_mode/return_url and success_url/cancel_url are mutually exclusive.

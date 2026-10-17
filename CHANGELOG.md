@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Stripe Checkout Sessions (hosted and embedded) are created in the shop's active language
+  (`locale`, via the new `StripeLocale` and `LanguageResolverInterface::getActiveLanguageAbbreviation()`).
+  Without a locale Stripe followed the BROWSER's language, so a German storefront showed an English
+  visitor an English payment form. Languages Stripe does not offer fall back to `auto`.
 ### Added
 - Sealed client config provider (`ClientConfig\StripeClientConfigProvider`, tag `payment_base.client_config_provider`):
   exposes only the publishable key of the current mode (or nothing when unset or not a `pk_` key) to payment-base's
