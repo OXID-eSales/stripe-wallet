@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+- Stripe Checkout Sessions (hosted and embedded) are created in the shop's active language
+  (`locale`, via the new `StripeLocale` and `LanguageResolverInterface::getActiveLanguageAbbreviation()`).
+  Without a locale Stripe followed the BROWSER's language, so a German storefront showed an English
+  visitor an English payment form. Languages Stripe does not offer fall back to `auto`.
+
 ## [v3.4.1] - 2026-10-09
 
 ### Fixed

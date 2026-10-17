@@ -511,6 +511,7 @@ services:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
+      $languageResolver: '@OxidEsales\Payments\Stripe\Service\LanguageResolverInterface'
     public: false
 
   # OPC Buy Now modal: append opcModalId to Stripe success/cancel URLs so that
