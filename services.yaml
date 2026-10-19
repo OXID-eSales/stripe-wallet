@@ -105,6 +105,14 @@ services:
       $logger: '@oxid_esales.monolog.logger'
     public: true
 
+  # Sealed client config: payment-base's `paymentClientConfig` query asks every
+  # tagged provider for its browser-safe values (here: the publishable key only).
+  OxidEsales\Payments\Stripe\ClientConfig\StripeClientConfigProvider:
+    arguments:
+      $publishableKeys: '@OxidEsales\Payments\Stripe\Service\PublishableKeyProvider'
+    tags: [ 'payment_base.client_config_provider' ]
+    public: true
+
   # Sprint 133 (F15): logs when it skips an already-settled contract, so a
   # sweep that can never act stops being indistinguishable from a quiet one.
   # Fetched at runtime via ServiceContainer::getServiceFromContainer() from
