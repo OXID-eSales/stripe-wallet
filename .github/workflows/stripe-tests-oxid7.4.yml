@@ -187,6 +187,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
         run: |
+          docker compose exec -T php composer require oxid-esales/graphql-storefront --no-interaction --no-update
           docker compose exec -T -e COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GH_TOKEN}\"}}" \
             php composer update --with-all-dependencies --no-interaction
 
@@ -481,6 +482,7 @@ jobs:
 
       - name: Install testing dependencies
         run: |
+          docker compose exec -T php composer require oxid-esales/graphql-storefront --no-interaction --no-update
           docker compose exec -T php composer update --no-interaction
 
       - name: Install module
