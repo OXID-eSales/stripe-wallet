@@ -351,3 +351,7 @@ Before switching to live mode:
 
 **License:** proprietary
 **Copyright:** OXID eSales AG
+
+---
+
+**Using Stripe from an app or a custom frontend?** See [Headless Storefronts](02-headless-storefronts.md).

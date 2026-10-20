@@ -57,6 +57,7 @@ src/Stripe/
 | 2 | [Payment-Component Dependency](02-payment-component-dependency.md) | What payment-component provides, interface mappings, services.yaml wiring, database schema |
 | 3 | [Extending the Stripe Module](03-extending-the-stripe-module.md) | 6 extension patterns with code examples, full subscription/booking examples, testing, pitfalls |
 | 4 | [Money & Amounts](04-money-and-amounts.md) | Integer minor units vs OXID floats, `AmountConverter`, `CapturableAmount`, refund math, `Money` comparisons |
+| 5 | [Headless Checkout over GraphQL](05-headless-graphql-checkout.md) | The three mutations, the sealed publishable-key exchange, webhook vs return, rights, errors, how to build another frontend or another provider |
 
 ---
 

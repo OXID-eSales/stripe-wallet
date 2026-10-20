@@ -49,6 +49,7 @@ SHOP_URL=https://<your shop>/ bin/graph-ql-cli-test.sh demo
 ```
 
 How it works, every command and example output: [bin/graph-ql-cli-test.md](bin/graph-ql-cli-test.md).
+Developer guide (building other frontends, adding providers): [docs/for_developer/05-headless-graphql-checkout.md](docs/for_developer/05-headless-graphql-checkout.md). Merchant guide: [docs/for_merchant/02-headless-storefronts.md](docs/for_merchant/02-headless-storefronts.md).
 
 ## Running Tests
 
