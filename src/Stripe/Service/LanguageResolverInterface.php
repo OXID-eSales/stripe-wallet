@@ -12,4 +12,9 @@ namespace OxidEsales\Payments\Stripe\Service;
 interface LanguageResolverInterface
 {
     public function getActiveLanguageId(): int;
+
+    /**
+     * The active language's abbreviation (`de`, `en`, …).
+     */
+    public function getActiveLanguageAbbreviation(): string;
 }
