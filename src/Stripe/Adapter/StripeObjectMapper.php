@@ -101,6 +101,7 @@ class StripeObjectMapper
             latestChargeId: $latestChargeId,
             charge: $chargeDto,
             amountCapturable: (int) ($pi->amount_capturable ?? 0),
+            amountReceived: (int) ($pi->amount_received ?? 0),
         );
     }
 

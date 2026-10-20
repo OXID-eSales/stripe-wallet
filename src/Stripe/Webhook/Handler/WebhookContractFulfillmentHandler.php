@@ -15,6 +15,7 @@ use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
+use OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder;
 use OxidEsales\Payments\Stripe\Service\ContractRefundRecorder;
 
 /**
@@ -38,6 +39,7 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
         private readonly ContractLinkedOrderUpdaterInterface $orderUpdater,
         private readonly TransactionRepositoryInterface $transactionRepository,
         private readonly ShopAdapterInterface $shopAdapter,
+        private readonly ContractCaptureRecorder $captureRecorder,
         private readonly ?ContractRefundRecorder $refundRecorder = null,
         private readonly ?LoggerInterface $logger = null
     ) {
@@ -46,25 +48,16 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
     /**
      * @inheritDoc
      */
-    public function handlePaymentSucceeded(string $providerOrderId): ?bool
+    public function handlePaymentSucceeded(string $providerOrderId, ?float $amountReceived = null): ?bool
     {
         $result = $this->contractFulfillmentService->fulfillByProviderOrderId($providerOrderId);
+        if ($result !== true) {
+            return $result;
+        }
 
-        if ($result === true) {
-            $contract = $this->findContractByProviderOrderId($providerOrderId);
-            $capturedAmount = $contract?->getCapturedAmount();
-            if ($contract !== null && $capturedAmount !== null) {
-                $this->recordAudit($contract, StripeDefinitions::TRANSACTION_TYPE_CAPTURE, $capturedAmount);
-            } elseif ($contract !== null) {
-                // Sprint 133 · Story 9 (F9): this used to coalesce to 0.0 and
-                // write an audit row stating that 0.00 was captured for a real
-                // capture. An audit trail with a wrong number is worse than a
-                // missing row plus a loud log line.
-                $this->logger?->error('Capture audit row skipped: contract has no captured amount', [
-                    'contract_id' => $contract->getId(),
-                    'provider_order_id' => $providerOrderId,
-                ]);
-            }
+        $contract = $this->findContractByProviderOrderId($providerOrderId);
+        if ($contract !== null) {
+            $this->captureRecorder->record($contract, $amountReceived);
         }
 
         return $result;

@@ -11,7 +11,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (`locale`, via the new `StripeLocale` and `LanguageResolverInterface::getActiveLanguageAbbreviation()`).
   Without a locale Stripe followed the BROWSER's language, so a German storefront showed an English
   visitor an English payment form. Languages Stripe does not offer fall back to `auto`.
+- A Stripe payment confirmed by `payment_intent.succeeded` (or `checkout.session.completed`) now records the
+  contract's captured amount (`amount_received`, falling back to `amount`) and writes one `capture` audit row.
+  Before, nothing on the webhook path set the captured amount, so the audit row was skipped
+  (`Capture audit row skipped: contract has no captured amount`) and refund bounds saw nothing captured.
+  A manual capture's own `capture` row is never duplicated. `WebhookContractFulfillmentHandlerInterface::handlePaymentSucceeded()`
+  gains an optional trailing `?float $amountReceived`.
 ### Added
+- `stripe:backfill-captured-amount [--apply]`: records the captured amount and the capture audit row on contracts that
+  were fulfilled before the fix above. Dry run by default; `--apply` reads each PaymentIntent from Stripe and writes.
+  Supported by `Service\ContractCaptureRecorder`, `StripePaymentIntentDto::$amountReceived` and
+  `Service\CapturedAmountBackfillService`.
 - Sealed client config provider (`ClientConfig\StripeClientConfigProvider`, tag `payment_base.client_config_provider`):
   exposes only the publishable key of the current mode (or nothing when unset or not a `pk_` key) to payment-base's
   `paymentClientConfig` query. Requires a payment-base release that ships `ClientConfigProviderInterface`.

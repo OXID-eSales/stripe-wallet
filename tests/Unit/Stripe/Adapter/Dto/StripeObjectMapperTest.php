@@ -143,6 +143,30 @@ final class StripeObjectMapperTest extends TestCase
         self::assertNull($dto->charge);
     }
 
+    public function testRetrievePaymentIntent_MapsAmountReceived(): void
+    {
+        $pi = PaymentIntent::constructFrom([
+            'id'              => 'pi_received',
+            'status'          => 'succeeded',
+            'amount'          => 10000,
+            'amount_received' => 9500,
+            'currency'        => 'eur',
+            'latest_charge'   => 'ch_received',
+            'created'         => 1700000000,
+        ]);
+
+        $dto = StripeObjectMapper::fromPaymentIntent($pi);
+
+        self::assertSame(9500, $dto->amountReceived);
+    }
+
+    public function testFromPaymentIntentDefaultsAmountReceivedToZeroWhenAbsent(): void
+    {
+        $pi = PaymentIntent::constructFrom(['id' => 'pi_none', 'status' => 'requires_capture']);
+
+        self::assertSame(0, StripeObjectMapper::fromPaymentIntent($pi)->amountReceived);
+    }
+
     public function testFromPaymentIntentWithExpandedCharge(): void
     {
         // Arrange — PI with expanded Charge object (no refunds)

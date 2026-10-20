@@ -121,6 +121,34 @@ final class CheckoutSessionCompletedWebhookHandlerTest extends TestCase
         $this->assertSame('ctr-pending', $outcome->contractId);
     }
 
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function testHandle_PassesAmountTotalToFulfillmentHandler(): void
+    {
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getId')->willReturn('ctr-total');
+        $contract->method('getState')->willReturn(ContractState::committed());
+        $this->contractRepository->method('findById')->willReturn($contract);
+        $event = new WebhookEvent(
+            id: 'evt_cs_total',
+            type: 'checkout.session.completed',
+            data: ['object' => [
+                'id' => 'cs_total',
+                'payment_status' => 'paid',
+                'payment_intent' => 'pi_total',
+                'amount_total' => 4250,
+                'currency' => 'eur',
+                'metadata' => ['contract_id' => 'ctr-total'],
+            ]],
+            created: time()
+        );
+        $this->fulfillmentHandler->expects($this->once())
+            ->method('handlePaymentSucceeded')
+            ->with('pi_total', 42.5)
+            ->willReturn(true);
+
+        $this->handler->handle($event);
+    }
+
     private function makeEvent(string $paymentStatus, string $paymentIntentId, ?string $contractId): WebhookEvent
     {
         $objectData = [

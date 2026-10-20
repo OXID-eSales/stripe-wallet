@@ -79,6 +79,8 @@ class CheckoutSessionCompletedWebhookHandler extends AbstractStripeWebhookHandle
         $contract->setProvider(StripeDefinitions::PROVIDER, $paymentIntentId);
         $this->contractRepository->save($contract);
 
+        $amountTotal = $this->parser->extractAmountInCurrencyUnits($event, 'amount_total');
+
         // GRAPH-QL / PS3: a paid session commits a PENDING contract right here,
         // so a headless shopper who never comes back still gets their order.
         if (($object['payment_status'] ?? null) === 'paid') {
@@ -88,7 +90,7 @@ class CheckoutSessionCompletedWebhookHandler extends AbstractStripeWebhookHandle
                 $contract,
                 $paymentIntentId,
                 $sessionId,
-                $this->parser->extractAmountInCurrencyUnits($event, 'amount_total'),
+                $amountTotal,
                 $currency,
                 ['checkoutSessionId' => $sessionId]
             );
@@ -99,7 +101,7 @@ class CheckoutSessionCompletedWebhookHandler extends AbstractStripeWebhookHandle
 
         // Attempt fulfillment if in correct state
         if ($contract->getState()->isCommitted()) {
-            $result = $this->fulfillmentHandler->handlePaymentSucceeded($paymentIntentId);
+            $result = $this->fulfillmentHandler->handlePaymentSucceeded($paymentIntentId, $amountTotal);
             if ($result === true) {
                 return StripeWebhookOutcome::of(WebhookResult::success('contract_fulfilled'), $contractId);
             }

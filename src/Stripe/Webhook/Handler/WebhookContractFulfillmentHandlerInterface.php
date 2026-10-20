@@ -24,9 +24,10 @@ interface WebhookContractFulfillmentHandlerInterface
      * transitions to FULFILLED, and dispatches ContractFulfilledEvent.
      *
      * @param string $providerOrderId Stripe PaymentIntent ID (pi_xxx)
+     * @param float|null $amountReceived Amount Stripe actually collected, in currency units; null when unknown
      * @return bool|null true if fulfilled, false if skipped (idempotent), null if not found
      */
-    public function handlePaymentSucceeded(string $providerOrderId): ?bool;
+    public function handlePaymentSucceeded(string $providerOrderId, ?float $amountReceived = null): ?bool;
 
     /**
      * Handle charge.refunded webhook event.

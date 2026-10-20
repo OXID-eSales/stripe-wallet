@@ -165,6 +165,30 @@ final class PaymentIntentSucceededWebhookHandlerTest extends TestCase
         $this->assertSame('ctr-commit', $outcome->contractId);
     }
 
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function testHandle_PassesAmountReceivedInCurrencyUnitsToFulfillmentHandler(): void
+    {
+        $event = $this->makeEvent(['id' => 'pi_amt', 'amount_received' => 1999, 'amount' => 2500, 'currency' => 'eur']);
+        $this->fulfillmentHandler->expects($this->once())
+            ->method('handlePaymentSucceeded')
+            ->with('pi_amt', 19.99)
+            ->willReturn(true);
+
+        $this->handler->handle($event);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function testHandle_FallsBackToAmountWhenAmountReceivedIsAbsent(): void
+    {
+        $event = $this->makeEvent(['id' => 'pi_amt2', 'amount' => 2500, 'currency' => 'eur']);
+        $this->fulfillmentHandler->expects($this->once())
+            ->method('handlePaymentSucceeded')
+            ->with('pi_amt2', 25.0)
+            ->willReturn(true);
+
+        $this->handler->handle($event);
+    }
+
     /**
      * @param array<string, mixed> $objectData
      */

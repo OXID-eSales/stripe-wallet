@@ -34,6 +34,9 @@ readonly class StripePaymentIntentDto
      *                                               (Stripe `amount_capturable`). Non-zero only while the PI
      *                                               is in `requires_capture` status. Default 0 preserves all
      *                                               existing call sites (additive widening).
+     * @param int                  $amountReceived   Amount Stripe actually collected, in minor units
+     *                                               (Stripe `amount_received`). Default 0 keeps existing
+     *                                               call sites unchanged (additive widening).
      */
     public function __construct(
         public string $id,
@@ -44,6 +47,7 @@ readonly class StripePaymentIntentDto
         public ?string $latestChargeId,
         public ?StripeChargeDto $charge = null,
         public int $amountCapturable = 0,
+        public int $amountReceived = 0,
     ) {
     }
 }

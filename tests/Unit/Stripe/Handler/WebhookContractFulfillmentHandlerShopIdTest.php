@@ -12,6 +12,7 @@ use OxidEsales\PaymentBase\Contract\Transaction;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
+use OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder;
 use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
 use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -63,7 +64,8 @@ class WebhookContractFulfillmentHandlerShopIdTest extends TestCase
             $this->contractFulfillmentService,
             $this->orderUpdater,
             $recordingRepo,
-            $shopAdapter
+            $shopAdapter,
+            new ContractCaptureRecorder($this->contractRepository, $recordingRepo, $shopAdapter)
         );
         $handler->handleChargeRefunded('pi_refund_shop7', 30.00);
 

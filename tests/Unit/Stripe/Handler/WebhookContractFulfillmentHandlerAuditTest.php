@@ -17,9 +17,12 @@ use OxidEsales\PaymentBase\Contract\Transaction;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
+use OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder;
 use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
 use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler;
+use OxidEsales\Payments\Stripe\Core\ShopId;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 
 /**
  * Sprint 112 / G3: every provider-driven action (capture, refund, cancel, fail)
@@ -115,7 +118,6 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
         // setCapturedAmount is state-guarded (rejects draft/not_finished), so
         // use a contract that has actually been through checkout.
         $contract = $this->fulfilledContractWithOrderId('order-cap');
-        $contract->setCapturedAmount(42.50);
         $this->contractFulfillmentService
             ->method('fulfillByProviderOrderId')
             ->willReturn(true);
@@ -124,7 +126,7 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
             ->willReturn($contract);
 
         $handler = $this->makeHandler();
-        $result = $handler->handlePaymentSucceeded('pi_capture');
+        $result = $handler->handlePaymentSucceeded('pi_capture', 42.50);
 
         $this->assertTrue($result);
         $this->assertCount(1, $this->transactionRepository->saved);
@@ -165,14 +167,116 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
         $this->assertSame([], $this->transactionRepository->saved);
     }
 
-    private function makeHandler(): WebhookContractFulfillmentHandler
+    public function testHandlePaymentSucceeded_WithAmountReceived_SetsCapturedAmountAndWritesOneCaptureRow(): void
+    {
+        $contract = $this->fulfilledContractWithOrderId('order-recv');
+        $this->contractFulfillmentService->method('fulfillByProviderOrderId')->willReturn(true);
+        $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
+        $this->contractRepository->expects($this->once())->method('save')->with($contract);
+
+        $result = $this->makeHandler()->handlePaymentSucceeded('pi_recv', 19.99);
+
+        $this->assertTrue($result);
+        $this->assertSame(19.99, $contract->getCapturedAmount());
+        $this->assertCount(1, $this->transactionRepository->saved);
+        $this->assertSame('capture', $this->transactionRepository->saved[0]->getType());
+        $this->assertSame(19.99, $this->transactionRepository->saved[0]->getAmount());
+    }
+
+    public function testHandlePaymentSucceeded_WhenCaptureRowAlreadyExists_SetsCapturedAmountWithoutSecondRow(): void
+    {
+        $contract = $this->fulfilledContractWithOrderId('order-manual');
+        $this->transactionRepository->existing[] = $this->transactionOfType($contract, 'capture');
+        $this->contractFulfillmentService->method('fulfillByProviderOrderId')->willReturn(true);
+        $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
+
+        $this->makeHandler()->handlePaymentSucceeded('pi_manual', 30.00);
+
+        $this->assertSame(30.00, $contract->getCapturedAmount());
+        $this->assertSame([], $this->transactionRepository->saved);
+    }
+
+    public function testHandlePaymentSucceeded_WhenContractAlreadyHasCapturedAmount_KeepsItAndWritesNoRow(): void
+    {
+        $contract = $this->fulfilledContractWithOrderId('order-has-amount');
+        $contract->setCapturedAmount(42.50);
+        $this->contractFulfillmentService->method('fulfillByProviderOrderId')->willReturn(true);
+        $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
+        $this->contractRepository->expects($this->never())->method('save');
+
+        $this->makeHandler()->handlePaymentSucceeded('pi_has_amount', 99.00);
+
+        $this->assertSame(42.50, $contract->getCapturedAmount());
+        $this->assertSame([], $this->transactionRepository->saved);
+    }
+
+    /**
+     * @return iterable<string, array{0: ?float}>
+     */
+    public static function unusableAmounts(): iterable
+    {
+        yield 'missing' => [null];
+        yield 'zero' => [0.0];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('unusableAmounts')]
+    public function testHandlePaymentSucceeded_WithZeroOrMissingAmount_LogsErrorAndWritesNoRow(?float $amount): void
+    {
+        $contract = $this->fulfilledContractWithOrderId('order-zero');
+        $this->contractFulfillmentService->method('fulfillByProviderOrderId')->willReturn(true);
+        $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
+        $this->contractRepository->expects($this->never())->method('save');
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('error')
+            ->with($this->stringContains('Capture audit row skipped'));
+
+        $result = $this->makeHandler($logger)->handlePaymentSucceeded('pi_zero', $amount);
+
+        $this->assertTrue($result);
+        $this->assertNull($contract->getCapturedAmount());
+        $this->assertSame([], $this->transactionRepository->saved);
+    }
+
+    public function testHandlePaymentSucceeded_WhenFulfillmentReturnsFalse_ChangesNothing(): void
+    {
+        $this->contractFulfillmentService->method('fulfillByProviderOrderId')->willReturn(false);
+        $this->contractRepository->expects($this->never())->method('save');
+
+        $result = $this->makeHandler()->handlePaymentSucceeded('pi_replay', 19.99);
+
+        $this->assertFalse($result);
+        $this->assertSame([], $this->transactionRepository->saved);
+    }
+
+    private function makeHandler(?LoggerInterface $logger = null): WebhookContractFulfillmentHandler
     {
         return new WebhookContractFulfillmentHandler(
             $this->contractRepository,
             $this->contractFulfillmentService,
             $this->orderUpdater,
             $this->transactionRepository,
-            $this->shopAdapter
+            $this->shopAdapter,
+            new ContractCaptureRecorder(
+                $this->contractRepository,
+                $this->transactionRepository,
+                $this->shopAdapter,
+                $logger
+            )
+        );
+    }
+
+    private function transactionOfType(PaymentContract $contract, string $type): Transaction
+    {
+        return new Transaction(
+            id: 'cap_manual',
+            shopId: ShopId::of(1, 'test'),
+            orderId: $contract->getOrderId() ?? '',
+            contractId: $contract->getId(),
+            provider: 'stripe',
+            type: $type,
+            status: 'completed',
+            amount: 30.00,
+            currency: 'EUR'
         );
     }
 
@@ -211,6 +315,9 @@ final class RecordingTransactionRepository implements TransactionRepositoryInter
     /** @var list<Transaction> */
     public array $saved = [];
 
+    /** @var list<Transaction> rows that exist before the code under test runs */
+    public array $existing = [];
+
     public function save(Transaction $transaction): void
     {
         $this->saved[] = $transaction;
@@ -228,7 +335,10 @@ final class RecordingTransactionRepository implements TransactionRepositoryInter
 
     public function findByContractId(string $contractId): array
     {
-        return [];
+        return array_values(array_filter(
+            [...$this->existing, ...$this->saved],
+            static fn (Transaction $transaction): bool => $transaction->getContractId() === $contractId
+        ));
     }
 
     public function findByProviderTransactionId(string $transactionId): ?Transaction

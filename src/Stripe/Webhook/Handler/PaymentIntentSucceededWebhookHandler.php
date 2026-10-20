@@ -58,14 +58,15 @@ class PaymentIntentSucceededWebhookHandler extends AbstractStripeWebhookHandler
             'payment_intent_id' => $paymentIntentId,
         ]);
 
+        $amountReceived = $this->amountReceivedOf($event);
+
         // GRAPH-QL / PS3: a PENDING contract is committed from the paid intent
         // before the fulfilment; the return leg is no longer the only way.
         $ended = $this->commitOpenContract(
             $this->findContract($event, $paymentIntentId),
             $paymentIntentId,
             $paymentIntentId,
-            $this->parser->extractAmountInCurrencyUnits($event, 'amount_received')
-                ?? $this->parser->extractAmountInCurrencyUnits($event, 'amount'),
+            $amountReceived,
             $this->currencyOf($event),
             ['paymentIntentId' => $paymentIntentId]
         );
@@ -73,10 +74,10 @@ class PaymentIntentSucceededWebhookHandler extends AbstractStripeWebhookHandler
             return $ended;
         }
 
-        $result = $this->fulfillmentHandler->handlePaymentSucceeded($paymentIntentId);
+        $result = $this->fulfillmentHandler->handlePaymentSucceeded($paymentIntentId, $amountReceived);
 
         if ($result === null) {
-            return $this->tryMetadataLookupOrLegacy($event, $paymentIntentId);
+            return $this->tryMetadataLookupOrLegacy($event, $paymentIntentId, $amountReceived);
         }
 
         return $this->mapHandlerResult(
@@ -103,6 +104,16 @@ class PaymentIntentSucceededWebhookHandler extends AbstractStripeWebhookHandler
         return $contractId !== null ? $this->contractRepository->findById($contractId) : null;
     }
 
+    /**
+     * What Stripe collected, in currency units: `amount_received`, or `amount`
+     * for payloads that omit it. Null when neither is usable.
+     */
+    private function amountReceivedOf(WebhookEvent $event): ?float
+    {
+        return $this->parser->extractAmountInCurrencyUnits($event, 'amount_received')
+            ?? $this->parser->extractAmountInCurrencyUnits($event, 'amount');
+    }
+
     private function currencyOf(WebhookEvent $event): string
     {
         $currency = $event->getObject()['currency'] ?? '';
@@ -113,8 +124,11 @@ class PaymentIntentSucceededWebhookHandler extends AbstractStripeWebhookHandler
     /**
      * Try metadata lookup or legacy fallback for orders without contracts indexed by PI.
      */
-    private function tryMetadataLookupOrLegacy(WebhookEvent $event, string $paymentIntentId): StripeWebhookOutcome
-    {
+    private function tryMetadataLookupOrLegacy(
+        WebhookEvent $event,
+        string $paymentIntentId,
+        ?float $amountReceived
+    ): StripeWebhookOutcome {
         $contractId = $this->parser->extractContractIdFromMetadata($event);
         $contract = $contractId !== null ? $this->contractRepository->findById($contractId) : null;
 
@@ -133,7 +147,7 @@ class PaymentIntentSucceededWebhookHandler extends AbstractStripeWebhookHandler
         }
 
         if ($contract->getState()->isCommitted()) {
-            $fulfillResult = $this->fulfillmentHandler->handlePaymentSucceeded($paymentIntentId);
+            $fulfillResult = $this->fulfillmentHandler->handlePaymentSucceeded($paymentIntentId, $amountReceived);
             return $fulfillResult === true
                 ? StripeWebhookOutcome::of(WebhookResult::success('contract_fulfilled'), $contractId)
                 : StripeWebhookOutcome::of(WebhookResult::skipped('Fulfillment skipped'), $contractId);

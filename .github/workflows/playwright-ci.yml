@@ -51,11 +51,14 @@ jobs:
           host: ${{ secrets.SHOP_HOST }}
           username: ${{ secrets.SHOP_SSH_USER }}
           key: ${{ secrets.SHOP_SSH_KEY }}
+          # Sprint 137 S3: the shop's `make php` ignores CMD (it opens a shell), so every
+          # command here used to be a silent no-op. Run them in the php container directly.
           script: |
             set -e
             cd ${{ env.SHOP_PATH }}
-            make php CMD="composer require oxid-esales/stripe-wallet:${{ inputs.branch }} --no-update --no-interaction"
-            make php CMD="composer update oxid-esales/stripe-wallet --with-all-dependencies --no-interaction"
+            php_exec() { docker compose exec -T -w /var/www php "$@"; }
+            php_exec composer require oxid-esales/stripe-wallet:${{ inputs.branch }} --no-update --no-interaction
+            php_exec composer update oxid-esales/stripe-wallet --with-all-dependencies --no-interaction
 
       - name: Reinstall and activate module
         uses: appleboy/ssh-action@v1
@@ -63,13 +66,19 @@ jobs:
           host: ${{ secrets.SHOP_HOST }}
           username: ${{ secrets.SHOP_SSH_USER }}
           key: ${{ secrets.SHOP_SSH_KEY }}
+          # payment-base is updated by --with-all-dependencies above, so it is reinstalled too.
+          # Container cache first, then the GraphQL schema cache that is built from it —
+          # a stale container left `paymentClientConfig` out of the schema (2026-10-20).
           script: |
             set -e
             cd ${{ env.SHOP_PATH }}
-            make php CMD="bin/oe-console oe:module:install vendor/oxid-esales/stripe-wallet"
-            make php CMD="bin/oe-console oe:module:deactivate oe_payments_stripe_wallet"
-            make php CMD="bin/oe-console oe:module:activate oe_payments_stripe_wallet"
-            make php CMD="bin/oe-console o:c:c"
+            console() { docker compose exec -T -w /var/www php vendor/bin/oe-console "$@"; }
+            console oe:module:install vendor/oxid-esales/payment-base
+            console oe:module:install vendor/oxid-esales/stripe-wallet
+            console oe:module:deactivate oe_payments_stripe_wallet
+            console oe:module:activate oe_payments_stripe_wallet
+            console oe:cache:clear
+            console oe:graphql:cache-clear
 
   playwright:
     name: Run Playwright tests
@@ -130,6 +139,13 @@ jobs:
           TEST_USER_PASSWORD=${{ secrets.TEST_USER_PASSWORD }}
           HEADLESS=true
           EOF
+
+      # Runs whatever suite is chosen: a deploy that serves a stale schema fails here.
+      - name: Verify deployed GraphQL schema
+        working-directory: ${{ env.PLAYWRIGHT_PATH }}
+        env:
+          CI: true
+        run: npx playwright test --project=chromium tests/e2e/GraphQL/graphql-schema.spec.ts
 
       - name: Run Playwright tests
         working-directory: ${{ env.PLAYWRIGHT_PATH }}

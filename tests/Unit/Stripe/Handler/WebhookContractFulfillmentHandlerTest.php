@@ -13,6 +13,7 @@ use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
+use OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder;
 use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
 use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler;
 use PHPUnit\Framework\TestCase;
@@ -56,7 +57,12 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             $this->contractFulfillmentService,
             $this->orderUpdater,
             $this->transactionRepository,
-            $this->shopAdapter
+            $this->shopAdapter,
+            new ContractCaptureRecorder(
+                $this->contractRepository,
+                $this->transactionRepository,
+                $this->shopAdapter
+            )
         );
     }
 

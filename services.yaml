@@ -1020,9 +1020,9 @@ services:
       $orderUpdater: '@OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface'
       $transactionRepository: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
       $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
+      # Sprint 137: records the captured amount + one capture audit row (shared with the backfill command).
+      $captureRecorder: '@OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder'
       $refundRecorder: '@OxidEsales\Payments\Stripe\Service\ContractRefundRecorder'
-      # Sprint 133 (F9): reports a capture whose amount the contract does not
-      # carry, instead of writing a 0.00 audit row for it.
       $logger: '@oxid_esales.monolog.logger'
     public: false
 
@@ -1416,6 +1416,34 @@ services:
       $reconciliationService: '@OxidEsales\Payments\Stripe\Service\OxpaidReconciliationServiceInterface'
     tags:
       - { name: 'console.command', command: 'stripe:reconcile-oxpaid' }
+    public: true
+
+  # Sprint 137 · Story 2: records what a fulfilled-but-unrecorded capture received.
+  OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder:
+    arguments:
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $transactionRepository: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
+      $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
+      $logger: '@oxid_esales.monolog.logger'
+    public: false
+
+  OxidEsales\Payments\Stripe\Service\CapturedAmountBackfillServiceInterface:
+    class: OxidEsales\Payments\Stripe\Service\CapturedAmountBackfillService
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $captureRecorder: '@OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder'
+      $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
+    public: true
+
+  # Console Command: stripe:backfill-captured-amount (Sprint 137, Story 2)
+  # Dry run unless --apply is passed.
+  OxidEsales\Payments\Stripe\Command\BackfillCapturedAmountCommand:
+    arguments:
+      $backfillService: '@OxidEsales\Payments\Stripe\Service\CapturedAmountBackfillServiceInterface'
+    tags:
+      - { name: 'console.command', command: 'stripe:backfill-captured-amount' }
     public: true
 
   # Console Command: stripe:prune-idempotency (Sprint 133, F8)
