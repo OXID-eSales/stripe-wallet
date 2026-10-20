@@ -1427,8 +1427,14 @@ services:
       $logger: '@oxid_esales.monolog.logger'
     public: false
 
+  # Defined under the class name so this definition replaces the one the
+  # src/Stripe/Service/* sweep creates — that one autowires Doctrine\DBAL\Connection,
+  # which a bare shop container doesn't have (CI 7.4/7.6 failed on it).
   OxidEsales\Payments\Stripe\Service\CapturedAmountBackfillServiceInterface:
-    class: OxidEsales\Payments\Stripe\Service\CapturedAmountBackfillService
+    alias: OxidEsales\Payments\Stripe\Service\CapturedAmountBackfillService
+    public: true
+
+  OxidEsales\Payments\Stripe\Service\CapturedAmountBackfillService:
     arguments:
       $connection: '@doctrine.dbal.connection'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
