@@ -15,6 +15,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Sealed client config provider (`ClientConfig\StripeClientConfigProvider`, tag `payment_base.client_config_provider`):
   exposes only the publishable key of the current mode (or nothing when unset or not a `pk_` key) to payment-base's
   `paymentClientConfig` query. Requires a payment-base release that ships `ClientConfigProviderInterface`.
+- Documentation of the headless checkout over GraphQL. For developers
+  (`docs/for_developer/05-headless-graphql-checkout.md`): the `stripeCheckoutStart` / `stripeCheckoutReturn` /
+  `stripeCheckoutCancel` API with `uiMode` `hosted` | `embedded`, the complete call sequence of a checkout as the
+  reference storefront (oxid-fe-user) performs it, the sealed publishable-key exchange (`paymentClientConfig`:
+  ECDH P-256 + HKDF-SHA256 + AES-256-GCM), the webhook as the step that finishes the order, rights and contract
+  token, the return-origin allow-list (`sPaymentBaseHeadlessReturnOrigins`), the error codes, and how to build
+  another frontend or add another provider. For merchants (`docs/for_merchant/02-headless-storefronts.md`): what a
+  headless storefront gets, embedded vs hosted presentation, the setup checklist, troubleshooting, limits.
+  Corrects two older statements along the way: `cancelUrl` and `checkoutSessionId` are optional (not `String!`),
+  and Stripe appends only `session_id` to the return URL.
+
+### Changed
+- CI installs `oxid-esales/graphql-storefront` together with the test shop: the shop's container compile reflects
+  every registered service class, and the GraphQL controller's GraphQLite attributes must resolve for that; the
+  GraphQL schema tests now run against a real schema instead of being skipped.
 
 ## [v3.4.1] - 2026-10-09
 
