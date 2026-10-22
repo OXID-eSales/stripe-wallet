@@ -17,7 +17,7 @@ guide speaks the documentation's vocabulary.
 | 139a | [Schema cache clear in docs and ops](sprint-139a-schema-cache-clear.md)           | stripe, payment-base, mollie-payment, hydroxid   | first; docs only             |
 | 139b | [Language and shop via `?lang=` / `?shp=`](sprint-139b-lang-shp-parameters.md) | oxid-fe-core, oxid-fe-user, hydroxid             | independent                  |
 | 139c | [`paymentContract` on the storefront `Order`](sprint-139c-extend-order-type.md) | payment-base, oxid-fe-user (dashboard)           | independent                  |
-| 139d | [Developer guide in the documentation's terms](sprint-139d-docs-vocabulary.md)    | stripe                                           | after 139a                   |
+| 139d | [Developer guide in the documentation's terms](../done/sprint-139d-docs-vocabulary.md)    | stripe                                           | after 139a                   |
 
 **Finding 5 (refresh tokens)** is implemented by subsprint 138e, story E2; it is not repeated here.
 **Finding 4 (guest checkout)** is [Sprint 140](sprint-140-guest-checkout.md).

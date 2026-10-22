@@ -19,4 +19,5 @@
 - **Done:** 138a (secrets purged, gitleaks in five repos; rotation checklist and history list in `reports/05`), 138b (token hashed at rest + guard allow-list; `reports/03`), 140a (anonymous rights + guest user, decision variant (a); `reports/04`).
 - Done in part: oxid-fe-core 0.10.0 carries 139b B1, 138f F1, 138e E1/E2, 140c C2 (226 unit tests, CI green); payment-base carries 138d D1 and 139c C1–C3/C5.
 - **Done:** 138g (PayPal webhook signature verification; `reports/06`; the live sandbox delivery proof waits for a shop serving the branch). paypal also carries its parts of 138b/138c/138d/139a/140b, CI green at `7ca28a4`.
-- In progress: stripe, mollie and oxid-fe-user subsprint work; hydroxid follows.
+- **Done:** 139d (developer guide in the documentation's terms; `reports/07`). stripe also carries its parts of 138b/138d/139a/140b, CI green at `ba66286`; live anonymous guest start proven (order 1314, cancelled). Findings: `zend.exception_ignore_args=0` leaks query text into the shop error log via graphql-base traces (host fix); guest orders ship to the invoice address (140a gap, confirmed).
+- In progress: mollie and oxid-fe-user; then the shared guest input in payment-base (DRY, 140b), hydroxid, 139a A1 reproduction, 138h.
