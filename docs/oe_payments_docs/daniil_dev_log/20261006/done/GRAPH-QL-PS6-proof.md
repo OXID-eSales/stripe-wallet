@@ -19,7 +19,7 @@ HEADLESS_GRAPHQL_URL=http://localhost.local/graphql/ PW_VIDEO=off npx playwright
 tests/e2e/GraphQL/stripe-headless-checkout.spec.ts --project=chromium --reporter=line`.
 
 Env of the spec: `SHOP_URL`, `HEADLESS_GRAPHQL_URL` (default `${SHOP_URL}graphql/`), `HEADLESS_USER_EMAIL` /
-`HEADLESS_USER_PASSWORD` (default `headless.user@oxid-esales.dev` / `useruser`), `HEADLESS_PRODUCT_ID` (default
+`HEADLESS_USER_PASSWORD` (no committed default since 138a), `HEADLESS_PRODUCT_ID` (default
 "Panorama", 20.90 EUR). The shop's origin is always an allowed return origin, so `returnUrl`/`cancelUrl` under it pass
 payment-base's policy without a setting.
 

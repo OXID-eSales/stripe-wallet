@@ -1,0 +1,32 @@
+# Historical findings pinned by exact fingerprint (commit:file:rule:line), one per line.
+# Written 2026-10-22 (subsprint 138a). Every entry below was redacted in the working tree
+# in the same subsprint or is a documented false positive; none of them narrows the scan.
+# A history rewrite is the user's decision (138a A4); until then these keep the full-history
+# scan green without hiding anything new.
+
+# 036be554: the CLI test script's default customer login; the tree requires USER_EMAIL / USER_PASSWORD since 138a
+036be554625a2f8e54bb5b994e323055bd7f0e1c:bin/graph-ql-cli-test.sh:credential-pair-email-then-password:20
+
+# 1f8f7550: archived e2e specs in the dev log with the demo-shop login; redacted in the tree by 138a
+1f8f75500fafc051440ec87f5f979e0f01836287:docs/oe_payments_docs/daniil_dev_log/20260902/e2e/opc-168-coupon-proof.spec.ts:credential-pair-email-then-password:42
+1f8f75500fafc051440ec87f5f979e0f01836287:docs/oe_payments_docs/daniil_dev_log/20260902/e2e/opc-purchase.spec.ts:credential-pair-email-then-password:20
+1f8f75500fafc051440ec87f5f979e0f01836287:docs/oe_payments_docs/daniil_dev_log/20260902/e2e/payment-list.spec.ts:credential-pair-email-then-password:5
+
+# 35b0fd0b: a Checkout Session client secret and an OXID force_sid in a dev-log run log; redacted in the tree by 138a
+35b0fd0bdc3dd4124f222221f1a45de675f4f0b1:docs/oe_payments_docs/daniil_dev_log/20260918/reports/01-fresh-session-run.log:oxid-force-sid:1
+35b0fd0bdc3dd4124f222221f1a45de675f4f0b1:docs/oe_payments_docs/daniil_dev_log/20260918/reports/01-fresh-session-run.log:oxid-force-sid:11
+35b0fd0bdc3dd4124f222221f1a45de675f4f0b1:docs/oe_payments_docs/daniil_dev_log/20260918/reports/01-fresh-session-run.log:oxid-force-sid:16
+35b0fd0bdc3dd4124f222221f1a45de675f4f0b1:docs/oe_payments_docs/daniil_dev_log/20260918/reports/01-fresh-session-run.log:oxid-force-sid:6
+35b0fd0bdc3dd4124f222221f1a45de675f4f0b1:docs/oe_payments_docs/daniil_dev_log/20260918/reports/01-fresh-session-run.log:oxid-force-sid:7
+35b0fd0bdc3dd4124f222221f1a45de675f4f0b1:docs/oe_payments_docs/daniil_dev_log/20260918/reports/01-fresh-session-run.log:stripe-checkout-session-client-secret:11
+35b0fd0bdc3dd4124f222221f1a45de675f4f0b1:docs/oe_payments_docs/daniil_dev_log/20260918/reports/01-fresh-session-run.log:stripe-checkout-session-client-secret:16
+
+# 6e828a24: the 2026-09-04 incident (squashed v3.1-rc.1 history): recipe YAML, tests/.env and tests/.env.dist held the pre-rotation test keys; rotated, see .gitleaks.toml
+6e828a242d6ba8e9a1971fb4856eaa8b1bdbe7b0:recipe/var/configuration/shops/1/modules/oe_payments_stripe_wallet.yaml:stripe-access-token:41
+6e828a242d6ba8e9a1971fb4856eaa8b1bdbe7b0:recipe/var/configuration/shops/1/modules/oe_payments_stripe_wallet.yaml:stripe-publishable-key:46
+6e828a242d6ba8e9a1971fb4856eaa8b1bdbe7b0:recipe/var/configuration/shops/1/modules/oe_payments_stripe_wallet.yaml:stripe-webhook-signing-secret:120
+6e828a242d6ba8e9a1971fb4856eaa8b1bdbe7b0:tests/.env.dist:stripe-publishable-key:4
+6e828a242d6ba8e9a1971fb4856eaa8b1bdbe7b0:tests/.env:stripe-publishable-key:4
+
+# a84373a5: a unit-test fixture spelled key-shaped; the tree builds the prefix at runtime since the next commit
+a84373a5d556b8a5c16ff6d3413f0318324c4c5d:tests/Unit/Stripe/ClientConfig/StripeClientConfigProviderTest.php:stripe-access-token:65

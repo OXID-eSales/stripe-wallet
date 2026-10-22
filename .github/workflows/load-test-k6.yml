@@ -128,7 +128,7 @@ jobs:
                 if (\\\$exists > 0) continue;
 
                 \\\$userId = md5(\\\$email);
-                \\\$passHash = password_hash('useruser', PASSWORD_DEFAULT);
+                \\\$passHash = password_hash('loadtest-seed', PASSWORD_DEFAULT);
                 \\\$db->execute(
                   'INSERT INTO oxuser (OXID, OXACTIVE, OXUSERNAME, OXPASSWORD, OXFNAME, OXLNAME, OXSTREET, OXSTREETNR, OXZIP, OXCITY, OXCOUNTRYID, OXSAL)
                    VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',

@@ -2,7 +2,7 @@ import { test, expect, Page } from '@playwright/test';
 import { setupOpcTest, openOpcModal, addProductToBasket, waitForBasketItems } from '../../helpers/setupOpcTest';
 
 const SHOP_URL = (process.env.SHOP_URL || 'https://daniil.oxiddev.de').replace(/\/$/, '') + '/';
-const USER = { email: 'playwright.user@oxid-esales.dev', password: 'useruser' };
+const USER = { email: '<test-user-e-mail>', password: '<test-user-password>' };
 
 async function login(page: Page): Promise<void> {
   await page.goto(SHOP_URL, { waitUntil: 'domcontentloaded' });

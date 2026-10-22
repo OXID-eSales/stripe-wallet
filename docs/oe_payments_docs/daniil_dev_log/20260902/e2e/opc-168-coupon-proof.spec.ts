@@ -8,7 +8,7 @@
  * unchanged here — the same eager-checkout POST, the same server-side read of
  * the session basket. Only the setup differs:
  *
- *   user    playwright.user@oxid-esales.dev / useruser  (already in the shop)
+ *   user    <test-user-e-mail> / <test-user-password>  (a customer already in the shop)
  *   basket  filled through the shared OPC helpers, which submit the shop's own
  *           tobasket form with a live stoken
  *   coupon  OPC168PROOF — 10 %, oxallowsameseries = 0, so exactly one
@@ -39,7 +39,7 @@ const CODE = process.env.PROOF_VOUCHER_CODE || 'OPC168PROOF';
 const PAYMENT_ID = process.env.PROOF_PAYMENT_ID || 'oe_payments_mollie';
 
 
-const USER = { email: 'playwright.user@oxid-esales.dev', password: 'useruser' };
+const USER = { email: '<test-user-e-mail>', password: '<test-user-password>' };
 
 /** The shop's own login path — the one the rest of the OPC suite uses. */
 async function loginNatively(page: Page): Promise<void> {

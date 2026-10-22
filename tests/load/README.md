@@ -8,7 +8,7 @@ Load testing framework for the Stripe payment module using [k6](https://k6.io/) 
 # Dry-run — 1 VU, 1 iteration (validate the flow works)
 K6_BROWSER_ENABLED=true \
 K6_BASE_URL=http://localhost.local \
-K6_TEST_USER_EMAIL=playwright.user@oxid-esales.dev \
+K6_TEST_USER_EMAIL=<a shop customer's e-mail> \
 K6_BROWSER_ARGS='ignore-certificate-errors' \
 LOAD_DRY_RUN=true \
 LOAD_SCENARIO=happy_path \
@@ -26,7 +26,7 @@ All commands run from `tests/load/`. The k6 binary is at `./bin/k6`.
 | `K6_BROWSER_ENABLED` | **Required.** Enables k6 browser module | — |
 | `K6_BASE_URL` | Shop URL (HTTP, no trailing slash) | `https://daniil.oxiddev.de` |
 | `K6_TEST_USER_EMAIL` | Login email for authenticated scenarios | random `loadtest_user_NNN` |
-| `K6_TEST_USER_PASSWORD` | Login password | `useruser` |
+| `K6_TEST_USER_PASSWORD` | Login password | `loadtest-seed` (the seeded CI users) |
 | `K6_BROWSER_ARGS` | Chromium flags (comma-separated) | — |
 | `LOAD_DRY_RUN` | `true` = 1 VU, 1 iteration | `false` |
 | `LOAD_SCENARIO` | Run single scenario by name | `all` |
@@ -42,7 +42,7 @@ All commands run from `tests/load/`. The k6 binary is at `./bin/k6`.
 # --- Base command (always needed) ---
 export K6_BROWSER_ENABLED=true
 export K6_BASE_URL=http://localhost.local
-export K6_TEST_USER_EMAIL=playwright.user@oxid-esales.dev
+export K6_TEST_USER_EMAIL=<a shop customer's e-mail>
 export K6_BROWSER_ARGS='ignore-certificate-errors'
 
 # 1. Dry-run single scenario (debug / validate selectors)
@@ -164,4 +164,4 @@ From `tests/e2e/playwright/playwright/fixtures/stripe-test-cards.ts`:
 - **Cards:** 4242424242424242 (success), 4000000000000002 (declined), 4000000000003220 (3DS)
 - **Card details:** 03/33, CVC 640, "Test Stripe"
 - **Coupons:** E2E_10PCT, E2E_50PCT, E2E_5FLAT
-- **Users:** `loadtest_user_001..200@oxid-esales.dev` or single `playwright.user@oxid-esales.dev`
+- **Users:** `loadtest_user_001..200@oxid-esales.dev` or a single customer via `K6_TEST_USER_EMAIL`

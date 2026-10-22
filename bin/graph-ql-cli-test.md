@@ -56,8 +56,8 @@ stripeCheckoutCancel ──▶   ………………………………………�
 
 - A shop with `oe_graphql_base` and `oe_graphql_storefront` active (dev shop: `oxid-esales/graphql-storefront:dev-b-7.4.x`),
   payment-base `b-7.4.x-GRAPH-QL` (Sprint 15) and this module's `b-7.4.x-GRAPH-QL` active, Stripe **test** keys configured.
-- A customer in a country with a delivery set (the demo data's Germany works). The dev shop has
-  `headless.user@oxid-esales.dev` / `useruser`; the Playwright user lives in Switzerland and gets no delivery.
+- A customer in a country with a delivery set (the demo data's Germany works). Set `USER_EMAIL` /
+  `USER_PASSWORD` to such a customer (no committed default); the Playwright user lives in Switzerland and gets no delivery.
 - `curl` and `jq` on the machine you run the script from; it talks HTTP to the shop, nothing else.
 
 ## Usage
@@ -82,7 +82,7 @@ Environment (all optional):
 |---|---|---|
 | `GRAPHQL_URL` | `http://localhost.local/graphql/` | the endpoint |
 | `SHOP_URL` | origin of `GRAPHQL_URL` | base of `RETURN_URL` / `CANCEL_URL`. **Must be the shop's configured URL** (or an origin listed in the setting `sPaymentBaseHeadlessReturnOrigins`), otherwise `return_url_rejected / origin_not_allowed`. In the dev shop that is the tunnel: `SHOP_URL=https://daniil.oxiddev.de/` |
-| `USER_EMAIL` / `USER_PASSWORD` | `headless.user@oxid-esales.dev` / `useruser` | the customer |
+| `USER_EMAIL` / `USER_PASSWORD` | — (required) | the customer |
 | `PRODUCT_ID` | `5e6a374e212258abbfd76b6adf911772` | "Panorama", 20.90 EUR |
 | `DELIVERY_METHOD_ID` | `oxidstandard` | used by `guard` only |
 | `RETURN_URL` / `CANCEL_URL` | `${SHOP_URL}index.php?cl=start&headless=return|cancel` | the shop's start page, so a hand test does not land on a 404; a real client owns these URLs. Stripe appends `&session_id=…` |
@@ -160,7 +160,7 @@ Or plain curl, which is all the script does:
 
 ```bash
 TOKEN=$(curl -s http://localhost.local/graphql/ -A 'Mozilla/5.0 cli' -H 'Content-Type: application/json' \
-  --data '{"query":"{ token(username: \"headless.user@oxid-esales.dev\", password: \"useruser\") }"}' | jq -r .data.token)
+  --data '{"query":"{ token(username: \"<test-user-e-mail>\", password: \"<test-user-password>\") }"}' | jq -r .data.token)
 curl -s http://localhost.local/graphql/ -A 'Mozilla/5.0 cli' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN" \
   --data '{"query":"mutation { stripeCheckoutStart(basketId: \"<id>\", confirmTermsAndConditions: true, returnUrl: \"https://daniil.oxiddev.de/r\", cancelUrl: \"https://daniil.oxiddev.de/c\") { redirectUrl } }"}'
 ```

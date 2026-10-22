@@ -40,7 +40,7 @@ if _INSECURE_TLS:
 USER_PREFIX = os.environ.get("LOAD_USER_PREFIX", "loadtest_user_")
 USER_DOMAIN = os.environ.get("LOAD_USER_DOMAIN", "@oxid-esales.dev")
 USER_COUNT = int(os.environ.get("LOAD_USER_COUNT", "200"))
-TEST_PASSWORD = os.environ.get("LOAD_TEST_PASSWORD", "useruser")
+TEST_PASSWORD = os.environ.get("LOAD_TEST_PASSWORD", "loadtest-seed")
 SEARCH_TERM = os.environ.get("LOAD_SEARCH_TERM", "kite")
 # Optional explicit ids; if unset we scrape them from the start/search HTML.
 PRODUCT_ANID = os.environ.get("LOAD_PRODUCT_ANID", "")

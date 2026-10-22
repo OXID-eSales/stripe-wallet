@@ -39,7 +39,7 @@ export const COUPONS = {
 };
 
 // ─── Users ────────────────────────────────────────────────────────
-export const TEST_PASSWORD = __ENV.K6_TEST_USER_PASSWORD || 'useruser';
+export const TEST_PASSWORD = __ENV.K6_TEST_USER_PASSWORD || 'loadtest-seed';
 export const USER_COUNT    = 200;
 
 // ─── Traffic Distribution ─────────────────────────────────────────

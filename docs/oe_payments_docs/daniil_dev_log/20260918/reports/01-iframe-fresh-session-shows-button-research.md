@@ -14,7 +14,7 @@
 
 ## 2. Reproduction (live, 2026-09-18)
 
-Fresh context → login as `playwright.user@oxid-esales.dev` → add "Wishbone aluminum" → address →
+Fresh context → login as `<test-user-e-mail>` → add "Wishbone aluminum" → address →
 payment (Stripe) → `cl=order`. Observed straight after load (6 s grace for any eager mount):
 
 | Observation | Fresh session (incognito) | Same session, page reloaded after one click |

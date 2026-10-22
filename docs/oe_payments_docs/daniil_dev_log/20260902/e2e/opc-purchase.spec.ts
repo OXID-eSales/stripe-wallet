@@ -17,7 +17,7 @@ import {
 } from '../../helpers/setupOpcTest';
 
 const SHOP_URL = (process.env.SHOP_URL || 'https://daniil.oxiddev.de').replace(/\/$/, '') + '/';
-const USER = { email: 'playwright.user@oxid-esales.dev', password: 'useruser' };
+const USER = { email: '<test-user-e-mail>', password: '<test-user-password>' };
 
 async function loginNatively(page: Page): Promise<void> {
   await page.goto(SHOP_URL, { waitUntil: 'domcontentloaded' });
@@ -142,7 +142,7 @@ test.describe('OPC purchase', () => {
       await page.waitForTimeout(3000);
     }
 
-    await page.locator('input#email').first().fill('playwright.user@oxid-esales.dev').catch(() => undefined);
+    await page.locator('input#email').first().fill('<test-user-e-mail>').catch(() => undefined);
     await page.locator('input#cardNumber').first().fill('4242424242424242', { timeout: 40000 });
     await page.locator('input#cardExpiry').first().fill('12 / 34');
     await page.locator('input#cardCvc').first().fill('123');

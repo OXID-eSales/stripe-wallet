@@ -107,7 +107,7 @@ env:
   LOAD_USER_PREFIX: loadtest_user_
   LOAD_USER_DOMAIN: '@oxid-esales.dev'
   LOAD_USER_COUNT: '200'
-  LOAD_TEST_PASSWORD: useruser
+  LOAD_TEST_PASSWORD: loadtest-seed
 
 jobs:
   load:
@@ -327,7 +327,7 @@ jobs:
               $db->execute(
                   'INSERT INTO oxuser (OXID, OXACTIVE, OXUSERNAME, OXPASSWORD, OXFNAME, OXLNAME, OXSTREET, OXSTREETNR, OXZIP, OXCITY, OXCOUNTRYID, OXSAL)'
                   . ' VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                  [md5($email), $email, password_hash('useruser', PASSWORD_DEFAULT), 'Load', 'Test' . $num, 'Bertoldstr.', $num, '79098', 'Freiburg', 'a7c40f631fc920687.20179984', 'MR']
+                  [md5($email), $email, password_hash('loadtest-seed', PASSWORD_DEFAULT), 'Load', 'Test' . $num, 'Bertoldstr.', $num, '79098', 'Freiburg', 'a7c40f631fc920687.20179984', 'MR']
               );
           }
           $db->execute('UPDATE oxarticles SET OXSTOCK = 99999 WHERE OXACTIVE = 1 AND OXSTOCK < 99999');
@@ -372,7 +372,7 @@ jobs:
                 \\\$db->execute(
                   'INSERT INTO oxuser (OXID, OXACTIVE, OXUSERNAME, OXPASSWORD, OXFNAME, OXLNAME, OXSTREET, OXSTREETNR, OXZIP, OXCITY, OXCOUNTRYID, OXSAL)
                    VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                  [md5(\\\$email), \\\$email, password_hash('useruser', PASSWORD_DEFAULT), 'Load', 'Test'.\\\$num, 'Bertoldstr.', \\\$num, '79098', 'Freiburg', 'a7c40f631fc920687.20179984', 'MR']
+                  [md5(\\\$email), \\\$email, password_hash('loadtest-seed', PASSWORD_DEFAULT), 'Load', 'Test'.\\\$num, 'Bertoldstr.', \\\$num, '79098', 'Freiburg', 'a7c40f631fc920687.20179984', 'MR']
                 );
               }
               echo 'Seeded 200 load test users';
