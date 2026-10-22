@@ -14,7 +14,7 @@ guide speaks the documentation's vocabulary.
 
 | #    | File                                                                              | Repos                                            | Order                        |
 | ---- | --------------------------------------------------------------------------------- | ------------------------------------------------ | ---------------------------- |
-| 139a | [Schema cache clear in docs and ops](sprint-139a-schema-cache-clear.md)           | stripe, payment-base, mollie-payment, hydroxid   | first; docs only             |
+| 139a | [Schema cache clear in docs and ops](../done/sprint-139a-schema-cache-clear.md)           | stripe, payment-base, mollie-payment, hydroxid   | first; docs only             |
 | 139b | [Language and shop via `?lang=` / `?shp=`](../done/sprint-139b-lang-shp-parameters.md) | oxid-fe-core, oxid-fe-user, hydroxid             | independent                  |
 | 139c | [`paymentContract` on the storefront `Order`](../done/sprint-139c-extend-order-type.md) | payment-base, oxid-fe-user (dashboard)           | independent                  |
 | 139d | [Developer guide in the documentation's terms](../done/sprint-139d-docs-vocabulary.md)    | stripe                                           | after 139a                   |
