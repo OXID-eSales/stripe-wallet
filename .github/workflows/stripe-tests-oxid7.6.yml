@@ -270,8 +270,9 @@ jobs:
           docker compose exec -T php bin/oe-console oe:module:install /var/www/test-module
           docker compose exec -T php bin/oe-console oe:module:activate oe_payments_stripe_wallet
           # GraphQLite caches its schema on disk and never clears it: after (re)activating a module with
-          # GraphQL controllers, clear it, as the install docs tell the merchant to.
-          docker compose exec -T php bin/oe-console oe:graphql:cache-clear
+          # GraphQL controllers, clear it, as the install docs tell the merchant to. The command belongs to
+          # graphql-base and exists only while that module is active, which this job does not require.
+          docker compose exec -T php bash -c 'if bin/oe-console list --raw | grep -q "^oe:graphql:cache-clear"; then bin/oe-console oe:graphql:cache-clear; else echo "oe:graphql:cache-clear not available (graphql-base not active): skipped"; fi'
 
       - name: Put module settings
         continue-on-error: true
