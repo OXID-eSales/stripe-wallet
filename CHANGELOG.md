@@ -13,6 +13,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (`CACHE_CLEAR_CMD`, `SKIP_CACHE_CLEAR=1`); the three `stripe-tests-oxid7.*.yml` workflows run it after the module
   activation.
 
+- Developer guide `05-headless-graphql-checkout.md`: §13 "How this relates to the OXID third-party-payments models"
+  (standard / express / own workflow table, why `placeOrder` is refused for our baskets, basket removal on contract
+  commit instead of `BeforeBasketRemoveOnPlaceOrder`) and §14 "Versions" (graphql-base 12.x / storefront 4.x; what to check
+  before 13 / 5), each statement checked against the code with the class named. The merchant README indexes the headless
+  and security-header guides; two dead links there are fixed.
+
 ### Security
 - Provider failures no longer put provider text into the GraphQL error (and so into `oxideshop.log`): the handler
   answers fixed messages (`Failed to create Stripe checkout session`, `Stripe payment processing failed`),

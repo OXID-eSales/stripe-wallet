@@ -24,6 +24,8 @@ public key. A client never talks to the shop's Twig controllers and never sees a
 10. [Adding another provider](#10-adding-another-provider)
 11. [Reference implementation and tools](#11-reference-implementation-and-tools)
 12. [Known gaps](#12-known-gaps)
+13. [How this relates to the OXID third-party-payments models](#13-how-this-relates-to-the-oxid-third-party-payments-models)
+14. [Versions](#14-versions)
 
 ---
 
@@ -50,6 +52,8 @@ Everything provider-neutral (basket → contract → early order → token → r
 **payment-base** (`src/Checkout/Headless/`). The Stripe module adds the Stripe session, the
 return resolver and the GraphQL controller. The same `StripePaymentHandler` serves the Twig/OPC
 checkout, so headless and classic orders are identical in the admin and in Stripe.
+
+If you know the OXID GraphQL documentation's "third-party payments" chapter, §13 maps its vocabulary to this flow.
 
 GraphQL is **optional** for both modules: the controllers, namespace mappers and permission
 providers are wired with `autowire: false` and `@?` references, so the modules activate on a shop
@@ -373,3 +377,66 @@ The complete provider-side checklist is in payment-base:
 - `uiMode: "custom"` (Stripe Elements) is not implemented.
 - Stripe appends only `session_id` to the return URL (not `contract_id`); keep the contract
   identifiers on the client side.
+
+---
+
+## 13. How this relates to the OXID third-party-payments models
+
+The OXID GraphQL documentation (chapter *Third Party Payments*: `introduction`, `standard_checkout`,
+`express_checkout`) describes how a payment module hooks into the storefront's checkout. Our flow is the third
+variant that chapter allows ("a 3rd party payment module could come with its completely own implementation of
+checkout workflow"). Every code reference below was checked against the code of this release.
+
+| Model (documentation) | Calls | Order is created | Who may call it | Hook |
+| --- | --- | --- | --- | --- |
+| **Standard checkout** | `basketSetDeliveryMethod`, `basketSetPayment`, the module's own approval query (the docs call it `3rdPartyStandardApprovalProcess`), then the storefront's `placeOrder` | by `placeOrder` (`OxidEsales\GraphQL\Storefront\Basket\Service\PlaceOrder`), before or without the money | a logged-in customer (JWT of an existing `oxuser`) | the module subscribes to `OxidEsales\GraphQL\Storefront\Basket\Event\BeforePlaceOrder` and prepares the basket |
+| **Express checkout** | the module's own approval query (`3rdPartyExpressApprovalProcess`), then `placeOrder` | by `placeOrder`, after the module stored what the PSP told it on the `oxuserbaskets` row | an anonymous token or an existing user; the user is matched or created in the `BeforePlaceOrder` subscriber | `BeforePlaceOrder` again |
+| **Own workflow (ours)** | `stripeCheckoutStart` / `stripeCheckoutReturn` / `stripeCheckoutCancel` (§3) | by the contract: an early order exists from the start (`NOT_FINISHED`), it is **committed** when the money is confirmed (`ContractCommitmentHandler` in payment-base), never by `placeOrder` | a logged-in customer (`#[Logged]` and `#[Right('PAYMENT_CHECKOUT')]` on `StripeCheckout`) | none on the checkout path; `placeOrder` is **refused** for our baskets |
+
+**Why `placeOrder` is refused.** A basket that pays with Stripe must not be ordered before the payment: the
+contract-first order is the only way an order for this payment comes to exist. payment-base subscribes to
+`BeforePlaceOrder` with `OxidEsales\PaymentBase\GraphQL\Subscriber\RefusePlaceOrderForContractFirstPayments`:
+it reads the payment id the storefront stored on the basket row (`oxuserbaskets.OEGQL_PAYMENTID`, set by
+`basketSetPayment`), asks `PaymentHandlerRegistryInterface::forPaymentMethod()` whether a contract-first handler
+owns it (for Stripe: `StripePaymentHandler`) and throws `OxidEsales\PaymentBase\GraphQL\Exception\ContractFirstPaymentCheckout`,
+a client-safe request error whose message names the mutation to call (`... call stripeCheckoutStart instead of placeOrder`).
+The storefront dispatches `BeforePlaceOrder` as the first statement of `PlaceOrder::placeOrder()`, so nothing
+has been written when it is refused. A basket without a payment, or with a payment no handler owns, passes
+untouched: other payment methods are unaffected.
+
+**What the standard model's `3rdPartyApproval` step is here.** There is none: the PSP step is part of
+`stripeCheckoutStart` (it answers `redirectUrl` or `clientSecret`) and its outcome arrives through the webhook
+or `stripeCheckoutReturn`. The module stores nothing on the basket row except what the storefront itself wrote.
+
+### Basket removal
+
+In the documented `placeOrder`, the storefront deletes the user basket after the order
+(`OxidEsales\GraphQL\Storefront\Basket\Infrastructure\Basket::placeOrder()`), after dispatching
+`BeforeBasketRemoveOnPlaceOrder`, whose `setPreserveBasketAfterOrder()` lets a module keep it. On our path
+**that event never fires**: it is dispatched only inside that `placeOrder()` and ours is never called. The same
+effect (a basket that cannot be ordered twice) is produced when the contract is **committed**:
+`StripePaymentHandler` stores the basket id on the contract (`basket_id` metadata) at start, and on
+`ContractCommittedEvent` payment-base's `OxidEsales\PaymentBase\EventSystem\Handler\UserBasketRemovalHandler`
+(tag `payment.event_handler`) deletes the `oxuserbaskets` row and its items. Until the commit the basket row exists; a later
+start for the same basket retires the earlier attempt, and the basket of a cancelled attempt must not be reused
+(§3, `stripeCheckoutCancel`).
+
+---
+
+## 14. Versions
+
+Tested against `oxid-esales/graphql-base` `dev-b-7.4.x` (its 12.x line, 12.0.2 at the time of writing) and
+`oxid-esales/graphql-storefront` `dev-b-7.4.x` (4.x line, 4.2.0), on the OXID 7.4 / 7.5 / 7.6 compilations the
+module's CI runs. The current OXID GraphQL documentation targets `graphql-base ^13`, `graphql-storefront ~5.0` and
+shop 7.5.1 or later. Nothing of ours is pinned to 13 / 5, but before moving to them check the changelogs of both
+for the places this code touches:
+
+- `OxidEsales\GraphQL\Base\Exception\Error` and `ErrorCategories` (`StripeCheckoutError`, and the errors of payment-base);
+- `OxidEsales\GraphQL\Base\Service\Authentication` (the JWT user of the mutations) and `Token` (`BearerTokenIdReader` in payment-base reads the bearer token's id for the client-config exchange);
+- the `#[Logged]` / `#[Right]` annotations of GraphQLite and the permission provider that grants `PAYMENT_CHECKOUT` and
+  `PAYMENT_CLIENT_CONFIG` to the user groups (including `oxidanonymous`);
+- the event `OxidEsales\GraphQL\Storefront\Basket\Event\BeforePlaceOrder` and its `getBasketId()`;
+- the basket row columns the storefront owns: `OEGQL_PAYMENTID`, `OEGQL_DELIVERYMETHODID`, `OEGQL_DELADDRESSID`;
+- the storefront's `Order` data type (payment-base's `ExtendType` over it).
+
+After the move run the module's integration suite against the new versions and `vendor/bin/oe-console oe:graphql:cache-clear`.
