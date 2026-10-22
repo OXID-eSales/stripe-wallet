@@ -22,7 +22,7 @@ client's line items. (a) is the documented model and the recommendation; (b) is 
 
 | #    | File                                                                       | Repos                               | Order                       |
 | ---- | -------------------------------------------------------------------------- | ----------------------------------- | --------------------------- |
-| 140a | [Backend: rights and guest user](../done/sprint-140a-backend-rights-and-guest-user.md) | payment-base                   | first (decision gate)       |
+| 140a | [Backend: rights and guest user](sprint-140a-backend-rights-and-guest-user.md) | payment-base                   | first (decision gate)       |
 | 140b | [Modules: mutations open to guests](sprint-140b-modules-open-to-guests.md) | stripe, mollie-payment, paypal      | after 140a released         |
 | 140c | [Frontend: checkout without login](sprint-140c-frontend-guest-flow.md)     | oxid-fe-core, oxid-fe-user, hydroxid | after 140b released        |
 

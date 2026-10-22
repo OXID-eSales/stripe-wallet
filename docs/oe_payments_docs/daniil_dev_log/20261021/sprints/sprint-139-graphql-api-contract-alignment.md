@@ -20,7 +20,7 @@ guide speaks the documentation's vocabulary.
 | 139d | [Developer guide in the documentation's terms](../done/sprint-139d-docs-vocabulary.md)    | stripe                                           | after 139a                   |
 
 **Finding 5 (refresh tokens)** is implemented by subsprint 138e, story E2; it is not repeated here.
-**Finding 4 (guest checkout)** is [Sprint 140](sprint-140-guest-checkout.md).
+**Finding 4 (guest checkout)** is [Sprint 140](../done/sprint-140-guest-checkout.md).
 
 ## Not verified before this sprint (do first, in 139a)
 
