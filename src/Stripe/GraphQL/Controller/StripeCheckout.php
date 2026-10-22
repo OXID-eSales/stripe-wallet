@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\GraphQL\Controller;
 
 use OxidEsales\GraphQL\Base\Service\Authentication;
+use OxidEsales\PaymentBase\Checkout\Headless\GuestDetails;
 use OxidEsales\PaymentBase\Checkout\Headless\HeadlessCheckoutException;
 use OxidEsales\PaymentBase\Checkout\Headless\HeadlessCheckoutServiceInterface;
 use OxidEsales\PaymentBase\Checkout\Headless\HeadlessStartRequest;
@@ -20,7 +21,6 @@ use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\GraphQL\Exception\StripeCheckoutError;
 use RuntimeException;
-use TheCodingMachine\GraphQLite\Annotations\Logged;
 use TheCodingMachine\GraphQLite\Annotations\Mutation;
 use TheCodingMachine\GraphQLite\Annotations\Right;
 use TheCodingMachine\GraphQLite\Types\ID;
@@ -52,15 +52,21 @@ final class StripeCheckout
     ) {
     }
 
+    /**
+     * @param GuestDetails|null $guest who an anonymous token is (`GuestCheckoutInput`); read only when the token's
+     *        user does not exist in the shop, ignored for a logged-in customer. The payment needs no argument:
+     *        this mutation names Stripe itself, so an anonymous token (which cannot `basketSetPayment`) starts
+     *        a basket that carries no payment
+     */
     #[Mutation]
-    #[Logged]
     #[Right('PAYMENT_CHECKOUT')]
     public function stripeCheckoutStart(
         ID $basketId,
         bool $confirmTermsAndConditions,
         string $returnUrl,
         ?string $cancelUrl = null,
-        string $uiMode = 'hosted'
+        string $uiMode = 'hosted',
+        ?GuestDetails $guest = null
     ): CheckoutStartResult {
         try {
             return new CheckoutStartResult($this->checkout->start(new HeadlessStartRequest(
@@ -73,6 +79,7 @@ final class StripeCheckout
                 // This mutation IS Stripe's: a basket the client never ran through
                 // basketSetPayment still starts; one set to another payment is refused.
                 paymentId: StripeDefinitions::STRIPE_WALLET_PAYMENT_ID,
+                guest: $guest,
             )));
         } catch (HeadlessCheckoutException $e) {
             throw new StripeCheckoutError($e);
@@ -83,7 +90,6 @@ final class StripeCheckout
      * @param string|null $checkoutSessionId the `session_id` Stripe appended to the return URL
      */
     #[Mutation]
-    #[Logged]
     #[Right('PAYMENT_CHECKOUT')]
     public function stripeCheckoutReturn(
         string $contractId,
@@ -103,7 +109,6 @@ final class StripeCheckout
     }
 
     #[Mutation]
-    #[Logged]
     #[Right('PAYMENT_CHECKOUT')]
     public function stripeCheckoutCancel(string $contractId, string $contractToken): CheckoutCancelResult
     {

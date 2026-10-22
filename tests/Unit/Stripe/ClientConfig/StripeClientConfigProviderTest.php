@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\ClientConfig;
 
+use OxidEsales\PaymentBase\ClientConfig\Contract\AllowListedClientConfigProviderInterface;
 use OxidEsales\PaymentBase\ClientConfig\Contract\ClientConfigProviderInterface;
 use OxidEsales\Payments\Stripe\ClientConfig\StripeClientConfigProvider;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
@@ -32,6 +33,15 @@ final class StripeClientConfigProviderTest extends TestCase
 
         $this->assertInstanceOf(ClientConfigProviderInterface::class, $provider);
         $this->assertSame('stripe', $provider->providerId());
+    }
+
+    public function testPublicValueNames_Always_DeclaresExactlyThePublishedName(): void
+    {
+        $provider = $this->providerFor('pk_test_abc');
+
+        $this->assertInstanceOf(AllowListedClientConfigProviderInterface::class, $provider);
+        $this->assertSame(['publishableKey'], $provider->publicValueNames());
+        $this->assertSame($provider->publicValueNames(), array_keys($provider->publicValues()));
     }
 
     public function testExposesTheTestModePublishableKeyAndNothingElse(): void

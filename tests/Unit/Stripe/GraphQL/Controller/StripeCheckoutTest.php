@@ -11,6 +11,8 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Controller;
 
 use OxidEsales\GraphQL\Base\DataType\User;
 use OxidEsales\GraphQL\Base\Service\Authentication;
+use OxidEsales\PaymentBase\Checkout\Headless\GuestAddress;
+use OxidEsales\PaymentBase\Checkout\Headless\GuestDetails;
 use OxidEsales\PaymentBase\Checkout\Headless\HeadlessCancelResult;
 use OxidEsales\PaymentBase\Checkout\Headless\HeadlessCheckoutException;
 use OxidEsales\PaymentBase\Checkout\Headless\HeadlessCheckoutServiceInterface;
@@ -78,6 +80,16 @@ final class StripeCheckoutTest extends TestCase
         self::assertSame('tok-1', $result->contractToken());
         self::assertSame('cs_secret', $result->clientSecret());
         self::assertSame('embedded', $result->renderMode());
+    }
+
+    public function testStart_GuestDetails_AreHandedToTheHeadlessRequest(): void
+    {
+        $guest = new GuestDetails('guest@example.com', new GuestAddress('Gerda', 'Guest', 'Grunewaldstr.', '1', '79098', 'Freiburg', 'country-de'));
+        $this->checkout->expects($this->once())->method('start')
+            ->with($this->callback(static fn(HeadlessStartRequest $r): bool => $r->guest === $guest))
+            ->willReturn(new HeadlessStartResult('ctr-1', 'tok-1', 'stripe', null, 'https://checkout.stripe.com/c/cs_1', null, 'redirect'));
+
+        $this->controller()->stripeCheckoutStart(new ID('ub-1'), true, 'https://app.example.com/return', null, 'hosted', $guest);
     }
 
     public function testStartDefaultsToHostedWithoutACancelUrl(): void

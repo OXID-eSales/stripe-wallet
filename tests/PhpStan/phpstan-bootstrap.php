@@ -56,6 +56,7 @@ if (!class_exists(\TheCodingMachine\GraphQLite\Annotations\Mutation::class, fals
         . '#[\\Attribute(\\Attribute::TARGET_METHOD)] class Logged { public function __construct(mixed ...$args) {} } '
         . '#[\\Attribute(\\Attribute::TARGET_METHOD)] class Right { public function __construct(mixed ...$args) {} } '
         . '#[\\Attribute(\\Attribute::TARGET_CLASS)] class Type { public function __construct(mixed ...$args) {} } '
+        . '#[\\Attribute(\\Attribute::TARGET_METHOD)] class Factory { public function __construct(mixed ...$args) {} } '
         . '#[\\Attribute(\\Attribute::TARGET_METHOD)] class Field { public function __construct(mixed ...$args) {} }'
     );
 }

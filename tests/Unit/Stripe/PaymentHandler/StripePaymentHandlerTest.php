@@ -129,7 +129,7 @@ class StripePaymentHandlerTest extends TestCase
         $result = $this->createHandler()->processPayment($context);
 
         $this->assertFalse($result->isSuccess());
-        $this->assertStringContainsString('DB connection lost', $result->getErrorMessage() ?? '');
+        $this->assertStringNotContainsString('DB connection lost', $result->getErrorMessage() ?? '', 'provider and infrastructure text stays out of the result');
     }
 
     // ── confirmPayment() ──

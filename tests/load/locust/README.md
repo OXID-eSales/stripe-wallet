@@ -104,5 +104,5 @@ cd tests/load/locust && pip install pytest && python -m pytest tests/
 ## Seeded data
 
 The workflow seeds 200 login-able users (`loadtest_user_001..200@oxid-esales.dev`,
-password `useruser`) and sets high stock before the run (idempotent). The
+password `loadtest-seed`) and sets high stock before the run (idempotent). The
 `CheckoutFlow` scenario logs in as these.

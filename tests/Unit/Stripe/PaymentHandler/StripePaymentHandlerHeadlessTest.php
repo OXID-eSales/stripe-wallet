@@ -30,6 +30,8 @@ use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\Result\CheckoutSessionResult;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
+use Psr\Log\LogLevel;
 
 /**
  * The handler with its two shop-session seams recorded instead of executed.
@@ -233,9 +235,71 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
         self::assertNull($this->contract->getMetadata('basket_id'));
     }
 
+    public function testProviderFailure_SessionRefusedByStripe_ResultMessageContainsNoProviderText(): void
+    {
+        $this->checkoutSessionService->method('createSession')->willReturn(CheckoutSessionResult::failure(
+            'Invalid URL https://app.example.com/return?uid=u-1 for cs_live_a1b2',
+            'url_invalid'
+        ));
+
+        $result = $this->handler()->processPayment($this->headlessContext());
+
+        self::assertFalse($result->isSuccess());
+        self::assertSame('STRIPE_SESSION_FAILED', $result->getErrorCode());
+        $message = (string) $result->getErrorMessage();
+        self::assertStringNotContainsString('https://', $message);
+        self::assertStringNotContainsString('cs_', $message);
+        self::assertStringNotContainsString('uid=', $message);
+    }
+
+    public function testProviderFailure_SessionRefusedByStripe_TextGoesToTheDebugLogWithTheContractId(): void
+    {
+        $this->checkoutSessionService->method('createSession')
+            ->willReturn(CheckoutSessionResult::failure('Invalid URL for cs_live_a1b2', 'url_invalid'));
+        $logger = $this->createMock(LoggerInterface::class);
+        $logged = [];
+        $logger->method('debug')->willReturnCallback(static function (string|\Stringable $message, array $context) use (&$logged): void {
+            $logged[] = [LogLevel::DEBUG, $context];
+        });
+        $logger->method('error')->willReturnCallback(static function (string|\Stringable $message, array $context) use (&$logged): void {
+            $logged[] = [LogLevel::ERROR, $context];
+        });
+
+        $this->handler($logger)->processPayment($this->headlessContext());
+
+        $debug = array_values(array_filter($logged, static fn(array $entry): bool => $entry[0] === LogLevel::DEBUG));
+        self::assertCount(1, $debug);
+        self::assertSame('contract-1', $debug[0][1]['contractId']);
+        self::assertSame('Invalid URL for cs_live_a1b2', $debug[0][1]['providerMessage']);
+        foreach (array_filter($logged, static fn(array $entry): bool => $entry[0] === LogLevel::ERROR) as $entry) {
+            self::assertStringNotContainsString('cs_', (string) json_encode($entry[1]));
+        }
+    }
+
+    public function testProviderFailure_UnexpectedThrowable_ResultMessageAndErrorLogCarryNoExceptionText(): void
+    {
+        $this->checkoutSessionService->method('createSession')
+            ->willThrowException(new \RuntimeException('No such session cs_live_a1b2 at https://api.stripe.com/v1'));
+        $errorContexts = [];
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->method('error')->willReturnCallback(static function (string|\Stringable $message, array $context) use (&$errorContexts): void {
+            $errorContexts[] = (string) json_encode([(string) $message, $context]);
+        });
+
+        $result = $this->handler($logger)->processPayment($this->headlessContext());
+
+        self::assertSame('STRIPE_PAYMENT_FAILED', $result->getErrorCode());
+        self::assertStringNotContainsString('cs_', (string) $result->getErrorMessage());
+        self::assertNotSame([], $errorContexts);
+        foreach ($errorContexts as $line) {
+            self::assertStringNotContainsString('cs_', $line);
+            self::assertStringNotContainsString('https://', $line);
+        }
+    }
+
     // ---------------------------------------------------------------- helpers
 
-    private function handler(): SessionRecordingStripeHandler
+    private function handler(?LoggerInterface $logger = null): SessionRecordingStripeHandler
     {
         $shopAdapter = $this->createMock(ShopAdapterInterface::class);
         $shopAdapter->method('getShopUrl')->willReturn('https://shop.example.com/');
@@ -256,7 +320,7 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
             $this->shopOrderService,
             $config,
             $this->tokenService,
-            null,
+            $logger,
             $language,
             $iframe,
         );

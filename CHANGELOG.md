@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- **Docs (138h).** The developer guide's security model (§7) states what the headless channel leaves behind and where
+  it does not (hashed contract token, log policy, URLs, browser storage, errors by code, secret scanning); the merchant
+  guide lists the log policy and the PayPal webhook id next to what stays in the shop.
+- **Guest checkout over GraphQL (140b).** `stripeCheckoutStart`, `stripeCheckoutReturn` and `stripeCheckoutCancel` no longer
+  carry `#[Logged]`: the right `PAYMENT_CHECKOUT` alone guards them, so an anonymous token with the right is accepted and one
+  without it is refused (logged-in behaviour unchanged). `stripeCheckoutStart` gains the optional argument
+  `guest: GuestCheckoutInput` (`email`, `invoiceAddress: GuestAddressInput!`, `deliveryAddress: GuestAddressInput`), the
+  input type is payment-base's (`GuestCheckoutInputFactory`, defined once for all provider modules); a refusal of the
+  details (`guest_details_required`) surfaces as payment-base's `GuestDetailsRefused`, `account_exists` as
+  `StripeCheckoutError`, both with `extensions.errorCode`. The payment
+  needs no argument: the mutation already names Stripe itself. Return and cancel stay authorised by the contract token
+  alone. `bin/graph-ql-cli-test.sh guest` runs the guest start. Known gap (payment-base 140a): the order ships to the
+  invoice address, a basket's delivery address is not applied. The input types moved into payment-base (this module's own
+  copy, `GuestCheckoutInputFactory`, is removed; `NamespaceMapper` maps no type namespace any more): the same type names
+  defined in two active provider modules would clash, so there is exactly one definition.
+
+### Documentation
+- `oe:graphql:cache-clear` after activating or updating the module: setup step and troubleshooting row for
+  `Cannot query field "…"` in the merchant guide `02-headless-storefronts.md`, §1 and §11 of the headless developer guide,
+  `bin/graph-ql-cli-test.md`; `bin/graph-ql-cli-test.sh` clears the schema cache before its first query
+  (`CACHE_CLEAR_CMD`, `SKIP_CACHE_CLEAR=1`); the three `stripe-tests-oxid7.*.yml` workflows run it after the module
+  activation.
+
+- Developer guide `05-headless-graphql-checkout.md`: §13 "How this relates to the OXID third-party-payments models"
+  (standard / express / own workflow table, why `placeOrder` is refused for our baskets, basket removal on contract
+  commit instead of `BeforeBasketRemoveOnPlaceOrder`) and §14 "Versions" (graphql-base 12.x / storefront 4.x; what to check
+  before 13 / 5), each statement checked against the code with the class named. The merchant README indexes the headless
+  and security-header guides; two dead links there are fixed.
+
+### Security
+- Provider failures no longer put provider text into the GraphQL error (and so into `oxideshop.log`): the handler
+  answers fixed messages (`Failed to create Stripe checkout session`, `Stripe payment processing failed`),
+  `StripeCheckoutError` answers "Stripe could not start the checkout" for `provider_failed`; Stripe's own text goes to the
+  logger at `debug` with the contract id, the `error` log line carries the exception class only.
+
 ### Fixed
 - Stripe Checkout Sessions (hosted and embedded) are created in the shop's active language
   (`locale`, via the new `StripeLocale` and `LanguageResolverInterface::getActiveLanguageAbbreviation()`).
@@ -25,6 +61,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Sealed client config provider (`ClientConfig\StripeClientConfigProvider`, tag `payment_base.client_config_provider`):
   exposes only the publishable key of the current mode (or nothing when unset or not a `pk_` key) to payment-base's
   `paymentClientConfig` query. Requires a payment-base release that ships `ClientConfigProviderInterface`.
+  The provider also implements `AllowListedClientConfigProviderInterface` (payment-base 1.4.0+) and declares
+  `publishableKey` as its only value name, so the guard refuses any other name whatever its value looks like.
 - Headless checkout over GraphQL. See docs for developers
   (`docs/for_developer/05-headless-graphql-checkout.md`): the `stripeCheckoutStart` / `stripeCheckoutReturn` /
   `stripeCheckoutCancel` API with `uiMode` `hosted` | `embedded`, the complete call sequence of a checkout as the

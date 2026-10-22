@@ -17,10 +17,13 @@ set -euo pipefail
 
 GRAPHQL_URL="${GRAPHQL_URL:-http://localhost.local/graphql/}"
 SHOP_URL="${SHOP_URL:-$(printf '%s' "$GRAPHQL_URL" | sed -E 's#(https?://[^/]+).*#\1/#')}"
-USER_EMAIL="${USER_EMAIL:-headless.user@oxid-esales.dev}"
-USER_PASSWORD="${USER_PASSWORD:-useruser}"
+# Without a customer the script runs with an anonymous token: enough for 'guest', 'return', 'cancel'.
+USER_EMAIL="${USER_EMAIL:-}"
+USER_PASSWORD="${USER_PASSWORD:-}"
 PRODUCT_ID="${PRODUCT_ID:-5e6a374e212258abbfd76b6adf911772}"   # "Panorama", 20.90 EUR in the demo data
 DELIVERY_METHOD_ID="${DELIVERY_METHOD_ID:-oxidstandard}"
+GUEST_EMAIL="${GUEST_EMAIL:-guest.$(date +%s)@example.com}"
+COUNTRY_ID="${COUNTRY_ID:-a7c40f631fc920687.20179984}"   # Germany in the demo data: countries { id }
 STATE_FILE="${STATE_FILE:-${TMPDIR:-/tmp}/graph-ql-cli-test.state}"
 # The return / cancel URLs belong to the headless client; the shop does not
 # serve them. For a test by hand the shop's start page is a friendlier landing
@@ -31,8 +34,16 @@ CANCEL_URL="${CANCEL_URL:-${SHOP_URL}index.php?cl=start&headless=cancel}"
 # default is one). A real headless client is a browser or an app; look like one.
 USER_AGENT="${USER_AGENT:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36 graph-ql-cli-test}"
 VERBOSE="${VERBOSE:-0}"
+# GraphQLite caches the schema on disk and never clears it by itself: after a module update the old schema can
+# stay live ('Cannot query field ...'). Cleared once before the first query, inside the PHP container of the SDK
+# this script lives in. From another machine (remote shop) the command cannot run: set CACHE_CLEAR_CMD to what
+# does the job there (an ssh line), or SKIP_CACHE_CLEAR=1. A failed clear is a warning, never a stop.
+SDK_ROOT="${SDK_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." 2>/dev/null && pwd)}"
+CACHE_CLEAR_CMD="${CACHE_CLEAR_CMD:-docker compose --project-directory $SDK_ROOT exec -T php bin/oe-console oe:graphql:cache-clear}"
+SKIP_CACHE_CLEAR="${SKIP_CACHE_CLEAR:-0}"
 
 TOKEN=""
+CACHE_CLEARED=0
 
 usage() {
     cat <<USAGE
@@ -45,6 +56,7 @@ usage: $(basename "$0") <command> [args]
                           stripeCheckoutReturn — commits the paid contract (ids default to the last start)
   cancel [contractId contractToken]
                           stripeCheckoutCancel — retires the unpaid contract (ids default to the last start)
+  guest [hosted|embedded] no login: anonymous token, basket, stripeCheckoutStart with guest details (no account)
   wrong-token             stripeCheckoutCancel with a bogus token: refused, nothing changes
   guard                   core placeOrder on a basket paying with Stripe: refused, names stripeCheckoutStart
   demo                    everything that needs no browser: schema, start hosted + embedded, cancel, wrong-token, guard
@@ -54,8 +66,10 @@ environment (defaults in brackets):
   GRAPHQL_URL [$GRAPHQL_URL]   SHOP_URL [$SHOP_URL]
   USER_EMAIL [$USER_EMAIL]   USER_PASSWORD [***]
   PRODUCT_ID [$PRODUCT_ID]   DELIVERY_METHOD_ID [$DELIVERY_METHOD_ID]
+  GUEST_EMAIL [$GUEST_EMAIL]   COUNTRY_ID [$COUNTRY_ID]  (guest only; the e-mail must not belong to a registered customer)
   RETURN_URL / CANCEL_URL (must be under an allowed origin; the shop's own origin always is)
   STATE_FILE [$STATE_FILE]   VERBOSE=1 prints every raw response
+  CACHE_CLEAR_CMD [$CACHE_CLEAR_CMD]   SKIP_CACHE_CLEAR=1 [$SKIP_CACHE_CLEAR]  (schema cache clear before the first query)
 USAGE
 }
 
@@ -98,8 +112,27 @@ error_of() {
     printf '%s' "$1" | jq -r 'if .errors then "\(.errors[0].message) [\(.errors[0].extensions.errorCode // "-")\(if .errors[0].extensions.providerCode then "/" + .errors[0].extensions.providerCode else "" end)]" else "NO ERROR — unexpected: \(.data|tojson)" end'
 }
 
+# The schema cache clear (vendor/bin/oe-console oe:graphql:cache-clear) once, before the first query.
+clear_schema_cache() {
+    [ "$CACHE_CLEARED" = "1" ] && return
+    CACHE_CLEARED=1
+    [ "$SKIP_CACHE_CLEAR" = "1" ] && return
+    if $CACHE_CLEAR_CMD >/dev/null 2>&1; then
+        note "GraphQL schema cache cleared"
+        return
+    fi
+    note "warning: could not clear the GraphQL schema cache ('$CACHE_CLEAR_CMD'); a stale schema shows as 'Cannot query field'"
+}
+
 login() {
+    clear_schema_cache
     [ -n "$TOKEN" ] && return
+    if [ -z "$USER_EMAIL" ] || [ -z "$USER_PASSWORD" ]; then
+        # return / cancel of a guest checkout need no customer: the contract token is the credential.
+        TOKEN=$(data "$(gql '{ token }')" token | jq -r .)
+        note "no USER_EMAIL / USER_PASSWORD: using an anonymous token"
+        return
+    fi
     TOKEN=$(data "$(gql "{ token(username: \"$USER_EMAIL\", password: \"$USER_PASSWORD\") }")" token | jq -r .)
     note "logged in as $USER_EMAIL"
 }
@@ -147,6 +180,23 @@ cmd_start() {
     printf '%s\n' "$start" | jq .
     save_state "$(printf '%s' "$start" | jq -r .contractId)" "$(printf '%s' "$start" | jq -r .contractToken)" "$basket_id"
     note "contract + order are open (order NOT_FINISHED); saved to $STATE_FILE"
+}
+
+# A shopper without an account: the anonymous token of `token` without credentials builds the basket, and the
+# checkout start carries who they are. The shop keeps a passwordless guest account for the e-mail.
+cmd_guest() {
+    local ui_mode="${1:-hosted}"
+    say "stripeCheckoutStart as a guest (anonymous token, uiMode: $ui_mode)"
+    clear_schema_cache
+    TOKEN=$(data "$(gql '{ token }')" token | jq -r .)
+    note "anonymous token, guest e-mail $GUEST_EMAIL"
+    local basket_id address start
+    basket_id=$(basket_with_one_product)
+    address="firstName: \"Gerda\", lastName: \"Guest\", street: \"Grunewaldstr.\", streetNumber: \"1\", zipCode: \"79098\", city: \"Freiburg\", countryId: \"$COUNTRY_ID\""
+    start=$(data "$(gql "mutation { stripeCheckoutStart(basketId: \"$basket_id\", confirmTermsAndConditions: true, returnUrl: \"$RETURN_URL\", cancelUrl: \"$CANCEL_URL\", uiMode: \"$ui_mode\", guest: {email: \"$GUEST_EMAIL\", invoiceAddress: {$address}}) { contractId contractToken providerName orderNumber redirectUrl clientSecret renderMode } }")" stripeCheckoutStart)
+    printf '%s\n' "$start" | jq .
+    save_state "$(printf '%s' "$start" | jq -r .contractId)" "$(printf '%s' "$start" | jq -r .contractToken)" "$basket_id"
+    note "return / cancel need no login: the contract token is the credential (saved to $STATE_FILE)"
 }
 
 cmd_pay() {
@@ -215,6 +265,7 @@ need curl; need jq
 case "${1:-}" in
     schema) cmd_schema ;;
     start) cmd_start "${2:-hosted}" ;;
+    guest) cmd_guest "${2:-hosted}" ;;
     pay) cmd_pay ;;
     return) cmd_return "${2:-}" "${3:-}" "${4:-}" ;;
     cancel) cmd_cancel "${2:-}" "${3:-}" ;;

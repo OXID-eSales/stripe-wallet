@@ -37,7 +37,7 @@ export async function fillStripeCard(page, cardNumber, expiry, cvc, name) {
   try {
     const emailInput = page.locator('#email');
     await emailInput.waitFor({ state: 'visible', timeout: 3000 });
-    await emailInput.fill('playwright.user@oxid-esales.dev');
+    await emailInput.fill('loadtest@example.com');
   } catch { /* prefilled */ }
 
   // Fill card number — click the placeholder input, then type

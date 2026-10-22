@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\ClientConfig;
 
-use OxidEsales\PaymentBase\ClientConfig\Contract\ClientConfigProviderInterface;
+use OxidEsales\PaymentBase\ClientConfig\Contract\AllowListedClientConfigProviderInterface;
 use OxidEsales\Payments\Stripe\Service\PublishableKeyProvider;
 
 /**
@@ -21,9 +21,11 @@ use OxidEsales\Payments\Stripe\Service\PublishableKeyProvider;
  *
  * @since 3.5.0
  */
-final class StripeClientConfigProvider implements ClientConfigProviderInterface
+final class StripeClientConfigProvider implements AllowListedClientConfigProviderInterface
 {
     private const PROVIDER_ID = 'stripe';
+
+    private const PUBLISHABLE_KEY_NAME = 'publishableKey';
 
     /** Stripe publishable keys always start with this; a setting filled with a secret key must not pass. */
     private const PUBLISHABLE_KEY_PREFIX = 'pk_';
@@ -37,6 +39,14 @@ final class StripeClientConfigProvider implements ClientConfigProviderInterface
         return self::PROVIDER_ID;
     }
 
+    /**
+     * Declared so payment-base's guard refuses any other name, whatever its value looks like.
+     */
+    public function publicValueNames(): array
+    {
+        return [self::PUBLISHABLE_KEY_NAME];
+    }
+
     public function publicValues(): array
     {
         $key = $this->publishableKeys->resolve();
@@ -45,6 +55,6 @@ final class StripeClientConfigProvider implements ClientConfigProviderInterface
             return [];
         }
 
-        return ['publishableKey' => $key];
+        return [self::PUBLISHABLE_KEY_NAME => $key];
     }
 }
