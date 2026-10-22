@@ -31,8 +31,16 @@ CANCEL_URL="${CANCEL_URL:-${SHOP_URL}index.php?cl=start&headless=cancel}"
 # default is one). A real headless client is a browser or an app; look like one.
 USER_AGENT="${USER_AGENT:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36 graph-ql-cli-test}"
 VERBOSE="${VERBOSE:-0}"
+# GraphQLite caches the schema on disk and never clears it by itself: after a module update the old schema can
+# stay live ('Cannot query field ...'). Cleared once before the first query, inside the PHP container of the SDK
+# this script lives in. From another machine (remote shop) the command cannot run: set CACHE_CLEAR_CMD to what
+# does the job there (an ssh line), or SKIP_CACHE_CLEAR=1. A failed clear is a warning, never a stop.
+SDK_ROOT="${SDK_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." 2>/dev/null && pwd)}"
+CACHE_CLEAR_CMD="${CACHE_CLEAR_CMD:-docker compose --project-directory $SDK_ROOT exec -T php bin/oe-console oe:graphql:cache-clear}"
+SKIP_CACHE_CLEAR="${SKIP_CACHE_CLEAR:-0}"
 
 TOKEN=""
+CACHE_CLEARED=0
 
 usage() {
     cat <<USAGE
@@ -56,6 +64,7 @@ environment (defaults in brackets):
   PRODUCT_ID [$PRODUCT_ID]   DELIVERY_METHOD_ID [$DELIVERY_METHOD_ID]
   RETURN_URL / CANCEL_URL (must be under an allowed origin; the shop's own origin always is)
   STATE_FILE [$STATE_FILE]   VERBOSE=1 prints every raw response
+  CACHE_CLEAR_CMD [$CACHE_CLEAR_CMD]   SKIP_CACHE_CLEAR=1 [$SKIP_CACHE_CLEAR]  (schema cache clear before the first query)
 USAGE
 }
 
@@ -98,7 +107,20 @@ error_of() {
     printf '%s' "$1" | jq -r 'if .errors then "\(.errors[0].message) [\(.errors[0].extensions.errorCode // "-")\(if .errors[0].extensions.providerCode then "/" + .errors[0].extensions.providerCode else "" end)]" else "NO ERROR — unexpected: \(.data|tojson)" end'
 }
 
+# The schema cache clear (vendor/bin/oe-console oe:graphql:cache-clear) once, before the first query.
+clear_schema_cache() {
+    [ "$CACHE_CLEARED" = "1" ] && return
+    CACHE_CLEARED=1
+    [ "$SKIP_CACHE_CLEAR" = "1" ] && return
+    if $CACHE_CLEAR_CMD >/dev/null 2>&1; then
+        note "GraphQL schema cache cleared"
+        return
+    fi
+    note "warning: could not clear the GraphQL schema cache ('$CACHE_CLEAR_CMD'); a stale schema shows as 'Cannot query field'"
+}
+
 login() {
+    clear_schema_cache
     [ -n "$TOKEN" ] && return
     TOKEN=$(data "$(gql "{ token(username: \"$USER_EMAIL\", password: \"$USER_PASSWORD\") }")" token | jq -r .)
     note "logged in as $USER_EMAIL"

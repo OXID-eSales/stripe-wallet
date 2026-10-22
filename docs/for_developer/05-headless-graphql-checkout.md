@@ -55,6 +55,12 @@ GraphQL is **optional** for both modules: the controllers, namespace mappers and
 providers are wired with `autowire: false` and `@?` references, so the modules activate on a shop
 without `graphql-base`; the mutations simply do not exist there.
 
+**After every activation or update of the module, clear GraphQLite's schema cache:**
+`vendor/bin/oe-console oe:graphql:cache-clear` (`bin/oe-console` in the Docker SDK). The schema is cached on disk
+and never cleared automatically; a shop that skips the step keeps answering with the old API and a new
+mutation or query fails with `Cannot query field "…"`. The test workflows in `.github/workflows/` run it after the
+module activation, and `bin/graph-ql-cli-test.sh` runs it before its first query.
+
 ---
 
 ## 2. Where the code lives
@@ -350,7 +356,8 @@ The complete provider-side checklist is in payment-base:
 ## 11. Reference implementation and tools
 
 - **Command line:** `SHOP_URL=https://<shop>/ bin/graph-ql-cli-test.sh demo` runs a whole
-  checkout with curl; every command and example output in
+  checkout with curl (it clears the GraphQL schema cache first: `vendor/bin/oe-console oe:graphql:cache-clear`,
+  see §1; `SKIP_CACHE_CLEAR=1` or `CACHE_CLEAR_CMD=…` for a shop it cannot reach); every command and example output in
   [`bin/graph-ql-cli-test.md`](../../bin/graph-ql-cli-test.md). (Its argument table lists
   `cancelUrl` and `checkoutSessionId` as required; in the code both are optional.)
 - **Browser:** `oxid-fe-user` (Vue 3) with `oxid-fe-core` — `plugins/payment-stripe/` (the inline

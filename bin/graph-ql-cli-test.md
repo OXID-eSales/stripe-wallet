@@ -58,6 +58,11 @@ stripeCheckoutCancel ──▶   ………………………………………�
   payment-base `b-7.4.x-GRAPH-QL` (Sprint 15) and this module's `b-7.4.x-GRAPH-QL` active, Stripe **test** keys configured.
 - A customer in a country with a delivery set (the demo data's Germany works). Set `USER_EMAIL` /
   `USER_PASSWORD` to such a customer (no committed default); the Playwright user lives in Switzerland and gets no delivery.
+- After activating or updating the module the GraphQL schema cache must be cleared, or the new mutations are
+  missing (`Cannot query field "stripeCheckoutStart"`): `vendor/bin/oe-console oe:graphql:cache-clear`
+  (`bin/oe-console` in the Docker SDK). The script does it itself before its first query, through
+  `docker compose` of the SDK it lives in; for a remote shop set `CACHE_CLEAR_CMD` (for example an `ssh … oe-console
+  oe:graphql:cache-clear` line) or `SKIP_CACHE_CLEAR=1` and run the command on the server.
 - `curl` and `jq` on the machine you run the script from; it talks HTTP to the shop, nothing else.
 
 ## Usage
@@ -87,6 +92,8 @@ Environment (all optional):
 | `DELIVERY_METHOD_ID` | `oxidstandard` | used by `guard` only |
 | `RETURN_URL` / `CANCEL_URL` | `${SHOP_URL}index.php?cl=start&headless=return|cancel` | the shop's start page, so a hand test does not land on a 404; a real client owns these URLs. Stripe appends `&session_id=…` |
 | `STATE_FILE` | `/tmp/graph-ql-cli-test.state` | the last start's contract id / token / basket id |
+| `CACHE_CLEAR_CMD` | `docker compose --project-directory <SDK root> exec -T php bin/oe-console oe:graphql:cache-clear` | run once before the first query; a failure is a warning |
+| `SKIP_CACHE_CLEAR` | `0` | `1` skips the clear |
 | `VERBOSE` | `0` | `1` prints every raw JSON response to stderr |
 
 ## Examples

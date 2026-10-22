@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Documentation
+- `oe:graphql:cache-clear` after activating or updating the module: setup step and troubleshooting row for
+  `Cannot query field "…"` in the merchant guide `02-headless-storefronts.md`, §1 and §11 of the headless developer guide,
+  `bin/graph-ql-cli-test.md`; `bin/graph-ql-cli-test.sh` clears the schema cache before its first query
+  (`CACHE_CLEAR_CMD`, `SKIP_CACHE_CLEAR=1`); the three `stripe-tests-oxid7.*.yml` workflows run it after the module
+  activation.
+
 ### Security
 - Provider failures no longer put provider text into the GraphQL error (and so into `oxideshop.log`): the handler
   answers fixed messages (`Failed to create Stripe checkout session`, `Stripe payment processing failed`),
