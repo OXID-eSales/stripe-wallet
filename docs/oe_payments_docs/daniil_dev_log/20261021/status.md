@@ -18,4 +18,5 @@
 - Branches cut and pushed: stripe (from `docs/graphql-docs-review`, so merge that first), mollie, payment-base, paypal (clone at `source/extensions/paypal-comply`, your `feature/iframe-fields` checkout untouched), oxid-fe-core, oxid-fe-user, hydroxid.
 - **Done:** 138a (secrets purged, gitleaks in five repos; rotation checklist and history list in `reports/05`), 138b (token hashed at rest + guard allow-list; `reports/03`), 140a (anonymous rights + guest user, decision variant (a); `reports/04`).
 - Done in part: oxid-fe-core 0.10.0 carries 139b B1, 138f F1, 138e E1/E2, 140c C2 (226 unit tests, CI green); payment-base carries 138d D1 and 139c C1–C3/C5.
-- In progress: stripe, mollie, paypal and oxid-fe-user subsprint work; hydroxid follows.
+- **Done:** 138g (PayPal webhook signature verification; `reports/06`; the live sandbox delivery proof waits for a shop serving the branch). paypal also carries its parts of 138b/138c/138d/139a/140b, CI green at `7ca28a4`.
+- In progress: stripe, mollie and oxid-fe-user subsprint work; hydroxid follows.
