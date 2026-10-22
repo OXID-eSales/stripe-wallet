@@ -114,6 +114,7 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
             return $reused;
         }
 
+        $contractId = '';
         try {
             // 1. Create contract in DRAFT state
             $contract = $this->createContract($context);
@@ -126,10 +127,15 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
             $sessionResult = $this->createCheckoutSession($contract, $context);
 
             if (!$sessionResult->isSuccessful()) {
-                return PaymentHandlerResult::error(
-                    'Failed to create Stripe checkout session: ' . $sessionResult->getErrorMessage(),
-                    'STRIPE_SESSION_FAILED'
-                );
+                // The provider's text may hold session ids and URLs and the result reaches
+                // the GraphQL error and so the shop log: the text stays at debug level.
+                $this->logger?->debug('[StripePaymentHandler] Stripe refused the checkout session', [
+                    'contractId' => $contractId,
+                    'providerCode' => $sessionResult->getErrorCode(),
+                    'providerMessage' => $sessionResult->getErrorMessage(),
+                ]);
+
+                return PaymentHandlerResult::error('Failed to create Stripe checkout session', 'STRIPE_SESSION_FAILED');
             }
 
             // 4. Store session ID on contract
@@ -158,14 +164,17 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
                 ]
             );
         } catch (\Throwable $e) {
+            // Exception text can carry provider ids and URLs: class at error level, text at debug.
             $this->logger?->error('[StripePaymentHandler] processPayment failed', [
-                'error' => $e->getMessage(),
+                'contractId' => $contractId,
+                'exception' => $e::class,
+            ]);
+            $this->logger?->debug('[StripePaymentHandler] processPayment failure detail', [
+                'contractId' => $contractId,
+                'providerMessage' => $e->getMessage(),
             ]);
 
-            return PaymentHandlerResult::error(
-                'Stripe payment processing failed: ' . $e->getMessage(),
-                'STRIPE_PAYMENT_FAILED'
-            );
+            return PaymentHandlerResult::error('Stripe payment processing failed', 'STRIPE_PAYMENT_FAILED');
         }
     }
 

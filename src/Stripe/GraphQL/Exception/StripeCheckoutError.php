@@ -23,10 +23,18 @@ use OxidEsales\PaymentBase\Checkout\Headless\HeadlessCheckoutException;
  */
 final class StripeCheckoutError extends Error
 {
+    /**
+     * graphql-base writes every error message to oxideshop.log. Stripe's own text
+     * (session ids, URLs) therefore never reaches it: the handler logs it at debug level.
+     */
+    private const PROVIDER_FAILED_MESSAGE = 'Stripe could not start the checkout';
+
     public function __construct(HeadlessCheckoutException $refusal)
     {
         parent::__construct(
-            message: $refusal->getMessage(),
+            message: $refusal->errorCode === HeadlessCheckoutException::PROVIDER_FAILED
+                ? self::PROVIDER_FAILED_MESSAGE
+                : $refusal->getMessage(),
             previous: $refusal,
             category: ErrorCategories::REQUESTERROR,
             extensions: array_filter([

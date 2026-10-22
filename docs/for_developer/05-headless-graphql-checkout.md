@@ -286,13 +286,18 @@ detail). Map by code, not by message:
 | `terms_not_confirmed` | `confirmTermsAndConditions` false while the shop requires consent |
 | `return_url_rejected` | `providerCode`: `not_absolute`, `scheme_not_allowed`, `origin_not_allowed`, `credentials_not_allowed` |
 | `user_not_found` | the JWT's user does not exist |
-| `provider_failed` | Stripe refused; `providerCode`: `STRIPE_UI_MODE_UNSUPPORTED`, `STRIPE_SESSION_FAILED`, `STRIPE_PAYMENT_FAILED` |
+| `provider_failed` | Stripe refused; the message is the fixed sentence "Stripe could not start the checkout" (`StripeCheckoutError`), `providerCode`: `STRIPE_UI_MODE_UNSUPPORTED`, `STRIPE_SESSION_FAILED`, `STRIPE_PAYMENT_FAILED` |
 | `contract_not_found` | unknown contract id on return/cancel |
 | `invalid_token` | wrong `contractToken` (also graphql-base's code for a bad bearer token) |
 | `no_return_resolver` | provider has no return resolver (not the case for Stripe) |
 
 Only `hosted` and `embedded` are accepted as `uiMode`; anything else is
 `STRIPE_UI_MODE_UNSUPPORTED`.
+
+graphql-base writes every error message to the shop log, so a message never carries Stripe's text (session
+ids, URLs) or a client URL: `StripePaymentHandler` writes Stripe's text to the PSR logger at `debug` level with the
+contract id, and `return_url_rejected` names the origin only. Look in the debug log for the reason of a
+`provider_failed`.
 
 ---
 

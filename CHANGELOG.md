@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+- Provider failures no longer put provider text into the GraphQL error (and so into `oxideshop.log`): the handler
+  answers fixed messages (`Failed to create Stripe checkout session`, `Stripe payment processing failed`),
+  `StripeCheckoutError` answers "Stripe could not start the checkout" for `provider_failed`; Stripe's own text goes to the
+  logger at `debug` with the contract id, the `error` log line carries the exception class only.
+
 ### Fixed
 - Stripe Checkout Sessions (hosted and embedded) are created in the shop's active language
   (`locale`, via the new `StripeLocale` and `LanguageResolverInterface::getActiveLanguageAbbreviation()`).
