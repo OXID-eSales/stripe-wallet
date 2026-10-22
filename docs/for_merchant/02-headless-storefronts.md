@@ -121,11 +121,12 @@ stornoed.
 | Order stays "pending" for the frontend | the webhook has not reached the shop yet (or is not registered); the frontend then settles on its own on the next check | register the webhook, check the Stripe Dashboard → Webhooks for delivery errors; the shop must be reachable over HTTPS |
 | `Cannot query field "stripeCheckoutStart"` | GraphQL modules not installed/activated, or the Stripe module activated before them | install and activate `graphql-base` + `graphql-storefront`, then re-activate the Stripe module |
 | `Cannot query field "…"` for a call the module documents (`stripeCheckoutStart`, `paymentClientConfig`, …) although the module is active | the GraphQL schema cache still holds the schema from before the activation or update | run `vendor/bin/oe-console oe:graphql:cache-clear` (`bin/oe-console` in the Docker SDK) and repeat the call |
-| Guests cannot pay | the headless checkout currently needs a logged-in customer | the frontend registers/logs in the shopper first (free registration is enough) |
+| Guest gets `account_exists` | the e-mail the guest typed belongs to a registered customer account | the frontend asks the shopper to log in; nothing was changed on the account |
+| Guest gets `guest_details_required` | the frontend sent no or incomplete guest details (e-mail, invoice address) | fix the frontend's form; the message names the field |
 
 ---
 
 ## Limits
 
-- Guest checkout is not available over the API yet (customers only).
+- Guests (no account) can pay: the frontend sends their e-mail and address with the checkout start and the shop keeps a passwordless guest account for the e-mail. The order currently ships to the **invoice** address, also when the guest gave a different delivery address (known gap).
 - Only Stripe's hosted page and Embedded Checkout are offered; custom Stripe Elements are not.

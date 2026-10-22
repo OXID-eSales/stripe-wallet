@@ -30,11 +30,11 @@ stripeCheckoutCancel ──▶   ………………………………………�
                         ◀─ CheckoutCancelResult { cancelled, contractId, contractState }
 ```
 
-- **Mutations** (`#[Logged] #[Right('PAYMENT_CHECKOUT')]`, granted to `oxidcustomer` and `oxidnotyetordered`):
+- **Mutations** (`#[Right('PAYMENT_CHECKOUT')]`, granted to `oxidcustomer`, `oxidnotyetordered` and `oxidanonymous`; no `#[Logged]`, so an anonymous token works):
 
   | Mutation | Arguments | Returns |
   |---|---|---|
-  | `stripeCheckoutStart` | `basketId: ID!`, `confirmTermsAndConditions: Boolean!`, `returnUrl: String!`, `cancelUrl: String!`, `uiMode: String` (`hosted` default, `embedded`) | `CheckoutStartResult!` |
+  | `stripeCheckoutStart` | `basketId: ID!`, `confirmTermsAndConditions: Boolean!`, `returnUrl: String!`, `cancelUrl: String!`, `uiMode: String` (`hosted` default, `embedded`), `guest: GuestCheckoutInput` (optional; anonymous tokens, see the developer guide §3) | `CheckoutStartResult!` |
   | `stripeCheckoutReturn` | `contractId: String!`, `contractToken: String!`, `checkoutSessionId: String!` | `CheckoutReturnResult!` |
   | `stripeCheckoutCancel` | `contractId: String!`, `contractToken: String!` | `CheckoutCancelResult!` |
 
@@ -57,7 +57,7 @@ stripeCheckoutCancel ──▶   ………………………………………�
 - A shop with `oe_graphql_base` and `oe_graphql_storefront` active (dev shop: `oxid-esales/graphql-storefront:dev-b-7.4.x`),
   payment-base `b-7.4.x-GRAPH-QL` (Sprint 15) and this module's `b-7.4.x-GRAPH-QL` active, Stripe **test** keys configured.
 - A customer in a country with a delivery set (the demo data's Germany works). Set `USER_EMAIL` /
-  `USER_PASSWORD` to such a customer (no committed default); the Playwright user lives in Switzerland and gets no delivery.
+  `USER_PASSWORD` to such a customer (not needed for `guest`) (no committed default); the Playwright user lives in Switzerland and gets no delivery.
 - After activating or updating the module the GraphQL schema cache must be cleared, or the new mutations are
   missing (`Cannot query field "stripeCheckoutStart"`): `vendor/bin/oe-console oe:graphql:cache-clear`
   (`bin/oe-console` in the Docker SDK). The script does it itself before its first query, through
@@ -75,6 +75,7 @@ bin/graph-ql-cli-test.sh <command> [args]
   pay                     = start hosted, then tells you how to pay and how to finish with 'return'
   return <checkoutSessionId> [contractId contractToken]   stripeCheckoutReturn (ids default to the last start)
   cancel [contractId contractToken]                        stripeCheckoutCancel (ids default to the last start)
+  guest [hosted|embedded] no login: anonymous token, basket, stripeCheckoutStart with guest details
   wrong-token             stripeCheckoutCancel with a bogus token: refused, nothing changes
   guard                   core placeOrder on a basket paying with Stripe: refused, names stripeCheckoutStart
   demo                    everything that needs no browser
@@ -88,6 +89,7 @@ Environment (all optional):
 | `GRAPHQL_URL` | `http://localhost.local/graphql/` | the endpoint |
 | `SHOP_URL` | origin of `GRAPHQL_URL` | base of `RETURN_URL` / `CANCEL_URL`. **Must be the shop's configured URL** (or an origin listed in the setting `sPaymentBaseHeadlessReturnOrigins`), otherwise `return_url_rejected / origin_not_allowed`. In the dev shop that is the tunnel: `SHOP_URL=https://daniil.oxiddev.de/` |
 | `USER_EMAIL` / `USER_PASSWORD` | — (required) | the customer |
+| `GUEST_EMAIL` / `COUNTRY_ID` | `guest.<time>@example.com` / `a7c40f631fc920687.20179984` (Germany) | the `guest` command only; the e-mail must not belong to a registered customer (`account_exists`) |
 | `PRODUCT_ID` | `5e6a374e212258abbfd76b6adf911772` | "Panorama", 20.90 EUR |
 | `DELIVERY_METHOD_ID` | `oxidstandard` | used by `guard` only |
 | `RETURN_URL` / `CANCEL_URL` | `${SHOP_URL}index.php?cl=start&headless=return|cancel` | the shop's start page, so a hand test does not land on a 404; a real client owns these URLs. Stripe appends `&session_id=…` |
@@ -203,8 +205,12 @@ only after `var/cache/container/` is cleared.
 
 - **User agent.** OXID disables the basket for user agents it takes for search engines; curl's default is one, and the
   symptom is `total 0` and "no delivery". The script sends a browser-like `User-Agent`.
-- **Introspection.** The storefront's `basketSetDeliveryMethod`, `basketSetPayment` and the Stripe mutations are
-  `#[Logged]`, so anonymous introspection does not list them. `schema` logs in first.
+- **Introspection.** The storefront's `basketSetDeliveryMethod` and `basketSetPayment` are `#[Logged]`, so
+  anonymous introspection does not list them; the Stripe mutations are visible to an anonymous token (right
+  `PAYMENT_CHECKOUT`), but `schema` logs in as a customer first to show everything.
+- **Guest.** `guest` needs no `USER_EMAIL`: with an anonymous token `basketSetPayment` does not exist, which is why
+  `stripeCheckoutStart` names its payment itself. Without `guest` details an anonymous start is refused with
+  `guest_details_required`.
 - **Return origin.** `returnUrl` / `cancelUrl` must be under the shop's own URL or an origin in
   `sPaymentBaseHeadlessReturnOrigins` — set `SHOP_URL` to the configured shop URL, not to `localhost.local`,
   when the two differ.

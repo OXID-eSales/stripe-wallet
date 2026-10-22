@@ -11,7 +11,8 @@ namespace OxidEsales\Payments\Stripe\GraphQL\Service;
 
 /**
  * Tells graphql-base where the Stripe checkout mutations live. The result
- * types are payment-base's (`Checkout*Result`), so no type namespace here.
+ * types are payment-base's (`Checkout*Result`); the only type namespace here is
+ * the `guest` input of `stripeCheckoutStart` (`GuestCheckoutInputFactory`).
  *
  * Mirrors `OxidEsales\GraphQL\Base\Framework\NamespaceMapperInterface`
  * WITHOUT implementing it, on purpose: graphql-base is optional for this
@@ -41,6 +42,8 @@ final class NamespaceMapper
      */
     public function getTypeNamespaceMapping(): array
     {
-        return [];
+        return [
+            'OxidEsales\\Payments\\Stripe\\GraphQL\\DataType' => __DIR__ . '/../DataType/',
+        ];
     }
 }

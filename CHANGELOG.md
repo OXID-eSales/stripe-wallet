@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- **Guest checkout over GraphQL (140b).** `stripeCheckoutStart`, `stripeCheckoutReturn` and `stripeCheckoutCancel` no longer
+  carry `#[Logged]`: the right `PAYMENT_CHECKOUT` alone guards them, so an anonymous token with the right is accepted and one
+  without it is refused (logged-in behaviour unchanged). `stripeCheckoutStart` gains the optional argument
+  `guest: GuestCheckoutInput` (`email`, `invoiceAddress: GuestAddressInput!`, `deliveryAddress: GuestAddressInput`), built
+  by `GraphQL\DataType\GuestCheckoutInputFactory` into payment-base's `GuestDetails` / `GuestAddress`; their refusals
+  (`guest_details_required`, `account_exists`) surface as `StripeCheckoutError` with `extensions.errorCode`. The payment
+  needs no argument: the mutation already names Stripe itself. Return and cancel stay authorised by the contract token
+  alone. `bin/graph-ql-cli-test.sh guest` runs the guest start. Known gap (payment-base 140a): the order ships to the
+  invoice address, a basket's delivery address is not applied. The input types are defined in this module until they move
+  into payment-base; the same type names in two active provider modules would clash.
+
 ### Documentation
 - `oe:graphql:cache-clear` after activating or updating the module: setup step and troubleshooting row for
   `Cannot query field "…"` in the merchant guide `02-headless-storefronts.md`, §1 and §11 of the headless developer guide,

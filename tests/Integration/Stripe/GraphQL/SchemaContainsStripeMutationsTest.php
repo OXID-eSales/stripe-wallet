@@ -9,17 +9,16 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Integration\Stripe\GraphQL;
 
-use ArrayIterator;
-use Iterator;
-use Kcs\ClassFinder\Finder\FinderInterface;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Tests\Integration\IntegrationTestCase;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutCancelResult;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutReturnResult;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutStartResult;
 use OxidEsales\Payments\Stripe\GraphQL\Controller\StripeCheckout;
+use OxidEsales\Payments\Stripe\GraphQL\DataType\GuestCheckoutInputFactory;
+use OxidEsales\Payments\Stripe\Tests\Support\FixedClassFinder;
+use GraphQL\Type\Definition\InputObjectType;
 use PHPUnit\Framework\Attributes\Group;
-use ReflectionClass;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Cache\Psr16Cache;
 use TheCodingMachine\GraphQLite\SchemaFactory;
@@ -59,14 +58,16 @@ final class SchemaContainsStripeMutationsTest extends IntegrationTestCase
     public function testGraphQliteBuildsTheThreeStripeCheckoutMutationsOverPaymentBasesTypes(): void
     {
         $factory = new SchemaFactory(new Psr16Cache(new ArrayAdapter()), ContainerFactory::getInstance()->getContainer());
-        $factory->setFinder($this->finderOver([
+        $factory->setFinder(new FixedClassFinder([
             StripeCheckout::class,
+            GuestCheckoutInputFactory::class,
             CheckoutStartResult::class,
             CheckoutReturnResult::class,
             CheckoutCancelResult::class,
         ]));
         $factory->addControllerNamespace('OxidEsales\\Payments\\Stripe\\GraphQL\\Controller');
         $factory->addTypeNamespace('OxidEsales\\PaymentBase\\GraphQL\\DataType');
+        $factory->addTypeNamespace('OxidEsales\\Payments\\Stripe\\GraphQL\\DataType');
 
         $schema = $factory->createSchema();
         $schema->assertValid();
@@ -80,7 +81,7 @@ final class SchemaContainsStripeMutationsTest extends IntegrationTestCase
         $start = $mutations->getField('stripeCheckoutStart');
         self::assertSame('CheckoutStartResult!', (string) $start->getType());
         self::assertSame(
-            ['basketId', 'confirmTermsAndConditions', 'returnUrl', 'cancelUrl', 'uiMode'],
+            ['basketId', 'confirmTermsAndConditions', 'returnUrl', 'cancelUrl', 'uiMode', 'guest'],
             array_map(static fn($arg) => $arg->name, $start->args)
         );
         self::assertSame('CheckoutReturnResult!', (string) $mutations->getField('stripeCheckoutReturn')->getType());
@@ -94,100 +95,37 @@ final class SchemaContainsStripeMutationsTest extends IntegrationTestCase
         );
     }
 
-    /**
-     * A class finder over a fixed list. GraphQLite's default (composer
-     * classmap) finder reflects every class under a namespace prefix, which
-     * in this shop re-enters OXID's module-chain autoloader for other
-     * modules' controllers; the schema under test needs exactly these classes.
-     *
-     * @param list<class-string> $classes
-     */
-    private function finderOver(array $classes): FinderInterface
+    public function testTheGuestInputTypesCarryExactlyTheAgreedFields(): void
     {
-        return new class ($classes) implements FinderInterface {
-            /** @var list<string> */
-            private array $namespaces = [];
+        $factory = new SchemaFactory(new Psr16Cache(new ArrayAdapter()), ContainerFactory::getInstance()->getContainer());
+        $factory->setFinder(new FixedClassFinder([
+            StripeCheckout::class,
+            GuestCheckoutInputFactory::class,
+            CheckoutStartResult::class,
+            CheckoutReturnResult::class,
+            CheckoutCancelResult::class,
+        ]));
+        $factory->addControllerNamespace('OxidEsales\\Payments\\Stripe\\GraphQL\\Controller');
+        $factory->addTypeNamespace('OxidEsales\\PaymentBase\\GraphQL\\DataType');
+        $factory->addTypeNamespace('OxidEsales\\Payments\\Stripe\\GraphQL\\DataType');
+        $schema = $factory->createSchema();
 
-            /** @param list<class-string> $classes */
-            public function __construct(private readonly array $classes)
-            {
-            }
+        $guest = $schema->getType('GuestCheckoutInput');
+        self::assertInstanceOf(InputObjectType::class, $guest);
+        self::assertSame(['email', 'invoiceAddress', 'deliveryAddress'], array_keys($guest->getFields()));
+        self::assertSame('GuestAddressInput!', (string) $guest->getField('invoiceAddress')->getType());
+        self::assertSame('GuestAddressInput', (string) $guest->getField('deliveryAddress')->getType());
 
-            public function getIterator(): Iterator
-            {
-                $found = [];
-                foreach ($this->classes as $class) {
-                    foreach ($this->namespaces ?: [''] as $namespace) {
-                        if (str_starts_with($class, $namespace)) {
-                            $found[$class] = new ReflectionClass($class);
-                            break;
-                        }
-                    }
-                }
-
-                return new ArrayIterator($found);
-            }
-
-            public function inNamespace(string|array $namespaces): self
-            {
-                $clone = clone $this;
-                $clone->namespaces = array_map(
-                    static fn(string $ns): string => rtrim($ns, '\\') . '\\',
-                    (array) $namespaces
-                );
-
-                return $clone;
-            }
-
-            public function implementationOf(string|array $interface): self
-            {
-                return $this;
-            }
-
-            public function subclassOf(string|null $superClass): self
-            {
-                return $this;
-            }
-
-            public function annotatedBy(string|null $annotationClass): self
-            {
-                return $this;
-            }
-
-            public function withAttribute(string|null $attributeClass): self
-            {
-                return $this;
-            }
-
-            public function in(string|array $dirs): self
-            {
-                return $this;
-            }
-
-            public function notInNamespace(string|array $namespaces): self
-            {
-                return $this;
-            }
-
-            public function filter(callable|null $callback): self
-            {
-                return $this;
-            }
-
-            public function path(string $pattern): self
-            {
-                return $this;
-            }
-
-            public function notPath(string $pattern): self
-            {
-                return $this;
-            }
-
-            public function pathFilter(callable|null $callback): self
-            {
-                return $this;
-            }
-        };
+        $address = $schema->getType('GuestAddressInput');
+        self::assertInstanceOf(InputObjectType::class, $address);
+        self::assertSame(
+            [
+                'firstName', 'lastName', 'street', 'streetNumber', 'zipCode', 'city', 'countryId',
+                'salutation', 'company', 'additionalInfo', 'stateId', 'phone',
+            ],
+            array_keys($address->getFields())
+        );
+        self::assertSame('String', (string) $address->getField('company')->getType(), 'optional fields are nullable');
+        self::assertSame('String!', (string) $address->getField('firstName')->getType());
     }
 }

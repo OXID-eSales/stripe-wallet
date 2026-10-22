@@ -88,9 +88,12 @@ module activation, and `bin/graph-ql-cli-test.sh` runs it before its first query
 
 ## 3. The API
 
-All mutations need a bearer token of a **customer** (`#[Logged]`) with the right
-`PAYMENT_CHECKOUT` (groups `oxidcustomer`, `oxidnotyetordered`, `oxidadmin`). Send it as
-`Authorization: Bearer <jwt>`; get it from graphql-base's `token(username, password)` query.
+All mutations need a bearer token with the right `PAYMENT_CHECKOUT` (groups `oxidcustomer`,
+`oxidnotyetordered`, `oxidanonymous`, `oxidadmin`) and **no** `#[Logged]`: a logged-in customer's token or an
+**anonymous** token (`query { token }` without credentials, a guest) both work. Send it as
+`Authorization: Bearer <jwt>`; get a customer's from graphql-base's `token(username, password)` query.
+Return and cancel are authorised by the contract token alone: any token with the right and the matching contract
+token succeeds (also a different anonymous token, e.g. after the browser was reopened), a wrong token fails with `invalid_token`.
 
 ### `stripeCheckoutStart`
 
@@ -102,6 +105,7 @@ mutation {
     returnUrl: String!
     cancelUrl: String          # optional; defaults to returnUrl
     uiMode: String = "hosted"  # "hosted" | "embedded"
+    guest: GuestCheckoutInput  # optional; only for an anonymous token, see "Guest checkout" below
   ) {
     contractId        # String!
     contractToken     # String!  — keep it; return and cancel need it
@@ -129,6 +133,58 @@ mutation {
   Embedded Checkout with `clientSecret`. In this mode Stripe has no cancel URL (the two are
   mutually exclusive at Stripe); your own UI handles "cancel" by calling `stripeCheckoutCancel`.
 - The capture mode follows the module setting `sStripeCaptureMode` (`automatic` or `manual`).
+
+#### Guest checkout (no account, anonymous token)
+
+```graphql
+input GuestCheckoutInput {
+  email: String!
+  invoiceAddress: GuestAddressInput!
+  deliveryAddress: GuestAddressInput
+}
+input GuestAddressInput {
+  firstName: String!  lastName: String!  street: String!  streetNumber: String!
+  zipCode: String!    city: String!      countryId: ID!   # the shop's country id: countries { id }
+  salutation: String  company: String    additionalInfo: String  stateId: ID  phone: String
+}
+```
+
+An anonymous token cannot call `basketSetPayment` (it is `#[Logged]`), and `stripeCheckoutStart` needs no payment
+argument: the mutation names Stripe itself (`paymentId` in `StripeCheckout`), so a basket without a payment starts.
+The sequence with an anonymous token:
+
+```graphql
+query    { token }                                                   # no Authorization header → anonymous JWT
+mutation { basketCreate(basket: {title: "cart", public: false}) { id } }
+mutation { basketAddItem(basketId: "…", productId: "…", amount: 1) { cost { total } } }
+mutation {
+  stripeCheckoutStart(
+    basketId: "…", confirmTermsAndConditions: true,
+    returnUrl: "https://app.example.com/return", cancelUrl: "https://app.example.com/cancel",
+    guest: {
+      email: "gerda@example.com"
+      invoiceAddress: { firstName: "Gerda", lastName: "Guest", street: "Grunewaldstr.", streetNumber: "1",
+                        zipCode: "79098", city: "Freiburg", countryId: "a7c40f631fc920687.20179984" }
+      deliveryAddress: { firstName: "Dora", lastName: "Dock", street: "Hafenweg", streetNumber: "9",
+                         zipCode: "20457", city: "Hamburg", countryId: "a7c40f631fc920687.20179984" }  # optional
+    }
+  ) { contractId contractToken orderNumber redirectUrl renderMode }
+}
+```
+
+From here on nothing differs from a customer checkout (`stripeCheckoutReturn` / `Cancel` with the contract token).
+payment-base creates (or reuses) a passwordless guest account for the e-mail, makes it the owner of the basket
+and starts the contract for it (`docs/graphql-headless-checkout.md` of payment-base, "Guest checkout"). Refusals have
+the usual stable `extensions.errorCode`: `guest_details_required` (anonymous token without `guest`, or a missing or
+invalid field: the message names the field, never the value), `account_exists` (the e-mail belongs to a registered
+account: the shopper must log in), `basket_forbidden` (the basket has another owner). `guest` is ignored for a
+logged-in customer. Input validation happens in `GuestCheckoutInputFactory`, which builds payment-base's `GuestAddress`
+and `GuestDetails` value objects and turns their refusals into the same client-safe error.
+
+The two input types are defined here, in the Stripe module (`src/Stripe/GraphQL/DataType/GuestCheckoutInputFactory.php`),
+because payment-base does not ship them yet. GraphQL type names are schema-wide: the Mollie and PayPal modules mirror
+`GuestCheckoutInput` / `GuestAddressInput`, and two modules defining the same input type cannot be active in one shop
+until the types move into payment-base (the DRY follow-up).
 
 ### `stripeCheckoutReturn`
 
@@ -373,7 +429,10 @@ The complete provider-side checklist is in payment-base:
 
 ## 12. Known gaps
 
-- **No guest checkout:** `#[Logged]` on the mutations; anonymous tokens only read the key.
+- **Guest orders ship to the invoice address:** the contract-first flow does not apply a basket's delivery address
+  (`OEGQL_DELADDRESSID`) to the order, for guests and customers alike (the address is stored for the guest, the order
+  ignores it). Guest accounts have no `oxregister`, so `customer { orders }` is empty for them. Guest accounts and
+  address rows accumulate; there is no cleanup and no rate limit on anonymous starts.
 - `uiMode: "custom"` (Stripe Elements) is not implemented.
 - Stripe appends only `session_id` to the return URL (not `contract_id`); keep the contract
   identifiers on the client side.
@@ -391,7 +450,7 @@ checkout workflow"). Every code reference below was checked against the code of 
 | --- | --- | --- | --- | --- |
 | **Standard checkout** | `basketSetDeliveryMethod`, `basketSetPayment`, the module's own approval query (the docs call it `3rdPartyStandardApprovalProcess`), then the storefront's `placeOrder` | by `placeOrder` (`OxidEsales\GraphQL\Storefront\Basket\Service\PlaceOrder`), before or without the money | a logged-in customer (JWT of an existing `oxuser`) | the module subscribes to `OxidEsales\GraphQL\Storefront\Basket\Event\BeforePlaceOrder` and prepares the basket |
 | **Express checkout** | the module's own approval query (`3rdPartyExpressApprovalProcess`), then `placeOrder` | by `placeOrder`, after the module stored what the PSP told it on the `oxuserbaskets` row | an anonymous token or an existing user; the user is matched or created in the `BeforePlaceOrder` subscriber | `BeforePlaceOrder` again |
-| **Own workflow (ours)** | `stripeCheckoutStart` / `stripeCheckoutReturn` / `stripeCheckoutCancel` (§3) | by the contract: an early order exists from the start (`NOT_FINISHED`), it is **committed** when the money is confirmed (`ContractCommitmentHandler` in payment-base), never by `placeOrder` | a logged-in customer (`#[Logged]` and `#[Right('PAYMENT_CHECKOUT')]` on `StripeCheckout`) | none on the checkout path; `placeOrder` is **refused** for our baskets |
+| **Own workflow (ours)** | `stripeCheckoutStart` / `stripeCheckoutReturn` / `stripeCheckoutCancel` (§3) | by the contract: an early order exists from the start (`NOT_FINISHED`), it is **committed** when the money is confirmed (`ContractCommitmentHandler` in payment-base), never by `placeOrder` | a logged-in customer or an anonymous token (`#[Right('PAYMENT_CHECKOUT')]` on `StripeCheckout`, no `#[Logged]`; guest, see §3) | none on the checkout path; `placeOrder` is **refused** for our baskets |
 
 **Why `placeOrder` is refused.** A basket that pays with Stripe must not be ordered before the payment: the
 contract-first order is the only way an order for this payment comes to exist. payment-base subscribes to
