@@ -16,13 +16,13 @@ The storefront's basket services work on the authenticated user's id. Whether an
 own a basket at all is proven first on the SDK shop; the result decides between
 **(a)** anonymous basket + user created at `checkoutStart`, and
 **(b)** a guest user created at `checkoutStart` from e-mail + addresses, basket built from the
-client's line items. (a) is the documented model and the recommendation; (b) is the fallback.
+client's line items. (a) is the documented model and the recommendation; (b) is the fallback. **Decided 2026-10-22: (a)** — see [`../reports/04-sprint-140a-proof-2026-10-22.md`](../reports/04-sprint-140a-proof-2026-10-22.md).
 
 ## Subsprints
 
 | #    | File                                                                       | Repos                               | Order                       |
 | ---- | -------------------------------------------------------------------------- | ----------------------------------- | --------------------------- |
-| 140a | [Backend: rights and guest user](sprint-140a-backend-rights-and-guest-user.md) | payment-base                   | first (decision gate)       |
+| 140a | [Backend: rights and guest user](../done/sprint-140a-backend-rights-and-guest-user.md) | payment-base                   | first (decision gate)       |
 | 140b | [Modules: mutations open to guests](sprint-140b-modules-open-to-guests.md) | stripe, mollie-payment, paypal      | after 140a released         |
 | 140c | [Frontend: checkout without login](sprint-140c-frontend-guest-flow.md)     | oxid-fe-core, oxid-fe-user, hydroxid | after 140b released        |
 
