@@ -161,7 +161,7 @@ load_state() {
 }
 
 cmd_schema() {
-    say "Stripe mutations in the schema (logged in — GraphQLite hides #[Logged] fields from anonymous introspection)"
+    say "Stripe mutations in the schema (an anonymous token suffices: the mutations carry #[Right] only, no #[Logged])"
     login
     gql '{ __type(name: "Mutation") { fields { name args { name type { name kind ofType { name } } } type { name ofType { name } } } } }' \
         | jq -r '.data.__type.fields[] | select(.name|startswith("stripeCheckout")) | "  \(.name)(\([.args[] | "\(.name): \(.type.name // .type.ofType.name)"] | join(", "))): \(.type.name // .type.ofType.name)"'

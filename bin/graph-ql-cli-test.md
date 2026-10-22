@@ -107,8 +107,8 @@ SHOP_URL=https://daniil.oxiddev.de/ bin/graph-ql-cli-test.sh demo
 ```
 
 ```
-Stripe mutations in the schema (logged in — GraphQLite hides #[Logged] fields from anonymous introspection)
-  stripeCheckoutStart(basketId: ID, confirmTermsAndConditions: Boolean, returnUrl: String, cancelUrl: String, uiMode: String): CheckoutStartResult
+Stripe mutations in the schema (an anonymous token suffices: the mutations carry #[Right] only, no #[Logged])
+  stripeCheckoutStart(basketId: ID, confirmTermsAndConditions: Boolean, returnUrl: String, cancelUrl: String, uiMode: String, guest: GuestCheckoutInput): CheckoutStartResult
   stripeCheckoutReturn(contractId: String, contractToken: String, checkoutSessionId: String): CheckoutReturnResult
   stripeCheckoutCancel(contractId: String, contractToken: String): CheckoutCancelResult
   CheckoutStartResult { contractId, contractToken, providerName, orderNumber, redirectUrl, clientSecret, renderMode }
