@@ -99,6 +99,8 @@ a well-built frontend falls back to the hosted page by itself.
 | which origins may receive shoppers back | the look of the checkout page |
 | the order, its number, status, capture, refund | showing the order number and status to the shopper |
 | the publishable key, handed over sealed per session | asking for it when the payment step opens |
+| the log policy: no provider text, no full return URLs, no tokens in the shop log (set `zend.exception_ignore_args=On` in PHP, the production default) | logging without query strings in its own web server |
+| the webhook signing secret (Stripe) — and, for the PayPal module, the **webhook id**, which is mandatory since PayPal webhooks are verified against it | nothing to configure for either |
 
 ---
 

@@ -322,13 +322,17 @@ webhook's timing, and a shopper who closes the tab still gets the order. Details
 
 ## 7. Security model
 
-- **Authentication:** graphql-base JWT. The checkout mutations require a logged-in customer; the
-  key query accepts a guest token. Rights come from payment-base's `PermissionProvider`
-  (`PAYMENT_CHECKOUT`, `PAYMENT_CLIENT_CONFIG`).
+- **Authentication:** graphql-base JWT. The checkout mutations and the key query accept a
+  logged-in customer or an anonymous token; the right decides, not the login (`#[Right]` only, no
+  `#[Logged]`, sprint 140b). Rights come from payment-base's `PermissionProvider`
+  (`PAYMENT_CHECKOUT`, `PAYMENT_CLIENT_CONFIG`; `oxidanonymous` also gets the storefront basket
+  rights, never `PLACE_ORDER`).
 - **Contract token:** `stripeCheckoutStart` answers a random 128-bit `contractToken`
-  (`bin2hex(random_bytes(16))`, stored in the contract metadata). `return` and `cancel` compare
-  it with `hash_equals`; a mismatch is `invalid_token`. Nobody can settle or cancel someone else's
-  attempt with just the contract id.
+  (`bin2hex(random_bytes(16))`). The shop stores only its SHA-256 (`HeadlessTokenHash`, payment-base
+  sprint 138b; existing plaintext values are hashed by the payment-base migration), so a database
+  read cannot replay an attempt. `return` and `cancel` hash the presented token and compare with
+  `hash_equals`; a mismatch is `invalid_token`. Nobody can settle or cancel someone else's attempt
+  with just the contract id.
 - **Return-URL allow-list:** the shop only redirects to its own origin or to
   `sPaymentBaseHeadlessReturnOrigins` (scheme + host + port; no credentials in the URL). A frontend
   on a new domain or port must be listed first — a dev server on an unlisted port fails with
@@ -337,6 +341,25 @@ webhook's timing, and a shopper who closes the tab still gets the order. Details
   tokens and webhook secrets stay in module settings.
 - **CORS:** `/graphql/` must allow the frontend's origin like any other API; that is shop
   configuration, not part of this module.
+- **No traces (sprint 138):** what the headless channel leaves behind, and where it does not.
+  - *Shop log:* a rejected return URL is logged as `Return URL rejected (<reason>): <origin>` — the
+    origin only (`ReturnUrlRejectedException`, full URL at debug level). Stripe's own error text
+    never reaches the GraphQL error or the error log; it goes to the debug log with the contract
+    id, and the client gets a fixed message with `errorCode: provider_failed` and `providerCode`
+    (`StripePaymentHandler`, `StripeCheckoutError`). Host setting that still matters:
+    `zend.exception_ignore_args=On` (PHP's production default), otherwise graphql-base's stack
+    traces copy the full query text — return URLs and contract tokens — into `oxideshop.log`.
+  - *URLs:* the headless return URL is the client's URL plus Stripe's `session_id`; nothing of ours
+    (`contract_id`, `cancelled`) is appended. The reference frontend drops the query string with
+    `history.replaceState` after reading it and its nginx logs `$uri` without the query string.
+  - *Browser:* the JWT (and the refresh token, oxid-fe-core 0.10.0) in `localStorage`, the checkout
+    attempt (`contractId`, `contractToken`, `orderNumber`) in `sessionStorage` until the attempt
+    reaches an outcome or the shopper logs out; logout revokes the JWT server-side (`tokenDelete`).
+  - *Screen:* the frontend renders messages by `errorCode` / `providerCode`, never the raw
+    `message` (section 8 is the UI contract).
+  - *Git:* gitleaks scans tree and history in every repository of the stack with rules for Stripe
+    checkout-session client secrets, `force_sid`, PayPal tokens, Mollie keys and e-mail/password
+    pairs; test logins come from local `.env` files only, and tests skip without them.
 
 ---
 

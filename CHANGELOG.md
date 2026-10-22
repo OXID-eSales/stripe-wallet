@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- **Docs (138h).** The developer guide's security model (§7) states what the headless channel leaves behind and where
+  it does not (hashed contract token, log policy, URLs, browser storage, errors by code, secret scanning); the merchant
+  guide lists the log policy and the PayPal webhook id next to what stays in the shop.
 - **Guest checkout over GraphQL (140b).** `stripeCheckoutStart`, `stripeCheckoutReturn` and `stripeCheckoutCancel` no longer
   carry `#[Logged]`: the right `PAYMENT_CHECKOUT` alone guards them, so an anonymous token with the right is accepted and one
   without it is refused (logged-in behaviour unchanged). `stripeCheckoutStart` gains the optional argument
