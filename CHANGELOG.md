@@ -25,6 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Sealed client config provider (`ClientConfig\StripeClientConfigProvider`, tag `payment_base.client_config_provider`):
   exposes only the publishable key of the current mode (or nothing when unset or not a `pk_` key) to payment-base's
   `paymentClientConfig` query. Requires a payment-base release that ships `ClientConfigProviderInterface`.
+  The provider also implements `AllowListedClientConfigProviderInterface` (payment-base 1.4.0+) and declares
+  `publishableKey` as its only value name, so the guard refuses any other name whatever its value looks like.
 - Headless checkout over GraphQL. See docs for developers
   (`docs/for_developer/05-headless-graphql-checkout.md`): the `stripeCheckoutStart` / `stripeCheckoutReturn` /
   `stripeCheckoutCancel` API with `uiMode` `hosted` | `embedded`, the complete call sequence of a checkout as the
