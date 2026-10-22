@@ -14,12 +14,12 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * GRAPH-QL / PS4 — graphql-base discovers the Stripe mutations through this
- * mapper; the result types are payment-base's, the only type namespace here is the
- * guest input factory (`GuestCheckoutInput`, `GuestAddressInput`).
+ * mapper; every type they use (results, the `guest` input) is payment-base's and
+ * mapped by payment-base, so this module maps no type namespace.
  */
 final class NamespaceMapperTest extends TestCase
 {
-    public function testMapsTheControllerAndTheGuestInputNamespacesToExistingDirectories(): void
+    public function testMapsTheControllerNamespaceToAnExistingDirectoryAndNoTypeNamespace(): void
     {
         $mapper = new NamespaceMapper();
 
@@ -27,9 +27,6 @@ final class NamespaceMapperTest extends TestCase
         self::assertArrayHasKey('OxidEsales\\Payments\\Stripe\\GraphQL\\Controller', $controllers);
         self::assertDirectoryExists($controllers['OxidEsales\\Payments\\Stripe\\GraphQL\\Controller']);
 
-        $types = $mapper->getTypeNamespaceMapping();
-        self::assertSame(['OxidEsales\\Payments\\Stripe\\GraphQL\\DataType'], array_keys($types));
-        self::assertDirectoryExists($types['OxidEsales\\Payments\\Stripe\\GraphQL\\DataType']);
-        self::assertFileExists($types['OxidEsales\\Payments\\Stripe\\GraphQL\\DataType'] . 'GuestCheckoutInputFactory.php');
+        self::assertSame([], $mapper->getTypeNamespaceMapping(), 'the input types live in payment-base, once');
     }
 }

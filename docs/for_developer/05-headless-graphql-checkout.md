@@ -178,13 +178,13 @@ and starts the contract for it (`docs/graphql-headless-checkout.md` of payment-b
 the usual stable `extensions.errorCode`: `guest_details_required` (anonymous token without `guest`, or a missing or
 invalid field: the message names the field, never the value), `account_exists` (the e-mail belongs to a registered
 account: the shopper must log in), `basket_forbidden` (the basket has another owner). `guest` is ignored for a
-logged-in customer. Input validation happens in `GuestCheckoutInputFactory`, which builds payment-base's `GuestAddress`
-and `GuestDetails` value objects and turns their refusals into the same client-safe error.
+logged-in customer. Input validation happens in payment-base's `GuestCheckoutInputFactory`, which builds its `GuestAddress`
+and `GuestDetails` value objects and turns their refusals into `GuestDetailsRefused`, a client-safe error with the
+same `extensions.errorCode`.
 
-The two input types are defined here, in the Stripe module (`src/Stripe/GraphQL/DataType/GuestCheckoutInputFactory.php`),
-because payment-base does not ship them yet. GraphQL type names are schema-wide: the Mollie and PayPal modules mirror
-`GuestCheckoutInput` / `GuestAddressInput`, and two modules defining the same input type cannot be active in one shop
-until the types move into payment-base (the DRY follow-up).
+The two input types are defined once, in payment-base (`GraphQL\DataType\GuestCheckoutInputFactory`), and shared by the
+Stripe, Mollie and PayPal start mutations: this module defines no GraphQL type of its own, and `stripeCheckoutStart`
+only declares `?GuestDetails $guest`. GraphQL type names are schema-wide, which is why they must not be defined twice.
 
 ### `stripeCheckoutReturn`
 

@@ -34,7 +34,7 @@ stripeCheckoutCancel ──▶   ………………………………………�
 
   | Mutation | Arguments | Returns |
   |---|---|---|
-  | `stripeCheckoutStart` | `basketId: ID!`, `confirmTermsAndConditions: Boolean!`, `returnUrl: String!`, `cancelUrl: String!`, `uiMode: String` (`hosted` default, `embedded`), `guest: GuestCheckoutInput` (optional; anonymous tokens, see the developer guide §3) | `CheckoutStartResult!` |
+  | `stripeCheckoutStart` | `basketId: ID!`, `confirmTermsAndConditions: Boolean!`, `returnUrl: String!`, `cancelUrl: String!`, `uiMode: String` (`hosted` default, `embedded`), `guest: GuestCheckoutInput` (optional; anonymous tokens; the input type is payment-base's, shared by all providers; see the developer guide §3) | `CheckoutStartResult!` |
   | `stripeCheckoutReturn` | `contractId: String!`, `contractToken: String!`, `checkoutSessionId: String!` | `CheckoutReturnResult!` |
   | `stripeCheckoutCancel` | `contractId: String!`, `contractToken: String!` | `CheckoutCancelResult!` |
 

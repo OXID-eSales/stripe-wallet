@@ -24,9 +24,9 @@ use OxidEsales\PaymentBase\Checkout\Headless\HeadlessStartResult;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutCancelResult;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutReturnResult;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutStartResult;
+use OxidEsales\PaymentBase\GraphQL\DataType\GuestCheckoutInputFactory;
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Controller\StripeCheckout;
-use OxidEsales\Payments\Stripe\GraphQL\DataType\GuestCheckoutInputFactory;
 use OxidEsales\Payments\Stripe\Tests\Support\FixedClassFinder;
 use OxidEsales\Eshop\Application\Model\User as EshopUser;
 use PHPUnit\Framework\Attributes\Group;
@@ -209,7 +209,7 @@ final class StripeCheckoutAnonymousAccessTest extends TestCase
         self::assertArrayNotHasKey('errors', $this->execute(self::START));
     }
 
-    public function testCheckoutStart_GuestWithInvalidEmail_IsAStripeCheckoutErrorWithTheStableCode(): void
+    public function testCheckoutStart_GuestWithInvalidEmail_IsRefusedWithTheStableCode(): void
     {
         $this->asAnonymousToken('anonymous-1');
         $this->checkout->expects($this->never())->method('start');
@@ -221,7 +221,7 @@ final class StripeCheckoutAnonymousAccessTest extends TestCase
         self::assertStringNotContainsString('not-an-email', $result['errors'][0]['message'], 'the message names the field, never the value');
     }
 
-    public function testCheckoutStart_GuestWithAnEmptyRequiredAddressField_IsAStripeCheckoutErrorWithTheStableCode(): void
+    public function testCheckoutStart_GuestWithAnEmptyRequiredAddressField_IsRefusedWithTheStableCode(): void
     {
         $this->asAnonymousToken('anonymous-1');
         $this->checkout->expects($this->never())->method('start');
@@ -232,7 +232,7 @@ final class StripeCheckoutAnonymousAccessTest extends TestCase
         self::assertStringContainsString('city', $result['errors'][0]['message']);
     }
 
-    public function testCheckoutStart_GuestWithARegisteredEmail_IsAStripeCheckoutErrorAccountExists(): void
+    public function testCheckoutStart_GuestWithARegisteredEmail_IsRefusedAccountExists(): void
     {
         $this->asAnonymousToken('anonymous-1');
         $this->checkout->method('start')->willThrowException(
@@ -318,7 +318,6 @@ final class StripeCheckoutAnonymousAccessTest extends TestCase
         ]));
         $factory->addControllerNamespace('OxidEsales\\Payments\\Stripe\\GraphQL\\Controller');
         $factory->addTypeNamespace('OxidEsales\\PaymentBase\\GraphQL\\DataType');
-        $factory->addTypeNamespace('OxidEsales\\Payments\\Stripe\\GraphQL\\DataType');
         $factory->setAuthenticationService($this->authentication);
         $factory->setAuthorizationService($authorization);
 

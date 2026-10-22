@@ -14,8 +14,8 @@ use OxidEsales\EshopCommunity\Tests\Integration\IntegrationTestCase;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutCancelResult;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutReturnResult;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutStartResult;
+use OxidEsales\PaymentBase\GraphQL\DataType\GuestCheckoutInputFactory;
 use OxidEsales\Payments\Stripe\GraphQL\Controller\StripeCheckout;
-use OxidEsales\Payments\Stripe\GraphQL\DataType\GuestCheckoutInputFactory;
 use OxidEsales\Payments\Stripe\Tests\Support\FixedClassFinder;
 use GraphQL\Type\Definition\InputObjectType;
 use PHPUnit\Framework\Attributes\Group;
@@ -70,7 +70,6 @@ final class SchemaContainsStripeMutationsTest extends IntegrationTestCase
         ]));
         $factory->addControllerNamespace('OxidEsales\\Payments\\Stripe\\GraphQL\\Controller');
         $factory->addTypeNamespace('OxidEsales\\PaymentBase\\GraphQL\\DataType');
-        $factory->addTypeNamespace('OxidEsales\\Payments\\Stripe\\GraphQL\\DataType');
 
         $schema = $factory->createSchema();
         $schema->assertValid();
@@ -98,7 +97,11 @@ final class SchemaContainsStripeMutationsTest extends IntegrationTestCase
         );
     }
 
-    public function testTheGuestInputTypesCarryExactlyTheAgreedFields(): void
+    /**
+     * The input type is payment-base's (its fields are pinned there, once); here only that the start mutation
+     * takes it under the agreed name, and that this module does not define a second one.
+     */
+    public function testStartTakesTheSharedGuestCheckoutInput(): void
     {
         $factory = new SchemaFactory(new Psr16Cache(new ArrayAdapter()), ContainerFactory::getInstance()->getContainer());
         $factory->setFinder(new FixedClassFinder([
@@ -110,25 +113,12 @@ final class SchemaContainsStripeMutationsTest extends IntegrationTestCase
         ]));
         $factory->addControllerNamespace('OxidEsales\\Payments\\Stripe\\GraphQL\\Controller');
         $factory->addTypeNamespace('OxidEsales\\PaymentBase\\GraphQL\\DataType');
-        $factory->addTypeNamespace('OxidEsales\\Payments\\Stripe\\GraphQL\\DataType');
         $schema = $factory->createSchema();
+        $schema->assertValid();
 
-        $guest = $schema->getType('GuestCheckoutInput');
-        self::assertInstanceOf(InputObjectType::class, $guest);
-        self::assertSame(['email', 'invoiceAddress', 'deliveryAddress'], array_keys($guest->getFields()));
-        self::assertSame('GuestAddressInput!', (string) $guest->getField('invoiceAddress')->getType());
-        self::assertSame('GuestAddressInput', (string) $guest->getField('deliveryAddress')->getType());
-
-        $address = $schema->getType('GuestAddressInput');
-        self::assertInstanceOf(InputObjectType::class, $address);
-        self::assertSame(
-            [
-                'firstName', 'lastName', 'street', 'streetNumber', 'zipCode', 'city', 'countryId',
-                'salutation', 'company', 'additionalInfo', 'stateId', 'phone',
-            ],
-            array_keys($address->getFields())
-        );
-        self::assertSame('String', (string) $address->getField('company')->getType(), 'optional fields are nullable');
-        self::assertSame('String!', (string) $address->getField('firstName')->getType());
+        $guest = $schema->getMutationType()?->getField('stripeCheckoutStart')->getArg('guest');
+        self::assertNotNull($guest);
+        self::assertSame('GuestCheckoutInput', (string) $guest->getType());
+        self::assertInstanceOf(InputObjectType::class, $schema->getType('GuestCheckoutInput'));
     }
 }
