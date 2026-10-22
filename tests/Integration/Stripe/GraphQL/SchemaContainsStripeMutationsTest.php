@@ -45,6 +45,9 @@ final class SchemaContainsStripeMutationsTest extends IntegrationTestCase
         if (!class_exists(SchemaFactory::class)) {
             self::markTestSkipped('graphql-base / GraphQLite is not installed');
         }
+        // Required by path, not by autoload: the shop bootstrap CI uses does not register the Tests\ namespace, and
+        // the class implements a kcs/class-finder interface that exists only where GraphQLite does (guard above).
+        require_once __DIR__ . '/../../../Support/FixedClassFinder.php';
     }
 
     public function testTheControllerResolvesFromTheContainer(): void
