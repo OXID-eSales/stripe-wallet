@@ -21,13 +21,13 @@ screen; the browser keeps only what the next request needs.
 
 | #    | File                                                                                   | Repos                                   | Order / dependency                     |
 | ---- | -------------------------------------------------------------------------------------- | --------------------------------------- | -------------------------------------- |
-| 138a | [Purge, rotate, gitleaks everywhere](../done/sprint-138a-purge-rotate-gitleaks.md)             | mollie, stripe, paypal, oxid-fe-user, hydroxid | first; independent                 |
-| 138b | [Contract token hashed at rest + guard allow-list](../done/sprint-138b-token-at-rest-and-guard.md) | payment-base                         | independent                            |
-| 138c | [No identifiers in URLs](../done/sprint-138c-no-ids-in-urls.md)                                | mollie, paypal, oxid-fe-user            | after 138b is released (pins)          |
-| 138d | [Logs without secrets](../done/sprint-138d-log-hygiene.md)                                     | payment-base, stripe, paypal, oxid-fe-user, hydroxid | independent              |
-| 138e | [Browser keeps only what it needs](../done/sprint-138e-browser-storage-and-logout.md)          | oxid-fe-core, oxid-fe-user              | independent                            |
-| 138f | [Error UX by code](../done/sprint-138f-error-ux-by-code.md)                                    | oxid-fe-user                            | after 138d (error shapes)              |
-| 138g | [PayPal webhook signature verification](../done/sprint-138g-paypal-webhook-signature.md)       | paypal                                  | independent                            |
+| 138a | [Purge, rotate, gitleaks everywhere](sprint-138a-purge-rotate-gitleaks.md)             | mollie, stripe, paypal, oxid-fe-user, hydroxid | first; independent                 |
+| 138b | [Contract token hashed at rest + guard allow-list](sprint-138b-token-at-rest-and-guard.md) | payment-base                         | independent                            |
+| 138c | [No identifiers in URLs](sprint-138c-no-ids-in-urls.md)                                | mollie, paypal, oxid-fe-user            | after 138b is released (pins)          |
+| 138d | [Logs without secrets](sprint-138d-log-hygiene.md)                                     | payment-base, stripe, paypal, oxid-fe-user, hydroxid | independent              |
+| 138e | [Browser keeps only what it needs](sprint-138e-browser-storage-and-logout.md)          | oxid-fe-core, oxid-fe-user              | independent                            |
+| 138f | [Error UX by code](sprint-138f-error-ux-by-code.md)                                    | oxid-fe-user                            | after 138d (error shapes)              |
+| 138g | [PayPal webhook signature verification](sprint-138g-paypal-webhook-signature.md)       | paypal                                  | independent                            |
 | 138h | [Docs and closing report](sprint-138h-docs-and-report.md)                              | stripe, oxid-fe-user                    | last                                   |
 
 ## Sprint acceptance

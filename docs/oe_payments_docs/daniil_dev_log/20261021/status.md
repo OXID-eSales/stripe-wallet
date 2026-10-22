@@ -24,4 +24,4 @@
 - **Done:** 138d (logs without secrets), 139b (`?lang=`/`?shp=` by id); `reports/09`. hydroxid 0.10.0 carries 139a A4 and 140c C5 (guest form in three themes, four device profiles). 139a A1 reproduced on the SDK shop: code change without re-activation = stale schema; re-activation or `oe:graphql:cache-clear` rebuilds it. 138h H1–H3 docs committed (stripe `18d7cbb`, user `6afada2`).
 - **Done:** 138c (no identifiers in URLs), 139a (schema cache-clear in docs, scripts, CI, pay1 procedure; stale cache reproduced); `reports/10`. mollie `feature/graphql-comply` CI green at `b6a7645` (its agent stopped before reporting; evidence rebuilt from the branch).
 - **Done:** 140b (modules open to guests, one shared `GuestCheckoutInput` in payment-base), 140c (checkout without login; Stripe and Mollie guest orders on the sandbox) — Sprint 140 complete; `reports/11`.
-- Next: 138h closing report, then the sprint indexes move to `done/`.
+- **Done:** 138h — closing report `reports/12`; all 15 subsprints and the three sprint indexes are in `done/`. Your steps (rotate, merge order, pay1 update, PayPal proofs) are listed in report 12.
