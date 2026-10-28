@@ -61,6 +61,7 @@ final class OxidStripeAdminSettingsTest extends TestCase
         self::assertSame('pk_test_AAAAAAAAAAbbbb', $snapshot->testPublishableKey);
         self::assertSame('pk_live_BBBBBBBBBBbbbb', $snapshot->livePublishableKey);
         self::assertSame('https://shop.example/webhook', $snapshot->webhookEndpointUrl);
+        self::assertSame('https://shop.example/admin/index.php?cl=module_config', $snapshot->classicSettingsUrl);
     }
 
     public function testSnapshot_SecretsAreOnlyFlags(): void
@@ -196,6 +197,7 @@ final class OxidStripeAdminSettingsTest extends TestCase
     {
         $config = $this->createStub(ModuleConfigurationServiceInterface::class);
         $config->method('getWebhookUrl')->willReturn('https://shop.example/webhook');
+        $config->method('getClassicSettingsUrl')->willReturn('https://shop.example/admin/index.php?cl=module_config');
 
         return new OxidStripeAdminSettings($this->module, $this->webhooks, new ConfigurationValidator($config), $config);
     }

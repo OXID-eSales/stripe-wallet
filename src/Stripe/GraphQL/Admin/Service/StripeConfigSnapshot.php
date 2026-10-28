@@ -28,6 +28,7 @@ final readonly class StripeConfigSnapshot
         public string $testPublishableKey,
         public string $livePublishableKey,
         public string $webhookEndpointUrl,
+        public string $classicSettingsUrl,
         public bool $testTokenSet,
         public bool $liveTokenSet,
         public bool $testPlatformKeySet,

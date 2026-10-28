@@ -99,6 +99,7 @@ final class NoSecretInAnyAnswerTest extends TestCase
     {
         $config = $this->createStub(ModuleConfigurationServiceInterface::class);
         $config->method('getWebhookUrl')->willReturn('https://shop.example/webhook');
+        $config->method('getClassicSettingsUrl')->willReturn('https://shop.example/admin/index.php?cl=module_config');
 
         return new OxidStripeAdminSettings($this->module, $this->state(), new ConfigurationValidator($config), $config);
     }

@@ -253,6 +253,7 @@ final class FileLoggerFactoryGatingTest extends TestCase
             public function isRemoveByBasketCurrency(): bool { return false; }
             public function shouldProvideCustomerEmail(): bool { return false; }
             public function getWebhookUrl(): string { return ''; }
+            public function getClassicSettingsUrl(): string { return ''; }
             public function isConfigured(): bool { return false; }
             public function getPlatformKey(): string { return ''; }
             public function getModuleDescription(): string { return ''; }

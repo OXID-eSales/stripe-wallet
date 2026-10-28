@@ -54,6 +54,30 @@ final class StripeUrlBuilderTest extends TestCase
         $this->assertStringStartsWith('https://', $builder->getWebhookUrl());
     }
 
+    public function testGetClassicSettingsUrlPointsAtTheModuleConfigPageOfTheShop(): void
+    {
+        $builder = $this->createBuilderWithAdminTarget('https://shop.example.com/', 'admin', 3);
+
+        $this->assertSame(
+            'https://shop.example.com/admin/index.php?cl=module_config&oxid=oe_payments_stripe_wallet&shp=3',
+            $builder->getClassicSettingsUrl()
+        );
+    }
+
+    public function testGetClassicSettingsUrlRespectsAConfiguredAdminDirectory(): void
+    {
+        $builder = $this->createBuilderWithAdminTarget('https://shop.example.com/', 'backoffice', 1);
+
+        $this->assertStringStartsWith('https://shop.example.com/backoffice/index.php?', $builder->getClassicSettingsUrl());
+    }
+
+    public function testGetClassicSettingsUrlAddsTheMissingSlashAfterTheShopUrl(): void
+    {
+        $builder = $this->createBuilderWithAdminTarget('https://shop.example.com', 'admin', 1);
+
+        $this->assertStringStartsWith('https://shop.example.com/admin/index.php?', $builder->getClassicSettingsUrl());
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -68,6 +92,33 @@ final class StripeUrlBuilderTest extends TestCase
             protected function getSslShopBaseUrl(): string
             {
                 return $this->stubbedSslUrl;
+            }
+        };
+    }
+
+    private function createBuilderWithAdminTarget(string $shopUrl, string $adminDir, int $shopId): StripeUrlBuilder
+    {
+        return new class ($shopUrl, $adminDir, $shopId) extends StripeUrlBuilder {
+            public function __construct(
+                private readonly string $stubbedShopUrl,
+                private readonly string $stubbedAdminDir,
+                private readonly int $stubbedShopId,
+            ) {
+            }
+
+            protected function getAdminShopBaseUrl(): string
+            {
+                return $this->stubbedShopUrl;
+            }
+
+            protected function getAdminDirectory(): string
+            {
+                return $this->stubbedAdminDir;
+            }
+
+            protected function getShopId(): int
+            {
+                return $this->stubbedShopId;
             }
         };
     }

@@ -91,6 +91,16 @@ final class AdminStripeConfig
         return $this->config->webhookEndpointUrl;
     }
 
+    /**
+     * The classic admin's settings page of this module for the current shop: the Connect onboarding of Stripe runs
+     * there. No secret and no session token in it.
+     */
+    #[Field]
+    public function getClassicSettingsUrl(): string
+    {
+        return $this->config->classicSettingsUrl;
+    }
+
     /** The connected account's secret key of the test mode is stored. */
     #[Field]
     public function isTestTokenSet(): bool
