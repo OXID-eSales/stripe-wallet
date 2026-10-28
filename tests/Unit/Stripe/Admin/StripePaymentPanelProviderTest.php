@@ -218,6 +218,7 @@ final class StripePaymentPanelProviderTest extends TestCase
 
         $provider = $this->providerWithResetTracker($dispatcher, $resetCounter);
 
+        $this->expectException(\OxidEsales\PaymentBase\Admin\Panel\AdminActionRefusedException::class);
         $provider->handleAction(
             'refund',
             ['refund_amount' => 'not-a-number'],
@@ -250,6 +251,7 @@ final class StripePaymentPanelProviderTest extends TestCase
 
         $provider = $this->provider(dispatcher: $dispatcher, validator: $validator, feedback: $feedback);
 
+        $this->expectException(\OxidEsales\PaymentBase\Admin\Panel\AdminActionRefusedException::class);
         $provider->handleAction(
             'capture',
             ['capture_amount' => '10.00', 'capture_reason' => '<script>'],
@@ -343,6 +345,7 @@ final class StripePaymentPanelProviderTest extends TestCase
 
         $provider = $this->provider(dispatcher: $dispatcher, feedback: $feedback);
 
+        $this->expectException(\OxidEsales\PaymentBase\Admin\Panel\AdminActionRefusedException::class);
         $provider->handleAction(
             'capture',
             ['capture_amount' => '12,30 EUR', 'capture_reason' => ''],
@@ -369,6 +372,7 @@ final class StripePaymentPanelProviderTest extends TestCase
 
         $provider = $this->provider(dispatcher: $dispatcher, feedback: $feedback, bounds: $bounds);
 
+        $this->expectException(\OxidEsales\PaymentBase\Admin\Panel\AdminActionRefusedException::class);
         $provider->handleAction(
             'capture',
             ['capture_amount' => '100.01'],
@@ -429,6 +433,7 @@ final class StripePaymentPanelProviderTest extends TestCase
 
         $provider = $this->provider(dispatcher: $dispatcher, feedback: $feedback);
 
+        $this->expectException(\OxidEsales\PaymentBase\Admin\Panel\AdminActionRefusedException::class);
         $provider->handleAction(
             'refund',
             ['refund_amount' => 'abc'],
@@ -481,6 +486,7 @@ final class StripePaymentPanelProviderTest extends TestCase
 
         $provider = $this->provider(dispatcher: $dispatcher, validator: $validator, feedback: $feedback);
 
+        $this->expectException(\OxidEsales\PaymentBase\Admin\Panel\AdminActionRefusedException::class);
         $provider->handleAction(
             'capture',
             ['capture_amount' => 'abc', 'capture_reason' => '<bad>'],
@@ -513,6 +519,7 @@ final class StripePaymentPanelProviderTest extends TestCase
 
         $provider = $this->provider(dispatcher: $dispatcher, validator: $validator, feedback: $feedback);
 
+        $this->expectException(\OxidEsales\PaymentBase\Admin\Panel\AdminActionRefusedException::class);
         $provider->handleAction(
             'refund',
             ['refund_description' => '<img src=x>'],
@@ -539,6 +546,7 @@ final class StripePaymentPanelProviderTest extends TestCase
 
         $provider = $this->provider(dispatcher: $dispatcher, feedback: $feedback, bounds: $bounds);
 
+        $this->expectException(\OxidEsales\PaymentBase\Admin\Panel\AdminActionRefusedException::class);
         $provider->handleAction(
             'capture',
             ['capture_amount' => '50.00'],

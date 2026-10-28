@@ -185,6 +185,16 @@ final class StripeAdminApiWiringTest extends IntegrationTestCase
         }
     }
 
+    public function testPaymentBase_ShowsStripesColumnOfTheStateHelp(): void
+    {
+        $response = $this->probe('{ adminPaymentContractStateHelp(provider: "stripe") { providerLabel rows { state providerStatus } } }');
+
+        self::assertArrayNotHasKey('errors', $response);
+        $help = $response['data']['adminPaymentContractStateHelp'];
+        self::assertSame('Stripe PaymentIntent status', $help['providerLabel']);
+        self::assertContains('requires_capture', array_column($help['rows'], 'providerStatus'));
+    }
+
     public function testQuery_AdminStripeConfig_ReturnsEveryFieldAndNeverTheStoredSecrets(): void
     {
         $storedSecrets = $this->storedSecrets();

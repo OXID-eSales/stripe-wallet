@@ -1460,6 +1460,14 @@ services:
       - { name: 'oe.payment.admin_panel' }
     public: true
 
+  # PAY-3: Stripe's column of payment-base's contract-state Help for the admin API (adminPaymentContractStateHelp);
+  # ViewConfig builds it with `new` for the classic Help, the tag is for payment-base's registry.
+  OxidEsales\Payments\Stripe\Admin\StripeContractStateHelp:
+    autowire: false
+    autoconfigure: false
+    tags:
+      - { name: 'oe.payment.admin_state_help' }
+
   # Sprint 121 (STRP-129): stateless semantic amount validator (no interface —
   # pure deterministic function; tests use the real instance).
   OxidEsales\Payments\Stripe\Admin\AdminAmountValidator:

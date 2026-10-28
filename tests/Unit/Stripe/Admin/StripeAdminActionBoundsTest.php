@@ -53,6 +53,37 @@ final class StripeAdminActionBoundsTest extends TestCase
         $this->assertSame(67.89, (new StripeAdminActionBounds($provider))->refundBound($order));
     }
 
+    public function testReadBoundsAreBothSidesOfTheLiveIntent(): void
+    {
+        $order = $this->orderStub();
+        $provider = $this->createStub(OrderRefundViewDataProvider::class);
+        $provider->method('getPaymentIntent')->willReturn(new \OxidEsales\Payments\Stripe\Adapter\Dto\StripePaymentIntentDto('pi_1', 'requires_capture', 1000, 'eur', 1, null));
+        $provider->method('getCaptureableRaw')->willReturn(10.0);
+        $provider->method('getRemainingRefundableRaw')->willReturn(0.0);
+
+        $bounds = (new StripeAdminActionBounds($provider))->readBounds($order);
+
+        $this->assertTrue($bounds->available);
+        $this->assertSame(10.0, $bounds->capturable);
+        $this->assertSame(0.0, $bounds->refundable, 'an authorisation has no charge to refund yet: a real zero, not unreadable');
+    }
+
+    public function testReadBoundsAreUnavailableWhenStripeCannotBeRead(): void
+    {
+        $provider = $this->createStub(OrderRefundViewDataProvider::class);
+        $provider->method('getPaymentIntent')->willReturn(null);
+
+        $this->assertFalse((new StripeAdminActionBounds($provider))->readBounds($this->orderStub())->available);
+    }
+
+    public function testReadBoundsAreUnavailableWhenReadingThrows(): void
+    {
+        $provider = $this->createStub(OrderRefundViewDataProvider::class);
+        $provider->method('getPaymentIntent')->willThrowException(new \RuntimeException('boom'));
+
+        $this->assertFalse((new StripeAdminActionBounds($provider))->readBounds($this->orderStub())->available);
+    }
+
     private function orderStub(): Order
     {
         return $this->getMockBuilder(Order::class)
