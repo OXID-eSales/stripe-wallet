@@ -25,14 +25,14 @@ final class AdminStripeConfigPayload implements PayloadWithErrors
     {
     }
 
-    public static function of(StripeConfigResult $result): self
+    public static function of(StripeConfigResult $result, bool $secretsEditable): self
     {
         $refusal = $result->refusal();
         if ($refusal !== null) {
             return new self(null, [StripeAdminErrors::from($refusal)]);
         }
 
-        return new self(new AdminStripeConfig($result->config()), []);
+        return new self(new AdminStripeConfig($result->config(), $secretsEditable), []);
     }
 
     #[Field]

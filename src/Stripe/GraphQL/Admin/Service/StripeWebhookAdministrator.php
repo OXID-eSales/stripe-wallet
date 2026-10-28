@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\GraphQL\Admin\Service;
 
 use OxidEsales\PaymentBase\GraphQL\Admin\Service\AdminStepUpInterface;
+use OxidEsales\PaymentBase\GraphQL\Admin\Service\AdminSuperadminCheckInterface;
 use OxidEsales\Payments\Stripe\Service\Exception\WebhookRegistrationException;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\WebhookEndpointRegistrarInterface;
@@ -29,6 +30,7 @@ final class StripeWebhookAdministrator implements StripeWebhookAdministratorInte
         private readonly StripeWebhookStateInterface $state,
         private readonly WebhookEndpointRegistrarInterface $registrar,
         private readonly ModuleConfigurationServiceInterface $config,
+        private readonly AdminSuperadminCheckInterface $superadmin,
         private readonly AdminStepUpInterface $stepUp,
         private readonly StripeAdminAuditInterface $audit,
         private readonly LoggerInterface $logger,
@@ -67,6 +69,10 @@ final class StripeWebhookAdministrator implements StripeWebhookAdministratorInte
 
     private function runRegister(): StripeWebhookResult
     {
+        // Registering stores a signing secret: the superadmin's, asked before the second factor.
+        if (!$this->superadmin->isSuperadmin()) {
+            return StripeWebhookResult::refused(StripeAdminRefusal::superadminRequired('webhook'));
+        }
         $this->stepUp->require();
         $snapshot = $this->settings->snapshot();
         $mode = $snapshot->mode;

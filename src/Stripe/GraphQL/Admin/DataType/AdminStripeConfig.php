@@ -23,8 +23,18 @@ use TheCodingMachine\GraphQLite\Annotations\Type;
 #[Type(name: 'AdminStripeConfig')]
 final class AdminStripeConfig
 {
-    public function __construct(private readonly StripeConfigSnapshot $config)
+    public function __construct(private readonly StripeConfigSnapshot $config, private readonly bool $secretsEditable)
     {
+    }
+
+    /**
+     * Whether the admin of the request may change API keys, secrets and the webhook registration: only a superadmin.
+     * The rest of the settings need ADMIN_PAYMENT_CONFIG alone.
+     */
+    #[Field]
+    public function isSecretsEditable(): bool
+    {
+        return $this->secretsEditable;
     }
 
     /** `test` or `live`: the credentials the shop uses. */

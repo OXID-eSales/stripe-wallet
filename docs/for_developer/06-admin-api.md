@@ -22,10 +22,10 @@ Requires payment-base with its admin payment API (1.5.0) and, for the provider w
 
 | Operation | Right | Does |
 | --- | --- | --- |
-| `adminStripeConfig: AdminStripeConfig!` | `ADMIN_PAYMENT_CONFIG` | mode, captureMode, removeByBillingCountry, removeByBasketCurrency, provideCustomerEmail, logLevel, logWebhooks, test/live publishable keys, webhookEndpointUrl, `classicSettingsUrl` (the classic admin's settings page of this module for the current shop, `{shopUrl}{adminDir}/index.php?cl=module_config&oxid=oe_payments_stripe_wallet&shp=<shopId>`; where the Connect onboarding runs, no secret in it), flags `testTokenSet` `liveTokenSet` `testPlatformKeySet` `livePlatformKeySet` `webhookSecretSet` `testConnected` `liveConnected`, `keyValidationError`, `version` |
+| `adminStripeConfig: AdminStripeConfig!` | `ADMIN_PAYMENT_CONFIG` | mode, captureMode, removeByBillingCountry, removeByBasketCurrency, provideCustomerEmail, logLevel, logWebhooks, test/live publishable keys, webhookEndpointUrl, `classicSettingsUrl` (the classic admin's settings page of this module for the current shop, `{shopUrl}{adminDir}/index.php?cl=module_config&oxid=oe_payments_stripe_wallet&shp=<shopId>`; where the Connect onboarding runs, no secret in it), `secretsEditable` (true only for a superadmin, see below), flags `testTokenSet` `liveTokenSet` `testPlatformKeySet` `livePlatformKeySet` `webhookSecretSet` `testConnected` `liveConnected`, `keyValidationError`, `version` |
 | `adminStripeConfigModify(input: AdminStripeConfigInput!): AdminStripeConfigPayload!` | `ADMIN_PAYMENT_CONFIG` | changes settings; `{ config, errors }` |
 | `adminStripeWebhookStatus: AdminStripeWebhookStatus!` | `ADMIN_PAYMENT_CONFIG` | `mode`, `configured`, `endpointId`, `url` |
-| `adminStripeWebhookRegister: AdminStripeWebhookPayload!` | `ADMIN_PAYMENT_CONFIG` + step-up | registers or updates the shop's endpoint at Stripe, stores id and signing secret |
+| `adminStripeWebhookRegister: AdminStripeWebhookPayload!` | `ADMIN_PAYMENT_CONFIG` + superadmin + step-up | registers or updates the shop's endpoint at Stripe, stores id and signing secret |
 | `adminStripeWebhookClearAll: AdminStripeWebhookPayload!` | `ADMIN_PAYMENT_CONFIG` + step-up | deletes the endpoints at Stripe that point at this shop's URL, forgets the stored one |
 | `AdminPaymentContract.stripe: AdminStripePaymentDetails` | `ADMIN_PAYMENT_VIEW` | `paymentIntentId`, `chargeId`, `externalTransactionId`, `intentStatus`, `dashboardUrl`, `apiError` (read-only; null for a contract of another provider) |
 
@@ -40,6 +40,19 @@ mean "clear"). A secret is a field name in the audit log, never a value; `Stripe
 never returned. Proof: `Unit\Stripe\GraphQL\Admin\NoSecretInAnyAnswerTest` searches every field of every answer, refusals
 included, for every stored, new and Stripe-created secret and for secret-shaped strings; the integration test does the same
 against the secrets stored in the real shop.
+
+### Secrets: superadmin only (PAY-10)
+
+`ADMIN_PAYMENT_CONFIG` is enough for every non-secret field (mode, capture mode, filters, publishable keys, webhook URL,
+logging). A call that carries a **non-empty** `testToken`, `liveToken`, `testPlatformKey`, `livePlatformKey` or
+`webhookSecret`, and `adminStripeWebhookRegister` (it stores a signing secret), need the built-in **superadmin** role
+(payment-base's `AdminSuperadminCheckInterface`). Otherwise the whole call is refused, nothing is written (the harmless
+fields of the same call are not saved either) and the payload's `errors` holds a `ValidationError`
+`{ errorCode: validation_failed, field, code: superadmin_required }`: `field` is the first secret sent (in the order
+testToken, liveToken, testPlatformKey, livePlatformKey, webhookSecret), `webhook` for register. The audit row is the refused
+call, field names only. `adminStripeWebhookClearAll` deletes endpoints but no key: unchanged. `AdminStripeConfig.secretsEditable:
+Boolean!` tells the client (true only for a superadmin). Order of checks: right, **superadmin**, step-up (a non-superadmin is
+never asked for a second factor), optimistic lock, validation. Without the admin module the check says "no".
 
 ### `adminStripeConfigModify`
 

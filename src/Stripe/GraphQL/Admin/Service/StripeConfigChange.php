@@ -69,13 +69,22 @@ final readonly class StripeConfigChange
 
     public function writesSecret(): bool
     {
+        return $this->firstSecretField() !== null;
+    }
+
+    /**
+     * The first secret field this change carries (a non-empty value), in the fixed order of the secrets; null when
+     * it carries none. A name, never a value.
+     */
+    public function firstSecretField(): ?string
+    {
         foreach (self::SECRET_FIELDS as $field) {
             if ($this->isGiven($field)) {
-                return true;
+                return $field;
             }
         }
 
-        return false;
+        return null;
     }
 
     /**

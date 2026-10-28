@@ -22,6 +22,7 @@ use OxidEsales\Payments\Stripe\Service\ConfigurationValidator;
 use OxidEsales\Payments\Stripe\Service\Exception\WebhookRegistrationException;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\CountingStepUp;
+use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\FakeSuperadminCheck;
 use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\InMemoryConfVars;
 use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\InMemoryModuleSettings;
 use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\RecordingStripeAudit;
@@ -67,6 +68,7 @@ final class NoSecretInAnyAnswerTest extends TestCase
         $answers[] = $config->adminStripeConfigModify($this->input($answers[0]->getVersion(), testToken: 'sk_test_BBBBBBBBBBmismatch'));
         $answers[] = $config->adminStripeConfigModify($this->input($answers[0]->getVersion(), testToken: 'sk-leaky-not-a-key-format'));
         $answers[] = $config->adminStripeConfig();
+        $answers[] = $this->configController(false)->adminStripeConfigModify($this->input($answers[0]->getVersion(), testToken: self::NEW_TOKEN, webhookSecret: self::NEW_WEBHOOK_SECRET));
         $webhooks = $this->webhookController(new ScriptedWebhookRegistrar());
         $answers[] = $webhooks->adminStripeWebhookStatus();
         $answers[] = $webhooks->adminStripeWebhookRegister();
@@ -109,17 +111,18 @@ final class NoSecretInAnyAnswerTest extends TestCase
         return new OxidStripeWebhookState($this->vars, $this->module);
     }
 
-    private function configController(): StripeAdminConfigController
+    private function configController(bool $superadmin = true): StripeAdminConfigController
     {
         $modifier = new StripeConfigModifier(
             $this->settings(),
             new StripeConfigChangeValidator(),
             new ConfigurationValidator($this->createStub(ModuleConfigurationServiceInterface::class)),
+            new FakeSuperadminCheck($superadmin),
             new CountingStepUp(),
             new RecordingStripeAudit(),
         );
 
-        return new StripeAdminConfigController($this->settings(), $modifier);
+        return new StripeAdminConfigController($this->settings(), $modifier, new FakeSuperadminCheck($superadmin));
     }
 
     private function webhookController(ScriptedWebhookRegistrar $registrar): StripeAdminWebhookController
@@ -132,6 +135,7 @@ final class NoSecretInAnyAnswerTest extends TestCase
             $this->state(),
             $registrar,
             $config,
+            new FakeSuperadminCheck(),
             new CountingStepUp(),
             new RecordingStripeAudit(),
             new NullLogger(),
