@@ -22,7 +22,7 @@ Requires payment-base with its admin payment API (1.5.0) and, for the provider w
 
 | Operation | Right | Does |
 | --- | --- | --- |
-| `adminStripeConfig: AdminStripeConfig!` | `ADMIN_PAYMENT_CONFIG` | mode, captureMode, removeByBillingCountry, removeByBasketCurrency, provideCustomerEmail, logLevel, logWebhooks, test/live publishable keys, webhookEndpointUrl, flags `testTokenSet` `liveTokenSet` `testPlatformKeySet` `livePlatformKeySet` `webhookSecretSet` `testConnected` `liveConnected`, `keyValidationError`, `version` |
+| `adminStripeConfig: AdminStripeConfig!` | `ADMIN_PAYMENT_CONFIG` | mode, captureMode, removeByBillingCountry, removeByBasketCurrency, provideCustomerEmail, logLevel, logWebhooks, test/live publishable keys, webhookEndpointUrl, `classicSettingsUrl` (the classic admin's settings page of this module for the current shop, `{shopUrl}{adminDir}/index.php?cl=module_config&oxid=oe_payments_stripe_wallet&shp=<shopId>`; where the Connect onboarding runs, no secret in it), flags `testTokenSet` `liveTokenSet` `testPlatformKeySet` `livePlatformKeySet` `webhookSecretSet` `testConnected` `liveConnected`, `keyValidationError`, `version` |
 | `adminStripeConfigModify(input: AdminStripeConfigInput!): AdminStripeConfigPayload!` | `ADMIN_PAYMENT_CONFIG` | changes settings; `{ config, errors }` |
 | `adminStripeWebhookStatus: AdminStripeWebhookStatus!` | `ADMIN_PAYMENT_CONFIG` | `mode`, `configured`, `endpointId`, `url` |
 | `adminStripeWebhookRegister: AdminStripeWebhookPayload!` | `ADMIN_PAYMENT_CONFIG` + step-up | registers or updates the shop's endpoint at Stripe, stores id and signing secret |

@@ -33,7 +33,7 @@ final class StripeAdminApiWiringTest extends IntegrationTestCase
 {
     private const CONFIG_FIELDS = 'mode captureMode removeByBillingCountry removeByBasketCurrency provideCustomerEmail '
         . 'logLevel logWebhooks testPublishableKey livePublishableKey webhookEndpointUrl testTokenSet liveTokenSet '
-        . 'testPlatformKeySet livePlatformKeySet webhookSecretSet testConnected liveConnected keyValidationError version';
+        . 'testPlatformKeySet livePlatformKeySet webhookSecretSet testConnected liveConnected keyValidationError version classicSettingsUrl';
     private const WEBHOOK_SECRET_VARS = ['sStripeWebhookEndpointSecretTest', 'sStripeWebhookEndpointSecretLive'];
     private const SECRET_SETTINGS = [
         'sStripeTestToken', 'sStripeLiveToken', 'sStripeTestKey', 'sStripeLiveKey', 'sStripeWebhookEndpointSecret',
@@ -206,6 +206,10 @@ final class StripeAdminApiWiringTest extends IntegrationTestCase
 
         self::assertArrayNotHasKey('errors', $response);
         self::assertArrayHasKey('webhookSecretSet', $response['data']['adminStripeConfig']);
+        self::assertMatchesRegularExpression(
+            '#^https?://[^?]+/[^/?]+/index\.php\?cl=module_config&oxid=oe_payments_stripe_wallet&shp=\d+$#',
+            $response['data']['adminStripeConfig']['classicSettingsUrl']
+        );
         $body = (string) json_encode($response);
         foreach ($storedSecrets as $secret) {
             self::assertFalse(str_contains($body, $secret), 'a stored secret appears in the response');

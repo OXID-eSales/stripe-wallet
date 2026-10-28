@@ -30,7 +30,7 @@ final class AdminStripeTypesTest extends TestCase
             'mode', 'captureMode', 'removeByBillingCountry', 'removeByBasketCurrency', 'provideCustomerEmail',
             'logLevel', 'logWebhooks', 'testPublishableKey', 'livePublishableKey', 'webhookEndpointUrl',
             'testTokenSet', 'liveTokenSet', 'testPlatformKeySet', 'livePlatformKeySet', 'webhookSecretSet',
-            'testConnected', 'liveConnected', 'keyValidationError', 'version',
+            'testConnected', 'liveConnected', 'keyValidationError', 'version', 'classicSettingsUrl',
         ], $fields);
         foreach ($fields as $field) {
             self::assertDoesNotMatchRegularExpression('/(token|secret|platformkey)$/i', $field, 'no field may carry a secret value');
@@ -58,6 +58,7 @@ final class AdminStripeTypesTest extends TestCase
         self::assertTrue($config->isTestConnected());
         self::assertFalse($config->isLiveConnected());
         self::assertSame('nope', $config->getKeyValidationError());
+        self::assertSame('https://shop.example/admin/index.php?cl=module_config&oxid=oe_payments_stripe_wallet&shp=1', $config->getClassicSettingsUrl());
         self::assertSame($snapshot->version(), $config->getVersion());
     }
 

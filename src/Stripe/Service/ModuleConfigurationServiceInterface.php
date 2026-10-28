@@ -56,6 +56,9 @@ interface ModuleConfigurationServiceInterface
 
     public function getWebhookUrl(): string;
 
+    /** The classic admin's settings page of this module for the current shop. */
+    public function getClassicSettingsUrl(): string;
+
     public function isConfigured(): bool;
 
     /**

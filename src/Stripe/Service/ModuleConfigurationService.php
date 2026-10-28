@@ -263,6 +263,11 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
         return $this->urlBuilder->getWebhookUrl();
     }
 
+    public function getClassicSettingsUrl(): string
+    {
+        return $this->urlBuilder->getClassicSettingsUrl();
+    }
+
     /**
      * Get the platform secret key for the current mode.
      *

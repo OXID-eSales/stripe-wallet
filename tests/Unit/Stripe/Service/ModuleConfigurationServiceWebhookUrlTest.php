@@ -49,6 +49,16 @@ final class ModuleConfigurationServiceWebhookUrlTest extends TestCase
         $service->getWebhookUrl();
     }
 
+    public function testGetClassicSettingsUrlDelegatesToUrlBuilder(): void
+    {
+        $urlBuilder = $this->createMock(StripeUrlBuilder::class);
+        $urlBuilder->method('getClassicSettingsUrl')->willReturn('https://shop.example.com/admin/index.php?cl=module_config');
+
+        $service = $this->createServiceWithUrlBuilder($urlBuilder);
+
+        $this->assertSame('https://shop.example.com/admin/index.php?cl=module_config', $service->getClassicSettingsUrl());
+    }
+
     private function createServiceWithUrlBuilder(StripeUrlBuilder&MockObject $urlBuilder): ModuleConfigurationService
     {
         $descriptionProvider = $this->createMock(ModuleDescriptionProvider::class);

@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Provider wiring of payment-base's PAY-1 admin payment API: Stripe's column of the contract-state Help, the reasons and
   description the panel accepts, live capture/refund bounds, and readable refusals (`AdminActionRefusedException`) for the
   amount and text gate of the Payment tab; the classic tab behaves as before.
+- **PAY-8:** `AdminStripeConfig.classicSettingsUrl` (read-only, no secret): the classic admin's settings page of this module,
+  so the new admin can link to the Connect onboarding (`ModuleConfigurationServiceInterface::getClassicSettingsUrl()`).
 - `ConfigurationValidator::getKeyPairError()` (`KeyPairValidatorInterface`).
 
 ### Requires

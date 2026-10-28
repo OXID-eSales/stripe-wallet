@@ -74,6 +74,7 @@ final class OxidStripeAdminSettings implements StripeAdminSettingsInterface
             testPublishableKey: $this->publishableKey(StripeDefinitions::MODE_TEST),
             livePublishableKey: $this->publishableKey(StripeDefinitions::MODE_LIVE),
             webhookEndpointUrl: $this->config->getWebhookUrl(),
+            classicSettingsUrl: $this->config->getClassicSettingsUrl(),
             testTokenSet: $this->token(StripeDefinitions::MODE_TEST) !== '',
             liveTokenSet: $this->token(StripeDefinitions::MODE_LIVE) !== '',
             testPlatformKeySet: $this->platformKey(StripeDefinitions::MODE_TEST) !== '',

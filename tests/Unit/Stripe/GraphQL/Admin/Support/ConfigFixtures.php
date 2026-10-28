@@ -29,6 +29,7 @@ final class ConfigFixtures
             'testPublishableKey' => 'pk_test_AAAAAAAAAAbbbb',
             'livePublishableKey' => '',
             'webhookEndpointUrl' => 'https://shop.example/index.php?cl=stripewebhook',
+            'classicSettingsUrl' => 'https://shop.example/admin/index.php?cl=module_config&oxid=oe_payments_stripe_wallet&shp=1',
             'testTokenSet' => true,
             'liveTokenSet' => false,
             'testPlatformKeySet' => false,

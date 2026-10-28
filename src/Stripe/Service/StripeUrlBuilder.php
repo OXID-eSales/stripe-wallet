@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\Payments\Stripe\Module;
 
 /**
  * Builds outbound URLs for Stripe integration (webhook URL, shop SSL base URL).
@@ -25,6 +26,8 @@ use OxidEsales\Eshop\Core\Registry;
  */
 class StripeUrlBuilder
 {
+    private const DEFAULT_ADMIN_DIRECTORY = 'admin';
+
     /**
      * Get the webhook URL for Stripe configuration.
      *
@@ -40,6 +43,16 @@ class StripeUrlBuilder
     }
 
     /**
+     * The classic admin's settings page of this module for the current shop. The new admin app cannot know the
+     * classic admin address, so the shop supplies it; the Connect onboarding only works there.
+     */
+    public function getClassicSettingsUrl(): string
+    {
+        return rtrim($this->getAdminShopBaseUrl(), '/') . '/' . $this->getAdminDirectory()
+            . '/index.php?cl=module_config&oxid=' . Module::MODULE_ID . '&shp=' . $this->getShopId();
+    }
+
+    /**
      * Get the SSL form of the shop URL. Used for outbound URLs that third
      * parties dial back into (Stripe webhooks, Connect callbacks).
      *
@@ -49,5 +62,28 @@ class StripeUrlBuilder
     {
         // @phpstan-ignore-next-line OXID core: Registry::getConfig() is the sanctioned seam
         return Registry::getConfig()->getSslShopUrl();
+    }
+
+    /**
+     * Overridable in test subclasses to avoid touching Registry.
+     */
+    protected function getAdminShopBaseUrl(): string
+    {
+        // @phpstan-ignore-next-line OXID core: Registry::getConfig() is the sanctioned seam
+        return Registry::getConfig()->getShopUrl(0, true);
+    }
+
+    protected function getAdminDirectory(): string
+    {
+        // @phpstan-ignore-next-line OXID core: Registry::getConfig() is the sanctioned seam
+        $directory = Registry::getConfig()->getConfigParam('sAdminDir');
+
+        return is_string($directory) && $directory !== '' ? $directory : self::DEFAULT_ADMIN_DIRECTORY;
+    }
+
+    protected function getShopId(): int
+    {
+        // @phpstan-ignore-next-line OXID core: Registry::getConfig() is the sanctioned seam
+        return (int) Registry::getConfig()->getShopId();
     }
 }
