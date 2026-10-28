@@ -19,10 +19,12 @@ final class InMemoryStripeSettings implements StripeAdminSettingsInterface
 
     /**
      * @param array<string, string> $tokens mode => stored secret key
+     * @param array<string, string> $platformKeys mode => stored platform key
      */
     public function __construct(
         private StripeConfigSnapshot $current,
         private array $tokens = ['test' => 'sk_test_AAAAAAAAAAstored', 'live' => ''],
+        private array $platformKeys = ['test' => 'sk_test_PLATFORMstored', 'live' => ''],
     ) {
     }
 
@@ -34,6 +36,11 @@ final class InMemoryStripeSettings implements StripeAdminSettingsInterface
     public function token(string $mode): string
     {
         return $this->tokens[$mode] ?? '';
+    }
+
+    public function platformKey(string $mode): string
+    {
+        return $this->platformKeys[$mode] ?? '';
     }
 
     public function apply(StripeConfigChange $change): void

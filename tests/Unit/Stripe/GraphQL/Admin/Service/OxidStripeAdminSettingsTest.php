@@ -186,6 +186,12 @@ final class OxidStripeAdminSettingsTest extends TestCase
         self::assertSame('', $this->settings()->token('live'));
     }
 
+    public function testPlatformKey_ReturnsTheStoredPlatformKeyOfAMode(): void
+    {
+        self::assertSame(self::TEST_PLATFORM_KEY, $this->settings()->platformKey('test'));
+        self::assertSame('', $this->settings()->platformKey('live'));
+    }
+
     private function settings(): OxidStripeAdminSettings
     {
         $config = $this->createStub(ModuleConfigurationServiceInterface::class);

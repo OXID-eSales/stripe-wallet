@@ -135,6 +135,11 @@ final class StripeAdminConfigControllerTest extends TestCase
                 return '';
             }
 
+            public function platformKey(string $mode): string
+            {
+                return '';
+            }
+
             public function apply(StripeConfigChange $change): void
             {
             }

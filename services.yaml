@@ -51,6 +51,7 @@ services:
     class: OxidEsales\Payments\Stripe\GraphQL\Admin\Service\OxidModuleConfVars
     autowire: false
     autoconfigure: false
+    public: true # the integration tests resolve it
 
   OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeWebhookStateInterface:
     class: OxidEsales\Payments\Stripe\GraphQL\Admin\Service\OxidStripeWebhookState
@@ -93,6 +94,33 @@ services:
       - '@OxidEsales\Payments\Stripe\Service\KeyPairValidatorInterface'
       - '@OxidEsales\PaymentBase\GraphQL\Admin\Service\AdminStepUpInterface'
       - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminAuditInterface'
+
+  OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeWebhookAdministratorInterface:
+    class: OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeWebhookAdministrator
+    autowire: false
+    autoconfigure: false
+    public: true # the integration tests resolve it
+    arguments:
+      - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminSettingsInterface'
+      - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeWebhookStateInterface'
+      - '@OxidEsales\Payments\Stripe\Service\WebhookEndpointRegistrarInterface'
+      - '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+      - '@OxidEsales\PaymentBase\GraphQL\Admin\Service\AdminStepUpInterface'
+      - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminAuditInterface'
+      - '@oxid_esales.monolog.logger'
+
+  # Fetched by GraphQLite's container (graphql-base), hence public; private definition + public alias, see the
+  # RoutePass note at StripeCheckout.
+  oe_payments_stripe.graphql.admin_webhook_controller:
+    class: OxidEsales\Payments\Stripe\GraphQL\Admin\Controller\StripeAdminWebhookController
+    autowire: false
+    autoconfigure: false
+    arguments:
+      - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeWebhookAdministratorInterface'
+
+  OxidEsales\Payments\Stripe\GraphQL\Admin\Controller\StripeAdminWebhookController:
+    alias: oe_payments_stripe.graphql.admin_webhook_controller
+    public: true
 
   # Fetched by GraphQLite's container (graphql-base), hence public; private definition + public alias, see the
   # RoutePass note at StripeCheckout.

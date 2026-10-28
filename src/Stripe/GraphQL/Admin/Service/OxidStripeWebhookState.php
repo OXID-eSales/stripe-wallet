@@ -21,6 +21,7 @@ use OxidEsales\Payments\Stripe\Module;
 final class OxidStripeWebhookState implements StripeWebhookStateInterface
 {
     private const LEGACY_SECRET_SETTING = 'sStripeWebhookEndpointSecret';
+    private const LEGACY_ENDPOINT_SETTING = 'sStripeWebhookEndpoint';
 
     public function __construct(
         private readonly ModuleConfVarsInterface $vars,
@@ -46,6 +47,31 @@ final class OxidStripeWebhookState implements StripeWebhookStateInterface
     public function storeSecret(string $mode, #[\SensitiveParameter] string $secret): void
     {
         $this->vars->save($this->secretName($mode), $secret);
+    }
+
+    public function storeEndpoint(
+        string $mode,
+        string $endpointId,
+        #[\SensitiveParameter] ?string $secret,
+        string $url,
+    ): void {
+        $this->vars->save($this->endpointIdName($mode), $endpointId);
+        $this->settings->saveString(self::LEGACY_ENDPOINT_SETTING, $url, Module::MODULE_ID);
+        if ($secret === null) {
+            return;
+        }
+        $this->vars->save($this->secretName($mode), $secret);
+        $this->settings->saveString(self::LEGACY_SECRET_SETTING, $secret, Module::MODULE_ID);
+    }
+
+    public function forgetAll(): void
+    {
+        foreach ([StripeDefinitions::MODE_TEST, StripeDefinitions::MODE_LIVE] as $mode) {
+            $this->vars->save($this->endpointIdName($mode), '');
+            $this->vars->save($this->secretName($mode), '');
+        }
+        $this->settings->saveString(self::LEGACY_ENDPOINT_SETTING, '', Module::MODULE_ID);
+        $this->settings->saveString(self::LEGACY_SECRET_SETTING, '', Module::MODULE_ID);
     }
 
     private function endpointIdName(string $mode): string

@@ -13,6 +13,8 @@ use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeWebhookStateInterface
 
 final class InMemoryWebhookState implements StripeWebhookStateInterface
 {
+    public string $registeredUrl = '';
+
     /**
      * @param array<string, string> $endpointIds mode => endpoint id
      * @param array<string, string> $secrets mode => signing secret
@@ -34,5 +36,21 @@ final class InMemoryWebhookState implements StripeWebhookStateInterface
     public function storeSecret(string $mode, string $secret): void
     {
         $this->secrets[$mode] = $secret;
+    }
+
+    public function storeEndpoint(string $mode, string $endpointId, ?string $secret, string $url): void
+    {
+        $this->endpointIds[$mode] = $endpointId;
+        if ($secret !== null) {
+            $this->secrets[$mode] = $secret;
+        }
+        $this->registeredUrl = $url;
+    }
+
+    public function forgetAll(): void
+    {
+        $this->endpointIds = [];
+        $this->secrets = [];
+        $this->registeredUrl = '';
     }
 }

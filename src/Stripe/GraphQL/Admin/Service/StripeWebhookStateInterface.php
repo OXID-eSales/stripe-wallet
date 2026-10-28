@@ -27,4 +27,21 @@ interface StripeWebhookStateInterface
      * Stores a signing secret pasted by an admin for a mode.
      */
     public function storeSecret(string $mode, #[\SensitiveParameter] string $secret): void;
+
+    /**
+     * Remembers a registered endpoint: id and (only when Stripe just created it, which is the only time it tells
+     * it) the signing secret, per mode; the URL and secret also go to the legacy module settings the classic form
+     * shows. A null secret keeps the stored one.
+     */
+    public function storeEndpoint(
+        string $mode,
+        string $endpointId,
+        #[\SensitiveParameter] ?string $secret,
+        string $url,
+    ): void;
+
+    /**
+     * Forgets the endpoint of both modes, their secrets and the legacy settings.
+     */
+    public function forgetAll(): void;
 }

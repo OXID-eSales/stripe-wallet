@@ -13,9 +13,11 @@ use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface;
 use OxidEsales\EshopCommunity\Tests\Integration\IntegrationTestCase;
 use OxidEsales\GraphQL\Admin\Authorization\Service\RightsCatalogue;
+use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\ModuleConfVarsInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\OxidStripeAdminAudit;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminAuditInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminSettingsInterface;
+use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeWebhookAdministratorInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Service\NamespaceMapper;
 use OxidEsales\Payments\Stripe\Module;
 use PHPUnit\Framework\Attributes\Group;
@@ -29,6 +31,7 @@ final class StripeAdminApiWiringTest extends IntegrationTestCase
     private const CONFIG_FIELDS = 'mode captureMode removeByBillingCountry removeByBasketCurrency provideCustomerEmail '
         . 'logLevel logWebhooks testPublishableKey livePublishableKey webhookEndpointUrl testTokenSet liveTokenSet '
         . 'testPlatformKeySet livePlatformKeySet webhookSecretSet testConnected liveConnected keyValidationError version';
+    private const WEBHOOK_SECRET_VARS = ['sStripeWebhookEndpointSecretTest', 'sStripeWebhookEndpointSecretLive'];
     private const SECRET_SETTINGS = [
         'sStripeTestToken', 'sStripeLiveToken', 'sStripeTestKey', 'sStripeLiveKey', 'sStripeWebhookEndpointSecret',
     ];
@@ -105,6 +108,44 @@ final class StripeAdminApiWiringTest extends IntegrationTestCase
         self::assertNull($response['data']['adminStripeConfigModify']['config']);
     }
 
+    public function testSchema_HasTheThreeWebhookOperationsAndNoFieldThatCouldCarryTheSigningSecret(): void
+    {
+        $schema = $this->schema();
+
+        self::assertMatchesRegularExpression('/adminStripeWebhookStatus: AdminStripeWebhookStatus!/', $schema);
+        self::assertMatchesRegularExpression('/adminStripeWebhookRegister: AdminStripeWebhookPayload!/', $schema);
+        self::assertMatchesRegularExpression('/adminStripeWebhookClearAll: AdminStripeWebhookPayload!/', $schema);
+        preg_match('/type AdminStripeWebhookStatus \{([^}]*)\}/s', $schema, $status);
+        preg_match('/type AdminStripeWebhookPayload \{([^}]*)\}/s', $schema, $payload);
+        preg_match_all('/^\s*(\w+)[(:]/m', ($status[1] ?? '') . ($payload[1] ?? ''), $fields);
+        self::assertEqualsCanonicalizing(['mode', 'configured', 'endpointId', 'url', 'status', 'deleted', 'errors'], $fields[1]);
+    }
+
+    public function testContainer_WiresTheWebhookAdministrator(): void
+    {
+        $status = $this->service(StripeWebhookAdministratorInterface::class)->status();
+
+        self::assertContains($status->mode, ['test', 'live']);
+        self::assertNotSame('', $status->url);
+    }
+
+    public function testQuery_AdminStripeWebhookStatus_NeverReturnsAStoredSigningSecret(): void
+    {
+        $secrets = $this->storedWebhookSecrets();
+        if ($secrets === []) {
+            self::markTestSkipped('this shop has no webhook signing secret stored; the grep needs one to look for');
+        }
+
+        $response = $this->probe('{ adminStripeWebhookStatus { mode configured endpointId url } }');
+
+        self::assertArrayNotHasKey('errors', $response);
+        $body = (string) json_encode($response);
+        foreach ($secrets as $secret) {
+            self::assertFalse(str_contains($body, $secret), 'a stored signing secret appears in the response');
+        }
+        self::assertStringNotContainsString('whsec_', $body);
+    }
+
     public function testQuery_AdminStripeConfig_ReturnsEveryFieldAndNeverTheStoredSecrets(): void
     {
         $storedSecrets = $this->storedSecrets();
@@ -150,6 +191,22 @@ final class StripeAdminApiWiringTest extends IntegrationTestCase
         $secrets = [];
         foreach (self::SECRET_SETTINGS as $name) {
             $value = $settings->getString($name, Module::MODULE_ID)->toString();
+            if (strlen($value) >= 8) {
+                $secrets[] = $value;
+            }
+        }
+
+        return $secrets;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function storedWebhookSecrets(): array
+    {
+        $secrets = [];
+        foreach (self::WEBHOOK_SECRET_VARS as $name) {
+            $value = $this->service(ModuleConfVarsInterface::class)->read($name);
             if (strlen($value) >= 8) {
                 $secrets[] = $value;
             }

@@ -90,6 +90,13 @@ final class OxidStripeAdminSettings implements StripeAdminSettingsInterface
         return $this->string(self::TOKEN_SETTINGS[$mode] ?? self::TOKEN_SETTINGS[StripeDefinitions::MODE_TEST]);
     }
 
+    public function platformKey(string $mode): string
+    {
+        return $this->string(
+            self::PLATFORM_KEY_SETTINGS[$mode] ?? self::PLATFORM_KEY_SETTINGS[StripeDefinitions::MODE_TEST]
+        );
+    }
+
     public function apply(StripeConfigChange $change): void
     {
         foreach (self::STRING_FIELDS as $field => $setting) {
@@ -173,11 +180,6 @@ final class OxidStripeAdminSettings implements StripeAdminSettingsInterface
     private function publishableKey(string $mode): string
     {
         return $this->string(self::PUBLISHABLE_KEY_SETTINGS[$mode]);
-    }
-
-    private function platformKey(string $mode): string
-    {
-        return $this->string(self::PLATFORM_KEY_SETTINGS[$mode]);
     }
 
     private function string(string $name): string
