@@ -15,9 +15,9 @@ use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\KeyPairValidatorInterface;
 
 /**
- * `adminStripeConfigModify`: a secret only for a superadmin (checked first), step-up (switching to live, or writing any secret), optimistic lock, validation, the
- * key-mismatch check of the pair a change would leave behind, then the write. The right is the controller's; one
- * audit row per call.
+ * `adminStripeConfigModify`: a secret only for a superadmin (checked first), step-up (switching to live, or writing
+ * any secret), optimistic lock, validation, the key-mismatch check of the pair a change would leave behind, then the
+ * write. The right is the controller's; one audit row per call.
  */
 final class StripeConfigModifier implements StripeConfigModifierInterface
 {

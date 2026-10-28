@@ -47,12 +47,15 @@ final class StripeAdminConfigController
 
     /**
      * Changes settings. Secrets are write-only (empty = unchanged) and the superadmin's alone (`superadmin_required`);
-     * switching to live and writing a secret need a step-up; a publishable key and a secret key of different accounts are refused at the field.
+     * switching to live and writing a secret need a step-up; a publishable key and a secret key of different
+     * accounts are refused at the field.
      */
     #[Mutation]
     #[Right(PaymentRightsProvider::CONFIG)]
     public function adminStripeConfigModify(AdminStripeConfigInput $input): AdminStripeConfigPayload
     {
-        return AdminStripeConfigPayload::of($this->modifier->modify($input->toChange()), $this->superadmin->isSuperadmin());
+        $result = $this->modifier->modify($input->toChange());
+
+        return AdminStripeConfigPayload::of($result, $this->superadmin->isSuperadmin());
     }
 }
