@@ -17,8 +17,10 @@ use OxidEsales\Payments\Stripe\Service\ConfigurationValidator;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\ConfigFixtures;
 use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\CountingStepUp;
+use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\FakeSuperadminCheck;
 use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\InMemoryStripeSettings;
 use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\RecordingStripeAudit;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -27,12 +29,14 @@ final class StripeConfigModifierTest extends TestCase
     private InMemoryStripeSettings $settings;
     private CountingStepUp $stepUp;
     private RecordingStripeAudit $audit;
+    private FakeSuperadminCheck $superadmin;
 
     protected function setUp(): void
     {
         $this->settings = new InMemoryStripeSettings(ConfigFixtures::snapshot());
         $this->stepUp = new CountingStepUp();
         $this->audit = new RecordingStripeAudit();
+        $this->superadmin = new FakeSuperadminCheck();
     }
 
     public function testModify_AHarmlessField_IsSavedWithoutAStepUp(): void
@@ -196,6 +200,75 @@ final class StripeConfigModifierTest extends TestCase
         self::assertStringNotContainsString('brandnew', (string) json_encode($this->audit->rows));
     }
 
+    /**
+     * @return iterable<string, array{array<string, string>, string}>
+     */
+    public static function secretChanges(): iterable
+    {
+        yield 'test token' => [['testToken' => 'sk_test_AAAAAAAAAAbrandnew'], 'testToken'];
+        yield 'live token' => [['liveToken' => 'sk_live_BBBBBBBBBBbrandnew'], 'liveToken'];
+        yield 'test platform key' => [['testPlatformKey' => 'sk_test_PLATFORMplatform'], 'testPlatformKey'];
+        yield 'webhook secret' => [['webhookSecret' => 'whsec_AAAAAAAAAAAA'], 'webhookSecret'];
+    }
+
+    /**
+     * @param array<string, string> $secret
+     */
+    #[DataProvider('secretChanges')]
+    public function testModify_ASecretFromANonSuperadmin_IsRefusedAtTheFieldBeforeAnyStepUpAndNothingIsSaved(array $secret, string $field): void
+    {
+        $this->superadmin = new FakeSuperadminCheck(false);
+
+        $result = $this->modifier()->modify($this->change(...$secret, captureMode: 'manual'));
+
+        self::assertSame('superadmin_required', $result->refusal()?->code);
+        self::assertSame($field, $result->refusal()->field);
+        self::assertSame(0, $this->stepUp->required, 'no second factor is asked for something the admin may not do');
+        self::assertSame('automatic', $this->settings->snapshot()->captureMode, 'the whole call is refused');
+        self::assertSame('sk_test_AAAAAAAAAAstored', $this->settings->token('test'));
+        self::assertSame('superadmin_required', $this->audit->rows[0]['outcome'], 'audited as the refusal it is');
+        self::assertEqualsCanonicalizing([$field, 'captureMode'], $this->audit->rows[0]['fields']);
+    }
+
+    public function testModify_AHarmlessChangeFromANonSuperadmin_IsSavedAndTheCheckIsNotEvenAsked(): void
+    {
+        $this->superadmin = new FakeSuperadminCheck(false);
+
+        $result = $this->modifier()->modify($this->change(captureMode: 'manual', testToken: '', testPublishableKey: 'pk_test_AAAAAAAAAAnewpub'));
+
+        self::assertNull($result->refusal());
+        self::assertSame('manual', $this->settings->snapshot()->captureMode);
+        self::assertSame(0, $this->superadmin->asked);
+    }
+
+    public function testModify_SwitchingToLiveWithoutASecret_NeedsNoSuperadmin(): void
+    {
+        $this->superadmin = new FakeSuperadminCheck(false);
+
+        $result = $this->modifier()->modify($this->change(mode: 'live'));
+
+        self::assertNull($result->refusal());
+        self::assertSame(1, $this->stepUp->required, 'the step-up stays what it was');
+    }
+
+    public function testModify_ASecretFromASuperadmin_StillAsksForTheStepUp(): void
+    {
+        $result = $this->modifier()->modify($this->change(testToken: 'sk_test_AAAAAAAAAAbrandnew'));
+
+        self::assertNull($result->refusal());
+        self::assertSame(1, $this->stepUp->required);
+    }
+
+    public function testModify_ARefusedSecretIsAuditedAsOneRefusedCallWithFieldNamesOnly(): void
+    {
+        $this->superadmin = new FakeSuperadminCheck(false);
+
+        $this->modifier()->modify($this->change(testToken: 'sk_test_AAAAAAAAAAbrandnew'));
+
+        self::assertCount(1, $this->audit->rows);
+        self::assertStringNotContainsString('brandnew', (string) json_encode($this->audit->rows));
+    }
+
     private function modifier(): StripeConfigModifier
     {
         $config = $this->createStub(ModuleConfigurationServiceInterface::class);
@@ -204,6 +277,7 @@ final class StripeConfigModifierTest extends TestCase
             $this->settings,
             new StripeConfigChangeValidator(),
             new ConfigurationValidator($config),
+            $this->superadmin,
             $this->stepUp,
             $this->audit,
         );

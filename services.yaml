@@ -92,6 +92,7 @@ services:
       - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminSettingsInterface'
       - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeConfigChangeValidator'
       - '@OxidEsales\Payments\Stripe\Service\KeyPairValidatorInterface'
+      - '@OxidEsales\PaymentBase\GraphQL\Admin\Service\AdminSuperadminCheckInterface'
       - '@OxidEsales\PaymentBase\GraphQL\Admin\Service\AdminStepUpInterface'
       - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminAuditInterface'
 
@@ -105,6 +106,7 @@ services:
       - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeWebhookStateInterface'
       - '@OxidEsales\Payments\Stripe\Service\WebhookEndpointRegistrarInterface'
       - '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+      - '@OxidEsales\PaymentBase\GraphQL\Admin\Service\AdminSuperadminCheckInterface'
       - '@OxidEsales\PaymentBase\GraphQL\Admin\Service\AdminStepUpInterface'
       - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminAuditInterface'
       - '@oxid_esales.monolog.logger'
@@ -169,6 +171,7 @@ services:
     arguments:
       - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminSettingsInterface'
       - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeConfigModifierInterface'
+      - '@OxidEsales\PaymentBase\GraphQL\Admin\Service\AdminSuperadminCheckInterface'
 
   OxidEsales\Payments\Stripe\GraphQL\Admin\Controller\StripeAdminConfigController:
     alias: oe_payments_stripe.graphql.admin_config_controller

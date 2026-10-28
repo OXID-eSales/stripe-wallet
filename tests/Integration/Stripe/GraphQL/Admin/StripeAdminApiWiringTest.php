@@ -33,7 +33,7 @@ final class StripeAdminApiWiringTest extends IntegrationTestCase
 {
     private const CONFIG_FIELDS = 'mode captureMode removeByBillingCountry removeByBasketCurrency provideCustomerEmail '
         . 'logLevel logWebhooks testPublishableKey livePublishableKey webhookEndpointUrl testTokenSet liveTokenSet '
-        . 'testPlatformKeySet livePlatformKeySet webhookSecretSet testConnected liveConnected keyValidationError version classicSettingsUrl';
+        . 'testPlatformKeySet livePlatformKeySet webhookSecretSet testConnected liveConnected keyValidationError version classicSettingsUrl secretsEditable';
     private const WEBHOOK_SECRET_VARS = ['sStripeWebhookEndpointSecretTest', 'sStripeWebhookEndpointSecretLive'];
     private const SECRET_SETTINGS = [
         'sStripeTestToken', 'sStripeLiveToken', 'sStripeTestKey', 'sStripeLiveKey', 'sStripeWebhookEndpointSecret',
@@ -72,7 +72,7 @@ final class StripeAdminApiWiringTest extends IntegrationTestCase
         self::assertNotEmpty($type, 'type AdminStripeConfig');
         preg_match_all('/^\s*(\w+)[(:]/m', $type[1], $fields);
         self::assertEqualsCanonicalizing(explode(' ', self::CONFIG_FIELDS), $fields[1]);
-        foreach (['testTokenSet', 'liveTokenSet', 'testPlatformKeySet', 'livePlatformKeySet', 'webhookSecretSet'] as $flag) {
+        foreach (['testTokenSet', 'liveTokenSet', 'testPlatformKeySet', 'livePlatformKeySet', 'webhookSecretSet', 'secretsEditable'] as $flag) {
             self::assertMatchesRegularExpression('/' . $flag . ': Boolean!/', $type[1]);
         }
         foreach ($fields[1] as $field) {
@@ -214,6 +214,38 @@ final class StripeAdminApiWiringTest extends IntegrationTestCase
         foreach ($storedSecrets as $secret) {
             self::assertFalse(str_contains($body, $secret), 'a stored secret appears in the response');
         }
+    }
+
+    public function testMutation_ASecretWithoutASuperadminSession_IsRefusedAtTheFieldAndNothingIsWritten(): void
+    {
+        $before = $this->service(StripeAdminSettingsInterface::class)->snapshot();
+
+        $response = $this->probe(
+            'mutation { adminStripeConfigModify(input: { expectedVersion: "' . $before->version() . '", testToken: "sk_test_PAY10notarealkey", captureMode: "manual" }) '
+            . '{ config { version } errors { errorCode message ... on ValidationError { field code } } } }'
+        );
+
+        self::assertArrayNotHasKey('errors', $response);
+        $error = $response['data']['adminStripeConfigModify']['errors'][0] ?? [];
+        self::assertSame(['validation_failed', 'testToken', 'superadmin_required'], [$error['errorCode'] ?? null, $error['field'] ?? null, $error['code'] ?? null]);
+        self::assertSame($before->captureMode, $this->service(StripeAdminSettingsInterface::class)->snapshot()->captureMode, 'the whole call is refused');
+        self::assertStringNotContainsString('PAY10notarealkey', (string) json_encode($response));
+    }
+
+    public function testMutation_WebhookRegisterWithoutASuperadminSession_IsRefused(): void
+    {
+        $response = $this->probe('mutation { adminStripeWebhookRegister { errors { errorCode ... on ValidationError { field code } } } }');
+
+        self::assertArrayNotHasKey('errors', $response);
+        $error = $response['data']['adminStripeWebhookRegister']['errors'][0] ?? [];
+        self::assertSame(['webhook', 'superadmin_required'], [$error['field'] ?? null, $error['code'] ?? null]);
+    }
+
+    public function testQuery_SecretsEditableIsFalseWithoutASuperadminSession(): void
+    {
+        $response = $this->probe('{ adminStripeConfig { secretsEditable } }');
+
+        self::assertFalse($response['data']['adminStripeConfig']['secretsEditable'] ?? null);
     }
 
     public function testQuery_TheSchemaOffersNoWayToAskForASecretByName(): void

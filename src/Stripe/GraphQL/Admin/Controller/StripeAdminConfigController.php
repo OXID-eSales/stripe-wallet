@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\GraphQL\Admin\Controller;
 
+use OxidEsales\PaymentBase\GraphQL\Admin\Service\AdminSuperadminCheckInterface;
 use OxidEsales\PaymentBase\GraphQL\Admin\Service\PaymentRightsProvider;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\DataType\AdminStripeConfig;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\DataType\AdminStripeConfigInput;
@@ -30,6 +31,7 @@ final class StripeAdminConfigController
     public function __construct(
         private readonly StripeAdminSettingsInterface $settings,
         private readonly StripeConfigModifierInterface $modifier,
+        private readonly AdminSuperadminCheckInterface $superadmin,
     ) {
     }
 
@@ -40,17 +42,20 @@ final class StripeAdminConfigController
     #[Right(PaymentRightsProvider::CONFIG)]
     public function adminStripeConfig(): AdminStripeConfig
     {
-        return new AdminStripeConfig($this->settings->snapshot());
+        return new AdminStripeConfig($this->settings->snapshot(), $this->superadmin->isSuperadmin());
     }
 
     /**
-     * Changes settings. Secrets are write-only (empty = unchanged); switching to live and writing a secret need a
-     * step-up; a publishable key and a secret key of different accounts are refused at the field.
+     * Changes settings. Secrets are write-only (empty = unchanged) and the superadmin's alone (`superadmin_required`);
+     * switching to live and writing a secret need a step-up; a publishable key and a secret key of different
+     * accounts are refused at the field.
      */
     #[Mutation]
     #[Right(PaymentRightsProvider::CONFIG)]
     public function adminStripeConfigModify(AdminStripeConfigInput $input): AdminStripeConfigPayload
     {
-        return AdminStripeConfigPayload::of($this->modifier->modify($input->toChange()));
+        $result = $this->modifier->modify($input->toChange());
+
+        return AdminStripeConfigPayload::of($result, $this->superadmin->isSuperadmin());
     }
 }

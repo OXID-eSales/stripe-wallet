@@ -27,7 +27,7 @@ final class AdminStripeTypesTest extends TestCase
         $fields = $this->fieldNamesOf(AdminStripeConfig::class);
 
         self::assertEqualsCanonicalizing([
-            'mode', 'captureMode', 'removeByBillingCountry', 'removeByBasketCurrency', 'provideCustomerEmail',
+            'mode', 'captureMode', 'removeByBillingCountry', 'removeByBasketCurrency', 'provideCustomerEmail', 'secretsEditable',
             'logLevel', 'logWebhooks', 'testPublishableKey', 'livePublishableKey', 'webhookEndpointUrl',
             'testTokenSet', 'liveTokenSet', 'testPlatformKeySet', 'livePlatformKeySet', 'webhookSecretSet',
             'testConnected', 'liveConnected', 'keyValidationError', 'version', 'classicSettingsUrl',
@@ -40,7 +40,7 @@ final class AdminStripeTypesTest extends TestCase
     public function testConfig_ReadsFromTheSnapshot(): void
     {
         $snapshot = ConfigFixtures::snapshot(['liveTokenSet' => true, 'keyValidationError' => 'nope']);
-        $config = new AdminStripeConfig($snapshot);
+        $config = new AdminStripeConfig($snapshot, true);
 
         self::assertSame('test', $config->getMode());
         self::assertSame('automatic', $config->getCaptureMode());
@@ -92,8 +92,8 @@ final class AdminStripeTypesTest extends TestCase
 
     public function testPayload_CarriesTheConfigOrTheErrorNeverBoth(): void
     {
-        $done = AdminStripeConfigPayload::of(StripeConfigResult::done(ConfigFixtures::snapshot()));
-        $refused = AdminStripeConfigPayload::of(StripeConfigResult::refused(StripeAdminRefusal::invalid('mode', 'not_allowed', 'no')));
+        $done = AdminStripeConfigPayload::of(StripeConfigResult::done(ConfigFixtures::snapshot()), true);
+        $refused = AdminStripeConfigPayload::of(StripeConfigResult::refused(StripeAdminRefusal::invalid('mode', 'not_allowed', 'no')), false);
 
         self::assertNotNull($done->config());
         self::assertSame([], $done->errors());

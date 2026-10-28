@@ -21,6 +21,7 @@ use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeConfigResult;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeConfigSnapshot;
 use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\ConfigFixtures;
 use PHPUnit\Framework\TestCase;
+use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\FakeSuperadminCheck;
 use ReflectionMethod;
 use TheCodingMachine\GraphQLite\Annotations\Mutation;
 use TheCodingMachine\GraphQLite\Annotations\Query;
@@ -122,7 +123,23 @@ final class StripeAdminConfigControllerTest extends TestCase
         };
     }
 
-    private function controller(?StripeConfigModifierInterface $modifier = null): StripeAdminConfigController
+    public function testConfig_TellsWhetherTheSecretsAreEditable_OnlyForASuperadmin(): void
+    {
+        self::assertTrue($this->controller(null, true)->adminStripeConfig()->isSecretsEditable());
+        self::assertFalse($this->controller(null, false)->adminStripeConfig()->isSecretsEditable());
+    }
+
+    public function testModify_TheAnswersConfigTellsTheSame(): void
+    {
+        $done = StripeConfigResult::done(ConfigFixtures::snapshot());
+        $modifier = $this->createStub(StripeConfigModifierInterface::class);
+        $modifier->method('modify')->willReturn($done);
+
+        self::assertFalse($this->controller($modifier, false)->adminStripeConfigModify($this->input())->config()?->isSecretsEditable());
+        self::assertTrue($this->controller($modifier, true)->adminStripeConfigModify($this->input())->config()?->isSecretsEditable());
+    }
+
+    private function controller(?StripeConfigModifierInterface $modifier = null, bool $superadmin = true): StripeAdminConfigController
     {
         $settings = new class implements StripeAdminSettingsInterface {
             public function snapshot(): StripeConfigSnapshot
@@ -145,6 +162,6 @@ final class StripeAdminConfigControllerTest extends TestCase
             }
         };
 
-        return new StripeAdminConfigController($settings, $modifier ?? $this->createStub(StripeConfigModifierInterface::class));
+        return new StripeAdminConfigController($settings, $modifier ?? $this->createStub(StripeConfigModifierInterface::class), new FakeSuperadminCheck($superadmin));
     }
 }

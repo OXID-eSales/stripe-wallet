@@ -10,13 +10,14 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\GraphQL\Admin\Service;
 
 use OxidEsales\PaymentBase\GraphQL\Admin\Service\AdminStepUpInterface;
+use OxidEsales\PaymentBase\GraphQL\Admin\Service\AdminSuperadminCheckInterface;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\KeyPairValidatorInterface;
 
 /**
- * `adminStripeConfigModify`: step-up (switching to live, or writing any secret), optimistic lock, validation, the
- * key-mismatch check of the pair a change would leave behind, then the write. The right is the controller's; one
- * audit row per call.
+ * `adminStripeConfigModify`: a secret only for a superadmin (checked first), step-up (switching to live, or writing
+ * any secret), optimistic lock, validation, the key-mismatch check of the pair a change would leave behind, then the
+ * write. The right is the controller's; one audit row per call.
  */
 final class StripeConfigModifier implements StripeConfigModifierInterface
 {
@@ -26,6 +27,7 @@ final class StripeConfigModifier implements StripeConfigModifierInterface
         private readonly StripeAdminSettingsInterface $settings,
         private readonly StripeConfigChangeValidator $validator,
         private readonly KeyPairValidatorInterface $keyPairs,
+        private readonly AdminSuperadminCheckInterface $superadmin,
         private readonly AdminStepUpInterface $stepUp,
         private readonly StripeAdminAuditInterface $audit,
     ) {
@@ -42,6 +44,11 @@ final class StripeConfigModifier implements StripeConfigModifierInterface
 
     private function run(StripeConfigChange $change): StripeConfigResult
     {
+        $secretField = $change->firstSecretField();
+        if ($secretField !== null && !$this->superadmin->isSuperadmin()) {
+            // Before the step-up: nobody is asked for a second factor for something they may not do.
+            return StripeConfigResult::refused(StripeAdminRefusal::superadminRequired($secretField));
+        }
         $current = $this->settings->snapshot();
         if ($this->needsStepUp($change, $current)) {
             $this->stepUp->require();

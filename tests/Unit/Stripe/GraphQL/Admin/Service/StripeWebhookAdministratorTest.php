@@ -15,6 +15,7 @@ use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\WebhookEndpointRegistrationResult;
 use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\ConfigFixtures;
 use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\CountingStepUp;
+use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\FakeSuperadminCheck;
 use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\InMemoryStripeSettings;
 use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\InMemoryWebhookState;
 use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\RecordingStripeAudit;
@@ -28,6 +29,7 @@ final class StripeWebhookAdministratorTest extends TestCase
     private InMemoryStripeSettings $settings;
     private InMemoryWebhookState $state;
     private CountingStepUp $stepUp;
+    private FakeSuperadminCheck $superadmin;
     private RecordingStripeAudit $audit;
 
     protected function setUp(): void
@@ -35,6 +37,7 @@ final class StripeWebhookAdministratorTest extends TestCase
         $this->settings = new InMemoryStripeSettings(ConfigFixtures::snapshot());
         $this->state = new InMemoryWebhookState();
         $this->stepUp = new CountingStepUp();
+        $this->superadmin = new FakeSuperadminCheck();
         $this->audit = new RecordingStripeAudit();
     }
 
@@ -87,6 +90,30 @@ final class StripeWebhookAdministratorTest extends TestCase
         self::assertTrue($this->state->hasSecret('test'));
         self::assertSame('https://shop.example/index.php?cl=stripewebhook', $this->state->registeredUrl);
         self::assertSame('we_new', $result->status()->endpointId);
+    }
+
+    public function testRegister_FromANonSuperadmin_IsRefusedBeforeTheStepUpAndNothingIsRegistered(): void
+    {
+        $this->superadmin = new FakeSuperadminCheck(false);
+        $registrar = new ScriptedWebhookRegistrar();
+
+        $result = $this->administrator($registrar)->register();
+
+        self::assertSame('superadmin_required', $result->refusal()?->code);
+        self::assertSame('webhook', $result->refusal()->field);
+        self::assertSame(0, $this->stepUp->required);
+        self::assertSame([], $registrar->registered);
+        self::assertSame('superadmin_required', $this->audit->rows[0]['outcome']);
+    }
+
+    public function testClearAll_FromANonSuperadmin_StaysAsItWas(): void
+    {
+        $this->superadmin = new FakeSuperadminCheck(false);
+
+        $result = $this->administrator(new ScriptedWebhookRegistrar())->clearAll();
+
+        self::assertNotSame('superadmin_required', $result->refusal()?->code, 'clear-all deletes endpoints, not keys');
+        self::assertSame(0, $this->superadmin->asked);
     }
 
     public function testRegister_TheAnswerNeverCarriesTheSigningSecret(): void
@@ -226,6 +253,7 @@ final class StripeWebhookAdministratorTest extends TestCase
             $this->state,
             $registrar ?? new ScriptedWebhookRegistrar(),
             $config,
+            $this->superadmin,
             $this->stepUp,
             $this->audit,
             new NullLogger(),
