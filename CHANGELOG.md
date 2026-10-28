@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Stripe admin API (PAY-3)** for `oxid-admin-graphql` (optional, see `docs/for_developer/06-admin-api.md`):
+  `adminStripeConfig` / `adminStripeConfigModify` (secrets write-only, optimistic lock, step-up for live and any secret,
+  key-mismatch check, audit with field names only), `adminStripeWebhookStatus` / `adminStripeWebhookRegister` /
+  `adminStripeWebhookClearAll`, and `AdminPaymentContract.stripe` (payment intent, charge, status, dashboard link; fails
+  closed when Stripe cannot be reached). Rights: `ADMIN_PAYMENT_CONFIG` / `ADMIN_PAYMENT_VIEW`.
+- Provider wiring of payment-base's PAY-1 admin payment API: Stripe's column of the contract-state Help, the reasons and
+  description the panel accepts, live capture/refund bounds, and readable refusals (`AdminActionRefusedException`) for the
+  amount and text gate of the Payment tab; the classic tab behaves as before.
+- `ConfigurationValidator::getKeyPairError()` (`KeyPairValidatorInterface`).
+
+### Requires
+- payment-base with the PAY-1 provider API (next release after 1.5.0; until then CI pins payment-base's branch
+  `b-7.4.x-admin-payment-plugins`) and, for the admin API itself, payment-base >= 1.5.
+
 ### Changed
 - **Docs (138h).** The developer guide's security model (§7) states what the headless channel leaves behind and where
   it does not (hashed contract token, log policy, URLs, browser storage, errors by code, secret scanning); the merchant
