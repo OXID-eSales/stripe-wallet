@@ -13,7 +13,10 @@ use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface;
 use OxidEsales\EshopCommunity\Tests\Integration\IntegrationTestCase;
 use OxidEsales\GraphQL\Admin\Authorization\Service\RightsCatalogue;
+use Doctrine\DBAL\Connection;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\ModuleConfVarsInterface;
+use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\OrderPaymentIntentIdReaderInterface;
+use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripePaymentDetailsReaderInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\OxidStripeAdminAudit;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminAuditInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminSettingsInterface;
@@ -144,6 +147,42 @@ final class StripeAdminApiWiringTest extends IntegrationTestCase
             self::assertFalse(str_contains($body, $secret), 'a stored signing secret appears in the response');
         }
         self::assertStringNotContainsString('whsec_', $body);
+    }
+
+    public function testSchema_TheContractHasTheStripeExtensionWithTheDocumentedFields(): void
+    {
+        $schema = $this->schema();
+
+        self::assertMatchesRegularExpression('/type AdminPaymentContract \{[^}]*stripe: AdminStripePaymentDetails\b/s', $schema);
+        preg_match('/type AdminStripePaymentDetails \{([^}]*)\}/s', $schema, $type);
+        preg_match_all('/^\s*(\w+)[(:]/m', $type[1] ?? '', $fields);
+        self::assertEqualsCanonicalizing(
+            ['paymentIntentId', 'chargeId', 'externalTransactionId', 'intentStatus', 'dashboardUrl', 'apiError'],
+            $fields[1]
+        );
+    }
+
+    public function testReader_AContractThatDoesNotExist_HasNoStripePart(): void
+    {
+        self::assertNull($this->service(StripePaymentDetailsReaderInterface::class)->find('no-such-contract'));
+    }
+
+    public function testOrderReader_ReadsTheIntentIdTheOrderKeeps(): void
+    {
+        $orderId = 'pay3-test-order-' . bin2hex(random_bytes(4));
+        $connection = $this->service(Connection::class);
+        $connection->executeStatement(
+            'INSERT INTO oxorder (OXID, OXSHOPID, OXTRANSID) VALUES (?, 1, ?)',
+            [$orderId, 'pi_integration_123']
+        );
+        try {
+            $reader = $this->service(OrderPaymentIntentIdReaderInterface::class);
+
+            self::assertSame('pi_integration_123', $reader->intentIdOf($orderId));
+            self::assertSame('', $reader->intentIdOf('no-such-order'));
+        } finally {
+            $connection->executeStatement('DELETE FROM oxorder WHERE OXID = ?', [$orderId]);
+        }
     }
 
     public function testQuery_AdminStripeConfig_ReturnsEveryFieldAndNeverTheStoredSecrets(): void
