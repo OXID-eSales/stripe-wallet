@@ -39,6 +39,52 @@ services:
     tags: [ 'graphql_namespace_mapper' ]
 
   # ===========================================
+  # PAY-3 — Stripe admin API (optional: needs oxid-admin-graphql and payment-base's admin payment API)
+  # ===========================================
+  # Nothing here is autowired and the admin API's own services are reached only through `@?`, so the module
+  # installs and activates on a shop without it (AdminApiIsOptionalTest). Docs: docs/for_developer/06-admin-api.md.
+  OxidEsales\Payments\Stripe\Service\KeyPairValidatorInterface:
+    alias: OxidEsales\Payments\Stripe\Service\ConfigurationValidator
+    public: false
+
+  OxidEsales\Payments\Stripe\GraphQL\Admin\Service\ModuleConfVarsInterface:
+    class: OxidEsales\Payments\Stripe\GraphQL\Admin\Service\OxidModuleConfVars
+    autowire: false
+    autoconfigure: false
+
+  OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeWebhookStateInterface:
+    class: OxidEsales\Payments\Stripe\GraphQL\Admin\Service\OxidStripeWebhookState
+    autowire: false
+    autoconfigure: false
+    arguments:
+      - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\ModuleConfVarsInterface'
+      - '@OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface'
+
+  OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminSettingsInterface:
+    class: OxidEsales\Payments\Stripe\GraphQL\Admin\Service\OxidStripeAdminSettings
+    autowire: false
+    autoconfigure: false
+    public: true # the integration tests resolve it
+    arguments:
+      - '@OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface'
+      - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeWebhookStateInterface'
+      - '@OxidEsales\Payments\Stripe\Service\KeyPairValidatorInterface'
+      - '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+
+  # Fetched by GraphQLite's container (graphql-base), hence public; private definition + public alias, see the
+  # RoutePass note at StripeCheckout.
+  oe_payments_stripe.graphql.admin_config_controller:
+    class: OxidEsales\Payments\Stripe\GraphQL\Admin\Controller\StripeAdminConfigController
+    autowire: false
+    autoconfigure: false
+    arguments:
+      - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminSettingsInterface'
+
+  OxidEsales\Payments\Stripe\GraphQL\Admin\Controller\StripeAdminConfigController:
+    alias: oe_payments_stripe.graphql.admin_config_controller
+    public: true
+
+  # ===========================================
   # GRAPH-QL / PS5 — ACP checkout service (payment-base MCP layer)
   # ===========================================
   # The provider half of the agentic-commerce layer: create_checkout on the

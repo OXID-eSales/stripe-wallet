@@ -10,7 +10,9 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\GraphQL\Service;
 
 /**
- * Tells graphql-base where the Stripe checkout mutations live. The result
+ * Tells graphql-base where the Stripe checkout mutations live and (when oxid-admin-graphql is installed) the Stripe
+ * admin API: settings and webhook operations, their types and the `stripe` extension of the Payment tab's contract.
+ * The result
  * types (`Checkout*Result`) and the `guest` input (`GuestCheckoutInput`) are payment-base's,
  * mapped by its own namespace mapper: this module defines no GraphQL type.
  *
@@ -27,14 +29,32 @@ namespace OxidEsales\Payments\Stripe\GraphQL\Service;
  */
 final class NamespaceMapper
 {
+    // The admin API is built on oxid-admin-graphql's types and payment-base's admin payment API: both must exist.
+    private const ADMIN_ORDER_TYPE = 'OxidEsales\\GraphQL\\Admin\\Order\\DataType\\AdminOrder';
+    private const ADMIN_PAYMENT_CONTRACT_TYPE =
+        'OxidEsales\\PaymentBase\\GraphQL\\Admin\\DataType\\AdminPaymentContract';
+
+    /**
+     * @param bool|null $adminApiAvailable null: ask the autoloader whether oxid-admin-graphql and payment-base's
+     *                                      admin payment API are there
+     */
+    public function __construct(private readonly ?bool $adminApiAvailable = null)
+    {
+    }
+
     /**
      * @return array<string, string>
      */
     public function getControllerNamespaceMapping(): array
     {
-        return [
+        $mapping = [
             'OxidEsales\\Payments\\Stripe\\GraphQL\\Controller' => __DIR__ . '/../Controller/',
         ];
+        if ($this->adminApiInstalled()) {
+            $mapping['OxidEsales\\Payments\\Stripe\\GraphQL\\Admin\\Controller'] = __DIR__ . '/../Admin/Controller/';
+        }
+
+        return $mapping;
     }
 
     /**
@@ -42,6 +62,19 @@ final class NamespaceMapper
      */
     public function getTypeNamespaceMapping(): array
     {
-        return [];
+        if (!$this->adminApiInstalled()) {
+            return [];
+        }
+
+        return [
+            'OxidEsales\\Payments\\Stripe\\GraphQL\\Admin\\DataType' => __DIR__ . '/../Admin/DataType/',
+            'OxidEsales\\Payments\\Stripe\\GraphQL\\Admin\\Relation' => __DIR__ . '/../Admin/Relation/',
+        ];
+    }
+
+    private function adminApiInstalled(): bool
+    {
+        return $this->adminApiAvailable
+            ?? (class_exists(self::ADMIN_ORDER_TYPE) && class_exists(self::ADMIN_PAYMENT_CONTRACT_TYPE));
     }
 }
