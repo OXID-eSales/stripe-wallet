@@ -44,6 +44,28 @@ final class StripeContractStateHelpTest extends TestCase
         self::assertStringContainsString('payment_intent.payment_failed', $statuses['failed']);
     }
 
+    public function testIsStripesProviderColumnOfThePaymentBaseHelp(): void
+    {
+        $help = new StripeContractStateHelp();
+
+        self::assertInstanceOf(\OxidEsales\PaymentBase\Admin\Help\ContractStateHelpProviderInterface::class, $help);
+        self::assertSame(\OxidEsales\Payments\Stripe\Core\StripeDefinitions::PROVIDER, $help->providerName());
+        self::assertSame('stripe', $help->providerName(), 'payment-base keys the panel providers by this name');
+        self::assertSame('Stripe PaymentIntent status', $help->providerLabel());
+    }
+
+    public function testIsRegisteredWithTheTagPaymentBaseCollects(): void
+    {
+        $services = \Symfony\Component\Yaml\Yaml::parseFile(dirname(__DIR__, 4) . '/services.yaml', \Symfony\Component\Yaml\Yaml::PARSE_CUSTOM_TAGS)['services'];
+
+        $definition = $services[StripeContractStateHelp::class] ?? null;
+        self::assertIsArray($definition);
+        self::assertSame(
+            [['name' => \OxidEsales\PaymentBase\Admin\Help\ContractStateHelpProviderInterface::TAG]],
+            $definition['tags']
+        );
+    }
+
     #[DataProvider('languages')]
     public function testItsIdentsAreTranslatedAndTheLabelReadsOxidContractStatus(string $language): void
     {

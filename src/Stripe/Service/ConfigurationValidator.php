@@ -17,7 +17,7 @@ namespace OxidEsales\Payments\Stripe\Service;
  *
  * @since 2.0.0
  */
-class ConfigurationValidator implements ConfigurationValidatorInterface
+class ConfigurationValidator implements ConfigurationValidatorInterface, KeyPairValidatorInterface
 {
     public function __construct(
         private readonly ModuleConfigurationServiceInterface $config
@@ -31,9 +31,16 @@ class ConfigurationValidator implements ConfigurationValidatorInterface
      */
     public function getKeyValidationError(): ?string
     {
-        $publishableKey = $this->config->getPublishableKey();
-        $secretKey = $this->config->getToken();
+        return $this->getKeyPairError($this->config->getPublishableKey(), $this->config->getToken());
+    }
 
+    /**
+     * Same rules for any pair of keys (the admin API checks the pair a change would leave behind).
+     *
+     * @return string|null Error message or null if the keys belong together
+     */
+    public function getKeyPairError(string $publishableKey, string $secretKey): ?string
+    {
         if (empty($publishableKey)) {
             return 'Publishable key is not configured';
         }
