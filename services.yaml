@@ -71,6 +71,29 @@ services:
       - '@OxidEsales\Payments\Stripe\Service\KeyPairValidatorInterface'
       - '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
 
+  OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeConfigChangeValidator:
+    autowire: false
+    autoconfigure: false
+
+  OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminAuditInterface:
+    class: OxidEsales\Payments\Stripe\GraphQL\Admin\Service\OxidStripeAdminAudit
+    autowire: false
+    autoconfigure: false
+    public: true # the integration tests resolve it
+    arguments:
+      - '@?OxidEsales\GraphQL\Admin\Audit\Service\AuditRecorder'
+
+  OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeConfigModifierInterface:
+    class: OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeConfigModifier
+    autowire: false
+    autoconfigure: false
+    arguments:
+      - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminSettingsInterface'
+      - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeConfigChangeValidator'
+      - '@OxidEsales\Payments\Stripe\Service\KeyPairValidatorInterface'
+      - '@OxidEsales\PaymentBase\GraphQL\Admin\Service\AdminStepUpInterface'
+      - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminAuditInterface'
+
   # Fetched by GraphQLite's container (graphql-base), hence public; private definition + public alias, see the
   # RoutePass note at StripeCheckout.
   oe_payments_stripe.graphql.admin_config_controller:
@@ -79,6 +102,7 @@ services:
     autoconfigure: false
     arguments:
       - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminSettingsInterface'
+      - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeConfigModifierInterface'
 
   OxidEsales\Payments\Stripe\GraphQL\Admin\Controller\StripeAdminConfigController:
     alias: oe_payments_stripe.graphql.admin_config_controller

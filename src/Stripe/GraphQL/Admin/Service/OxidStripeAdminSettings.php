@@ -33,6 +33,19 @@ final class OxidStripeAdminSettings implements StripeAdminSettingsInterface
         StripeDefinitions::MODE_TEST => 'sStripeTestKey',
         StripeDefinitions::MODE_LIVE => 'sStripeLiveKey',
     ];
+    private const STRING_FIELDS = [
+        'mode' => 'sStripeMode',
+        'captureMode' => 'sStripeCaptureMode',
+        'logLevel' => 'sStripeLogLevel',
+        'testPublishableKey' => 'sStripeTestPk',
+        'livePublishableKey' => 'sStripeLivePk',
+    ];
+    private const BOOLEAN_FIELDS = [
+        'removeByBillingCountry' => 'blStripeRemoveByBillingCountry',
+        'removeByBasketCurrency' => 'blStripeRemoveByBasketCurrency',
+        'provideCustomerEmail' => 'blStripeProvideCustomerEmailAddress',
+        'logWebhooks' => 'blStripeLogWebhooks',
+    ];
     private const PUBLISHABLE_KEY_SETTINGS = [
         StripeDefinitions::MODE_TEST => 'sStripeTestPk',
         StripeDefinitions::MODE_LIVE => 'sStripeLivePk',
@@ -72,6 +85,48 @@ final class OxidStripeAdminSettings implements StripeAdminSettingsInterface
         );
     }
 
+    public function token(string $mode): string
+    {
+        return $this->string(self::TOKEN_SETTINGS[$mode] ?? self::TOKEN_SETTINGS[StripeDefinitions::MODE_TEST]);
+    }
+
+    public function apply(StripeConfigChange $change): void
+    {
+        foreach (self::STRING_FIELDS as $field => $setting) {
+            $value = $change->$field;
+            if ($value !== null) {
+                $this->settings->saveString($setting, $value, Module::MODULE_ID);
+            }
+        }
+        foreach (self::BOOLEAN_FIELDS as $field => $setting) {
+            $value = $change->$field;
+            if ($value !== null) {
+                $this->settings->saveBoolean($setting, $value, Module::MODULE_ID);
+            }
+        }
+        $this->applySecrets($change);
+    }
+
+    private function applySecrets(StripeConfigChange $change): void
+    {
+        foreach ([StripeDefinitions::MODE_TEST, StripeDefinitions::MODE_LIVE] as $mode) {
+            $this->saveSecret(self::TOKEN_SETTINGS[$mode], $change->tokenFor($mode));
+            $this->saveSecret(self::PLATFORM_KEY_SETTINGS[$mode], $change->platformKeyFor($mode));
+        }
+        $webhookSecret = $change->webhookSecret();
+        if ($webhookSecret !== null) {
+            // The secret belongs to the mode the shop will be in after this change.
+            $this->webhookState->storeSecret($change->mode ?? $this->mode(), $webhookSecret);
+        }
+    }
+
+    private function saveSecret(string $setting, #[\SensitiveParameter] ?string $secret): void
+    {
+        if ($secret !== null) {
+            $this->settings->saveString($setting, $secret, Module::MODULE_ID);
+        }
+    }
+
     private function mode(): string
     {
         return $this->string('sStripeMode') === StripeDefinitions::MODE_LIVE
@@ -108,27 +163,16 @@ final class OxidStripeAdminSettings implements StripeAdminSettingsInterface
         return $this->token($mode) !== '' && $this->publishableKey($mode) !== '';
     }
 
-    /**
-     * The shipped message names the first characters of both keys' account part; the API says only that they differ.
-     */
     private function keyValidationError(string $mode): ?string
     {
-        $error = $this->keyPairValidator->getKeyPairError($this->publishableKey($mode), $this->token($mode));
-        if ($error !== null && str_contains($error, 'different Stripe accounts')) {
-            return 'The publishable key and the secret key belong to different Stripe accounts';
-        }
-
-        return $error;
+        return StripeKeyPairMessage::from(
+            $this->keyPairValidator->getKeyPairError($this->publishableKey($mode), $this->token($mode))
+        );
     }
 
     private function publishableKey(string $mode): string
     {
         return $this->string(self::PUBLISHABLE_KEY_SETTINGS[$mode]);
-    }
-
-    private function token(string $mode): string
-    {
-        return $this->string(self::TOKEN_SETTINGS[$mode]);
     }
 
     private function platformKey(string $mode): string

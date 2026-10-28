@@ -22,4 +22,9 @@ interface StripeWebhookStateInterface
      * including its refusal of the legacy mode-agnostic secret once the other mode has its own).
      */
     public function hasSecret(string $mode): bool;
+
+    /**
+     * Stores a signing secret pasted by an admin for a mode.
+     */
+    public function storeSecret(string $mode, #[\SensitiveParameter] string $secret): void;
 }

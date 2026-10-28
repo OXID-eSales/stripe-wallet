@@ -43,6 +43,11 @@ final class OxidStripeWebhookState implements StripeWebhookStateInterface
         return $legacy !== '' && $this->vars->read($this->secretName($this->otherMode($mode))) === '';
     }
 
+    public function storeSecret(string $mode, #[\SensitiveParameter] string $secret): void
+    {
+        $this->vars->save($this->secretName($mode), $secret);
+    }
+
     private function endpointIdName(string $mode): string
     {
         return $mode === StripeDefinitions::MODE_LIVE ? 'sStripeWebhookEndpointIdLive' : 'sStripeWebhookEndpointIdTest';

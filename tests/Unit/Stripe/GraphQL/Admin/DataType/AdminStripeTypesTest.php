@@ -10,6 +10,10 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\DataType;
 
 use OxidEsales\Payments\Stripe\GraphQL\Admin\DataType\AdminStripeConfig;
+use OxidEsales\Payments\Stripe\GraphQL\Admin\DataType\AdminStripeConfigInput;
+use OxidEsales\Payments\Stripe\GraphQL\Admin\DataType\AdminStripeConfigPayload;
+use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminRefusal;
+use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeConfigResult;
 use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\ConfigFixtures;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -55,6 +59,45 @@ final class AdminStripeTypesTest extends TestCase
         self::assertFalse($config->isLiveConnected());
         self::assertSame('nope', $config->getKeyValidationError());
         self::assertSame($snapshot->version(), $config->getVersion());
+    }
+
+    public function testInput_TakesSecretsButTheConfigTypeNeverReturnsThem(): void
+    {
+        $input = new ReflectionClass(AdminStripeConfigInput::class);
+
+        foreach (['expectedVersion', 'testToken', 'liveToken', 'testPlatformKey', 'livePlatformKey', 'webhookSecret'] as $property) {
+            self::assertTrue($input->hasProperty($property), $property);
+        }
+        self::assertFalse($input->hasProperty('webhookEndpointUrl'), 'the endpoint is registered, not edited');
+    }
+
+    public function testInput_BecomesAChangeWithoutLosingOrInventingAnything(): void
+    {
+        $input = new AdminStripeConfigInput();
+        $input->expectedVersion = 'v1';
+        $input->mode = 'live';
+        $input->liveToken = 'sk_live_AAAAAAAAAAvalue';
+        $input->logWebhooks = false;
+
+        $change = $input->toChange();
+
+        self::assertSame('v1', $change->expectedVersion);
+        self::assertSame('live', $change->mode);
+        self::assertSame('sk_live_AAAAAAAAAAvalue', $change->tokenFor('live'));
+        self::assertFalse($change->logWebhooks);
+        self::assertNull($change->captureMode);
+        self::assertSame(['mode', 'logWebhooks', 'liveToken'], $change->fieldNames());
+    }
+
+    public function testPayload_CarriesTheConfigOrTheErrorNeverBoth(): void
+    {
+        $done = AdminStripeConfigPayload::of(StripeConfigResult::done(ConfigFixtures::snapshot()));
+        $refused = AdminStripeConfigPayload::of(StripeConfigResult::refused(StripeAdminRefusal::invalid('mode', 'not_allowed', 'no')));
+
+        self::assertNotNull($done->config());
+        self::assertSame([], $done->errors());
+        self::assertNull($refused->config());
+        self::assertCount(1, $refused->errors());
     }
 
     /**

@@ -33,6 +33,11 @@ final class AdminApiIsOptionalTest extends TestCase
         });
 
         self::assertSame([], $hard, 'a hard reference to an admin API service breaks the compile without it: use @?');
+        self::assertContains(
+            '@?OxidEsales\\GraphQL\\Admin\\Audit\\Service\\AuditRecorder',
+            $this->flattenedReferences($services),
+            'the audit recorder is wired optionally',
+        );
     }
 
     public function testNoServiceIsDefinedForAClassOfTheAdminApiItself(): void
@@ -47,7 +52,7 @@ final class AdminApiIsOptionalTest extends TestCase
         $services = $this->services();
         $admin = array_filter($services, static fn (string $id): bool => str_contains($id, 'Stripe\\GraphQL\\Admin\\'), ARRAY_FILTER_USE_KEY);
 
-        self::assertGreaterThanOrEqual(4, count($admin));
+        self::assertGreaterThanOrEqual(7, count($admin));
         foreach ($admin as $id => $definition) {
             self::assertIsArray($definition, $id);
             if (isset($definition['alias'])) {

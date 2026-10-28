@@ -13,6 +13,8 @@ use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface;
 use OxidEsales\EshopCommunity\Tests\Integration\IntegrationTestCase;
 use OxidEsales\GraphQL\Admin\Authorization\Service\RightsCatalogue;
+use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\OxidStripeAdminAudit;
+use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminAuditInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminSettingsInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Service\NamespaceMapper;
 use OxidEsales\Payments\Stripe\Module;
@@ -70,6 +72,37 @@ final class StripeAdminApiWiringTest extends IntegrationTestCase
         foreach ($fields[1] as $field) {
             self::assertDoesNotMatchRegularExpression('/(token|secret|platformkey)$/i', $field, 'field ' . $field);
         }
+    }
+
+    public function testContainer_WiresTheAuditToTheRealRecorder(): void
+    {
+        self::assertInstanceOf(OxidStripeAdminAudit::class, $this->service(StripeAdminAuditInterface::class));
+    }
+
+    public function testSchema_HasTheModifyMutationWithAWriteOnlySecretInput(): void
+    {
+        $schema = $this->schema();
+
+        self::assertMatchesRegularExpression('/adminStripeConfigModify\(input: AdminStripeConfigInput!\): AdminStripeConfigPayload!/', $schema);
+        self::assertMatchesRegularExpression('/input AdminStripeConfigInput \{[^}]*expectedVersion: String!/s', $schema);
+        foreach (['testToken', 'liveToken', 'testPlatformKey', 'livePlatformKey', 'webhookSecret'] as $secret) {
+            self::assertMatchesRegularExpression('/input AdminStripeConfigInput \{[^}]*' . $secret . ': String[^!]/s', $schema);
+        }
+        preg_match('/type AdminStripeConfigPayload \{([^}]*)\}/s', $schema, $payload);
+        self::assertMatchesRegularExpression('/config: AdminStripeConfig\b/', $payload[1] ?? '');
+        self::assertMatchesRegularExpression('/errors: \[AdminError!\]!/', $payload[1] ?? '');
+    }
+
+    public function testMutation_AStaleVersion_IsAConflictAndNothingIsWritten(): void
+    {
+        $response = $this->probe(
+            'mutation { adminStripeConfigModify(input: { expectedVersion: "stale", captureMode: "manual" }) '
+            . '{ config { version } errors { errorCode message } } }'
+        );
+
+        self::assertArrayNotHasKey('errors', $response);
+        self::assertSame('conflict', $response['data']['adminStripeConfigModify']['errors'][0]['errorCode'] ?? null);
+        self::assertNull($response['data']['adminStripeConfigModify']['config']);
     }
 
     public function testQuery_AdminStripeConfig_ReturnsEveryFieldAndNeverTheStoredSecrets(): void

@@ -14,6 +14,7 @@ use OxidEsales\Payments\Stripe\Service\ConfigurationValidator;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\InMemoryModuleSettings;
 use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\InMemoryWebhookState;
+use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeConfigChange;
 use PHPUnit\Framework\TestCase;
 
 final class OxidStripeAdminSettingsTest extends TestCase
@@ -127,6 +128,62 @@ final class OxidStripeAdminSettingsTest extends TestCase
 
         self::assertSame('test', $snapshot->mode);
         self::assertSame('automatic', $snapshot->captureMode);
+    }
+
+    public function testApply_SavesTheFieldsTheChangeCarriesAndNothingElse(): void
+    {
+        $this->settings()->apply(new StripeConfigChange(
+            expectedVersion: 'v',
+            mode: 'live',
+            captureMode: 'automatic',
+            removeByBillingCountry: false,
+            provideCustomerEmail: false,
+            logLevel: 'errors',
+            logWebhooks: true,
+            livePublishableKey: 'pk_live_CCCCCCCCCCbbbb',
+        ));
+
+        $values = $this->module->values;
+        self::assertSame('live', $values['sStripeMode']);
+        self::assertSame('automatic', $values['sStripeCaptureMode']);
+        self::assertFalse($values['blStripeRemoveByBillingCountry']);
+        self::assertFalse($values['blStripeProvideCustomerEmailAddress']);
+        self::assertSame('errors', $values['sStripeLogLevel']);
+        self::assertTrue($values['blStripeLogWebhooks']);
+        self::assertSame('pk_live_CCCCCCCCCCbbbb', $values['sStripeLivePk']);
+        self::assertSame(
+            ['sStripeMode', 'sStripeCaptureMode', 'sStripeLogLevel', 'sStripeLivePk', 'blStripeRemoveByBillingCountry', 'blStripeProvideCustomerEmailAddress', 'blStripeLogWebhooks'],
+            $this->module->saved,
+        );
+    }
+
+    public function testApply_StoresANewSecretAndLeavesTheOthersAlone(): void
+    {
+        $this->settings()->apply(new StripeConfigChange(
+            expectedVersion: 'v',
+            liveToken: 'sk_live_BBBBBBBBBBnewone',
+            testPlatformKey: '',
+        ));
+
+        self::assertSame('sk_live_BBBBBBBBBBnewone', $this->module->values['sStripeLiveToken']);
+        self::assertSame(self::TEST_TOKEN, $this->module->values['sStripeTestToken']);
+        self::assertSame(self::TEST_PLATFORM_KEY, $this->module->values['sStripeTestKey']);
+        self::assertSame(['sStripeLiveToken'], $this->module->saved);
+        self::assertTrue($this->settings()->snapshot()->liveTokenSet, 'the next snapshot shows the write');
+    }
+
+    public function testApply_AWebhookSecretIsStoredForTheModeTheShopWillBeIn(): void
+    {
+        $this->settings()->apply(new StripeConfigChange(expectedVersion: 'v', mode: 'live', webhookSecret: 'whsec_forlive12'));
+
+        self::assertSame('whsec_forlive12', $this->webhooks->secrets['live']);
+        self::assertSame('whsec_stored', $this->webhooks->secrets['test']);
+    }
+
+    public function testToken_ReturnsTheStoredSecretKeyOfAMode(): void
+    {
+        self::assertSame(self::TEST_TOKEN, $this->settings()->token('test'));
+        self::assertSame('', $this->settings()->token('live'));
     }
 
     private function settings(): OxidStripeAdminSettings

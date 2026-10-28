@@ -30,4 +30,9 @@ final class InMemoryWebhookState implements StripeWebhookStateInterface
     {
         return ($this->secrets[$mode] ?? '') !== '';
     }
+
+    public function storeSecret(string $mode, string $secret): void
+    {
+        $this->secrets[$mode] = $secret;
+    }
 }

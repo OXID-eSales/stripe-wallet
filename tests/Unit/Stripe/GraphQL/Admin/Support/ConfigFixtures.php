@@ -39,4 +39,12 @@ final class ConfigFixtures
             'keyValidationError' => null,
         ], $overrides));
     }
+
+    /**
+     * @param array<string, mixed> $overrides
+     */
+    public static function snapshotFrom(StripeConfigSnapshot $base, array $overrides): StripeConfigSnapshot
+    {
+        return new StripeConfigSnapshot(...array_merge(get_object_vars($base), $overrides));
+    }
 }

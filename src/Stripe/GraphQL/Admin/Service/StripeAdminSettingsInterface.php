@@ -15,4 +15,15 @@ namespace OxidEsales\Payments\Stripe\GraphQL\Admin\Service;
 interface StripeAdminSettingsInterface
 {
     public function snapshot(): StripeConfigSnapshot;
+
+    /**
+     * The stored secret key of the connected account for a mode, for the key-pair check inside the service layer.
+     * Never leaves it.
+     */
+    public function token(string $mode): string;
+
+    /**
+     * Stores the fields the change carries; a secret only when it is a new one.
+     */
+    public function apply(StripeConfigChange $change): void;
 }
