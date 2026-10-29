@@ -1201,10 +1201,8 @@ services:
   OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface:
     class: OxidEsales\Payments\Stripe\Service\OxidContractLinkedOrderUpdater
     arguments:
-      # STRP-168 — a mirrored ending hands the customer their vouchers back,
-      # so the order lands where the cleanup command would have left it.
-      $voucherReleaser: '@OxidEsales\PaymentBase\Repository\VoucherReleaseInterface'
-      $logger: '@?Psr\Log\LoggerInterface'
+      # OPC-175 / S4 — the order ends the shared way: storno, stock and vouchers back.
+      $ending: '@OxidEsales\PaymentBase\Adapter\LinkedOrderEndingInterface'
     public: false
 
   OxidEsales\Payments\Stripe\Service\OxidContractLinkedOrderUpdater:
