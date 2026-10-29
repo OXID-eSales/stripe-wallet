@@ -178,6 +178,15 @@ Add one narrow interface in payment-base: `CheckoutAttemptInvalidatorInterface::
 - Superseded-contract guard: a webhook or return for a contract that is not the active contract of its order must not change the order. This applies to `Stripe\Service\OxidContractLinkedOrderUpdater`, the Mollie `mirrorOnLinkedOrder()` and the PayPal approve/capture handlers. If money arrives on a superseded contract: do not change the order, log `ERROR`, and show it in the admin Payment tab. An automatic refund is a follow-up.
 - The local DB has 5 orders with more than one contract today (test residue). S0 checks that the new query gives the correct contract for them.
 
+**Status of 4.7 (S2b):** implemented 2026-10-29, not pushed. payment-base `78476e2`, stripe `1dc5568`, mollie-payment `dbb4b51`, paypal `57d0fa3`.
+- `findByOrderId()`: `ORDER BY OXSTATE IN ('cancelled','expired','failed') ASC, OXCREATED DESC, OXID DESC LIMIT 1`. Fulfilled counts as active. Integration `FindByOrderIdActiveContractTest` 3 (2 were red before).
+- `ContractOrderOwnership` (payment-base): a contract owns its order when it is the active contract of it (or nothing is found — the behaviour from before). Unit 4.
+- Guard: the Stripe and Mollie webhook handlers still end a replaced contract, but mirror the ending (cancel / fail / expiry) onto the order only when the contract owns it. Optional constructor argument, no wiring change. Unit: Stripe 4 new, Mollie 2 new.
+- Verified, no change: every "paid" path already refuses a terminal contract — `ContractCommitService::refusal()` (existing test), Stripe / Mollie handlers skip terminal contracts, PayPal approve captures only an open contract (new pin test `testApprovedNeverCapturesAReplacedContract`).
+- Why the guard is still necessary: a webhook for C1 that is processed before the adoption has saved C1 as cancelled ends C1 itself and used to end order O with it. With the guard, the order is safe in both orders of events.
+- Gates: unit payment-base 1954, Mollie 958 (all checks + CI-form PHPCS), PayPal 844 green. PHPStan: only errors from before (payment-base `array_values` notice; PayPal 87 with the change stashed). The S0 Playwright spec stays green after the change.
+- Note: `DoctrineContractRepositoryTest` empties the whole contract table in its cleanup (`DELETE FROM oe_payments_contract`). Do not run it against a shared DB outside its transaction.
+
 ### 4.8 Comparison
 
 | Item | Retire on change (S2) | Order adoption (section 4) |
