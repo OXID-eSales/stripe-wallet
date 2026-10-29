@@ -24,9 +24,4 @@ final class InMemoryConfVars implements ModuleConfVarsInterface
     {
         return $this->values[$name] ?? '';
     }
-
-    public function save(string $name, string $value): void
-    {
-        $this->values[$name] = $value;
-    }
 }

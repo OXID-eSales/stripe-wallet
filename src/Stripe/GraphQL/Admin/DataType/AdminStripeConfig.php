@@ -15,26 +15,15 @@ use TheCodingMachine\GraphQLite\Annotations\Type;
 
 /**
  * The Stripe settings of the shop. Secrets are write-only: the `*Set` flags say whether one is stored, and no field
- * carries its value, ever. `version` is the token `adminStripeConfigModify` wants back (`expectedVersion`), so that
- * two admins do not overwrite each other.
+ * carries its value, ever. `version` identifies the state of the settings that was read.
  *
  * The getters carry the GraphQL field names (graphqlite strips get/is).
  */
 #[Type(name: 'AdminStripeConfig')]
 final class AdminStripeConfig
 {
-    public function __construct(private readonly StripeConfigSnapshot $config, private readonly bool $secretsEditable)
+    public function __construct(private readonly StripeConfigSnapshot $config)
     {
-    }
-
-    /**
-     * Whether the admin of the request may change API keys, secrets and the webhook registration: only a superadmin.
-     * The rest of the settings need ADMIN_PAYMENT_CONFIG alone.
-     */
-    #[Field]
-    public function isSecretsEditable(): bool
-    {
-        return $this->secretsEditable;
     }
 
     /** `test` or `live`: the credentials the shop uses. */

@@ -28,9 +28,4 @@ final class OxidModuleConfVars implements ModuleConfVarsInterface
 
         return is_string($value) ? $value : '';
     }
-
-    public function save(string $name, string $value): void
-    {
-        Registry::getConfig()->saveShopConfVar('str', $name, $value, null, self::MODULE_NAMESPACE);
-    }
 }

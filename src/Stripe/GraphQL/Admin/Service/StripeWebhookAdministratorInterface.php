@@ -12,8 +12,4 @@ namespace OxidEsales\Payments\Stripe\GraphQL\Admin\Service;
 interface StripeWebhookAdministratorInterface
 {
     public function status(): StripeWebhookStatus;
-
-    public function register(): StripeWebhookResult;
-
-    public function clearAll(): StripeWebhookResult;
 }

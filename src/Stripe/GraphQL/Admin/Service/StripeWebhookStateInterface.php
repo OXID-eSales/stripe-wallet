@@ -11,7 +11,7 @@ namespace OxidEsales\Payments\Stripe\GraphQL\Admin\Service;
 
 /**
  * What the shop remembers of its webhook endpoint per mode: the endpoint id and the signing secret. The secret
- * itself never leaves the storage through this seam, only whether one is there.
+ * itself never leaves the storage through this seam, only whether one is there. Read-only: the classic admin writes.
  */
 interface StripeWebhookStateInterface
 {
@@ -22,26 +22,4 @@ interface StripeWebhookStateInterface
      * including its refusal of the legacy mode-agnostic secret once the other mode has its own).
      */
     public function hasSecret(string $mode): bool;
-
-    /**
-     * Stores a signing secret pasted by an admin for a mode.
-     */
-    public function storeSecret(string $mode, #[\SensitiveParameter] string $secret): void;
-
-    /**
-     * Remembers a registered endpoint: id and (only when Stripe just created it, which is the only time it tells
-     * it) the signing secret, per mode; the URL and secret also go to the legacy module settings the classic form
-     * shows. A null secret keeps the stored one.
-     */
-    public function storeEndpoint(
-        string $mode,
-        string $endpointId,
-        #[\SensitiveParameter] ?string $secret,
-        string $url,
-    ): void;
-
-    /**
-     * Forgets the endpoint of both modes, their secrets and the legacy settings.
-     */
-    public function forgetAll(): void;
 }
