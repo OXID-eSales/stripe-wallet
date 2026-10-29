@@ -30,7 +30,7 @@
 | S1 OPC Stripe on the shared chain | done | stripe `7cd03e4`, fallbacks removed `566e24b` | unit + e2e |
 | S2a coupon stays while the attempt is open | done | pb `1c97198`, `6da11f1` | e2e 3/3 + one-per-customer series |
 | S2b one order, one contract (enforced) | **done** | pb `2fa1706` | migration ran; `OneOrderOneContractMigrationTest` 6, unit 1951 — `done/OPC-175-S2b-one-order-one-contract.md` |
-| S2c rewrite the order in place | open | | |
+| S2c rewrite the order in place | **done** | pb `2150aee` | `OxidShopOrderServiceRewriteOrderTest` 5 (real core + Mailpit) — `done/OPC-175-S2c-rewrite-order-in-place.md` |
 | S2d re-bind the contract, close the PSP page | open | | |
 | S2e wire the flow, remove retire/unwind paths | open | | |
 | S2g refund on a replaced attempt | open | | |
