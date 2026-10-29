@@ -48,7 +48,10 @@ class CheckoutInFlightGuard
     /**
      * GRAPH-QL / PS3: the Stripe session of this contract whatever its payment
      * status - the cleanup asks this first, because a session Stripe reports
-     * as paid is money, not garbage. Null when Stripe cannot answer.
+     * as paid is money, not garbage. Null when the contract has no session.
+     *
+     * OPC-175: when Stripe cannot answer, the exception reaches the caller.
+     * "Unknown" is not "unpaid"; nobody cancels an attempt on a guess.
      */
     public function sessionOf(?object $contract): ?StripeCheckoutSessionDto
     {
@@ -56,11 +59,7 @@ class CheckoutInFlightGuard
             return null;
         }
 
-        try {
-            return $this->retrieveSession($this->readProviderOrderId($contract));
-        } catch (Throwable) {
-            return null;
-        }
+        return $this->retrieveSession($this->readProviderOrderId($contract));
     }
 
     public function inspect(?object $contract): ?StripeCheckoutSessionDto

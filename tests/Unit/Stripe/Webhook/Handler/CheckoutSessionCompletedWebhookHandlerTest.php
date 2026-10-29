@@ -36,7 +36,8 @@ final class CheckoutSessionCompletedWebhookHandlerTest extends TestCase
             new StripeWebhookEventParser(),
             $this->fulfillmentHandler,
             $this->contractRepository,
-            $this->createMock(LoggerInterface::class)
+            $this->createMock(LoggerInterface::class),
+            $this->createMock(\OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder::class)
         );
     }
 

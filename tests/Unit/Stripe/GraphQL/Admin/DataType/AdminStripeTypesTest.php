@@ -48,7 +48,7 @@ final class AdminStripeTypesTest extends TestCase
         self::assertFalse($config->isProvideCustomerEmail());
         self::assertSame('normal', $config->getLogLevel());
         self::assertTrue($config->isLogWebhooks());
-        self::assertSame('pk_test_AAAAAAAAAAbbbb', $config->getTestPublishableKey());
+        self::assertSame('pk_test_fakeAAAAAAAAAAbbbb', $config->getTestPublishableKey());
         self::assertSame('', $config->getLivePublishableKey());
         self::assertSame('https://shop.example/index.php?cl=stripewebhook', $config->getWebhookEndpointUrl());
         self::assertTrue($config->isTestTokenSet());
@@ -77,14 +77,14 @@ final class AdminStripeTypesTest extends TestCase
         $input = new AdminStripeConfigInput();
         $input->expectedVersion = 'v1';
         $input->mode = 'live';
-        $input->liveToken = 'sk_live_AAAAAAAAAAvalue';
+        $input->liveToken = 'sk_live_fakeAAAAAAAAAAvalue';
         $input->logWebhooks = false;
 
         $change = $input->toChange();
 
         self::assertSame('v1', $change->expectedVersion);
         self::assertSame('live', $change->mode);
-        self::assertSame('sk_live_AAAAAAAAAAvalue', $change->tokenFor('live'));
+        self::assertSame('sk_live_fakeAAAAAAAAAAvalue', $change->tokenFor('live'));
         self::assertFalse($change->logWebhooks);
         self::assertNull($change->captureMode);
         self::assertSame(['mode', 'logWebhooks', 'liveToken'], $change->fieldNames());

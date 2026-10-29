@@ -11,6 +11,8 @@ namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
+use OxidEsales\PaymentBase\Contract\ReplacedAttempts;
+use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelUrlBuildEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeSuccessUrlBuildEvent;
@@ -40,6 +42,8 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
 
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,
+        // OPC-175: each session is stamped with the attempt of its contract.
+        private readonly ContractRepositoryInterface $contracts,
         ?LoggerInterface $logger = null,
         private readonly ?EventDispatcherInterface $eventDispatcher = null,
         private readonly ?LanguageResolverInterface $languageResolver = null,
@@ -62,16 +66,22 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
         ?string $stripeCustomerId = null,
         bool $embedded = false
     ): CheckoutSessionResult {
+        $attempt = $this->attemptOf($contractId);
+
         try {
             $lineItems = $this->buildLineItems($basketSnapshot);
 
+            // OPC-175: the attempt tells a late event of a replaced session from
+            // one of the attempt the contract continues with.
             $sessionMetadata = [
                 'contract_id' => $contractId,
+                'contract_attempt' => $attempt,
                 'shop_id' => $shopId,
             ];
 
             $paymentIntentMetadata = [
                 'contract_id' => $contractId,
+                'contract_attempt' => $attempt,
             ];
 
             // STRP-75: Include order info in metadata when available
@@ -323,5 +333,18 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
         }
 
         return $cancelUrl;
+    }
+
+    /**
+     * The number of provider attempts the contract has replaced so far.
+     */
+    private function attemptOf(string $contractId): string
+    {
+        $contract = $this->contracts->findById($contractId);
+        if ($contract === null) {
+            throw new \RuntimeException('No contract ' . $contractId . ' for the Stripe checkout session');
+        }
+
+        return (string) count(ReplacedAttempts::of($contract));
     }
 }

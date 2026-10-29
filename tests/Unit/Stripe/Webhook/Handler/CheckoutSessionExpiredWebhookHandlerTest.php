@@ -63,6 +63,29 @@ final class CheckoutSessionExpiredWebhookHandlerTest extends TestCase
         $this->assertNull($outcome->contractId);
     }
 
+    /**
+     * OPC-175: the customer changed the payment method; the closer expired the
+     * Stripe session and the same contract continues with another attempt.
+     * Stripe's expiry event of that session must not expire the contract.
+     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function sessionOfAReplacedAttempt_isSkippedAndTheContractStays(): void
+    {
+        $contract = new \OxidEsales\PaymentBase\Contract\PaymentContract(1, 'u-1', \OxidEsales\PaymentBase\Contract\BasketSnapshot::fromArray([
+            'items' => [], 'discounts' => [], 'totalGross' => 1.0, 'totalNet' => 1.0, 'totalVat' => 0.0, 'currency' => 'EUR',
+        ]), 'ctr-continued');
+        $contract->setMetadata('replaced_attempts', [['provider' => 'stripe', 'providerOrderId' => 'cs_old']]);
+        $contracts = $this->createMock(ContractRepositoryInterface::class);
+        $contracts->method('findById')->with('ctr-continued')->willReturn($contract);
+        $this->fulfillmentHandler->expects($this->never())->method('handleSessionExpired');
+        $handler = new CheckoutSessionExpiredWebhookHandler(new StripeWebhookEventParser(), $this->fulfillmentHandler, $contracts, $this->logger);
+
+        $outcome = $handler->handle($this->makeEvent('ctr-continued'));
+
+        $this->assertSame('skipped', $outcome->result->action);
+        $this->assertSame('Session of a replaced checkout attempt', $outcome->result->error);
+    }
+
     #[\PHPUnit\Framework\Attributes\Test]
     public function handlerReturnsTrue_returnsSessionExpiredWithContractId(): void
     {

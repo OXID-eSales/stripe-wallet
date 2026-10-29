@@ -43,6 +43,7 @@ class CheckoutSessionServiceTest extends TestCase
     {
         return new CheckoutSessionService(
             $this->adapterFactory,
+            $this->contractsWithAttempts(0),
             $this->logger
         );
     }
@@ -124,7 +125,7 @@ class CheckoutSessionServiceTest extends TestCase
                 return $this->buildSessionDto('cs_test_lang', 'https://checkout.stripe.com/pay/cs_test_lang');
             });
 
-        $service = new CheckoutSessionService($this->adapterFactory, $this->logger, null, $resolver);
+        $service = new CheckoutSessionService($this->adapterFactory, $this->contractsWithAttempts(0), $this->logger, null, $resolver);
         $service->createSession(
             'contract_lang',
             $this->createBasketSnapshot(),
@@ -1023,5 +1024,46 @@ class CheckoutSessionServiceTest extends TestCase
             'https://shop.example.com/success',
             'https://shop.example.com/cancel'
         );
+    }
+
+    /**
+     * OPC-175: the session and its payment intent carry the attempt of their
+     * contract, so a late event of a replaced session is told apart.
+     */
+    public function testCreateSession_StampsTheContractAttemptOnSessionAndPaymentIntent(): void
+    {
+        $captured = null;
+        $adapter = $this->createMock(\OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface::class);
+        $adapter->method('createCheckoutSession')->willReturnCallback(
+            static function (array $params) use (&$captured): \OxidEsales\Payments\Stripe\Adapter\Dto\StripeCheckoutSessionDto {
+                $captured = $params;
+
+                return new \OxidEsales\Payments\Stripe\Adapter\Dto\StripeCheckoutSessionDto('cs_1', 'unpaid', '', 'unknown', [], 100, 'eur', 'https://checkout.stripe.com/c/cs_1');
+            }
+        );
+        $factory = $this->createMock(\OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface::class);
+        $factory->method('getStripeAdapter')->willReturn($adapter);
+
+        (new CheckoutSessionService($factory, $this->contractsWithAttempts(2), $this->logger))->createSession(
+            'contract_1',
+            $this->createBasketSnapshot(),
+            'https://shop.example.com/success',
+            'https://shop.example.com/cancel'
+        );
+
+        self::assertSame('2', $captured['metadata']['contract_attempt']);
+        self::assertSame('2', $captured['payment_intent_data']['metadata']['contract_attempt']);
+    }
+
+    private function contractsWithAttempts(int $replaced): \OxidEsales\PaymentBase\Repository\ContractRepositoryInterface
+    {
+        $contract = $this->createMock(\OxidEsales\PaymentBase\Contract\PaymentContractInterface::class);
+        $contract->method('getMetadata')->willReturnCallback(
+            static fn (string $key): mixed => $key === 'replaced_attempts' ? array_fill(0, $replaced, ['provider' => 'mollie']) : null
+        );
+        $contracts = $this->createMock(\OxidEsales\PaymentBase\Repository\ContractRepositoryInterface::class);
+        $contracts->method('findById')->willReturn($contract);
+
+        return $contracts;
     }
 }

@@ -43,18 +43,17 @@ class PaymentControllerCleanupTest extends TestCase
     }
 
     /**
-     * When a contract ID exists in session, cleanup service is called once and
-     * the full session variable set is cleared via the helper (not direct Registry).
+     * OPC-175: the attempt in the session is not cancelled any more (the next
+     * start continues it); only the Stripe session keys are cleared, via the
+     * helper (not direct Registry).
      */
-    public function testCleanupCallsServiceAndClearsSessionViaHelper(): void
+    public function testCleanupClearsTheSessionAndKeepsTheAttempt(): void
     {
         $helper = new SpyControllerRequestHelper();
         $helper->contractIdFromSession = 'contract_abc';
 
         $cleanupService = $this->createMock(RetryCleanupService::class);
-        $cleanupService->expects($this->once())
-            ->method('cleanupPreviousAttempt')
-            ->with('contract_abc');
+        $cleanupService->expects($this->never())->method('cleanupPreviousAttempt');
 
         $controller = $this->makeController($helper, $cleanupService);
         $controller->triggerCleanup();
@@ -88,27 +87,6 @@ class PaymentControllerCleanupTest extends TestCase
             $helper->sessionVars,
             'clearStripeSessionVariables() must clear ALL five Stripe session keys'
         );
-    }
-
-    /**
-     * Cleanup errors are swallowed — exceptions from the service must not propagate.
-     */
-    public function testCleanupSurvivesServiceException(): void
-    {
-        $helper = new SpyControllerRequestHelper();
-        $helper->contractIdFromSession = 'contract_err';
-
-        $cleanupService = $this->createMock(RetryCleanupService::class);
-        $cleanupService->method('cleanupPreviousAttempt')
-            ->willThrowException(new \RuntimeException('DB down'));
-
-        $controller = $this->makeController($helper, $cleanupService);
-
-        // Must not throw
-        $controller->triggerCleanup();
-
-        // Session is still cleared even when cleanup fails
-        $this->assertTrue($helper->clearStripeSessionVariablesCalled);
     }
 
     private function makeController(

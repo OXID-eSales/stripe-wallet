@@ -272,14 +272,49 @@ services:
     arguments:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
 
+  # OPC-175: "is this attempt already money?" - asked by RetryCleanupService
+  # and by StripeAwareAttemptCleaner below.
+  OxidEsales\Payments\Stripe\Service\PaidSessionSettler:
+    arguments:
+      $inFlightGuard: '@OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard'
+      $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
+      $logger: '@oxid_esales.monolog.logger'
+
+  # OPC-175: payment-base's shared retire cancels the attempt a session left
+  # open, whatever its provider. A Stripe attempt is asked about first: a paid
+  # session is committed, never cancelled. `decorates` is resolved when the
+  # container is compiled, so the order of the imported services files does
+  # not matter.
+  # OPC-175 / S2g: money on a replaced attempt goes back to the customer.
+  OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder:
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $contracts: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+
+  # OPC-175: closes the Stripe payment page of an attempt the customer leaves.
+  OxidEsales\Payments\Stripe\Service\StripeAttemptCloser:
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+    tags:
+      - { name: oe.payment.attempt_closer }
+
+  OxidEsales\Payments\Stripe\Service\StripeAwareAttemptCleaner:
+    decorates: OxidEsales\PaymentBase\Checkout\PreviousCheckoutAttemptCleanerInterface
+    arguments:
+      $inner: '@.inner'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $paidSessions: '@OxidEsales\Payments\Stripe\Service\PaidSessionSettler'
+    public: true
+
   OxidEsales\Payments\Stripe\Service\RetryCleanupService:
     arguments:
       $logger: '@oxid_esales.monolog.logger'
       # Keeps the cleanup from cancelling a checkout the customer is about to pay
       # in — see CheckoutInFlightGuard.
       $inFlightGuard: '@OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard'
-      # GRAPH-QL / PS3: a session Stripe reports as paid is committed, never cancelled.
-      $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
+      # GRAPH-QL / PS3, OPC-175: a session Stripe reports as paid is committed, never cancelled.
+      $paidSessions: '@OxidEsales\Payments\Stripe\Service\PaidSessionSettler'
     public: true
 
   # Same reason: fetched by id from the Order model extension (admin order tab).
@@ -354,6 +389,10 @@ services:
       # One checkout, one Stripe session: hands back the session already in
       # flight instead of preparing another on every OPC processCheckout call.
       $inFlightGuard: '@OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard'
+      # OPC-175: the early order comes from the shared chain
+      # (ContractDraftCompletedEvent -> EarlyOrderCreationHandler), as in every
+      # other checkout: it retires the attempt the session left open first.
+      $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
     tags:
       - { name: oe.payment.handler }
     public: true
@@ -459,16 +498,12 @@ services:
   OxidEsales\PaymentBase\EventSystem\Handler\EarlyOrderCreationHandler:
     arguments:
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
-      $shopOrderService: '@OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface'
+      # OPC-175: creates the order of a new contract, rewrites the order of a
+      # contract that continues the open attempt (one order, one contract).
+      $earlyOrders: '@OxidEsales\PaymentBase\Adapter\EarlyOrderWriterInterface'
       $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
       $eventLogger: '@stripe.events.file_logger'
-      # STRP-171 - retire the NOT_FINISHED order this session already
-      # left behind, instead of stacking another one beside it.
-      $previousAttemptCleaner: '@OxidEsales\PaymentBase\Checkout\PreviousCheckoutAttemptCleanerInterface'
       $openAttempts: '@OxidEsales\PaymentBase\Checkout\OpenCheckoutAttemptRegistryInterface'
-      # GRAPH-QL / PS2: a headless start with nothing in the registry retires the
-      # open attempt for the same user basket (payment-base S3).
-      $openAttemptFinder: '@OxidEsales\PaymentBase\Repository\OpenAttemptFinderInterface'
     tags:
       - { name: payment.event_handler, priority: 100 }
     public: false
@@ -664,6 +699,7 @@ services:
     class: OxidEsales\Payments\Stripe\Service\CheckoutSessionService
     arguments:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $contracts: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
       $languageResolver: '@OxidEsales\Payments\Stripe\Service\LanguageResolverInterface'
@@ -684,18 +720,6 @@ services:
   OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalCancelUrlHandler:
     arguments:
       $sessionReader: '@OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalSessionReader'
-      $logger: '@oxid_esales.monolog.logger'
-    tags:
-      - { name: payment.event_handler }
-
-  # OPC-96: release Stripe reservations (voucher un-mark, NOT_FINISHED order
-  # storno, contract cancel) when the OPC modal is re-opened after an
-  # external-payment round-trip. Subscribes to the OPC-owned event
-  # OpcModalReopenedAfterExternalReturnEvent — the OPC module never
-  # references Stripe.
-  OxidEsales\Payments\Stripe\EventSystem\Handler\OpcExternalReturnCleanupHandler:
-    arguments:
-      $cleanupService: '@OxidEsales\Payments\Stripe\Service\RetryCleanupService'
       $logger: '@oxid_esales.monolog.logger'
     tags:
       - { name: payment.event_handler }
@@ -1177,10 +1201,8 @@ services:
   OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface:
     class: OxidEsales\Payments\Stripe\Service\OxidContractLinkedOrderUpdater
     arguments:
-      # STRP-168 — a mirrored ending hands the customer their vouchers back,
-      # so the order lands where the cleanup command would have left it.
-      $voucherReleaser: '@OxidEsales\PaymentBase\Repository\VoucherReleaseInterface'
-      $logger: '@?Psr\Log\LoggerInterface'
+      # OPC-175 / S4 — the order ends the shared way: storno, stock and vouchers back.
+      $ending: '@OxidEsales\PaymentBase\Adapter\LinkedOrderEndingInterface'
     public: false
 
   OxidEsales\Payments\Stripe\Service\OxidContractLinkedOrderUpdater:
@@ -1221,6 +1243,7 @@ services:
       $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
+      $lateMoney: '@OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder'
       # GRAPH-QL / PS3: a paid intent / session commits a PENDING contract
       # (payment-base ContractCommitService) - the return leg is no longer the
       # only way.
@@ -1236,6 +1259,7 @@ services:
       $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
+      $lateMoney: '@OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder'
       $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
     tags: [ { name: stripe.webhook_handler } ]
     public: false
@@ -1282,6 +1306,7 @@ services:
       $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
+      $lateMoney: '@OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder'
       # GRAPH-QL / PS3: a paid intent / session commits a PENDING contract
       # (payment-base ContractCommitService) - the return leg is no longer the
       # only way.

@@ -140,6 +140,7 @@ final class PaymentIntentAmountCapturableUpdatedCommitTest extends TestCase
             $this->fulfillment,
             $this->contracts,
             new NullLogger(),
+            $this->createMock(\OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder::class),
             $this->commit
         );
     }

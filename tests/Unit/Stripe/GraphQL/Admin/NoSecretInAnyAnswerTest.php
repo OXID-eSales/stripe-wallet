@@ -39,10 +39,10 @@ use TheCodingMachine\GraphQLite\Annotations\Field;
  */
 final class NoSecretInAnyAnswerTest extends TestCase
 {
-    private const STORED_TOKEN = 'sk_test_AAAAAAAAAAstoredtoken';
-    private const STORED_PLATFORM_KEY = 'sk_test_PLATFORMstoredplatform';
+    private const STORED_TOKEN = 'sk_test_fakeAAAAAAAAAAstoredtoken';
+    private const STORED_PLATFORM_KEY = 'sk_test_fakePLATFORMstoredplatform';
     private const STORED_WEBHOOK_SECRET = 'whsec_storedsigningsecret';
-    private const NEW_TOKEN = 'sk_test_AAAAAAAAAAbrandnewtoken';
+    private const NEW_TOKEN = 'sk_test_fakeAAAAAAAAAAbrandnewtoken';
     private const NEW_WEBHOOK_SECRET = 'whsec_brandnewsigningsecret';
     private const CREATED_WEBHOOK_SECRET = 'whsec_createdbystripe12';
     private const SECRET_LOOKING = '/(?:[sr]k_(?:test|live)_|whsec_)/';
@@ -53,7 +53,7 @@ final class NoSecretInAnyAnswerTest extends TestCase
     protected function setUp(): void
     {
         $this->module = new InMemoryModuleSettings([
-            'sStripeMode' => 'test', 'sStripeTestPk' => 'pk_test_AAAAAAAAAAbbbb',
+            'sStripeMode' => 'test', 'sStripeTestPk' => 'pk_test_fakeAAAAAAAAAAbbbb',
             'sStripeTestToken' => self::STORED_TOKEN, 'sStripeTestKey' => self::STORED_PLATFORM_KEY,
         ]);
         $this->vars = new InMemoryConfVars(['sStripeWebhookEndpointSecretTest' => self::STORED_WEBHOOK_SECRET]);
@@ -65,7 +65,7 @@ final class NoSecretInAnyAnswerTest extends TestCase
         $answers = [$config->adminStripeConfig()];
         $answers[] = $config->adminStripeConfigModify($this->input($answers[0]->getVersion(), testToken: self::NEW_TOKEN, webhookSecret: self::NEW_WEBHOOK_SECRET));
         $answers[] = $config->adminStripeConfigModify($this->input('stale', testToken: self::NEW_TOKEN));
-        $answers[] = $config->adminStripeConfigModify($this->input($answers[0]->getVersion(), testToken: 'sk_test_BBBBBBBBBBmismatch'));
+        $answers[] = $config->adminStripeConfigModify($this->input($answers[0]->getVersion(), testToken: 'sk_test_fakeBBBBBBBBBBmismatch'));
         $answers[] = $config->adminStripeConfigModify($this->input($answers[0]->getVersion(), testToken: 'sk-leaky-not-a-key-format'));
         $answers[] = $config->adminStripeConfig();
         $answers[] = $this->configController(false)->adminStripeConfigModify($this->input($answers[0]->getVersion(), testToken: self::NEW_TOKEN, webhookSecret: self::NEW_WEBHOOK_SECRET));

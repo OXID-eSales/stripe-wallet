@@ -35,6 +35,15 @@ final class StripeObjectMapperTest extends TestCase
     // fromCheckoutSession
     // -------------------------------------------------------------------------
 
+    /** OPC-175: the session status (open / complete / expired) decides whether the closer expires it. */
+    public function testFromCheckoutSession_MapsTheSessionStatus(): void
+    {
+        $session = Session::constructFrom(['id' => 'cs_1', 'status' => 'open', 'payment_status' => 'unpaid']);
+
+        self::assertSame('open', StripeObjectMapper::fromCheckoutSession($session)->status);
+        self::assertNull(StripeObjectMapper::fromCheckoutSession(Session::constructFrom(['id' => 'cs_2']))->status);
+    }
+
     public function testFromCheckoutSessionWithPaidAutomaticCapture(): void
     {
         // Arrange — paid session, payment_intent is a string ID

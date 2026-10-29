@@ -78,8 +78,8 @@ final class StripeWebhookAdministratorTest extends TestCase
         self::assertNull($result->refusal());
         self::assertSame(
             [[
-                'accountKey' => 'sk_test_AAAAAAAAAAstored',
-                'platformKey' => 'sk_test_PLATFORMstored',
+                'accountKey' => 'sk_test_fakeAAAAAAAAAAstored',
+                'platformKey' => 'sk_test_fakePLATFORMstored',
                 'url' => 'https://shop.example/index.php?cl=stripewebhook',
                 'existing' => null,
                 'description' => 'Stripe module',
@@ -187,7 +187,7 @@ final class StripeWebhookAdministratorTest extends TestCase
 
         self::assertNull($result->refusal());
         self::assertSame(3, $result->deleted());
-        self::assertSame([['sk_test_PLATFORMstored', 'https://shop.example/index.php?cl=stripewebhook']], $registrar->cleared);
+        self::assertSame([['sk_test_fakePLATFORMstored', 'https://shop.example/index.php?cl=stripewebhook']], $registrar->cleared);
         self::assertSame('', $this->state->endpointId('test'));
         self::assertFalse($result->status()->configured);
         self::assertSame(1, $this->stepUp->required);
@@ -208,7 +208,7 @@ final class StripeWebhookAdministratorTest extends TestCase
 
     public function testClearAll_WithoutAPlatformKey_IsRefusedAndNothingIsDeleted(): void
     {
-        $this->settings = new InMemoryStripeSettings(ConfigFixtures::snapshot(), ['test' => 'sk_test_AAAAAAAAAAstored'], ['test' => '']);
+        $this->settings = new InMemoryStripeSettings(ConfigFixtures::snapshot(), ['test' => 'sk_test_fakeAAAAAAAAAAstored'], ['test' => '']);
         $registrar = new ScriptedWebhookRegistrar();
 
         $result = $this->administrator($registrar)->clearAll();

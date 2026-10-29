@@ -30,12 +30,12 @@ final class ConfigurationValidatorKeyPairTest extends TestCase
 
     public function testGetKeyPairError_KeysOfOneAccount_IsNull(): void
     {
-        self::assertNull($this->validator->getKeyPairError('pk_test_AAAAAAAAAAxxxx', 'sk_test_AAAAAAAAAAyyyy'));
+        self::assertNull($this->validator->getKeyPairError('pk_test_fakeAAAAAAAAAAxxxx', 'sk_test_fakeAAAAAAAAAAyyyy'));
     }
 
     public function testGetKeyPairError_KeysOfDifferentAccounts_NamesTheMismatch(): void
     {
-        $error = $this->validator->getKeyPairError('pk_test_AAAAAAAAAAxxxx', 'sk_test_BBBBBBBBBByyyy');
+        $error = $this->validator->getKeyPairError('pk_test_fakeAAAAAAAAAAxxxx', 'sk_test_fakeBBBBBBBBBByyyy');
 
         self::assertNotNull($error);
         self::assertStringContainsString('different Stripe accounts', $error);
@@ -43,13 +43,13 @@ final class ConfigurationValidatorKeyPairTest extends TestCase
 
     public function testGetKeyPairError_AMalformedKey_IsNamed(): void
     {
-        self::assertSame('Publishable key has invalid format', $this->validator->getKeyPairError('nonsense', 'sk_test_AAAAAAAAAAyyyy'));
-        self::assertSame('Secret key has invalid format', $this->validator->getKeyPairError('pk_test_AAAAAAAAAAxxxx', 'nonsense'));
+        self::assertSame('Publishable key has invalid format', $this->validator->getKeyPairError('nonsense', 'sk_test_fakeAAAAAAAAAAyyyy'));
+        self::assertSame('Secret key has invalid format', $this->validator->getKeyPairError('pk_test_fakeAAAAAAAAAAxxxx', 'nonsense'));
     }
 
     public function testGetKeyPairError_AMissingKey_IsNamed(): void
     {
-        self::assertSame('Publishable key is not configured', $this->validator->getKeyPairError('', 'sk_test_AAAAAAAAAAyyyy'));
-        self::assertSame('Secret key is not configured', $this->validator->getKeyPairError('pk_test_AAAAAAAAAAxxxx', ''));
+        self::assertSame('Publishable key is not configured', $this->validator->getKeyPairError('', 'sk_test_fakeAAAAAAAAAAyyyy'));
+        self::assertSame('Secret key is not configured', $this->validator->getKeyPairError('pk_test_fakeAAAAAAAAAAxxxx', ''));
     }
 }

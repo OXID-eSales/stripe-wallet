@@ -14,10 +14,11 @@ use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentBase\Adapter\ContractFirstPaymentHandlerInterface;
 use OxidEsales\PaymentBase\Adapter\PaymentContextInterface;
 use OxidEsales\PaymentBase\Adapter\PaymentHandlerResult;
-use OxidEsales\PaymentBase\Adapter\Request\CreateOrderRequest;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
-use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\EventSystem\Event\Contract\ContractDraftCompletedEvent;
+use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractServiceInterface;
 use OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface;
@@ -39,8 +40,11 @@ use Psr\Log\LoggerInterface;
  *
  * Flow:
  * 1. Create contract (DRAFT)
- * 2. Create early order (NOT_FINISHED) — same as standard flow
- * 3. Transition contract: DRAFT → NOT_FINISHED → PENDING
+ * 2. Dispatch ContractDraftCompletedEvent: payment-base's EarlyOrderCreationHandler
+ *    retires the attempt this session left open, creates the early order
+ *    (NOT_FINISHED) and moves the contract DRAFT → NOT_FINISHED → PENDING —
+ *    the same chain as Mollie, PayPal and Stripe's own `cl=order` checkout (OPC-175)
+ * 3. Check that the order exists before Stripe is called
  * 4. Create Stripe Checkout Session
  * 5. Return redirect URL to Stripe hosted page
  * 6. After payment, Stripe redirects to checkoutSuccess (existing handler)
@@ -59,9 +63,10 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
         private readonly CheckoutSessionServiceInterface $checkoutSessionService,
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ShopAdapterInterface $shopAdapter,
-        private readonly ShopOrderServiceInterface $shopOrderService,
         private readonly ModuleConfigurationServiceInterface $config,
         private readonly TokenServiceInterface $tokenService,
+        // OPC-175: the shared chain that creates the early order.
+        private readonly EventDispatcherInterface $eventDispatcher,
         private readonly ?LoggerInterface $logger = null,
         ?LanguageResolverInterface $languageResolver = null,
         private readonly ?IframeCheckoutSettingsInterface $iframeSettings = null,
@@ -120,7 +125,7 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
             $contract = $this->createContract($context);
             $contractId = $contract->getId() ?? '';
 
-            // 2. Create early order and transition DRAFT → NOT_FINISHED → PENDING
+            // 2. Early order through the shared chain: DRAFT → NOT_FINISHED → PENDING
             $this->createEarlyOrderAndTransition($contract, $context);
 
             // 3. Create Stripe Checkout Session
@@ -275,69 +280,82 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
     }
 
     /**
-     * Create early order and transition contract through required states.
+     * Create the early order through payment-base's shared chain, as Mollie,
+     * PayPal and Stripe's own `cl=order` checkout do.
      *
-     * Mirrors the standard flow's EarlyOrderCreationHandler:
-     * DRAFT → NOT_FINISHED (with orderId) → PENDING
+     * OPC-175: ContractDraftCompletedEvent → EarlyOrderCreationHandler retires
+     * the attempt this session (headless: this basket) left open, creates the
+     * NOT_FINISHED order, moves the contract DRAFT → NOT_FINISHED → PENDING and
+     * remembers it as the open attempt. Until OPC-175 this method created the
+     * order itself and never retired anything, so a switch between providers
+     * left the previous order open - holding the customer's voucher, which core
+     * then dropped from the basket and refused in the next finalizeOrder().
+     *
+     * Protected: a unit-test seam (see StripePaymentHandlerLanguageTest).
      */
     protected function createEarlyOrderAndTransition(
         PaymentContractInterface $contract,
         PaymentContextInterface $context
     ): void {
-        $paymentMethodId = $context->getPaymentMethodId();
         $headless = $this->isHeadless($context);
-        $basketId = $headless ? $this->basketIdOf($context) : null;
 
         if (!$headless) {
             // The OPC checkout lives in the PHP session: the session basket gets
             // the payment and the address check is skipped (Stripe owns it).
-            $this->prepareSessionForOrder($paymentMethodId);
+            $this->prepareSessionForOrder($context->getPaymentMethodId());
         }
 
-        // GRAPH-QL / PS1: a headless checkout names the persisted basket it pays
-        // for; payment-base's order service then builds the shop basket from
-        // that row (no session) and the address hash is restored by it.
-        $request = new CreateOrderRequest(
-            sessionId: $headless ? $this->headlessSessionId($context, $basketId) : $this->sessionId(),
-            userId: $contract->getUserId(),
-            paymentId: $paymentMethodId,
-            paymentTransactionId: null,
-            orderRemark: null,
-            metadata: ['contract_id' => $contract->getId()],
-            initialStatus: 'NOT_FINISHED',
-            basketId: $basketId
-        );
+        $this->eventDispatcher->dispatch(new ContractDraftCompletedEvent(
+            $contract,
+            $this->draftCompletedContext($contract, $context, $headless)
+        ));
 
-        $orderResponse = $this->shopOrderService->createOrder($request);
-        $orderId = $orderResponse->orderId;
-
-        $contract->setMetadata('order_number', (string) $orderResponse->orderNumber);
-        if ($basketId !== null) {
-            // So the next start for this basket retires this attempt, and the
-            // basket is removed on commit (payment-base S3 / S6).
-            $contract->setMetadata('basket_id', $basketId);
-        }
-
-        // Sprint 133 (F15): transitionToNotFinished() is now on
-        // PaymentContractInterface alongside transitionToPending(), so this no
-        // longer has to narrow to the concrete PaymentContract. The old comment
-        // claimed the narrow abstract surface was intentional, but every other
-        // transition this module uses was already on the interface.
-
-        // DRAFT → NOT_FINISHED
-        $contract->transitionToNotFinished($orderId);
-        $this->contractRepository->save($contract);
-
-        // NOT_FINISHED → PENDING
-        $contract->transitionToPending();
-        $this->contractRepository->save($contract);
+        $this->assertEarlyOrderCreated($contract);
 
         $this->logger?->info('[StripePaymentHandler] Early order created, contract in PENDING', [
             'contractId' => $contract->getId(),
-            'orderId' => $orderId,
-            'orderNumber' => $orderResponse->orderNumber,
+            'orderId' => $contract->getOrderId(),
+            'orderNumber' => $contract->getMetadata('order_number'),
             'state' => $contract->getStateValue(),
         ]);
+    }
+
+    /**
+     * What EarlyOrderCreationHandler reads: the payment, the user, the session
+     * the order belongs to and - headless only - the persisted basket, from
+     * which payment-base builds the shop basket without a PHP session.
+     */
+    private function draftCompletedContext(
+        PaymentContractInterface $contract,
+        PaymentContextInterface $context,
+        bool $headless
+    ): EventContext {
+        $basketId = $headless ? $this->basketIdOf($context) : null;
+        $data = [
+            'providerName' => StripeDefinitions::PROVIDER,
+            'paymentId' => $context->getPaymentMethodId(),
+            'userId' => $contract->getUserId(),
+            'sessionId' => $headless ? $this->headlessSessionId($context, $basketId) : $this->sessionId(),
+        ];
+
+        if ($basketId !== null) {
+            $data['basketId'] = $basketId;
+        }
+
+        return new EventContext($data);
+    }
+
+    /**
+     * A contract without an order must never reach Stripe: the customer would
+     * pay for nothing the shop can fulfil. EarlyOrderCreationHandler rethrows
+     * its own failures; this catches a chain on which nobody created the order.
+     */
+    private function assertEarlyOrderCreated(PaymentContractInterface $contract): void
+    {
+        $orderId = $contract->getOrderId();
+        if ($orderId === null || $orderId === '' || !$contract->getState()->isPending()) {
+            throw new \RuntimeException('No early order was created for contract ' . (string) $contract->getId());
+        }
     }
 
     /**

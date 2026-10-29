@@ -19,10 +19,10 @@ use PHPUnit\Framework\TestCase;
 
 final class OxidStripeAdminSettingsTest extends TestCase
 {
-    private const TEST_TOKEN = 'sk_test_AAAAAAAAAAsecret1';
-    private const LIVE_TOKEN = 'sk_live_BBBBBBBBBBsecret2';
-    private const TEST_PLATFORM_KEY = 'sk_test_PLATFORMplatform3';
-    private const LIVE_PLATFORM_KEY = 'sk_live_PLATFORMplatform4';
+    private const TEST_TOKEN = 'sk_test_fakeAAAAAAAAAAsecret1';
+    private const LIVE_TOKEN = 'sk_live_fakeBBBBBBBBBBsecret2';
+    private const TEST_PLATFORM_KEY = 'sk_test_fakePLATFORMplatform3';
+    private const LIVE_PLATFORM_KEY = 'sk_live_fakePLATFORMplatform4';
 
     private InMemoryModuleSettings $module;
     private InMemoryWebhookState $webhooks;
@@ -37,8 +37,8 @@ final class OxidStripeAdminSettingsTest extends TestCase
             'blStripeProvideCustomerEmailAddress' => true,
             'sStripeLogLevel' => 'debug',
             'blStripeLogWebhooks' => false,
-            'sStripeTestPk' => 'pk_test_AAAAAAAAAAbbbb',
-            'sStripeLivePk' => 'pk_live_BBBBBBBBBBbbbb',
+            'sStripeTestPk' => 'pk_test_fakeAAAAAAAAAAbbbb',
+            'sStripeLivePk' => 'pk_live_fakeBBBBBBBBBBbbbb',
             'sStripeTestToken' => self::TEST_TOKEN,
             'sStripeLiveToken' => '',
             'sStripeTestKey' => self::TEST_PLATFORM_KEY,
@@ -58,8 +58,8 @@ final class OxidStripeAdminSettingsTest extends TestCase
         self::assertTrue($snapshot->provideCustomerEmail);
         self::assertSame('debug', $snapshot->logLevel);
         self::assertFalse($snapshot->logWebhooks);
-        self::assertSame('pk_test_AAAAAAAAAAbbbb', $snapshot->testPublishableKey);
-        self::assertSame('pk_live_BBBBBBBBBBbbbb', $snapshot->livePublishableKey);
+        self::assertSame('pk_test_fakeAAAAAAAAAAbbbb', $snapshot->testPublishableKey);
+        self::assertSame('pk_live_fakeBBBBBBBBBBbbbb', $snapshot->livePublishableKey);
         self::assertSame('https://shop.example/webhook', $snapshot->webhookEndpointUrl);
         self::assertSame('https://shop.example/admin/index.php?cl=module_config', $snapshot->classicSettingsUrl);
     }
@@ -101,7 +101,7 @@ final class OxidStripeAdminSettingsTest extends TestCase
 
     public function testSnapshot_AMismatchIsReportedWithoutTheKeys(): void
     {
-        $this->module->values['sStripeTestToken'] = 'sk_test_ZZZZZZZZZZsecret9';
+        $this->module->values['sStripeTestToken'] = 'sk_test_fakeZZZZZZZZZZsecret9';
 
         $error = $this->settings()->snapshot()->keyValidationError;
 
@@ -162,11 +162,11 @@ final class OxidStripeAdminSettingsTest extends TestCase
     {
         $this->settings()->apply(new StripeConfigChange(
             expectedVersion: 'v',
-            liveToken: 'sk_live_BBBBBBBBBBnewone',
+            liveToken: 'sk_live_fakeBBBBBBBBBBnewone',
             testPlatformKey: '',
         ));
 
-        self::assertSame('sk_live_BBBBBBBBBBnewone', $this->module->values['sStripeLiveToken']);
+        self::assertSame('sk_live_fakeBBBBBBBBBBnewone', $this->module->values['sStripeLiveToken']);
         self::assertSame(self::TEST_TOKEN, $this->module->values['sStripeTestToken']);
         self::assertSame(self::TEST_PLATFORM_KEY, $this->module->values['sStripeTestKey']);
         self::assertSame(['sStripeLiveToken'], $this->module->saved);
@@ -175,9 +175,9 @@ final class OxidStripeAdminSettingsTest extends TestCase
 
     public function testApply_AWebhookSecretIsStoredForTheModeTheShopWillBeIn(): void
     {
-        $this->settings()->apply(new StripeConfigChange(expectedVersion: 'v', mode: 'live', webhookSecret: 'whsec_forlive12'));
+        $this->settings()->apply(new StripeConfigChange(expectedVersion: 'v', mode: 'live', webhookSecret: 'whsec_fakeforlive12'));
 
-        self::assertSame('whsec_forlive12', $this->webhooks->secrets['live']);
+        self::assertSame('whsec_fakeforlive12', $this->webhooks->secrets['live']);
         self::assertSame('whsec_stored', $this->webhooks->secrets['test']);
     }
 

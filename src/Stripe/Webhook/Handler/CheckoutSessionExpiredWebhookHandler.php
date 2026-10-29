@@ -51,6 +51,13 @@ class CheckoutSessionExpiredWebhookHandler extends AbstractStripeWebhookHandler
             return StripeWebhookOutcome::of(WebhookResult::skipped('No contract ID in session metadata'));
         }
 
+        // OPC-175: Stripe expires the session of an attempt the customer left
+        // for another payment method; the contract continues with that one.
+        $contract = $this->contractRepository->findById($contractId);
+        if ($contract !== null && $this->isOfReplacedAttempt($event, $contract)) {
+            return StripeWebhookOutcome::of(WebhookResult::skipped('Session of a replaced checkout attempt'));
+        }
+
         $this->logger->info('Processing checkout.session.expired', [
             'contract_id' => $contractId,
         ]);

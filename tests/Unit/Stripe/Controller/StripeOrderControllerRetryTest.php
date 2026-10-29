@@ -32,7 +32,8 @@ class StripeOrderControllerRetryTest extends TestCase
         $this->cleanupService = $this->createMock(RetryCleanupService::class);
     }
 
-    public function testCreateCheckoutSessionCleansUpPreviousAttempt(): void
+    /** OPC-175: the next start continues the open attempt - it is not cancelled first. */
+    public function testCreateCheckoutSessionKeepsThePreviousAttempt(): void
     {
         $helper = new StubControllerRequestHelper();
         $helper->contractIdFromSession = 'contract_previous_123';
@@ -41,10 +42,8 @@ class StripeOrderControllerRetryTest extends TestCase
         $helper->basket = $this->createBasketMock();
 
         $this->cleanupService
-            ->expects($this->once())
-            ->method('cleanupPreviousAttempt')
-            ->with('contract_previous_123')
-            ->willReturn(true);
+            ->expects($this->never())
+            ->method('cleanupPreviousAttempt');
 
         $this->eventDispatcher
             ->method('dispatch')
@@ -61,15 +60,14 @@ class StripeOrderControllerRetryTest extends TestCase
         ob_get_clean();
     }
 
-    public function testCreateCheckoutSessionGeneratesNewSessChallenge(): void
+    /** OPC-175: the order continues, so its session challenge stays. */
+    public function testCreateCheckoutSessionKeepsTheSessChallenge(): void
     {
         $helper = new StubControllerRequestHelper();
         $helper->contractIdFromSession = 'contract_old';
         $helper->sessionChallengeResult = true;
         $helper->agbAcceptedFromRequest = true; // Sprint 101: AGB gate must be satisfied
         $helper->basket = $this->createBasketMock();
-
-        $this->cleanupService->method('cleanupPreviousAttempt')->willReturn(true);
 
         $this->eventDispatcher
             ->method('dispatch')
@@ -85,9 +83,7 @@ class StripeOrderControllerRetryTest extends TestCase
         @$controller->createCheckoutSession();
         ob_get_clean();
 
-        // After cleanup, sess_challenge should be set with a new value
-        $this->assertArrayHasKey('sess_challenge', $helper->sessionVars);
-        $this->assertSame('new_uid_generated', $helper->sessionVars['sess_challenge']);
+        $this->assertArrayNotHasKey('sess_challenge', $helper->sessionVars);
     }
 
     public function testCreateCheckoutSessionSkipsCleanupWhenNoContract(): void
@@ -117,17 +113,16 @@ class StripeOrderControllerRetryTest extends TestCase
         ob_get_clean();
     }
 
-    public function testCheckoutCancelCleansUpAndRedirectsToPayment(): void
+    /** OPC-175: cancel keeps the attempt; session keys go, a fresh challenge comes. */
+    public function testCheckoutCancelKeepsTheAttemptAndRedirectsToPayment(): void
     {
         $helper = new StubControllerRequestHelper();
         $helper->contractIdFromSession = 'contract_cancelled';
         $helper->basket = $this->createBasketMock();
 
         $this->cleanupService
-            ->expects($this->once())
-            ->method('cleanupPreviousAttempt')
-            ->with('contract_cancelled')
-            ->willReturn(true);
+            ->expects($this->never())
+            ->method('cleanupPreviousAttempt');
 
         $controller = $this->createController($helper);
         $result = $controller->checkoutCancel();
@@ -136,26 +131,6 @@ class StripeOrderControllerRetryTest extends TestCase
         // Sprint 88: Session cleared + new sess_challenge generated for retry
         $this->assertArrayHasKey('sess_challenge', $helper->sessionVars);
         $this->assertNotEmpty($helper->sessionVars['sess_challenge']);
-    }
-
-    public function testCheckoutCancelContinuesOnCleanupFailure(): void
-    {
-        $helper = new StubControllerRequestHelper();
-        $helper->contractIdFromSession = 'contract_fail';
-        $helper->basket = $this->createBasketMock();
-
-        $this->cleanupService
-            ->expects($this->once())
-            ->method('cleanupPreviousAttempt')
-            ->with('contract_fail')
-            ->willThrowException(new \RuntimeException('DB connection lost'));
-
-        $controller = $this->createController($helper);
-        $result = $controller->checkoutCancel();
-
-        $this->assertSame('payment', $result);
-        // Sprint 88: New sess_challenge always generated, even on cleanup failure
-        $this->assertArrayHasKey('sess_challenge', $helper->sessionVars);
     }
 
     public function testCheckoutCancelSkipsCleanupWhenNoContract(): void

@@ -14,8 +14,10 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\Commit\CommitOutcome;
 use OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface;
 use OxidEsales\PaymentBase\Service\Commit\PaymentConfirmation;
+use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventHandlerInterface;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookOutcome;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
@@ -147,6 +149,59 @@ abstract class AbstractStripeWebhookHandler implements StripeWebhookEventHandler
     /**
      * Look up the contract ID by providerOrderId (PaymentIntent ID).
      */
+    /**
+     * OPC-175 — the contract the event's metadata names, but only when the event
+     * belongs to the contract's CURRENT provider attempt. The customer may have
+     * changed the payment method: the same contract then continues with another
+     * attempt, and an event of the replaced Stripe session (expiry, a late
+     * payment) must not touch it. Logged as an error: a late payment is money.
+     */
+    protected function contractOfCurrentAttempt(WebhookEvent $event, string $contractId): ?PaymentContractInterface
+    {
+        $contract = $this->contractRepository->findById($contractId);
+        if ($contract === null || $this->isOfReplacedAttempt($event, $contract)) {
+            return null;
+        }
+
+        return $contract;
+    }
+
+    /**
+     * OPC-175 / S2g — money that arrives on a replaced attempt goes back to the
+     * customer. True when the event belongs to a replaced attempt (it is then
+     * handled here and must not reach the contract).
+     */
+    protected function refundIfReplacedAttempt(
+        WebhookEvent $event,
+        string $paymentIntentId,
+        StripeLatePaymentRefunder $lateMoney
+    ): bool {
+        $contractId = $this->parser->extractContractIdFromMetadata($event);
+        $contract = $contractId === null ? null : $this->contractRepository->findById($contractId);
+        if ($contract === null || !$this->isOfReplacedAttempt($event, $contract)) {
+            return false;
+        }
+
+        $lateMoney->settle($contract, $this->parser->attemptOf($event), $paymentIntentId);
+
+        return true;
+    }
+
+    protected function isOfReplacedAttempt(WebhookEvent $event, PaymentContractInterface $contract): bool
+    {
+        if ($this->parser->isForCurrentAttempt($event, $contract)) {
+            return false;
+        }
+
+        $this->logger->error('Stripe event of a replaced checkout attempt not applied to its contract', [
+            'contract_id' => $contract->getId(),
+            'event_type' => $event->type,
+            'object_id' => $event->getObjectId(),
+        ]);
+
+        return true;
+    }
+
     protected function resolveContractIdFromProviderOrderId(string $providerOrderId): ?string
     {
         $contract = $this->contractRepository->findByProviderOrderId($providerOrderId);

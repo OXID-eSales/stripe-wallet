@@ -27,7 +27,7 @@ class RetryCleanupServiceTest extends TestCase
     {
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->orderService = $this->createMock(ShopOrderServiceInterface::class);
-        $this->service = new RetryCleanupService($this->contractRepository, $this->orderService);
+        $this->service = new RetryCleanupService($this->contractRepository, $this->orderService, $this->unpaidSessions());
     }
 
 
@@ -55,7 +55,7 @@ class RetryCleanupServiceTest extends TestCase
 
         $this->contractRepository->method('findById')->willReturn($contract);
 
-        $service = new RetryCleanupService($this->contractRepository, $this->orderService, $logger);
+        $service = new RetryCleanupService($this->contractRepository, $this->orderService, $this->unpaidSessions(), $logger);
 
         $this->assertFalse($service->cleanupPreviousAttempt($contract->getId()));
     }
@@ -73,7 +73,7 @@ class RetryCleanupServiceTest extends TestCase
 
         $this->contractRepository->method('findById')->willReturn($contract);
 
-        $service = new RetryCleanupService($this->contractRepository, $this->orderService);
+        $service = new RetryCleanupService($this->contractRepository, $this->orderService, $this->unpaidSessions());
 
         $this->assertTrue($service->cleanupPreviousAttempt('c1'));
     }
@@ -191,70 +191,6 @@ class RetryCleanupServiceTest extends TestCase
     }
 
     // ==========================================
-    // cleanupForUser() TESTS
-    // ==========================================
-
-    public function testCleanupForUserCancelsActiveContract(): void
-    {
-        $contract = $this->createContract();
-        $contract->transitionToNotFinished('order_789');
-        $contract->transitionToPending();
-
-        $this->contractRepository
-            ->method('findActiveByUserId')
-            ->with('user123')
-            ->willReturn($contract);
-
-        $this->orderService
-            ->expects($this->once())
-            ->method('deleteNotFinishedOrder')
-            ->with('order_789')
-            ->willReturn(true);
-
-        $this->contractRepository
-            ->expects($this->once())
-            ->method('save');
-
-        $result = $this->service->cleanupForUser('user123');
-
-        $this->assertTrue($result);
-        $this->assertTrue($contract->getState()->isCancelled());
-    }
-
-    public function testCleanupForUserSkipsWhenNoActiveContract(): void
-    {
-        $this->contractRepository
-            ->method('findActiveByUserId')
-            ->willReturn(null);
-
-        $this->orderService->expects($this->never())->method('deleteNotFinishedOrder');
-
-        $result = $this->service->cleanupForUser('user123');
-
-        $this->assertFalse($result);
-    }
-
-    public function testCleanupForUserSkipsCommittedContract(): void
-    {
-        $contract = $this->createContract();
-        $contract->transitionToNotFinished('order_789');
-        $contract->transitionToPending();
-        $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED);
-        $contract->commitToOrder('order_789');
-
-        $this->contractRepository
-            ->method('findActiveByUserId')
-            ->willReturn($contract);
-
-        $this->orderService->expects($this->never())->method('deleteNotFinishedOrder');
-        $this->contractRepository->expects($this->never())->method('save');
-
-        $result = $this->service->cleanupForUser('user123');
-
-        $this->assertFalse($result);
-    }
-
-    // ==========================================
     // cleanupStaleContracts() TESTS
     // ==========================================
 
@@ -327,5 +263,14 @@ class RetryCleanupServiceTest extends TestCase
         $count = $this->service->cleanupStaleContracts(30);
 
         $this->assertSame(1, $count);
+    }
+
+    /** None of these contracts has a paid Stripe session. */
+    private function unpaidSessions(): \OxidEsales\Payments\Stripe\Service\PaidSessionSettler
+    {
+        $settler = $this->createMock(\OxidEsales\Payments\Stripe\Service\PaidSessionSettler::class);
+        $settler->method('settle')->willReturn(false);
+
+        return $settler;
     }
 }

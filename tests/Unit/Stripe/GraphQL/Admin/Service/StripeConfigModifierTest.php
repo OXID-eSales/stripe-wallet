@@ -63,16 +63,16 @@ final class StripeConfigModifierTest extends TestCase
     {
         $this->modifier()->modify($this->change(testToken: '', captureMode: 'manual'));
 
-        self::assertSame('sk_test_AAAAAAAAAAstored', $this->settings->token('test'));
+        self::assertSame('sk_test_fakeAAAAAAAAAAstored', $this->settings->token('test'));
         self::assertSame(0, $this->stepUp->required);
     }
 
     public function testModify_ANewSecret_IsStoredNeedsAStepUpAndIsNeverReturned(): void
     {
-        $result = $this->modifier()->modify($this->change(testToken: 'sk_test_AAAAAAAAAAbrandnew'));
+        $result = $this->modifier()->modify($this->change(testToken: 'sk_test_fakeAAAAAAAAAAbrandnew'));
 
         self::assertNull($result->refusal());
-        self::assertSame('sk_test_AAAAAAAAAAbrandnew', $this->settings->token('test'));
+        self::assertSame('sk_test_fakeAAAAAAAAAAbrandnew', $this->settings->token('test'));
         self::assertSame(1, $this->stepUp->required, 'writing a secret asks for a step-up');
         self::assertStringNotContainsString('brandnew', (string) json_encode($result->config()));
     }
@@ -80,7 +80,7 @@ final class StripeConfigModifierTest extends TestCase
     public function testModify_ANewWebhookSecretOrPlatformKey_AlsoNeedsAStepUp(): void
     {
         $this->modifier()->modify($this->change(webhookSecret: 'whsec_AAAAAAAAAAAA'));
-        $this->modifier()->modify($this->change(testPlatformKey: 'sk_test_PLATFORMplatform'));
+        $this->modifier()->modify($this->change(testPlatformKey: 'sk_test_fakePLATFORMplatform'));
 
         self::assertSame(2, $this->stepUp->required);
     }
@@ -90,7 +90,7 @@ final class StripeConfigModifierTest extends TestCase
         $this->stepUp = new CountingStepUp(proven: false);
 
         try {
-            $this->modifier()->modify($this->change(testToken: 'sk_test_AAAAAAAAAAbrandnew'));
+            $this->modifier()->modify($this->change(testToken: 'sk_test_fakeAAAAAAAAAAbrandnew'));
             self::fail('the step-up must stop the write');
         } catch (RuntimeException $stepUpRequired) {
             self::assertSame('step_up_required', $stepUpRequired->getMessage());
@@ -151,7 +151,7 @@ final class StripeConfigModifierTest extends TestCase
 
     public function testModify_APublishableKeyOfAnotherAccountThanTheStoredToken_IsRefusedAtTheField(): void
     {
-        $result = $this->modifier()->modify($this->change(testPublishableKey: 'pk_test_ZZZZZZZZZZbbbb', captureMode: 'manual'));
+        $result = $this->modifier()->modify($this->change(testPublishableKey: 'pk_test_fakeZZZZZZZZZZbbbb', captureMode: 'manual'));
 
         self::assertSame('testPublishableKey', $result->refusal()?->field);
         self::assertSame('key_mismatch', $result->refusal()->code);
@@ -162,24 +162,24 @@ final class StripeConfigModifierTest extends TestCase
 
     public function testModify_ANewTokenOfAnotherAccountThanTheStoredPublishableKey_IsRefusedAtTheToken(): void
     {
-        $result = $this->modifier()->modify($this->change(testToken: 'sk_test_ZZZZZZZZZZnewsecret'));
+        $result = $this->modifier()->modify($this->change(testToken: 'sk_test_fakeZZZZZZZZZZnewsecret'));
 
         self::assertSame('testToken', $result->refusal()?->field);
         self::assertSame('key_mismatch', $result->refusal()->code);
         self::assertStringNotContainsString('newsecret', $result->refusal()->message);
-        self::assertSame('sk_test_AAAAAAAAAAstored', $this->settings->token('test'));
+        self::assertSame('sk_test_fakeAAAAAAAAAAstored', $this->settings->token('test'));
     }
 
     public function testModify_AKeyWhoseCounterpartIsNotSetYet_IsNotAMismatch(): void
     {
-        $result = $this->modifier()->modify($this->change(livePublishableKey: 'pk_live_BBBBBBBBBBbbbb'));
+        $result = $this->modifier()->modify($this->change(livePublishableKey: 'pk_live_fakeBBBBBBBBBBbbbb'));
 
         self::assertNull($result->refusal(), 'the live token comes later');
     }
 
     public function testModify_BothKeysTogether_AreJudgedAsAPair(): void
     {
-        $result = $this->modifier()->modify($this->change(liveToken: 'sk_live_BBBBBBBBBBsecret', livePublishableKey: 'pk_live_BBBBBBBBBBbbbb'));
+        $result = $this->modifier()->modify($this->change(liveToken: 'sk_live_fakeBBBBBBBBBBsecret', livePublishableKey: 'pk_live_fakeBBBBBBBBBBbbbb'));
 
         self::assertNull($result->refusal());
         self::assertTrue($this->settings->snapshot()->liveTokenSet);
@@ -187,7 +187,7 @@ final class StripeConfigModifierTest extends TestCase
 
     public function testModify_EveryCallIsAuditedOnceWithFieldNamesOnly(): void
     {
-        $this->modifier()->modify($this->change(captureMode: 'manual', testToken: 'sk_test_AAAAAAAAAAbrandnew'));
+        $this->modifier()->modify($this->change(captureMode: 'manual', testToken: 'sk_test_fakeAAAAAAAAAAbrandnew'));
         $this->modifier()->modify($this->change(captureMode: 'later'));
 
         self::assertSame(
@@ -205,9 +205,9 @@ final class StripeConfigModifierTest extends TestCase
      */
     public static function secretChanges(): iterable
     {
-        yield 'test token' => [['testToken' => 'sk_test_AAAAAAAAAAbrandnew'], 'testToken'];
-        yield 'live token' => [['liveToken' => 'sk_live_BBBBBBBBBBbrandnew'], 'liveToken'];
-        yield 'test platform key' => [['testPlatformKey' => 'sk_test_PLATFORMplatform'], 'testPlatformKey'];
+        yield 'test token' => [['testToken' => 'sk_test_fakeAAAAAAAAAAbrandnew'], 'testToken'];
+        yield 'live token' => [['liveToken' => 'sk_live_fakeBBBBBBBBBBbrandnew'], 'liveToken'];
+        yield 'test platform key' => [['testPlatformKey' => 'sk_test_fakePLATFORMplatform'], 'testPlatformKey'];
         yield 'webhook secret' => [['webhookSecret' => 'whsec_AAAAAAAAAAAA'], 'webhookSecret'];
     }
 
@@ -225,7 +225,7 @@ final class StripeConfigModifierTest extends TestCase
         self::assertSame($field, $result->refusal()->field);
         self::assertSame(0, $this->stepUp->required, 'no second factor is asked for something the admin may not do');
         self::assertSame('automatic', $this->settings->snapshot()->captureMode, 'the whole call is refused');
-        self::assertSame('sk_test_AAAAAAAAAAstored', $this->settings->token('test'));
+        self::assertSame('sk_test_fakeAAAAAAAAAAstored', $this->settings->token('test'));
         self::assertSame('superadmin_required', $this->audit->rows[0]['outcome'], 'audited as the refusal it is');
         self::assertEqualsCanonicalizing([$field, 'captureMode'], $this->audit->rows[0]['fields']);
     }
@@ -234,7 +234,7 @@ final class StripeConfigModifierTest extends TestCase
     {
         $this->superadmin = new FakeSuperadminCheck(false);
 
-        $result = $this->modifier()->modify($this->change(captureMode: 'manual', testToken: '', testPublishableKey: 'pk_test_AAAAAAAAAAnewpub'));
+        $result = $this->modifier()->modify($this->change(captureMode: 'manual', testToken: '', testPublishableKey: 'pk_test_fakeAAAAAAAAAAnewpub'));
 
         self::assertNull($result->refusal());
         self::assertSame('manual', $this->settings->snapshot()->captureMode);
@@ -253,7 +253,7 @@ final class StripeConfigModifierTest extends TestCase
 
     public function testModify_ASecretFromASuperadmin_StillAsksForTheStepUp(): void
     {
-        $result = $this->modifier()->modify($this->change(testToken: 'sk_test_AAAAAAAAAAbrandnew'));
+        $result = $this->modifier()->modify($this->change(testToken: 'sk_test_fakeAAAAAAAAAAbrandnew'));
 
         self::assertNull($result->refusal());
         self::assertSame(1, $this->stepUp->required);
@@ -263,7 +263,7 @@ final class StripeConfigModifierTest extends TestCase
     {
         $this->superadmin = new FakeSuperadminCheck(false);
 
-        $this->modifier()->modify($this->change(testToken: 'sk_test_AAAAAAAAAAbrandnew'));
+        $this->modifier()->modify($this->change(testToken: 'sk_test_fakeAAAAAAAAAAbrandnew'));
 
         self::assertCount(1, $this->audit->rows);
         self::assertStringNotContainsString('brandnew', (string) json_encode($this->audit->rows));

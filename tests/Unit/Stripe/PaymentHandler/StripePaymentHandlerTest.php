@@ -6,7 +6,6 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\PaymentHandler;
 
 use OxidEsales\PaymentBase\Adapter\PaymentHandlerInterface;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
-use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractServiceInterface;
 use OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface;
@@ -25,7 +24,6 @@ class StripePaymentHandlerTest extends TestCase
     private CheckoutSessionServiceInterface&MockObject $checkoutSessionService;
     private ContractRepositoryInterface&MockObject $contractRepository;
     private ShopAdapterInterface&MockObject $shopAdapter;
-    private ShopOrderServiceInterface&MockObject $shopOrderService;
     private ModuleConfigurationServiceInterface&MockObject $config;
     private TokenServiceInterface&MockObject $tokenService;
 
@@ -35,7 +33,6 @@ class StripePaymentHandlerTest extends TestCase
         $this->checkoutSessionService = $this->createMock(CheckoutSessionServiceInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->shopAdapter = $this->createMock(ShopAdapterInterface::class);
-        $this->shopOrderService = $this->createMock(ShopOrderServiceInterface::class);
         $this->config = $this->createMock(ModuleConfigurationServiceInterface::class);
         $this->tokenService = $this->createMock(TokenServiceInterface::class);
 
@@ -56,9 +53,9 @@ class StripePaymentHandlerTest extends TestCase
             $this->checkoutSessionService,
             $this->contractRepository,
             $this->shopAdapter,
-            $this->shopOrderService,
             $this->config,
             $this->tokenService,
+            new \OxidEsales\PaymentBase\EventSystem\EventDispatcher(),
             iframeSettings: $iframeSettings,
             adapterFactory: $adapterFactory
         );

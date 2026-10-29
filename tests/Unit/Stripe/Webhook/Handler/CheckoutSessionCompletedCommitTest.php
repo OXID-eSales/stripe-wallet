@@ -110,6 +110,37 @@ final class CheckoutSessionCompletedCommitTest extends TestCase
         self::assertStringContainsString('contract_cancelled', (string) $outcome->result->error);
     }
 
+    /**
+     * OPC-175 / S2g: the customer paid in a Stripe session they had left for
+     * another payment method. The contract continues with the new attempt; the
+     * money goes back and the contract is not committed with it.
+     */
+    public function testAPaidSessionOfAReplacedAttempt_IsGivenBackAndCommitsNothing(): void
+    {
+        $contract = $this->pendingContract();
+        $contract->reopenForNewAttempt(
+            \OxidEsales\PaymentBase\Contract\AttemptClosure::Closed,
+            $contract->getBasketSnapshot(),
+            [ContractCondition::TYPE_PAYMENT_AUTHORIZED]
+        );
+        $this->contracts->method('findById')->with('ctr-1')->willReturn($contract);
+        $lateMoney = $this->createMock(\OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder::class);
+        $lateMoney->expects($this->once())->method('settle')->with($contract, 0, 'pi_1');
+        $this->commit->expects($this->never())->method('commit');
+        $handler = new CheckoutSessionCompletedWebhookHandler(
+            new StripeWebhookEventParser(),
+            $this->fulfillment,
+            $this->contracts,
+            new NullLogger(),
+            $lateMoney,
+            $this->commit
+        );
+
+        $outcome = $handler->handle($this->event('paid'));
+
+        self::assertSame('Payment on a replaced checkout attempt: given back', $outcome->result->error);
+    }
+
     private function handler(): CheckoutSessionCompletedWebhookHandler
     {
         return new CheckoutSessionCompletedWebhookHandler(
@@ -117,6 +148,7 @@ final class CheckoutSessionCompletedCommitTest extends TestCase
             $this->fulfillment,
             $this->contracts,
             new NullLogger(),
+            $this->createMock(\OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder::class),
             $this->commit
         );
     }
