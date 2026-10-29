@@ -10,6 +10,8 @@
 - 2026-10-29: Keep the same `NOT_FINISHED` order when the customer changes the payment method (section 4, "order adoption"). The retire (cancel + new order) stays as the fallback only.
 - 2026-10-29: The OPC Stripe path uses the same principles and methods as all other payment methods (S1, done).
 - 2026-10-29: Mitigate the risk "money arrives on the old contract" (section 4.10).
+- 2026-10-29: **No fallbacks.** Each step has one straightforward path. A failure is a failure, not a switch to another behaviour.
+- 2026-10-29: **One order — one contract.** An order never has more than one contract, and a contract never has more than one order. Thus "keep the order" means: keep the order **and** its contract. Section 4 is rewritten for this; S2b (several contracts for each order) is reverted.
 
 **Definition of Done (sprint level):**
 1. The customer applies a coupon in OPC. The customer changes the payment method one or more times (Stripe ↔ Mollie ↔ PayPal). The coupon stays in the basket. The order total stays the same.
@@ -102,151 +104,63 @@ The current retire in `EarlyOrderCreationHandler` and the OPC-96 snapshot restor
 
 ---
 
-## 4. Solution: keep the same `NOT_FINISHED` order ("order adoption")
+## 4. Solution: keep the order and its contract (rewritten 2026-10-29)
 
-**Decision (2026-10-29): yes, keep the order.**
-
-**Request (2026-10-29):** When the customer changes the payment method, keep the same `NOT_FINISHED` order. Change only the payment data of the order. Do not create a second order.
+**Decisions:** keep the order; no fallbacks; one order — one contract.
 
 ### 4.1 Principle
 
-- **One order, one active contract.** The order stays. The **contract** changes, because a contract belongs to one provider (`provider`, `providerOrderId`, provider metadata, own state machine). The old contract gets the state `cancelled` (reason `payment_method_changed`). A new contract of the new provider gets the same `OXORDERID`.
-- The order does not store a contract id (`OxidShopOrderService::storeOrderMetadata()` only logs). The only link is `oe_payments_contract.OXORDERID`. The index `IDX_ORDER` is not unique. Thus the table accepts a second contract for the same order without a migration.
-- **Core already has the tool.** `Order::finalizeOrder($basket, $user, true)` (the "recalculate" mode of the admin) keeps the order id, the order number and the voucher marks. It does not run `validateOrder()`, `executePayment()`, `markVouchers()` or `sendOrderByEmail()`. It writes the new totals, the payment cost, the `oxuserpayments` row and `OXPAYMENTTYPE` (`Order::setPayment()`).
+- The customer has one checkout attempt for each session: one order and one contract. When the customer changes the payment method, or retries, **the same contract and the same order** continue. The contract is moved to the new payment attempt; the order is rewritten in place.
+- The contract keeps its id, its order id and its order number. These are replaced: provider, provider order id (`OXPROVIDERORDERID`), `payment_method_id`, the provider data. The replaced provider attempt goes into the contract's history (metadata `replaced_attempts`: provider, provider order id, time).
+- A PSP event for a replaced provider attempt finds no contract by its provider order id. Thus it cannot change the order. Money that arrives on it is refunded (4.6).
+- The order always follows the current basket. There is no "basket unchanged" precondition and no alternative path.
 
-### 4.2 Flow on Place Order with the new method M2
+### 4.2 The 1:1 rule is enforced (S2b, new)
 
-Initial condition: the session has an open attempt: order O, contract C1, method M1 (from `OpenCheckoutAttemptRegistry`, after S1 also for Stripe).
+1. Migration: unique index on `oe_payments_contract.OXORDERID`. When rows with the same order id exist, the migration stops and lists them; it does not choose a row. (Local DB today: one real order with two cancelled Mollie contracts, plus test rows `order-a`…`order-d`.)
+2. `PaymentContract`: the order id is set once (`transitionToNotFinished()`). `commitToOrder()` with a different order id throws. No method changes the order id.
+3. Tests: migration up/down; a second contract for the same order id is refused by the DB; `commitToOrder()` with another id throws.
 
-1. Read the open attempt C1 and its order O.
-2. Check the preconditions (4.3). If one precondition is false, use the fallback (4.4).
-3. Invalidate the PSP attempt of C1 (4.6). If this fails, use the fallback.
-4. Set C1 to `cancelled` (reason `payment_method_changed`). Do not cancel O. Do not release the vouchers.
-5. The new provider creates contract C2 (no change).
-6. Call `ShopOrderServiceInterface::adoptOrder(O, M2, C2)` instead of `createOrder()`. In one DB transaction:
-   1. Load O. Put M2 on the session basket (`setPayment()`). Call `setSkipVouchersChecking(true)` (core does the same in `Order::getOrderBasket()`, `Order.php:1431`). Call `calculateBasket(true)`.
-   2. Remove `sess_challenge` when it names O. If you do not remove it, `finalizeOrder()` answers `ORDEREXISTS` (`Order.php:474-479`).
-   3. Call `finalizeOrder($basket, $user, true)`.
-   4. Set `OXTRANSSTATUS` back to `NOT_FINISHED` (core sets `OK`). Set `OXORDERDATE` to now (core keeps the old date in this mode).
-   5. Render the order mails again in capture mode (`deferConfirmationMail()` + `sendOrderByEmail()`). Store them on C2. Drop the mails of C1 (STRP-176 store). The old mails show the old payment method and the old total.
-7. C2: `NOT_FINISHED(O)` → `PENDING` (no change). The registry remembers C2.
-8. The PSP session of C2 gets the same order number as before.
+### 4.3 Flow on Place Order while the session has an open attempt (contract C, order O)
 
-### 4.3 Preconditions for the adoption
+1. Read C from `OpenCheckoutAttemptRegistry`. C is in `not_finished` or `pending`, O is `NOT_FINISHED`. (Without an open attempt the normal flow creates C and O, as today.)
+2. Ask the current provider of C whether it is paid. Paid: commit C (S3); the checkout is complete; the customer goes to the thank-you page. This is the fact "the customer has paid", not an alternative path.
+3. Close the current payment page of C at the provider: Stripe — expire the Checkout Session; Mollie — cancel the payment; PayPal — nothing (PayPal moves money only on our capture call). A provider refusal is recorded in the history entry; money that arrives later is refunded (4.6).
+4. Move C to the new attempt: `PaymentContract::rebindProvider(provider, paymentMethodId)` — allowed in `not_finished` and `pending` only; moves the current provider data into `replaced_attempts`; clears the provider order id.
+5. Rewrite O from the session basket in one DB transaction (`ShopOrderServiceInterface::rewriteOrder(O, paymentId)`): core `finalizeOrder($basket, $user, true)` keeps order id and number; remove `sess_challenge` first when it names O; set `OXTRANSSTATUS` back to `NOT_FINISHED`; `OXORDERDATE` = now. Order articles, stock and vouchers follow the basket (S2c spike verifies how core's recalculate mode treats them and closes each gap). Render the order mails again and store them on C (STRP-176 store).
+6. The new provider creates its payment page for C with the same order number. The registry keeps C.
 
-| # | Precondition | Why |
-|---|--------------|-----|
-| P1 | O has `OXTRANSSTATUS = NOT_FINISHED`, `OXSTORNO = 0`, no `OXPAID`. | Never change a paid or ended order. |
-| P2 | C1 is not committed and not terminal. | Same rule as `PreviousCheckoutAttemptCleaner::isAbandonable()`. |
-| P3 | The basket is the same as at the creation of O, except the payment. Compare a fingerprint: articles + amounts, voucher ids, shipping set, delivery address hash, currency, language. Store the fingerprint in the C1 metadata at order creation. | `finalizeOrder(…, true)` does not check stock, minimum value or vouchers again. This is safe only when the basket did not change. |
-| P4 | The PSP attempt of C1 is invalidated (4.6). | The customer must not pay C1 after the adoption. |
+### 4.4 What goes away (no fallbacks, no second path)
 
-### 4.4 Fallback
+| Code | Why it goes |
+|------|-------------|
+| Retire of the previous attempt in `EarlyOrderCreationHandler` / `PayPalOrderCreationHandler` for the session's open attempt | Replaced by 4.3. The cleaner stays only for the ending of an attempt (cleanup command). |
+| Retire on the return from a cancelled PSP page: OPC `ExternalReturnAttemptCleanupHandler`, Stripe `OpcExternalReturnCleanupHandler`, Mollie `AbandonedAttemptCleanup`, PayPal `CheckoutCancellation` | The attempt stays open; the next Place Order continues it (4.3). An attempt the customer leaves for good is ended by the not-finished cleanup command (with voucher release and restock, S4). |
+| OPC-96 voucher snapshot / unwind / restore, OPC-185 unwind + re-add in `setPaymentMethod()` | The voucher stays on O (S2a); nothing is dropped, nothing must be restored. |
+| S2b "active contract" rule and `ContractOrderOwnership` | Reverted 2026-10-29 (payment-base `5b1ed6a`, stripe `4b4e86c`, mollie `efd9ca5`): one order has one contract. |
+| Fallbacks in S1/S2a/S3 code | Removed 2026-10-29: payment-base `6da11f1` (Voucher fails instead of falling back to core), stripe `566e24b` (required dispatcher, settler and commit service; a Stripe error is not "unpaid"). |
 
-If a precondition is false, do the retire of S1/S2: cancel O and C1, release the vouchers, create a new order. The fallback is the current behaviour plus the S1–S4 fixes. Thus the adoption never makes a checkout fail.
+### 4.5 Coupon (S2a, done)
 
-### 4.5 The coupon between the change and Place Order
+The voucher row of O stays on O for the whole attempt. The `Voucher` extension accepts it in each recalculation. When the basket changes its vouchers, step 4.3.5 marks the new ones and releases the removed ones on O.
 
-With the adoption, the voucher row stays linked to O all the time. Each OPC recalculation then removes the voucher (`Voucher::isAvailable()`; and `isAvailableInOtherOrder()` for a series with `OXALLOWUSEANOTHER = 0`). Thus payment-base must extend core `Voucher` (module `extend`):
+### 4.6 Money on a replaced provider attempt (S2g)
 
-- `isAvailable()` and `isAvailableInOtherOrder()` accept a row when its `OXORDERID` is the order of the open attempt of **this** session, and this order is `NOT_FINISHED` and not stornoed.
-- All other rows keep the core check.
+- `ContractCommitService` and the provider webhook handlers find the contract by the **current** provider order id only. An event for a replaced provider attempt does not match: the order cannot change.
+- New: before "contract not found" is answered, the handler looks up `replaced_attempts`. A "paid" event for a replaced attempt → full refund through the provider (`RefundIntentEventInterface`), recorded in the history entry (refund id or error). Once for each provider payment id.
+- Admin: the Payment tab of O shows each replaced attempt with money and its refund state. A refund error shows "Refund manually" and logs `ERROR`.
 
-This extension keeps the coupon in the basket. The OPC-185 unwind and the OPC-96 snapshot restore then become safety nets only.
-
-**Status of 4.5 (S2a):** implemented 2026-10-29, payment-base `1c97198` on `b-7.4.x-coupon-reaplying-OPC-175`.
-- `Voucher` extension (`oxVoucher::class => Voucher::class` in `metadata.php`): `isAvailable()` accepts the row of the open attempt's order; `isAvailableInOtherOrder()` does not count that order as an earlier use. Every other row keeps core's rules; core's rules also apply when the open attempt cannot be read.
-- `OpenCheckoutAttemptOrder` (+ interface, public service): reads `OpenCheckoutAttemptRegistry`, answers the order id only while the contract is neither committed nor terminal.
-- Tests: `VoucherTest` 10, `OpenCheckoutAttemptOrderTest` 6; unit suite 1950 green; PHPCS / PHPMD green; PHPStan clean on the new files (`metadata.php` keeps its 4 errors from before).
-- Proof: the S0 Playwright spec is green in all three directions (total stays 1320, the voucher moves to the open order), and with the one-per-customer series `E2E_NOSTACK` (Stripe → Mollie).
-- Shop: the class extension needs `oe_payment_base` re-activated. The shared shop refuses this while Stripe depends on it, so the two YAML entries were added by hand (`modules/oe_payment_base.yaml` `classExtensions`, `class_extension_chain.yaml`; backups in the job tmp) and the cache cleared. Each other installation: deactivate the dependants, re-activate payment-base, or re-run the module configuration.
-- Known limit: a coupon code that the customer removes and enters again while its row is held by the open attempt is refused by `Voucher::getVoucherByNr()` (it selects free rows only). The basket keeps the coupon otherwise, so this needs a remove + re-add. Record for S5.
-
-### 4.6 Invalidate the PSP attempt of C1
-
-| Provider | Action | If not possible |
-|----------|--------|-----------------|
-| Stripe | Ask the session status. If `paid`: commit C1 (S3), no adoption. If `open`: expire the Checkout Session. | Fallback, do not adopt. |
-| Mollie | Read the payment. If `paid`/`authorized`: no adoption. If `open` and `isCancelable`: cancel it. If `canceled`/`expired`/`failed`: nothing to do. | Payment is `open` and not cancelable → fallback. |
-| PayPal | Read the order. If `COMPLETED` or an authorization exists: no adoption. If `CREATED`/`APPROVED`: nothing to do. PayPal takes no money without our capture call, and the guard in 4.7 stops this call. | Fallback. |
-
-Add one narrow interface in payment-base: `CheckoutAttemptInvalidatorInterface::invalidate(PaymentContractInterface): bool`. Each provider has one implementation (tagged service, selected by `provider`).
-
-### 4.7 One active contract for each order
-
-- `DoctrineContractRepository::findByOrderId()` has no `ORDER BY` today (`WHERE OXORDERID = :orderId`). 28 files call it. Change only this query: first a contract that is not `cancelled`/`expired`, then the newest. Then all 28 callers get the active contract.
-- Superseded-contract guard: a webhook or return for a contract that is not the active contract of its order must not change the order. This applies to `Stripe\Service\OxidContractLinkedOrderUpdater`, the Mollie `mirrorOnLinkedOrder()` and the PayPal approve/capture handlers. If money arrives on a superseded contract: do not change the order, log `ERROR`, and show it in the admin Payment tab. An automatic refund is a follow-up.
-- The local DB has 5 orders with more than one contract today (test residue). S0 checks that the new query gives the correct contract for them.
-
-**Status of 4.7 (S2b):** implemented 2026-10-29, not pushed. payment-base `78476e2`, stripe `1dc5568`, mollie-payment `dbb4b51`, paypal `57d0fa3`.
-- `findByOrderId()`: `ORDER BY OXSTATE IN ('cancelled','expired','failed') ASC, OXCREATED DESC, OXID DESC LIMIT 1`. Fulfilled counts as active. Integration `FindByOrderIdActiveContractTest` 3 (2 were red before).
-- `ContractOrderOwnership` (payment-base): a contract owns its order when it is the active contract of it (or nothing is found — the behaviour from before). Unit 4.
-- Guard: the Stripe and Mollie webhook handlers still end a replaced contract, but mirror the ending (cancel / fail / expiry) onto the order only when the contract owns it. Optional constructor argument, no wiring change. Unit: Stripe 4 new, Mollie 2 new.
-- Verified, no change: every "paid" path already refuses a terminal contract — `ContractCommitService::refusal()` (existing test), Stripe / Mollie handlers skip terminal contracts, PayPal approve captures only an open contract (new pin test `testApprovedNeverCapturesAReplacedContract`).
-- Why the guard is still necessary: a webhook for C1 that is processed before the adoption has saved C1 as cancelled ends C1 itself and used to end order O with it. With the guard, the order is safe in both orders of events.
-- Gates: unit payment-base 1954, Mollie 958 (all checks + CI-form PHPCS), PayPal 844 green. PHPStan: only errors from before (payment-base `array_values` notice; PayPal 87 with the change stashed). The S0 Playwright spec stays green after the change.
-- Note: `DoctrineContractRepositoryTest` empties the whole contract table in its cleanup (`DELETE FROM oe_payments_contract`). Do not run it against a shared DB outside its transaction.
-
-### 4.8 Comparison
-
-| Item | Retire on change (S2) | Order adoption (section 4) |
-|------|----------------------|----------------------------|
-| New orders for each change | 1 | 0 |
-| Gaps in the order numbers | 1 for each change | none |
-| Voucher | released, then marked again | stays on the same order |
-| Stock | depends on S0 result | no change (same order) |
-| Order mail | rendered for the new order | must be rendered again (4.2 step 6.5) |
-| Contracts for each order | 1 | 1 active + n cancelled |
-| Code | about 4 files, 2 repos | about 12–15 files, 4 repos |
-| Main risk | cancel of an attempt that the customer pays | money on a superseded contract (4.7); stale data when P3 is wrong |
-
-### 4.9 Stories (S2 becomes the fallback; S0, S1, S3, S4 stay)
+### 4.7 Stories
 
 | Story | Content | Repo | Estimate |
 |-------|---------|------|----------|
-| S2a | `Voucher` extension (4.5). Tests: a voucher of the open order of this session stays in the basket after `calculateBasket(true)`; a voucher of another order is still refused. | payment-base | S |
-| S2b | Active contract rule in `findByOrderId()` + superseded-contract guard (4.7). | payment-base, stripe, mollie-payment, paypal | M |
-| S2c | Basket fingerprint on the contract at order creation + `ShopOrderServiceInterface::adoptOrder()` (4.2 step 6, without mails). Integration test: same `OXID`, same `OXORDERNR`, new `OXPAYMENTTYPE`, new `OXPAYCOST`/totals, status `NOT_FINISHED`, voucher still linked. | payment-base | M |
-| S2d | `CheckoutAttemptInvalidatorInterface` + one implementation for each provider (4.6). | payment-base, stripe, mollie-payment, paypal | M |
-| S2e | Use the adoption in `EarlyOrderCreationHandler`, `PayPalOrderCreationHandler` and `StripePaymentHandler` (after the reuse decision). Fallback to the retire when a precondition is false. | payment-base, stripe, paypal | M |
-| S2f | Render the order mails again on adoption, move them from C1 to C2. | payment-base | S |
-| S2g | Refund money that arrives on a replaced contract; show it in the admin (section 4.10). | payment-base, stripe, mollie-payment, paypal | M |
+| S2b | 1:1 rule enforced (4.2) | payment-base | S |
+| S2c | Spike + `rewriteOrder()`: order articles, stock, vouchers, totals, mails follow the basket (4.3.5) | payment-base | M |
+| S2d | `rebindProvider()` + history; close the payment page for each provider (4.3.3–4) | payment-base, stripe, mollie-payment, paypal | M |
+| S2e | Flow 4.3 in the shared chain (`EarlyOrderCreationHandler`, `PayPalOrderCreationHandler`, Stripe via S1); remove the code in 4.4 | payment-base, one-page-checkout, stripe, mollie-payment, paypal | M |
+| S2g | Refund of money on a replaced attempt + admin (4.6) | payment-base, stripe, mollie-payment, paypal | M |
 
-**Recommendation.** The adoption is possible with the core recalculate mode, and no DB migration is necessary. It is about three times the code of S2. Do S0, S1, S3 and S4 first, because both variants need them. Then do S2a–S2f and S2g (section 4.10).
-
-**Update after the decision.** S2 (retire in `setPaymentMethod()`) is not necessary any more:
-- S2a keeps the voucher of the open order valid in each recalculation. This closes G3, G4 and G5.
-- The fallback retire already exists in `EarlyOrderCreationHandler`. After S1 it runs for all providers. Thus the fallback needs no new code.
-
-### 4.10 Risk mitigation: money arrives on the old contract
-
-**Risk.** The customer pays the old attempt C1 after the system replaced C1 with C2. Order O then belongs to C2 and shows the new payment method.
-
-**Where this can occur:**
-
-| Provider | Scenario | Money moves without the shop? |
-|----------|----------|-------------------------------|
-| Stripe | The Stripe page or iframe of C1 is open in a second tab. Or the customer submits the iframe at the same time as the change. | Yes |
-| Mollie | The Mollie page of C1 is open in a second tab. Many Mollie methods are not cancelable when `open`. Bank transfer can stay `open` for days. | Yes |
-| PayPal | The customer approved C1. PayPal moves money only on our capture call. | No |
-
-**What the code does today (verified 2026-10-29).** Each provider confirms a payment through `ContractCommitService::commit()` (Stripe webhooks and `PaidSessionSettler`, Mollie `WebhookContractFulfillmentHandler`, PayPal `CheckoutOrderApprovedHandler` and `PaymentCaptureCompletedHandler`). For a contract in a terminal state, `refusal()` returns `refused('contract_cancelled')` and logs an `ERROR`. Thus a replaced contract never changes the order. **The gap:** the PSP keeps the money. Nobody gives it back, and the admin sees only a log line. This gap also exists today for the retire (`checkout_retry`).
-
-**Mitigation in four layers:**
-
-| Layer | Action | Where |
-|-------|--------|-------|
-| L1 Prevent | Close the old payment page before the adoption (4.6). Stripe: if paid, commit C1 and do not adopt (done in S3); else expire the Checkout Session. If the expire fails because the session is complete, ask again: paid → commit C1, no adoption. Mollie: cancel the payment when `isCancelable`. PayPal: nothing to do (L2 stops the capture). | S2d |
-| L2 Guard | A replaced contract never changes the order. This exists already in `ContractCommitService::refusal()`. Add one more test for each provider: a "paid" event for a cancelled contract does not change `OXPAID`, `OXTRANSSTATUS` or `OXPAYMENTTYPE` of O. PayPal: do not call capture for a cancelled contract. | S2b (tests), PayPal guard |
-| L3 Refund | When `commit()` refuses a confirmation because the contract is cancelled, dispatch a full refund to the provider of the confirmation (payment-base `RefundIntentEventInterface`, the same path as the admin refund). Record the result on C1: metadata `late_payment` = amount, currency, time, refund id or error. Do this once (idempotent by the authorization id). | S2g |
-| L4 Show | The admin Payment tab and the Help popup of O show a warning when a replaced contract of O has `late_payment`. A refund error shows "Refund manually" and logs an `ERROR`. The command `oe:payments:not_finished:cleanup` reports the number of open late payments. | S2g |
-
-**Not recommended now:** "late winner" — the late payment of C1 wins, C2 is cancelled, and O goes back to C1. A cancelled contract is terminal in the state machine. This needs a new non-terminal state "superseded". Record it as a follow-up.
-
-**Story S2g — Refund money that arrives on a replaced contract (estimate M, payment-base + each provider refund handler).**
-- Tests first: `ContractCommitServiceTest::testCommit_CancelledContract_DispatchesFullRefundOnce`, `…_RefundFails_RecordsLatePaymentAndLogsError`, `…_SecondConfirmation_DoesNotRefundTwice`. One integration test for each provider with a signed webhook replay: the old contract is cancelled, the payment event arrives, the order O does not change, the refund request goes to the PSP sandbox.
-- DoD: a sandbox run for Stripe (pay in a second tab after the change) and Mollie (pay on the open Mollie page after the change). Both payments come back as refunds. Order O stays unchanged. The admin sees the warning.
-
+S2f (mails) is part of S2c.
 
 ---
 
@@ -337,7 +251,7 @@ The original plan follows for reference.
 
 ## Story 2 — OPC retires the open attempt when the payment method changes
 
-**Status:** not necessary after the decision of 2026-10-29. S2a closes G3–G5. The fallback retire is in `EarlyOrderCreationHandler` (S1). The text stays for reference.
+**Status:** dropped 2026-10-29. S2a closes G3–G5; section 4.3 continues the same contract and order. There is no fallback retire. The text stays for reference.
 
 **Why:** G3, G4, G5. When the system releases the voucher row before the recalculation, the voucher stays in the basket. Then no restore is necessary.
 **Estimate:** M
@@ -366,7 +280,7 @@ The original plan follows for reference.
 **Status:** implemented 2026-10-29 together with S1 (necessary for S1: the shared retire can now reach a Stripe attempt), not committed.
 - `PaidSessionSettler` (new): the paid-session check moved out of `RetryCleanupService`. `RetryCleanupService` uses it, with no change of behaviour or wiring.
 - `StripeAwareAttemptCleaner` (new): Symfony decorator of `PreviousCheckoutAttemptCleanerInterface`. A Stripe contract with a paid session is committed and not cancelled. Each other contract goes to the payment-base cleaner unchanged.
-- When Stripe cannot answer, the retire continues (same rule as `RetryCleanupService` and `CheckoutInFlightGuard`). If it stops, the old order keeps the voucher and core refuses the new order.
+- ~~When Stripe cannot answer, the retire continues.~~ Changed 2026-10-29 (no fallbacks, stripe `566e24b`): a Stripe error reaches the caller; nothing is cancelled on a guess. The settler and the commit service are required.
 - Tests: `PaidSessionSettlerTest` 4, `StripeAwareAttemptCleanerTest` 4, `RetryCleanupServicePaidSessionTest` 4, `RetryCleanupServiceTest` 13 — green. The container resolves `PreviousCheckoutAttemptCleanerInterface` to `StripeAwareAttemptCleaner` (checked 2026-10-29).
 - Open: the sandbox DoD below.
 
