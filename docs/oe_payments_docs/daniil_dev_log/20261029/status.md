@@ -35,5 +35,5 @@
 | S2e wire the flow, remove retire/unwind paths | **done** | pb `c7559d8`, stripe `7c37b06`, mollie `4140787`, paypal `c7cce05`, OPC `86e3d9d7`, e2e `0b8c27c` | e2e 3/3: one order + one contract continue across Stripe/Mollie/PayPal — `done/OPC-175-S2e-continue-the-open-attempt.md` |
 | S2g refund on a replaced attempt | **done** | pb `97db439`, stripe `90773c6`, mollie `e2fd66e` | refunders unit + finder integration; admin view is a follow-up — `done/OPC-175-S2g-late-money-refund.md` |
 | S3 never cancel a paid Stripe attempt | done | stripe `7cd03e4`, `566e24b` | unit |
-| S4 Mollie/PayPal release + restock | open | | |
+| S4 Mollie/PayPal release + restock | **done** | pb `2193886`, mollie `af77b8a`, paypal `a3c4f48`, stripe `2db68e2` | G6 3/3, G7 1/1, restock on real stock 3/3, pb integration 242 — `done/OPC-175-S4-ended-order-releases.md` |
 | S5 full proof + closing report | open | | |
