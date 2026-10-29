@@ -187,6 +187,57 @@ class WebhookContractFulfillmentHandlerCancelOrderTest extends TestCase
         $this->assertSame([], $this->orderUpdater->calls, 'and its order is left alone');
     }
 
+    /**
+     * OPC-175 / S2b. The customer changed the payment method: the order was
+     * kept and now belongs to a new contract. A late cancel / fail / expiry of
+     * the old contract ends that contract, but must not end the order the new
+     * contract is being paid with.
+     */
+    public function testHandlePaymentCanceled_ContractReplacedOnItsOrder_LeavesTheOrderAlone(): void
+    {
+        $contract = $this->makeContractWithOrderId('order-kept');
+        $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
+        $this->contractRepository->method('findByOrderId')->with('order-kept')
+            ->willReturn($this->makeContractWithOrderId('order-kept'));
+
+        $this->assertTrue($this->makeHandler()->handlePaymentCanceled('pi_old', 'requested_by_customer'));
+        $this->assertTrue($contract->getState()->isCancelled());
+        $this->assertSame([], $this->orderUpdater->calls);
+    }
+
+    public function testHandlePaymentFailed_ContractReplacedOnItsOrder_LeavesTheOrderAlone(): void
+    {
+        $contract = $this->makeContractWithOrderId('order-kept');
+        $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
+        $this->contractRepository->method('findByOrderId')
+            ->willReturn($this->makeContractWithOrderId('order-kept'));
+
+        $this->assertTrue($this->makeHandler()->handlePaymentFailed('pi_old', 'card_declined'));
+        $this->assertSame([], $this->orderUpdater->calls);
+    }
+
+    public function testHandleSessionExpired_ContractReplacedOnItsOrder_LeavesTheOrderAlone(): void
+    {
+        $contract = $this->makeContractWithOrderId('order-kept');
+        $this->contractRepository->method('findById')->willReturn($contract);
+        $this->contractRepository->method('findByOrderId')
+            ->willReturn($this->makeContractWithOrderId('order-kept'));
+
+        $this->assertTrue($this->makeHandler()->handleSessionExpired('contract-old'));
+        $this->assertTrue($contract->getState()->isExpired());
+        $this->assertSame([], $this->orderUpdater->calls);
+    }
+
+    public function testHandlePaymentCanceled_ContractStillActiveOnItsOrder_CancelsTheOrder(): void
+    {
+        $contract = $this->makeContractWithOrderId('order-own');
+        $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
+        $this->contractRepository->method('findByOrderId')->willReturn($contract);
+
+        $this->assertTrue($this->makeHandler()->handlePaymentCanceled('pi_own', ''));
+        $this->assertSame(['cancelled:order-own'], $this->orderUpdater->calls);
+    }
+
     private function makeHandler(): WebhookContractFulfillmentHandler
     {
         return new WebhookContractFulfillmentHandler(

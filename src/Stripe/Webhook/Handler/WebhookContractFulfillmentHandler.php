@@ -9,6 +9,7 @@ use Psr\Log\LoggerInterface;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Contract\Transaction;
+use OxidEsales\PaymentBase\Repository\ContractOrderOwnership;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
@@ -41,9 +42,15 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
         private readonly ShopAdapterInterface $shopAdapter,
         private readonly ContractCaptureRecorder $captureRecorder,
         private readonly ?ContractRefundRecorder $refundRecorder = null,
-        private readonly ?LoggerInterface $logger = null
+        private readonly ?LoggerInterface $logger = null,
+        // OPC-175: optional so the existing wiring keeps working; built from the
+        // repository above when not given.
+        ?ContractOrderOwnership $orderOwnership = null
     ) {
+        $this->orderOwnership = $orderOwnership ?? new ContractOrderOwnership($contractRepository);
     }
+
+    private readonly ContractOrderOwnership $orderOwnership;
 
     /**
      * @inheritDoc
@@ -162,7 +169,7 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
     private function mirrorCancellationOnLinkedOrder(PaymentContractInterface $contract): void
     {
         $orderId = $contract->getOrderId();
-        if ($orderId === null || $orderId === '') {
+        if ($orderId === null || $orderId === '' || !$this->ownsItsOrder($contract)) {
             return;
         }
 
@@ -172,7 +179,7 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
     private function mirrorFailureOnLinkedOrder(PaymentContractInterface $contract, string $reason): void
     {
         $orderId = $contract->getOrderId();
-        if ($orderId === null || $orderId === '') {
+        if ($orderId === null || $orderId === '' || !$this->ownsItsOrder($contract)) {
             return;
         }
 
@@ -221,6 +228,26 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
         // contract was what made the order unreachable.
         $this->mirrorCancellationOnLinkedOrder($contract);
         return true;
+    }
+
+    /**
+     * OPC-175: the customer changed the payment method, the order was kept and
+     * a new contract took it over. The old contract's ending stays on the old
+     * contract; the order is the new contract's.
+     */
+    private function ownsItsOrder(PaymentContractInterface $contract): bool
+    {
+        if ($this->orderOwnership->ownsItsOrder($contract)) {
+            return true;
+        }
+
+        $this->logger?->info('Ending of a replaced contract not mirrored onto the order', [
+            'contract_id' => $contract->getId(),
+            'order_id' => $contract->getOrderId(),
+            'state' => $contract->getStateValue(),
+        ]);
+
+        return false;
     }
 
     /**
