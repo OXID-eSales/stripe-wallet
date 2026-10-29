@@ -21,3 +21,19 @@
   - Fallbacks removed: payment-base `6da11f1` (Voucher extension fails instead of falling back to core's rules), stripe `566e24b` (StripePaymentHandler requires the dispatcher; PaidSessionSettler requires guard + commit service, no "no commit service" branch; `CheckoutInFlightGuard::sessionOf()` lets a Stripe error through — unknown is not unpaid; RetryCleanupService gets the settler injected). Affected tests green (Stripe 9 files, payment-base Voucher/resolver 16); container resolves; S0 Playwright spec still 3/3 green.
   - Sprint section 4 rewritten: keep the order AND its contract — on Place Order the same contract is re-bound to the new provider (`rebindProvider()`, history `replaced_attempts`) and the order is rewritten in place from the current basket (`rewriteOrder()`); 1:1 enforced by a unique `OXORDERID` index (migration stops and lists duplicates) and an immutable contract order id; money on a replaced provider attempt is refunded. Goes away: retire for the open attempt, retire-on-return handlers (OPC/Stripe/Mollie/PayPal), OPC-96/OPC-185 voucher unwinds. New stories S2b (1:1), S2c (rewriteOrder + mails), S2d (rebind + close PSP page), S2e (wire + remove), S2g (refund).
 - Note: the S0 spec asserts the current retire behaviour (earlier order CANCELLED, new order); its expectations change with S2e (same order continues, new payment type).
+
+## OPC-175 story table (from 2026-10-29 evening)
+
+| Story | State | Commit | Proof |
+|---|---|---|---|
+| S0 proof | done | pb `f634b79`, mollie `33f7f28`, paypal `53563cf`, OPC e2e `2a4a7db` | Playwright 3/3; red tests G6/G7 wait for S4 |
+| S1 OPC Stripe on the shared chain | done | stripe `7cd03e4`, fallbacks removed `566e24b` | unit + e2e |
+| S2a coupon stays while the attempt is open | done | pb `1c97198`, `6da11f1` | e2e 3/3 + one-per-customer series |
+| S2b one order, one contract (enforced) | **done** | pb `2fa1706` | migration ran; `OneOrderOneContractMigrationTest` 6, unit 1951 — `done/OPC-175-S2b-one-order-one-contract.md` |
+| S2c rewrite the order in place | open | | |
+| S2d re-bind the contract, close the PSP page | open | | |
+| S2e wire the flow, remove retire/unwind paths | open | | |
+| S2g refund on a replaced attempt | open | | |
+| S3 never cancel a paid Stripe attempt | done | stripe `7cd03e4`, `566e24b` | unit |
+| S4 Mollie/PayPal release + restock | open | | |
+| S5 full proof + closing report | open | | |
