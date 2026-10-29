@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Webhook;
 
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Contract\ReplacedAttempts;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
 
@@ -103,6 +105,20 @@ class StripeWebhookEventParser
     /**
      * Extract contract_id from event metadata.
      */
+    /**
+     * OPC-175: Stripe stamps each session and payment intent with the attempt
+     * of the contract it was created for (`contract_attempt`, the number of
+     * attempts the contract had replaced by then). An object without a stamp
+     * was created before the stamp existed - attempt 0.
+     */
+    public function isForCurrentAttempt(WebhookEvent $event, PaymentContractInterface $contract): bool
+    {
+        $metadata = $event->getObject()['metadata'] ?? [];
+        $attempt = is_array($metadata) ? ($metadata['contract_attempt'] ?? '0') : '0';
+
+        return is_numeric($attempt) && (int) $attempt === count(ReplacedAttempts::of($contract));
+    }
+
     public function extractContractIdFromMetadata(WebhookEvent $event): ?string
     {
         $object = $event->getObject();

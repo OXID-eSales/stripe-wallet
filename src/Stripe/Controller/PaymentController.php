@@ -15,7 +15,6 @@ use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\ContractTokenService;
 use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
-use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
 
 /**
@@ -65,7 +64,11 @@ class PaymentController extends PaymentController_parent
     }
 
     /**
-     * Clean up a stale Stripe checkout attempt if one exists in the session.
+     * Clear the Stripe session keys of an attempt the customer comes back from.
+     *
+     * OPC-175: the attempt itself is not cancelled any more. One order, one
+     * contract: the next start continues the same contract and order with the
+     * payment method the customer picks now (payment-base ContractService).
      *
      * Delegates all session reads and clears to ControllerRequestHelper so that
      * the full key set (stripe_payment_intent_id, stripe_client_secret,
@@ -80,19 +83,8 @@ class PaymentController extends PaymentController_parent
     protected function cleanupStaleCheckoutAttempt(): void
     {
         $helper = $this->getRequestHelper();
-        $contractId = $helper->getContractIdFromSession();
-
-        if ($contractId === null) {
+        if ($helper->getContractIdFromSession() === null) {
             return;
-        }
-
-        try {
-            $cleanupService = $this->getServiceFromContainer(RetryCleanupService::class);
-            $cleanupService->cleanupPreviousAttempt($contractId);
-        } catch (\Throwable $e) {
-            Registry::getLogger()->error('STRP-105: Payment page cleanup failed', [
-                'error' => $e->getMessage(),
-            ]);
         }
 
         $helper->clearStripeSessionVariables();

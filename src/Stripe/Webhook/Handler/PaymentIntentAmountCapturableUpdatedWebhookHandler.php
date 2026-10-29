@@ -107,7 +107,7 @@ class PaymentIntentAmountCapturableUpdatedWebhookHandler extends AbstractStripeW
 
         $contractId = $this->parser->extractContractIdFromMetadata($event);
 
-        return $contractId !== null ? $this->contractRepository->findById($contractId) : null;
+        return $contractId !== null ? $this->contractOfCurrentAttempt($event, $contractId) : null;
     }
 
     private function currencyOf(WebhookEvent $event): string

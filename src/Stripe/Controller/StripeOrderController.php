@@ -34,7 +34,6 @@ use OxidEsales\Payments\Stripe\Service\LanguageTranslatorInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\OxidLanguageTranslator;
 use OxidEsales\Payments\Stripe\Service\OxidUserFieldReader;
-use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use OxidEsales\Payments\Stripe\Service\UserDataValidationMessageFormatter;
 use OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface;
 
@@ -86,9 +85,12 @@ class StripeOrderController extends StripeOrderController_parent
 
     /**
      * If the session holds a stripe_contract_id but the user is simply
-     * viewing the order page (not submitting), the previous checkout attempt
-     * is stale. Cancel the contract and delete the NOT_FINISHED order so
-     * that vouchers are released before the basket is recalculated.
+     * viewing the order page (not submitting), clear the Stripe session keys.
+     *
+     * OPC-175: the attempt itself is not cancelled any more. One order, one
+     * contract: the next start continues the same contract and order
+     * (payment-base ContractService); its voucher stays valid meanwhile
+     * (payment-base Voucher extension).
      *
      * @since 2.0.0 STRP-105
      */
@@ -101,18 +103,9 @@ class StripeOrderController extends StripeOrderController_parent
             return;
         }
 
-        try {
-            $cleanupService = $this->getServiceFromContainer(RetryCleanupService::class);
-            $cleanupService->cleanupPreviousAttempt($contractId);
-        } catch (Throwable $e) {
-            Registry::getLogger()->error('STRP-105: Order page cleanup failed', [
-                'error' => $e->getMessage(),
-            ]);
-        }
-
         $helper->clearStripeSessionVariables();
 
-        // Sprint 88: Generate new sess_challenge after storno cleanup
+        // Sprint 88: a fresh sess_challenge for the next attempt.
         $helper->setSessionVariable('sess_challenge', $this->generateNewSessChallenge());
     }
 
@@ -190,7 +183,6 @@ class StripeOrderController extends StripeOrderController_parent
         }
 
         try {
-            $this->cleanupPreviousCheckoutAttempt($helper);
             $context = $this->buildCheckoutEventContext($helper);
             $this->dispatchSessionEvent($helper, $context);
             $this->emitSessionResponse($context);
@@ -324,7 +316,7 @@ class StripeOrderController extends StripeOrderController_parent
     /**
      * Guard: reject the request when blConfirmAGB is active but the customer
      * has not submitted ord_agb=1. Must be called after session validation and
-     * before cleanupPreviousCheckoutAttempt() to avoid side effects on
+     * before the checkout session is created to avoid side effects on
      * invalid requests.
      *
      * Returns true when the request may proceed; false when rejected (HTTP 400
@@ -506,8 +498,10 @@ class StripeOrderController extends StripeOrderController_parent
      * Handle cancel/back-navigation from Stripe Checkout.
      *
      * When user cancels on Stripe hosted page, Stripe redirects here.
-     * Cleans up the NOT_FINISHED order and cancels the contract,
-     * then redirects to the payment page.
+     * OPC-175: the attempt is not cancelled - one order, one contract; the
+     * next start continues it with the payment method the customer picks.
+     * The Stripe session keys and the consent are cleared, then the customer
+     * goes back to the payment page.
      *
      * @since 2.0.0 STRP-100
      */
@@ -517,18 +511,10 @@ class StripeOrderController extends StripeOrderController_parent
         $contractId = $helper->getContractIdFromSession();
 
         if ($contractId !== null) {
-            try {
-                $cleanupService = $this->getServiceFromContainer(RetryCleanupService::class);
-                $cleanupService->cleanupPreviousAttempt($contractId);
-            } catch (Throwable $e) {
-                $helper->logError('checkoutCancel cleanup failed', $e);
-            }
             $helper->clearStripeSessionVariables();
         }
 
-        // Sprint 88: Generate new sess_challenge so the next finalizeOrder()
-        // creates a fresh order row instead of hitting checkOrderExist() for
-        // the storno'd order that remains in the database.
+        // Sprint 88: a fresh sess_challenge for the next attempt.
         $helper->setSessionVariable('sess_challenge', $this->generateNewSessChallenge());
 
         // Sprint 128: Clear consent — customer cancelled, so a new attempt
@@ -541,34 +527,6 @@ class StripeOrderController extends StripeOrderController_parent
     // ==========================================
     // CONTROLLER-SPECIFIC METHODS
     // ==========================================
-
-    /**
-     * Clean up previous checkout attempt before creating a new session.
-     *
-     * If the session has a contractId from a previous attempt, cancels that contract
-     * and deletes the NOT_FINISHED order. Otherwise falls back to userId lookup
-     * (covers the case where user closed the tab and lost the session).
-     *
-     * @since 2.0.0 STRP-100
-     */
-    protected function cleanupPreviousCheckoutAttempt(ControllerRequestHelper $helper): void
-    {
-        $cleanupService = $this->getServiceFromContainer(RetryCleanupService::class);
-        $previousContractId = $helper->getContractIdFromSession();
-
-        if ($previousContractId !== null) {
-            $cleanupService->cleanupPreviousAttempt($previousContractId);
-            $helper->clearStripeSessionVariables();
-            $helper->setSessionVariable('sess_challenge', $this->generateNewSessChallenge());
-            return;
-        }
-
-        // Fallback: user closed tab, session lost — look up by userId
-        $user = $this->getUser();
-        if ($user !== null) {
-            $cleanupService->cleanupForUser((string) $user->getId());
-        }
-    }
 
     /**
      * Process results from event context.

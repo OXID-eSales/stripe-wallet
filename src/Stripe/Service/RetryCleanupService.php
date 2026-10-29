@@ -53,20 +53,6 @@ class RetryCleanupService
     }
 
     /**
-     * Clean up any dangling checkout attempt for a user.
-     *
-     * Covers the case where the user closed the browser/tab (no cancel redirect,
-     * session lost) and comes back later with a new session. Looks up the most
-     * recent active contract by userId.
-     */
-    public function cleanupForUser(string $userId): bool
-    {
-        $contract = $this->contractRepository->findActiveByUserId($userId);
-
-        return $this->cancelContractAndDeleteOrder($contract);
-    }
-
-    /**
      * Clean up stale NOT_FINISHED contracts older than the given threshold.
      *
      * Called after webhook processing to garbage-collect abandoned checkouts

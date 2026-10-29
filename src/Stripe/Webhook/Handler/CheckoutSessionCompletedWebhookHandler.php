@@ -70,7 +70,7 @@ class CheckoutSessionCompletedWebhookHandler extends AbstractStripeWebhookHandle
             return StripeWebhookOutcome::of(WebhookResult::skipped('Contract not found for checkout session'));
         }
 
-        $contract = $this->contractRepository->findById($contractId);
+        $contract = $this->contractOfCurrentAttempt($event, $contractId);
         if ($contract === null) {
             return StripeWebhookOutcome::of(WebhookResult::skipped('Contract not found for checkout session'));
         }

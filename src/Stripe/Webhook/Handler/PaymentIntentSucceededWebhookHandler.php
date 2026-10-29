@@ -101,7 +101,7 @@ class PaymentIntentSucceededWebhookHandler extends AbstractStripeWebhookHandler
 
         $contractId = $this->parser->extractContractIdFromMetadata($event);
 
-        return $contractId !== null ? $this->contractRepository->findById($contractId) : null;
+        return $contractId !== null ? $this->contractOfCurrentAttempt($event, $contractId) : null;
     }
 
     /**
@@ -130,7 +130,7 @@ class PaymentIntentSucceededWebhookHandler extends AbstractStripeWebhookHandler
         ?float $amountReceived
     ): StripeWebhookOutcome {
         $contractId = $this->parser->extractContractIdFromMetadata($event);
-        $contract = $contractId !== null ? $this->contractRepository->findById($contractId) : null;
+        $contract = $contractId !== null ? $this->contractOfCurrentAttempt($event, $contractId) : null;
 
         if ($contract === null) {
             $this->logger->debug('No contract found, webhook processed without contract update', [

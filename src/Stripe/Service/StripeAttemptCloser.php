@@ -19,8 +19,11 @@ use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
  * OPC-175 — the customer leaves a Stripe attempt for another payment method.
  *
  * A paid session is not replaced. An open one is expired: Stripe then takes no
- * more payment on it. A complete or expired session needs nothing. A Stripe
- * error reaches the caller: nothing is replaced on a guess.
+ * more payment on it. A complete or expired session needs nothing. After
+ * checkout.session.completed the contract carries the payment intent instead
+ * of the session: succeeded, requires_capture or processing is paid, any other
+ * status can take no money without a new confirmation. A Stripe error reaches
+ * the caller: nothing is replaced on a guess.
  *
  * @since OPC-175
  */
@@ -28,6 +31,8 @@ final class StripeAttemptCloser implements PaymentAttemptCloserInterface
 {
     private const SESSION_OPEN = 'open';
     private const PAID = 'paid';
+    private const PAYMENT_INTENT_PREFIX = 'pi_';
+    private const PAID_PAYMENT_INTENT = ['succeeded', 'requires_capture', 'processing'];
 
     public function __construct(private readonly StripeAdapterFactoryInterface $adapterFactory)
     {
@@ -46,6 +51,12 @@ final class StripeAttemptCloser implements PaymentAttemptCloserInterface
         }
 
         $adapter = $this->adapterFactory->getStripeAdapter();
+        if (str_starts_with($sessionId, self::PAYMENT_INTENT_PREFIX)) {
+            $status = $adapter->retrievePaymentIntent($sessionId)->status;
+
+            return in_array($status, self::PAID_PAYMENT_INTENT, true) ? AttemptClosure::Paid : AttemptClosure::Closed;
+        }
+
         $session = $adapter->retrieveCheckoutSession($sessionId);
         if ($session->paymentStatus === self::PAID) {
             return AttemptClosure::Paid;

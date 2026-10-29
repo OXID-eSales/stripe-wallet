@@ -491,16 +491,12 @@ services:
   OxidEsales\PaymentBase\EventSystem\Handler\EarlyOrderCreationHandler:
     arguments:
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
-      $shopOrderService: '@OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface'
+      # OPC-175: creates the order of a new contract, rewrites the order of a
+      # contract that continues the open attempt (one order, one contract).
+      $earlyOrders: '@OxidEsales\PaymentBase\Adapter\EarlyOrderWriterInterface'
       $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
       $eventLogger: '@stripe.events.file_logger'
-      # STRP-171 - retire the NOT_FINISHED order this session already
-      # left behind, instead of stacking another one beside it.
-      $previousAttemptCleaner: '@OxidEsales\PaymentBase\Checkout\PreviousCheckoutAttemptCleanerInterface'
       $openAttempts: '@OxidEsales\PaymentBase\Checkout\OpenCheckoutAttemptRegistryInterface'
-      # GRAPH-QL / PS2: a headless start with nothing in the registry retires the
-      # open attempt for the same user basket (payment-base S3).
-      $openAttemptFinder: '@OxidEsales\PaymentBase\Repository\OpenAttemptFinderInterface'
     tags:
       - { name: payment.event_handler, priority: 100 }
     public: false
@@ -696,6 +692,7 @@ services:
     class: OxidEsales\Payments\Stripe\Service\CheckoutSessionService
     arguments:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $contracts: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
       $languageResolver: '@OxidEsales\Payments\Stripe\Service\LanguageResolverInterface'
@@ -716,18 +713,6 @@ services:
   OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalCancelUrlHandler:
     arguments:
       $sessionReader: '@OxidEsales\Payments\Stripe\EventSystem\Handler\OpcModalSessionReader'
-      $logger: '@oxid_esales.monolog.logger'
-    tags:
-      - { name: payment.event_handler }
-
-  # OPC-96: release Stripe reservations (voucher un-mark, NOT_FINISHED order
-  # storno, contract cancel) when the OPC modal is re-opened after an
-  # external-payment round-trip. Subscribes to the OPC-owned event
-  # OpcModalReopenedAfterExternalReturnEvent — the OPC module never
-  # references Stripe.
-  OxidEsales\Payments\Stripe\EventSystem\Handler\OpcExternalReturnCleanupHandler:
-    arguments:
-      $cleanupService: '@OxidEsales\Payments\Stripe\Service\RetryCleanupService'
       $logger: '@oxid_esales.monolog.logger'
     tags:
       - { name: payment.event_handler }

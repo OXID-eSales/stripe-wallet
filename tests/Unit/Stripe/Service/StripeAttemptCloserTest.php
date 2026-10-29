@@ -77,6 +77,26 @@ final class StripeAttemptCloserTest extends TestCase
         $this->closer()->close($this->contract('cs_1'));
     }
 
+    public function testClose_CompletedSessionWithASucceededPaymentIntent_IsPaid(): void
+    {
+        $this->adapter->method('retrievePaymentIntent')->with('pi_1')->willReturn($this->paymentIntent('succeeded'));
+        $this->adapter->expects($this->never())->method('retrieveCheckoutSession');
+
+        self::assertSame(AttemptClosure::Paid, $this->closer()->close($this->contract('pi_1')));
+    }
+
+    public function testClose_PaymentIntentThatNeedsAnotherConfirmation_IsClosed(): void
+    {
+        $this->adapter->method('retrievePaymentIntent')->willReturn($this->paymentIntent('requires_payment_method'));
+
+        self::assertSame(AttemptClosure::Closed, $this->closer()->close($this->contract('pi_1')));
+    }
+
+    private function paymentIntent(string $status): \OxidEsales\Payments\Stripe\Adapter\Dto\StripePaymentIntentDto
+    {
+        return new \OxidEsales\Payments\Stripe\Adapter\Dto\StripePaymentIntentDto('pi_1', $status, 100, 'eur', 0, null);
+    }
+
     private function closer(): StripeAttemptCloser
     {
         $factory = $this->createMock(StripeAdapterFactoryInterface::class);

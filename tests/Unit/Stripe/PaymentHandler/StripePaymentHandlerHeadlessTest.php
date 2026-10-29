@@ -14,10 +14,12 @@ use OxidEsales\PaymentBase\Adapter\PaymentContextInterface;
 use OxidEsales\PaymentBase\Adapter\Request\CreateOrderRequest;
 use OxidEsales\PaymentBase\Adapter\Response\OrderResponse;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
+use OxidEsales\PaymentBase\Adapter\EarlyOrderWriter;
+use OxidEsales\PaymentBase\Adapter\ShopOrderRewriterInterface;
 use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
+use OxidEsales\PaymentBase\Contract\AttemptClosure;
 use OxidEsales\PaymentBase\Checkout\Context\CheckoutContextInterface;
 use OxidEsales\PaymentBase\Checkout\OpenCheckoutAttemptRegistry;
-use OxidEsales\PaymentBase\Checkout\PreviousCheckoutAttemptCleanerInterface;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
@@ -82,7 +84,7 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
     private ShopOrderServiceInterface&MockObject $shopOrderService;
     private TokenServiceInterface&MockObject $tokenService;
     private PaymentContract $contract;
-    private ?PreviousCheckoutAttemptCleanerInterface $cleaner = null;
+    private ShopOrderRewriterInterface&MockObject $orderRewriter;
     private ?OpenCheckoutAttemptRegistry $openAttempts = null;
     private ?CheckoutInFlightGuard $inFlightGuard = null;
     private bool $wireTheSharedChain = true;
@@ -95,6 +97,7 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
         $this->shopOrderService = $this->createMock(ShopOrderServiceInterface::class);
         $this->tokenService = $this->createMock(TokenServiceInterface::class);
         $this->tokenService->method('generateToken')->willReturn('tok');
+        $this->orderRewriter = $this->createMock(ShopOrderRewriterInterface::class);
 
         $this->contract = new PaymentContract(1, 'user_123', BasketSnapshot::fromArray([
             'items' => [], 'discounts' => [], 'totalGross' => 100.0, 'totalNet' => 84.03, 'totalVat' => 15.97, 'currency' => 'EUR',
@@ -315,41 +318,34 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
     }
 
     /**
-     * OPC-175 — the attempt this session left open (any provider) is retired
-     * BEFORE the new order exists: its voucher rows are free again when core's
-     * finalizeOrder() validates the basket vouchers.
+     * OPC-175 — one order, one contract. The open attempt of this session
+     * (here a Mollie one) continues: payment-base's ContractService hands back
+     * the same contract, reopened with its order; that order is written again
+     * for Stripe. No second order, no second contract.
      */
-    public function testOpcStart_RetiresThePreviousAttemptBeforeTheOrderIsCreated(): void
+    public function testOpcStart_AnOpenAttemptContinues_ItsOrderIsWrittenAgain(): void
     {
-        $calls = [];
-        $this->openAttempts = $this->registryRemembering('contract-mollie-0');
-        $cleaner = $this->createMock(PreviousCheckoutAttemptCleanerInterface::class);
-        $cleaner->expects($this->once())->method('clean')->with('contract-mollie-0')
-            ->willReturnCallback(static function () use (&$calls): bool {
-                $calls[] = 'retire';
-
-                return true;
-            });
-        $this->cleaner = $cleaner;
+        $this->contract->transitionToNotFinished('order-kept');
+        $this->contract->transitionToPending();
+        $this->contract->setProvider('mollie', 'tr_1');
+        $this->contract->reopenForNewAttempt(AttemptClosure::Closed, $this->contract->getBasketSnapshot(), [ContractCondition::TYPE_PAYMENT_AUTHORIZED]);
         $this->shopOrderService = $this->createMock(ShopOrderServiceInterface::class);
-        $this->shopOrderService->method('createOrder')->willReturnCallback(function () use (&$calls): OrderResponse {
-            $calls[] = 'createOrder';
-
-            return $this->orderResponse();
-        });
+        $this->shopOrderService->expects($this->never())->method('createOrder');
+        $this->orderRewriter->expects($this->once())->method('rewriteOrder')->with('order-kept')
+            ->willReturn(new OrderResponse('order-kept', 1001, 'user_123', 100.0, 'EUR', 'not_finished', StripeDefinitions::STRIPE_WALLET_PAYMENT_ID));
         $this->checkoutSessionService->method('createSession')
             ->willReturn(CheckoutSessionResult::success('cs_1', 'https://checkout.stripe.com/c/cs_1'));
 
         $result = $this->handler()->processPayment($this->opcContext());
 
         self::assertTrue($result->isSuccess(), (string) $result->getErrorMessage());
-        self::assertSame(['retire', 'createOrder'], $calls);
+        self::assertSame('order-kept', $this->contract->getOrderId());
+        self::assertTrue($this->contract->getState()->isPending());
     }
 
     public function testOpcStart_RemembersTheNewContractAsTheOpenAttemptOfThisSession(): void
     {
         $this->openAttempts = $this->registryRemembering(null);
-        $this->cleaner = $this->createMock(PreviousCheckoutAttemptCleanerInterface::class);
         $this->checkoutSessionService->method('createSession')
             ->willReturn(CheckoutSessionResult::success('cs_1', 'https://checkout.stripe.com/c/cs_1'));
 
@@ -377,7 +373,7 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
         self::assertSame('STRIPE_PAYMENT_FAILED', $result->getErrorCode());
     }
 
-    public function testOpcStart_WhenTheCheckoutInFlightIsReused_NeitherRetiresNorCreatesAnOrder(): void
+    public function testOpcStart_WhenTheCheckoutInFlightIsReused_NoOrderIsWritten(): void
     {
         $inFlight = $this->createMock(CheckoutInFlightGuard::class);
         $inFlight->method('inspect')->willReturn(new StripeCheckoutSessionDto(
@@ -392,11 +388,9 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
         ));
         $this->inFlightGuard = $inFlight;
         $this->contractRepository->method('findActiveByUserId')->willReturn($this->contract);
-        $cleaner = $this->createMock(PreviousCheckoutAttemptCleanerInterface::class);
-        $cleaner->expects($this->never())->method('clean');
-        $this->cleaner = $cleaner;
         $this->openAttempts = $this->registryRemembering('contract-1');
         $this->shopOrderService->expects($this->never())->method('createOrder');
+        $this->orderRewriter->expects($this->never())->method('rewriteOrder');
 
         $result = $this->handler()->processPayment($this->opcContext());
 
@@ -448,11 +442,8 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
 
         $earlyOrderCreation = new EarlyOrderCreationHandler(
             $this->contractRepository,
-            $this->shopOrderService,
-            null,
-            null,
-            $this->cleaner,
-            $this->openAttempts,
+            new EarlyOrderWriter($this->shopOrderService, $this->orderRewriter),
+            $this->openAttempts ?? $this->registryRemembering(null),
         );
 
         return new EventDispatcher(new EventListenerProvider([$earlyOrderCreation]));
