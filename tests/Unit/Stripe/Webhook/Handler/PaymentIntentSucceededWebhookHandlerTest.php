@@ -38,7 +38,8 @@ final class PaymentIntentSucceededWebhookHandlerTest extends TestCase
             new StripeWebhookEventParser(),
             $this->fulfillmentHandler,
             $this->contractRepository,
-            $this->logger
+            $this->logger,
+            $this->createMock(\OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder::class)
         );
     }
 

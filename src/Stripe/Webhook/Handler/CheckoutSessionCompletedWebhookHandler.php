@@ -17,6 +17,7 @@ use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookOutcome;
+use OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -36,6 +37,8 @@ class CheckoutSessionCompletedWebhookHandler extends AbstractStripeWebhookHandle
         WebhookContractFulfillmentHandlerInterface $fulfillmentHandler,
         ContractRepositoryInterface $contractRepository,
         LoggerInterface $logger,
+        // OPC-175 / S2g: money on a replaced attempt goes back to the customer.
+        private readonly StripeLatePaymentRefunder $lateMoney,
         ?ContractCommitServiceInterface $contractCommit = null
     ) {
         parent::__construct($parser, $fulfillmentHandler, $contractRepository, $logger, $contractCommit);
@@ -58,6 +61,10 @@ class CheckoutSessionCompletedWebhookHandler extends AbstractStripeWebhookHandle
         $paymentIntentId = $object['payment_intent'] ?? null;
         if (!is_string($paymentIntentId) || $paymentIntentId === '') {
             return StripeWebhookOutcome::of(WebhookResult::skipped('No payment intent ID in checkout session'));
+        }
+
+        if ($this->refundIfReplacedAttempt($event, $paymentIntentId, $this->lateMoney)) {
+            return StripeWebhookOutcome::of(WebhookResult::skipped('Payment on a replaced checkout attempt: given back'));
         }
 
         $this->logger->info('Processing checkout.session.completed', [

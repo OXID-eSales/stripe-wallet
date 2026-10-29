@@ -285,6 +285,13 @@ services:
   # session is committed, never cancelled. `decorates` is resolved when the
   # container is compiled, so the order of the imported services files does
   # not matter.
+  # OPC-175 / S2g: money on a replaced attempt goes back to the customer.
+  OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder:
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $contracts: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
+
   # OPC-175: closes the Stripe payment page of an attempt the customer leaves.
   OxidEsales\Payments\Stripe\Service\StripeAttemptCloser:
     arguments:
@@ -1238,6 +1245,7 @@ services:
       $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
+      $lateMoney: '@OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder'
       # GRAPH-QL / PS3: a paid intent / session commits a PENDING contract
       # (payment-base ContractCommitService) - the return leg is no longer the
       # only way.
@@ -1253,6 +1261,7 @@ services:
       $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
+      $lateMoney: '@OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder'
       $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
     tags: [ { name: stripe.webhook_handler } ]
     public: false
@@ -1299,6 +1308,7 @@ services:
       $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
+      $lateMoney: '@OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder'
       # GRAPH-QL / PS3: a paid intent / session commits a PENDING contract
       # (payment-base ContractCommitService) - the return leg is no longer the
       # only way.

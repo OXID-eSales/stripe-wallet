@@ -17,6 +17,7 @@ use OxidEsales\PaymentBase\Service\Commit\PaymentConfirmation;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventHandlerInterface;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookOutcome;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
@@ -163,6 +164,27 @@ abstract class AbstractStripeWebhookHandler implements StripeWebhookEventHandler
         }
 
         return $contract;
+    }
+
+    /**
+     * OPC-175 / S2g — money that arrives on a replaced attempt goes back to the
+     * customer. True when the event belongs to a replaced attempt (it is then
+     * handled here and must not reach the contract).
+     */
+    protected function refundIfReplacedAttempt(
+        WebhookEvent $event,
+        string $paymentIntentId,
+        StripeLatePaymentRefunder $lateMoney
+    ): bool {
+        $contractId = $this->parser->extractContractIdFromMetadata($event);
+        $contract = $contractId === null ? null : $this->contractRepository->findById($contractId);
+        if ($contract === null || !$this->isOfReplacedAttempt($event, $contract)) {
+            return false;
+        }
+
+        $lateMoney->settle($contract, $this->parser->attemptOf($event), $paymentIntentId);
+
+        return true;
     }
 
     protected function isOfReplacedAttempt(WebhookEvent $event, PaymentContractInterface $contract): bool

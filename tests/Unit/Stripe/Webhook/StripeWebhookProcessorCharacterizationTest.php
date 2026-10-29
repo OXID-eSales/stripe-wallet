@@ -647,7 +647,8 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
                 $parser,
                 $this->fulfillmentHandler,
                 $this->contractRepository,
-                $this->logger
+                $this->logger,
+                $this->createMock(\OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder::class)
             ),
             new PaymentIntentFailedWebhookHandler(
                 $parser,
@@ -677,7 +678,8 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
                 $parser,
                 $this->fulfillmentHandler,
                 $this->contractRepository,
-                $this->logger
+                $this->logger,
+                $this->createMock(\OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder::class)
             ),
             new CheckoutSessionExpiredWebhookHandler(
                 $parser,

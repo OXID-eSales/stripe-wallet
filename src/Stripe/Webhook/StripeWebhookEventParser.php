@@ -113,10 +113,19 @@ class StripeWebhookEventParser
      */
     public function isForCurrentAttempt(WebhookEvent $event, PaymentContractInterface $contract): bool
     {
+        return $this->attemptOf($event) === count(ReplacedAttempts::of($contract));
+    }
+
+    /**
+     * The attempt the Stripe object was created for: its index in the contract's
+     * history once it is replaced.
+     */
+    public function attemptOf(WebhookEvent $event): int
+    {
         $metadata = $event->getObject()['metadata'] ?? [];
         $attempt = is_array($metadata) ? ($metadata['contract_attempt'] ?? '0') : '0';
 
-        return is_numeric($attempt) && (int) $attempt === count(ReplacedAttempts::of($contract));
+        return is_numeric($attempt) ? (int) $attempt : 0;
     }
 
     public function extractContractIdFromMetadata(WebhookEvent $event): ?string
