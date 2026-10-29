@@ -44,6 +44,7 @@ The customer applies a coupon in OPC. Then the customer changes the payment meth
 | G6 | A Mollie webhook `canceled` / `failed` / `expired` sets only `OXTRANSSTATUS` (`OxidContractLinkedOrderUpdater::markCancelled()` :25, `markFailed()` :36). It does not set `OXSTORNO` and does not release the vouchers. The cleanup command finds only `NOT_FINISHED` orders (`DoctrineNotFinishedOrderRepository::findStaleNotFinishedOrderIds()` :49). | `mollie-payment/src/Mollie/Service/OxidContractLinkedOrderUpdater.php` | The voucher stays used for all time. |
 | G7 | The PayPal webhook `PAYMENT.AUTHORIZATION.VOIDED` cancels only the contract. The order stays `NOT_FINISHED`. | `paypal/src/PayPal/WebhookHandler/PaymentAuthorizationVoidedHandler.php:34-46` | The voucher comes back only after the cleanup command runs (after N days). |
 | G8 | Nothing dispatches `ContractCancelledEvent`. `ContractCleanupHandler` only saves the contract. A contract cancel does not cascade to the order or the vouchers. | `payment-base/src/EventSystem/Handler/ContractCleanupHandler.php` | Each provider must do the order and voucher work itself. G6 and G7 are the result. |
+| G9 | Each early order takes the stock (`finalizeOrder()`). The retire (`deleteNotFinishedOrder()`, SQL storno) does not restock. Found in S0 (100 → 98 after one retired and one open attempt). | `payment-base/src/Repository/DoctrineNotFinishedOrderRepository.php::cancelOrder()` | Each retired attempt loses one unit of stock for good. The adoption avoids it; the fallback retire must restock (S4). |
 
 **Why Stripe does not use `OpenCheckoutAttemptRegistry` (answer to the question about G1, 2026-10-29).** There is no technical reason. The cause is the history of the code:
 
@@ -252,6 +253,12 @@ Add one narrow interface in payment-base: `CheckoutAttemptInvalidatorInterface::
 ---
 
 ## Story 0 — Proof: show the defect with tests before the change
+
+**Status:** done 2026-10-29 (not committed). Report `../reports/01-OPC-175-proof-2026-10-29.md`.
+- Playwright `opc-175-coupon-survives-payment-switch.spec.ts` (Stripe→Mollie, Mollie→Stripe, PayPal→Stripe): the retire checks are green (S1); the coupon checks are red — the coupon is lost already at the **first** Place Order, so the second order has no discount.
+- Integration: payment-base `RetireReleasesVoucherTest` green; mollie `LinkedOrderEndReleasesVoucherTest` 2 red (G6); paypal `AuthorizationVoidedReleasesVoucherTest` red (G7).
+- New gap **G9**: each early order takes the stock; the retire does not restock (100 → 98 after one retired + one open attempt).
+- Not done: the roundtrip spec with a real payment (the card form in the iframe is not automatable here) and the standard `cl=order` regression spec — moved to S5.
 
 **Why:** We do not have a reproduction in tests yet. Each later story must change a red test to green.
 **Estimate:** M
