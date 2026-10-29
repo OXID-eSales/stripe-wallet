@@ -23,8 +23,8 @@ final class InMemoryStripeSettings implements StripeAdminSettingsInterface
      */
     public function __construct(
         private StripeConfigSnapshot $current,
-        private array $tokens = ['test' => 'sk_test_AAAAAAAAAAstored', 'live' => ''],
-        private array $platformKeys = ['test' => 'sk_test_PLATFORMstored', 'live' => ''],
+        private array $tokens = ['test' => 'sk_test_fakeAAAAAAAAAAstored', 'live' => ''],
+        private array $platformKeys = ['test' => 'sk_test_fakePLATFORMstored', 'live' => ''],
     ) {
     }
 

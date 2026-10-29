@@ -23,10 +23,10 @@ final class StripeConfigChangeValidatorTest extends TestCase
             mode: 'live',
             captureMode: 'manual',
             logLevel: 'debug',
-            testPublishableKey: 'pk_test_AAAAAAAAAAbbbb',
+            testPublishableKey: 'pk_test_fakeAAAAAAAAAAbbbb',
             livePublishableKey: '',
-            testToken: 'sk_test_AAAAAAAAAAyyyy',
-            livePlatformKey: 'rk_live_PLATFORMplatform',
+            testToken: 'sk_test_fakeAAAAAAAAAAyyyy',
+            livePlatformKey: 'rk_live_fakePLATFORMplatform',
             webhookSecret: 'whsec_AAAAAAAAAAAA',
         );
 
@@ -41,13 +41,13 @@ final class StripeConfigChangeValidatorTest extends TestCase
         yield 'mode' => [new StripeConfigChange('v', mode: 'staging'), 'mode', 'not_allowed'];
         yield 'capture mode' => [new StripeConfigChange('v', captureMode: 'later'), 'captureMode', 'not_allowed'];
         yield 'log level' => [new StripeConfigChange('v', logLevel: 'verbose'), 'logLevel', 'not_allowed'];
-        yield 'publishable key format' => [new StripeConfigChange('v', testPublishableKey: 'sk_test_AAAAAAAAAAbbbb'), 'testPublishableKey', 'invalid_format'];
-        yield 'live key in the test field' => [new StripeConfigChange('v', testPublishableKey: 'pk_live_AAAAAAAAAAbbbb'), 'testPublishableKey', 'wrong_mode'];
-        yield 'test token in the live field' => [new StripeConfigChange('v', liveToken: 'sk_test_AAAAAAAAAAyyyy'), 'liveToken', 'wrong_mode'];
+        yield 'publishable key format' => [new StripeConfigChange('v', testPublishableKey: 'sk_test_fakeAAAAAAAAAAbbbb'), 'testPublishableKey', 'invalid_format'];
+        yield 'live key in the test field' => [new StripeConfigChange('v', testPublishableKey: 'pk_live_fakeAAAAAAAAAAbbbb'), 'testPublishableKey', 'wrong_mode'];
+        yield 'test token in the live field' => [new StripeConfigChange('v', liveToken: 'sk_test_fakeAAAAAAAAAAyyyy'), 'liveToken', 'wrong_mode'];
         yield 'token format' => [new StripeConfigChange('v', testToken: 'not a key'), 'testToken', 'invalid_format'];
-        yield 'a publishable key as the token' => [new StripeConfigChange('v', testToken: 'pk_test_AAAAAAAAAAbbbb'), 'testToken', 'invalid_format'];
+        yield 'a publishable key as the token' => [new StripeConfigChange('v', testToken: 'pk_test_fakeAAAAAAAAAAbbbb'), 'testToken', 'invalid_format'];
         yield 'platform key format' => [new StripeConfigChange('v', livePlatformKey: 'whsec_AAAAAAAAAAAA'), 'livePlatformKey', 'invalid_format'];
-        yield 'webhook secret format' => [new StripeConfigChange('v', webhookSecret: 'sk_test_AAAAAAAAAAyyyy'), 'webhookSecret', 'invalid_format'];
+        yield 'webhook secret format' => [new StripeConfigChange('v', webhookSecret: 'sk_test_fakeAAAAAAAAAAyyyy'), 'webhookSecret', 'invalid_format'];
     }
 
     #[DataProvider('invalidChanges')]

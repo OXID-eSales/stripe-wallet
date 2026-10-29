@@ -221,7 +221,7 @@ final class StripeAdminApiWiringTest extends IntegrationTestCase
         $before = $this->service(StripeAdminSettingsInterface::class)->snapshot();
 
         $response = $this->probe(
-            'mutation { adminStripeConfigModify(input: { expectedVersion: "' . $before->version() . '", testToken: "sk_test_PAY10notarealkey", captureMode: "manual" }) '
+            'mutation { adminStripeConfigModify(input: { expectedVersion: "' . $before->version() . '", testToken: "sk_test_fakePAY10notarealkey", captureMode: "manual" }) '
             . '{ config { version } errors { errorCode message ... on ValidationError { field code } } } }'
         );
 

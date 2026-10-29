@@ -36,13 +36,13 @@ final class StripeConfigChangeTest extends TestCase
     {
         $change = new StripeConfigChange(
             expectedVersion: 'v1',
-            liveToken: 'sk_live_AAAAAAAAAAvalue',
-            livePlatformKey: 'sk_live_PLATFORMvalue',
+            liveToken: 'sk_live_fakeAAAAAAAAAAvalue',
+            livePlatformKey: 'sk_live_fakePLATFORMvalue',
             webhookSecret: 'whsec_value1234',
         );
 
-        self::assertSame('sk_live_AAAAAAAAAAvalue', $change->tokenFor('live'));
-        self::assertSame('sk_live_PLATFORMvalue', $change->platformKeyFor('live'));
+        self::assertSame('sk_live_fakeAAAAAAAAAAvalue', $change->tokenFor('live'));
+        self::assertSame('sk_live_fakePLATFORMvalue', $change->platformKeyFor('live'));
         self::assertTrue($change->writesSecret());
         self::assertSame(['liveToken', 'livePlatformKey', 'webhookSecret'], $change->fieldNames());
         self::assertStringNotContainsString('value', implode(',', $change->fieldNames()));
@@ -50,15 +50,15 @@ final class StripeConfigChangeTest extends TestCase
 
     public function testTouchesTheKeysOfAMode(): void
     {
-        $change = new StripeConfigChange(expectedVersion: 'v1', livePublishableKey: 'pk_live_AAAAAAAAAAbbbb');
+        $change = new StripeConfigChange(expectedVersion: 'v1', livePublishableKey: 'pk_live_fakeAAAAAAAAAAbbbb');
 
         self::assertTrue($change->touchesKeys('live'));
         self::assertFalse($change->touchesKeys('test'));
-        self::assertTrue((new StripeConfigChange(expectedVersion: 'v1', testToken: 'sk_test_AAAAAAAAAAyyyy'))->touchesKeys('test'));
+        self::assertTrue((new StripeConfigChange(expectedVersion: 'v1', testToken: 'sk_test_fakeAAAAAAAAAAyyyy'))->touchesKeys('test'));
     }
 
     public function testAPlatformKeyAloneDoesNotTouchThePairOfKeys(): void
     {
-        self::assertFalse((new StripeConfigChange(expectedVersion: 'v1', testPlatformKey: 'sk_test_PLATFORMplatform'))->touchesKeys('test'));
+        self::assertFalse((new StripeConfigChange(expectedVersion: 'v1', testPlatformKey: 'sk_test_fakePLATFORMplatform'))->touchesKeys('test'));
     }
 }

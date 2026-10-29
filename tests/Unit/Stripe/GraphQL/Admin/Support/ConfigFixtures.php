@@ -26,7 +26,7 @@ final class ConfigFixtures
             'provideCustomerEmail' => false,
             'logLevel' => 'normal',
             'logWebhooks' => true,
-            'testPublishableKey' => 'pk_test_AAAAAAAAAAbbbb',
+            'testPublishableKey' => 'pk_test_fakeAAAAAAAAAAbbbb',
             'livePublishableKey' => '',
             'webhookEndpointUrl' => 'https://shop.example/index.php?cl=stripewebhook',
             'classicSettingsUrl' => 'https://shop.example/admin/index.php?cl=module_config&oxid=oe_payments_stripe_wallet&shp=1',
