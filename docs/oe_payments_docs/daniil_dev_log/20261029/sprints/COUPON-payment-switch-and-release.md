@@ -154,6 +154,14 @@ With the adoption, the voucher row stays linked to O all the time. Each OPC reca
 
 This extension keeps the coupon in the basket. The OPC-185 unwind and the OPC-96 snapshot restore then become safety nets only.
 
+**Status of 4.5 (S2a):** implemented 2026-10-29, payment-base `1c97198` on `b-7.4.x-coupon-reaplying-OPC-175`.
+- `Voucher` extension (`oxVoucher::class => Voucher::class` in `metadata.php`): `isAvailable()` accepts the row of the open attempt's order; `isAvailableInOtherOrder()` does not count that order as an earlier use. Every other row keeps core's rules; core's rules also apply when the open attempt cannot be read.
+- `OpenCheckoutAttemptOrder` (+ interface, public service): reads `OpenCheckoutAttemptRegistry`, answers the order id only while the contract is neither committed nor terminal.
+- Tests: `VoucherTest` 10, `OpenCheckoutAttemptOrderTest` 6; unit suite 1950 green; PHPCS / PHPMD green; PHPStan clean on the new files (`metadata.php` keeps its 4 errors from before).
+- Proof: the S0 Playwright spec is green in all three directions (total stays 1320, the voucher moves to the open order), and with the one-per-customer series `E2E_NOSTACK` (Stripe → Mollie).
+- Shop: the class extension needs `oe_payment_base` re-activated. The shared shop refuses this while Stripe depends on it, so the two YAML entries were added by hand (`modules/oe_payment_base.yaml` `classExtensions`, `class_extension_chain.yaml`; backups in the job tmp) and the cache cleared. Each other installation: deactivate the dependants, re-activate payment-base, or re-run the module configuration.
+- Known limit: a coupon code that the customer removes and enters again while its row is held by the open attempt is refused by `Voucher::getVoucherByNr()` (it selects free rows only). The basket keeps the coupon otherwise, so this needs a remove + re-add. Record for S5.
+
 ### 4.6 Invalidate the PSP attempt of C1
 
 | Provider | Action | If not possible |
