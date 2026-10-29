@@ -22,69 +22,27 @@ Requires payment-base with its admin payment API (1.5.0) and, for the provider w
 
 | Operation | Right | Does |
 | --- | --- | --- |
-| `adminStripeConfig: AdminStripeConfig!` | `ADMIN_PAYMENT_CONFIG` | mode, captureMode, removeByBillingCountry, removeByBasketCurrency, provideCustomerEmail, logLevel, logWebhooks, test/live publishable keys, webhookEndpointUrl, `classicSettingsUrl` (the classic admin's settings page of this module for the current shop, `{shopUrl}{adminDir}/index.php?cl=module_config&oxid=oe_payments_stripe_wallet&shp=<shopId>`; where the Connect onboarding runs, no secret in it), `secretsEditable` (true only for a superadmin, see below), flags `testTokenSet` `liveTokenSet` `testPlatformKeySet` `livePlatformKeySet` `webhookSecretSet` `testConnected` `liveConnected`, `keyValidationError`, `version` |
-| `adminStripeConfigModify(input: AdminStripeConfigInput!): AdminStripeConfigPayload!` | `ADMIN_PAYMENT_CONFIG` | changes settings; `{ config, errors }` |
+| `adminStripeConfig: AdminStripeConfig!` | `ADMIN_PAYMENT_CONFIG` | mode, captureMode, removeByBillingCountry, removeByBasketCurrency, provideCustomerEmail, logLevel, logWebhooks, test/live publishable keys, webhookEndpointUrl, `classicSettingsUrl` (the classic admin's settings page of this module for the current shop, `{shopUrl}{adminDir}/index.php?cl=module_config&oxid=oe_payments_stripe_wallet&shp=<shopId>`; where the Connect onboarding runs, no secret in it), flags `testTokenSet` `liveTokenSet` `testPlatformKeySet` `livePlatformKeySet` `webhookSecretSet` `testConnected` `liveConnected`, `keyValidationError`, `version` |
 | `adminStripeWebhookStatus: AdminStripeWebhookStatus!` | `ADMIN_PAYMENT_CONFIG` | `mode`, `configured`, `endpointId`, `url` |
-| `adminStripeWebhookRegister: AdminStripeWebhookPayload!` | `ADMIN_PAYMENT_CONFIG` + superadmin + step-up | registers or updates the shop's endpoint at Stripe, stores id and signing secret |
-| `adminStripeWebhookClearAll: AdminStripeWebhookPayload!` | `ADMIN_PAYMENT_CONFIG` + step-up | deletes the endpoints at Stripe that point at this shop's URL, forgets the stored one |
 | `AdminPaymentContract.stripe: AdminStripePaymentDetails` | `ADMIN_PAYMENT_VIEW` | `paymentIntentId`, `chargeId`, `externalTransactionId`, `intentStatus`, `dashboardUrl`, `apiError` (read-only; null for a contract of another provider) |
 
-### Secrets are write-only
+### Read-only: the settings change in the classic admin only (CFG-1)
+
+The admin API **cannot change any Stripe setting**: there is no mutation for the configuration, the API keys, the webhook
+secret or the webhook endpoints (`adminStripeConfigModify`, `adminStripeWebhookRegister` and `adminStripeWebhookClearAll`
+were removed, with their input and payload types, the modifier, validator, audit and step-up services and
+`AdminStripeConfig.secretsEditable`). Use the classic admin's module configuration (`classicSettingsUrl`): the form, the
+Connect onboarding and the "Create webhooks" / "Clear all webhooks" buttons are unchanged. What stays: the two read queries,
+the contract extension below, and payment-base's money operations (capture, refund, void).
+
+### Secrets never leave the shop
 
 No type has a field that could carry a secret value: the config says `testTokenSet`, `liveTokenSet`, `testPlatformKeySet`,
-`livePlatformKeySet`, `webhookSecretSet` and nothing else. The input takes `testToken`, `liveToken`, `testPlatformKey`,
-`livePlatformKey` and `webhookSecret`; **empty or absent means unchanged** (there is no way to read one back, so empty cannot
-mean "clear"). A secret is a field name in the audit log, never a value; `StripeConfigChange` marks its secrets
-`#[SensitiveParameter]`; validation messages never quote a value; Stripe's own error messages are scrubbed of `sk_`/`rk_`/
-`pk_`/`whsec_` strings (`StripeSecretRedactor`). The signing secret Stripe returns when it creates an endpoint is stored and
-never returned. Proof: `Unit\Stripe\GraphQL\Admin\NoSecretInAnyAnswerTest` searches every field of every answer, refusals
-included, for every stored, new and Stripe-created secret and for secret-shaped strings; the integration test does the same
-against the secrets stored in the real shop.
-
-### Secrets: superadmin only (PAY-10)
-
-`ADMIN_PAYMENT_CONFIG` is enough for every non-secret field (mode, capture mode, filters, publishable keys, webhook URL,
-logging). A call that carries a **non-empty** `testToken`, `liveToken`, `testPlatformKey`, `livePlatformKey` or
-`webhookSecret`, and `adminStripeWebhookRegister` (it stores a signing secret), need the built-in **superadmin** role
-(payment-base's `AdminSuperadminCheckInterface`). Otherwise the whole call is refused, nothing is written (the harmless
-fields of the same call are not saved either) and the payload's `errors` holds a `ValidationError`
-`{ errorCode: validation_failed, field, code: superadmin_required }`: `field` is the first secret sent (in the order
-testToken, liveToken, testPlatformKey, livePlatformKey, webhookSecret), `webhook` for register. The audit row is the refused
-call, field names only. `adminStripeWebhookClearAll` deletes endpoints but no key: unchanged. `AdminStripeConfig.secretsEditable:
-Boolean!` tells the client (true only for a superadmin). Order of checks: right, **superadmin**, step-up (a non-superadmin is
-never asked for a second factor), optimistic lock, validation. Without the admin module the check says "no".
-
-### `adminStripeConfigModify`
-
-1. **Step-up** (payment-base's `AdminStepUpInterface`) when the call switches to `live` or carries any non-empty secret
-   (connected-account key, platform key, webhook secret). Like PayPal: not for every edit while already in live.
-2. **Optimistic lock**: `expectedVersion` is the `version` of the config read (a hash of its fields; module settings have no
-   row timestamp). A mismatch is a `ConflictError` and nothing is written. The lock is checked before the fields.
-3. **Validation** (`StripeConfigChangeValidator`): enums (`not_allowed`), key formats (`invalid_format`: `pk_`, `sk_` for the
-   token, `sk_`/`rk_` for the platform key, `whsec_`) and that a key belongs to its mode (`wrong_mode`).
-4. **Key mismatch**: for every mode whose publishable key or token changes, the pair the change would leave behind is judged
-   by `ConfigurationValidator::getKeyPairError`; both halves must exist for a judgement. Refused at the changed field with
-   `key_mismatch`; the message quotes no key. Nothing is saved, not even the other fields of the call.
-5. The write goes through OXID's module setting service (`OxidStripeAdminSettings`), the path of the classic form; a webhook
-   secret goes to the per-mode oxconfig variable `ModuleConfigurationService::getWebhookSecret` reads first.
-
-One audit row per call (`adminStripeConfigModify`, entity `paymentProvider` / `stripe`, field names only), success or
-failure, including a refused step-up. Errors are `ConflictError` (`errorCode: conflict`) and `ValidationError`
-(`errorCode: validation_failed`, `field`, `code`) in the payload.
-
-### Webhook operations
-
-They do what the classic "Create webhooks" / "Clear all webhooks" buttons do, through
-`WebhookEndpointRegistrarInterface::registerForShop` / `clearAll` (`StripeWebhookAdministrator`). Both mutations need a
-step-up first and write one audit row (`adminStripeWebhookRegister` / `adminStripeWebhookClearAll`, field `webhookEndpoint`).
-
-- Register: the shop's own key first, a Connect webhook on the platform only for a connected account the platform
-  controls (the registrar's rule); an existing endpoint id is updated in place and its secret is kept. Stored per mode in
-  oxconfig (`sStripeWebhookEndpointId{Test,Live}`, `sStripeWebhookEndpointSecret{Test,Live}`) and, as the classic form does,
-  in the legacy module settings. Refusals (`validation_failed`): `token_missing` (field `token`), `registration_failed`
-  (field `webhook`, Stripe's message scrubbed).
-- Clear-all: only endpoints of this shop's URL; refusals `platform_key_missing` (field `platformKey`), `clear_failed`.
-  `deleted` in the payload is how many were removed.
+`livePlatformKeySet`, `webhookSecretSet` and nothing else. Stripe's own error messages shown with a contract are scrubbed of
+`sk_`/`rk_`/`pk_`/`whsec_` strings (`StripeSecretRedactor`). Proof: `Unit\Stripe\GraphQL\Admin\NoSecretInAnyAnswerTest`
+searches every field of every answer for every stored secret and for secret-shaped strings; the integration test does the
+same against the secrets stored in the real shop; `StripeAdminApiWiringTest` proves the schema has no settings-changing
+operation.
 
 ### The `stripe` details of a contract
 
