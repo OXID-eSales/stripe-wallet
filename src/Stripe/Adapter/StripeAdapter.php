@@ -301,6 +301,12 @@ class StripeAdapter implements StripeAdapterInterface
         return StripeObjectMapper::fromCheckoutSession($raw);
     }
 
+    public function expireCheckoutSession(string $sessionId): StripeCheckoutSessionDto
+    {
+        $raw = $this->checkoutSessionHelper->expireCheckoutSession($this->stripeClient, $sessionId);
+        return StripeObjectMapper::fromCheckoutSession($raw);
+    }
+
     public function retrievePaymentIntent(string $paymentIntentId, array $expand = []): StripePaymentIntentDto
     {
         $raw = $this->paymentIntentHelper->retrievePaymentIntent($this->stripeClient, $paymentIntentId, $expand);

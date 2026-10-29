@@ -35,6 +35,18 @@ class CheckoutSessionHelper
     }
 
     /**
+     * OPC-175: an expired session takes no more payment.
+     */
+    public function expireCheckoutSession(StripeClient $client, string $sessionId): Session
+    {
+        try {
+            return $client->checkout->sessions->expire($sessionId);
+        } catch (ApiErrorException $e) {
+            throw StripeExceptionConverter::convert($e);
+        }
+    }
+
+    /**
      * @param array<string> $expand
      */
     public function retrieveCheckoutSession(StripeClient $client, string $sessionId, array $expand = []): Session

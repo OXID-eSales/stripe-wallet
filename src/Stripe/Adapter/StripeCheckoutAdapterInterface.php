@@ -30,4 +30,9 @@ interface StripeCheckoutAdapterInterface
      * @param array<string, mixed> $params
      */
     public function createCheckoutSession(array $params): StripeCheckoutSessionDto;
+
+    /**
+     * Expire an open Checkout Session: it takes no more payment (OPC-175).
+     */
+    public function expireCheckoutSession(string $sessionId): StripeCheckoutSessionDto;
 }

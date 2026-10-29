@@ -68,6 +68,7 @@ class StripeObjectMapper
             currency: (string) ($session->currency ?? 'eur'),
             url: $url !== null ? (string) $url : null,
             clientSecret: $clientSecret !== null ? (string) $clientSecret : null,
+            status: isset($session->status) ? (string) $session->status : null,
         );
     }
 

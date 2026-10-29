@@ -32,6 +32,7 @@ readonly class StripeCheckoutSessionDto
      * @param string              $currency             ISO-4217 currency code, lowercase
      * @param string|null         $url                  Stripe-hosted Checkout page URL; null for return-mode sessions
      * @param string|null         $clientSecret         Embedded Checkout client secret (ui_mode=embedded); null for hosted sessions
+     * @param string|null         $status               Session status: open, complete, expired (OPC-175); null when Stripe sent none
      */
     public function __construct(
         public string $id,
@@ -43,6 +44,7 @@ readonly class StripeCheckoutSessionDto
         public string $currency,
         public ?string $url = null,
         public ?string $clientSecret = null,
+        public ?string $status = null,
     ) {
     }
 }

@@ -285,6 +285,13 @@ services:
   # session is committed, never cancelled. `decorates` is resolved when the
   # container is compiled, so the order of the imported services files does
   # not matter.
+  # OPC-175: closes the Stripe payment page of an attempt the customer leaves.
+  OxidEsales\Payments\Stripe\Service\StripeAttemptCloser:
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+    tags:
+      - { name: oe.payment.attempt_closer }
+
   OxidEsales\Payments\Stripe\Service\StripeAwareAttemptCleaner:
     decorates: OxidEsales\PaymentBase\Checkout\PreviousCheckoutAttemptCleanerInterface
     arguments:
