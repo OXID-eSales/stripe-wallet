@@ -36,4 +36,6 @@
 | S2g refund on a replaced attempt | **done** | pb `97db439`, stripe `90773c6`, mollie `e2fd66e` | refunders unit + finder integration; admin view is a follow-up — `done/OPC-175-S2g-late-money-refund.md` |
 | S3 never cancel a paid Stripe attempt | done | stripe `7cd03e4`, `566e24b` | unit |
 | S4 Mollie/PayPal release + restock | **done** | pb `2193886`, mollie `af77b8a`, paypal `a3c4f48`, stripe `2db68e2` | G6 3/3, G7 1/1, restock on real stock 3/3, pb integration 242 — `done/OPC-175-S4-ended-order-releases.md` |
-| S5 full proof + closing report | open | | |
+| S5 full proof + closing report | **done** | e2e `2f47ccd` | switch spec 3/3, OPC + classic Stripe matrix 4/4, DB 0/0; Mollie/invoice/voucher-fixture env failures listed — `reports/02-OPC-175-closing-report-2026-10-29.md` |
+
+- 2026-10-29 end: S2g, S4, S5 done. All OPC-175 stories done; nothing pushed. Open: admin view for late money, sandbox round trip, push/PRs (payment-base first).
