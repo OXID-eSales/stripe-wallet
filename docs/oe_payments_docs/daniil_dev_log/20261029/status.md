@@ -32,7 +32,7 @@
 | S2b one order, one contract (enforced) | **done** | pb `2fa1706` | migration ran; `OneOrderOneContractMigrationTest` 6, unit 1951 — `done/OPC-175-S2b-one-order-one-contract.md` |
 | S2c rewrite the order in place | **done** | pb `2150aee` | `OxidShopOrderServiceRewriteOrderTest` 5 (real core + Mailpit) — `done/OPC-175-S2c-rewrite-order-in-place.md` |
 | S2d re-bind the contract, close the PSP page | **done** | pb `002611b`, stripe `d783116`, mollie `233406b`, paypal `c15bb21` | reopen + 3 closers, unit green — `done/OPC-175-S2d-rebind-and-close.md` |
-| S2e wire the flow, remove retire/unwind paths | open | | |
+| S2e wire the flow, remove retire/unwind paths | **done** | pb `c7559d8`, stripe `7c37b06`, mollie `4140787`, paypal `c7cce05`, OPC `86e3d9d7`, e2e `0b8c27c` | e2e 3/3: one order + one contract continue across Stripe/Mollie/PayPal — `done/OPC-175-S2e-continue-the-open-attempt.md` |
 | S2g refund on a replaced attempt | open | | |
 | S3 never cancel a paid Stripe attempt | done | stripe `7cd03e4`, `566e24b` | unit |
 | S4 Mollie/PayPal release + restock | open | | |
