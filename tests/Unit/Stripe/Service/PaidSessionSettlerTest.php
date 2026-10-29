@@ -27,13 +27,19 @@ use Psr\Log\NullLogger;
  */
 final class SettlerScriptedInFlightGuard extends CheckoutInFlightGuard
 {
-    public function __construct(private readonly ?StripeCheckoutSessionDto $session)
-    {
+    public function __construct(
+        private readonly ?StripeCheckoutSessionDto $session,
+        private readonly ?\Throwable $failure = null
+    ) {
         parent::__construct(null);
     }
 
     protected function retrieveSession(string $sessionId): ?StripeCheckoutSessionDto
     {
+        if ($this->failure !== null) {
+            throw $this->failure;
+        }
+
         return $this->session;
     }
 }
@@ -75,22 +81,23 @@ final class PaidSessionSettlerTest extends TestCase
         self::assertFalse($this->settler($this->session('unpaid'), $this->commit)->settle($this->pendingContract()));
     }
 
-    public function testSettle_StripeCannotAnswer_AnswersFalse(): void
+    public function testSettle_NoStripeSession_AnswersFalse(): void
     {
         $this->commit->expects($this->never())->method('commit');
 
         self::assertFalse($this->settler(null, $this->commit)->settle($this->pendingContract()));
     }
 
-    public function testSettle_PaidSessionWithoutCommitService_AnswersTrueAndLeavesTheContract(): void
+    public function testSettle_StripeCannotAnswer_FailsAndCommitsNothing(): void
     {
-        $contract = $this->pendingContract();
+        $this->commit->expects($this->never())->method('commit');
+        $guard = new SettlerScriptedInFlightGuard(null, new \RuntimeException('Stripe unreachable'));
 
-        self::assertTrue($this->settler($this->session('paid'), null)->settle($contract));
-        self::assertTrue($contract->getState()->isPending());
+        $this->expectExceptionMessage('Stripe unreachable');
+        (new PaidSessionSettler($guard, $this->commit, new NullLogger()))->settle($this->pendingContract());
     }
 
-    private function settler(?StripeCheckoutSessionDto $session, ?ContractCommitServiceInterface $commit): PaidSessionSettler
+    private function settler(?StripeCheckoutSessionDto $session, ContractCommitServiceInterface $commit): PaidSessionSettler
     {
         return new PaidSessionSettler(new SettlerScriptedInFlightGuard($session), $commit, new NullLogger());
     }

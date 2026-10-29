@@ -54,7 +54,13 @@ final class StaleOrderCleanupIntegrationTest extends IntegrationTestCase
         $this->contractRepository = new DoctrineContractRepository($this->connection);
 
         $orderService = new OxidShopOrderService();
-        $this->cleanupService = new RetryCleanupService($this->contractRepository, $orderService);
+        // OPC-175: the settler is required. These contracts have no Stripe session.
+        $paidSessions = new \OxidEsales\Payments\Stripe\Service\PaidSessionSettler(
+            new \OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard(),
+            $this->createMock(\OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface::class),
+            new \Psr\Log\NullLogger()
+        );
+        $this->cleanupService = new RetryCleanupService($this->contractRepository, $orderService, $paidSessions);
     }
 
     public function tearDown(): void

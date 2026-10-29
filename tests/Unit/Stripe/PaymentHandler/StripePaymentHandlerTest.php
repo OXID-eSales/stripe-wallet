@@ -55,6 +55,7 @@ class StripePaymentHandlerTest extends TestCase
             $this->shopAdapter,
             $this->config,
             $this->tokenService,
+            new \OxidEsales\PaymentBase\EventSystem\EventDispatcher(),
             iframeSettings: $iframeSettings,
             adapterFactory: $adapterFactory
         );

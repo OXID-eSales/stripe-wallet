@@ -273,7 +273,7 @@ services:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
 
   # OPC-175: "is this attempt already money?" - asked by RetryCleanupService
-  # (which builds its own) and by StripeAwareAttemptCleaner below.
+  # and by StripeAwareAttemptCleaner below.
   OxidEsales\Payments\Stripe\Service\PaidSessionSettler:
     arguments:
       $inFlightGuard: '@OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard'
@@ -299,8 +299,8 @@ services:
       # Keeps the cleanup from cancelling a checkout the customer is about to pay
       # in — see CheckoutInFlightGuard.
       $inFlightGuard: '@OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard'
-      # GRAPH-QL / PS3: a session Stripe reports as paid is committed, never cancelled.
-      $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
+      # GRAPH-QL / PS3, OPC-175: a session Stripe reports as paid is committed, never cancelled.
+      $paidSessions: '@OxidEsales\Payments\Stripe\Service\PaidSessionSettler'
     public: true
 
   # Same reason: fetched by id from the Order model extension (admin order tab).

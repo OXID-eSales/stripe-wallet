@@ -426,12 +426,12 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
             $shopAdapter,
             $config,
             $this->tokenService,
+            $this->sharedChain(),
             $logger,
             $language,
             $iframe,
             null,
             $this->inFlightGuard,
-            $this->sharedChain(),
         );
     }
 

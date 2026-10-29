@@ -31,33 +31,24 @@ use Psr\Log\LoggerInterface;
 class PaidSessionSettler
 {
     public function __construct(
-        private readonly ?CheckoutInFlightGuard $inFlightGuard,
-        private readonly ?ContractCommitServiceInterface $contractCommit,
+        private readonly CheckoutInFlightGuard $inFlightGuard,
+        private readonly ContractCommitServiceInterface $contractCommit,
         private readonly LoggerInterface $logger
     ) {
     }
 
     /**
      * True when Stripe reports the contract's session as paid: the contract is
-     * then committed through payment-base's ContractCommitService (or, without
-     * one wired, left alone and logged) and must never be cancelled. False when
-     * the session is unpaid or Stripe cannot answer - the caller carries on.
+     * then committed through payment-base's ContractCommitService and must
+     * never be cancelled. False when the contract has no Stripe session or it
+     * is unpaid. When Stripe cannot answer, the exception reaches the caller:
+     * nothing is cancelled on a guess.
      */
     public function settle(PaymentContractInterface $contract): bool
     {
-        $session = $this->inFlightGuard?->sessionOf($contract);
+        $session = $this->inFlightGuard->sessionOf($contract);
         if ($session === null || $session->paymentStatus !== 'paid') {
             return false;
-        }
-
-        if ($this->contractCommit === null) {
-            $this->logger->error('Stale checkout has a PAID Stripe session and no commit service; left untouched', [
-                'contractId' => $contract->getId(),
-                'sessionId' => $session->id,
-                'paymentIntentId' => $session->paymentIntentId,
-            ]);
-
-            return true;
         }
 
         $currency = strtoupper($session->currency);

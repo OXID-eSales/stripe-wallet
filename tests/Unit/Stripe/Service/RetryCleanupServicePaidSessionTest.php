@@ -19,9 +19,11 @@ use OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface;
 use OxidEsales\PaymentBase\Service\Commit\PaymentConfirmation;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeCheckoutSessionDto;
 use OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard;
+use OxidEsales\Payments\Stripe\Service\PaidSessionSettler;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 /**
  * The guard with Stripe replaced: answers the scripted session for any id and
@@ -112,25 +114,17 @@ final class RetryCleanupServicePaidSessionTest extends TestCase
         self::assertTrue($contract->getState()->isCancelled());
     }
 
-    /**
-     * No commit service wired (a services.yaml that predates this): a paid
-     * session must still never be cancelled - it is logged and left alone.
-     */
-    public function testAPaidSessionWithoutACommitServiceIsLeftAlone(): void
-    {
-        $contract = $this->pendingContract();
-        $this->contracts->method('findById')->willReturn($contract);
-        $this->orders->expects($this->never())->method('deleteNotFinishedOrder');
-
-        $service = new RetryCleanupService($this->contracts, $this->orders, null, new ScriptedInFlightGuard($this->session('paid')));
-
-        self::assertFalse($service->cleanupPreviousAttempt('ctr-1'));
-        self::assertTrue($contract->getState()->isPending());
-    }
-
     private function service(?StripeCheckoutSessionDto $session): RetryCleanupService
     {
-        return new RetryCleanupService($this->contracts, $this->orders, null, new ScriptedInFlightGuard($session), $this->commit);
+        $guard = new ScriptedInFlightGuard($session);
+
+        return new RetryCleanupService(
+            $this->contracts,
+            $this->orders,
+            new PaidSessionSettler($guard, $this->commit, new NullLogger()),
+            null,
+            $guard
+        );
     }
 
     private function session(string $paymentStatus): StripeCheckoutSessionDto

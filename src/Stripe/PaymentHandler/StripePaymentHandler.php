@@ -65,15 +65,13 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
         private readonly ShopAdapterInterface $shopAdapter,
         private readonly ModuleConfigurationServiceInterface $config,
         private readonly TokenServiceInterface $tokenService,
+        // OPC-175: the shared chain that creates the early order.
+        private readonly EventDispatcherInterface $eventDispatcher,
         private readonly ?LoggerInterface $logger = null,
         ?LanguageResolverInterface $languageResolver = null,
         private readonly ?IframeCheckoutSettingsInterface $iframeSettings = null,
         private readonly ?StripeAdapterFactoryInterface $adapterFactory = null,
-        private readonly ?CheckoutInFlightGuard $inFlightGuard = null,
-        // OPC-175: the shared chain that creates the early order. Optional only
-        // because PHP wants it after the optional parameters above; without it
-        // no order is created and processPayment() fails before Stripe is called.
-        private readonly ?EventDispatcherInterface $eventDispatcher = null
+        private readonly ?CheckoutInFlightGuard $inFlightGuard = null
     ) {
         $this->languageResolver = $languageResolver ?? new OxidLanguageResolver();
     }
@@ -307,7 +305,7 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
             $this->prepareSessionForOrder($context->getPaymentMethodId());
         }
 
-        $this->eventDispatcher?->dispatch(new ContractDraftCompletedEvent(
+        $this->eventDispatcher->dispatch(new ContractDraftCompletedEvent(
             $contract,
             $this->draftCompletedContext($contract, $context, $headless)
         ));

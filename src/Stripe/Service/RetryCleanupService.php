@@ -7,7 +7,6 @@ namespace OxidEsales\Payments\Stripe\Service;
 use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -24,19 +23,15 @@ class RetryCleanupService
 {
     private readonly LoggerInterface $logger;
 
-    /** OPC-175: shared with StripeAwareAttemptCleaner, so it is a service of its own. */
-    private readonly PaidSessionSettler $paidSessions;
-
     public function __construct(
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ShopOrderServiceInterface $orderService,
+        // GRAPH-QL / PS3, OPC-175: a session Stripe reports as paid is committed, not cancelled.
+        private readonly PaidSessionSettler $paidSessions,
         ?LoggerInterface $logger = null,
-        private readonly ?CheckoutInFlightGuard $inFlightGuard = null,
-        // GRAPH-QL / PS3: a session Stripe reports as paid is committed, not cancelled.
-        private readonly ?ContractCommitServiceInterface $contractCommit = null
+        private readonly ?CheckoutInFlightGuard $inFlightGuard = null
     ) {
         $this->logger = $logger ?? new NullLogger();
-        $this->paidSessions = new PaidSessionSettler($this->inFlightGuard, $this->contractCommit, $this->logger);
     }
 
     /**

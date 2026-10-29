@@ -27,7 +27,7 @@ class RetryCleanupServiceTest extends TestCase
     {
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->orderService = $this->createMock(ShopOrderServiceInterface::class);
-        $this->service = new RetryCleanupService($this->contractRepository, $this->orderService);
+        $this->service = new RetryCleanupService($this->contractRepository, $this->orderService, $this->unpaidSessions());
     }
 
 
@@ -55,7 +55,7 @@ class RetryCleanupServiceTest extends TestCase
 
         $this->contractRepository->method('findById')->willReturn($contract);
 
-        $service = new RetryCleanupService($this->contractRepository, $this->orderService, $logger);
+        $service = new RetryCleanupService($this->contractRepository, $this->orderService, $this->unpaidSessions(), $logger);
 
         $this->assertFalse($service->cleanupPreviousAttempt($contract->getId()));
     }
@@ -73,7 +73,7 @@ class RetryCleanupServiceTest extends TestCase
 
         $this->contractRepository->method('findById')->willReturn($contract);
 
-        $service = new RetryCleanupService($this->contractRepository, $this->orderService);
+        $service = new RetryCleanupService($this->contractRepository, $this->orderService, $this->unpaidSessions());
 
         $this->assertTrue($service->cleanupPreviousAttempt('c1'));
     }
@@ -327,5 +327,14 @@ class RetryCleanupServiceTest extends TestCase
         $count = $this->service->cleanupStaleContracts(30);
 
         $this->assertSame(1, $count);
+    }
+
+    /** None of these contracts has a paid Stripe session. */
+    private function unpaidSessions(): \OxidEsales\Payments\Stripe\Service\PaidSessionSettler
+    {
+        $settler = $this->createMock(\OxidEsales\Payments\Stripe\Service\PaidSessionSettler::class);
+        $settler->method('settle')->willReturn(false);
+
+        return $settler;
     }
 }
