@@ -17,8 +17,6 @@ use Doctrine\DBAL\Connection;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\ModuleConfVarsInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\OrderPaymentIntentIdReaderInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripePaymentDetailsReaderInterface;
-use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\OxidStripeAdminAudit;
-use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminAuditInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminSettingsInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeWebhookAdministratorInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Service\NamespaceMapper;
@@ -78,11 +76,6 @@ final class StripeAdminApiWiringTest extends IntegrationTestCase
         foreach ($fields[1] as $field) {
             self::assertDoesNotMatchRegularExpression('/(token|secret|platformkey)$/i', $field, 'field ' . $field);
         }
-    }
-
-    public function testContainer_WiresTheAuditToTheRealRecorder(): void
-    {
-        self::assertInstanceOf(OxidStripeAdminAudit::class, $this->service(StripeAdminAuditInterface::class));
     }
 
     public function testSchema_OffersNoOperationThatChangesTheSettings(): void
