@@ -15,15 +15,23 @@ use OxidEsales\PaymentBase\Adapter\Request\CreateOrderRequest;
 use OxidEsales\PaymentBase\Adapter\Response\OrderResponse;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
+use OxidEsales\PaymentBase\Checkout\Context\CheckoutContextInterface;
+use OxidEsales\PaymentBase\Checkout\OpenCheckoutAttemptRegistry;
+use OxidEsales\PaymentBase\Checkout\PreviousCheckoutAttemptCleanerInterface;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\EventSystem\EventDispatcher;
+use OxidEsales\PaymentBase\EventSystem\EventListenerProvider;
+use OxidEsales\PaymentBase\EventSystem\Handler\EarlyOrderCreationHandler;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractServiceInterface;
 use OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface;
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
+use OxidEsales\Payments\Stripe\Adapter\Dto\StripeCheckoutSessionDto;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\PaymentHandler\StripePaymentHandler;
+use OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
 use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
@@ -60,6 +68,11 @@ final class SessionRecordingStripeHandler extends StripePaymentHandler
  * order is built from the persisted basket (basketId), the Checkout Session
  * sends the shopper to the client's URLs, and nothing is read from or written
  * to the session. The OPC path is byte-identical to before.
+ *
+ * OPC-175: both paths create the early order through payment-base's shared
+ * chain (ContractDraftCompletedEvent -> EarlyOrderCreationHandler), as Mollie,
+ * PayPal and Stripe's own `cl=order` checkout do. The chain here is the real
+ * one; only the shop order service is a mock.
  */
 final class StripePaymentHandlerHeadlessTest extends TestCase
 {
@@ -69,6 +82,10 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
     private ShopOrderServiceInterface&MockObject $shopOrderService;
     private TokenServiceInterface&MockObject $tokenService;
     private PaymentContract $contract;
+    private ?PreviousCheckoutAttemptCleanerInterface $cleaner = null;
+    private ?OpenCheckoutAttemptRegistry $openAttempts = null;
+    private ?CheckoutInFlightGuard $inFlightGuard = null;
+    private bool $wireTheSharedChain = true;
 
     protected function setUp(): void
     {
@@ -297,6 +314,96 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
         }
     }
 
+    /**
+     * OPC-175 — the attempt this session left open (any provider) is retired
+     * BEFORE the new order exists: its voucher rows are free again when core's
+     * finalizeOrder() validates the basket vouchers.
+     */
+    public function testOpcStart_RetiresThePreviousAttemptBeforeTheOrderIsCreated(): void
+    {
+        $calls = [];
+        $this->openAttempts = $this->registryRemembering('contract-mollie-0');
+        $cleaner = $this->createMock(PreviousCheckoutAttemptCleanerInterface::class);
+        $cleaner->expects($this->once())->method('clean')->with('contract-mollie-0')
+            ->willReturnCallback(static function () use (&$calls): bool {
+                $calls[] = 'retire';
+
+                return true;
+            });
+        $this->cleaner = $cleaner;
+        $this->shopOrderService = $this->createMock(ShopOrderServiceInterface::class);
+        $this->shopOrderService->method('createOrder')->willReturnCallback(function () use (&$calls): OrderResponse {
+            $calls[] = 'createOrder';
+
+            return $this->orderResponse();
+        });
+        $this->checkoutSessionService->method('createSession')
+            ->willReturn(CheckoutSessionResult::success('cs_1', 'https://checkout.stripe.com/c/cs_1'));
+
+        $result = $this->handler()->processPayment($this->opcContext());
+
+        self::assertTrue($result->isSuccess(), (string) $result->getErrorMessage());
+        self::assertSame(['retire', 'createOrder'], $calls);
+    }
+
+    public function testOpcStart_RemembersTheNewContractAsTheOpenAttemptOfThisSession(): void
+    {
+        $this->openAttempts = $this->registryRemembering(null);
+        $this->cleaner = $this->createMock(PreviousCheckoutAttemptCleanerInterface::class);
+        $this->checkoutSessionService->method('createSession')
+            ->willReturn(CheckoutSessionResult::success('cs_1', 'https://checkout.stripe.com/c/cs_1'));
+
+        $this->handler()->processPayment($this->opcContext());
+
+        self::assertSame('contract-1', $this->openAttempts->peek());
+        self::assertTrue($this->contract->getState()->isPending());
+        self::assertSame('order-1', $this->contract->getOrderId());
+        self::assertSame('1001', $this->contract->getMetadata('order_number'));
+    }
+
+    /**
+     * The handler no longer creates the order itself. If nothing on the chain
+     * did (a broken wiring), no Stripe session may be opened for a contract
+     * that has no order to pay for.
+     */
+    public function testOpcStart_WhenNoOrderWasCreated_FailsAndOpensNoStripeSession(): void
+    {
+        $this->wireTheSharedChain = false;
+        $this->checkoutSessionService->expects($this->never())->method('createSession');
+
+        $result = $this->handler()->processPayment($this->opcContext());
+
+        self::assertFalse($result->isSuccess());
+        self::assertSame('STRIPE_PAYMENT_FAILED', $result->getErrorCode());
+    }
+
+    public function testOpcStart_WhenTheCheckoutInFlightIsReused_NeitherRetiresNorCreatesAnOrder(): void
+    {
+        $inFlight = $this->createMock(CheckoutInFlightGuard::class);
+        $inFlight->method('inspect')->willReturn(new StripeCheckoutSessionDto(
+            id: 'cs_open',
+            paymentStatus: 'unpaid',
+            paymentIntentId: '',
+            paymentIntentStatus: 'unknown',
+            metadata: [],
+            amountTotal: 10000,
+            currency: 'eur',
+            url: 'https://checkout.stripe.com/c/cs_open',
+        ));
+        $this->inFlightGuard = $inFlight;
+        $this->contractRepository->method('findActiveByUserId')->willReturn($this->contract);
+        $cleaner = $this->createMock(PreviousCheckoutAttemptCleanerInterface::class);
+        $cleaner->expects($this->never())->method('clean');
+        $this->cleaner = $cleaner;
+        $this->openAttempts = $this->registryRemembering('contract-1');
+        $this->shopOrderService->expects($this->never())->method('createOrder');
+
+        $result = $this->handler()->processPayment($this->opcContext());
+
+        self::assertTrue($result->getMetadataValue('reused'));
+        self::assertSame('contract-1', $this->openAttempts->peek());
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private function handler(?LoggerInterface $logger = null): SessionRecordingStripeHandler
@@ -317,13 +424,72 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
             $this->checkoutSessionService,
             $this->contractRepository,
             $shopAdapter,
-            $this->shopOrderService,
             $config,
             $this->tokenService,
             $logger,
             $language,
             $iframe,
+            null,
+            $this->inFlightGuard,
+            $this->sharedChain(),
         );
+    }
+
+    /**
+     * The real payment-base chain: the dispatcher hands ContractDraftCompletedEvent
+     * to the real EarlyOrderCreationHandler, which retires, creates the order
+     * (mock), transitions the contract and remembers it.
+     */
+    private function sharedChain(): EventDispatcher
+    {
+        if (!$this->wireTheSharedChain) {
+            return new EventDispatcher(new EventListenerProvider([]));
+        }
+
+        $earlyOrderCreation = new EarlyOrderCreationHandler(
+            $this->contractRepository,
+            $this->shopOrderService,
+            null,
+            null,
+            $this->cleaner,
+            $this->openAttempts,
+        );
+
+        return new EventDispatcher(new EventListenerProvider([$earlyOrderCreation]));
+    }
+
+    private function registryRemembering(?string $contractId): OpenCheckoutAttemptRegistry
+    {
+        $context = new class () implements CheckoutContextInterface {
+            /** @var array<string, mixed> */
+            private array $values = [];
+
+            public function getScopeId(): string
+            {
+                return 'session-1';
+            }
+
+            public function get(string $key, mixed $default = null): mixed
+            {
+                return $this->values[$key] ?? $default;
+            }
+
+            public function set(string $key, mixed $value): void
+            {
+                $this->values[$key] = $value;
+            }
+
+            public function remove(string $key): void
+            {
+                unset($this->values[$key]);
+            }
+        };
+        $registry = new OpenCheckoutAttemptRegistry($context);
+        if ($contractId !== null) {
+            $registry->remember($contractId);
+        }
+
+        return $registry;
     }
 
     private function headlessContext(

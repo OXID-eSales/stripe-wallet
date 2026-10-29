@@ -272,6 +272,27 @@ services:
     arguments:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
 
+  # OPC-175: "is this attempt already money?" - asked by RetryCleanupService
+  # (which builds its own) and by StripeAwareAttemptCleaner below.
+  OxidEsales\Payments\Stripe\Service\PaidSessionSettler:
+    arguments:
+      $inFlightGuard: '@OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard'
+      $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
+      $logger: '@oxid_esales.monolog.logger'
+
+  # OPC-175: payment-base's shared retire cancels the attempt a session left
+  # open, whatever its provider. A Stripe attempt is asked about first: a paid
+  # session is committed, never cancelled. `decorates` is resolved when the
+  # container is compiled, so the order of the imported services files does
+  # not matter.
+  OxidEsales\Payments\Stripe\Service\StripeAwareAttemptCleaner:
+    decorates: OxidEsales\PaymentBase\Checkout\PreviousCheckoutAttemptCleanerInterface
+    arguments:
+      $inner: '@.inner'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $paidSessions: '@OxidEsales\Payments\Stripe\Service\PaidSessionSettler'
+    public: true
+
   OxidEsales\Payments\Stripe\Service\RetryCleanupService:
     arguments:
       $logger: '@oxid_esales.monolog.logger'
@@ -354,6 +375,10 @@ services:
       # One checkout, one Stripe session: hands back the session already in
       # flight instead of preparing another on every OPC processCheckout call.
       $inFlightGuard: '@OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard'
+      # OPC-175: the early order comes from the shared chain
+      # (ContractDraftCompletedEvent -> EarlyOrderCreationHandler), as in every
+      # other checkout: it retires the attempt the session left open first.
+      $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
     tags:
       - { name: oe.payment.handler }
     public: true

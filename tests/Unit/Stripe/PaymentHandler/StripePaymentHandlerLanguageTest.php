@@ -8,7 +8,6 @@ use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Eshop\Core\Session;
 use OxidEsales\PaymentBase\Adapter\PaymentContextInterface;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
-use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractServiceInterface;
@@ -37,7 +36,6 @@ final class StripePaymentHandlerLanguageTest extends TestCase
     private CheckoutSessionServiceInterface&MockObject $checkoutSessionService;
     private ContractRepositoryInterface&MockObject $contractRepository;
     private ShopAdapterInterface&MockObject $shopAdapter;
-    private ShopOrderServiceInterface&MockObject $shopOrderService;
     private ModuleConfigurationServiceInterface&MockObject $config;
     private TokenServiceInterface&MockObject $tokenService;
 
@@ -47,7 +45,6 @@ final class StripePaymentHandlerLanguageTest extends TestCase
         $this->checkoutSessionService = $this->createMock(CheckoutSessionServiceInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->shopAdapter = $this->createMock(ShopAdapterInterface::class);
-        $this->shopOrderService = $this->createMock(ShopOrderServiceInterface::class);
         $this->config = $this->createMock(ModuleConfigurationServiceInterface::class);
         $this->tokenService = $this->createMock(TokenServiceInterface::class);
 
@@ -143,7 +140,6 @@ final class StripePaymentHandlerLanguageTest extends TestCase
             $this->checkoutSessionService,
             $this->contractRepository,
             $this->shopAdapter,
-            $this->shopOrderService,
             $this->config,
             $this->tokenService,
             null,
@@ -154,7 +150,6 @@ final class StripePaymentHandlerLanguageTest extends TestCase
                 CheckoutSessionServiceInterface $checkoutSessionService,
                 ContractRepositoryInterface $contractRepository,
                 ShopAdapterInterface $shopAdapter,
-                ShopOrderServiceInterface $shopOrderService,
                 ModuleConfigurationServiceInterface $config,
                 TokenServiceInterface $tokenService,
                 ?LoggerInterface $logger,
@@ -165,7 +160,6 @@ final class StripePaymentHandlerLanguageTest extends TestCase
                     $checkoutSessionService,
                     $contractRepository,
                     $shopAdapter,
-                    $shopOrderService,
                     $config,
                     $tokenService,
                     $logger,

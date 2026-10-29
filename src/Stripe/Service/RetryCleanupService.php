@@ -7,9 +7,6 @@ namespace OxidEsales\Payments\Stripe\Service;
 use OxidEsales\PaymentBase\Adapter\ShopOrderServiceInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
-use OxidEsales\Payments\Stripe\Core\AmountConverter;
-use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
-use OxidEsales\PaymentBase\Service\Commit\PaymentConfirmation;
 use OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard;
 use Psr\Log\LoggerInterface;
@@ -27,6 +24,9 @@ class RetryCleanupService
 {
     private readonly LoggerInterface $logger;
 
+    /** OPC-175: shared with StripeAwareAttemptCleaner, so it is a service of its own. */
+    private readonly PaidSessionSettler $paidSessions;
+
     public function __construct(
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ShopOrderServiceInterface $orderService,
@@ -36,6 +36,7 @@ class RetryCleanupService
         private readonly ?ContractCommitServiceInterface $contractCommit = null
     ) {
         $this->logger = $logger ?? new NullLogger();
+        $this->paidSessions = new PaidSessionSettler($this->inFlightGuard, $this->contractCommit, $this->logger);
     }
 
     /**
@@ -131,7 +132,7 @@ class RetryCleanupService
         // shopper who paid but never reached the return leg lost their order
         // (money taken, no order). A paid session is committed; a usable unpaid
         // one is kept; only then may the attempt be retired.
-        if ($this->settlePaidSession($contract)) {
+        if ($this->paidSessions->settle($contract)) {
             return false;
         }
 
@@ -157,52 +158,6 @@ class RetryCleanupService
 
         $contract->cancel('checkout_retry');
         $this->contractRepository->save($contract);
-
-        return true;
-    }
-
-    /**
-     * True when Stripe reports the contract's session as paid: the contract is
-     * then committed through payment-base's ContractCommitService (or, without
-     * one wired, left alone and logged) and must never be cancelled here.
-     */
-    private function settlePaidSession(PaymentContractInterface $contract): bool
-    {
-        $session = $this->inFlightGuard?->sessionOf($contract);
-        if ($session === null || $session->paymentStatus !== 'paid') {
-            return false;
-        }
-
-        if ($this->contractCommit === null) {
-            $this->logger->error('Stale checkout has a PAID Stripe session and no commit service; left untouched', [
-                'contractId' => $contract->getId(),
-                'sessionId' => $session->id,
-                'paymentIntentId' => $session->paymentIntentId,
-            ]);
-
-            return true;
-        }
-
-        $currency = strtoupper($session->currency);
-        $outcome = $this->contractCommit->commit(new PaymentConfirmation(
-            contractId: (string) $contract->getId(),
-            providerName: StripeDefinitions::PROVIDER,
-            authorizationId: $session->paymentIntentId,
-            providerOrderId: $session->id,
-            amount: AmountConverter::toMajorUnits($session->amountTotal, $currency),
-            currency: $currency,
-            requiresCapture: false,
-            source: 'cleanup',
-            extraContext: ['checkoutSessionId' => $session->id],
-        ));
-
-        $this->logger->info('Stale checkout had a paid Stripe session; committed instead of cancelled', [
-            'contractId' => $contract->getId(),
-            'sessionId' => $session->id,
-            'outcome' => $outcome->outcome,
-            'orderId' => $outcome->orderId,
-            'reason' => $outcome->reason,
-        ]);
 
         return true;
     }
