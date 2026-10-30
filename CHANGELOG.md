@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Manual capture and refund from the admin (CFG-1 S8, found by a Stripe test-mode run from the admin app).** An admin
+  capture now records the captured amount on the contract (it wrote the transaction row and moved the state, but the
+  contract kept 0.00 captured until a webhook that may never come), and an admin refund now writes its row to the
+  transaction table with Stripe's refund id as reference (only the `charge.refunded` webhook wrote one, without the id), so
+  the admin's Payment tab lists every capture and refund with its provider reference. After upgrading clear the container
+  cache.
+
 ### Removed
 - **CFG-1: no GraphQL path changes the module's settings any more** (they change in the classic admin only):
   `adminStripeConfigModify`, `adminStripeWebhookRegister` and `adminStripeWebhookClearAll`, with `AdminStripeConfigInput`,

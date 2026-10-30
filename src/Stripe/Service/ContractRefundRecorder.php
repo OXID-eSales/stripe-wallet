@@ -7,6 +7,7 @@ namespace OxidEsales\Payments\Stripe\Service;
 use DateTimeImmutable;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
@@ -30,7 +31,8 @@ class ContractRefundRecorder
 
     public function __construct(
         private readonly ContractRepositoryInterface $contractRepository,
-        ?LoggerInterface $logger = null
+        ?LoggerInterface $logger = null,
+        private readonly ?TransactionRepositoryInterface $transactions = null
     ) {
         $this->logger = $logger ?? new NullLogger();
     }
@@ -44,8 +46,13 @@ class ContractRefundRecorder
      *
      * @param string|null $contractId Optional id hint for structured log context.
      */
-    public function record(PaymentContractInterface $contract, float $amount, ?string $contractId = null): void
-    {
+    public function record(
+        PaymentContractInterface $contract,
+        float $amount,
+        ?string $contractId = null,
+        ?string $refundId = null,
+        string $reason = ''
+    ): void {
         if (!$contract->getState()->isFulfilled()) {
             $this->logger->warning('Cannot record refund on contract: not in FULFILLED state', [
                 'contractId' => $contractId,
@@ -57,5 +64,22 @@ class ContractRefundRecorder
         $contract->addRefundedAmount($amount);
         $contract->setRefundedAt(new DateTimeImmutable());
         $this->contractRepository->save($contract);
+        $this->logRefundRow($contract, $amount, $refundId, $reason);
+    }
+
+    /**
+     * The row the admin's Payment tab lists, with Stripe's refund id as its reference. Refunds that arrive by webhook
+     * carry no refund id here and write their own row.
+     */
+    private function logRefundRow(PaymentContractInterface $contract, float $amount, ?string $refundId, string $reason): void
+    {
+        $contractId = $contract->getId();
+        if ($this->transactions === null || $refundId === null || $refundId === '' || $contractId === null) {
+            return;
+        }
+        if ($this->transactions->findByProviderTransactionId($refundId) !== null) {
+            return;
+        }
+        $this->transactions->logRefund($contractId, $amount, $refundId, $reason);
     }
 }
