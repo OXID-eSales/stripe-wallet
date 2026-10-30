@@ -23,6 +23,8 @@ use OxidEsales\Payments\Stripe\Core\AmountConverter;
  */
 class StripeWebhookEventParser
 {
+    private const REFUND_STATUSES_WITHOUT_MONEY = ['failed', 'canceled'];
+
     /**
      * Extract payment intent ID from event data.
      */
@@ -100,6 +102,51 @@ class StripeWebhookEventParser
             : '';
 
         return AmountConverter::toMajorUnits($amount, $currency);
+    }
+
+    /**
+     * The refunds a charge event lists (`refunds.data`), without the ones that moved no money.
+     *
+     * Stripe omits the list from events of newer API versions: an empty result means "not listed", not "no refunds" -
+     * the cumulative `amount_refunded` is then the only source.
+     *
+     * @return list<ChargeRefund>
+     */
+    public function extractRefunds(WebhookEvent $event): array
+    {
+        $object = $event->getObject();
+        $list = is_array($object['refunds'] ?? null) ? ($object['refunds']['data'] ?? null) : null;
+        if (!is_array($list)) {
+            return [];
+        }
+
+        $refunds = [];
+        foreach ($list as $entry) {
+            $refund = is_array($entry) ? $this->toChargeRefund($entry, $object) : null;
+            if ($refund !== null) {
+                $refunds[] = $refund;
+            }
+        }
+
+        return $refunds;
+    }
+
+    /**
+     * @param array<mixed> $entry
+     * @param array<string, mixed> $charge
+     */
+    private function toChargeRefund(array $entry, array $charge): ?ChargeRefund
+    {
+        $id = $entry['id'] ?? null;
+        $amount = $entry['amount'] ?? null;
+        $status = $entry['status'] ?? 'succeeded';
+        if (!is_string($id) || $id === '' || !is_int($amount) || in_array($status, self::REFUND_STATUSES_WITHOUT_MONEY, true)) {
+            return null;
+        }
+
+        $currency = $entry['currency'] ?? $charge['currency'] ?? '';
+
+        return new ChargeRefund($id, AmountConverter::toMajorUnits($amount, is_string($currency) ? strtoupper($currency) : ''));
     }
 
     /**

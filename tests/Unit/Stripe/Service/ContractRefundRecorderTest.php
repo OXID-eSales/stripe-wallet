@@ -67,6 +67,45 @@ final class ContractRefundRecorderTest extends TestCase
         $this->recorder->record($contract, 0.0);
     }
 
+    /**
+     * CFG-1 S8: an admin refund updated the contract's sum but left no row in the transaction table, so the Payment tab
+     * of the admin app never listed it (only the charge.refunded webhook wrote a row, without Stripe's refund id).
+     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function logsTheRefundAsATransactionRowWithStripesRefundId(): void
+    {
+        $transactions = $this->createMock(\OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface::class);
+        $transactions->method('findByProviderTransactionId')->with('re_123')->willReturn(null);
+        $transactions->expects($this->once())->method('logRefund')->with('contract_abc', 25.0, 're_123', 'requested_by_customer');
+        $recorder = new ContractRefundRecorder($this->contractRepository, null, $transactions);
+        $contract = $this->createFulfilledContract();
+        $contract->method('getId')->willReturn('contract_abc');
+
+        $recorder->record($contract, 25.0, 'contract_abc', 're_123', 'requested_by_customer');
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function aRefundThatHasARowAlreadyIsNotLoggedTwice(): void
+    {
+        $transactions = $this->createMock(\OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface::class);
+        $transactions->method('findByProviderTransactionId')->willReturn($this->createMock(\OxidEsales\PaymentBase\Contract\Transaction::class));
+        $transactions->expects($this->never())->method('logRefund');
+        $recorder = new ContractRefundRecorder($this->contractRepository, null, $transactions);
+
+        $recorder->record($this->createFulfilledContract(), 25.0, 'contract_abc', 're_123', '');
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function noRowIsLoggedWithoutARefundIdOrOnANonFulfilledContract(): void
+    {
+        $transactions = $this->createMock(\OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface::class);
+        $transactions->expects($this->never())->method('logRefund');
+        $recorder = new ContractRefundRecorder($this->contractRepository, null, $transactions);
+
+        $recorder->record($this->createFulfilledContract(), 25.0, 'contract_abc');
+        $recorder->record($this->createNonFulfilledContract(), 25.0, 'contract_abc', 're_123', '');
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------

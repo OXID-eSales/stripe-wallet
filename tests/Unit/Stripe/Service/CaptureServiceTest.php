@@ -364,6 +364,43 @@ class CaptureServiceTest extends TestCase
     }
 
     /**
+     * CFG-1 S8: an admin capture wrote the transaction row and moved the state but never the captured amount, so the
+     * contract (what the admin app's Payment tab sums up) said 0.00 captured for money Stripe had taken.
+     */
+    public function testProcessCaptureRecordsTheCapturedAmountOnTheContractBeforeItIsFulfilled(): void
+    {
+        $this->adapter->method('capturePayment')->willReturn(CaptureResponse::success(
+            providerPaymentId: 'pi_committed',
+            captureId: 'ch_committed',
+            amountCaptured: 131.0,
+            currency: 'eur',
+            status: 'succeeded',
+            capturedAt: new \DateTimeImmutable()
+        ));
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getProviderOrderId')->willReturn('pi_committed');
+        $contract->method('getAmount')->willReturn(262.0);
+        $contract->method('getCapturedAmount')->willReturn(null);
+        $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::committed());
+        $recorded = [];
+        $contract->expects($this->once())->method('setCapturedAmount')->with(131.0)
+            ->willReturnCallback(static function () use (&$recorded): void {
+                $recorded[] = 'amount';
+            });
+        $this->fulfillmentService->expects($this->once())->method('fulfill')->with($contract)
+            ->willReturnCallback(static function () use (&$recorded): bool {
+                $recorded[] = 'fulfilled';
+
+                return true;
+            });
+
+        $this->createService()->processCapture($contract, 131.0, []);
+
+        // the fulfilment saves the contract: the amount has to be on it by then
+        $this->assertSame(['amount', 'fulfilled'], $recorded);
+    }
+
+    /**
      * Sprint 82: Authorized contracts still use captureAuthorization() (unchanged behavior).
      */
     public function testProcessCaptureCallsCaptureAuthorizationForAuthorizedContract(): void

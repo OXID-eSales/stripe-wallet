@@ -178,12 +178,12 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
             return;
         }
 
-        $this->updateContractState($event);
+        $this->updateContractState($event, $result->refundId);
         $this->logRefundRequest($result, $orderId);
         $this->setSuccessResults($context, $result, $orderId);
     }
 
-    protected function updateContractState(StripeRefundRequestEvent $event): void
+    protected function updateContractState(StripeRefundRequestEvent $event, ?string $refundId = null): void
     {
         $contractId = $event->getContractId();
         if ($contractId === null) {
@@ -197,7 +197,7 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
 
         $refundAmount = $event->getAmount() ?? $contract->getAmount();
         $recorder = $this->refundRecorder ?? new ContractRefundRecorder($this->contractRepository, $this->logger);
-        $recorder->record($contract, $refundAmount, $contractId);
+        $recorder->record($contract, $refundAmount, $contractId, $refundId, (string) $event->getReason());
     }
 
     /**

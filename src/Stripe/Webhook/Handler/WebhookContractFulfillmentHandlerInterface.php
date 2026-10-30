@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Webhook\Handler;
 
+use OxidEsales\Payments\Stripe\Webhook\ChargeRefund;
+
 /**
  * Interface for handling webhook events with contract-awareness.
  *
@@ -33,10 +35,11 @@ interface WebhookContractFulfillmentHandlerInterface
      * Handle charge.refunded webhook event.
      *
      * @param string $providerOrderId Stripe PaymentIntent ID
-     * @param float $refundAmount Amount refunded in currency units
+     * @param float $refundAmount Stripe's cumulative amount_refunded of the charge, in currency units
+     * @param list<ChargeRefund> $refunds the refunds the event lists; empty when it lists none
      * @return bool|null true if processed, false if skipped, null if not found
      */
-    public function handleChargeRefunded(string $providerOrderId, float $refundAmount): ?bool;
+    public function handleChargeRefunded(string $providerOrderId, float $refundAmount, array $refunds = []): ?bool;
 
     /**
      * Handle payment_intent.payment_failed webhook event.

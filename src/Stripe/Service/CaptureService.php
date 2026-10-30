@@ -93,6 +93,7 @@ class CaptureService implements CaptureServiceInterface
 
         if ($result->isSuccessful()) {
             $this->recordCaptureTransaction($contract, $result);
+            $this->recordCapturedAmount($contract, $result);
             $this->transitionContractState($contract);
         }
 
@@ -205,6 +206,19 @@ class CaptureService implements CaptureServiceInterface
         $transaction->setProviderOrderId($contract->getProviderOrderId());
 
         $this->transactionRepository->save($transaction);
+    }
+
+    /**
+     * The contract carries what was captured (the admin sums it up and bounds a refund by it). Set before the state
+     * moves: both transitions below save the contract.
+     */
+    private function recordCapturedAmount(PaymentContractInterface $contract, CaptureResponse $result): void
+    {
+        if ($result->amountCaptured === null) {
+            return;
+        }
+        $contract->setCapturedAmount(($contract->getCapturedAmount() ?? 0.0) + $result->amountCaptured);
+        $contract->setCapturedAt(new \DateTimeImmutable());
     }
 
     private function transitionContractState(PaymentContractInterface $contract): void

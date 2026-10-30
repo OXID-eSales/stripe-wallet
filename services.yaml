@@ -72,30 +72,6 @@ services:
       - '@OxidEsales\Payments\Stripe\Service\KeyPairValidatorInterface'
       - '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
 
-  OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeConfigChangeValidator:
-    autowire: false
-    autoconfigure: false
-
-  OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminAuditInterface:
-    class: OxidEsales\Payments\Stripe\GraphQL\Admin\Service\OxidStripeAdminAudit
-    autowire: false
-    autoconfigure: false
-    public: true # the integration tests resolve it
-    arguments:
-      - '@?OxidEsales\GraphQL\Admin\Audit\Service\AuditRecorder'
-
-  OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeConfigModifierInterface:
-    class: OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeConfigModifier
-    autowire: false
-    autoconfigure: false
-    arguments:
-      - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminSettingsInterface'
-      - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeConfigChangeValidator'
-      - '@OxidEsales\Payments\Stripe\Service\KeyPairValidatorInterface'
-      - '@OxidEsales\PaymentBase\GraphQL\Admin\Service\AdminSuperadminCheckInterface'
-      - '@OxidEsales\PaymentBase\GraphQL\Admin\Service\AdminStepUpInterface'
-      - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminAuditInterface'
-
   OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeWebhookAdministratorInterface:
     class: OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeWebhookAdministrator
     autowire: false
@@ -104,12 +80,6 @@ services:
     arguments:
       - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminSettingsInterface'
       - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeWebhookStateInterface'
-      - '@OxidEsales\Payments\Stripe\Service\WebhookEndpointRegistrarInterface'
-      - '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
-      - '@OxidEsales\PaymentBase\GraphQL\Admin\Service\AdminSuperadminCheckInterface'
-      - '@OxidEsales\PaymentBase\GraphQL\Admin\Service\AdminStepUpInterface'
-      - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminAuditInterface'
-      - '@oxid_esales.monolog.logger'
 
   OxidEsales\Payments\Stripe\GraphQL\Admin\Service\OrderPaymentIntentIdReaderInterface:
     class: OxidEsales\Payments\Stripe\GraphQL\Admin\Service\DbalOrderPaymentIntentIdReader
@@ -170,8 +140,6 @@ services:
     autoconfigure: false
     arguments:
       - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminSettingsInterface'
-      - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeConfigModifierInterface'
-      - '@OxidEsales\PaymentBase\GraphQL\Admin\Service\AdminSuperadminCheckInterface'
 
   OxidEsales\Payments\Stripe\GraphQL\Admin\Controller\StripeAdminConfigController:
     alias: oe_payments_stripe.graphql.admin_config_controller
@@ -1149,6 +1117,7 @@ services:
     arguments:
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
+      $transactions: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
     public: false
 
   # ==========================================

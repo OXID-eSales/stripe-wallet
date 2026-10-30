@@ -6,19 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Changed
-- **API keys and secrets: superadmin only (PAY-10 S3).** `adminStripeConfigModify` with a non-empty `testToken` / `liveToken` /
-  `testPlatformKey` / `livePlatformKey` / `webhookSecret`, and `adminStripeWebhookRegister`, are refused for anyone but a
-  superadmin: payload `errors` entry `validation_failed` with `code: superadmin_required` (`field` = the first secret sent,
-  `webhook` for register); nothing written, audited as refused, checked before the step-up. New field
-  `AdminStripeConfig.secretsEditable: Boolean!`. Non-secret fields stay with `ADMIN_PAYMENT_CONFIG`. Needs payment-base with
-  `AdminSuperadminCheckInterface`. After upgrading: `bin/oe-console oe:graphql:cache-clear`.
+### Fixed
+- **A refund is booked once (CFG-1 S8).** An admin refund and Stripe's `charge.refunded` webhook for the same refund both
+  booked it: the contract's refunded amount doubled and a second, reference-less refund row appeared. The webhook now
+  books only refunds the module does not know, told apart by Stripe's refund id (the reference of the admin's row); an
+  event without a refund list is reconciled against the cumulative `amount_refunded` the contract already carries. This
+  also fixes dashboard refunds: several partial refunds added Stripe's cumulative total each time, and a replay of an older
+  event added again. Dashboard refunds now keep their `re_...` id as the row's reference. Admin capture was not affected
+  (the contract's captured amount guards the webhook). After upgrading clear the container cache.
+- **Manual capture and refund from the admin (CFG-1 S8, found by a Stripe test-mode run from the admin app).** An admin
+  capture now records the captured amount on the contract (it wrote the transaction row and moved the state, but the
+  contract kept 0.00 captured until a webhook that may never come), and an admin refund now writes its row to the
+  transaction table with Stripe's refund id as reference (only the `charge.refunded` webhook wrote one, without the id), so
+  the admin's Payment tab lists every capture and refund with its provider reference. After upgrading clear the container
+  cache.
+
+### Removed
+- **CFG-1: no GraphQL path changes the module's settings any more** (they change in the classic admin only):
+  `adminStripeConfigModify`, `adminStripeWebhookRegister` and `adminStripeWebhookClearAll`, with `AdminStripeConfigInput`,
+  `AdminStripeConfigPayload`, `AdminStripeWebhookPayload`, `AdminStripeConfig.secretsEditable`, the modifier, change
+  validator, audit and result classes, and the write side of the settings and webhook-state seams. Kept: `adminStripeConfig`,
+  `adminStripeWebhookStatus`, `AdminPaymentContract.stripe` and payment-base's capture / refund / void. After upgrading:
+  `bin/oe-console oe:graphql:cache-clear`.
 
 ### Added
 - **Stripe admin API (PAY-3)** for `oxid-admin-graphql` (optional, see `docs/for_developer/06-admin-api.md`):
-  `adminStripeConfig` / `adminStripeConfigModify` (secrets write-only, optimistic lock, step-up for live and any secret,
-  key-mismatch check, audit with field names only), `adminStripeWebhookStatus` / `adminStripeWebhookRegister` /
-  `adminStripeWebhookClearAll`, and `AdminPaymentContract.stripe` (payment intent, charge, status, dashboard link; fails
+  `adminStripeConfig`, `adminStripeWebhookStatus` (read-only, see Removed), and `AdminPaymentContract.stripe` (payment intent, charge, status, dashboard link; fails
   closed when Stripe cannot be reached). Rights: `ADMIN_PAYMENT_CONFIG` / `ADMIN_PAYMENT_VIEW`.
 - Provider wiring of payment-base's PAY-1 admin payment API: Stripe's column of the contract-state Help, the reasons and
   description the panel accepts, live capture/refund bounds, and readable refusals (`AdminActionRefusedException`) for the

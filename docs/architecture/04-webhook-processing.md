@@ -435,7 +435,7 @@ class WebhookResult
 | `payment_intent.payment_failed` | handlePaymentFailed | Mark contract FAILED |
 | `payment_intent.canceled` | handlePaymentCanceled | Mark contract CANCELLED |
 | `charge.captured` | handleChargeCaptured | Update capturedAmount |
-| `charge.refunded` | handleChargeRefunded | Update refundedAmount |
+| `charge.refunded` | handleChargeRefunded | Book refunds the contract does not carry yet (by Stripe refund id `re_...`, or, when the event lists none, by the difference to the cumulative `amount_refunded`); an admin refund is never booked a second time |
 | `charge.dispute.created` | (to be implemented) | Create dispute record |
 | `checkout.session.completed` | handleSessionCompleted | Alternative to payment_intent.succeeded |
 | `checkout.session.expired` | handleSessionExpired | Mark contract EXPIRED |

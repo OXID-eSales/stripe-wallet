@@ -10,10 +10,6 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\DataType;
 
 use OxidEsales\Payments\Stripe\GraphQL\Admin\DataType\AdminStripeConfig;
-use OxidEsales\Payments\Stripe\GraphQL\Admin\DataType\AdminStripeConfigInput;
-use OxidEsales\Payments\Stripe\GraphQL\Admin\DataType\AdminStripeConfigPayload;
-use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminRefusal;
-use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeConfigResult;
 use OxidEsales\Payments\Stripe\Tests\Unit\Stripe\GraphQL\Admin\Support\ConfigFixtures;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -27,7 +23,7 @@ final class AdminStripeTypesTest extends TestCase
         $fields = $this->fieldNamesOf(AdminStripeConfig::class);
 
         self::assertEqualsCanonicalizing([
-            'mode', 'captureMode', 'removeByBillingCountry', 'removeByBasketCurrency', 'provideCustomerEmail', 'secretsEditable',
+            'mode', 'captureMode', 'removeByBillingCountry', 'removeByBasketCurrency', 'provideCustomerEmail',
             'logLevel', 'logWebhooks', 'testPublishableKey', 'livePublishableKey', 'webhookEndpointUrl',
             'testTokenSet', 'liveTokenSet', 'testPlatformKeySet', 'livePlatformKeySet', 'webhookSecretSet',
             'testConnected', 'liveConnected', 'keyValidationError', 'version', 'classicSettingsUrl',
@@ -40,7 +36,7 @@ final class AdminStripeTypesTest extends TestCase
     public function testConfig_ReadsFromTheSnapshot(): void
     {
         $snapshot = ConfigFixtures::snapshot(['liveTokenSet' => true, 'keyValidationError' => 'nope']);
-        $config = new AdminStripeConfig($snapshot, true);
+        $config = new AdminStripeConfig($snapshot);
 
         self::assertSame('test', $config->getMode());
         self::assertSame('automatic', $config->getCaptureMode());
@@ -60,45 +56,6 @@ final class AdminStripeTypesTest extends TestCase
         self::assertSame('nope', $config->getKeyValidationError());
         self::assertSame('https://shop.example/admin/index.php?cl=module_config&oxid=oe_payments_stripe_wallet&shp=1', $config->getClassicSettingsUrl());
         self::assertSame($snapshot->version(), $config->getVersion());
-    }
-
-    public function testInput_TakesSecretsButTheConfigTypeNeverReturnsThem(): void
-    {
-        $input = new ReflectionClass(AdminStripeConfigInput::class);
-
-        foreach (['expectedVersion', 'testToken', 'liveToken', 'testPlatformKey', 'livePlatformKey', 'webhookSecret'] as $property) {
-            self::assertTrue($input->hasProperty($property), $property);
-        }
-        self::assertFalse($input->hasProperty('webhookEndpointUrl'), 'the endpoint is registered, not edited');
-    }
-
-    public function testInput_BecomesAChangeWithoutLosingOrInventingAnything(): void
-    {
-        $input = new AdminStripeConfigInput();
-        $input->expectedVersion = 'v1';
-        $input->mode = 'live';
-        $input->liveToken = 'sk_live_fakeAAAAAAAAAAvalue';
-        $input->logWebhooks = false;
-
-        $change = $input->toChange();
-
-        self::assertSame('v1', $change->expectedVersion);
-        self::assertSame('live', $change->mode);
-        self::assertSame('sk_live_fakeAAAAAAAAAAvalue', $change->tokenFor('live'));
-        self::assertFalse($change->logWebhooks);
-        self::assertNull($change->captureMode);
-        self::assertSame(['mode', 'logWebhooks', 'liveToken'], $change->fieldNames());
-    }
-
-    public function testPayload_CarriesTheConfigOrTheErrorNeverBoth(): void
-    {
-        $done = AdminStripeConfigPayload::of(StripeConfigResult::done(ConfigFixtures::snapshot()), true);
-        $refused = AdminStripeConfigPayload::of(StripeConfigResult::refused(StripeAdminRefusal::invalid('mode', 'not_allowed', 'no')), false);
-
-        self::assertNotNull($done->config());
-        self::assertSame([], $done->errors());
-        self::assertNull($refused->config());
-        self::assertCount(1, $refused->errors());
     }
 
     /**

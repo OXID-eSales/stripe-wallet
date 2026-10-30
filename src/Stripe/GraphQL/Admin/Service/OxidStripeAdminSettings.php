@@ -16,9 +16,9 @@ use OxidEsales\Payments\Stripe\Service\KeyPairValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 
 /**
- * The Stripe module settings through OXID's module setting service (the project configuration), the path of the
- * classic module configuration form. Read straight from it, not through ModuleConfigurationService, which caches
- * the configuration of its construction: after a write the next snapshot must show it.
+ * The Stripe module settings through OXID's module setting service (the project configuration), the store of the
+ * classic module configuration form. Read-only (CFG-1): nothing here writes. Read straight from it, not through
+ * ModuleConfigurationService, which caches the configuration of its construction.
  * Secrets are read only to say whether they are set and to judge a pair of keys; they never leave this class.
  */
 final class OxidStripeAdminSettings implements StripeAdminSettingsInterface
@@ -32,19 +32,6 @@ final class OxidStripeAdminSettings implements StripeAdminSettingsInterface
     private const PLATFORM_KEY_SETTINGS = [
         StripeDefinitions::MODE_TEST => 'sStripeTestKey',
         StripeDefinitions::MODE_LIVE => 'sStripeLiveKey',
-    ];
-    private const STRING_FIELDS = [
-        'mode' => 'sStripeMode',
-        'captureMode' => 'sStripeCaptureMode',
-        'logLevel' => 'sStripeLogLevel',
-        'testPublishableKey' => 'sStripeTestPk',
-        'livePublishableKey' => 'sStripeLivePk',
-    ];
-    private const BOOLEAN_FIELDS = [
-        'removeByBillingCountry' => 'blStripeRemoveByBillingCountry',
-        'removeByBasketCurrency' => 'blStripeRemoveByBasketCurrency',
-        'provideCustomerEmail' => 'blStripeProvideCustomerEmailAddress',
-        'logWebhooks' => 'blStripeLogWebhooks',
     ];
     private const PUBLISHABLE_KEY_SETTINGS = [
         StripeDefinitions::MODE_TEST => 'sStripeTestPk',
@@ -96,43 +83,6 @@ final class OxidStripeAdminSettings implements StripeAdminSettingsInterface
         return $this->string(
             self::PLATFORM_KEY_SETTINGS[$mode] ?? self::PLATFORM_KEY_SETTINGS[StripeDefinitions::MODE_TEST]
         );
-    }
-
-    public function apply(StripeConfigChange $change): void
-    {
-        foreach (self::STRING_FIELDS as $field => $setting) {
-            $value = $change->$field;
-            if ($value !== null) {
-                $this->settings->saveString($setting, $value, Module::MODULE_ID);
-            }
-        }
-        foreach (self::BOOLEAN_FIELDS as $field => $setting) {
-            $value = $change->$field;
-            if ($value !== null) {
-                $this->settings->saveBoolean($setting, $value, Module::MODULE_ID);
-            }
-        }
-        $this->applySecrets($change);
-    }
-
-    private function applySecrets(StripeConfigChange $change): void
-    {
-        foreach ([StripeDefinitions::MODE_TEST, StripeDefinitions::MODE_LIVE] as $mode) {
-            $this->saveSecret(self::TOKEN_SETTINGS[$mode], $change->tokenFor($mode));
-            $this->saveSecret(self::PLATFORM_KEY_SETTINGS[$mode], $change->platformKeyFor($mode));
-        }
-        $webhookSecret = $change->webhookSecret();
-        if ($webhookSecret !== null) {
-            // The secret belongs to the mode the shop will be in after this change.
-            $this->webhookState->storeSecret($change->mode ?? $this->mode(), $webhookSecret);
-        }
-    }
-
-    private function saveSecret(string $setting, #[\SensitiveParameter] ?string $secret): void
-    {
-        if ($secret !== null) {
-            $this->settings->saveString($setting, $secret, Module::MODULE_ID);
-        }
     }
 
     private function mode(): string

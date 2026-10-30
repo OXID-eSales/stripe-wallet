@@ -17,8 +17,6 @@ use Doctrine\DBAL\Connection;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\ModuleConfVarsInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\OrderPaymentIntentIdReaderInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripePaymentDetailsReaderInterface;
-use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\OxidStripeAdminAudit;
-use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminAuditInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminSettingsInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeWebhookAdministratorInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Service\NamespaceMapper;
@@ -33,7 +31,7 @@ final class StripeAdminApiWiringTest extends IntegrationTestCase
 {
     private const CONFIG_FIELDS = 'mode captureMode removeByBillingCountry removeByBasketCurrency provideCustomerEmail '
         . 'logLevel logWebhooks testPublishableKey livePublishableKey webhookEndpointUrl testTokenSet liveTokenSet '
-        . 'testPlatformKeySet livePlatformKeySet webhookSecretSet testConnected liveConnected keyValidationError version classicSettingsUrl secretsEditable';
+        . 'testPlatformKeySet livePlatformKeySet webhookSecretSet testConnected liveConnected keyValidationError version classicSettingsUrl';
     private const WEBHOOK_SECRET_VARS = ['sStripeWebhookEndpointSecretTest', 'sStripeWebhookEndpointSecretLive'];
     private const SECRET_SETTINGS = [
         'sStripeTestToken', 'sStripeLiveToken', 'sStripeTestKey', 'sStripeLiveKey', 'sStripeWebhookEndpointSecret',
@@ -72,7 +70,7 @@ final class StripeAdminApiWiringTest extends IntegrationTestCase
         self::assertNotEmpty($type, 'type AdminStripeConfig');
         preg_match_all('/^\s*(\w+)[(:]/m', $type[1], $fields);
         self::assertEqualsCanonicalizing(explode(' ', self::CONFIG_FIELDS), $fields[1]);
-        foreach (['testTokenSet', 'liveTokenSet', 'testPlatformKeySet', 'livePlatformKeySet', 'webhookSecretSet', 'secretsEditable'] as $flag) {
+        foreach (['testTokenSet', 'liveTokenSet', 'testPlatformKeySet', 'livePlatformKeySet', 'webhookSecretSet'] as $flag) {
             self::assertMatchesRegularExpression('/' . $flag . ': Boolean!/', $type[1]);
         }
         foreach ($fields[1] as $field) {
@@ -80,48 +78,33 @@ final class StripeAdminApiWiringTest extends IntegrationTestCase
         }
     }
 
-    public function testContainer_WiresTheAuditToTheRealRecorder(): void
-    {
-        self::assertInstanceOf(OxidStripeAdminAudit::class, $this->service(StripeAdminAuditInterface::class));
-    }
-
-    public function testSchema_HasTheModifyMutationWithAWriteOnlySecretInput(): void
+    public function testSchema_OffersNoOperationThatChangesTheSettings(): void
     {
         $schema = $this->schema();
 
-        self::assertMatchesRegularExpression('/adminStripeConfigModify\(input: AdminStripeConfigInput!\): AdminStripeConfigPayload!/', $schema);
-        self::assertMatchesRegularExpression('/input AdminStripeConfigInput \{[^}]*expectedVersion: String!/s', $schema);
-        foreach (['testToken', 'liveToken', 'testPlatformKey', 'livePlatformKey', 'webhookSecret'] as $secret) {
-            self::assertMatchesRegularExpression('/input AdminStripeConfigInput \{[^}]*' . $secret . ': String[^!]/s', $schema);
+        foreach (['adminStripeConfigModify', 'adminStripeWebhookRegister', 'adminStripeWebhookClearAll'] as $removed) {
+            self::assertStringNotContainsString($removed, $schema, 'the settings change only in the classic admin');
         }
-        preg_match('/type AdminStripeConfigPayload \{([^}]*)\}/s', $schema, $payload);
-        self::assertMatchesRegularExpression('/config: AdminStripeConfig\b/', $payload[1] ?? '');
-        self::assertMatchesRegularExpression('/errors: \[AdminError!\]!/', $payload[1] ?? '');
+        foreach (['AdminStripeConfigInput', 'AdminStripeConfigPayload', 'AdminStripeWebhookPayload', 'secretsEditable'] as $removedType) {
+            self::assertStringNotContainsString($removedType, $schema);
+        }
     }
 
-    public function testMutation_AStaleVersion_IsAConflictAndNothingIsWritten(): void
-    {
-        $response = $this->probe(
-            'mutation { adminStripeConfigModify(input: { expectedVersion: "stale", captureMode: "manual" }) '
-            . '{ config { version } errors { errorCode message } } }'
-        );
-
-        self::assertArrayNotHasKey('errors', $response);
-        self::assertSame('conflict', $response['data']['adminStripeConfigModify']['errors'][0]['errorCode'] ?? null);
-        self::assertNull($response['data']['adminStripeConfigModify']['config']);
-    }
-
-    public function testSchema_HasTheThreeWebhookOperationsAndNoFieldThatCouldCarryTheSigningSecret(): void
+    public function testSchema_StillHasTheReadQueries(): void
     {
         $schema = $this->schema();
 
+        self::assertMatchesRegularExpression('/adminStripeConfig: AdminStripeConfig!/', $schema);
         self::assertMatchesRegularExpression('/adminStripeWebhookStatus: AdminStripeWebhookStatus!/', $schema);
-        self::assertMatchesRegularExpression('/adminStripeWebhookRegister: AdminStripeWebhookPayload!/', $schema);
-        self::assertMatchesRegularExpression('/adminStripeWebhookClearAll: AdminStripeWebhookPayload!/', $schema);
+    }
+
+    public function testSchema_TheWebhookStatusHasNoFieldThatCouldCarryTheSigningSecret(): void
+    {
+        $schema = $this->schema();
+
         preg_match('/type AdminStripeWebhookStatus \{([^}]*)\}/s', $schema, $status);
-        preg_match('/type AdminStripeWebhookPayload \{([^}]*)\}/s', $schema, $payload);
-        preg_match_all('/^\s*(\w+)[(:]/m', ($status[1] ?? '') . ($payload[1] ?? ''), $fields);
-        self::assertEqualsCanonicalizing(['mode', 'configured', 'endpointId', 'url', 'status', 'deleted', 'errors'], $fields[1]);
+        preg_match_all('/^\s*(\w+)[(:]/m', $status[1] ?? '', $fields);
+        self::assertEqualsCanonicalizing(['mode', 'configured', 'endpointId', 'url'], $fields[1]);
     }
 
     public function testContainer_WiresTheWebhookAdministrator(): void
@@ -214,38 +197,6 @@ final class StripeAdminApiWiringTest extends IntegrationTestCase
         foreach ($storedSecrets as $secret) {
             self::assertFalse(str_contains($body, $secret), 'a stored secret appears in the response');
         }
-    }
-
-    public function testMutation_ASecretWithoutASuperadminSession_IsRefusedAtTheFieldAndNothingIsWritten(): void
-    {
-        $before = $this->service(StripeAdminSettingsInterface::class)->snapshot();
-
-        $response = $this->probe(
-            'mutation { adminStripeConfigModify(input: { expectedVersion: "' . $before->version() . '", testToken: "sk_test_fakePAY10notarealkey", captureMode: "manual" }) '
-            . '{ config { version } errors { errorCode message ... on ValidationError { field code } } } }'
-        );
-
-        self::assertArrayNotHasKey('errors', $response);
-        $error = $response['data']['adminStripeConfigModify']['errors'][0] ?? [];
-        self::assertSame(['validation_failed', 'testToken', 'superadmin_required'], [$error['errorCode'] ?? null, $error['field'] ?? null, $error['code'] ?? null]);
-        self::assertSame($before->captureMode, $this->service(StripeAdminSettingsInterface::class)->snapshot()->captureMode, 'the whole call is refused');
-        self::assertStringNotContainsString('PAY10notarealkey', (string) json_encode($response));
-    }
-
-    public function testMutation_WebhookRegisterWithoutASuperadminSession_IsRefused(): void
-    {
-        $response = $this->probe('mutation { adminStripeWebhookRegister { errors { errorCode ... on ValidationError { field code } } } }');
-
-        self::assertArrayNotHasKey('errors', $response);
-        $error = $response['data']['adminStripeWebhookRegister']['errors'][0] ?? [];
-        self::assertSame(['webhook', 'superadmin_required'], [$error['field'] ?? null, $error['code'] ?? null]);
-    }
-
-    public function testQuery_SecretsEditableIsFalseWithoutASuperadminSession(): void
-    {
-        $response = $this->probe('{ adminStripeConfig { secretsEditable } }');
-
-        self::assertFalse($response['data']['adminStripeConfig']['secretsEditable'] ?? null);
     }
 
     public function testQuery_TheSchemaOffersNoWayToAskForASecretByName(): void

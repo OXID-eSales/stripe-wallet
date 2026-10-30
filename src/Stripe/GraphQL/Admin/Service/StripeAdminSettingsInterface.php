@@ -26,9 +26,4 @@ interface StripeAdminSettingsInterface
      * The stored platform key (webhook registration for Connect) for a mode. Never leaves the service layer.
      */
     public function platformKey(string $mode): string;
-
-    /**
-     * Stores the fields the change carries; a secret only when it is a new one.
-     */
-    public function apply(StripeConfigChange $change): void;
 }
