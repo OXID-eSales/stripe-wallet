@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- **A refund is booked once (CFG-1 S8).** An admin refund and Stripe's `charge.refunded` webhook for the same refund both
+  booked it: the contract's refunded amount doubled and a second, reference-less refund row appeared. The webhook now
+  books only refunds the module does not know, told apart by Stripe's refund id (the reference of the admin's row); an
+  event without a refund list is reconciled against the cumulative `amount_refunded` the contract already carries. This
+  also fixes dashboard refunds: several partial refunds added Stripe's cumulative total each time, and a replay of an older
+  event added again. Dashboard refunds now keep their `re_...` id as the row's reference. Admin capture was not affected
+  (the contract's captured amount guards the webhook). After upgrading clear the container cache.
 - **Manual capture and refund from the admin (CFG-1 S8, found by a Stripe test-mode run from the admin app).** An admin
   capture now records the captured amount on the contract (it wrote the transaction row and moved the state, but the
   contract kept 0.00 captured until a webhook that may never come), and an admin refund now writes its row to the

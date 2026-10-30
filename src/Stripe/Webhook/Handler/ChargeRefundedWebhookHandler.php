@@ -67,7 +67,11 @@ class ChargeRefundedWebhookHandler extends AbstractStripeWebhookHandler
             'refunded_amount' => $refundedAmount,
         ]);
 
-        $result = $this->fulfillmentHandler->handleChargeRefunded($paymentIntentId, $refundedAmount);
+        $result = $this->fulfillmentHandler->handleChargeRefunded(
+            $paymentIntentId,
+            $refundedAmount,
+            $this->parser->extractRefunds($event)
+        );
 
         return $this->mapHandlerResult(
             $result,

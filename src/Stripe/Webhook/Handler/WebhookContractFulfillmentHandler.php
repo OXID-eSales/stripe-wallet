@@ -17,6 +17,7 @@ use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
 use OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder;
 use OxidEsales\Payments\Stripe\Service\ContractRefundRecorder;
+use OxidEsales\Payments\Stripe\Webhook\ChargeRefund;
 
 /**
  * Handles webhook events with contract-awareness.
@@ -33,6 +34,9 @@ use OxidEsales\Payments\Stripe\Service\ContractRefundRecorder;
  */
 class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHandlerInterface
 {
+    /** Rounding noise between Stripe's integer minor units and the contract's float total. */
+    private const AMOUNT_TOLERANCE = 0.000001;
+
     public function __construct(
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ContractFulfillmentServiceInterface $contractFulfillmentService,
@@ -65,8 +69,13 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
 
     /**
      * @inheritDoc
+     *
+     * CFG-1 S8: `$refundAmount` is the charge's cumulative total, not one refund - and an admin refund has booked its
+     * own refund already. Refunds are told apart by Stripe's refund id (the reference of the row the admin refund
+     * wrote); an event that lists none is reconciled against the total the contract carries. Never by "an amount like
+     * this exists": two refunds of the same amount are two refunds.
      */
-    public function handleChargeRefunded(string $providerOrderId, float $refundAmount): ?bool
+    public function handleChargeRefunded(string $providerOrderId, float $refundAmount, array $refunds = []): ?bool
     {
         $contract = $this->findContractByProviderOrderId($providerOrderId);
 
@@ -79,15 +88,42 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
             return false;
         }
 
-        // Sprint 8 / 114.8: Record refund amount on contract (accumulates for partial refunds).
-        // Delegates to ContractRefundRecorder which enforces the FULFILLED guard uniformly.
-        if ($refundAmount > 0.0) {
-            $recorder = $this->refundRecorder ?? new ContractRefundRecorder($this->contractRepository);
-            $recorder->record($contract, $refundAmount);
-            $this->recordAudit($contract, StripeDefinitions::TRANSACTION_TYPE_REFUND, $refundAmount);
+        // The contract already carries what Stripe reports (admin refund, earlier event, replay of an older one).
+        if ($refundAmount - ($contract->getRefundedAmount() ?? 0.0) <= self::AMOUNT_TOLERANCE) {
+            return true;
+        }
+
+        foreach ($this->unbookedRefunds($contract, $refundAmount, $refunds) as $refund) {
+            $this->bookRefund($contract, $refund->amount, $refund->id);
         }
 
         return true;
+    }
+
+    /**
+     * @param list<ChargeRefund> $refunds
+     * @return list<ChargeRefund>
+     */
+    private function unbookedRefunds(PaymentContractInterface $contract, float $cumulativeAmount, array $refunds): array
+    {
+        if ($refunds === []) {
+            $difference = $cumulativeAmount - ($contract->getRefundedAmount() ?? 0.0);
+
+            return [new ChargeRefund('', $difference)];
+        }
+
+        return array_values(array_filter(
+            $refunds,
+            fn (ChargeRefund $refund): bool => $refund->amount > 0.0
+                && $this->transactionRepository->findByProviderTransactionId($refund->id) === null
+        ));
+    }
+
+    private function bookRefund(PaymentContractInterface $contract, float $amount, string $refundId): void
+    {
+        $recorder = $this->refundRecorder ?? new ContractRefundRecorder($this->contractRepository);
+        $recorder->record($contract, $amount);
+        $this->recordAudit($contract, StripeDefinitions::TRANSACTION_TYPE_REFUND, $amount, $refundId);
     }
 
     /**
@@ -141,8 +177,12 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
         return true;
     }
 
-    private function recordAudit(PaymentContractInterface $contract, string $type, float $amount): void
-    {
+    private function recordAudit(
+        PaymentContractInterface $contract,
+        string $type,
+        float $amount,
+        string $providerReference = ''
+    ): void {
         $transaction = new Transaction(
             id: $type . '_' . bin2hex(random_bytes(16)),
             shopId: ShopId::of($this->shopAdapter->getShopId(), 'webhook audit row'),
@@ -155,6 +195,9 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
             currency: $contract->getCurrency()
         );
         $transaction->setProviderOrderId($contract->getProviderOrderId());
+        if ($providerReference !== '') {
+            $transaction->setTransactionId($providerReference);
+        }
 
         $this->transactionRepository->save($transaction);
     }
