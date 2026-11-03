@@ -28,7 +28,6 @@ For architecture details, see [`docs/architecture/00-overview.md`](../architectu
 | Service | `TokenServiceInterface` | Contract token generation/validation |
 | Service | `ReturnSecurityValidatorInterface` | Return URL security validation |
 | Service | `FraudCheckServiceInterface` | Fraud check abstraction |
-| Service | `StockRestorationServiceInterface` | Stock restoration on cancellation |
 | Service | `FileLoggerInterface` | File-based logging abstraction |
 | Service | `PaymentAdapterFactoryInterface` | Creates payment adapter instances |
 | Event | `EventDispatcherInterface` | PSR-14 compatible event dispatching |
@@ -107,7 +106,6 @@ How stripe implements payment-component interfaces:
 | `ShopOrderServiceInterface` | `OxidShopOrderService` |
 | `PaymentAdapterFactoryInterface` | `StripeAdapterFactory` |
 | `FraudCheckServiceInterface` | `StripeRadarFraudCheckService` |
-| `StockRestorationServiceInterface` | `OxidStockRestorationService` |
 | `ReturnSecurityValidatorInterface` | `ReturnSessionSecurityService` |
 | `TokenServiceInterface` | `ContractTokenService` |
 | `ContractMetadataServiceInterface` | `ContractMetadataService` (from payment-component) |

@@ -125,7 +125,7 @@ final class RefundFlowTest extends TestCase
     public function anAdminRefundFollowedByAnEventWithoutARefundListIsBookedOnce(): void
     {
         $this->adminRefund('re_admin_1', 25.0);
-        $this->lister->method('listFor')->with('ch_1')->willReturn([new ChargeRefund('re_admin_1', 25.0, 'EUR')]);
+        $this->lister->method('listFor')->with('ch_1')->willReturn([new ChargeRefund('re_admin_1', 25.0, 'EUR', true)]);
 
         $this->webhook->handle($this->chargeRefunded(null));
 
@@ -147,7 +147,7 @@ final class RefundFlowTest extends TestCase
     public function aDashboardRefundWithoutARefundListIsBookedByTheRefundIdStripeLists(): void
     {
         $this->lister->expects($this->exactly(2))->method('listFor')->with('ch_1')
-            ->willReturn([new ChargeRefund('re_dash_1', 25.0, 'EUR')]);
+            ->willReturn([new ChargeRefund('re_dash_1', 25.0, 'EUR', true)]);
 
         $this->webhook->handle($this->chargeRefunded(null));
         $this->webhook->handle($this->chargeRefunded(null));
@@ -160,8 +160,8 @@ final class RefundFlowTest extends TestCase
     public function anEventWhoseRefundListIsTruncatedIsCompletedFromStripe(): void
     {
         $this->lister->expects($this->once())->method('listFor')->with('ch_1')->willReturn([
-            new ChargeRefund('re_1', 10.0, 'EUR'),
-            new ChargeRefund('re_2', 10.0, 'EUR'),
+            new ChargeRefund('re_1', 10.0, 'EUR', true),
+            new ChargeRefund('re_2', 10.0, 'EUR', true),
         ]);
 
         $this->webhook->handle($this->chargeRefunded([['re_1', 1000]], hasMore: true));
@@ -319,7 +319,8 @@ final class InMemoryRefundLedger implements ProviderRefundLedgerInterface
         string $providerRefundId,
         float $amount,
         string $currency,
-        string $source
+        string $source,
+        bool $succeeded
     ): RefundBooking {
         if ($providerRefundId === '') {
             throw new InvalidArgumentException('A provider refund is booked by its refund id; none was given.');

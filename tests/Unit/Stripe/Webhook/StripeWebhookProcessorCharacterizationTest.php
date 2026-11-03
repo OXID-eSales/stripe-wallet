@@ -24,6 +24,7 @@ use OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentCanceledWebhookHandl
 use OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentFailedWebhookHandler;
 use OxidEsales\Payments\Stripe\Webhook\Handler\PaymentIntentSucceededWebhookHandler;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
+use OxidEsales\PaymentBase\Logging\ThrowableSummary;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;
 use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -694,7 +695,8 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
             $this->logRepository,
             $this->logger,
             $this->config,
-            $handlers
+            $handlers,
+            new ThrowableSummary([])
         );
     }
 

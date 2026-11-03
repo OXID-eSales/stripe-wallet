@@ -62,10 +62,10 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
         $contract = $this->fulfilledContractWithOrderId('order-90');
         $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
         $this->refundLedger->expects($this->once())->method('book')
-            ->with($contract->getId(), 're_1', 50.0, 'EUR', 'webhook')
+            ->with($contract->getId(), 're_1', 50.0, 'EUR', 'webhook', true)
             ->willReturn(RefundBooking::booked(50.0));
 
-        $result = $this->makeHandler()->handleChargeRefunded('pi_refund', [new ChargeRefund('re_1', 50.0, 'EUR')]);
+        $result = $this->makeHandler()->handleChargeRefunded('pi_refund', [new ChargeRefund('re_1', 50.0, 'EUR', true)]);
 
         $this->assertTrue($result);
         $this->assertSame([], $this->transactionRepository->saved);
@@ -78,7 +78,7 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
 
         $handler = $this->makeHandler();
         $this->refundLedger->expects($this->never())->method('book');
-        $result = $handler->handleChargeRefunded('pi_committed', [new ChargeRefund('re_1', 50.0, 'EUR')]);
+        $result = $handler->handleChargeRefunded('pi_committed', [new ChargeRefund('re_1', 50.0, 'EUR', true)]);
 
         $this->assertFalse($result);
         $this->assertSame([], $this->transactionRepository->saved);

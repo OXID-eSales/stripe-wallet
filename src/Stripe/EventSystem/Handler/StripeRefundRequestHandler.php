@@ -16,6 +16,7 @@ use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use Throwable;
 
 /**
@@ -203,7 +204,8 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
             (string) $result->refundId,
             (float) $result->amountRefunded,
             strtoupper((string) $result->currency),
-            'admin'
+            'admin',
+            $result->status === StripeStatusMapper::STRIPE_SUCCEEDED
         );
     }
 

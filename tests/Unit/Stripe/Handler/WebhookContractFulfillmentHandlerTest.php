@@ -274,10 +274,10 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->willReturn($contract);
 
         $this->refundLedger->expects($this->once())->method('book')
-            ->with('contract_refund', 're_50', 50.0, 'EUR', 'webhook')
+            ->with('contract_refund', 're_50', 50.0, 'EUR', 'webhook', true)
             ->willReturn(RefundBooking::booked(50.0));
 
-        $result = $this->makeHandler()->handleChargeRefunded($providerOrderId, [new ChargeRefund('re_50', 50.0, 'EUR')]);
+        $result = $this->makeHandler()->handleChargeRefunded($providerOrderId, [new ChargeRefund('re_50', 50.0, 'EUR', true)]);
 
         $this->assertTrue($result);
     }
@@ -289,21 +289,21 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
         $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
         $booked = [];
         $this->refundLedger->method('book')->willReturnCallback(
-            static function (string $contractId, string $refundId, float $amount, string $currency, string $source) use (&$booked): RefundBooking {
-                $booked[] = [$contractId, $refundId, $amount, $currency, $source];
+            static function (string $contractId, string $refundId, float $amount, string $currency, string $source, bool $succeeded) use (&$booked): RefundBooking {
+                $booked[] = [$contractId, $refundId, $amount, $currency, $source, $succeeded];
 
                 return RefundBooking::booked($amount);
             }
         );
 
         $this->makeHandler()->handleChargeRefunded('pi_two', [
-            new ChargeRefund('re_a', 10.0, 'EUR'),
-            new ChargeRefund('re_b', 10.0, 'EUR'),
+            new ChargeRefund('re_a', 10.0, 'EUR', true),
+            new ChargeRefund('re_b', 10.0, 'EUR', false),
         ]);
 
         $this->assertSame([
-            ['contract_two', 're_a', 10.0, 'EUR', 'webhook'],
-            ['contract_two', 're_b', 10.0, 'EUR', 'webhook'],
+            ['contract_two', 're_a', 10.0, 'EUR', 'webhook', true],
+            ['contract_two', 're_b', 10.0, 'EUR', 'webhook', false],
         ], $booked);
     }
 
@@ -313,7 +313,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
         $this->contractRepository->method('findByProviderOrderId')->willReturn($this->fulfilledContractMock('contract_zero'));
         $this->refundLedger->expects($this->never())->method('book');
 
-        $result = $this->makeHandler()->handleChargeRefunded('pi_zero', [new ChargeRefund('re_zero', 0.0, 'EUR')]);
+        $result = $this->makeHandler()->handleChargeRefunded('pi_zero', [new ChargeRefund('re_zero', 0.0, 'EUR', true)]);
 
         $this->assertTrue($result);
     }
@@ -325,7 +325,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->willReturn($this->createCommittedContractMock('pi_committed', 'order-1'));
         $this->refundLedger->expects($this->never())->method('book');
 
-        $result = $this->makeHandler()->handleChargeRefunded('pi_committed', [new ChargeRefund('re_1', 5.0, 'EUR')]);
+        $result = $this->makeHandler()->handleChargeRefunded('pi_committed', [new ChargeRefund('re_1', 5.0, 'EUR', true)]);
 
         $this->assertFalse($result);
     }

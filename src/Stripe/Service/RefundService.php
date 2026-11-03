@@ -12,7 +12,6 @@ namespace OxidEsales\Payments\Stripe\Service;
 use DateTimeImmutable;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
-use OxidEsales\PaymentBase\Service\StockRestorationServiceInterface;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripePaymentIntentDto;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeRefundDto;
 use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
@@ -35,7 +34,6 @@ class RefundService implements RefundServiceInterface
 
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,
-        private readonly StockRestorationServiceInterface $stockRestorationService,
         ?LoggerInterface $logger = null
     ) {
         $this->logger = $logger ?? new NullLogger();
@@ -95,28 +93,8 @@ class RefundService implements RefundServiceInterface
             $validReason,
             $metadata,
             $amountInMinorUnits,
-            $this->buildRequestReference($paymentIntent),
-            $this->refundsTheRest($paymentIntent, $amountInMinorUnits)
+            $this->buildRequestReference($paymentIntent)
         );
-    }
-
-    /**
-     * VR-21 F2: whether this refund leaves nothing refundable on the charge — no amount (Stripe refunds the
-     * rest), or an amount that covers captured minus already refunded. Without the expanded charge a partial
-     * amount cannot be judged and counts as partial: stock is only ever given back once the order is gone.
-     */
-    private function refundsTheRest(StripePaymentIntentDto $paymentIntent, ?int $amountInMinorUnits): bool
-    {
-        if ($amountInMinorUnits === null) {
-            return true;
-        }
-
-        $charge = $paymentIntent->charge;
-        if ($charge === null) {
-            return false;
-        }
-
-        return $amountInMinorUnits >= $charge->amountCaptured - $charge->amountRefunded;
     }
 
     public function processRefundByCharge(
@@ -145,15 +123,14 @@ class RefundService implements RefundServiceInterface
         ?string $reason,
         ?array $metadata,
         ?int $amountInCents = null,
-        ?string $requestReference = null,
-        bool $refundsTheRest = true
+        ?string $requestReference = null
     ): RefundResponse {
         try {
             $refundDto = $this->adapterFactory
                 ->getStripeAdapter()
                 ->createRefundByCharge($chargeId, $amountInCents, $reason, $metadata, $requestReference);
 
-            return $this->handleRefundResponse($refundDto, $chargeId, $orderId, $paymentIntentId, $refundsTheRest);
+            return $this->handleRefundResponse($refundDto, $chargeId, $orderId, $paymentIntentId);
         } catch (PaymentAdapterException $e) {
             return $this->handleRefundError($e, $chargeId);
         }
@@ -248,15 +225,10 @@ class RefundService implements RefundServiceInterface
         StripeRefundDto $refund,
         string $chargeId,
         ?string $orderId,
-        ?string $paymentIntentId,
-        bool $refundsTheRest
+        ?string $paymentIntentId
     ): RefundResponse {
         if (!in_array($refund->status, [StripeStatusMapper::STRIPE_SUCCEEDED, StripeStatusMapper::STRIPE_REFUND_STATUS_PENDING], true)) {
             return RefundResponse::failure("Refund failed with status: {$refund->status}");
-        }
-
-        if ($orderId !== null && $refundsTheRest && $refund->status === StripeStatusMapper::STRIPE_SUCCEEDED) {
-            $this->restoreStock($orderId);
         }
 
         // Convert amount from Stripe minor units to major units using the refund's own currency.
@@ -281,19 +253,6 @@ class RefundService implements RefundServiceInterface
             providerData: ['charge_id' => $chargeId],
             metadata: $orderId !== null ? ['order_id' => $orderId] : []
         );
-    }
-
-    /**
-     * VR-21 F2: the whole order goes back to stock only once the refund succeeded and nothing is left to
-     * refund. A partial or still pending refund keeps the stock and the order lines.
-     */
-    private function restoreStock(string $orderId): void
-    {
-        $articlesProcessed = $this->stockRestorationService->restoreStockForOrder($orderId);
-        $this->logger->info('Stock restored after refund', [
-            'orderId' => $orderId,
-            'articlesProcessed' => $articlesProcessed,
-        ]);
     }
 
     private function handleRefundError(PaymentAdapterException $e, string $chargeId): RefundResponse

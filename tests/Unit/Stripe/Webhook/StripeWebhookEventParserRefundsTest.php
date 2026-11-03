@@ -24,7 +24,17 @@ final class StripeWebhookEventParserRefundsTest extends TestCase
             ['id' => 're_1', 'amount' => 1250, 'status' => 'succeeded'],
         ]]]);
 
-        $this->assertEquals([new ChargeRefund('re_1', 12.5, 'EUR')], (new StripeWebhookEventParser())->extractRefunds($event));
+        $this->assertEquals([new ChargeRefund('re_1', 12.5, 'EUR', true)], (new StripeWebhookEventParser())->extractRefunds($event));
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function aPendingRefundIsNotYetSucceeded(): void
+    {
+        $event = $this->event(['currency' => 'eur', 'refunds' => ['has_more' => false, 'data' => [
+            ['id' => 're_2', 'amount' => 500, 'status' => 'pending'],
+        ]]]);
+
+        $this->assertEquals([new ChargeRefund('re_2', 5.0, 'EUR', false)], (new StripeWebhookEventParser())->extractRefunds($event));
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

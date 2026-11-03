@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Webhook;
 
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeRefundDto;
+use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 
@@ -31,7 +32,7 @@ final class ChargeRefundLister implements ChargeRefundListerInterface
             }
             $currency = strtoupper($refund->currency);
             $amount = AmountConverter::toMajorUnits($refund->amount, $currency);
-            $refunds[] = new ChargeRefund($refund->id, $amount, $currency);
+            $refunds[] = new ChargeRefund($refund->id, $amount, $currency, $refund->status === StripeStatusMapper::STRIPE_SUCCEEDED);
         }
 
         return $refunds;

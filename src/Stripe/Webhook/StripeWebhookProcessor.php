@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Webhook;
 
 use OxidEsales\PaymentBase\Repository\WebhookLogRepositoryInterface;
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\PaymentBase\Webhook\AbstractWebhookProcessor;
 use OxidEsales\PaymentBase\Webhook\Exception\WebhookSignatureException;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
@@ -47,9 +48,10 @@ class StripeWebhookProcessor extends AbstractWebhookProcessor
         WebhookLogRepositoryInterface $logRepository,
         LoggerInterface $logger,
         private readonly ModuleConfigurationServiceInterface $config,
-        private readonly iterable $handlers
+        private readonly iterable $handlers,
+        ThrowableSummaryInterface $throwableSummary
     ) {
-        parent::__construct($logRepository, $logger);
+        parent::__construct($logRepository, $logger, $throwableSummary);
     }
 
     protected function getProviderName(): string

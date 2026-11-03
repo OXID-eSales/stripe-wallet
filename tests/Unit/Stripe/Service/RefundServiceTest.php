@@ -13,7 +13,6 @@ use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\RefundService;
 use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
-use OxidEsales\PaymentBase\Service\StockRestorationServiceInterface;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -23,20 +22,17 @@ use Psr\Log\LoggerInterface;
  * TDD Tests for RefundService.
  *
  * Sprint 21: Extract business logic from StripeRefundRequestHandler.
- * Sprint 24: Added StockRestorationService mock.
  */
 class RefundServiceTest extends TestCase
 {
     private StripeAdapterFactoryInterface&MockObject $adapterFactory;
     private StripeAdapterInterface&MockObject $stripeAdapter;
-    private StockRestorationServiceInterface&MockObject $stockRestorationService;
     private LoggerInterface&MockObject $logger;
 
     protected function setUp(): void
     {
         $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
         $this->stripeAdapter = $this->createMock(StripeAdapterInterface::class);
-        $this->stockRestorationService = $this->createMock(StockRestorationServiceInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->adapterFactory
@@ -48,7 +44,6 @@ class RefundServiceTest extends TestCase
     {
         return new RefundService(
             $this->adapterFactory,
-            $this->stockRestorationService,
             $this->logger
         );
     }
@@ -372,8 +367,7 @@ class RefundServiceTest extends TestCase
             // Reset mocks for each iteration
             $this->stripeAdapter = $this->createMock(StripeAdapterInterface::class);
             $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
-            $this->stockRestorationService = $this->createMock(StockRestorationServiceInterface::class);
-            $this->adapterFactory->method('getStripeAdapter')->willReturn($this->stripeAdapter);
+                $this->adapterFactory->method('getStripeAdapter')->willReturn($this->stripeAdapter);
 
             $this->stripeAdapter
                 ->expects($this->once())
@@ -455,7 +449,6 @@ class RefundServiceTest extends TestCase
             ->method('createRefundByCharge')
             ->willReturn($refund);
 
-        // Sprint 24: Now logs twice - once for stock restoration (if orderId present), once for refund
         $this->logger
             ->expects($this->once())
             ->method('info')
@@ -466,176 +459,9 @@ class RefundServiceTest extends TestCase
                 })
             );
 
-        // Act - no metadata means no orderId, so no stock restoration log
+        // Act
         $service = $this->createService();
         $service->processRefundByCharge('ch_test'); // Full refund (no amount parameter)
-    }
-
-    // --- Stock Restoration Tests (Sprint 24) ---
-
-    public function testSuccessfulRefundCallsStockRestoration(): void
-    {
-        // Arrange
-        $orderId = 'order_stock_test';
-        $metadata = ['order_id' => $orderId];
-
-        $refund = $this->buildRefundDto('re_stock', 5000, 'eur', 'succeeded');
-
-        $this->stripeAdapter
-            ->method('createRefundByCharge')
-            ->willReturn($refund);
-
-        $this->stockRestorationService
-            ->expects($this->once())
-            ->method('restoreStockForOrder')
-            ->with($orderId)
-            ->willReturn(2);
-
-        // Act
-        $service = $this->createService();
-        $result = $service->processRefundByCharge('ch_test', null, $metadata);
-
-        // Assert
-        $this->assertTrue($result->isSuccessful());
-    }
-
-    // --- VR-21 F2: restock only when a succeeded refund leaves nothing refundable ---
-
-    public function testPartialRefundKeepsStock(): void
-    {
-        $this->givenChargeCapturedAndRefunded(10000, 0);
-        $this->stripeAdapter->method('createRefundByCharge')
-            ->willReturn($this->buildRefundDto('re_part', 100, 'eur', 'succeeded'));
-
-        $this->stockRestorationService->expects($this->never())->method('restoreStockForOrder');
-
-        $result = $this->createService()->processRefund('order_part', 'pi_part', null, null, 'admin', 1.00);
-
-        $this->assertTrue($result->isSuccessful());
-    }
-
-    public function testPendingRefundKeepsStock(): void
-    {
-        $this->givenChargeCapturedAndRefunded(10000, 0);
-        $this->stripeAdapter->method('createRefundByCharge')
-            ->willReturn($this->buildRefundDto('re_pend', 10000, 'eur', 'pending'));
-
-        $this->stockRestorationService->expects($this->never())->method('restoreStockForOrder');
-
-        $result = $this->createService()->processRefund('order_pend', 'pi_pend');
-
-        $this->assertTrue($result->isSuccessful());
-        $this->assertSame('pending', $result->status);
-    }
-
-    public function testFullSucceededRefundRestocksOnce(): void
-    {
-        $this->givenChargeCapturedAndRefunded(10000, 0);
-        $this->stripeAdapter->method('createRefundByCharge')
-            ->willReturn($this->buildRefundDto('re_full', 10000, 'eur', 'succeeded'));
-
-        $this->stockRestorationService->expects($this->once())
-            ->method('restoreStockForOrder')->with('order_full')->willReturn(3);
-
-        $this->createService()->processRefund('order_full', 'pi_full');
-    }
-
-    public function testRefundOfTheRestRestocksOnce(): void
-    {
-        $this->givenChargeCapturedAndRefunded(10000, 4000);
-        $this->stripeAdapter->method('createRefundByCharge')
-            ->willReturn($this->buildRefundDto('re_rest', 6000, 'eur', 'succeeded'));
-
-        $this->stockRestorationService->expects($this->once())
-            ->method('restoreStockForOrder')->with('order_rest')->willReturn(3);
-
-        $this->createService()->processRefund('order_rest', 'pi_rest', null, null, 'admin', 60.00);
-    }
-
-    public function testPartialRefundWithoutExpandedChargeKeepsStock(): void
-    {
-        $this->stripeAdapter->method('retrievePaymentIntent')->willReturn($this->buildPiDto('pi_x', 'ch_x'));
-        $this->stripeAdapter->method('createRefundByCharge')
-            ->willReturn($this->buildRefundDto('re_x', 10000, 'eur', 'succeeded'));
-
-        $this->stockRestorationService->expects($this->never())->method('restoreStockForOrder');
-
-        $this->createService()->processRefund('order_x', 'pi_x', null, null, 'admin', 100.00);
-    }
-
-    public function testPendingRefundByChargeKeepsStock(): void
-    {
-        $this->stripeAdapter->method('createRefundByCharge')
-            ->willReturn($this->buildRefundDto('re_pc', 2500, 'eur', 'pending'));
-
-        $this->stockRestorationService->expects($this->never())->method('restoreStockForOrder');
-
-        $this->createService()->processRefundByCharge('ch_test', null, ['order_id' => 'order_pc']);
-    }
-
-    private function givenChargeCapturedAndRefunded(int $captured, int $refunded): void
-    {
-        $this->stripeAdapter->method('retrievePaymentIntent')->willReturn(new StripePaymentIntentDto(
-            id: 'pi_any',
-            status: 'succeeded',
-            amount: $captured,
-            currency: 'eur',
-            created: 1700000000,
-            latestChargeId: 'ch_any',
-            charge: new StripeChargeDto(
-                id: 'ch_any',
-                amount: $captured,
-                amountCaptured: $captured,
-                amountRefunded: $refunded,
-                currency: 'eur',
-                captured: true,
-                created: 1700000000,
-            ),
-        ));
-    }
-
-    public function testRefundWithoutOrderIdSkipsStockRestoration(): void
-    {
-        // Arrange - no orderId in metadata
-        $refund = $this->buildRefundDto('re_no_stock', 3000, 'eur', 'succeeded');
-
-        $this->stripeAdapter
-            ->method('createRefundByCharge')
-            ->willReturn($refund);
-
-        // Stock restoration should NOT be called
-        $this->stockRestorationService
-            ->expects($this->never())
-            ->method('restoreStockForOrder');
-
-        // Act
-        $service = $this->createService();
-        $result = $service->processRefundByCharge('ch_test');
-
-        // Assert
-        $this->assertTrue($result->isSuccessful());
-    }
-
-    public function testFailedRefundDoesNotCallStockRestoration(): void
-    {
-        // Arrange
-        $refund = $this->buildRefundDto('re_failed', 2500, 'eur', 'failed');
-
-        $this->stripeAdapter
-            ->method('createRefundByCharge')
-            ->willReturn($refund);
-
-        // Stock restoration should NOT be called on failed refund
-        $this->stockRestorationService
-            ->expects($this->never())
-            ->method('restoreStockForOrder');
-
-        // Act
-        $service = $this->createService();
-        $result = $service->processRefundByCharge('ch_test', null, ['order_id' => 'order_123']);
-
-        // Assert
-        $this->assertFalse($result->isSuccessful());
     }
 
     public function testFailedRefundIsLoggedAsError(): void
