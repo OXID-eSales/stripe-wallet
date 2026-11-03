@@ -349,7 +349,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         ]);
 
         $this->fulfillmentHandler->method('handleChargeRefunded')
-            ->with('pi_chref', 30.0)
+            ->with('pi_chref', [])
             ->willReturn(true);
 
         $contract = $this->makeContractWithId('ctr-refund');
@@ -666,7 +666,8 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
                 $parser,
                 $this->fulfillmentHandler,
                 $this->contractRepository,
-                $this->logger
+                $this->logger,
+                $this->createMock(\OxidEsales\Payments\Stripe\Webhook\ChargeRefundListerInterface::class)
             ),
             new ChargeDisputeCreatedWebhookHandler(
                 $parser,

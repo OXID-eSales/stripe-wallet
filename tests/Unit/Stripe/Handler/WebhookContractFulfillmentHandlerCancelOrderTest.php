@@ -13,6 +13,7 @@ use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
@@ -199,7 +200,8 @@ class WebhookContractFulfillmentHandlerCancelOrderTest extends TestCase
                 $this->contractRepository,
                 $this->transactionRepository,
                 $this->shopAdapter
-            )
+            ),
+            $this->createMock(ProviderRefundLedgerInterface::class)
         );
     }
 

@@ -272,7 +272,7 @@ class RefundService implements RefundServiceInterface
 
         return RefundResponse::success(
             providerPaymentId: $paymentIntentId ?? $chargeId,
-            refundId: $refund->id !== '' ? $refund->id : 'unknown',
+            refundId: $refund->id,
             amountRefunded: $amountInMajorUnits,
             currency: $refund->currency,
             status: $refund->status,

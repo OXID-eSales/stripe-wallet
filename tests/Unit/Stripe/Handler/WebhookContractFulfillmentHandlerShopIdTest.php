@@ -9,6 +9,7 @@ use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Contract\Transaction;
+use OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
@@ -38,14 +39,14 @@ class WebhookContractFulfillmentHandlerShopIdTest extends TestCase
 
     /**
      * Sprint 114.1: recordAudit writes the shop id from the injected ShopAdapterInterface,
-     * not a hardcoded 1.
+     * not a hardcoded 1. (Refund rows are the ledger's since VR-21 F5; the failure row is the handler's.)
      */
-    public function testRefundRecordingUsesInjectedShopId(): void
+    public function testAuditRowUsesInjectedShopId(): void
     {
         $shopAdapter = $this->createMock(ShopAdapterInterface::class);
         $shopAdapter->method('getShopId')->willReturn('7');
 
-        $contract = $this->makeFullyFulfilledContract();
+        $contract = $this->makePendingContract();
         $this->contractRepository
             ->method('findByProviderOrderId')
             ->willReturn($contract);
@@ -65,15 +66,16 @@ class WebhookContractFulfillmentHandlerShopIdTest extends TestCase
             $this->orderUpdater,
             $recordingRepo,
             $shopAdapter,
-            new ContractCaptureRecorder($this->contractRepository, $recordingRepo, $shopAdapter)
+            new ContractCaptureRecorder($this->contractRepository, $recordingRepo, $shopAdapter),
+            $this->createMock(ProviderRefundLedgerInterface::class)
         );
-        $handler->handleChargeRefunded('pi_refund_shop7', 30.00);
+        $handler->handlePaymentFailed('pi_fail_shop7', 'card_declined');
 
         $this->assertNotNull($capturedTransaction);
         $this->assertSame(7, $capturedTransaction->getShopId());
     }
 
-    private function makeFullyFulfilledContract(): PaymentContract
+    private function makePendingContract(): PaymentContract
     {
         $snapshot = BasketSnapshot::fromArray([
             'items' => [],
@@ -87,9 +89,7 @@ class WebhookContractFulfillmentHandlerShopIdTest extends TestCase
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
         $contract->transitionToNotFinished('order-shop7');
         $contract->transitionToPending();
-        $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED);
-        $contract->commitToOrder('order-shop7');
-        $contract->fulfill();
+
         return $contract;
     }
 }

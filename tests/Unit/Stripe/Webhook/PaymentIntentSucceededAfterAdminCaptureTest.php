@@ -50,7 +50,8 @@ final class PaymentIntentSucceededAfterAdminCaptureTest extends TestCase
             $this->createMock(ContractLinkedOrderUpdaterInterface::class),
             $transactions,
             $shop,
-            new ContractCaptureRecorder($contracts, $transactions, $shop)
+            new ContractCaptureRecorder($contracts, $transactions, $shop),
+            $this->createMock(\OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface::class)
         );
 
         $handler->handlePaymentSucceeded('pi_capture', 40.0);

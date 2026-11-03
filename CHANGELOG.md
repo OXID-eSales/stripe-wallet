@@ -7,10 +7,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- **Every Stripe refund is booked once, by Stripe's refund id, for the amount Stripe refunded (VR-21 F5).** The admin
+  refund and the `charge.refunded` webhook booked refunds separately and raced each other without a lock; an event with
+  no refund list booked "the difference" under an empty refund id, which defeated the dedupe; and the admin path booked
+  the contract's authorized amount instead of what Stripe refunded (wrong after a partial capture). Both paths now book
+  through payment-base's `ProviderRefundLedgerInterface` (needs payment-base with the ledger, 1.7.0): one booking per
+  refund id whichever path reports it first, the refund's transaction row written by the ledger (the module no longer
+  writes its own refund row). The webhook books every refund of the charge by its id; an event that carries no
+  `refunds.data` (newer API versions) or carries it cut short (`has_more`) is completed from Stripe's refund list of
+  the charge, and a failure asking Stripe fails the delivery so Stripe retries. A refund Stripe did not run (failed,
+  canceled) is not booked; a refund response without a refund id is a booking error, no longer `unknown`. The refund
+  restock rule of VR-21 F2 is unchanged. `StripeRefundRequestHandler` and `WebhookContractFulfillmentHandler` take the
+  ledger as a required dependency (no more `new ContractRefundRecorder` fallback). After upgrading clear the container
+  cache.
 - **A partial or pending refund no longer restocks the order (VR-21 F2).** Every succeeded or pending refund, of any
   amount, returned all order lines to stock and stornoed them. Stock now comes back only when the refund succeeded and
   leaves nothing refundable on the charge (no amount, or captured minus already refunded). A pending refund that later
-  succeeds is not restocked by this path; the shared ledger (VR-21 F5) takes that over.
+  succeeds is not restocked by this path.
 - **A refund is booked once (CFG-1 S8).** An admin refund and Stripe's `charge.refunded` webhook for the same refund both
   booked it: the contract's refunded amount doubled and a second, reference-less refund row appeared. The webhook now
   books only refunds the module does not know, told apart by Stripe's refund id (the reference of the admin's row); an
@@ -26,6 +39,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   cache.
 
 ### Removed
+- **`ContractRefundRecorder` (VR-21 F5):** payment-base's ledger records refunds on the contract.
 - **CFG-1: no GraphQL path changes the module's settings any more** (they change in the classic admin only):
   `adminStripeConfigModify`, `adminStripeWebhookRegister` and `adminStripeWebhookClearAll`, with `AdminStripeConfigInput`,
   `AdminStripeConfigPayload`, `AdminStripeWebhookPayload`, `AdminStripeConfig.secretsEditable`, the modifier, change
