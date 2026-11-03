@@ -1108,19 +1108,6 @@ services:
 
 
   # ==========================================
-  # Contract Refund Recorder (Sprint 114.8)
-  # ==========================================
-  # Extracted from D3 duplication: StripeRefundRequestHandler + WebhookContractFulfillmentHandler.
-  # Centralizes the FULFILLED guard + addRefundedAmount + setRefundedAt + save sequence.
-
-  OxidEsales\Payments\Stripe\Service\ContractRefundRecorder:
-    arguments:
-      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
-      $logger: '@oxid_esales.monolog.logger'
-      $transactions: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
-    public: false
-
-  # ==========================================
   # Stripe Refund Handler (Sprint 4, Refactored Sprint 21)
   # ==========================================
   # Handles StripeRefundRequestEvent from admin panel, webhook, or API.
@@ -1128,17 +1115,16 @@ services:
   # Sprint 21: Delegates to RefundService for business logic (SRP).
   # Sprint 22: Removed OrderRefundUpdateService (dead code), full refund only.
   # Sprint 25: Added event logger for debugging
-  # Sprint 114.8: Delegates refund recording to ContractRefundRecorder (D3).
+  # VR-21 F5: books the refund Stripe made through payment-base's ProviderRefundLedger (by Stripe's refund id).
 
   OxidEsales\Payments\Stripe\EventSystem\Handler\StripeRefundRequestHandler:
     arguments:
       $refundService: '@OxidEsales\Payments\Stripe\Service\RefundServiceInterface'
-      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $requestLogService: '@OxidEsales\PaymentBase\Service\RequestLogServiceInterface'
       $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
+      $refundLedger: '@OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
-      $refundRecorder: '@OxidEsales\Payments\Stripe\Service\ContractRefundRecorder'
       $paymentIntentResolver: '@OxidEsales\Payments\Stripe\Service\PaymentIntentResolver'
     tags:
       - { name: payment.event_handler }
@@ -1162,7 +1148,8 @@ services:
       $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
       # Sprint 137: records the captured amount + one capture audit row (shared with the backfill command).
       $captureRecorder: '@OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder'
-      $refundRecorder: '@OxidEsales\Payments\Stripe\Service\ContractRefundRecorder'
+      # VR-21 F5: refunds are booked once by Stripe's refund id (payment-base's ledger)
+      $refundLedger: '@OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface'
       $logger: '@oxid_esales.monolog.logger'
     public: false
 
@@ -1251,12 +1238,20 @@ services:
     tags: [ { name: stripe.webhook_handler } ]
     public: false
 
+  # VR-21 F5: Stripe's own list of a charge's refunds, for charge.refunded events that carry none.
+  OxidEsales\Payments\Stripe\Webhook\ChargeRefundListerInterface:
+    class: OxidEsales\Payments\Stripe\Webhook\ChargeRefundLister
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+    public: false
+
   OxidEsales\Payments\Stripe\Webhook\Handler\ChargeRefundedWebhookHandler:
     arguments:
       $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
       $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
+      $refundLister: '@OxidEsales\Payments\Stripe\Webhook\ChargeRefundListerInterface'
     tags: [ { name: stripe.webhook_handler } ]
     public: false
 

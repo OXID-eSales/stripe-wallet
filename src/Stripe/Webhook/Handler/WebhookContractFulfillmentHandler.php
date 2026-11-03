@@ -9,6 +9,7 @@ use Psr\Log\LoggerInterface;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Contract\Transaction;
+use OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
@@ -16,7 +17,6 @@ use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
 use OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder;
-use OxidEsales\Payments\Stripe\Service\ContractRefundRecorder;
 use OxidEsales\Payments\Stripe\Webhook\ChargeRefund;
 
 /**
@@ -34,9 +34,6 @@ use OxidEsales\Payments\Stripe\Webhook\ChargeRefund;
  */
 class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHandlerInterface
 {
-    /** Rounding noise between Stripe's integer minor units and the contract's float total. */
-    private const AMOUNT_TOLERANCE = 0.000001;
-
     public function __construct(
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ContractFulfillmentServiceInterface $contractFulfillmentService,
@@ -44,7 +41,7 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
         private readonly TransactionRepositoryInterface $transactionRepository,
         private readonly ShopAdapterInterface $shopAdapter,
         private readonly ContractCaptureRecorder $captureRecorder,
-        private readonly ?ContractRefundRecorder $refundRecorder = null,
+        private readonly ProviderRefundLedgerInterface $refundLedger,
         private readonly ?LoggerInterface $logger = null
     ) {
     }
@@ -70,12 +67,11 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
     /**
      * @inheritDoc
      *
-     * CFG-1 S8: `$refundAmount` is the charge's cumulative total, not one refund - and an admin refund has booked its
-     * own refund already. Refunds are told apart by Stripe's refund id (the reference of the row the admin refund
-     * wrote); an event that lists none is reconciled against the total the contract carries. Never by "an amount like
-     * this exists": two refunds of the same amount are two refunds.
+     * VR-21 F5: every refund is booked through payment-base's ledger by Stripe's refund id, for the amount Stripe
+     * refunded - the admin refund books the same id, so whichever path comes second is a duplicate. No cumulative
+     * arithmetic and no refund id of our own: two refunds of the same amount are two refund ids.
      */
-    public function handleChargeRefunded(string $providerOrderId, float $refundAmount, array $refunds = []): ?bool
+    public function handleChargeRefunded(string $providerOrderId, array $refunds): ?bool
     {
         $contract = $this->findContractByProviderOrderId($providerOrderId);
 
@@ -83,47 +79,25 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
             return null;
         }
 
-        // Refunds can only happen on FULFILLED contracts
+        // The ledger books on FULFILLED contracts only.
         if (!$contract->getState()->isFulfilled()) {
             return false;
         }
 
-        // The contract already carries what Stripe reports (admin refund, earlier event, replay of an older one).
-        if ($refundAmount - ($contract->getRefundedAmount() ?? 0.0) <= self::AMOUNT_TOLERANCE) {
-            return true;
-        }
-
-        foreach ($this->unbookedRefunds($contract, $refundAmount, $refunds) as $refund) {
-            $this->bookRefund($contract, $refund->amount, $refund->id);
+        foreach ($refunds as $refund) {
+            $this->bookRefund((string) $contract->getId(), $refund);
         }
 
         return true;
     }
 
-    /**
-     * @param list<ChargeRefund> $refunds
-     * @return list<ChargeRefund>
-     */
-    private function unbookedRefunds(PaymentContractInterface $contract, float $cumulativeAmount, array $refunds): array
+    private function bookRefund(string $contractId, ChargeRefund $refund): void
     {
-        if ($refunds === []) {
-            $difference = $cumulativeAmount - ($contract->getRefundedAmount() ?? 0.0);
-
-            return [new ChargeRefund('', $difference)];
+        if ($refund->amount <= 0.0) {
+            return;
         }
 
-        return array_values(array_filter(
-            $refunds,
-            fn (ChargeRefund $refund): bool => $refund->amount > 0.0
-                && $this->transactionRepository->findByProviderTransactionId($refund->id) === null
-        ));
-    }
-
-    private function bookRefund(PaymentContractInterface $contract, float $amount, string $refundId): void
-    {
-        $recorder = $this->refundRecorder ?? new ContractRefundRecorder($this->contractRepository);
-        $recorder->record($contract, $amount);
-        $this->recordAudit($contract, StripeDefinitions::TRANSACTION_TYPE_REFUND, $amount, $refundId);
+        $this->refundLedger->book($contractId, $refund->id, $refund->amount, $refund->currency, 'webhook');
     }
 
     /**

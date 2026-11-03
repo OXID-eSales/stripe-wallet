@@ -35,11 +35,10 @@ interface WebhookContractFulfillmentHandlerInterface
      * Handle charge.refunded webhook event.
      *
      * @param string $providerOrderId Stripe PaymentIntent ID
-     * @param float $refundAmount Stripe's cumulative amount_refunded of the charge, in currency units
-     * @param list<ChargeRefund> $refunds the refunds the event lists; empty when it lists none
-     * @return bool|null true if processed, false if skipped, null if not found
+     * @param list<ChargeRefund> $refunds every refund Stripe holds for the charge, each booked once by its refund id
+     * @return bool|null true if processed, false if skipped (contract not FULFILLED), null if not found
      */
-    public function handleChargeRefunded(string $providerOrderId, float $refundAmount, array $refunds = []): ?bool;
+    public function handleChargeRefunded(string $providerOrderId, array $refunds): ?bool;
 
     /**
      * Handle payment_intent.payment_failed webhook event.

@@ -23,7 +23,7 @@ use OxidEsales\Payments\Stripe\Core\AmountConverter;
  */
 class StripeWebhookEventParser
 {
-    private const REFUND_STATUSES_WITHOUT_MONEY = ['failed', 'canceled'];
+    public const REFUND_STATUSES_WITHOUT_MONEY = ['failed', 'canceled'];
 
     /**
      * Extract payment intent ID from event data.
@@ -107,8 +107,8 @@ class StripeWebhookEventParser
     /**
      * The refunds a charge event lists (`refunds.data`), without the ones that moved no money.
      *
-     * Stripe omits the list from events of newer API versions: an empty result means "not listed", not "no refunds" -
-     * the cumulative `amount_refunded` is then the only source.
+     * Stripe omits the list from events of newer API versions: an empty result can mean "not listed" -
+     * {@see self::listsEveryRefund()} tells whether the list may be relied on.
      *
      * @return list<ChargeRefund>
      */
@@ -132,6 +132,20 @@ class StripeWebhookEventParser
     }
 
     /**
+     * Whether the event carries the charge's complete refund list: present, and not cut short (`has_more`).
+     * When it does not, Stripe has to be asked for the refunds of the charge.
+     */
+    public function listsEveryRefund(WebhookEvent $event): bool
+    {
+        $refunds = $event->getObject()['refunds'] ?? null;
+        if (!is_array($refunds) || !is_array($refunds['data'] ?? null)) {
+            return false;
+        }
+
+        return ($refunds['has_more'] ?? false) !== true;
+    }
+
+    /**
      * @param array<mixed> $entry
      * @param array<string, mixed> $charge
      */
@@ -145,8 +159,9 @@ class StripeWebhookEventParser
         }
 
         $currency = $entry['currency'] ?? $charge['currency'] ?? '';
+        $currency = is_string($currency) ? strtoupper($currency) : '';
 
-        return new ChargeRefund($id, AmountConverter::toMajorUnits($amount, is_string($currency) ? strtoupper($currency) : ''));
+        return new ChargeRefund($id, AmountConverter::toMajorUnits($amount, $currency), $currency);
     }
 
     /**

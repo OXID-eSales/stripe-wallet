@@ -351,6 +351,16 @@ class StripeAdapter implements StripeAdapterInterface
         return StripeObjectMapper::fromCharge($raw);
     }
 
+    public function listChargeRefunds(string $chargeId): array
+    {
+        $refunds = [];
+        foreach ($this->refundHelper->listRefundsByCharge($this->stripeClient, $chargeId) as $raw) {
+            $refunds[] = StripeObjectMapper::fromRefund($raw);
+        }
+
+        return $refunds;
+    }
+
     public function createStripeCustomer(array $params): StripeCustomerDto
     {
         try {

@@ -37,4 +37,11 @@ interface StripeRefundAdapterInterface
     ): StripeRefundDto;
 
     public function retrieveCharge(string $chargeId): StripeChargeDto;
+
+    /**
+     * Every refund Stripe holds for the charge (all pages), whatever the API version expands on the charge itself.
+     *
+     * @return list<StripeRefundDto>
+     */
+    public function listChargeRefunds(string $chargeId): array;
 }

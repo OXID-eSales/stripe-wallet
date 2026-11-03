@@ -14,11 +14,14 @@ use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Contract\Transaction;
+use OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface;
+use OxidEsales\PaymentBase\Refund\RefundBooking;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder;
 use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
+use OxidEsales\Payments\Stripe\Webhook\ChargeRefund;
 use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler;
 use OxidEsales\Payments\Stripe\Core\ShopId;
 use PHPUnit\Framework\TestCase;
@@ -38,9 +41,11 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
     private ContractLinkedOrderUpdaterInterface $orderUpdater;
     private RecordingTransactionRepository $transactionRepository;
     private ShopAdapterInterface $shopAdapter;
+    private ProviderRefundLedgerInterface&\PHPUnit\Framework\MockObject\MockObject $refundLedger;
 
     protected function setUp(): void
     {
+        $this->refundLedger = $this->createMock(ProviderRefundLedgerInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->contractFulfillmentService = $this->createMock(ContractFulfillmentServiceInterface::class);
         $this->orderUpdater = $this->createMock(ContractLinkedOrderUpdaterInterface::class);
@@ -49,21 +54,21 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
         $this->shopAdapter->method('getShopId')->willReturn('1');
     }
 
-    public function testHandleChargeRefundedWritesRefundAuditRow(): void
+    /**
+     * VR-21 F5: the refund's transaction row is the ledger's (keyed by Stripe's refund id); the handler writes none.
+     */
+    public function testHandleChargeRefundedLeavesTheRefundRowToTheLedger(): void
     {
         $contract = $this->fulfilledContractWithOrderId('order-90');
         $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
+        $this->refundLedger->expects($this->once())->method('book')
+            ->with($contract->getId(), 're_1', 50.0, 'EUR', 'webhook')
+            ->willReturn(RefundBooking::booked(50.0));
 
-        $handler = $this->makeHandler();
-        $result = $handler->handleChargeRefunded('pi_refund', 50.00);
+        $result = $this->makeHandler()->handleChargeRefunded('pi_refund', [new ChargeRefund('re_1', 50.0, 'EUR')]);
 
         $this->assertTrue($result);
-        $this->assertCount(1, $this->transactionRepository->saved);
-        $tx = $this->transactionRepository->saved[0];
-        $this->assertSame('refund', $tx->getType());
-        $this->assertSame(50.00, $tx->getAmount());
-        $this->assertSame($contract->getId(), $tx->getContractId());
-        $this->assertSame('order-90', $tx->getOrderId());
+        $this->assertSame([], $this->transactionRepository->saved);
     }
 
     public function testHandleChargeRefundedDoesNotWriteAuditRowOnStateGuardSkip(): void
@@ -72,7 +77,8 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
         $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
 
         $handler = $this->makeHandler();
-        $result = $handler->handleChargeRefunded('pi_committed', 50.00);
+        $this->refundLedger->expects($this->never())->method('book');
+        $result = $handler->handleChargeRefunded('pi_committed', [new ChargeRefund('re_1', 50.0, 'EUR')]);
 
         $this->assertFalse($result);
         $this->assertSame([], $this->transactionRepository->saved);
@@ -261,7 +267,8 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
                 $this->transactionRepository,
                 $this->shopAdapter,
                 $logger
-            )
+            ),
+            $this->refundLedger
         );
     }
 

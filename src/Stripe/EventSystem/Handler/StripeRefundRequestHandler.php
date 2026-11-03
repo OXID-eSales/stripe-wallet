@@ -6,11 +6,10 @@ namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
-use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface;
 use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
 use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
-use OxidEsales\Payments\Stripe\Service\ContractRefundRecorder;
 use OxidEsales\Payments\Stripe\Service\PaymentIntentResolver;
 use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
 use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
@@ -28,6 +27,8 @@ use Throwable;
  * 3. Delegate to RefundService
  * 4. Delegate logging to RequestLogService
  * 5. Set results in context
+ * 6. Book the refund Stripe made on its contract through payment-base's ledger (VR-21 F5): by Stripe's refund
+ *    id and for the amount Stripe refunded; the `charge.refunded` webhook books the same id and is then a duplicate.
  *
  * Sprint 114.10a (A3): Replaced oxNew(Order) + oxorder__oxtransid lookup with
  * PaymentIntentResolver to mirror the agnostic PI resolution in capture/cancel handlers.
@@ -40,13 +41,12 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
 
     public function __construct(
         private readonly RefundServiceInterface $refundService,
-        private readonly ContractRepositoryInterface $contractRepository,
         private readonly RequestLogServiceInterface $requestLogService,
         private readonly ShopAdapterInterface $shopAdapter,
+        private readonly ProviderRefundLedgerInterface $refundLedger,
+        private readonly PaymentIntentResolver $paymentIntentResolver,
         ?LoggerInterface $logger = null,
-        ?FileLoggerInterface $eventLogger = null,
-        private readonly ?ContractRefundRecorder $refundRecorder = null,
-        private readonly ?PaymentIntentResolver $paymentIntentResolver = null
+        ?FileLoggerInterface $eventLogger = null
     ) {
         $this->logger = $logger ?? new NullLogger();
         $this->eventLogger = $eventLogger;
@@ -113,9 +113,8 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
         StripeRefundRequestEvent $event,
         EventContext $context
     ): ?string {
-        $resolver = $this->paymentIntentResolver ?? new PaymentIntentResolver($this->contractRepository);
         try {
-            return $resolver->resolve($event->getPaymentIntentId(), $event->getContractId());
+            return $this->paymentIntentResolver->resolve($event->getPaymentIntentId(), $event->getContractId());
         } catch (RuntimeException $e) {
             $context->set('error', $e->getMessage());
             $context->set('refundSuccess', false);
@@ -178,26 +177,34 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
             return;
         }
 
-        $this->updateContractState($event, $result->refundId);
+        $this->bookRefund($event, $result);
         $this->logRefundRequest($result, $orderId);
         $this->setSuccessResults($context, $result, $orderId);
     }
 
-    protected function updateContractState(StripeRefundRequestEvent $event, ?string $refundId = null): void
+    /**
+     * Books the refund Stripe made: its refund id, its amount and currency - never the contract's authorized
+     * amount, which a partial capture leaves larger than what Stripe can refund. A ledger failure propagates:
+     * the refund exists at Stripe, and the admin is told that booking it failed.
+     */
+    private function bookRefund(StripeRefundRequestEvent $event, RefundResponse $result): void
     {
         $contractId = $event->getContractId();
         if ($contractId === null) {
+            $this->logger->warning('Refund not booked by the admin path: the request names no contract', [
+                'refund_id' => $result->refundId,
+            ]);
+
             return;
         }
 
-        $contract = $this->contractRepository->findById($contractId);
-        if ($contract === null) {
-            return;
-        }
-
-        $refundAmount = $event->getAmount() ?? $contract->getAmount();
-        $recorder = $this->refundRecorder ?? new ContractRefundRecorder($this->contractRepository, $this->logger);
-        $recorder->record($contract, $refundAmount, $contractId, $refundId, (string) $event->getReason());
+        $this->refundLedger->book(
+            $contractId,
+            (string) $result->refundId,
+            (float) $result->amountRefunded,
+            strtoupper((string) $result->currency),
+            'admin'
+        );
     }
 
     /**

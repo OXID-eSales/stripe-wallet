@@ -10,11 +10,14 @@ use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\ContractState;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface;
+use OxidEsales\PaymentBase\Refund\RefundBooking;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder;
 use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
+use OxidEsales\Payments\Stripe\Webhook\ChargeRefund;
 use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler;
 use PHPUnit\Framework\TestCase;
 
@@ -39,9 +42,11 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     private ContractLinkedOrderUpdaterInterface $orderUpdater;
     private TransactionRepositoryInterface $transactionRepository;
     private ShopAdapterInterface $shopAdapter;
+    private ProviderRefundLedgerInterface&\PHPUnit\Framework\MockObject\MockObject $refundLedger;
 
     protected function setUp(): void
     {
+        $this->refundLedger = $this->createMock(ProviderRefundLedgerInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->contractFulfillmentService = $this->createMock(ContractFulfillmentServiceInterface::class);
         $this->orderUpdater = $this->createMock(ContractLinkedOrderUpdaterInterface::class);
@@ -62,7 +67,8 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
                 $this->contractRepository,
                 $this->transactionRepository,
                 $this->shopAdapter
-            )
+            ),
+            $this->refundLedger
         );
     }
 
@@ -256,7 +262,6 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
     public function handlerHandlesChargeRefundedEvent(): void
     {
         $providerOrderId = 'pi_refunded';
-        $refundAmount = 50.00;
 
         // For refund, contract must be FULFILLED (already captured)
         $contract = $this->createMock(PaymentContractInterface::class);
@@ -268,11 +273,70 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             ->method('findByProviderOrderId')
             ->willReturn($contract);
 
-        $handler = $this->makeHandler();
+        $this->refundLedger->expects($this->once())->method('book')
+            ->with('contract_refund', 're_50', 50.0, 'EUR', 'webhook')
+            ->willReturn(RefundBooking::booked(50.0));
 
-        $result = $handler->handleChargeRefunded($providerOrderId, $refundAmount);
+        $result = $this->makeHandler()->handleChargeRefunded($providerOrderId, [new ChargeRefund('re_50', 50.0, 'EUR')]);
 
         $this->assertTrue($result);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function everyListedRefundIsBookedByItsOwnIdAndAmount(): void
+    {
+        $contract = $this->fulfilledContractMock('contract_two');
+        $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
+        $booked = [];
+        $this->refundLedger->method('book')->willReturnCallback(
+            static function (string $contractId, string $refundId, float $amount, string $currency, string $source) use (&$booked): RefundBooking {
+                $booked[] = [$contractId, $refundId, $amount, $currency, $source];
+
+                return RefundBooking::booked($amount);
+            }
+        );
+
+        $this->makeHandler()->handleChargeRefunded('pi_two', [
+            new ChargeRefund('re_a', 10.0, 'EUR'),
+            new ChargeRefund('re_b', 10.0, 'EUR'),
+        ]);
+
+        $this->assertSame([
+            ['contract_two', 're_a', 10.0, 'EUR', 'webhook'],
+            ['contract_two', 're_b', 10.0, 'EUR', 'webhook'],
+        ], $booked);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function aRefundThatMovedNoMoneyIsNotBooked(): void
+    {
+        $this->contractRepository->method('findByProviderOrderId')->willReturn($this->fulfilledContractMock('contract_zero'));
+        $this->refundLedger->expects($this->never())->method('book');
+
+        $result = $this->makeHandler()->handleChargeRefunded('pi_zero', [new ChargeRefund('re_zero', 0.0, 'EUR')]);
+
+        $this->assertTrue($result);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function aRefundOnAContractThatIsNotFulfilledIsSkippedNotBooked(): void
+    {
+        $this->contractRepository->method('findByProviderOrderId')
+            ->willReturn($this->createCommittedContractMock('pi_committed', 'order-1'));
+        $this->refundLedger->expects($this->never())->method('book');
+
+        $result = $this->makeHandler()->handleChargeRefunded('pi_committed', [new ChargeRefund('re_1', 5.0, 'EUR')]);
+
+        $this->assertFalse($result);
+    }
+
+    private function fulfilledContractMock(string $id): PaymentContractInterface
+    {
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getState')->willReturn(ContractState::fulfilled());
+        $contract->method('getId')->willReturn($id);
+
+        return $contract;
     }
 
     // =========================================================================
@@ -589,44 +653,6 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
         $result = $this->makeHandler()->handlePaymentCanceled($providerOrderId, 'user_requested');
 
         $this->assertTrue($result);
-    }
-
-    #[\PHPUnit\Framework\Attributes\Group('sprint-114-10a')]
-    #[\PHPUnit\Framework\Attributes\Group('l3-downcast')]
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function handleChargeRefundedRecordsRefundAmountOnInterface(): void
-    {
-        $providerOrderId = 'pi_refund_interface';
-        $refundAmount = 25.0;
-
-        // Use concrete PaymentContract so we can verify addRefundedAmount was called
-        $snapshot = BasketSnapshot::fromArray([
-            'items' => [],
-            'discounts' => [],
-            'totalGross' => 100.0,
-            'totalNet' => 84.03,
-            'totalVat' => 15.97,
-            'currency' => 'EUR',
-            'capturedAt' => date('Y-m-d H:i:s'),
-        ]);
-
-        $contract = new PaymentContract(1, 'user_refund_iface', $snapshot);
-        $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
-        $contract->transitionToNotFinished('order_refund_iface');
-        $contract->transitionToPending();
-        $contract->setProvider('stripe', $providerOrderId);
-        $contract->fulfillCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED, ['authId' => 'auth_123']);
-        $contract->commitToOrder('order_refund_iface');
-        $contract->fulfill();
-
-        $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
-        // The recorder will call save when recording
-        $this->contractRepository->expects($this->atLeastOnce())->method('save');
-
-        $result = $this->makeHandler()->handleChargeRefunded($providerOrderId, $refundAmount);
-
-        $this->assertTrue($result);
-        $this->assertEqualsWithDelta($refundAmount, $contract->getRefundedAmount() ?? 0.0, 0.001);
     }
 
     // =========================================================================

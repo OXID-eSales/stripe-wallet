@@ -30,6 +30,7 @@ use Stripe\StripeClient;
 class RefundHelper
 {
     private const DEFAULT_TTL_SECONDS = 86400;
+    private const REFUND_PAGE_SIZE = 100;
 
     private readonly IdempotentExecutor $idempotentExecutor;
 
@@ -75,6 +76,26 @@ class RefundHelper
     {
         try {
             return $client->charges->retrieve($chargeId);
+        } catch (ApiErrorException $e) {
+            throw StripeExceptionConverter::convert($e);
+        }
+    }
+
+    /**
+     * Every refund of the charge, all pages (read to the end here, so an API error surfaces as an adapter exception).
+     *
+     * @return list<Refund>
+     */
+    public function listRefundsByCharge(StripeClient $client, string $chargeId): array
+    {
+        try {
+            $refunds = [];
+            $page = $client->refunds->all(['charge' => $chargeId, 'limit' => self::REFUND_PAGE_SIZE]);
+            foreach ($page->autoPagingIterator() as $refund) {
+                $refunds[] = $refund;
+            }
+
+            return $refunds;
         } catch (ApiErrorException $e) {
             throw StripeExceptionConverter::convert($e);
         }

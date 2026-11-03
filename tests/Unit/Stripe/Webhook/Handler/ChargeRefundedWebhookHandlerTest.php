@@ -12,6 +12,8 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Webhook\Handler;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
+use OxidEsales\Payments\Stripe\Webhook\ChargeRefund;
+use OxidEsales\Payments\Stripe\Webhook\ChargeRefundListerInterface;
 use OxidEsales\Payments\Stripe\Webhook\Handler\ChargeRefundedWebhookHandler;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
 use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface;
@@ -24,6 +26,7 @@ final class ChargeRefundedWebhookHandlerTest extends TestCase
 {
     private WebhookContractFulfillmentHandlerInterface&MockObject $fulfillmentHandler;
     private ContractRepositoryInterface&MockObject $contractRepository;
+    private ChargeRefundListerInterface&MockObject $lister;
     private ChargeRefundedWebhookHandler $handler;
 
     protected function setUp(): void
@@ -31,11 +34,14 @@ final class ChargeRefundedWebhookHandlerTest extends TestCase
         $this->fulfillmentHandler = $this->createMock(WebhookContractFulfillmentHandlerInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
 
+        $this->lister = $this->createMock(ChargeRefundListerInterface::class);
+
         $this->handler = new ChargeRefundedWebhookHandler(
             new StripeWebhookEventParser(),
             $this->fulfillmentHandler,
             $this->contractRepository,
-            $this->createMock(LoggerInterface::class)
+            $this->createMock(LoggerInterface::class),
+            $this->lister
         );
     }
 
@@ -74,7 +80,7 @@ final class ChargeRefundedWebhookHandlerTest extends TestCase
         ]);
 
         $this->fulfillmentHandler->method('handleChargeRefunded')
-            ->with('pi_refund', 50.0)
+            ->with('pi_refund', [])
             ->willReturn(true);
 
         $contract = $this->createMock(PaymentContractInterface::class);
@@ -110,42 +116,75 @@ final class ChargeRefundedWebhookHandlerTest extends TestCase
      */
 
     /**
-     * Sprint 133 · Story 9 (F9): an unparseable amount used to arrive as 0.00
-     * and be recorded as a real refund of nothing. It is now a processing
-     * failure, so the controller answers 500 and Stripe retries the event.
+     * VR-21 F5: what the event lists reaches the handler as it is (id, amount, currency) - the cumulative
+     * `amount_refunded` is not booked from.
      */
     #[\PHPUnit\Framework\Attributes\Test]
-    public function missingRefundedAmount_returnsFailureAndDoesNotFulfil(): void
+    public function theRefundsTheEventListsAreHandedOver(): void
     {
-        $this->fulfillmentHandler->expects($this->never())->method('handleChargeRefunded');
+        $this->lister->expects($this->never())->method('listFor');
+        $this->fulfillmentHandler->expects($this->once())
+            ->method('handleChargeRefunded')
+            ->with('pi_1', $this->callback(
+                static fn (array $refunds): bool => count($refunds) === 1
+                    && $refunds[0]->id === 're_1' && $refunds[0]->amount === 12.5 && $refunds[0]->currency === 'EUR'
+            ))
+            ->willReturn(true);
 
-        $outcome = $this->handler->handle($this->makeEvent([
+        $this->handler->handle($this->makeEvent([
             'id' => 'ch_1',
             'payment_intent' => 'pi_1',
             'currency' => 'eur',
-            // no amount_refunded
+            'amount_refunded' => 1250,
+            'refunds' => ['data' => [['id' => 're_1', 'amount' => 1250, 'currency' => 'eur', 'status' => 'succeeded']], 'has_more' => false],
         ]));
+    }
 
-        $this->assertTrue($outcome->result->isFailure());
+    /**
+     * Newer API versions leave `refunds` off the event: Stripe's own list of the charge's refunds is the source.
+     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function anEventWithoutARefundListIsCompletedFromStripesRefundList(): void
+    {
+        $listed = [new ChargeRefund('re_dash', 25.0, 'EUR')];
+        $this->lister->expects($this->once())->method('listFor')->with('ch_nolist')->willReturn($listed);
+        $this->fulfillmentHandler->expects($this->once())
+            ->method('handleChargeRefunded')
+            ->with('pi_nolist', $listed)
+            ->willReturn(true);
+
+        $this->handler->handle($this->makeEvent([
+            'id' => 'ch_nolist',
+            'payment_intent' => 'pi_nolist',
+            'currency' => 'eur',
+            'amount_refunded' => 2500,
+        ]));
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function zeroRefundedAmountIsStillProcessed(): void
+    public function aChargeWithoutAnIdIsAnInvalidEvent(): void
     {
-        // A genuine zero must stay distinguishable from "unknown".
-        $this->fulfillmentHandler->expects($this->once())
-            ->method('handleChargeRefunded')
-            ->with('pi_zero', 0.0)
-            ->willReturn(true);
+        $this->fulfillmentHandler->expects($this->never())->method('handleChargeRefunded');
 
-        $outcome = $this->handler->handle($this->makeEvent([
-            'id' => 'ch_zero',
-            'payment_intent' => 'pi_zero',
-            'amount_refunded' => 0,
+        $outcome = $this->handler->handle($this->makeEvent(['payment_intent' => 'pi_noid', 'currency' => 'eur']));
+
+        $this->assertTrue($outcome->result->isFailure());
+        $this->assertSame('invalid_event', $outcome->result->action);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function aFailureListingTheRefundsPropagatesSoStripeRetries(): void
+    {
+        $this->lister->method('listFor')->willThrowException(new \RuntimeException('Stripe unreachable'));
+        $this->fulfillmentHandler->expects($this->never())->method('handleChargeRefunded');
+
+        $this->expectException(\RuntimeException::class);
+
+        $this->handler->handle($this->makeEvent([
+            'id' => 'ch_x',
+            'payment_intent' => 'pi_x',
             'currency' => 'eur',
         ]));
-
-        $this->assertFalse($outcome->result->isFailure());
     }
 
     private function makeEvent(array $objectData): WebhookEvent
