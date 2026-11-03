@@ -12,7 +12,7 @@ use OxidEsales\PaymentBase\EventSystem\Handler\HandlerInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface;
-use OxidEsales\PaymentBase\Service\TokenServiceInterface;
+use OxidEsales\PaymentBase\Checkout\Return\ContractReturnTokenServiceInterface;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
@@ -41,7 +41,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
     public function __construct(
         private readonly CheckoutSessionServiceInterface $checkoutSessionService,
         private readonly ContractRepositoryInterface $contractRepository,
-        private readonly TokenServiceInterface $tokenService,
+        private readonly ContractReturnTokenServiceInterface $returnTokens,
         private readonly ShopAdapterInterface $shopAdapter,
         private readonly StripeCustomerServiceInterface $customerService,
         private readonly ModuleConfigurationServiceInterface $config,
@@ -150,7 +150,8 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         // Sprint 133 (F14): no silent fallback to shop 1 on EE multishop.
         $shopIdInt = ShopId::of($shopId, 'checkout session handler');
 
-        $contractToken = $this->tokenService->generateToken($contractId);
+        // VR-20 R5: payment-base's shared return token, bound to the shopper and expiring.
+        $contractToken = $this->returnTokens->generateToken($contractId, $contract->getUserId());
         $successUrl = $this->checkoutSessionService->buildSuccessUrl($shopUrl, $contractId, $contractToken, $sessionId, $languageId, $shopIdInt);
         $cancelUrl = $shopUrl . 'index.php?cl=order&fnc=checkoutCancel&lang=' . $languageId . '&shp=' . $shopIdInt;
 

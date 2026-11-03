@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service\Return;
 
 use OxidEsales\Payments\Stripe\Service\Return\CheckoutReturnRejection;
+use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessRejection;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
@@ -28,8 +29,9 @@ final class CheckoutReturnRejectionTest extends TestCase
         foreach (
             [
                 CheckoutReturnRejection::MissingContractIdentifiers,
-                CheckoutReturnRejection::InvalidContractToken,
-                CheckoutReturnRejection::ContractMismatch,
+                CheckoutReturnRejection::AccessDenied,
+                CheckoutReturnRejection::TokenExpired,
+                CheckoutReturnRejection::ProviderMismatch,
                 CheckoutReturnRejection::ContractNotFound,
                 CheckoutReturnRejection::NoOrderCreated,
             ] as $rejection
@@ -40,6 +42,17 @@ final class CheckoutReturnRejectionTest extends TestCase
                 $rejection->name . ' must not tell the customer which check refused'
             );
         }
+    }
+
+    /**
+     * VR-20 R5: every way payment-base's guard refuses a return has a Stripe reason of its own.
+     */
+    public function testEveryGuardRefusalMapsToItsOwnReason(): void
+    {
+        $this->assertSame(CheckoutReturnRejection::ContractNotFound, CheckoutReturnRejection::fromGuard(ReturnAccessRejection::ContractNotFound));
+        $this->assertSame(CheckoutReturnRejection::ProviderMismatch, CheckoutReturnRejection::fromGuard(ReturnAccessRejection::ProviderMismatch));
+        $this->assertSame(CheckoutReturnRejection::TokenExpired, CheckoutReturnRejection::fromGuard(ReturnAccessRejection::TokenExpired));
+        $this->assertSame(CheckoutReturnRejection::AccessDenied, CheckoutReturnRejection::fromGuard(ReturnAccessRejection::AccessDenied));
     }
 
     /**

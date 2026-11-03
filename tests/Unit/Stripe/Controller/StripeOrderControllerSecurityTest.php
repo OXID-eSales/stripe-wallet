@@ -37,9 +37,9 @@ use PHPUnit\Framework\TestCase;
  *
  * checkoutSuccess() branch coverage (all via readReturnInputs / loadReturnContract):
  *   B1: session_id missing → "Payment information missing" (readReturnInputs line ~312)
- *   B2: contractId or contractToken not string → "Payment verification failed" (line ~319)
- *   B3: validateContractToken() fails → "Payment verification failed" (line ~324)
- *   B4: session contract id mismatches request contract id → "Payment verification failed" (line ~330)
+ *   B2: contractId missing → "Payment verification failed" (a missing token is the guard's to judge, see B2 token)
+ *   B3: the return guard refuses the token → "Payment verification failed"
+ *   B4: the return guard refuses a stranger (another shopper's contract) → "Payment verification failed"
  *   B5: repo->findById() returns null → "Payment verification failed" (loadReturnContract)
  *   B6: dispatchCheckoutReturn returns null → "Payment verification failed" (line ~297)
  *   B7: happy path → 'thankyou'
@@ -190,7 +190,8 @@ class StripeOrderControllerSecurityTest extends TestCase
     }
 
     /**
-     * Branch B2 (token missing): contractToken missing → "Payment verification failed".
+     * Branch B2 (token missing): VR-20 R5 - the return carries no token, so only the contract's shopper in the session
+     * that started the payment may open it; payment-base's guard refuses anyone else → "Payment verification failed".
      */
     public function testCheckoutSuccessB2RejectsOnMissingContractToken(): void
     {
@@ -201,6 +202,7 @@ class StripeOrderControllerSecurityTest extends TestCase
             'sessionId' => 'cs_test_b2token',
             'contractIdFromRequest' => 'contract_123',
             'contractToken' => null,
+            'tokenValidationResult' => false,
         ]);
 
         $result = $controller->checkoutSuccess();
@@ -247,9 +249,8 @@ class StripeOrderControllerSecurityTest extends TestCase
      * This used to be a comparison against the session's stripe_contract_id, which
      * refused *any* contract but the last one the order page created — including
      * the customer's own, after Stripe had charged them. Ownership is what that
-     * check was reaching for, and it is what is enforced here: the contract id is
-     * already authenticated by its token, so the remaining question is whose
-     * contract it is.
+     * check was reaching for, and it is what payment-base's ReturnAccessGuard enforces now (VR-20 R5): a valid
+     * return token, or the contract's shopper in the session that started the payment.
      */
     public function testCheckoutSuccessB4RejectsAnotherShoppersContract(): void
     {
@@ -260,8 +261,8 @@ class StripeOrderControllerSecurityTest extends TestCase
             'sessionId' => 'cs_test_b4',
             'contractIdFromRequest' => 'contract_from_url',
             'contractToken' => 'valid_token',
-            'tokenValidationResult' => true,
-            // the repository hands back a contract owned by user_1
+            // payment-base's guard refuses a shopper who is not the contract's (the repository's is user_1's)
+            'tokenValidationResult' => false,
             'currentUserId' => 'a_different_shopper',
         ]);
 

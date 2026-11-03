@@ -29,7 +29,7 @@ use OxidEsales\PaymentBase\EventSystem\Handler\EarlyOrderCreationHandler;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractServiceInterface;
 use OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface;
-use OxidEsales\PaymentBase\Service\TokenServiceInterface;
+use OxidEsales\PaymentBase\Checkout\Return\ContractReturnTokenServiceInterface;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeCheckoutSessionDto;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\PaymentHandler\StripePaymentHandler;
@@ -82,7 +82,7 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
     private CheckoutSessionServiceInterface&MockObject $checkoutSessionService;
     private ContractRepositoryInterface&MockObject $contractRepository;
     private ShopOrderServiceInterface&MockObject $shopOrderService;
-    private TokenServiceInterface&MockObject $tokenService;
+    private ContractReturnTokenServiceInterface&MockObject $tokenService;
     private PaymentContract $contract;
     private ShopOrderRewriterInterface&MockObject $orderRewriter;
     private ?OpenCheckoutAttemptRegistry $openAttempts = null;
@@ -95,7 +95,7 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
         $this->checkoutSessionService = $this->createMock(CheckoutSessionServiceInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->shopOrderService = $this->createMock(ShopOrderServiceInterface::class);
-        $this->tokenService = $this->createMock(TokenServiceInterface::class);
+        $this->tokenService = $this->createMock(ContractReturnTokenServiceInterface::class);
         $this->tokenService->method('generateToken')->willReturn('tok');
         $this->orderRewriter = $this->createMock(ShopOrderRewriterInterface::class);
 
@@ -250,9 +250,38 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
         $result = $handler->processPayment($this->opcContext());
 
         self::assertTrue($result->isSuccess(), (string) $result->getErrorMessage());
-        self::assertSame(['prepare:' . StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, 'sessionId', 'sessionId'], $handler->sessionCalls);
+        // the contract records the session (VR-20 R5), the session is prepared, the early order and the URLs name it
+        self::assertSame(['sessionId', 'prepare:' . StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, 'sessionId', 'sessionId'], $handler->sessionCalls);
         self::assertSame('redirect', $result->getMetadataValue('renderMode'));
         self::assertNull($this->contract->getMetadata('basket_id'));
+    }
+
+    /**
+     * VR-20 R5: the shop session that started the payment is recorded on the contract, so payment-base's
+     * ReturnAccessGuard lets the shopper back in through it; the return token is bound to the contract's shopper.
+     */
+    public function testTheOpcPathRecordsTheInitiatingSessionAndIssuesTheSharedTokenForTheShopper(): void
+    {
+        $this->tokenService = $this->createMock(ContractReturnTokenServiceInterface::class);
+        $this->tokenService->expects($this->once())->method('generateToken')->with('contract-1', 'user_123')->willReturn('tok');
+        $this->shopOrderService->method('createOrder')->willReturn($this->orderResponse());
+        $this->checkoutSessionService->method('buildSuccessUrl')->willReturn('https://shop.example.com/return');
+        $this->checkoutSessionService->method('buildCancelUrl')->willReturn('https://shop.example.com/payment');
+        $this->checkoutSessionService->method('createSession')->willReturn(CheckoutSessionResult::success('cs_1', 'https://checkout.stripe.com/c/cs_1'));
+
+        $this->handler()->processPayment($this->opcContext());
+
+        self::assertSame('sid-twig', $this->contract->getMetadata('initiating_session_id'));
+    }
+
+    public function testAHeadlessStartHasNoShopSessionToRecord(): void
+    {
+        $this->shopOrderService->method('createOrder')->willReturn($this->orderResponse());
+        $this->checkoutSessionService->method('createSession')->willReturn(CheckoutSessionResult::success('cs_1', 'https://checkout.stripe.com/c/cs_1'));
+
+        $this->handler()->processPayment($this->headlessContext());
+
+        self::assertNull($this->contract->getMetadata('initiating_session_id'));
     }
 
     public function testProviderFailure_SessionRefusedByStripe_ResultMessageContainsNoProviderText(): void

@@ -16,10 +16,10 @@ use OxidEsales\Payments\Stripe\Controller\StripeOrderController;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Sprint 67a: H3 — Contract token validation in checkoutSuccess().
+ * Sprint 67a: H3 — return access in checkoutSuccess().
  *
- * Ensures that checkoutSuccess() validates the contract_token parameter
- * via ContractTokenService BEFORE dispatching any events.
+ * Ensures that checkoutSuccess() asks payment-base's return guard (VR-20 R5: a valid return token, or the contract's
+ * shopper in the session that started the payment) BEFORE dispatching any events.
  *
  * Sprint 71: Updated to use StubControllerRequestHelper after accessor extraction.
  */
@@ -64,14 +64,19 @@ final class StripeOrderControllerTokenTest extends TestCase
         $this->assertTrue($controller->wasEventDispatched(), 'Event SHOULD be dispatched for valid token');
     }
 
+    /**
+     * VR-20 R5: a return without a token is not refused by the controller; whether the shopper's own session may open
+     * it is the guard's decision. Refused ...
+     */
     #[\PHPUnit\Framework\Attributes\Test]
-    public function checkoutSuccessRejectsMissingContractToken(): void
+    public function checkoutSuccessRejectsMissingContractTokenWhenTheGuardRefuses(): void
     {
         $helper = new StubControllerRequestHelper();
         $helper->checkoutSessionId = 'cs_test_123';
         $helper->contractIdFromRequest = 'contract_abc';
         $helper->contractTokenFromRequest = null;
         $helper->contractIdFromSession = 'contract_abc';
+        $helper->tokenValidationResult = false;
 
         $controller = new TestableStripeOrderControllerForToken($helper);
 
@@ -79,6 +84,25 @@ final class StripeOrderControllerTokenTest extends TestCase
 
         $this->assertSame('payment', $result);
         $this->assertStringContainsString('Payment verification failed', $helper->lastError ?? '');
+        $this->assertFalse($controller->wasEventDispatched());
+    }
+
+    /**
+     * ... and granted: the contract's shopper in the session that started the payment needs no token.
+     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function checkoutSuccessAcceptsAReturnWithoutATokenWhenTheGuardGrants(): void
+    {
+        $helper = new StubControllerRequestHelper();
+        $helper->checkoutSessionId = 'cs_test_123';
+        $helper->contractIdFromRequest = 'contract_abc';
+        $helper->contractTokenFromRequest = null;
+        $helper->tokenValidationResult = true;
+
+        $controller = new TestableStripeOrderControllerForToken($helper);
+        $controller->checkoutSuccess();
+
+        $this->assertTrue($controller->wasEventDispatched());
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

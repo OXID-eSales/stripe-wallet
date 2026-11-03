@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
+use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessGuard;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\EventSystem\Event\Contract\ContractDraftCompletedEvent;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContextInterface;
@@ -76,12 +77,25 @@ class StripeContractCreationHandler extends ContractCreationHandler
             $this->metadataService->storeDeliveryAddressMetadata($contract, $basket);
         }
         $this->metadataService->storeSecurityMetadata($contract, $context);
+        $this->recordInitiatingSession($contract, $context);
 
         // Save contract to persist the metadata
         $this->contractRepository->save($contract);
 
         // Set contractId on context for downstream handlers
         $context->set('contractId', $contract->getId());
+    }
+
+    /**
+     * VR-20 R5: the shop session the payment is started in. payment-base's ReturnAccessGuard lets the contract's
+     * shopper back in through it, without a return token.
+     */
+    private function recordInitiatingSession(PaymentContractInterface $contract, EventContextInterface $context): void
+    {
+        $sessionId = $context->get('sessionId');
+        if (is_string($sessionId) && $sessionId !== '') {
+            $contract->setMetadata(ReturnAccessGuard::METADATA_INITIATING_SESSION, $sessionId);
+        }
     }
 
     /**

@@ -10,8 +10,8 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service\Return;
 
 /**
- * The three identifiers a Stripe return must carry, once they have been
- * checked. Holding them in one value means the controller cannot accidentally
+ * What a Stripe return carries once it has been checked: the Checkout Session, the contract and the return token
+ * ('' when the return carried none). Holding them in one value means the controller cannot accidentally
  * proceed with a half-validated set.
  */
 final class CheckoutReturnInputs

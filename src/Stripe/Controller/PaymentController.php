@@ -12,7 +12,8 @@ namespace OxidEsales\Payments\Stripe\Controller;
 use OxidEsales\Payments\Stripe\Core\ShopCurrency;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
-use OxidEsales\Payments\Stripe\Service\ContractTokenService;
+use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessGuardInterface;
+use OxidEsales\Payments\Stripe\Service\LegacyReturnTokenValidator;
 use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
@@ -40,7 +41,8 @@ class PaymentController extends PaymentController_parent
     protected function getRequestHelper(): ControllerRequestHelper
     {
         return new ControllerRequestHelper(
-            $this->getServiceFromContainer(ContractTokenService::class),
+            $this->getServiceFromContainer(ReturnAccessGuardInterface::class),
+            $this->getServiceFromContainer(LegacyReturnTokenValidator::class),
             $this->getServiceFromContainer(ModuleConfigurationServiceInterface::class),
             $this->getServiceFromContainer(LanguageResolverInterface::class),
         );

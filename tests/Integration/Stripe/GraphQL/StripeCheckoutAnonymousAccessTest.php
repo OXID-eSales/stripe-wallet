@@ -25,7 +25,6 @@ use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutCancelResult;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutReturnResult;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutStartResult;
 use OxidEsales\PaymentBase\GraphQL\DataType\GuestCheckoutInputFactory;
-use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Controller\StripeCheckout;
 use OxidEsales\Payments\Stripe\Tests\Support\FixedClassFinder;
 use OxidEsales\Eshop\Application\Model\User as EshopUser;
@@ -277,7 +276,7 @@ final class StripeCheckoutAnonymousAccessTest extends TestCase
 
     private function schema(): Schema
     {
-        $controller = new StripeCheckout($this->checkout, $this->tokenService(), $this->authentication);
+        $controller = new StripeCheckout($this->checkout, $this->authentication);
         $container = new class ([StripeCheckout::class => $controller]) implements ContainerInterface {
             /** @param array<string, object> $services */
             public function __construct(private readonly array $services)
@@ -322,14 +321,6 @@ final class StripeCheckoutAnonymousAccessTest extends TestCase
         $factory->setAuthorizationService($authorization);
 
         return $factory->createSchema();
-    }
-
-    private function tokenService(): TokenServiceInterface
-    {
-        $tokens = $this->createMock(TokenServiceInterface::class);
-        $tokens->method('generateToken')->willReturn('stripe-tok');
-
-        return $tokens;
     }
 
     private function guestInput(

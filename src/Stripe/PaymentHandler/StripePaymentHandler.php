@@ -23,7 +23,8 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractServiceInterface;
 use OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard;
-use OxidEsales\PaymentBase\Service\TokenServiceInterface;
+use OxidEsales\PaymentBase\Checkout\Return\ContractReturnTokenServiceInterface;
+use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessGuard;
 use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
@@ -64,7 +65,7 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ShopAdapterInterface $shopAdapter,
         private readonly ModuleConfigurationServiceInterface $config,
-        private readonly TokenServiceInterface $tokenService,
+        private readonly ContractReturnTokenServiceInterface $returnTokens,
         // OPC-175: the shared chain that creates the early order.
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly ?LoggerInterface $logger = null,
@@ -122,7 +123,7 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
         $contractId = '';
         try {
             // 1. Create contract in DRAFT state
-            $contract = $this->createContract($context);
+            $contract = $this->createContract($context, $headless);
             $contractId = $contract->getId() ?? '';
 
             // 2. Early order through the shared chain: DRAFT → NOT_FINISHED → PENDING
@@ -263,7 +264,7 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
         return $this->iframeSettings?->isEnabled() ?? false;
     }
 
-    private function createContract(PaymentContextInterface $context): PaymentContractInterface
+    private function createContract(PaymentContextInterface $context, bool $headless): PaymentContractInterface
     {
         $userId = $this->resolveUserId($context->getUser());
 
@@ -275,6 +276,11 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
 
         $contract->setMetadata('payment_method_id', $context->getPaymentMethodId());
         $contract->setMetadata('handler', StripeDefinitions::PROVIDER);
+        if (!$headless) {
+            // VR-20 R5: the shop session the payment starts in; payment-base's ReturnAccessGuard lets the contract's
+            // shopper back in through it. A headless client has no shop session: its return is payment-base's own.
+            $contract->setMetadata(ReturnAccessGuard::METADATA_INITIATING_SESSION, $this->sessionId());
+        }
 
         return $contract;
     }
@@ -417,7 +423,7 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
 
         [$successUrl, $cancelUrl] = $headless
             ? $this->headlessUrls($context)
-            : $this->shopUrls($contractId);
+            : $this->shopUrls($contract);
 
         return $this->checkoutSessionService->createSession(
             contractId: $contractId,
@@ -438,8 +444,9 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
      *
      * @return array{0: string, 1: string}
      */
-    private function shopUrls(string $contractId): array
+    private function shopUrls(PaymentContractInterface $contract): array
     {
+        $contractId = $contract->getId() ?? '';
         $shopUrl = $this->shopAdapter->getShopUrl();
         $languageId = $this->languageResolver->getActiveLanguageId();
         // Sprint 133 (F14): no silent fallback to shop 1 on EE multishop.
@@ -448,7 +455,8 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
         $successUrl = $this->checkoutSessionService->buildSuccessUrl(
             $shopUrl,
             $contractId,
-            $this->tokenService->generateToken($contractId),
+            // VR-20 R5: payment-base's shared return token, bound to the shopper and expiring.
+            $this->returnTokens->generateToken($contractId, $contract->getUserId()),
             $this->sessionId(),
             $languageId,
             $shopIdInt

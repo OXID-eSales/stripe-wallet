@@ -35,6 +35,7 @@ final class ControllerRequestHelperAgbReaderTest extends TestCase
         $this->moduleConfig = $this->createMock(ModuleConfigurationServiceInterface::class);
         $this->languageResolver = $this->createMock(LanguageResolverInterface::class);
         $this->helper = new ControllerRequestHelper(
+            $this->createMock(\OxidEsales\PaymentBase\Checkout\Return\ReturnAccessGuardInterface::class),
             $this->tokenService,
             $this->moduleConfig,
             $this->languageResolver

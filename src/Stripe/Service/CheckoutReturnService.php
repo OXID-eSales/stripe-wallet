@@ -10,14 +10,12 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
-use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeCheckoutSessionDto;
 use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 
 /**
  * Service for processing Stripe checkout returns.
@@ -33,41 +31,29 @@ use Psr\Log\NullLogger;
  */
 class CheckoutReturnService implements CheckoutReturnServiceInterface
 {
-    private LoggerInterface $logger;
-
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,
-        private readonly TokenServiceInterface $tokenService,
-        ?LoggerInterface $logger = null
+        private readonly LoggerInterface $logger
     ) {
-        $this->logger = $logger ?? new NullLogger();
     }
 
     public function validateReturn(
         string $checkoutSessionId,
-        string $contractId,
-        string $contractToken
+        string $contractId
     ): CheckoutReturnResult {
-        // Step 1: Validate token
-        if (!$this->tokenService->validateToken($contractToken, $contractId)) {
-            $this->logger->warning('Invalid contract token', [
-                'contract_id' => $contractId,
-                'session_id' => $checkoutSessionId,
-            ]);
-            return CheckoutReturnResult::failure('Invalid contract token');
-        }
-
-        // Step 2: Retrieve Stripe session
+        // Who may come back for this contract is not asked here: payment-base's ReturnAccessGuard answered it at
+        // the return leg's door (VR-20 R5); this asks Stripe what the payment is.
+        // Step 1: Retrieve Stripe session
         $session = $this->retrieveSession($checkoutSessionId);
         if ($session === null) {
             return CheckoutReturnResult::failure('Failed to retrieve checkout session');
         }
 
-        // Step 3: Extract payment details early (needed for validation)
+        // Step 2: Extract payment details early (needed for validation)
         $paymentStatus        = $session->paymentStatus;
         $paymentIntentStatus  = $session->paymentIntentStatus;
 
-        // Step 4: Validate payment status
+        // Step 3: Validate payment status
         // Accept 'paid' (automatic capture) OR 'unpaid' with requires_capture (manual capture)
         $isAutomaticCapture = $paymentStatus === StripeStatusMapper::CHECKOUT_PAYMENT_STATUS_PAID;
         $isManualCapture = $paymentStatus === StripeStatusMapper::CHECKOUT_PAYMENT_STATUS_UNPAID
@@ -77,7 +63,7 @@ class CheckoutReturnService implements CheckoutReturnServiceInterface
             return CheckoutReturnResult::failure("Payment not completed: {$paymentStatus}");
         }
 
-        // Step 5: Validate contract ID from metadata
+        // Step 4: Validate contract ID from metadata
         $metadataContractId = $session->metadata['contract_id'] ?? null;
         if ($metadataContractId === null) {
             return CheckoutReturnResult::failure('Contract ID not found in checkout session metadata');
@@ -91,7 +77,7 @@ class CheckoutReturnService implements CheckoutReturnServiceInterface
             return CheckoutReturnResult::failure('Contract ID mismatch');
         }
 
-        // Step 6: Extract remaining payment details
+        // Step 5: Extract remaining payment details
         $paymentIntentId = $session->paymentIntentId;
         $amountTotal     = $session->amountTotal;
         $currency        = $session->currency;

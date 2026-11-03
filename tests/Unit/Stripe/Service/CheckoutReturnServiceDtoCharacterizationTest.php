@@ -10,7 +10,6 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
-use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeCheckoutSessionDto;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutReturnService;
@@ -29,15 +28,12 @@ final class CheckoutReturnServiceDtoCharacterizationTest extends TestCase
 {
     private StripeAdapterFactoryInterface&MockObject $adapterFactory;
     private StripeAdapterInterface&MockObject $adapter;
-    private TokenServiceInterface&MockObject $tokenService;
 
     protected function setUp(): void
     {
         $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
         $this->adapter        = $this->createMock(StripeAdapterInterface::class);
         $this->adapterFactory->method('getStripeAdapter')->willReturn($this->adapter);
-        $this->tokenService   = $this->createMock(TokenServiceInterface::class);
-        $this->tokenService->method('validateToken')->willReturn(true);
     }
 
     public function testValidateReturnSucceedsForPaidAutomaticCapture(): void
@@ -54,10 +50,10 @@ final class CheckoutReturnServiceDtoCharacterizationTest extends TestCase
         );
         $this->adapter->method('retrieveCheckoutSession')->willReturn($session);
 
-        $service = new CheckoutReturnService($this->adapterFactory, $this->tokenService);
+        $service = new CheckoutReturnService($this->adapterFactory, new \Psr\Log\NullLogger());
 
         // Act
-        $result = $service->validateReturn('cs_test_auto', 'contract_42', 'token_valid');
+        $result = $service->validateReturn('cs_test_auto', 'contract_42');
 
         // Assert
         self::assertTrue($result->isSuccessful());
@@ -82,10 +78,10 @@ final class CheckoutReturnServiceDtoCharacterizationTest extends TestCase
         );
         $this->adapter->method('retrieveCheckoutSession')->willReturn($session);
 
-        $service = new CheckoutReturnService($this->adapterFactory, $this->tokenService);
+        $service = new CheckoutReturnService($this->adapterFactory, new \Psr\Log\NullLogger());
 
         // Act
-        $result = $service->validateReturn('cs_test_manual', 'contract_99', 'token_valid');
+        $result = $service->validateReturn('cs_test_manual', 'contract_99');
 
         // Assert
         self::assertTrue($result->isSuccessful());
@@ -108,10 +104,10 @@ final class CheckoutReturnServiceDtoCharacterizationTest extends TestCase
         );
         $this->adapter->method('retrieveCheckoutSession')->willReturn($session);
 
-        $service = new CheckoutReturnService($this->adapterFactory, $this->tokenService);
+        $service = new CheckoutReturnService($this->adapterFactory, new \Psr\Log\NullLogger());
 
         // Act
-        $result = $service->validateReturn('cs_test_invalid', 'contract_77', 'token_valid');
+        $result = $service->validateReturn('cs_test_invalid', 'contract_77');
 
         // Assert
         self::assertFalse($result->isSuccessful());
@@ -132,10 +128,10 @@ final class CheckoutReturnServiceDtoCharacterizationTest extends TestCase
         );
         $this->adapter->method('retrieveCheckoutSession')->willReturn($session);
 
-        $service = new CheckoutReturnService($this->adapterFactory, $this->tokenService);
+        $service = new CheckoutReturnService($this->adapterFactory, new \Psr\Log\NullLogger());
 
         // Act
-        $result = $service->validateReturn('cs_mismatch', 'contract_42', 'token_valid');
+        $result = $service->validateReturn('cs_mismatch', 'contract_42');
 
         // Assert
         self::assertFalse($result->isSuccessful());
@@ -148,10 +144,10 @@ final class CheckoutReturnServiceDtoCharacterizationTest extends TestCase
         $this->adapter->method('retrieveCheckoutSession')
             ->willThrowException(new PaymentAdapterException('stripe', 'err', 'API error'));
 
-        $service = new CheckoutReturnService($this->adapterFactory, $this->tokenService);
+        $service = new CheckoutReturnService($this->adapterFactory, new \Psr\Log\NullLogger());
 
         // Act
-        $result = $service->validateReturn('cs_throw', 'contract_42', 'token_valid');
+        $result = $service->validateReturn('cs_throw', 'contract_42');
 
         // Assert
         self::assertFalse($result->isSuccessful());

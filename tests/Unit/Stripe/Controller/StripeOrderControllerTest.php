@@ -319,6 +319,8 @@ class StripeOrderControllerTest extends TestCase
             'sessionId' => 'cs_test',
             'contractId' => 'contract_123',
             'contractToken' => null,
+            // VR-20 R5: no token - payment-base's guard lets only the contract's shopper in the initiating session in
+            'tokenValidationResult' => false,
         ]);
 
         $result = $controller->checkoutSuccess();
@@ -390,7 +392,8 @@ class StripeOrderControllerTest extends TestCase
             'contractIdFromRequest' => 'contract_from_url',
             'contractToken' => 'valid_token',
             'basketNotEmpty' => true,
-            // the stub repository's contract belongs to user_1, not to this shopper
+            // the stub repository's contract belongs to user_1, not to this shopper: payment-base's guard refuses
+            'tokenValidationResult' => false,
             'userId' => 'someone_else',
         ]);
 

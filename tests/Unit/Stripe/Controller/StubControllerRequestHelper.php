@@ -17,6 +17,7 @@ class StubControllerRequestHelper extends ControllerRequestHelper
     public ?string $contractIdFromRequest = null;
     public ?string $contractTokenFromRequest = null;
     public ?string $contractIdFromSession = null;
+    /** What payment-base's return guard answers: true = access granted. */
     public bool $tokenValidationResult = true;
     public bool $sessionChallengeResult = true;
     public ?string $lastError = null;
@@ -94,12 +95,19 @@ class StubControllerRequestHelper extends ControllerRequestHelper
         return $this->sessionChallengeResult;
     }
 
-    public function validateContractToken(?string $contractId, ?string $contractToken): bool
-    {
-        if ($contractId === null || $contractToken === null) {
-            return false;
-        }
-        return $this->tokenValidationResult;
+    /**
+     * VR-20 R5: payment-base's guard decides; `tokenValidationResult` is what it answers (true = access granted).
+     */
+    public function checkReturnAccess(
+        ?\OxidEsales\PaymentBase\Contract\PaymentContractInterface $contract,
+        string $token,
+        string $sessionUserId
+    ): \OxidEsales\PaymentBase\Checkout\Return\ReturnAccessDecision {
+        return $this->tokenValidationResult
+            ? \OxidEsales\PaymentBase\Checkout\Return\ReturnAccessDecision::grant()
+            : \OxidEsales\PaymentBase\Checkout\Return\ReturnAccessDecision::reject(
+                \OxidEsales\PaymentBase\Checkout\Return\ReturnAccessRejection::AccessDenied
+            );
     }
 
     public function addErrorToDisplay(string $message): void

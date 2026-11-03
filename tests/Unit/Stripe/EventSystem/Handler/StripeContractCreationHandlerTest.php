@@ -120,6 +120,34 @@ class StripeContractCreationHandlerTest extends TestCase
         $handler->handle($event);
     }
 
+    /**
+     * VR-20 R5: the shop session that started the payment is on the contract; payment-base's ReturnAccessGuard lets
+     * the contract's shopper back in through it (no token needed), and nobody else.
+     */
+    public function testRecordsTheShopSessionThatStartedThePayment(): void
+    {
+        $contract = $this->createMockContract();
+        $this->setupContractService($contract);
+        $contract->expects($this->once())->method('setMetadata')->with('initiating_session_id', 'shop-session-1');
+        $context = new EventContext([
+            'userId' => 'user_123',
+            'basket' => $this->createMock(\stdClass::class),
+            'conditionTypes' => [],
+            'sessionId' => 'shop-session-1',
+        ]);
+
+        $this->createHandler()->handle(new StripeCheckoutSessionRequestEvent($context));
+    }
+
+    public function testWithoutAShopSessionNothingIsRecorded(): void
+    {
+        $contract = $this->createMockContract();
+        $this->setupContractService($contract);
+        $contract->expects($this->never())->method('setMetadata');
+
+        $this->createHandler()->handle(new StripeCheckoutSessionRequestEvent($this->createCheckoutContext($this->createMock(\stdClass::class))));
+    }
+
     public function testSetsContractInContext(): void
     {
         // Arrange

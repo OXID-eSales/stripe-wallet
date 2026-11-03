@@ -17,7 +17,6 @@ use OxidEsales\PaymentBase\Checkout\Headless\HeadlessStartRequest;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutCancelResult;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutReturnResult;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutStartResult;
-use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\GraphQL\Exception\StripeCheckoutError;
 use RuntimeException;
@@ -37,9 +36,8 @@ use TheCodingMachine\GraphQLite\Types\ID;
  *   stripeCheckoutCancel(contractId, contractToken) → { cancelled, contractId, contractState }
  *
  * Everything provider-neutral lives in payment-base's HeadlessCheckoutService;
- * this class adds the JWT user, Stripe's session id and a Stripe contract
- * token for the return resolver (payment-base already verified its own token),
- * and turns refusals into client-safe errors.
+ * this class adds the JWT user and Stripe's session id, and turns refusals into
+ * client-safe errors (payment-base verifies the return token itself).
  *
  * @since 3.4.0
  */
@@ -47,7 +45,6 @@ final class StripeCheckout
 {
     public function __construct(
         private readonly HeadlessCheckoutServiceInterface $checkout,
-        private readonly TokenServiceInterface $tokenService,
         private readonly ?Authentication $authentication = null,
     ) {
     }
@@ -96,10 +93,7 @@ final class StripeCheckout
         string $contractToken,
         ?string $checkoutSessionId = null
     ): CheckoutReturnResult {
-        $providerParams = ['contract_token' => $this->tokenService->generateToken($contractId)];
-        if ($checkoutSessionId !== null && $checkoutSessionId !== '') {
-            $providerParams = ['checkoutSessionId' => $checkoutSessionId] + $providerParams;
-        }
+        $providerParams = $checkoutSessionId !== null && $checkoutSessionId !== '' ? ['checkoutSessionId' => $checkoutSessionId] : [];
 
         try {
             return new CheckoutReturnResult($this->checkout->return($contractId, $contractToken, $providerParams));

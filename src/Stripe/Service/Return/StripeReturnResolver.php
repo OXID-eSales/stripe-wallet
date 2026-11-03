@@ -30,7 +30,9 @@ use Throwable;
  *
  * Expected context keys:
  *   - `checkoutSessionId` (string, required) — Stripe session id from URL.
- *   - `contract_token`    (string, required) — CSRF token for return.
+ *
+ * Who may come back for the contract is not asked here (VR-20 R5): payment-base's ReturnAccessGuard answered it at the
+ * door of the return leg (the browser) or payment-base's own headless token did.
  */
 class StripeReturnResolver implements ReturnResolverInterface
 {
@@ -61,21 +63,16 @@ class StripeReturnResolver implements ReturnResolverInterface
         EventContextInterface $context,
     ): ReturnResolution {
         $sessionId = $context->get('checkoutSessionId');
-        $contractToken = $context->get('contract_token');
         if (!is_string($sessionId) || $sessionId === '') {
             return ReturnResolution::failed('missing_checkout_session_id', 'Stripe session id missing on return');
         }
-        if (!is_string($contractToken) || $contractToken === '') {
-            return ReturnResolution::failed('missing_contract_token', 'Contract token missing on return');
-        }
-
         $contractId = $contract->getId();
         if ($contractId === null || $contractId === '') {
             return ReturnResolution::failed('missing_contract_id', 'Contract id missing on return');
         }
 
         try {
-            $result = $this->checkoutReturnService->validateReturn($sessionId, $contractId, $contractToken);
+            $result = $this->checkoutReturnService->validateReturn($sessionId, $contractId);
         } catch (Throwable $e) {
             return ReturnResolution::failed('validate_return_threw', $e->getMessage());
         }

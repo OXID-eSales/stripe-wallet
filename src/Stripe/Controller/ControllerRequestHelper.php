@@ -5,7 +5,12 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Controller;
 
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessDecision;
+use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessGuardInterface;
+use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessRequest;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\Return\CheckoutReturnRejection;
@@ -27,7 +32,9 @@ class ControllerRequestHelper
     private readonly LanguageResolverInterface $languageResolver;
 
     public function __construct(
-        private readonly TokenServiceInterface $tokenService,
+        private readonly ReturnAccessGuardInterface $returnGuard,
+        // VR-20 R5: Stripe's pre-shared-token validator, asked by the guard for old URLs while its switch is on.
+        private readonly TokenServiceInterface $legacyTokens,
         private readonly ModuleConfigurationServiceInterface $moduleConfig,
         ?LanguageResolverInterface $languageResolver = null
     ) {
@@ -205,13 +212,20 @@ class ControllerRequestHelper
         return Registry::getSession()->checkSessionChallenge();
     }
 
-    public function validateContractToken(?string $contractId, ?string $contractToken): bool
+    /**
+     * VR-20 R5: may this browser come back for this contract? payment-base's guard decides: a valid return token, or
+     * the contract's shopper in the session that started the payment.
+     */
+    public function checkReturnAccess(?PaymentContractInterface $contract, string $token, string $sessionUserId): ReturnAccessDecision
     {
-        if ($contractId === null || $contractToken === null) {
-            return false;
-        }
-
-        return $this->tokenService->validateToken($contractToken, $contractId);
+        return $this->returnGuard->check(new ReturnAccessRequest(
+            $contract,
+            StripeDefinitions::PROVIDER,
+            $token,
+            $sessionUserId,
+            $this->getSessionId(),
+            $this->legacyTokens
+        ));
     }
 
     // ==========================================

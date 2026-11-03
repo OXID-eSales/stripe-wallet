@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service\Return;
 
+use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessRejection;
+
 /**
  * Why a customer coming back from Stripe was turned away.
  *
@@ -21,20 +23,36 @@ enum CheckoutReturnRejection
     /** Stripe returned without a checkout session id. */
     case MissingSessionId;
 
-    /** The return carried no contract id and/or no contract token. */
+    /** The return carried no contract id. */
     case MissingContractIdentifiers;
 
-    /** The contract token does not authenticate the contract id. */
-    case InvalidContractToken;
+    /** Neither a valid return token nor the shopper's own initiating session (payment-base's guard). */
+    case AccessDenied;
 
-    /** The returned contract is not the one this session started. */
-    case ContractMismatch;
+    /** The return token is authentic but past its expiry. */
+    case TokenExpired;
 
-    /** The contract id is well-formed and signed, but no such contract exists. */
+    /** The contract belongs to another payment provider. */
+    case ProviderMismatch;
+
+    /** No such contract exists. */
     case ContractNotFound;
 
     /** The return was accepted, but the handler chain produced no order. */
     case NoOrderCreated;
+
+    /**
+     * The Stripe reason for what payment-base's ReturnAccessGuard refused.
+     */
+    public static function fromGuard(ReturnAccessRejection $refusal): self
+    {
+        return match ($refusal) {
+            ReturnAccessRejection::ContractNotFound => self::ContractNotFound,
+            ReturnAccessRejection::ProviderMismatch => self::ProviderMismatch,
+            ReturnAccessRejection::TokenExpired => self::TokenExpired,
+            ReturnAccessRejection::AccessDenied => self::AccessDenied,
+        };
+    }
 
     /**
      * What the customer is told. Only the missing-session-id case is specific,
@@ -55,8 +73,9 @@ enum CheckoutReturnRejection
         return match ($this) {
             self::MissingSessionId => 'missing_session_id',
             self::MissingContractIdentifiers => 'missing_contract_identifiers',
-            self::InvalidContractToken => 'invalid_contract_token',
-            self::ContractMismatch => 'contract_mismatch',
+            self::AccessDenied => 'access_denied',
+            self::TokenExpired => 'token_expired',
+            self::ProviderMismatch => 'provider_mismatch',
             self::ContractNotFound => 'contract_not_found',
             self::NoOrderCreated => 'no_order_created',
         };

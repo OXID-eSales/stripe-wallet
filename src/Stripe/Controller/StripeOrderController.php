@@ -25,7 +25,8 @@ use OxidEsales\PaymentBase\Validation\Message\MessageFormatterInterface;
 use OxidEsales\Payments\Stripe\Service\BasketBuyabilityValidator;
 use OxidEsales\Payments\Stripe\Service\BuyabilityFailure;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
-use OxidEsales\Payments\Stripe\Service\ContractTokenService;
+use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessGuardInterface;
+use OxidEsales\Payments\Stripe\Service\LegacyReturnTokenValidator;
 use OxidEsales\Payments\Stripe\Service\FieldValidationFailure;
 use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\LanguageTranslatorInterface;
@@ -310,13 +311,13 @@ class StripeOrderController extends StripeOrderController_parent
         }
 
         /** @var \OxidEsales\PaymentBase\Contract\PaymentContractInterface $contract */
-        $ownershipRejection = (new CheckoutReturnInputsResolver())
-            ->checkOwnership($contract->getUserId(), $this->readCurrentUserId());
-        if ($ownershipRejection !== null) {
+        // VR-20 R5: payment-base's guard - a valid return token, or the shopper in the session that started the payment.
+        $refusal = $helper->checkReturnAccess($contract, $inputs->contractToken, $this->readCurrentUserId())->rejection;
+        if ($refusal !== null) {
             return $this->rejectReturn(
                 $helper,
-                $ownershipRejection,
-                ['contractId' => $inputs->contractId, 'contractUserId' => $contract->getUserId()]
+                CheckoutReturnRejection::fromGuard($refusal),
+                ['contractId' => $inputs->contractId]
             );
         }
 
@@ -326,7 +327,6 @@ class StripeOrderController extends StripeOrderController_parent
             resolver: $this->getServiceFromContainer(StripeReturnResolver::class),
             extraContextKeys: [
                 'checkoutSessionId' => $inputs->sessionId,
-                'contract_token' => $inputs->contractToken,
             ],
         );
 
@@ -346,14 +346,10 @@ class StripeOrderController extends StripeOrderController_parent
     private function resolveReturnInputs(
         ControllerRequestHelper $helper
     ): CheckoutReturnInputs|CheckoutReturnRejection {
-        $contractId = $helper->getContractIdFromRequest();
-        $contractToken = $helper->getContractTokenFromRequest();
-
         return (new CheckoutReturnInputsResolver())->resolve(
             sessionId: $helper->getCheckoutSessionIdFromRequest(),
-            contractId: $contractId,
-            contractToken: $contractToken,
-            contractTokenValid: $helper->validateContractToken($contractId, $contractToken)
+            contractId: $helper->getContractIdFromRequest(),
+            contractToken: $helper->getContractTokenFromRequest()
         );
     }
 
@@ -376,27 +372,18 @@ class StripeOrderController extends StripeOrderController_parent
     }
 
     /**
-     * The shopper this request belongs to, or null when it cannot be determined.
-     *
-     * Failure is deliberately not an error: this feeds the ownership check, and a
-     * check that cannot be made must let a paid return through rather than throw
-     * a charged customer out of the flow.
+     * The shopper this request belongs to, '' when there is none or it cannot be determined. Unknown ownership is a
+     * refusal in payment-base's guard (a token still opens the return): a check that cannot be made does not grant.
      */
-    private function readCurrentUserId(): ?string
+    private function readCurrentUserId(): string
     {
         try {
             $user = $this->getUser();
         } catch (Throwable) {
-            return null;
+            return '';
         }
 
-        if (!is_object($user)) {
-            return null;
-        }
-
-        $userId = (string) $user->getId();
-
-        return $userId === '' ? null : $userId;
+        return is_object($user) ? (string) $user->getId() : '';
     }
 
     private function findReturnContract(string $contractId): ?object
@@ -518,7 +505,8 @@ class StripeOrderController extends StripeOrderController_parent
     {
         if ($this->requestHelper === null) {
             $this->requestHelper = new ControllerRequestHelper(
-                $this->getServiceFromContainer(ContractTokenService::class),
+                $this->getServiceFromContainer(ReturnAccessGuardInterface::class),
+                $this->getServiceFromContainer(LegacyReturnTokenValidator::class),
                 $this->getServiceFromContainer(ModuleConfigurationServiceInterface::class),
                 $this->getServiceFromContainer(LanguageResolverInterface::class)
             );

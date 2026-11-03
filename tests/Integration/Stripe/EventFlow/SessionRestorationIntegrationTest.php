@@ -9,9 +9,6 @@ use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ReturnSecurityValidatorInterface;
-use OxidEsales\PaymentBase\Service\TokenServiceInterface;
-use OxidEsales\Payments\Stripe\Service\ContractTokenService;
-use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\ReturnSessionSecurityService;
 use PHPUnit\Framework\TestCase;
 
@@ -20,8 +17,8 @@ use PHPUnit\Framework\TestCase;
  *
  * These tests verify the complete flow:
  * 1. Contract creation stores security metadata (IP, user_agent, timestamp)
- * 2. Checkout session URL includes contract_id and contract_token
- * 3. Return handler validates token and restores delivery address hash
+ * 2. Checkout session URL includes contract_id and the return token (payment-base's, VR-20 R5)
+ * 3. Return handler restores the delivery address hash
  * 4. $_REQUEST['sDeliveryAddressMD5'] is injected for OXID order validation
  */
 #[\PHPUnit\Framework\Attributes\Group('integration')]
@@ -30,16 +27,13 @@ use PHPUnit\Framework\TestCase;
 class SessionRestorationIntegrationTest extends TestCase
 {
     private ContractRepositoryInterface $contractRepository;
-    private TokenServiceInterface $tokenService;
     private ReturnSecurityValidatorInterface $securityService;
-    private string $testSecret = 'sk_test_integration_test_secret_key';
 
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->contractRepository = $this->createInMemoryContractRepository();
-        $this->tokenService = new ContractTokenService($this->createConfigServiceMock());
         $this->securityService = new ReturnSessionSecurityService(50);
 
         // Clear any previous $_REQUEST data
@@ -124,54 +118,6 @@ class SessionRestorationIntegrationTest extends TestCase
         // Clean up $_REQUEST
         $_REQUEST = [];
         parent::tearDown();
-    }
-
-    /**
-     * Create a mock ModuleConfigurationServiceInterface with the test secret key
-     */
-    private function createConfigServiceMock(): ModuleConfigurationServiceInterface
-    {
-        $configService = $this->createMock(ModuleConfigurationServiceInterface::class);
-        // D2: ContractTokenService calls getToken() (canonical accessor).
-        $configService->method('getToken')->willReturn($this->testSecret);
-        $configService->method('getWebhookSecret')->willReturn('');
-        return $configService;
-    }
-
-    // =================================================================
-    // Token Generation and Validation Tests
-    // =================================================================
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function tokenServiceGeneratesValidTokensForContractId(): void
-    {
-        $contractId = 'test_contract_' . uniqid();
-
-        $token = $this->tokenService->generateToken($contractId);
-
-        $this->assertNotEmpty($token);
-        $this->assertTrue($this->tokenService->validateToken($token, $contractId));
-    }
-
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function tokenServiceRejectsTokensForDifferentContractId(): void
-    {
-        $contractId1 = 'contract_original';
-        $contractId2 = 'contract_tampered';
-
-        $token = $this->tokenService->generateToken($contractId1);
-
-        $this->assertFalse($this->tokenService->validateToken($token, $contractId2));
-    }
-
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function tokenServiceExtractsContractIdFromValidToken(): void
-    {
-        $contractId = 'contract_extractable_' . uniqid();
-
-        $token = $this->tokenService->generateToken($contractId);
-        $extracted = $this->tokenService->extractContractId($token);
-
-        $this->assertEquals($contractId, $extracted);
     }
 
     // =================================================================
@@ -277,7 +223,7 @@ class SessionRestorationIntegrationTest extends TestCase
     // Full Flow Integration Tests
     // =================================================================
     #[\PHPUnit\Framework\Attributes\Test]
-    public function fullFlowCreatesTokenAndValidatesOnReturn(): void
+    public function fullFlowRestoresTheContractOnReturn(): void
     {
         // STEP 1: Create contract with delivery address hash
         $contract = $this->createTestContract();
@@ -292,14 +238,7 @@ class SessionRestorationIntegrationTest extends TestCase
         $this->contractRepository->save($contract);
         $contractId = $contract->getId();
 
-        // STEP 2: Generate token (simulating StripeCheckoutSessionHandler)
-        $token = $this->tokenService->generateToken($contractId);
-
-        $this->assertNotEmpty($token);
-
-        // STEP 3: Simulate return - validate token
-        $tokenValid = $this->tokenService->validateToken($token, $contractId);
-        $this->assertTrue($tokenValid, 'Token should be valid for correct contract ID');
+        // The return token is payment-base's (VR-20 R5), covered by its own tests and by the guard's.
 
         // STEP 4: Load contract from repository
         $loadedContract = $this->contractRepository->findById($contractId);
@@ -318,45 +257,6 @@ class SessionRestorationIntegrationTest extends TestCase
         $this->assertTrue($securityResult->isAllowed());
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function fullFlowRejectsInvalidToken(): void
-    {
-        $contract = $this->createTestContract();
-        $this->contractRepository->save($contract);
-        $contractId = $contract->getId();
-
-        // Generate valid token
-        $validToken = $this->tokenService->generateToken($contractId);
-
-        // Tamper with the token
-        $tamperedToken = $validToken . 'tampered';
-
-        // Validation should fail
-        $this->assertFalse($this->tokenService->validateToken($tamperedToken, $contractId));
-    }
-
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function fullFlowRejectsContractIdMismatch(): void
-    {
-        $contract1 = $this->createTestContract('contract_1');
-        $contract2 = $this->createTestContract('contract_2');
-
-        $this->contractRepository->save($contract1);
-        $this->contractRepository->save($contract2);
-
-        // Generate token for contract 1
-        $tokenForContract1 = $this->tokenService->generateToken($contract1->getId());
-
-        // Try to use it with contract 2
-        $this->assertFalse(
-            $this->tokenService->validateToken($tokenForContract1, $contract2->getId()),
-            'Token for contract 1 should not validate for contract 2'
-        );
-    }
-
-    // =================================================================
-    // $_REQUEST Injection Tests (Simulated)
-    // =================================================================
     #[\PHPUnit\Framework\Attributes\Test]
     public function requestInjectionSetsDeliveryAddressMd5(): void
     {
@@ -387,21 +287,12 @@ class SessionRestorationIntegrationTest extends TestCase
         $this->contractRepository->save($contract);
         $contractId = $contract->getId();
 
-        // Generate token (checkout session handler would do this)
-        $contractToken = $this->tokenService->generateToken($contractId);
-
         // === SIMULATE STRIPE REDIRECT AND RETURN ===
 
         // Clear $_REQUEST (simulating fresh request after Stripe redirect)
         $_REQUEST = [];
 
         // === SIMULATE RETURN HANDLER LOGIC ===
-
-        // 1. Validate token
-        $this->assertTrue(
-            $this->tokenService->validateToken($contractToken, $contractId),
-            'Token validation should pass'
-        );
 
         // 2. Load contract
         $loadedContract = $this->contractRepository->findById($contractId);
@@ -462,18 +353,6 @@ class SessionRestorationIntegrationTest extends TestCase
             \OxidEsales\PaymentBase\Contract\SecurityValidationResultInterface::class,
             $result
         );
-    }
-
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function tokenServiceHandlesSpecialCharactersInContractId(): void
-    {
-        $specialContractId = 'contract+with/special=chars';
-
-        $token = $this->tokenService->generateToken($specialContractId);
-        $extracted = $this->tokenService->extractContractId($token);
-
-        $this->assertEquals($specialContractId, $extracted);
-        $this->assertTrue($this->tokenService->validateToken($token, $specialContractId));
     }
 
     // =================================================================

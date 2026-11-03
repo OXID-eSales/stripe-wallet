@@ -10,7 +10,6 @@ use OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutReturnService;
 use OxidEsales\Payments\Stripe\Service\CheckoutReturnServiceInterface;
-use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -25,14 +24,12 @@ class CheckoutReturnServiceTest extends TestCase
 {
     private StripeAdapterFactoryInterface&MockObject $adapterFactory;
     private StripeAdapterInterface&MockObject $stripeAdapter;
-    private TokenServiceInterface&MockObject $tokenService;
     private LoggerInterface&MockObject $logger;
 
     protected function setUp(): void
     {
         $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
         $this->stripeAdapter = $this->createMock(StripeAdapterInterface::class);
-        $this->tokenService = $this->createMock(TokenServiceInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->adapterFactory
@@ -44,7 +41,6 @@ class CheckoutReturnServiceTest extends TestCase
     {
         return new CheckoutReturnService(
             $this->adapterFactory,
-            $this->tokenService,
             $this->logger
         );
     }
@@ -102,13 +98,7 @@ class CheckoutReturnServiceTest extends TestCase
         // Arrange
         $checkoutSessionId = 'cs_test_123';
         $contractId = 'contract_abc';
-        $contractToken = 'valid_token';
 
-        $this->tokenService
-            ->expects($this->once())
-            ->method('validateToken')
-            ->with($contractToken, $contractId)
-            ->willReturn(true);
 
         $session = new StripeCheckoutSessionDto(
             id: $checkoutSessionId,
@@ -128,7 +118,7 @@ class CheckoutReturnServiceTest extends TestCase
 
         // Act
         $service = $this->createService();
-        $result = $service->validateReturn($checkoutSessionId, $contractId, $contractToken);
+        $result = $service->validateReturn($checkoutSessionId, $contractId);
 
         // Assert
         $this->assertTrue($result->isSuccessful());
@@ -139,35 +129,9 @@ class CheckoutReturnServiceTest extends TestCase
         $this->assertEquals('paid', $result->getPaymentStatus());
     }
 
-    public function testValidateReturnInvalidToken(): void
-    {
-        // Arrange
-        $this->tokenService
-            ->expects($this->once())
-            ->method('validateToken')
-            ->willReturn(false);
-
-        $this->logger
-            ->expects($this->once())
-            ->method('warning')
-            ->with($this->stringContains('Invalid contract token'));
-
-        // Act
-        $service = $this->createService();
-        $result = $service->validateReturn('cs_test', 'contract_id', 'invalid_token');
-
-        // Assert
-        $this->assertFalse($result->isSuccessful());
-        $this->assertEquals('Invalid contract token', $result->getErrorMessage());
-        $this->assertEquals('payment', $result->getRedirectTarget());
-    }
-
     public function testValidateReturnPaymentNotCompleted(): void
     {
         // Arrange
-        $this->tokenService
-            ->method('validateToken')
-            ->willReturn(true);
 
         $session = new StripeCheckoutSessionDto(
             id: 'cs_unpaid',
@@ -185,7 +149,7 @@ class CheckoutReturnServiceTest extends TestCase
 
         // Act
         $service = $this->createService();
-        $result = $service->validateReturn('cs_unpaid', 'contract_123', 'token');
+        $result = $service->validateReturn('cs_unpaid', 'contract_123');
 
         // Assert
         $this->assertFalse($result->isSuccessful());
@@ -196,9 +160,6 @@ class CheckoutReturnServiceTest extends TestCase
     public function testValidateReturnContractIdMismatch(): void
     {
         // Arrange
-        $this->tokenService
-            ->method('validateToken')
-            ->willReturn(true);
 
         $session = new StripeCheckoutSessionDto(
             id: 'cs_mismatch',
@@ -221,7 +182,7 @@ class CheckoutReturnServiceTest extends TestCase
 
         // Act
         $service = $this->createService();
-        $result = $service->validateReturn('cs_mismatch', 'expected_contract', 'token');
+        $result = $service->validateReturn('cs_mismatch', 'expected_contract');
 
         // Assert
         $this->assertFalse($result->isSuccessful());
@@ -231,9 +192,6 @@ class CheckoutReturnServiceTest extends TestCase
     public function testValidateReturnMissingContractIdInMetadata(): void
     {
         // Arrange
-        $this->tokenService
-            ->method('validateToken')
-            ->willReturn(true);
 
         $session = new StripeCheckoutSessionDto(
             id: 'cs_no_metadata',
@@ -251,7 +209,7 @@ class CheckoutReturnServiceTest extends TestCase
 
         // Act
         $service = $this->createService();
-        $result = $service->validateReturn('cs_no_metadata', 'contract_123', 'token');
+        $result = $service->validateReturn('cs_no_metadata', 'contract_123');
 
         // Assert
         $this->assertFalse($result->isSuccessful());
@@ -261,9 +219,6 @@ class CheckoutReturnServiceTest extends TestCase
     public function testValidateReturnHandlesStripeApiError(): void
     {
         // Arrange
-        $this->tokenService
-            ->method('validateToken')
-            ->willReturn(true);
 
         $exception = new PaymentAdapterException(
             'stripe',
@@ -282,7 +237,7 @@ class CheckoutReturnServiceTest extends TestCase
 
         // Act
         $service = $this->createService();
-        $result = $service->validateReturn('cs_invalid', 'contract_123', 'token');
+        $result = $service->validateReturn('cs_invalid', 'contract_123');
 
         // Assert
         $this->assertFalse($result->isSuccessful());
@@ -292,9 +247,6 @@ class CheckoutReturnServiceTest extends TestCase
     public function testValidateReturnWithPaymentIntentObject(): void
     {
         // Arrange - PaymentIntent can be object instead of string
-        $this->tokenService
-            ->method('validateToken')
-            ->willReturn(true);
 
         $session = new StripeCheckoutSessionDto(
             id: 'cs_object_pi',
@@ -312,7 +264,7 @@ class CheckoutReturnServiceTest extends TestCase
 
         // Act
         $service = $this->createService();
-        $result = $service->validateReturn('cs_object_pi', 'contract_obj', 'token');
+        $result = $service->validateReturn('cs_object_pi', 'contract_obj');
 
         // Assert
         $this->assertTrue($result->isSuccessful());
@@ -324,9 +276,6 @@ class CheckoutReturnServiceTest extends TestCase
     public function testSuccessfulValidationIsLogged(): void
     {
         // Arrange
-        $this->tokenService
-            ->method('validateToken')
-            ->willReturn(true);
 
         $session = new StripeCheckoutSessionDto(
             id: 'cs_logged',
@@ -354,6 +303,6 @@ class CheckoutReturnServiceTest extends TestCase
 
         // Act
         $service = $this->createService();
-        $service->validateReturn('cs_logged', 'contract_logged', 'token');
+        $service->validateReturn('cs_logged', 'contract_logged');
     }
 }

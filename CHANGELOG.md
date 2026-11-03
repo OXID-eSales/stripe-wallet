@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed (VR-20 R5) - the return leg runs on payment-base's guard and shared return token
+- **Return URLs carry payment-base's `ContractReturnTokenService` token** (shopper-bound, 24 h by default, secret from
+  `oe_payments_secrets`), issued by `StripeCheckoutSessionHandler` (Twig) and `StripePaymentHandler` (OPC); both take
+  `ContractReturnTokenServiceInterface` instead of `TokenServiceInterface`. Before, the token had no expiry, no shopper
+  and a secret derived from the API key (the webhook secret when none was set).
+- **`checkoutSuccess` asks `ReturnAccessGuardInterface`** (`ControllerRequestHelper::checkReturnAccess()`): the contract
+  exists, is Stripe's, and the caller holds a valid return token **or is the contract's shopper in the session that
+  started the payment**. A return without a token is no longer refused for that alone: the shopper's own session opens
+  it. Unknown ownership (before: the check was skipped for a guest or an unknown user, so anyone with a valid token
+  passed) is now a refusal; the payment is then left to Stripe's webhook, which commits without a browser.
+  `CheckoutReturnInputsResolver::checkOwnership()` is gone; `CheckoutReturnRejection` has `AccessDenied`, `TokenExpired`,
+  `ProviderMismatch` (via `fromGuard()`) in place of `InvalidContractToken` and `ContractMismatch`.
+- **Contracts record `initiating_session_id`** at creation (`StripeContractCreationHandler` from the controller's
+  session id, `StripePaymentHandler` for the OPC path). A headless contract records none (no shop session): its return is
+  payment-base's own token check.
+- `CheckoutReturnService::validateReturn()` and `StripeReturnResolver` no longer validate a token (it was checked twice,
+  and in the headless flow Stripe generated the token it then validated itself); `stripeCheckoutReturn` passes the Stripe
+  session id only. `GraphQL\Controller\StripeCheckout` loses its token service argument.
+- **Legacy window.** `ContractTokenService` is gone; its validation half is `Service\LegacyReturnTokenValidator`
+  (`generateToken()` throws), passed to the guard as `ReturnAccessRequest::$legacyTokens`: URLs of checkouts started
+  before the update still open while payment-base's setting `blPaymentBaseAcceptLegacyReturnTokens` is on (one release).
+  Delete the class with that setting. The `TokenServiceInterface` alias in services.yaml (it resolved to another
+  provider's service when that module was active) is removed.
+
 ### Changed (VR-23 T1/T3/T5) - late money, Connect origin check, sweep as cron
 - **Provider payment gateway (T1).** New `Service\StripeProviderPaymentGateway` (tag
   `oe.payment.provider_payment_gateway`): `statusOf()` (`succeeded` = paid, `requires_capture` = authorized, anything

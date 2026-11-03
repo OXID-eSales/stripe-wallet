@@ -17,8 +17,6 @@ services:
     autoconfigure: false
     arguments:
       $checkout: '@OxidEsales\PaymentBase\Checkout\Headless\HeadlessCheckoutServiceInterface'
-      # Stripe's own contract token for StripeReturnResolver (payment-base verified its headless token already)
-      $tokenService: '@OxidEsales\Payments\Stripe\Service\ContractTokenService'
       $authentication: '@?OxidEsales\GraphQL\Base\Service\Authentication'
 
   # OXID 7.5+ RoutePass reflects the method attributes of every public service *definition* at container
@@ -346,8 +344,8 @@ services:
 
   OxidEsales\Payments\Stripe\PaymentHandler\StripePaymentHandler:
     arguments:
-      # Concrete Stripe token service (see ContractTokenService note) — not the shared interface.
-      $tokenService: '@OxidEsales\Payments\Stripe\Service\ContractTokenService'
+      # VR-20 R5: payment-base's shared return token (shopper-bound, expiring).
+      $returnTokens: '@OxidEsales\PaymentBase\Checkout\Return\ContractReturnTokenServiceInterface'
       # IFRAME-02: provider-agnostic "Use iframe instead of checkout button" flag (payment-base).
       $iframeSettings: '@OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface'
       # Sprint 133 (F6): confirmPayment() asks Stripe for the PaymentIntent state
@@ -616,18 +614,11 @@ services:
   # payment flows. Used to prevent tampering with return URLs.
   #
 
-  # Token Service Interface - Bind to implementation
-  # Derives secret from ModuleConfigurationService (no extra env var needed)
-  # Return-URL HMAC token service (secret derived from the Stripe API key). Bound as a CONCRETE
-  # service and injected directly into Stripe's own consumers — NEVER via the shared PaymentBase
-  # TokenServiceInterface. That interface is single-valued in the merged DI container, so when
-  # another PSP module (Mollie/PayPal) is active it resolves to that provider's token service
-  # (wrong API-key HMAC). The interface alias below is kept only for a Stripe-only shop / generic
-  # lookups; Stripe's own code always references the concrete class.
-  OxidEsales\Payments\Stripe\Service\ContractTokenService:
-    public: true
-  OxidEsales\PaymentBase\Service\TokenServiceInterface:
-    alias: OxidEsales\Payments\Stripe\Service\ContractTokenService
+  # VR-20 R5: payment-base's ContractReturnTokenService issues the return tokens and its ReturnAccessGuard decides who may
+  # come back. This validator only reads the tokens Stripe issued before (URLs of checkouts started before the update);
+  # payment-base's guard asks it while `blPaymentBaseAcceptLegacyReturnTokens` is on. Concrete on purpose: the shared
+  # TokenServiceInterface alias that used to point here is gone. Delete with that setting.
+  OxidEsales\Payments\Stripe\Service\LegacyReturnTokenValidator:
     public: true
 
   # ==========================================
@@ -753,7 +744,7 @@ services:
     arguments:
       $checkoutSessionService: '@OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
-      $tokenService: '@OxidEsales\Payments\Stripe\Service\ContractTokenService'
+      $returnTokens: '@OxidEsales\PaymentBase\Checkout\Return\ContractReturnTokenServiceInterface'
       $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
       $customerService: '@OxidEsales\Payments\Stripe\Service\StripeCustomerServiceInterface'
       $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
@@ -786,7 +777,6 @@ services:
     class: OxidEsales\Payments\Stripe\Service\CheckoutReturnService
     arguments:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
-      $tokenService: '@OxidEsales\Payments\Stripe\Service\ContractTokenService'
       $logger: '@oxid_esales.monolog.logger'
     public: false
 

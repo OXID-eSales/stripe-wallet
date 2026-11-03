@@ -11,7 +11,7 @@ use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractServiceInterface;
-use OxidEsales\PaymentBase\Service\TokenServiceInterface;
+use OxidEsales\PaymentBase\Checkout\Return\ContractReturnTokenServiceInterface;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\PaymentHandler\StripePaymentHandler;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
@@ -37,7 +37,7 @@ final class StripePaymentHandlerLanguageTest extends TestCase
     private ContractRepositoryInterface&MockObject $contractRepository;
     private ShopAdapterInterface&MockObject $shopAdapter;
     private ModuleConfigurationServiceInterface&MockObject $config;
-    private TokenServiceInterface&MockObject $tokenService;
+    private ContractReturnTokenServiceInterface&MockObject $tokenService;
 
     protected function setUp(): void
     {
@@ -46,7 +46,7 @@ final class StripePaymentHandlerLanguageTest extends TestCase
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->shopAdapter = $this->createMock(ShopAdapterInterface::class);
         $this->config = $this->createMock(ModuleConfigurationServiceInterface::class);
-        $this->tokenService = $this->createMock(TokenServiceInterface::class);
+        $this->tokenService = $this->createMock(ContractReturnTokenServiceInterface::class);
 
         $this->shopAdapter->method('getShopUrl')->willReturn('https://shop.example.com/');
         $this->shopAdapter->method('getShopId')->willReturn('1');
@@ -151,7 +151,7 @@ final class StripePaymentHandlerLanguageTest extends TestCase
                 ContractRepositoryInterface $contractRepository,
                 ShopAdapterInterface $shopAdapter,
                 ModuleConfigurationServiceInterface $config,
-                TokenServiceInterface $tokenService,
+                ContractReturnTokenServiceInterface $tokenService,
                 ?LoggerInterface $logger,
                 LanguageResolverInterface $resolver
             ) {

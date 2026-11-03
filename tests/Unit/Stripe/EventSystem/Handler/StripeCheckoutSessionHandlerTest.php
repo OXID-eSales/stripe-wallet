@@ -16,7 +16,7 @@ use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentBase\Service\TokenServiceInterface;
+use OxidEsales\PaymentBase\Checkout\Return\ContractReturnTokenServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -32,7 +32,7 @@ class StripeCheckoutSessionHandlerTest extends TestCase
 {
     private CheckoutSessionServiceInterface&MockObject $checkoutSessionService;
     private ContractRepositoryInterface&MockObject $contractRepository;
-    private TokenServiceInterface&MockObject $tokenService;
+    private ContractReturnTokenServiceInterface&MockObject $tokenService;
     private ShopAdapterInterface&MockObject $shopAdapter;
     private StripeCustomerServiceInterface&MockObject $customerService;
     private ModuleConfigurationServiceInterface&MockObject $config;
@@ -41,7 +41,7 @@ class StripeCheckoutSessionHandlerTest extends TestCase
     {
         $this->checkoutSessionService = $this->createMock(CheckoutSessionServiceInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
-        $this->tokenService = $this->createMock(TokenServiceInterface::class);
+        $this->tokenService = $this->createMock(ContractReturnTokenServiceInterface::class);
         $this->shopAdapter = $this->createMock(ShopAdapterInterface::class);
         $this->customerService = $this->createMock(StripeCustomerServiceInterface::class);
         $this->config = $this->createMock(ModuleConfigurationServiceInterface::class);
@@ -54,7 +54,7 @@ class StripeCheckoutSessionHandlerTest extends TestCase
         // Default token generation behavior
         $this->tokenService
             ->method('generateToken')
-            ->willReturnCallback(fn($contractId) => 'token_for_' . $contractId);
+            ->willReturnCallback(fn($contractId, $userId = null) => 'token_for_' . $contractId);
 
         // Default: service builds success URL
         $this->checkoutSessionService

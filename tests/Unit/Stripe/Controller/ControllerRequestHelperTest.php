@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller;
 
+use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessDecision;
+use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessGuardInterface;
+use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessRejection;
+use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessRequest;
+use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
@@ -21,6 +26,7 @@ use PHPUnit\Framework\TestCase;
 #[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper::class)]
 final class ControllerRequestHelperTest extends TestCase
 {
+    private ReturnAccessGuardInterface&MockObject $returnGuard;
     private TokenServiceInterface&MockObject $tokenService;
     private ModuleConfigurationServiceInterface&MockObject $moduleConfig;
     private LanguageResolverInterface&MockObject $languageResolver;
@@ -28,10 +34,12 @@ final class ControllerRequestHelperTest extends TestCase
 
     protected function setUp(): void
     {
+        $this->returnGuard = $this->createMock(ReturnAccessGuardInterface::class);
         $this->tokenService = $this->createMock(TokenServiceInterface::class);
         $this->moduleConfig = $this->createMock(ModuleConfigurationServiceInterface::class);
         $this->languageResolver = $this->createMock(LanguageResolverInterface::class);
         $this->helper = new ControllerRequestHelper(
+            $this->returnGuard,
             $this->tokenService,
             $this->moduleConfig,
             $this->languageResolver
@@ -75,43 +83,48 @@ final class ControllerRequestHelperTest extends TestCase
     }
 
     // ==========================================
-    // validateContractToken
+    // checkReturnAccess (VR-20 R5)
     // ==========================================
 
-    public function testValidateContractTokenReturnsFalseForNullContractId(): void
+    public function testReturnAccessIsPaymentBasesGuardsDecisionAboutThisContractTokenAndSession(): void
     {
-        $this->assertFalse($this->helper->validateContractToken(null, 'some_token'));
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $this->returnGuard->expects($this->once())->method('check')
+            ->with($this->callback(function (ReturnAccessRequest $request) use ($contract): bool {
+                $this->assertSame($contract, $request->contract);
+                $this->assertSame('stripe', $request->provider);
+                $this->assertSame('tok', $request->token);
+                $this->assertSame('user-1', $request->sessionUserId);
+                $this->assertSame('shop-session', $request->sessionId);
+                $this->assertSame($this->tokenService, $request->legacyTokens, 'old URLs are judged by the legacy validator');
+
+                return true;
+            }))
+            ->willReturn(ReturnAccessDecision::reject(ReturnAccessRejection::AccessDenied));
+
+        $decision = $this->helperInSession('shop-session')->checkReturnAccess($contract, 'tok', 'user-1');
+
+        $this->assertFalse($decision->granted);
+        $this->assertSame(ReturnAccessRejection::AccessDenied, $decision->rejection);
     }
 
-    public function testValidateContractTokenReturnsFalseForNullToken(): void
+    private function helperInSession(string $sessionId): ControllerRequestHelper
     {
-        $this->assertFalse($this->helper->validateContractToken('contract_123', null));
-    }
+        return new class ($this->returnGuard, $this->tokenService, $this->moduleConfig, $sessionId) extends ControllerRequestHelper {
+            public function __construct(
+                ReturnAccessGuardInterface $returnGuard,
+                TokenServiceInterface $legacyTokens,
+                ModuleConfigurationServiceInterface $moduleConfig,
+                private readonly string $testSessionId
+            ) {
+                parent::__construct($returnGuard, $legacyTokens, $moduleConfig);
+            }
 
-    public function testValidateContractTokenReturnsFalseForBothNull(): void
-    {
-        $this->assertFalse($this->helper->validateContractToken(null, null));
-    }
-
-    public function testValidateContractTokenDelegatesToTokenService(): void
-    {
-        $this->tokenService
-            ->expects($this->once())
-            ->method('validateToken')
-            ->with('valid_token', 'contract_123')
-            ->willReturn(true);
-
-        $this->assertTrue($this->helper->validateContractToken('contract_123', 'valid_token'));
-    }
-
-    public function testValidateContractTokenReturnsFalseForInvalidToken(): void
-    {
-        $this->tokenService
-            ->method('validateToken')
-            ->with('bad_token', 'contract_123')
-            ->willReturn(false);
-
-        $this->assertFalse($this->helper->validateContractToken('contract_123', 'bad_token'));
+            public function getSessionId(): string
+            {
+                return $this->testSessionId;
+            }
+        };
     }
 
     // ==========================================
@@ -121,7 +134,7 @@ final class ControllerRequestHelperTest extends TestCase
     public function testClearStripeSessionVariablesCallsDeleteForAllKeys(): void
     {
         $deletedKeys = [];
-        $helper = new class ($this->tokenService, $this->moduleConfig, $deletedKeys) extends ControllerRequestHelper {
+        $helper = new class ($this->returnGuard, $this->tokenService, $this->moduleConfig, $deletedKeys) extends ControllerRequestHelper {
             /** @var string[] */
             private array $deleted;
 
@@ -129,11 +142,12 @@ final class ControllerRequestHelperTest extends TestCase
              * @param string[] $deletedKeys
              */
             public function __construct(
+                ReturnAccessGuardInterface $returnGuard,
                 TokenServiceInterface $tokenService,
                 ModuleConfigurationServiceInterface $moduleConfig,
                 array &$deletedKeys
             ) {
-                parent::__construct($tokenService, $moduleConfig);
+                parent::__construct($returnGuard, $tokenService, $moduleConfig);
                 $this->deleted = &$deletedKeys;
             }
 

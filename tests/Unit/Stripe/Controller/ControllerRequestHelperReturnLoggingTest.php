@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller;
 
+use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessGuardInterface;
 use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
@@ -19,11 +20,12 @@ use Psr\Log\LoggerInterface;
 final class LoggingControllerRequestHelper extends ControllerRequestHelper
 {
     public function __construct(
+        ReturnAccessGuardInterface $returnGuard,
         TokenServiceInterface $tokenService,
         ModuleConfigurationServiceInterface $moduleConfig,
         private readonly LoggerInterface $testLogger,
     ) {
-        parent::__construct($tokenService, $moduleConfig);
+        parent::__construct($returnGuard, $tokenService, $moduleConfig);
     }
 
     protected function logger(): LoggerInterface
@@ -44,6 +46,7 @@ final class ControllerRequestHelperReturnLoggingTest extends TestCase
     private function helper(LoggerInterface $logger): LoggingControllerRequestHelper
     {
         return new LoggingControllerRequestHelper(
+            $this->createMock(ReturnAccessGuardInterface::class),
             $this->createMock(TokenServiceInterface::class),
             $this->createMock(ModuleConfigurationServiceInterface::class),
             $logger
@@ -58,11 +61,11 @@ final class ControllerRequestHelperReturnLoggingTest extends TestCase
             ->with(
                 $this->stringContains('checkout return rejected'),
                 $this->callback(
-                    static fn (array $context): bool => ($context['reason'] ?? null) === 'contract_mismatch'
+                    static fn (array $context): bool => ($context['reason'] ?? null) === 'access_denied'
                 )
             );
 
-        $this->helper($logger)->logReturnRejected(CheckoutReturnRejection::ContractMismatch);
+        $this->helper($logger)->logReturnRejected(CheckoutReturnRejection::AccessDenied);
     }
 
     public function testExtraContextIsPassedThrough(): void
@@ -73,13 +76,13 @@ final class ControllerRequestHelperReturnLoggingTest extends TestCase
             ->with(
                 $this->anything(),
                 $this->callback(static function (array $context): bool {
-                    return ($context['reason'] ?? null) === 'invalid_contract_token'
+                    return ($context['reason'] ?? null) === 'token_expired'
                         && ($context['contractId'] ?? null) === 'contract-1';
                 })
             );
 
         $this->helper($logger)->logReturnRejected(
-            CheckoutReturnRejection::InvalidContractToken,
+            CheckoutReturnRejection::TokenExpired,
             ['contractId' => 'contract-1']
         );
     }

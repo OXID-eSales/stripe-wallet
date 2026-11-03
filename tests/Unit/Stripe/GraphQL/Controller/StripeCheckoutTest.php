@@ -22,7 +22,6 @@ use OxidEsales\PaymentBase\Checkout\Headless\HeadlessStartResult;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutCancelResult;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutReturnResult;
 use OxidEsales\PaymentBase\GraphQL\DataType\CheckoutStartResult;
-use OxidEsales\PaymentBase\Service\TokenServiceInterface;
 use OxidEsales\Payments\Stripe\GraphQL\Controller\StripeCheckout;
 use OxidEsales\Payments\Stripe\GraphQL\Exception\StripeCheckoutError;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -40,15 +39,12 @@ final class StripeCheckoutTest extends TestCase
 {
     private HeadlessCheckoutServiceInterface&MockObject $checkout;
     private Authentication&MockObject $authentication;
-    private TokenServiceInterface&MockObject $tokens;
 
     protected function setUp(): void
     {
         $this->checkout = $this->createMock(HeadlessCheckoutServiceInterface::class);
         $this->authentication = $this->createMock(Authentication::class);
         $this->authentication->method('getUser')->willReturn(new User('user-1'));
-        $this->tokens = $this->createMock(TokenServiceInterface::class);
-        $this->tokens->method('generateToken')->willReturnCallback(static fn(string $id): string => 'stripe-tok-' . $id);
     }
 
     public function testStartHandsTheJwtUserAndTheArgumentsToTheHeadlessService(): void
@@ -120,10 +116,10 @@ final class StripeCheckoutTest extends TestCase
         }
     }
 
-    public function testReturnPassesTheStripeSessionIdAndAFreshStripeContractToken(): void
+    public function testReturnPassesTheStripeSessionId(): void
     {
         $this->checkout->expects($this->once())->method('return')
-            ->with('ctr-1', 'tok-1', ['checkoutSessionId' => 'cs_1', 'contract_token' => 'stripe-tok-ctr-1'])
+            ->with('ctr-1', 'tok-1', ['checkoutSessionId' => 'cs_1'])
             ->willReturn(new HeadlessReturnResult('committed', 'order-1', '1001', 'committed'));
 
         $result = $this->controller()->stripeCheckoutReturn('ctr-1', 'tok-1', 'cs_1');
@@ -136,7 +132,7 @@ final class StripeCheckoutTest extends TestCase
     public function testReturnWithoutASessionIdLeavesItToTheResolverToReport(): void
     {
         $this->checkout->expects($this->once())->method('return')
-            ->with('ctr-1', 'tok-1', ['contract_token' => 'stripe-tok-ctr-1'])
+            ->with('ctr-1', 'tok-1', [])
             ->willReturn(new HeadlessReturnResult('pending', null, '1001', 'pending'));
 
         self::assertSame('pending', $this->controller()->stripeCheckoutReturn('ctr-1', 'tok-1', null)->status());
@@ -167,6 +163,6 @@ final class StripeCheckoutTest extends TestCase
 
     private function controller(): StripeCheckout
     {
-        return new StripeCheckout($this->checkout, $this->tokens, $this->authentication);
+        return new StripeCheckout($this->checkout, $this->authentication);
     }
 }

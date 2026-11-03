@@ -37,7 +37,6 @@ final class StripeReturnResolverSecurityTest extends TestCase
     {
         $context = new EventContext();
         $context->set('checkoutSessionId', 'cs_1');
-        $context->set('contract_token', 'tok_1');
         $context->set('ip', '203.0.113.9');
         $context->set('user_agent', 'Mozilla/5.0');
 

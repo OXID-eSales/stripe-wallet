@@ -24,18 +24,18 @@ interface CheckoutReturnServiceInterface
      * Validate and process a checkout return from Stripe.
      *
      * This method:
-     * 1. Validates the contract token
-     * 2. Retrieves the Stripe checkout session
-     * 3. Validates payment status
-     * 4. Validates contract ID matches
+     * 1. Retrieves the Stripe checkout session
+     * 2. Validates payment status
+     * 3. Validates contract ID matches
+     *
+     * Who may come back for the contract is not asked here (VR-20 R5): payment-base's ReturnAccessGuard answers it at
+     * the door of the return leg.
      *
      * @param string $checkoutSessionId Stripe Checkout Session ID (cs_xxx)
      * @param string $contractId Contract ID from URL
-     * @param string $contractToken Security token for validation
      */
     public function validateReturn(
         string $checkoutSessionId,
-        string $contractId,
-        string $contractToken
+        string $contractId
     ): CheckoutReturnResult;
 }

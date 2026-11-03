@@ -11,14 +11,13 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
 /**
- * The customer coming back from Stripe can be turned away for five different
- * reasons, and until now every one of them produced the same sentence —
- * "Payment verification failed" — with nothing in the log. A support request
- * about it was unanswerable.
+ * The customer coming back from Stripe can be turned away for several reasons, and until the log named them every one
+ * produced the same sentence - "Payment verification failed" - with nothing in the log.
  *
- * This resolver makes the decision explicit and nameable: the same generic
- * sentence still reaches the customer (the reason is nobody's business), but
- * the shop can now say which check refused.
+ * VR-20 R5: this resolver only checks that the return names a Stripe session and a contract. Who may come back for
+ * that contract - a valid return token, or the shopper in the session that started the payment - is payment-base's
+ * ReturnAccessGuard's decision, made once the contract is loaded. A return without a token is therefore not refused
+ * here: the shopper's own session may open it.
  */
 #[CoversClass(CheckoutReturnInputsResolver::class)]
 final class CheckoutReturnInputsResolverTest extends TestCase
@@ -32,12 +31,7 @@ final class CheckoutReturnInputsResolverTest extends TestCase
 
     public function testCompleteReturnIsAccepted(): void
     {
-        $outcome = $this->resolver->resolve(
-            sessionId: 'cs_test_123',
-            contractId: 'contract-1',
-            contractToken: 'token-1',
-            contractTokenValid: true
-        );
+        $outcome = $this->resolver->resolve(sessionId: 'cs_test_123', contractId: 'contract-1', contractToken: 'token-1');
 
         $this->assertInstanceOf(CheckoutReturnInputs::class, $outcome);
         $this->assertSame('cs_test_123', $outcome->sessionId);
@@ -45,108 +39,43 @@ final class CheckoutReturnInputsResolverTest extends TestCase
         $this->assertSame('token-1', $outcome->contractToken);
     }
 
-    public function testMissingSessionIdIsItsOwnReason(): void
+    public function testAReturnWithoutATokenIsAcceptedForTheGuardToJudge(): void
     {
-        $outcome = $this->resolver->resolve(
-            sessionId: null,
-            contractId: 'contract-1',
-            contractToken: 'token-1',
-            contractTokenValid: true
-        );
+        $outcome = $this->resolver->resolve(sessionId: 'cs_test_123', contractId: 'contract-1', contractToken: null);
 
-        $this->assertSame(CheckoutReturnRejection::MissingSessionId, $outcome);
+        $this->assertInstanceOf(CheckoutReturnInputs::class, $outcome);
+        $this->assertSame('', $outcome->contractToken);
     }
 
-    public function testEmptySessionIdCountsAsMissing(): void
+    public function testMissingSessionIdIsItsOwnReason(): void
     {
-        $outcome = $this->resolver->resolve(
-            sessionId: '',
-            contractId: 'contract-1',
-            contractToken: 'token-1',
-            contractTokenValid: true
+        $this->assertSame(
+            CheckoutReturnRejection::MissingSessionId,
+            $this->resolver->resolve(sessionId: null, contractId: 'contract-1', contractToken: 'token-1')
         );
-
-        $this->assertSame(CheckoutReturnRejection::MissingSessionId, $outcome);
+        $this->assertSame(
+            CheckoutReturnRejection::MissingSessionId,
+            $this->resolver->resolve(sessionId: '', contractId: 'contract-1', contractToken: 'token-1')
+        );
     }
 
     public function testMissingContractIdIsReported(): void
     {
-        $outcome = $this->resolver->resolve(
-            sessionId: 'cs_test_123',
-            contractId: null,
-            contractToken: 'token-1',
-            contractTokenValid: true
+        $this->assertSame(
+            CheckoutReturnRejection::MissingContractIdentifiers,
+            $this->resolver->resolve(sessionId: 'cs_1', contractId: null, contractToken: 'token-1')
         );
-
-        $this->assertSame(CheckoutReturnRejection::MissingContractIdentifiers, $outcome);
-    }
-
-    public function testMissingContractTokenIsReported(): void
-    {
-        $outcome = $this->resolver->resolve(
-            sessionId: 'cs_test_123',
-            contractId: 'contract-1',
-            contractToken: null,
-            contractTokenValid: true
+        $this->assertSame(
+            CheckoutReturnRejection::MissingContractIdentifiers,
+            $this->resolver->resolve(sessionId: 'cs_1', contractId: '', contractToken: 'token-1')
         );
-
-        $this->assertSame(CheckoutReturnRejection::MissingContractIdentifiers, $outcome);
     }
 
-    public function testInvalidTokenIsReported(): void
-    {
-        $outcome = $this->resolver->resolve(
-            sessionId: 'cs_test_123',
-            contractId: 'contract-1',
-            contractToken: 'forged',
-            contractTokenValid: false
-        );
-
-        $this->assertSame(CheckoutReturnRejection::InvalidContractToken, $outcome);
-    }
-
-    // ==========================================
-    // ownership — replaces the old session-pointer comparison
-    // ==========================================
-
-    /**
-     * A contract belonging to the shopper who is here may proceed, whichever of
-     * the checkout paths created it. This is the case that used to fail: a
-     * checkout that produced more than one contract left the session pointing at
-     * one of them, and paying any other came back as "Payment verification
-     * failed" — after the customer had been charged.
-     */
-    public function testContractOwnedByTheCurrentUserIsAccepted(): void
-    {
-        $this->assertNull($this->resolver->checkOwnership('user-1', 'user-1'));
-    }
-
-    /**
-     * The binding that actually matters: someone else's contract is not yours to
-     * complete, however well-formed the token is.
-     */
-    public function testContractOwnedBySomeoneElseIsRejected(): void
+    public function testTheSessionIsCheckedBeforeTheContract(): void
     {
         $this->assertSame(
-            CheckoutReturnRejection::ContractMismatch,
-            $this->resolver->checkOwnership('user-1', 'user-2')
+            CheckoutReturnRejection::MissingSessionId,
+            $this->resolver->resolve(sessionId: null, contractId: null, contractToken: null)
         );
-    }
-
-    /**
-     * No shopper in the session — nothing to compare against, and completing a
-     * charged payment matters more than a check that cannot be made. The token
-     * has already authenticated the contract id at this point.
-     */
-    public function testUnknownCurrentUserDoesNotBlockTheReturn(): void
-    {
-        $this->assertNull($this->resolver->checkOwnership('user-1', null));
-        $this->assertNull($this->resolver->checkOwnership('user-1', ''));
-    }
-
-    public function testContractWithoutAnOwnerDoesNotBlockTheReturn(): void
-    {
-        $this->assertNull($this->resolver->checkOwnership(null, 'user-1'));
-        $this->assertNull($this->resolver->checkOwnership('', 'user-1'));
     }
 }
