@@ -510,29 +510,6 @@ services:
     alias: OxidEsales\PaymentBase\Adapter\SessionAdapterInterface
 
   # ==========================================
-  # Shop Order Service (Order Operations)
-  # ==========================================
-  #
-  # Provides platform-agnostic interface for order operations.
-  # Phase 1 implements order creation from basket/cart.
-  #
-  # Key Features:
-  # - Creates orders via Order::finalizeOrder()
-  # - Maps OXID order states to normalized statuses
-  # - Associates payment transactions with orders
-  # - Stores order metadata
-  #
-
-  # 2026-09-01 — this module no longer binds ShopOrderServiceInterface.
-  # payment-base owns order finalization; four modules aliasing one container
-  # id meant a single winner finalized every provider's orders.
-  # The class stays registered under its own id so anything referencing it
-  # directly keeps resolving; it is no longer what the shared contract points at.
-  OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService:
-    class: OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService
-    public: true
-
-  # ==========================================
   # Contract Repository (Data Access Layer)
   # ==========================================
 

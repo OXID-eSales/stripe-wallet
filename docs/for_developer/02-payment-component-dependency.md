@@ -104,7 +104,6 @@ How stripe implements payment-component interfaces:
 | `PaymentAdapterInterface` | `StripeAdapter` (via `LazyStripeAdapter` proxy) |
 | `ShopAdapterInterface` | `OxidShopAdapter` |
 | `SessionAdapterInterface` | `OxidSessionAdapter` |
-| `ShopOrderServiceInterface` | `OxidShopOrderService` |
 | `PaymentAdapterFactoryInterface` | `StripeAdapterFactory` |
 | `StockRestorationServiceInterface` | `OxidStockRestorationService` |
 | `ReturnSecurityValidatorInterface` | `ReturnSessionSecurityService` |

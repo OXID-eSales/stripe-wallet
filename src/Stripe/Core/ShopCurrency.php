@@ -15,7 +15,7 @@ use RuntimeException;
  * Resolves the ISO-4217 code of an OXID currency object, or fails.
  *
  * Sprint 133 · Story 7 (F7): four sites resolved a currency as
- * `$currency->name ?? 'EUR'` — `OxidShopAdapter`, `OxidShopOrderService`,
+ * `$currency->name ?? 'EUR'` — `OxidShopAdapter`, the former order service,
  * `PaymentController` and `StripeReturnResolver`. On a CHF- or USD-only shop
  * whose currency object is unavailable (misconfigured aCurrencies, a currency
  * deleted mid-session) that created a PaymentIntent in EUR carrying the CHF

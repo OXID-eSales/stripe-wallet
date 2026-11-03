@@ -13,11 +13,11 @@ use Doctrine\DBAL\Connection;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionProviderInterface;
 use OxidEsales\EshopCommunity\Tests\Integration\IntegrationTestCase;
+use OxidEsales\PaymentBase\Adapter\OxidShopOrderService;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Repository\DoctrineContractRepository;
-use OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 
 /**
@@ -53,7 +53,8 @@ final class StaleOrderCleanupIntegrationTest extends IntegrationTestCase
 
         $this->contractRepository = new DoctrineContractRepository($this->connection);
 
-        $orderService = new OxidShopOrderService();
+        // payment-base owns order finalization; the shared service is the one the cleanup runs against in the shop.
+        $orderService = $container->get(OxidShopOrderService::class);
         // OPC-175: the settler is required. These contracts have no Stripe session.
         $paidSessions = new \OxidEsales\Payments\Stripe\Service\PaidSessionSettler(
             new \OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard(),
