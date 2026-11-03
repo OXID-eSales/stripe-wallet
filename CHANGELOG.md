@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed - Adopts payment-base VR wave 2 (F3/L1/A1)
+- **Stock is restored by payment-base, not by Stripe (VR-21 F3).** Removed: `Stripe\Service\OxidStockRestorationService`
+  with its services.yaml binding and autowire exclude and `StockRestorationServiceTest`; `RefundService` no longer takes
+  a `StockRestorationServiceInterface`, no longer calls `restoreStockForOrder()` and no longer computes whether a refund
+  "refunds the rest" (its `refundsTheRest()` and `restoreStock()` are gone). Every refund is booked through
+  `ProviderRefundLedgerInterface::book()` with the new `$succeeded` flag (Stripe's refund status is `succeeded`; pending
+  is false); payment-base's `RefundSettledPolicy` returns the stock once a succeeded refund leaves nothing refundable.
+  `ChargeRefund` carries `succeeded` (from the webhook event's refund list and from `ChargeRefundLister`).
+- **Webhook processor (VR-18 L1).** `StripeWebhookProcessor` passes payment-base's `ThrowableSummaryInterface` to
+  `AbstractWebhookProcessor` (wired in services.yaml).
+- **Money invariants (VR-22 A1).** No Stripe flow books more than authorized/captured: the webhook capture record is
+  skipped once a captured amount exists and the admin capture is bounded by Stripe's capturable amount, so nothing needed
+  changing. Stripe still books no chargebacks.
+
 ### Security
 - **The legacy Payment Element path is removed (VR-20 R2, S-1).** `StripeOrderController::executeStripePayment` and
   `::stripeReturn` took the PaymentIntent id from the request (`payment_intent`, `payment_intent_id`) and authorized the

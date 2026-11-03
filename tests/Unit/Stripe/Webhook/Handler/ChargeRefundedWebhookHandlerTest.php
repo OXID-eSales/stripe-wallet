@@ -146,7 +146,7 @@ final class ChargeRefundedWebhookHandlerTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function anEventWithoutARefundListIsCompletedFromStripesRefundList(): void
     {
-        $listed = [new ChargeRefund('re_dash', 25.0, 'EUR')];
+        $listed = [new ChargeRefund('re_dash', 25.0, 'EUR', true)];
         $this->lister->expects($this->once())->method('listFor')->with('ch_nolist')->willReturn($listed);
         $this->fulfillmentHandler->expects($this->once())
             ->method('handleChargeRefunded')

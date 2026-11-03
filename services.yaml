@@ -184,7 +184,6 @@ services:
       - 'src/Stripe/Service/ReconciliationResult.php'
       - 'src/Stripe/Service/RequestLogService.php'
       - 'src/Stripe/Service/WebhookLogService.php'
-      - 'src/Stripe/Service/OxidStockRestorationService.php'
       - 'src/Stripe/Service/WebhookEndpointRegistrationResult.php'
       # Sprint 119 Phase B: VOs, interfaces, and OXID-model-bound readers excluded from autowire sweep
       - 'src/Stripe/Service/FieldValidationFailure.php'
@@ -981,33 +980,16 @@ services:
     public: true
 
   # ==========================================
-  # Stock Restoration Service (Sprint 24)
-  # ==========================================
-  # Restores stock for all order articles on full refund.
-  # Implements same logic as OXID's OrderArticle::storno().
-
-  OxidEsales\PaymentBase\Service\StockRestorationServiceInterface:
-    class: OxidEsales\Payments\Stripe\Service\OxidStockRestorationService
-    autowire: false
-    arguments:
-      $connection: '@doctrine.dbal.connection'
-      $logger: '@oxid_esales.monolog.logger'
-      $useStock: true
-      $allowNegativeStock: false
-    public: false
-
-  # ==========================================
   # Stripe Refund Service (Sprint 21)
   # ==========================================
   # Extracted business logic from StripeRefundRequestHandler.
   # SRP: Service handles all refund processing logic.
-  # Sprint 24: Added StockRestorationService for stock restoration on refund.
+  # Stock comes back through payment-base's RefundSettledPolicy (ledger), not here (VR-21 F3).
 
   OxidEsales\Payments\Stripe\Service\RefundServiceInterface:
     class: OxidEsales\Payments\Stripe\Service\RefundService
     arguments:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
-      $stockRestorationService: '@OxidEsales\PaymentBase\Service\StockRestorationServiceInterface'
       $logger: '@oxid_esales.monolog.logger'
     public: false
 
@@ -1093,6 +1075,7 @@ services:
       $logger: '@oxid_esales.monolog.logger'
       $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
       $handlers: !tagged_iterator stripe.webhook_handler
+      $throwableSummary: '@OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface'
     public: true
 
   # Sprint 114.4: Tagged stripe.webhook_handler services — one per event type.

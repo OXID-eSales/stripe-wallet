@@ -97,7 +97,7 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
             return;
         }
 
-        $this->refundLedger->book($contractId, $refund->id, $refund->amount, $refund->currency, 'webhook');
+        $this->refundLedger->book($contractId, $refund->id, $refund->amount, $refund->currency, 'webhook', $refund->succeeded);
     }
 
     /**

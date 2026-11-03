@@ -44,7 +44,7 @@ final class ChargeRefundListerTest extends TestCase
         $refunds = $this->lister->listFor('ch_1');
 
         $this->assertEquals(
-            [new ChargeRefund('re_ok', 25.0, 'EUR'), new ChargeRefund('re_pending', 10.0, 'EUR')],
+            [new ChargeRefund('re_ok', 25.0, 'EUR', true), new ChargeRefund('re_pending', 10.0, 'EUR', false)],
             $refunds
         );
     }
@@ -54,6 +54,6 @@ final class ChargeRefundListerTest extends TestCase
     {
         $this->adapter->method('listChargeRefunds')->willReturn([new StripeRefundDto('re_jpy', 1500, 'jpy', 'succeeded', null, 1)]);
 
-        $this->assertEquals([new ChargeRefund('re_jpy', 1500.0, 'JPY')], $this->lister->listFor('ch_jpy'));
+        $this->assertEquals([new ChargeRefund('re_jpy', 1500.0, 'JPY', true)], $this->lister->listFor('ch_jpy'));
     }
 }

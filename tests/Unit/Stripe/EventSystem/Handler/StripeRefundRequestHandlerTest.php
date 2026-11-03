@@ -412,7 +412,7 @@ class StripeRefundRequestHandlerTest extends TestCase
 
         $this->ledger = $this->createMock(ProviderRefundLedgerInterface::class);
         $this->ledger->expects($this->once())->method('book')
-            ->with('contract_123', 're_60', 60.0, 'EUR', 'admin')
+            ->with('contract_123', 're_60', 60.0, 'EUR', 'admin', true)
             ->willReturn(RefundBooking::booked(60.0));
 
         $context = new EventContext(['orderId' => 'order_abc', 'contractId' => 'contract_123', 'amount' => null]);
@@ -434,7 +434,7 @@ class StripeRefundRequestHandlerTest extends TestCase
         ));
         $this->ledger = $this->createMock(ProviderRefundLedgerInterface::class);
         $this->ledger->expects($this->once())->method('book')
-            ->with('contract_123', 're_25', 25.5, 'EUR', 'admin')
+            ->with('contract_123', 're_25', 25.5, 'EUR', 'admin', false)
             ->willReturn(RefundBooking::booked(25.5));
 
         $context = new EventContext([

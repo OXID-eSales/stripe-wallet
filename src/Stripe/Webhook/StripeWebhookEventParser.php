@@ -12,6 +12,7 @@ namespace OxidEsales\Payments\Stripe\Webhook;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Contract\ReplacedAttempts;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
+use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
 
 /**
@@ -161,7 +162,7 @@ class StripeWebhookEventParser
         $currency = $entry['currency'] ?? $charge['currency'] ?? '';
         $currency = is_string($currency) ? strtoupper($currency) : '';
 
-        return new ChargeRefund($id, AmountConverter::toMajorUnits($amount, $currency), $currency);
+        return new ChargeRefund($id, AmountConverter::toMajorUnits($amount, $currency), $currency, $status === StripeStatusMapper::STRIPE_SUCCEEDED);
     }
 
     /**

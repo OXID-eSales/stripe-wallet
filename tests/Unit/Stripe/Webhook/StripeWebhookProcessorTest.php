@@ -18,6 +18,7 @@ use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventHandlerInterface;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookOutcome;
+use OxidEsales\PaymentBase\Logging\ThrowableSummary;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -222,7 +223,8 @@ class StripeWebhookProcessorTest extends TestCase
             $this->logRepository,
             $this->logger,
             $this->config,
-            $handlers
+            $handlers,
+            new ThrowableSummary([])
         );
     }
 
