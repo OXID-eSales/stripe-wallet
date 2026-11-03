@@ -18,7 +18,7 @@ env:
   # Branch of OXID-eSales/payment-base to test against. Change in sync with
   # the stripe branch when the two repos co-evolve (Sprint 119/STRP-129).
   # (GRAPH-QL / Sprint 15 was developed against b-7.4.x-GRAPH-QL and merged 2026-10-07.)
-  PAYMENT_BASE_BRANCH: 'b-7.4.x-VR-pb-wave2'
+  PAYMENT_BASE_BRANCH: 'b-7.4.x-VR-pb-wave3'
   # payment-base's extra.branch-alias covers dev-b-7.4.x only; a feature
   # branch needs an explicit alias to satisfy this module's `>=v1.2`
   # constraint. Same version the branch alias resolves to, so nothing new to
