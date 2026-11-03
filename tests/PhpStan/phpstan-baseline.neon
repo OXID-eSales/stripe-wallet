@@ -91,12 +91,6 @@ parameters:
 			path: ../../src/Stripe/Adapter/StripeAdapter.php
 
 		-
-			message: '#^Method OxidEsales\\Payments\\Stripe\\Adapter\\StripeWebhookEvent\:\:getPaymentId\(\) should return string\|null but returns mixed\.$#'
-			identifier: return.type
-			count: 1
-			path: ../../src/Stripe/Adapter/StripeWebhookEvent.php
-
-		-
 			message: '#^Method OxidEsales\\Payments\\Stripe\\Controller\\Admin\\ModuleConfiguration\:\:stripeSecondChanceDayDiffs\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1

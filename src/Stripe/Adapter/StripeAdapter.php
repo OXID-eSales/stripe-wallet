@@ -263,26 +263,14 @@ class StripeAdapter implements StripeAdapterInterface
     // WEBHOOK PROCESSING
     // ==========================================
 
+    /**
+     * Not a Stripe webhook path: StripeWebhookProcessor verifies and parses incoming events.
+     * The method exists only because PaymentAdapterInterface declares it; failing loudly keeps
+     * a second, unverified parsing path from growing back.
+     */
     public function parseWebhook(string $payload, string $signature, string $secret): WebhookEvent
     {
-        try {
-            $event = Webhook::constructEvent($payload, $signature, $secret);
-            return new StripeWebhookEvent($event, $payload, verified: true);
-        } catch (\UnexpectedValueException $e) {
-            throw new PaymentAdapterException(
-                providerName: StripeDefinitions::PROVIDER,
-                errorCode: 'invalid_payload',
-                message: 'Invalid webhook payload',
-                previous: $e
-            );
-        } catch (\Stripe\Exception\SignatureVerificationException $e) {
-            throw new PaymentAdapterException(
-                providerName: StripeDefinitions::PROVIDER,
-                errorCode: 'invalid_signature',
-                message: 'Invalid webhook signature',
-                previous: $e
-            );
-        }
+        throw new \LogicException('Stripe webhooks are parsed by StripeWebhookProcessor, not the adapter.');
     }
 
     // ==========================================

@@ -244,4 +244,14 @@ final class StripeAdapterTest extends TestCase
 
         $this->assertInstanceOf(StripeRefundDto::class, $result);
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function parseWebhookIsNotThePathWebhooksRunThrough(): void
+    {
+        // Webhooks are verified and parsed by StripeWebhookProcessor; the adapter method only
+        // exists because payment-base's PaymentAdapterInterface declares it.
+        $this->expectException(\LogicException::class);
+
+        $this->adapter->parseWebhook('{}', 'sig', 'secret');
+    }
 }

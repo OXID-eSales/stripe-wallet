@@ -1183,15 +1183,6 @@ services:
     tags: [ { name: stripe.webhook_handler } ]
     public: false
 
-  OxidEsales\Payments\Stripe\Webhook\Handler\ChargeDisputeCreatedWebhookHandler:
-    arguments:
-      $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
-      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
-      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
-      $logger: '@oxid_esales.monolog.logger'
-    tags: [ { name: stripe.webhook_handler } ]
-    public: false
-
   OxidEsales\Payments\Stripe\Webhook\Handler\CheckoutSessionCompletedWebhookHandler:
     arguments:
       $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
