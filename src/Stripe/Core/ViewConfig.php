@@ -130,16 +130,6 @@ class ViewConfig extends ViewConfig_parent
     }
 
     /**
-     * Check if detailed logging should be enabled
-     *
-     * @return bool
-     */
-    public function isStripeDebugEnabled(): bool
-    {
-        return $this->isStripeDevelopmentMode();
-    }
-
-    /**
      * Phase 5 — frontend debug flag driven by the log-level resolver.
      *
      * Returns true only when the effective sStripeLogLevel is 'debug'.
@@ -189,7 +179,6 @@ class ViewConfig extends ViewConfig_parent
 
         return $mtime === false ? '0' : (string) $mtime;
     }
-
 
     /**
      * Check if Stripe Checkout is active and ready to present to the customer.

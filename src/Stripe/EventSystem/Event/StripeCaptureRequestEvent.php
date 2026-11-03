@@ -91,14 +91,6 @@ readonly class StripeCaptureRequestEvent implements EventInterface
     }
 
     /**
-     * Check if this is a full capture request.
-     */
-    public function isFullCapture(): bool
-    {
-        return $this->getAmount() === null;
-    }
-
-    /**
      * Get the initiator of the capture request.
      *
      * @return string One of: admin, webhook, api, cron
@@ -116,16 +108,5 @@ readonly class StripeCaptureRequestEvent implements EventInterface
     {
         $reason = $this->context->get('reason');
         return is_string($reason) ? $reason : null;
-    }
-
-    /**
-     * Get idempotency key for Stripe API call.
-     *
-     * If not provided, one will be generated from contractId.
-     */
-    public function getIdempotencyKey(): ?string
-    {
-        $key = $this->context->get('idempotencyKey');
-        return is_string($key) ? $key : null;
     }
 }

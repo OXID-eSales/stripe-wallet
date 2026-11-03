@@ -77,18 +77,4 @@ class StripeClientFactory implements StripeClientProviderInterface
             'stripe_version' => '2024-11-20.acacia',
         ]);
     }
-
-    /**
-     * Validate that the secret key format is correct.
-     *
-     * @return bool True if key format is valid
-     */
-    public function isValidSecretKey(): bool
-    {
-        if ($this->testMode) {
-            return str_starts_with($this->secretKey, 'sk_test_');
-        }
-
-        return str_starts_with($this->secretKey, 'sk_live_');
-    }
 }

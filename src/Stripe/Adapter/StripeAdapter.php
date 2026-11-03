@@ -364,16 +364,6 @@ class StripeAdapter implements StripeAdapterInterface
         }
     }
 
-    public function testConnection(): bool
-    {
-        try {
-            $this->stripeClient->balance->retrieve();
-            return true;
-        } catch (\Throwable $e) {
-            return false;
-        }
-    }
-
     // ==========================================
     // PRIVATE HELPER METHODS
     // ==========================================

@@ -258,7 +258,6 @@ final class FileLoggerFactoryGatingTest extends TestCase
             public function getPlatformKey(): string { return ''; }
             public function getModuleDescription(): string { return ''; }
             public function getCaptureMode(): string { return 'automatic'; }
-            public function is3DSecureEnabled(): bool { return false; }
             public function getMinimumOrderAmount(): float { return 0.5; }
             public function getLogLevel(): string { return 'off'; }
             public function isFrontendDebugEnabled(): bool { return false; }

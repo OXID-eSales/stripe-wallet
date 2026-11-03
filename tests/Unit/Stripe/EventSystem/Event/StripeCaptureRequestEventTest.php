@@ -69,24 +69,6 @@ class StripeCaptureRequestEventTest extends TestCase
         $this->assertNull($event->getAmount());
     }
 
-    public function testIsFullCaptureReturnsTrueWhenAmountIsNull(): void
-    {
-        $context = new EventContext([]);
-        $event = new StripeCaptureRequestEvent($context);
-
-        $this->assertTrue($event->isFullCapture());
-    }
-
-    public function testIsFullCaptureReturnsFalseWhenAmountIsSet(): void
-    {
-        $context = new EventContext([
-            'amount' => 50.00,
-        ]);
-        $event = new StripeCaptureRequestEvent($context);
-
-        $this->assertFalse($event->isFullCapture());
-    }
-
     public function testGetInitiatorReturnsValue(): void
     {
         $context = new EventContext([
@@ -113,16 +95,6 @@ class StripeCaptureRequestEventTest extends TestCase
         $event = new StripeCaptureRequestEvent($context);
 
         $this->assertEquals('Order shipped', $event->getReason());
-    }
-
-    public function testGetIdempotencyKeyReturnsValue(): void
-    {
-        $context = new EventContext([
-            'idempotencyKey' => 'key_unique_123',
-        ]);
-        $event = new StripeCaptureRequestEvent($context);
-
-        $this->assertEquals('key_unique_123', $event->getIdempotencyKey());
     }
 
     public function testGetContextReturnsContext(): void

@@ -317,14 +317,6 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     }
 
     /**
-     * Check if 3D Secure is enabled
-     */
-    public function is3DSecureEnabled(): bool
-    {
-        return (bool) $this->get('blStripe3DSecure');
-    }
-
-    /**
      * Get minimum order amount for Stripe
      * Returns 0.50 as default (Stripe minimum)
      */

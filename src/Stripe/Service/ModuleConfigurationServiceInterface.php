@@ -77,8 +77,6 @@ interface ModuleConfigurationServiceInterface
 
     public function getCaptureMode(): string;
 
-    public function is3DSecureEnabled(): bool;
-
     public function getMinimumOrderAmount(): float;
 
     /**

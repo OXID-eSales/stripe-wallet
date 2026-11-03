@@ -189,30 +189,4 @@ class StripeDefinitions
     {
         return self::STRIPE_DEFINITIONS[$paymentId]['countries'] ?? [];
     }
-
-    /**
-     * Check if payment method supports a specific currency
-     *
-     * @param string $paymentId
-     * @param string $currency
-     * @return bool
-     */
-    public static function supportsCurrency(string $paymentId, string $currency): bool
-    {
-        $currencies = self::getSupportedCurrencies($paymentId);
-        return empty($currencies) || in_array(strtoupper($currency), $currencies, true);
-    }
-
-    /**
-     * Check if payment method supports a specific country
-     *
-     * @param string $paymentId
-     * @param string $country
-     * @return bool
-     */
-    public static function supportsCountry(string $paymentId, string $country): bool
-    {
-        $countries = self::getSupportedCountries($paymentId);
-        return empty($countries) || in_array(strtoupper($country), $countries, true);
-    }
 }
