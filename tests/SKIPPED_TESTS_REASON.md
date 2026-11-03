@@ -80,7 +80,6 @@ A small number of tests in the default `Integration` suite still call
 |---|---|---|
 | `MetadataTest::testTemplatesDefined` | Module declares no `templates` section | Expected; add `templates` to metadata.php to enable |
 | `StripeAdapterIntegrationTest::*` | Stripe credentials absent (redirected to live-stripe suite) | No longer in default suite |
-| `tests/Unit/Stripe/Twig/DumpExtensionTest.php:102,119` | `services.yaml not found` | Unit-test guard; fires only if file moves |
 | `tests/Unit/Stripe/Model/OrderAddressValidationTest.php:39` | `markTestIncomplete` — requires full OXID bootstrap | Placeholder; tracked in backlog |
 | `StripeAdapterIntegrationTest::testCharge*` | `markTestIncomplete` — sandbox data unavailable | Only in live-stripe suite anyway |
 
