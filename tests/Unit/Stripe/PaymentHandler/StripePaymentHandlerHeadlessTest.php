@@ -25,6 +25,7 @@ use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\EventSystem\EventDispatcher;
 use OxidEsales\PaymentBase\EventSystem\EventListenerProvider;
+use OxidEsales\PaymentBase\Logging\ThrowableSummary;
 use OxidEsales\PaymentBase\EventSystem\Handler\EarlyOrderCreationHandler;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractServiceInterface;
@@ -469,13 +470,19 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
             return new EventDispatcher(new EventListenerProvider([]));
         }
 
-        $earlyOrderCreation = new EarlyOrderCreationHandler(
+        // The handler dispatches its follow-up event on the same dispatcher: the provider reads its
+        // handlers lazily, so the handler can be appended once the dispatcher exists.
+        $handlers = new \ArrayObject();
+        $dispatcher = new EventDispatcher(new EventListenerProvider($handlers));
+        $handlers->append(new EarlyOrderCreationHandler(
             $this->contractRepository,
             new EarlyOrderWriter($this->shopOrderService, $this->orderRewriter),
             $this->openAttempts ?? $this->registryRemembering(null),
-        );
+            $dispatcher,
+            new ThrowableSummary([]),
+        ));
 
-        return new EventDispatcher(new EventListenerProvider([$earlyOrderCreation]));
+        return $dispatcher;
     }
 
     private function registryRemembering(?string $contractId): OpenCheckoutAttemptRegistry

@@ -225,9 +225,9 @@ final class StripeAcpCheckoutServiceTest extends TestCase
             $this->contracts,
             $this->createMock(EventDispatcherInterface::class),
             $this->formatter,
-            $opening,
-            $baskets,
-            $buyers,
+            $opening ?? $this->createMock(ContractOpeningServiceInterface::class),
+            $baskets ?? $this->createMock(UserBasketFactoryInterface::class),
+            $buyers ?? $this->createMock(GuestUserResolverInterface::class),
             $this->commit
         );
     }

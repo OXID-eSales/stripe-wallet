@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed - adopts payment-base VR wave 4 (H6/DC-PB7/D3/L1)
+- **H6**: `StripePaymentOwnershipProvider` (tag `oe.payment.ownership_provider`, owns `oe_payments_stripe_wallet`) and
+  `StripeClientConfigSecretPatternProvider` (tag `payment_base.client_config_secret_pattern_provider`: `sk_`, `rk_`,
+  `whsec_`) replace the knowledge payment-base's admin API and client-config guard used to hold about Stripe.
+- **DC-PB7b**: removed `WebhookDbLogServiceFactory` (+ test) and the two `services.yaml` blocks that built payment-base's
+  `WebhookLogService` (nothing injected it). Stripe's webhook DB log is unchanged: it is the claim row written by
+  `AbstractWebhookProcessor` / `WebhookLogRepositoryInterface::claimEvent()` / `updateStatus()`; the file log stays on
+  `Stripe\Service\WebhookLogService`.
+- **D3**: `StripeAcpCheckoutService` takes its four headless collaborators as required arguments; the module's
+  `EventBroker` / `EventBrokerInterface` and `CheckoutReturnResponder` definitions are gone (payment-base defines them).
+- Tests: DC-PB7c (local `AbstractProviderRequestEvent` subclass for the unmapped event), DC-PB7d (own counting rate-limit
+  store), D3 constructor arguments.
+
 ### Changed (VR-20 R5) - the return leg runs on payment-base's guard and shared return token
 - **Return URLs carry payment-base's `ContractReturnTokenService` token** (shopper-bound, 24 h by default, secret from
   `oe_payments_secrets`), issued by `StripeCheckoutSessionHandler` (Twig) and `StripePaymentHandler` (OPC); both take

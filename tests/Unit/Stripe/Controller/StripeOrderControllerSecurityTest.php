@@ -579,7 +579,7 @@ class StripeOrderControllerSecurityTest extends TestCase
                 $writer = new class implements SessionWriterInterface {
                     public function writeSessChallenge(string $orderId): void {}
                 };
-                return new CheckoutReturnResponder($this->mockDispatcher, $writer);
+                return \OxidEsales\Payments\Stripe\Tests\Support\CheckoutReturnResponderFactory::create($this->mockDispatcher, $writer);
             }
 
             protected function getServiceFromContainer(string $serviceName): object

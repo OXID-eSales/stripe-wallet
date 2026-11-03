@@ -352,7 +352,7 @@ class StripeOrderControllerAgbConsentTest extends TestCase
                 $writer = new class implements SessionWriterInterface {
                     public function writeSessChallenge(string $orderId): void {}
                 };
-                return new CheckoutReturnResponder($dispatcher, $writer);
+                return \OxidEsales\Payments\Stripe\Tests\Support\CheckoutReturnResponderFactory::create($dispatcher, $writer);
             }
 
             protected function getServiceFromContainer(string $serviceName): object

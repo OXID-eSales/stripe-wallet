@@ -6,6 +6,7 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\Service\AddressHmacService;
 use OxidEsales\PaymentBase\Service\ContractMetadataService;
 use OxidEsales\PaymentBase\Service\ContractMetadataServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -33,7 +34,7 @@ class ContractMetadataServiceTest extends TestCase
 
     private function createService(): ContractMetadataService
     {
-        return new ContractMetadataService();
+        return new ContractMetadataService(new AddressHmacService('test-address-hmac-secret'));
     }
 
     // --- Service Interface Tests ---
@@ -87,7 +88,7 @@ class ContractMetadataServiceTest extends TestCase
         // No deladrid
 
         $metadataSet = [];
-        $contract->expects($this->once())
+        $contract->expects($this->exactly(2))
             ->method('setMetadata')
             ->willReturnCallback(function ($key, $value) use (&$metadataSet) {
                 $metadataSet[$key] = $value;
@@ -100,6 +101,8 @@ class ContractMetadataServiceTest extends TestCase
         // Assert
         $this->assertArrayHasKey('delivery_address_hash', $metadataSet);
         $this->assertEquals('only_hash_xyz', $metadataSet['delivery_address_hash']);
+        // The hash is always signed (M9): hash + hmac, no id.
+        $this->assertArrayHasKey('delivery_address_hmac', $metadataSet);
         $this->assertArrayNotHasKey('delivery_address_id', $metadataSet);
     }
 

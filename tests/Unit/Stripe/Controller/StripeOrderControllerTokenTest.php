@@ -262,10 +262,7 @@ class TestableStripeOrderControllerForToken extends StripeOrderController
             $writer = new class implements \OxidEsales\PaymentBase\Controller\SessionWriterInterface {
                 public function writeSessChallenge(string $orderId): void {}
             };
-            return new \OxidEsales\PaymentBase\Controller\CheckoutReturnResponder(
-                $this->getEventDispatcher(),
-                $writer,
-            );
+            return \OxidEsales\Payments\Stripe\Tests\Support\CheckoutReturnResponderFactory::create($this->getEventDispatcher(), $writer);
         }
         throw new \RuntimeException("Unknown service: $serviceName");
     }

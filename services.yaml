@@ -225,6 +225,18 @@ services:
     tags: [ 'payment_base.client_config_provider' ]
     public: true
 
+  # VR-24 H6: payment-base's ClientConfigGuard no longer knows provider secret shapes.
+  OxidEsales\Payments\Stripe\ClientConfig\StripeClientConfigSecretPatternProvider:
+    tags: [ 'payment_base.client_config_secret_pattern_provider' ]
+    public: true
+
+  # VR-24 H6: the payment rows payment-base's generic admin API must leave to Stripe.
+  OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripePaymentOwnershipProvider:
+    autowire: false
+    autoconfigure: false
+    tags: [ 'oe.payment.ownership_provider' ]
+    public: true
+
   # Sprint 133 (F15): logs when it skips an already-settled contract, so a
   # sweep that can never act stops being indistinguishable from a quiet one.
   # Fetched at runtime via ServiceContainer::getServiceFromContainer() from
@@ -853,17 +865,6 @@ services:
       - { name: payment.event_handler, priority: 10 }
     public: true
 
-  # Event Broker — routes abstract request events through registered translators.
-  OxidEsales\PaymentBase\EventSystem\Broker\EventBroker:
-    arguments:
-      - '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
-      - !tagged_iterator oe.payment.event_translator
-    public: true
-
-  OxidEsales\PaymentBase\EventSystem\Broker\EventBrokerInterface:
-    alias: OxidEsales\PaymentBase\EventSystem\Broker\EventBroker
-    public: true
-
   # Sprint E: OXID-backed session writer (writes `sess_challenge` so
   # OXID's thankyou controller can load the order). Aliased to the
   # framework-neutral interface consumed by CheckoutReturnResponder —
@@ -872,15 +873,6 @@ services:
     public: false
   OxidEsales\PaymentBase\Controller\SessionWriterInterface:
     alias: OxidEsales\Payments\Stripe\Controller\OxidSessionWriter
-    public: true
-
-  # Provider-neutral post-return responder. Dispatches the shared
-  # CheckoutReturnCompletedEvent + PaymentAuthorizedEvent, writes
-  # sess_challenge via SessionWriterInterface, returns the orderId.
-  OxidEsales\PaymentBase\Controller\CheckoutReturnResponder:
-    arguments:
-      - '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
-      - '@OxidEsales\PaymentBase\Controller\SessionWriterInterface'
     public: true
 
   # PaymentIntentResolver — resolves PI id from event/contract/metadata (Sprint 114.8 D4).
@@ -1310,26 +1302,6 @@ services:
     class: OxidEsales\PaymentBase\Repository\DoctrineWebhookLogRepository
     arguments:
       $connection: '@doctrine.dbal.connection'
-    public: true
-
-  # Webhook DB Log Service Factory (logging-control sprint Phase 4)
-  # Injects the isWebhookLoggingEnabled() gate into the payment-base WebhookLogService
-  # as the optional $shouldLogPayload closure, keeping payment-base provider-agnostic.
-  # The claim row (OXEVENTID dedup/idempotency) is always written; only OXPAYLOAD and
-  # the PSR-3 mirror are gated behind blStripeLogWebhooks + level >= normal.
-  OxidEsales\Payments\Stripe\Service\Factory\WebhookDbLogServiceFactory:
-    autowire: false
-    arguments:
-      $repository: '@OxidEsales\PaymentBase\Repository\WebhookLogRepositoryInterface'
-      $logger: '@Psr\Log\LoggerInterface'
-      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
-
-  # Webhook Log Service - Sprint 7 Phase 4: Proper layering for webhook log access
-  # Architecture: Controller/Service → WebhookLogService → WebhookLogRepository → Database
-  # Phase 4 (logging-control): built via factory to inject the shouldLogPayload closure.
-  OxidEsales\PaymentBase\Service\WebhookLogServiceInterface:
-    class: OxidEsales\PaymentBase\Service\WebhookLogService
-    factory: ['@OxidEsales\Payments\Stripe\Service\Factory\WebhookDbLogServiceFactory', 'create']
     public: true
 
   # Payment Order State Repository - DEPRECATED (No longer used)

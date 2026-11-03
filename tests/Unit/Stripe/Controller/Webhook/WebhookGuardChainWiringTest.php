@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller\Webhook;
 
-use OxidEsales\PaymentBase\Validation\RateLimit\InMemoryRateLimitStore;
+use OxidEsales\PaymentBase\Validation\RateLimit\RateLimitStoreInterface;
 use OxidEsales\PaymentBase\Webhook\Guard\HttpsGuard;
 use OxidEsales\PaymentBase\Webhook\Guard\IpAllowlistGuard;
 use OxidEsales\PaymentBase\Webhook\Guard\PayloadSizeGuard;
@@ -114,7 +114,7 @@ final class WebhookGuardChainWiringTest extends TestCase
     #[Test]
     public function aHundredAndFirstRequestInTheWindowIsRefused(): void
     {
-        $guard = new RateLimitGuard(new InMemoryRateLimitStore(), 'stripe', 100, 60);
+        $guard = new RateLimitGuard($this->countingStore(), 'stripe', 100, 60);
         $request = new WebhookHttpRequest('https', '203.0.113.7', 10, '{}');
 
         for ($call = 1; $call <= 100; $call++) {
@@ -124,5 +124,23 @@ final class WebhookGuardChainWiringTest extends TestCase
 
         self::assertFalse($refused->ok);
         self::assertSame(429, $refused->httpStatus);
+    }
+
+    /**
+     * A store that counts per key and never expires: the window never elapses inside one test.
+     */
+    private function countingStore(): RateLimitStoreInterface
+    {
+        return new class implements RateLimitStoreInterface {
+            /** @var array<string, int> */
+            private array $counts = [];
+
+            public function increment(string $key, int $ttlSeconds): int
+            {
+                $this->counts[$key] = ($this->counts[$key] ?? 0) + 1;
+
+                return $this->counts[$key];
+            }
+        };
     }
 }

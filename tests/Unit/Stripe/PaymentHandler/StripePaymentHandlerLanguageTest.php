@@ -163,7 +163,9 @@ final class StripePaymentHandlerLanguageTest extends TestCase
                     $config,
                     $tokenService,
                     // The order seam below is replaced: nothing is dispatched.
-                    new \OxidEsales\PaymentBase\EventSystem\EventDispatcher(),
+                    new \OxidEsales\PaymentBase\EventSystem\EventDispatcher(
+                new \OxidEsales\PaymentBase\EventSystem\EventListenerProvider([])
+            ),
                     $logger,
                     $resolver
                 );

@@ -611,10 +611,7 @@ class StripeOrderControllerTest extends TestCase
                     $writer = new class implements \OxidEsales\PaymentBase\Controller\SessionWriterInterface {
                         public function writeSessChallenge(string $orderId): void {}
                     };
-                    return new \OxidEsales\PaymentBase\Controller\CheckoutReturnResponder(
-                        $this->mockDispatcher,
-                        $writer,
-                    );
+                    return \OxidEsales\Payments\Stripe\Tests\Support\CheckoutReturnResponderFactory::create($this->mockDispatcher, $writer);
                 }
                 throw new \RuntimeException("Unknown service: $serviceName");
             }
