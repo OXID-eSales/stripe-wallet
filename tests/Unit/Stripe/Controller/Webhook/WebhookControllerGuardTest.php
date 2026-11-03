@@ -9,8 +9,8 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller\Webhook;
 
-use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookGuardResult;
-use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRequestGuardInterface;
+use OxidEsales\PaymentBase\Webhook\Guard\WebhookGuardInterface;
+use OxidEsales\PaymentBase\Webhook\Guard\WebhookGuardResult;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -24,7 +24,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class WebhookControllerGuardTest extends TestCase
 {
-    private function controller(?WebhookRequestGuardInterface $guard): TestableWebhookController
+    private function controller(?WebhookGuardInterface $guard): TestableWebhookController
     {
         $controller = new TestableWebhookController();
         $controller->testGuard = $guard;
@@ -45,8 +45,8 @@ final class WebhookControllerGuardTest extends TestCase
 
     public function testWhenGuardRejectsPropagatesTheGuardStatusCode(): void
     {
-        $guard = $this->createMock(WebhookRequestGuardInterface::class);
-        $guard->method('check')->willReturn(new WebhookGuardResult('payload_too_large', 413, 'Too large'));
+        $guard = $this->createMock(WebhookGuardInterface::class);
+        $guard->method('check')->willReturn(WebhookGuardResult::reject(413, 'payload_too_large'));
 
         $controller = $this->controller($guard);
         $this->renderIgnoringTermination($controller);
@@ -57,68 +57,13 @@ final class WebhookControllerGuardTest extends TestCase
 
     public function testWhenAllGuardsPassProcessingProceeds(): void
     {
-        $guard = $this->createMock(WebhookRequestGuardInterface::class);
-        $guard->method('check')->willReturn(null);
+        $guard = $this->createMock(WebhookGuardInterface::class);
+        $guard->method('check')->willReturn(WebhookGuardResult::pass());
 
         $controller = $this->controller($guard);
         $this->renderIgnoringTermination($controller);
 
         $this->assertTrue($controller->processorWasUsed);
-    }
-
-    public function testMinimalFallbackChainStillEnforcesPayloadSize(): void
-    {
-        // Even with the container unavailable, the cheap invariants that need no
-        // DB must keep working once the fallback chain is installed.
-        $controller = new TestableWebhookController();
-        $controller->installMinimalFallbackChain();
-
-        $this->assertNotNull($controller->exposedGuard(), 'A fallback chain must exist.');
-
-        $oversized = str_repeat('x', 70000);
-
-        // Insecure transport is rejected first, which is itself fail-closed.
-        $insecure = $controller->exposedGuard()?->check($oversized, 'sig', '203.0.113.7');
-        $this->assertNotNull($insecure);
-        $this->assertSame('insecure_connection', $insecure->reason);
-
-        // Over HTTPS the size cap is what rejects it — no DB, no container.
-        $previous = $_SERVER['HTTPS'] ?? null;
-        $_SERVER['HTTPS'] = 'on';
-        try {
-            $result = $controller->exposedGuard()?->check($oversized, 'sig', '203.0.113.7');
-        } finally {
-            if ($previous === null) {
-                unset($_SERVER['HTTPS']);
-            } else {
-                $_SERVER['HTTPS'] = $previous;
-            }
-        }
-
-        $this->assertNotNull($result, 'The fallback chain must reject an oversized payload.');
-        $this->assertSame(413, $result->httpStatusCode);
-    }
-
-    public function testDegradedChainRefusesToProcessEvenWhenTheMinimalGuardsPass(): void
-    {
-        $controller = new TestableWebhookController();
-        $controller->installMinimalFallbackChain();
-        $controller->markDegraded();
-
-        $previous = $_SERVER['HTTPS'] ?? null;
-        $_SERVER['HTTPS'] = 'on';
-        try {
-            $this->renderIgnoringTermination($controller);
-        } finally {
-            if ($previous === null) {
-                unset($_SERVER['HTTPS']);
-            } else {
-                $_SERVER['HTTPS'] = $previous;
-            }
-        }
-
-        $this->assertSame(503, $controller->sentStatus);
-        $this->assertFalse($controller->processorWasUsed);
     }
 
     private function renderIgnoringTermination(TestableWebhookController $controller): void

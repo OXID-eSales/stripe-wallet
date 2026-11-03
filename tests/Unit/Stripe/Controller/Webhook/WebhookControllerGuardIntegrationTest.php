@@ -9,9 +9,10 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller\Webhook;
 
+use OxidEsales\PaymentBase\Webhook\Guard\WebhookGuardInterface;
+use OxidEsales\PaymentBase\Webhook\Guard\WebhookGuardResult;
+use OxidEsales\PaymentBase\Webhook\Guard\WebhookHttpRequest;
 use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookController;
-use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookGuardResult;
-use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRequestGuardInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -33,8 +34,8 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function controllerRejectsWhenGuardChainRejects(): void
     {
-        $rejection = new WebhookGuardResult('rate_limited', 429, 'Too many requests');
-        $guard = $this->createMock(WebhookRequestGuardInterface::class);
+        $rejection = WebhookGuardResult::reject(429, 'rate_limited');
+        $guard = $this->createMock(WebhookGuardInterface::class);
         $guard->method('check')->willReturn($rejection);
 
         $controller = new TestableWebhookControllerForGuard();
@@ -46,15 +47,15 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
             $this->fail('Expected render() to terminate via sendErrorResponse()');
         } catch (WebhookTestResponseSent $response) {
             $this->assertSame(429, $response->statusCode);
-            $this->assertStringContainsString('Too many requests', $response->body);
+            $this->assertStringContainsString('rate_limited', $response->body);
         }
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
     public function controllerProceedsWhenGuardChainAllows(): void
     {
-        $guard = $this->createMock(WebhookRequestGuardInterface::class);
-        $guard->method('check')->willReturn(null);
+        $guard = $this->createMock(WebhookGuardInterface::class);
+        $guard->method('check')->willReturn(WebhookGuardResult::pass());
 
         $controller = new TestableWebhookControllerForGuard();
         $controller->setTestGuard($guard);
@@ -71,13 +72,16 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function controllerCallsGuardWithCorrectArguments(): void
+    public function controllerHandsTheGuardTheRequestItReceived(): void
     {
-        $guard = $this->createMock(WebhookRequestGuardInterface::class);
+        $guard = $this->createMock(WebhookGuardInterface::class);
         $guard->expects($this->once())
             ->method('check')
-            ->with('{"test":true}', 'sig_test', '1.2.3.4')
-            ->willReturn(null);
+            ->with($this->callback(
+                static fn (WebhookHttpRequest $request): bool => $request->rawBody === '{"test":true}'
+                    && $request->clientIp === '1.2.3.4'
+            ))
+            ->willReturn(WebhookGuardResult::pass());
 
         $controller = new TestableWebhookControllerForGuard();
         $controller->setTestGuard($guard);
@@ -116,8 +120,8 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function guardRejectionPreventsFurtherProcessing(): void
     {
-        $rejection = new WebhookGuardResult('payload_too_large', 413, 'Payload too large');
-        $guard = $this->createMock(WebhookRequestGuardInterface::class);
+        $rejection = WebhookGuardResult::reject(413, 'payload_too_large');
+        $guard = $this->createMock(WebhookGuardInterface::class);
         $guard->method('check')->willReturn($rejection);
 
         $controller = new TestableWebhookControllerForGuard();
@@ -129,7 +133,7 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
             $this->fail('Expected render() to terminate via sendErrorResponse()');
         } catch (WebhookTestResponseSent $response) {
             $this->assertSame(413, $response->statusCode);
-            $this->assertStringContainsString('Payload too large', $response->body);
+            $this->assertStringContainsString('payload_too_large', $response->body);
         }
 
         // Guard rejection threw before reaching processor
@@ -173,8 +177,8 @@ final class WebhookControllerGuardIntegrationTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function payloadTooLargeIsRejectedByGuardBeforeSignatureValidation(): void
     {
-        $rejection = new WebhookGuardResult('payload_too_large', 413, 'Payload too large');
-        $guard = $this->createMock(WebhookRequestGuardInterface::class);
+        $rejection = WebhookGuardResult::reject(413, 'payload_too_large');
+        $guard = $this->createMock(WebhookGuardInterface::class);
         $guard->method('check')->willReturn($rejection);
 
         $controller = new TestableWebhookControllerForGuard();
@@ -224,13 +228,13 @@ class WebhookTestResponseSent extends \RuntimeException
  */
 class TestableWebhookControllerForGuard extends WebhookController
 {
-    private ?WebhookRequestGuardInterface $testGuard = null;
+    private ?WebhookGuardInterface $testGuard = null;
     private string $testPayload = '';
     private string $testSignature = '';
     private string $testRemoteIp = 'unknown';
     private bool $processorCalled = false;
 
-    public function setTestGuard(WebhookRequestGuardInterface $guard): void
+    public function setTestGuard(WebhookGuardInterface $guard): void
     {
         $this->testGuard = $guard;
     }
@@ -255,7 +259,7 @@ class TestableWebhookControllerForGuard extends WebhookController
         // webhookLogger stays null → optional-chaining calls are no-ops.
     }
 
-    protected function getGuard(): ?WebhookRequestGuardInterface
+    protected function getGuard(): ?WebhookGuardInterface
     {
         return $this->testGuard;
     }

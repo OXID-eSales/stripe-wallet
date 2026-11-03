@@ -11,8 +11,8 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller\Webhook;
 
 use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookController;
-use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookGuardChain;
-use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRequestGuardInterface;
+use OxidEsales\PaymentBase\Webhook\Guard\WebhookGuardChain;
+use OxidEsales\PaymentBase\Webhook\Guard\WebhookGuardInterface;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -88,7 +88,7 @@ class TestableWebhookControllerForOrdering extends WebhookController
 
     public function __construct(
         StripeWebhookProcessor $processor,
-        private readonly WebhookRequestGuardInterface $testGuard
+        private readonly WebhookGuardInterface $testGuard
     ) {
         $this->processor = $processor;
     }
@@ -97,7 +97,7 @@ class TestableWebhookControllerForOrdering extends WebhookController
     {
     }
 
-    protected function getGuard(): ?WebhookRequestGuardInterface
+    protected function getGuard(): ?WebhookGuardInterface
     {
         return $this->testGuard;
     }

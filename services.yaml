@@ -1657,40 +1657,47 @@ services:
   # Sprint 64d: Webhook Guard Chain (security hardening)
   # ==========================================
 
-  # Payload size guard (64KB max — Stripe events are typically 2-5KB)
-  OxidEsales\Payments\Stripe\Controller\Webhook\WebhookPayloadSizeGuard:
+  # VR-19 W4: payment-base's shared guards, cheapest check first: payload size -> HTTPS ->
+  # IP allow-list -> rate limit. The caller the last two see is the address payment-base's
+  # TrustedProxyClientIp resolves behind the shop's reverse proxies (settings "Webhooks").
+
+  # 64KB max — Stripe events are typically 2-5KB
+  stripe.webhook.guard.payload_size:
+    class: OxidEsales\PaymentBase\Webhook\Guard\PayloadSizeGuard
     arguments:
       $maxBytes: 65536
+    public: false
 
-  # Rate limiter: 100 requests per 60 seconds per IP
-  stripe.webhook.rate_limiter:
-    class: OxidEsales\PaymentBase\Mcp\Http\ApcuRateLimiter
-    arguments: [100, 60, 'stripe_webhook_rate:']
+  stripe.webhook.guard.https:
+    class: OxidEsales\PaymentBase\Webhook\Guard\HttpsGuard
+    public: false
 
-  OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRateLimitGuard:
-    arguments:
-      $rateLimiter: '@stripe.webhook.rate_limiter'
-
-  # IP allowlist: disabled by default (empty list = all IPs allowed)
-  OxidEsales\Payments\Stripe\Controller\Webhook\WebhookIpAllowlistGuard:
+  # Disabled by default (empty list = all IPs allowed; Stripe's signature authenticates)
+  stripe.webhook.guard.ip_allowlist:
+    class: OxidEsales\PaymentBase\Webhook\Guard\IpAllowlistGuard
     arguments:
       $allowedCidrs: []
-      $allowLoopback: true
+    public: false
 
-  # Sprint 67b (M6): HTTPS enforcement guard
-  OxidEsales\Payments\Stripe\Controller\Webhook\WebhookHttpsGuard:
+  # 100 requests per 60 seconds per caller, counted in payment-base's shared RateLimitStore
+  stripe.webhook.guard.rate_limit:
+    class: OxidEsales\PaymentBase\Webhook\Guard\RateLimitGuard
     arguments:
-      $allowInsecureLoopback: true
+      $store: '@OxidEsales\PaymentBase\Validation\RateLimit\RateLimitStoreInterface'
+      $provider: 'stripe'
+      $limitPerWindow: 100
+      $windowSeconds: 60
+    public: false
 
-  # Guard chain: ordered cheapest → most expensive
-  OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRequestGuardInterface:
-    class: OxidEsales\Payments\Stripe\Controller\Webhook\WebhookGuardChain
+  stripe.webhook.guard_chain:
+    class: OxidEsales\PaymentBase\Webhook\Guard\WebhookGuardChain
+    arguments:
+      $guards:
+        - '@stripe.webhook.guard.payload_size'
+        - '@stripe.webhook.guard.https'
+        - '@stripe.webhook.guard.ip_allowlist'
+        - '@stripe.webhook.guard.rate_limit'
     public: true
-    arguments:
-      - - '@OxidEsales\Payments\Stripe\Controller\Webhook\WebhookHttpsGuard'
-        - '@OxidEsales\Payments\Stripe\Controller\Webhook\WebhookPayloadSizeGuard'
-        - '@OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRateLimitGuard'
-        - '@OxidEsales\Payments\Stripe\Controller\Webhook\WebhookIpAllowlistGuard'
 
   # ---- Sprint 119 Phase B: user-data character-level validation (STRP-129) ----
 
