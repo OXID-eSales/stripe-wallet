@@ -17,6 +17,8 @@ use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Repository\DoctrineContractRepository;
+use OxidEsales\PaymentBase\Logging\ThrowableSummary;
+use Psr\Log\NullLogger;
 
 /**
  * Tests that OXORDER fields are correctly populated during checkout.
@@ -51,7 +53,7 @@ final class OxorderFieldPersistenceTest extends IntegrationTestCase
         $connectionProvider = $container->get(ConnectionProviderInterface::class);
         $this->connection = $connectionProvider->get();
 
-        $this->contractRepository = new DoctrineContractRepository($this->connection);
+        $this->contractRepository = new DoctrineContractRepository($this->connection, new NullLogger(), new ThrowableSummary([]));
     }
 
     public function tearDown(): void

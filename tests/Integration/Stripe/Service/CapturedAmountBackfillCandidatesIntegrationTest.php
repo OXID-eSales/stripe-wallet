@@ -23,6 +23,7 @@ use OxidEsales\PaymentBase\Payment\ProviderCaptureLedgerInterface;
 use OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\NullLogger;
+use OxidEsales\PaymentBase\Logging\ThrowableSummary;
 
 /**
  * Sprint 137 · Story 2: the candidate query runs against the real
@@ -48,7 +49,7 @@ final class CapturedAmountBackfillCandidatesIntegrationTest extends IntegrationT
         /** @var ConnectionProviderInterface $connectionProvider */
         $connectionProvider = $container->get(ConnectionProviderInterface::class);
         $this->connection = $connectionProvider->get();
-        $this->contractRepository = new DoctrineContractRepository($this->connection);
+        $this->contractRepository = new DoctrineContractRepository($this->connection, new NullLogger(), new ThrowableSummary([]));
     }
 
     public function tearDown(): void

@@ -41,6 +41,7 @@ use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Log\NullLogger;
+use OxidEsales\PaymentBase\Logging\ThrowableSummary;
 
 /**
  * VR-21 F5 on the shop database, with payment-base's real ledger: the admin refund and Stripe's `charge.refunded`
@@ -70,7 +71,7 @@ final class RefundFlowIntegrationTest extends IntegrationTestCase
         /** @var ConnectionProviderInterface $connectionProvider */
         $connectionProvider = $container->get(ConnectionProviderInterface::class);
         $this->connection = $connectionProvider->get();
-        $this->contracts = new DoctrineContractRepository($this->connection);
+        $this->contracts = new DoctrineContractRepository($this->connection, new NullLogger(), new ThrowableSummary([]));
         $transactions = new DoctrineTransactionRepository($this->connection);
         $ledger = new ProviderRefundLedger(
             $this->connection,

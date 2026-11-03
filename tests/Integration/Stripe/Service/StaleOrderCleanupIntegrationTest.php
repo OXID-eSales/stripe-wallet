@@ -19,6 +19,8 @@ use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Repository\DoctrineContractRepository;
 use OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
+use OxidEsales\PaymentBase\Logging\ThrowableSummary;
+use Psr\Log\NullLogger;
 
 /**
  * Integration tests for stale NOT_FINISHED order cleanup via RetryCleanupService.
@@ -51,7 +53,7 @@ final class StaleOrderCleanupIntegrationTest extends IntegrationTestCase
         $connectionProvider = $container->get(ConnectionProviderInterface::class);
         $this->connection = $connectionProvider->get();
 
-        $this->contractRepository = new DoctrineContractRepository($this->connection);
+        $this->contractRepository = new DoctrineContractRepository($this->connection, new NullLogger(), new ThrowableSummary([]));
 
         $orderService = new OxidShopOrderService();
         // OPC-175: the settler is required. These contracts have no Stripe session.
