@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+- **The legacy Payment Element path is removed (VR-20 R2, S-1).** `StripeOrderController::executeStripePayment` and
+  `::stripeReturn` took the PaymentIntent id from the request (`payment_intent`, `payment_intent_id`) and authorized the
+  session's contract with it; nothing tied that PaymentIntent to the contract, so one paid PaymentIntent could mark
+  other orders paid. No frontend called these routes any more. Removed with them: `StripePaymentExecuteEvent`,
+  `StripePaymentReturnEvent`, `StripePaymentStatusHandler`, `StripePaymentReturnHandler`,
+  `ControllerRequestHelper::getPaymentIntentIdFromRequest()`, `::getRedirectStatusFromRequest()`,
+  `::getSessionPaymentIntentId()` and `StripeOrderController::processContextResults()`. A Stripe payment commits only
+  through the Checkout Session return (`checkoutSuccess`, contract token + owner) and the webhook.
+  `LegacyPaymentElementPathIsGoneTest` keeps the entry points from coming back.
+
 ### Fixed
 - **A refund is booked once (CFG-1 S8).** An admin refund and Stripe's `charge.refunded` webhook for the same refund both
   booked it: the contract's refunded amount doubled and a second, reference-less refund row appeared. The webhook now

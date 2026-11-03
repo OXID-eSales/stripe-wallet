@@ -9,7 +9,6 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller;
 
-use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use OxidEsales\PaymentBase\EventSystem\Event\EventInterface;
 use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
 use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
@@ -245,11 +244,6 @@ class TestableStripeOrderControllerForToken extends StripeOrderController
             );
         }
         throw new \RuntimeException("Unknown service: $serviceName");
-    }
-
-    protected function processContextResults(EventContext $context): void
-    {
-        // No-op in tests
     }
 
     public function addTplParam($name, $value): void

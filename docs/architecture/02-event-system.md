@@ -69,8 +69,6 @@ EventInterface
 EventInterface
 ├── StripeCheckoutSessionRequestEvent
 ├── StripeCheckoutReturnEvent
-├── StripePaymentExecuteEvent
-├── StripePaymentReturnEvent
 ├── StripeCaptureRequestEvent
 ├── StripeCancelAuthorizationRequestEvent
 ├── StripeRefundRequestEvent
@@ -178,8 +176,6 @@ Stripe\EventSystem\Handler\StripeCheckoutSessionHandler:
 | StripeCheckoutSessionHandler | StripeCheckoutSessionRequestEvent | 0 | Creates Checkout Session |
 | StripeCheckoutReturnHandler | StripeCheckoutReturnEvent | 100 | Validates return from Checkout |
 | StripeOrderCreationHandler | ContractReadyToCommitEvent | 80 | Creates OXID order |
-| StripePaymentStatusHandler | StripePaymentExecuteEvent | - | Verifies Payment Element status |
-| StripePaymentReturnHandler | StripePaymentReturnEvent | - | Handles Payment Element return |
 | StripeCaptureRequestHandler | StripeCaptureRequestEvent | - | Manual capture from admin |
 | StripeCancelAuthorizationRequestHandler | StripeCancelAuthorizationRequestEvent | - | Cancel authorization |
 | StripeRefundRequestHandler | StripeRefundRequestEvent | - | Process refunds |

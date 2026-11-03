@@ -20,8 +20,6 @@ use OxidEsales\Payments\Stripe\Service\Return\CheckoutReturnRejection;
 use OxidEsales\Payments\Stripe\Service\Return\StripeReturnResolver;
 use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
-use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
-use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\PaymentBase\Validation\Message\MessageFormatterInterface;
 use OxidEsales\Payments\Stripe\Service\BasketBuyabilityValidator;
@@ -107,56 +105,6 @@ class StripeOrderController extends StripeOrderController_parent
 
         // Sprint 88: a fresh sess_challenge for the next attempt.
         $helper->setSessionVariable('sess_challenge', $this->generateNewSessChallenge());
-    }
-
-    /**
-     * Execute Stripe payment via Payment Element flow.
-     *
-     * Called when customer submits payment form with Payment Element.
-     */
-    public function executeStripePayment(): string
-    {
-        $helper = $this->getRequestHelper();
-
-        if (!$helper->validateSessionChallenge()) {
-            $helper->addErrorToDisplay('Session expired. Please reload the page.');
-            return 'payment';
-        }
-
-        // 1. Validate
-        $basket = $helper->getBasketFromSession();
-        if ($basket->getProductsCount() === 0) {
-            $helper->addErrorToDisplay('Basket is empty');
-            return 'basket';
-        }
-
-        $paymentIntentId = $helper->getPaymentIntentIdFromRequest()
-            ?? $helper->getSessionPaymentIntentId();
-
-        if ($paymentIntentId === null) {
-            $helper->addErrorToDisplay('Payment information missing');
-            return 'payment';
-        }
-
-        // 2. Create context - ONLY DATA, NO LOGIC
-        $context = new EventContext([
-            'basket' => $basket,
-            'user' => $basket->getBasketUser(),
-            'userId' => $basket->getBasketUser()->getId(),
-            'sessionId' => $helper->getSessionId(),
-            'paymentId' => $basket->getPaymentId(),
-            'paymentIntentId' => $paymentIntentId,
-            'contractId' => $helper->getContractIdFromSession(),
-        ]);
-
-        // 3. Dispatch event - HANDLERS DO THE WORK
-        $event = new StripePaymentExecuteEvent($context);
-        $this->getEventDispatcher()->dispatch($event);
-
-        // 4. Process results from context
-        $this->processContextResults($context);
-
-        return $context->get('redirectTarget') ?? 'order';
     }
 
     /**
@@ -460,41 +408,6 @@ class StripeOrderController extends StripeOrderController_parent
     }
 
     /**
-     * Handle return from Stripe after Payment Element confirmation.
-     *
-     * Called when customer is redirected back after Stripe.confirmPayment().
-     */
-    public function stripeReturn(): string
-    {
-        $helper = $this->getRequestHelper();
-
-        // 1. Get payment intent from URL or session
-        $paymentIntentId = $helper->getPaymentIntentIdFromRequest()
-            ?? $helper->getSessionPaymentIntentId();
-
-        if ($paymentIntentId === null) {
-            $helper->addErrorToDisplay('Payment information missing');
-            return 'payment';
-        }
-
-        // 2. Create context - ONLY DATA
-        $context = new EventContext([
-            'paymentIntentId' => $paymentIntentId,
-            'redirectStatus' => $helper->getRedirectStatusFromRequest(),
-            'contractId' => $helper->getContractIdFromSession(),
-        ]);
-
-        // 3. Dispatch event - HANDLERS DO THE WORK
-        $event = new StripePaymentReturnEvent($context);
-        $this->getEventDispatcher()->dispatch($event);
-
-        // 4. Process results
-        $this->processContextResults($context);
-
-        return $context->get('redirectTarget') ?? 'payment';
-    }
-
-    /**
      * Handle cancel/back-navigation from Stripe Checkout.
      *
      * When user cancels on Stripe hosted page, Stripe redirects here.
@@ -527,33 +440,6 @@ class StripeOrderController extends StripeOrderController_parent
     // ==========================================
     // CONTROLLER-SPECIFIC METHODS
     // ==========================================
-
-    /**
-     * Process results from event context.
-     * Handles template params and errors.
-     */
-    protected function processContextResults(EventContext $context): void
-    {
-        $helper = $this->getRequestHelper();
-
-        // Handle 3DS requirement
-        if ($context->get('requires3DS')) {
-            $this->addTplParam('stripe3DSRequired', true);
-            $this->addTplParam('stripeClientSecret', $context->get('clientSecret'));
-            $this->addTplParam('paymentIntentId', $context->get('paymentIntentId'));
-        }
-
-        // Handle errors
-        $error = $context->get('error');
-        if (is_string($error) && $error !== '') {
-            $helper->addErrorToDisplay($error);
-        }
-
-        // Handle order success
-        if ($context->get('orderId') !== null) {
-            $helper->setSessionVariable('sess_challenge', $context->get('orderId'));
-        }
-    }
 
     /**
      * Get the current user from the basket session.

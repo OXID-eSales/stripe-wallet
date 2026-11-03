@@ -178,8 +178,6 @@ The complete handler chain as registered in `services.yaml`:
 | `StripeContractCreationHandler` | `StripeCheckoutSessionRequestEvent` | 100 | Creates contract, stores metadata, dispatches `ContractDraftCompletedEvent` |
 | `StripeCheckoutSessionHandler` | `StripeCheckoutSessionRequestEvent` | 0 | Creates Stripe Checkout Session using contract data |
 | `StripeCheckoutReturnHandler` | `StripeCheckoutReturnEvent` | 100 | Processes return from Stripe, dispatches `PaymentAuthorizedEvent` |
-| `StripePaymentReturnHandler` | `StripePaymentReturnEvent` | 0 | Handles direct payment return flow |
-| `StripePaymentStatusHandler` | `StripePaymentExecuteEvent` | 0 | Checks payment status after execution |
 | `StripeOrderCreationHandler` | `ContractReadyToCommitEvent` | 80 | Finalizes order, transitions contract to COMMITTED |
 | `StripeCaptureRequestHandler` | `StripeCaptureRequestEvent` | 0 | Captures authorized payment |
 | `StripeCancelAuthorizationRequestHandler` | `StripeCancelAuthorizationRequestEvent` | 0 | Cancels payment authorization |

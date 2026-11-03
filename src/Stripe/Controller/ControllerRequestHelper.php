@@ -38,13 +38,6 @@ class ControllerRequestHelper
     // REQUEST ACCESSORS
     // ==========================================
 
-    public function getPaymentIntentIdFromRequest(): ?string
-    {
-        $value = Registry::getRequest()->getRequestParameter('payment_intent_id')
-            ?? Registry::getRequest()->getRequestParameter('payment_intent');
-        return is_string($value) ? $value : null;
-    }
-
     public function getCheckoutSessionIdFromRequest(): ?string
     {
         $value = Registry::getRequest()->getRequestParameter('session_id');
@@ -63,21 +56,9 @@ class ControllerRequestHelper
         return is_string($value) ? $value : null;
     }
 
-    public function getRedirectStatusFromRequest(): ?string
-    {
-        $value = Registry::getRequest()->getRequestParameter('redirect_status');
-        return is_string($value) ? $value : null;
-    }
-
     // ==========================================
     // SESSION ACCESSORS
     // ==========================================
-
-    public function getSessionPaymentIntentId(): ?string
-    {
-        $value = Registry::getSession()->getVariable('stripe_payment_intent_id');
-        return is_string($value) ? $value : null;
-    }
 
     public function getContractIdFromSession(): ?string
     {

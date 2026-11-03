@@ -8,20 +8,17 @@ use OxidEsales\Eshop\Application\Model\Basket;
 use OxidEsales\Eshop\Application\Model\User;
 use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Controller\StripeOrderController;
-use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentExecuteEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use OxidEsales\PaymentBase\EventSystem\Event\Payment\PaymentAuthorizedEvent;
 use OxidEsales\PaymentBase\EventSystem\Event\Return\CheckoutReturnCompletedEvent;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Return\ReturnResolution;
 use OxidEsales\Payments\Stripe\Service\Return\StripeReturnResolver;
-use OxidEsales\Payments\Stripe\EventSystem\Event\StripePaymentReturnEvent;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\UserFieldReaderInterface;
 use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
-use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -31,216 +28,12 @@ use PHPUnit\Framework\TestCase;
  * and processes results from the context. No business logic in the controller.
  *
  * Sprint 71: Updated to use StubControllerRequestHelper after accessor extraction.
- * Sprint 74: Moved from Integration/ to Unit/. Added coverage for processContextResults,
- *            security validation, error paths, and edge cases.
+ * Sprint 74: Moved from Integration/ to Unit/. Added coverage for security validation, error paths
+ *            and edge cases.
+ * VR-20 R2: the Payment Element routes (executeStripePayment, stripeReturn) and their tests are gone.
  */
 class StripeOrderControllerTest extends TestCase
 {
-    // ==========================================
-    // executeStripePayment — happy path
-    // ==========================================
-
-    public function testExecuteDispatchesStripePaymentExecuteEvent(): void
-    {
-        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-
-        $eventDispatcher
-            ->expects($this->once())
-            ->method('dispatch')
-            ->with($this->isInstanceOf(StripePaymentExecuteEvent::class))
-            ->willReturnCallback(function ($event) {
-                $event->getContext()->set('redirectTarget', 'thankyou');
-                return $event;
-            });
-
-        [$controller] = $this->createControllerWithMocks($eventDispatcher, [
-            'paymentIntentId' => 'pi_test_123',
-            'basketNotEmpty' => true,
-        ]);
-
-        $result = $controller->executeStripePayment();
-
-        $this->assertEquals('thankyou', $result);
-    }
-
-    public function testExecuteReturnsRedirectFromContext(): void
-    {
-        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-
-        $eventDispatcher
-            ->method('dispatch')
-            ->willReturnCallback(function ($event) {
-                $event->getContext()->set('redirectTarget', 'payment');
-                $event->getContext()->set('error', 'Payment failed');
-                return $event;
-            });
-
-        [$controller, $helper] = $this->createControllerWithMocks($eventDispatcher, [
-            'paymentIntentId' => 'pi_test_failed',
-            'basketNotEmpty' => true,
-        ]);
-
-        $result = $controller->executeStripePayment();
-
-        $this->assertEquals('payment', $result);
-        $this->assertEquals('Payment failed', $helper->lastError);
-    }
-
-    public function testContextContainsBasketData(): void
-    {
-        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-
-        $capturedContext = null;
-        $eventDispatcher
-            ->method('dispatch')
-            ->willReturnCallback(function ($event) use (&$capturedContext) {
-                $capturedContext = $event->getContext();
-                $capturedContext->set('redirectTarget', 'thankyou');
-                return $event;
-            });
-
-        [$controller] = $this->createControllerWithMocks($eventDispatcher, [
-            'paymentIntentId' => 'pi_test_123',
-            'basketNotEmpty' => true,
-            'userId' => 'user_abc',
-            'paymentId' => 'osc_stripe_card',
-        ]);
-
-        $controller->executeStripePayment();
-
-        $this->assertNotNull($capturedContext);
-        $this->assertEquals('pi_test_123', $capturedContext->get('paymentIntentId'));
-        $this->assertEquals('user_abc', $capturedContext->get('userId'));
-        $this->assertEquals('osc_stripe_card', $capturedContext->get('paymentId'));
-    }
-
-    // ==========================================
-    // executeStripePayment — validation edge cases (F9)
-    // ==========================================
-
-    public function testExecuteReturnsPaymentOnExpiredSession(): void
-    {
-        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $eventDispatcher->expects($this->never())->method('dispatch');
-
-        [$controller, $helper] = $this->createControllerWithMocks($eventDispatcher, [
-            'paymentIntentId' => 'pi_test_123',
-            'basketNotEmpty' => true,
-            'sessionChallengeResult' => false,
-        ]);
-
-        $result = $controller->executeStripePayment();
-
-        $this->assertEquals('payment', $result);
-        $this->assertStringContainsString('Session expired', $helper->lastError ?? '');
-    }
-
-    public function testControllerReturnsPaymentOnMissingPaymentIntentId(): void
-    {
-        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $eventDispatcher->expects($this->never())->method('dispatch');
-
-        [$controller] = $this->createControllerWithMocks($eventDispatcher, [
-            'paymentIntentId' => null,
-            'basketNotEmpty' => true,
-        ]);
-
-        $result = $controller->executeStripePayment();
-
-        $this->assertEquals('payment', $result);
-    }
-
-    public function testControllerReturnsBasketOnEmptyBasket(): void
-    {
-        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $eventDispatcher->expects($this->never())->method('dispatch');
-
-        [$controller] = $this->createControllerWithMocks($eventDispatcher, [
-            'paymentIntentId' => 'pi_test_123',
-            'basketNotEmpty' => false,
-        ]);
-
-        $result = $controller->executeStripePayment();
-
-        $this->assertEquals('basket', $result);
-    }
-
-    // ==========================================
-    // processContextResults — 3DS, error display, orderId (F2, F3)
-    // ==========================================
-
-    public function testExecuteSets3DSTemplateParams(): void
-    {
-        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-
-        $eventDispatcher
-            ->method('dispatch')
-            ->willReturnCallback(function ($event) {
-                $ctx = $event->getContext();
-                $ctx->set('requires3DS', true);
-                $ctx->set('clientSecret', 'secret_123');
-                $ctx->set('paymentIntentId', 'pi_3ds');
-                $ctx->set('redirectTarget', 'order');
-                return $event;
-            });
-
-        [$controller] = $this->createControllerWithMocks($eventDispatcher, [
-            'paymentIntentId' => 'pi_3ds',
-            'basketNotEmpty' => true,
-        ]);
-
-        $controller->executeStripePayment();
-
-        $tplParams = $controller->getTestTplParams();
-        $this->assertTrue($tplParams['stripe3DSRequired']);
-        $this->assertEquals('secret_123', $tplParams['stripeClientSecret']);
-        $this->assertEquals('pi_3ds', $tplParams['paymentIntentId']);
-    }
-
-    public function testExecuteDisplaysErrorFromContext(): void
-    {
-        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-
-        $eventDispatcher
-            ->method('dispatch')
-            ->willReturnCallback(function ($event) {
-                $event->getContext()->set('error', 'Card declined');
-                $event->getContext()->set('redirectTarget', 'payment');
-                return $event;
-            });
-
-        [$controller, $helper] = $this->createControllerWithMocks($eventDispatcher, [
-            'paymentIntentId' => 'pi_declined',
-            'basketNotEmpty' => true,
-        ]);
-
-        $controller->executeStripePayment();
-
-        $this->assertEquals('Card declined', $helper->lastError);
-    }
-
-    public function testExecuteSetsOrderIdInSession(): void
-    {
-        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-
-        $eventDispatcher
-            ->method('dispatch')
-            ->willReturnCallback(function ($event) {
-                $event->getContext()->set('orderId', 'order_abc');
-                $event->getContext()->set('redirectTarget', 'thankyou');
-                return $event;
-            });
-
-        [$controller, $helper] = $this->createControllerWithMocks($eventDispatcher, [
-            'paymentIntentId' => 'pi_test_123',
-            'basketNotEmpty' => true,
-        ]);
-
-        $controller->executeStripePayment();
-
-        $this->assertEquals('order_abc', $helper->sessionVars['sess_challenge']);
-    }
-
     // ==========================================
     // createCheckoutSession — happy path
     // ==========================================
@@ -607,75 +400,6 @@ class StripeOrderControllerTest extends TestCase
     }
 
     // ==========================================
-    // stripeReturn — happy path + data verification (F10)
-    // ==========================================
-
-    public function testStripeReturnDispatchesEvent(): void
-    {
-        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-
-        $eventDispatcher
-            ->expects($this->once())
-            ->method('dispatch')
-            ->with($this->isInstanceOf(StripePaymentReturnEvent::class))
-            ->willReturnCallback(function ($event) {
-                $event->getContext()->set('redirectTarget', 'thankyou');
-                return $event;
-            });
-
-        [$controller] = $this->createControllerWithMocks($eventDispatcher, [
-            'paymentIntentId' => 'pi_test_return',
-            'redirectStatus' => 'succeeded',
-        ]);
-
-        $result = $controller->stripeReturn();
-
-        $this->assertEquals('thankyou', $result);
-    }
-
-    public function testStripeReturnContextContainsData(): void
-    {
-        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-
-        $capturedContext = null;
-        $eventDispatcher
-            ->method('dispatch')
-            ->willReturnCallback(function ($event) use (&$capturedContext) {
-                $capturedContext = $event->getContext();
-                $capturedContext->set('redirectTarget', 'thankyou');
-                return $event;
-            });
-
-        [$controller] = $this->createControllerWithMocks($eventDispatcher, [
-            'paymentIntentId' => 'pi_test_return',
-            'redirectStatus' => 'succeeded',
-            'contractIdFromSession' => 'contract_123',
-        ]);
-
-        $controller->stripeReturn();
-
-        $this->assertNotNull($capturedContext);
-        $this->assertEquals('pi_test_return', $capturedContext->get('paymentIntentId'));
-        $this->assertEquals('succeeded', $capturedContext->get('redirectStatus'));
-        $this->assertEquals('contract_123', $capturedContext->get('contractId'));
-    }
-
-    public function testStripeReturnReturnsPaymentOnMissingPaymentIntentId(): void
-    {
-        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $eventDispatcher->expects($this->never())->method('dispatch');
-
-        [$controller] = $this->createControllerWithMocks($eventDispatcher, [
-            'paymentIntentId' => null,
-            'sessionPaymentIntentId' => null,
-        ]);
-
-        $result = $controller->stripeReturn();
-
-        $this->assertEquals('payment', $result);
-    }
-
-    // ==========================================
     // Helper infrastructure
     // ==========================================
 
@@ -692,10 +416,7 @@ class StripeOrderControllerTest extends TestCase
         $basket = $this->createBasketMock($options);
 
         $helper = new StubControllerRequestHelper();
-        $helper->paymentIntentIdFromRequest = $options['paymentIntentId'] ?? null;
-        $helper->sessionPaymentIntentId = $options['sessionPaymentIntentId'] ?? null;
         $helper->checkoutSessionId = $options['sessionId'] ?? null;
-        $helper->redirectStatus = $options['redirectStatus'] ?? null;
         $helper->contractIdFromRequest = $options['contractIdFromRequest'] ?? $options['contractId'] ?? null;
         $helper->contractTokenFromRequest = $options['contractToken'] ?? null;
         $helper->contractIdFromSession = $options['contractIdFromSession'] ?? $options['contractId'] ?? null;

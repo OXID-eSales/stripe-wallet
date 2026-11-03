@@ -115,19 +115,7 @@ parameters:
 			path: ../../src/Stripe/Controller/StripeOrderController.php
 
 		-
-			message: '#^Method OxidEsales\\Payments\\Stripe\\Controller\\StripeOrderController\:\:executeStripePayment\(\) should return string but returns mixed\.$#'
-			identifier: return.type
-			count: 1
-			path: ../../src/Stripe/Controller/StripeOrderController.php
-
-		-
 			message: '#^Method OxidEsales\\Payments\\Stripe\\Controller\\StripeOrderController\:\:getServiceFromContainer\(\) should return T of object but returns mixed\.$#'
-			identifier: return.type
-			count: 1
-			path: ../../src/Stripe/Controller/StripeOrderController.php
-
-		-
-			message: '#^Method OxidEsales\\Payments\\Stripe\\Controller\\StripeOrderController\:\:stripeReturn\(\) should return string but returns mixed\.$#'
 			identifier: return.type
 			count: 1
 			path: ../../src/Stripe/Controller/StripeOrderController.php
