@@ -13,6 +13,7 @@ use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\Payment\ProviderCaptureLedgerInterface;
 use OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
@@ -21,6 +22,7 @@ use OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder;
 use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
 use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 /**
  * Sprint 112 / G1: cancelled & failed contract transitions must mirror onto
@@ -196,11 +198,7 @@ class WebhookContractFulfillmentHandlerCancelOrderTest extends TestCase
             $this->orderUpdater,
             $this->transactionRepository,
             $this->shopAdapter,
-            new ContractCaptureRecorder(
-                $this->contractRepository,
-                $this->transactionRepository,
-                $this->shopAdapter
-            ),
+            new ContractCaptureRecorder($this->createMock(ProviderCaptureLedgerInterface::class), new NullLogger()),
             $this->createMock(ProviderRefundLedgerInterface::class)
         );
     }

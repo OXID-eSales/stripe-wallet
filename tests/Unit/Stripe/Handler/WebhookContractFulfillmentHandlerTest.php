@@ -10,6 +10,7 @@ use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\ContractState;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Payment\ProviderCaptureLedgerInterface;
 use OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface;
 use OxidEsales\PaymentBase\Refund\RefundBooking;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
@@ -20,6 +21,7 @@ use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
 use OxidEsales\Payments\Stripe\Webhook\ChargeRefund;
 use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 /**
  * TDD Tests for WebhookContractFulfillmentHandler
@@ -63,11 +65,7 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             $this->orderUpdater,
             $this->transactionRepository,
             $this->shopAdapter,
-            new ContractCaptureRecorder(
-                $this->contractRepository,
-                $this->transactionRepository,
-                $this->shopAdapter
-            ),
+            new ContractCaptureRecorder($this->createMock(ProviderCaptureLedgerInterface::class), new NullLogger()),
             $this->refundLedger
         );
     }

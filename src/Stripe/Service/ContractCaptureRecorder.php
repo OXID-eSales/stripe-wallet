@@ -9,102 +9,54 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
-use OxidEsales\PaymentBase\Contract\Transaction;
-use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
-use OxidEsales\Payments\Stripe\Core\ShopId;
-use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\PaymentBase\Payment\ProviderCaptureLedgerInterface;
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 
 /**
- * Records what Stripe captured for a contract: the captured amount on the
- * contract and, at most, one `capture` audit row.
+ * Books what Stripe captured for a contract when a webhook (or the backfill command) reports it, through
+ * payment-base's ProviderCaptureLedger.
  *
- * Captures confirmed by webhook (or found later by the backfill command) never
- * pass through CaptureService, so nothing else sets the amount. A contract that
- * already carries an amount was recorded by someone else (an admin capture
- * writes its own row) and is left alone. A `capture` row that already exists is
- * never duplicated.
+ * The capture id is the PaymentIntent id: Stripe makes at most one capture per PaymentIntent (a partial capture
+ * releases the rest), and the id is in every event that reports a payment, which a charge id is not (the Checkout
+ * Session event carries none). The admin's capture is booked under the same id by payment-base's runner, so
+ * whichever path reports first books it and the other is a duplicate.
  *
- * Sprint 137 · Story 2: extracted from WebhookContractFulfillmentHandler once
- * the backfill command became the second caller.
+ * A contract that already carries a captured amount was booked before: by the ledger, or by a version of this module
+ * that booked without capture ids. Its redelivered webhook must not add the amount again.
+ *
+ * Sprint 137 · Story 2: extracted from WebhookContractFulfillmentHandler once the backfill command became the second
+ * caller. VR-22 A5: books through the ledger instead of writing its own rows.
  */
 final class ContractCaptureRecorder
 {
-    private LoggerInterface $logger;
+    private const SOURCE = 'webhook';
 
     public function __construct(
-        private readonly ContractRepositoryInterface $contractRepository,
-        private readonly TransactionRepositoryInterface $transactionRepository,
-        private readonly ShopAdapterInterface $shopAdapter,
-        ?LoggerInterface $logger = null
+        private readonly ProviderCaptureLedgerInterface $captureLedger,
+        private readonly LoggerInterface $logger
     ) {
-        $this->logger = $logger ?? new NullLogger();
     }
 
     /**
      * @param float|null $amountReceived What Stripe collected, in currency units; null when unknown
      */
-    public function record(PaymentContractInterface $contract, ?float $amountReceived): void
+    public function record(PaymentContractInterface $contract, ?float $amountReceived, string $paymentIntentId): void
     {
         if ($contract->getCapturedAmount() !== null) {
             return;
         }
 
         if ($amountReceived === null || $amountReceived <= 0.0) {
-            // Sprint 133 · Story 9 (F9): never write a fictitious 0.00 capture
-            // row; a missing row plus a loud log line is the honest outcome.
-            $this->logger->error('Capture audit row skipped: contract has no captured amount', [
+            // Sprint 133 · Story 9 (F9): never book a fictitious 0.00 capture; a loud log line is the honest outcome.
+            $this->logger->error('Capture not booked: Stripe reported no amount collected', [
                 'contract_id' => $contract->getId(),
-                'provider_order_id' => $contract->getProviderOrderId(),
+                'payment_intent_id' => $paymentIntentId,
             ]);
+
             return;
         }
 
-        $contract->setCapturedAmount($amountReceived);
-        $this->contractRepository->save($contract);
-
-        if ($this->hasCaptureRow($contract)) {
-            return;
-        }
-
-        $this->writeCaptureRow($contract, $amountReceived);
-    }
-
-    private function hasCaptureRow(PaymentContractInterface $contract): bool
-    {
-        $contractId = $contract->getId();
-        if ($contractId === null) {
-            return false;
-        }
-
-        foreach ($this->transactionRepository->findByContractId($contractId) as $transaction) {
-            if ($transaction->getType() === StripeDefinitions::TRANSACTION_TYPE_CAPTURE) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function writeCaptureRow(PaymentContractInterface $contract, float $amount): void
-    {
-        $transaction = new Transaction(
-            id: StripeDefinitions::TRANSACTION_TYPE_CAPTURE . '_' . bin2hex(random_bytes(16)),
-            shopId: ShopId::of($this->shopAdapter->getShopId(), 'capture audit row'),
-            orderId: $contract->getOrderId() ?? '',
-            contractId: $contract->getId(),
-            provider: StripeDefinitions::PROVIDER,
-            type: StripeDefinitions::TRANSACTION_TYPE_CAPTURE,
-            status: StripeDefinitions::TRANSACTION_STATUS_COMPLETED,
-            amount: $amount,
-            currency: $contract->getCurrency()
-        );
-        $transaction->setProviderOrderId($contract->getProviderOrderId());
-
-        $this->transactionRepository->save($transaction);
+        $this->captureLedger->book((string) $contract->getId(), $paymentIntentId, $amountReceived, $contract->getCurrency(), self::SOURCE);
     }
 }

@@ -14,6 +14,8 @@ use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Contract\Transaction;
+use OxidEsales\PaymentBase\Payment\CaptureBooking;
+use OxidEsales\PaymentBase\Payment\ProviderCaptureLedgerInterface;
 use OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface;
 use OxidEsales\PaymentBase\Refund\RefundBooking;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
@@ -26,6 +28,7 @@ use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler
 use OxidEsales\Payments\Stripe\Core\ShopId;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * Sprint 112 / G3: every provider-driven action (capture, refund, cancel, fail)
@@ -42,10 +45,12 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
     private RecordingTransactionRepository $transactionRepository;
     private ShopAdapterInterface $shopAdapter;
     private ProviderRefundLedgerInterface&\PHPUnit\Framework\MockObject\MockObject $refundLedger;
+    private ProviderCaptureLedgerInterface&\PHPUnit\Framework\MockObject\MockObject $captureLedger;
 
     protected function setUp(): void
     {
         $this->refundLedger = $this->createMock(ProviderRefundLedgerInterface::class);
+        $this->captureLedger = $this->createMock(ProviderCaptureLedgerInterface::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->contractFulfillmentService = $this->createMock(ContractFulfillmentServiceInterface::class);
         $this->orderUpdater = $this->createMock(ContractLinkedOrderUpdaterInterface::class);
@@ -119,10 +124,8 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
      * produced for every capture whose amount was not recorded. It now asserts
      * the recorded amount too.
      */
-    public function testHandlePaymentSucceededWritesCaptureAuditRowOnSuccessfulFulfillment(): void
+    public function testHandlePaymentSucceededBooksTheCaptureOnTheLedgerOnSuccessfulFulfillment(): void
     {
-        // setCapturedAmount is state-guarded (rejects draft/not_finished), so
-        // use a contract that has actually been through checkout.
         $contract = $this->fulfilledContractWithOrderId('order-cap');
         $this->contractFulfillmentService
             ->method('fulfillByProviderOrderId')
@@ -130,15 +133,15 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
         $this->contractRepository
             ->method('findByProviderOrderId')
             ->willReturn($contract);
+        $this->captureLedger->expects($this->once())->method('book')
+            ->with($contract->getId(), 'pi_capture', 42.50, 'EUR', 'webhook')
+            ->willReturn(CaptureBooking::booked(42.50));
 
         $handler = $this->makeHandler();
         $result = $handler->handlePaymentSucceeded('pi_capture', 42.50);
 
         $this->assertTrue($result);
-        $this->assertCount(1, $this->transactionRepository->saved);
-        $tx = $this->transactionRepository->saved[0];
-        $this->assertSame('capture', $tx->getType());
-        $this->assertSame(42.50, $tx->getAmount());
+        $this->assertSame([], $this->transactionRepository->saved, 'the ledger writes the capture row, not the handler');
     }
 
     public function testHandlePaymentSucceededDoesNotWriteAZeroAuditRowWhenTheAmountIsUnknown(): void
@@ -153,6 +156,8 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
             ->method('findByProviderOrderId')
             ->willReturn($contract);
 
+        $this->captureLedger->expects($this->never())->method('book');
+
         $handler = $this->makeHandler();
         $result = $handler->handlePaymentSucceeded('pi_noamount');
 
@@ -165,40 +170,12 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
         $this->contractFulfillmentService
             ->method('fulfillByProviderOrderId')
             ->willReturn(false);
+        $this->captureLedger->expects($this->never())->method('book');
 
         $handler = $this->makeHandler();
         $result = $handler->handlePaymentSucceeded('pi_already_fulfilled');
 
         $this->assertFalse($result);
-        $this->assertSame([], $this->transactionRepository->saved);
-    }
-
-    public function testHandlePaymentSucceeded_WithAmountReceived_SetsCapturedAmountAndWritesOneCaptureRow(): void
-    {
-        $contract = $this->fulfilledContractWithOrderId('order-recv');
-        $this->contractFulfillmentService->method('fulfillByProviderOrderId')->willReturn(true);
-        $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
-        $this->contractRepository->expects($this->once())->method('save')->with($contract);
-
-        $result = $this->makeHandler()->handlePaymentSucceeded('pi_recv', 19.99);
-
-        $this->assertTrue($result);
-        $this->assertSame(19.99, $contract->getCapturedAmount());
-        $this->assertCount(1, $this->transactionRepository->saved);
-        $this->assertSame('capture', $this->transactionRepository->saved[0]->getType());
-        $this->assertSame(19.99, $this->transactionRepository->saved[0]->getAmount());
-    }
-
-    public function testHandlePaymentSucceeded_WhenCaptureRowAlreadyExists_SetsCapturedAmountWithoutSecondRow(): void
-    {
-        $contract = $this->fulfilledContractWithOrderId('order-manual');
-        $this->transactionRepository->existing[] = $this->transactionOfType($contract, 'capture');
-        $this->contractFulfillmentService->method('fulfillByProviderOrderId')->willReturn(true);
-        $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
-
-        $this->makeHandler()->handlePaymentSucceeded('pi_manual', 30.00);
-
-        $this->assertSame(30.00, $contract->getCapturedAmount());
         $this->assertSame([], $this->transactionRepository->saved);
     }
 
@@ -208,7 +185,7 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
         $contract->setCapturedAmount(42.50);
         $this->contractFulfillmentService->method('fulfillByProviderOrderId')->willReturn(true);
         $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
-        $this->contractRepository->expects($this->never())->method('save');
+        $this->captureLedger->expects($this->never())->method('book');
 
         $this->makeHandler()->handlePaymentSucceeded('pi_has_amount', 99.00);
 
@@ -231,10 +208,10 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
         $contract = $this->fulfilledContractWithOrderId('order-zero');
         $this->contractFulfillmentService->method('fulfillByProviderOrderId')->willReturn(true);
         $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
-        $this->contractRepository->expects($this->never())->method('save');
+        $this->captureLedger->expects($this->never())->method('book');
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects($this->once())->method('error')
-            ->with($this->stringContains('Capture audit row skipped'));
+            ->with($this->stringContains('Capture not booked'));
 
         $result = $this->makeHandler($logger)->handlePaymentSucceeded('pi_zero', $amount);
 
@@ -246,7 +223,7 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
     public function testHandlePaymentSucceeded_WhenFulfillmentReturnsFalse_ChangesNothing(): void
     {
         $this->contractFulfillmentService->method('fulfillByProviderOrderId')->willReturn(false);
-        $this->contractRepository->expects($this->never())->method('save');
+        $this->captureLedger->expects($this->never())->method('book');
 
         $result = $this->makeHandler()->handlePaymentSucceeded('pi_replay', 19.99);
 
@@ -262,12 +239,7 @@ class WebhookContractFulfillmentHandlerAuditTest extends TestCase
             $this->orderUpdater,
             $this->transactionRepository,
             $this->shopAdapter,
-            new ContractCaptureRecorder(
-                $this->contractRepository,
-                $this->transactionRepository,
-                $this->shopAdapter,
-                $logger
-            ),
+            new ContractCaptureRecorder($this->captureLedger, $logger ?? new NullLogger()),
             $this->refundLedger
         );
     }

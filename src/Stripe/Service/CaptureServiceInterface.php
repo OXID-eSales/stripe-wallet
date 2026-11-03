@@ -10,9 +10,8 @@ use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 /**
  * Service interface for capturing Stripe payments.
  *
- * Sprint 9: Two methods for different capture scenarios:
- * - processCapture(): Contract-based capture with state transition
- * - processDirectCapture(): Direct capture without contract (admin panel)
+ * - processCapture(): the broker's capture of a contract: Stripe, the booking, the state transition
+ * - captureAtStripe(): only the Stripe call (the admin's capture; payment-base's runner books it)
  *
  * @since 2.0.0
  */
@@ -38,19 +37,17 @@ interface CaptureServiceInterface
     ): CaptureResponse;
 
     /**
-     * Process a direct capture without contract (admin panel).
+     * Ask Stripe to capture a PaymentIntent. Nothing is booked and no contract state moves.
      *
-     * Used when capturing from admin panel where no contract exists.
-     * Does NOT handle contract state - only Stripe API call.
-     *
-     * @param string $paymentIntentId Stripe PaymentIntent ID
      * @param float|null $amount Amount in currency units (null for full capture)
+     * @param string $currency The contract's currency (minor-unit conversion)
      * @param array<string, mixed> $metadata Metadata to attach
-     * @return CaptureResponse Response object (never throws)
+     * @return CaptureResponse Response object (never throws); a failure carries Stripe's error code
      */
-    public function processDirectCapture(
+    public function captureAtStripe(
         string $paymentIntentId,
         ?float $amount,
+        string $currency,
         array $metadata
     ): CaptureResponse;
 }

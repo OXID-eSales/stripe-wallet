@@ -9,6 +9,7 @@ use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Contract\Transaction;
+use OxidEsales\PaymentBase\Payment\ProviderCaptureLedgerInterface;
 use OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
@@ -18,6 +19,7 @@ use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
 use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 /**
  * Sprint 114.1: WebhookContractFulfillmentHandler audit rows must use the
@@ -66,7 +68,7 @@ class WebhookContractFulfillmentHandlerShopIdTest extends TestCase
             $this->orderUpdater,
             $recordingRepo,
             $shopAdapter,
-            new ContractCaptureRecorder($this->contractRepository, $recordingRepo, $shopAdapter),
+            new ContractCaptureRecorder($this->createMock(ProviderCaptureLedgerInterface::class), new NullLogger()),
             $this->createMock(ProviderRefundLedgerInterface::class)
         );
         $handler->handlePaymentFailed('pi_fail_shop7', 'card_declined');

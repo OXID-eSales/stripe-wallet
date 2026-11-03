@@ -281,7 +281,7 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
 
     public function testEventPaymentIntentIdWinsOverContractWhenBothPresent(): void
     {
-        // Admin Stripe-tab path: OrderActionDispatcher sets paymentIntentId
+        // An explicit paymentIntentId in the event
         // explicitly. Even if a contractId is also present, the explicit
         // value wins — handler does not need to consult the repository.
         $context = new EventContext([

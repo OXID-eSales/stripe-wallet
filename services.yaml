@@ -1018,8 +1018,8 @@ services:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $contractFulfillmentService: '@OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface'
-      $transactionRepository: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
-      $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
+      # VR-22 A5: a capture is booked once through payment-base's ledger, under the PaymentIntent id
+      $captureLedger: '@OxidEsales\PaymentBase\Payment\ProviderCaptureLedgerInterface'
       $logger: '@oxid_esales.monolog.logger'
     public: false
 
@@ -1106,7 +1106,7 @@ services:
       $orderUpdater: '@OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface'
       $transactionRepository: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
       $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
-      # Sprint 137: records the captured amount + one capture audit row (shared with the backfill command).
+      # Sprint 137: books the capture through payment-base's ledger (shared with the backfill command).
       $captureRecorder: '@OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder'
       # VR-21 F5: refunds are booked once by Stripe's refund id (payment-base's ledger)
       $refundLedger: '@OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface'
@@ -1366,12 +1366,6 @@ services:
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
     public: true
 
-  OxidEsales\Payments\Stripe\Controller\Admin\OrderActionDispatcher:
-    arguments:
-      $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
-      $contractResolver: '@OxidEsales\Payments\Stripe\Service\OrderContractResolver'
-    public: true
-
   # Sprint 114.11b (S4): Extracted from OrderRefundViewDataProvider — history assembly.
   OxidEsales\Payments\Stripe\Admin\StripeTransactionHistoryBuilder:
     public: false
@@ -1400,18 +1394,23 @@ services:
   # because PayPal implements it too and a global alias would conflict.
   OxidEsales\Payments\Stripe\Admin\StripePaymentPanelProvider:
     arguments:
-      $actionDispatcher: '@OxidEsales\Payments\Stripe\Controller\Admin\OrderActionDispatcher'
       $viewDataBuilder: '@OxidEsales\Payments\Stripe\Admin\StripePanelViewDataBuilder'
       $orderLoader: '@OxidEsales\Payments\Stripe\Admin\StripePanelOrderLoader'
-      # Sprint 120 (STRP-129): capture_reason pre-dispatch gate + feedback channel
-      $userDataValidator: '@OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface'
-      $validationFeedback: '@OxidEsales\Payments\Stripe\Admin\AdminValidationFeedbackInterface'
-      # Sprint 121 (STRP-129): semantic amount gate + PSP-derived bounds
-      $amountValidator: '@OxidEsales\Payments\Stripe\Admin\AdminAmountValidator'
+      # PAY-3: the live bounds of the order's intent, read model for the admin API
       $actionBounds: '@OxidEsales\Payments\Stripe\Admin\AdminActionBoundsInterface'
     tags:
       - { name: 'oe.payment.admin_panel' }
     public: true
+
+  # VR-22 A5: Stripe's capture, refund and cancel for payment-base's MoneyOperationRunner (admin API and classic admin).
+  OxidEsales\Payments\Stripe\Admin\StripeMoneyGateway:
+    arguments:
+      $captures: '@OxidEsales\Payments\Stripe\Service\CaptureServiceInterface'
+      $refunds: '@OxidEsales\Payments\Stripe\Service\RefundServiceInterface'
+      $cancellations: '@OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface'
+    tags:
+      - { name: 'oe.payment.gateway' }
+    public: false
 
   # PAY-3: Stripe's column of payment-base's contract-state Help for the admin API (adminPaymentContractStateHelp);
   # ViewConfig builds it with `new` for the classic Help, the tag is for payment-base's registry.
@@ -1421,11 +1420,6 @@ services:
     tags:
       - { name: 'oe.payment.admin_state_help' }
 
-  # Sprint 121 (STRP-129): stateless semantic amount validator (no interface —
-  # pure deterministic function; tests use the real instance).
-  OxidEsales\Payments\Stripe\Admin\AdminAmountValidator:
-    public: false
-
   # Sprint 121 (STRP-129): narrow bounds seam over OrderRefundViewDataProvider.
   OxidEsales\Payments\Stripe\Admin\AdminActionBoundsInterface:
     class: OxidEsales\Payments\Stripe\Admin\StripeAdminActionBounds
@@ -1433,24 +1427,11 @@ services:
       $viewDataProvider: '@OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider'
     public: false
 
-  # Sprint 120 (STRP-129): session-backed feedback channel for admin
-  # Payment-tab validation failures (store on gate path, consume on render).
-  OxidEsales\Payments\Stripe\Admin\AdminValidationFeedbackInterface:
-    class: OxidEsales\Payments\Stripe\Admin\AdminValidationFeedback
-    arguments:
-      $session: '@OxidEsales\PaymentBase\Adapter\SessionAdapterInterface'
-    public: false
-
   OxidEsales\Payments\Stripe\Admin\StripePanelViewDataBuilder:
     arguments:
       $viewDataProvider: '@OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider'
       $contractResolver: '@OxidEsales\Payments\Stripe\Service\OrderContractResolver'
       $moduleConfig: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
-      # Sprint 120 (STRP-129): consume validation feedback + format messages
-      $validationFeedback: '@OxidEsales\Payments\Stripe\Admin\AdminValidationFeedbackInterface'
-      $messageFormatter: '@OxidEsales\Payments\Stripe\Service\UserDataValidationMessageFormatter'
-      # Sprint 121 (STRP-129): per-code amount messages
-      $translator: '@OxidEsales\Payments\Stripe\Service\LanguageTranslatorInterface'
     public: false
 
   OxidEsales\Payments\Stripe\Admin\StripePanelOrderLoader:
@@ -1523,12 +1504,10 @@ services:
       - { name: 'console.command', command: 'stripe:reconcile-oxpaid' }
     public: true
 
-  # Sprint 137 · Story 2: records what a fulfilled-but-unrecorded capture received.
+  # Sprint 137 · Story 2: books what a fulfilled-but-unrecorded capture received (VR-22 A5: through the capture ledger).
   OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder:
     arguments:
-      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
-      $transactionRepository: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
-      $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
+      $captureLedger: '@OxidEsales\PaymentBase\Payment\ProviderCaptureLedgerInterface'
       $logger: '@oxid_esales.monolog.logger'
     public: false
 

@@ -16,6 +16,8 @@ use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\ContractState;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\Payment\CaptureBooking;
+use OxidEsales\PaymentBase\Payment\ProviderCaptureLedgerInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
@@ -122,8 +124,7 @@ final class ManualCaptureIntegrationTest extends TestCase
             $adapterFactory,
             $this->contractRepository,
             $this->fulfillmentService,
-            $this->createMock(\OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface::class),
-            $this->shopAdapter,
+            $this->captureLedger(),
             new NullLogger()
         );
 
@@ -198,8 +199,7 @@ final class ManualCaptureIntegrationTest extends TestCase
             $adapterFactory,
             $this->contractRepository,
             $this->fulfillmentService,
-            $this->createMock(\OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface::class),
-            $this->shopAdapter,
+            $this->captureLedger(),
             new NullLogger()
         );
 
@@ -249,8 +249,7 @@ final class ManualCaptureIntegrationTest extends TestCase
             $adapterFactory,
             $this->contractRepository,
             $this->fulfillmentService,
-            $this->createMock(\OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface::class),
-            $this->shopAdapter,
+            $this->captureLedger(),
             new NullLogger()
         );
 
@@ -276,6 +275,14 @@ final class ManualCaptureIntegrationTest extends TestCase
     }
 
     // --- Helpers ---
+
+    private function captureLedger(): ProviderCaptureLedgerInterface
+    {
+        $ledger = $this->createMock(ProviderCaptureLedgerInterface::class);
+        $ledger->method('book')->willReturn(CaptureBooking::booked(0.0));
+
+        return $ledger;
+    }
 
     private function createCommittedContract(string $paymentIntentId): PaymentContract
     {

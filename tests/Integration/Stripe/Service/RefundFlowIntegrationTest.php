@@ -20,6 +20,7 @@ use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\Payment\ProviderCaptureLedgerInterface;
 use OxidEsales\PaymentBase\Refund\ProviderRefundLedger;
 use OxidEsales\PaymentBase\Refund\RefundSettledPolicy;
 use OxidEsales\PaymentBase\Service\StockRestorationServiceInterface;
@@ -107,7 +108,7 @@ final class RefundFlowIntegrationTest extends IntegrationTestCase
                 $this->createMock(ContractLinkedOrderUpdaterInterface::class),
                 $transactions,
                 $shop,
-                new ContractCaptureRecorder($this->contracts, $transactions, $shop),
+                new ContractCaptureRecorder($this->createMock(ProviderCaptureLedgerInterface::class), new NullLogger()),
                 $ledger
             ),
             $this->contracts,

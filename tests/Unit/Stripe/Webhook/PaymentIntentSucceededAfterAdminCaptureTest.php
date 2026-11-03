@@ -13,6 +13,7 @@ use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\Payment\ProviderCaptureLedgerInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
@@ -20,10 +21,11 @@ use OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder;
 use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
 use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 /**
- * CFG-1 S8, capture side of the refund double booking: an admin capture records the captured amount and its `cap_`
- * row (CaptureService); the payment_intent.succeeded that follows must not book the capture again - neither the
+ * CFG-1 S8, capture side of the refund double booking: an admin capture is booked by payment-base's runner through the
+ * capture ledger; the payment_intent.succeeded that follows must not book the capture again - neither the
  * amount nor a second capture row. Characterisation: the guard is the contract's captured amount.
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(WebhookContractFulfillmentHandler::class)]
@@ -39,6 +41,8 @@ final class PaymentIntentSucceededAfterAdminCaptureTest extends TestCase
         $contracts->expects($this->never())->method('save');
         $transactions = $this->createMock(TransactionRepositoryInterface::class);
         $transactions->expects($this->never())->method('save');
+        $captureLedger = $this->createMock(ProviderCaptureLedgerInterface::class);
+        $captureLedger->expects($this->never())->method('book');
         $fulfillment = $this->createMock(ContractFulfillmentServiceInterface::class);
         $fulfillment->method('fulfillByProviderOrderId')->willReturn(true);
         $shop = $this->createMock(ShopAdapterInterface::class);
@@ -50,7 +54,7 @@ final class PaymentIntentSucceededAfterAdminCaptureTest extends TestCase
             $this->createMock(ContractLinkedOrderUpdaterInterface::class),
             $transactions,
             $shop,
-            new ContractCaptureRecorder($contracts, $transactions, $shop),
+            new ContractCaptureRecorder($captureLedger, new NullLogger()),
             $this->createMock(\OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface::class)
         );
 

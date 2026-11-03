@@ -66,68 +66,38 @@ class StripeCaptureRequestHandlerTest extends TestCase
         $otherEvent = new \stdClass();
 
         $this->captureService->expects($this->never())->method('processCapture');
-        $this->captureService->expects($this->never())->method('processDirectCapture');
+        $this->captureService->expects($this->never())->method('captureAtStripe');
 
         $this->handler->handle($otherEvent);
     }
 
-    public function testHandleSetsErrorWhenPaymentIntentIdMissingInDirectMode(): void
+    public function testHandleSetsErrorWhenTheRequestNamesNoContract(): void
     {
-        // When no contractId is provided, handler falls back to direct capture mode
-        // which requires paymentIntentId
         $context = new EventContext([]);
         $event = new StripeCaptureRequestEvent($context);
 
         $this->handler->handle($event);
 
         $this->assertFalse($context->get('captureSuccess'));
-        $this->assertEquals('PaymentIntent ID is missing', $context->get('error'));
+        $this->assertEquals('Contract ID is missing', $context->get('error'));
     }
 
     /**
-     * Test that empty string PaymentIntent ID also triggers error.
-     * This test catches mutations that change === '' to !== ''
+     * VR-22 D-8: money is only ever captured for a contract. A caller-provided PaymentIntent id, with or without a
+     * contract, is not a way to capture an arbitrary PaymentIntent.
      */
-    public function testHandleSetsErrorWhenPaymentIntentIdIsEmptyString(): void
+    public function testACallerProvidedPaymentIntentWithoutAContractIsNeverCaptured(): void
     {
-        $context = new EventContext([
-            'paymentIntentId' => '',  // Empty string, not null
-        ]);
+        $context = new EventContext(['paymentIntentId' => 'pi_valid_123']);
         $event = new StripeCaptureRequestEvent($context);
+
+        $this->captureService->expects($this->never())->method('processCapture');
+        $this->captureService->expects($this->never())->method('captureAtStripe');
 
         $this->handler->handle($event);
 
         $this->assertFalse($context->get('captureSuccess'));
-        $this->assertEquals('PaymentIntent ID is missing', $context->get('error'));
-    }
-
-    /**
-     * Test that valid PaymentIntent ID in direct mode does NOT set error.
-     * This catches mutations that flip the validation logic.
-     */
-    public function testHandleDoesNotSetErrorWithValidPaymentIntentIdInDirectMode(): void
-    {
-        $context = new EventContext([
-            'paymentIntentId' => 'pi_valid_123',
-        ]);
-        $event = new StripeCaptureRequestEvent($context);
-
-        // Mock the capture service to return success
-        $this->captureService
-            ->method('processDirectCapture')
-            ->willReturn(CaptureResponse::success(
-                providerPaymentId: 'pi_test',
-                captureId: 'ch_capture_123',
-                amountCaptured: 100.0,
-                currency: 'EUR',
-                status: 'succeeded',
-                capturedAt: new \DateTimeImmutable()
-            ));
-
-        $this->handler->handle($event);
-
-        $this->assertTrue($context->get('captureSuccess'));
-        $this->assertNull($context->get('error'));
+        $this->assertEquals('Contract ID is missing', $context->get('error'));
     }
 
     public function testHandleSetsErrorWhenContractNotFound(): void
@@ -536,72 +506,6 @@ class StripeCaptureRequestHandlerTest extends TestCase
     }
 
     /**
-     * Test direct capture also sets capturedAt in context.
-     * This catches mutation #50 that removes context.set('capturedAt') in direct capture.
-     */
-    public function testDirectCaptureSetsCapturedAtInContext(): void
-    {
-        $context = new EventContext([
-            'paymentIntentId' => 'pi_direct_time',
-            'orderId' => 'order_123',
-            'initiator' => 'admin',
-        ]);
-        $event = new StripeCaptureRequestEvent($context);
-
-        $capturedTime = new DateTimeImmutable('2025-01-15 11:00:00');
-
-        $this->captureService
-            ->method('processDirectCapture')
-            ->willReturn(CaptureResponse::success(
-                providerPaymentId: 'pi_test',
-                captureId: 'ch_direct_time',
-                amountCaptured: 50.00,
-                currency: 'EUR',
-                status: 'succeeded',
-                capturedAt: $capturedTime
-            ));
-
-        $this->handler->handle($event);
-
-        // Verify capturedAt is set in direct capture mode too
-        $this->assertEquals('2025-01-15 11:00:00', $context->get('capturedAt'));
-    }
-
-    /**
-     * Test direct capture sets captureId in context.
-     * This catches mutation #47 that removes context.set('captureId').
-     */
-    public function testDirectCaptureSetsAllContextValues(): void
-    {
-        $context = new EventContext([
-            'paymentIntentId' => 'pi_direct_full',
-            'orderId' => 'order_456',
-            'initiator' => 'webhook',
-        ]);
-        $event = new StripeCaptureRequestEvent($context);
-
-        $this->captureService
-            ->method('processDirectCapture')
-            ->willReturn(CaptureResponse::success(
-                providerPaymentId: 'pi_test',
-                captureId: 'ch_direct_full_123',
-                amountCaptured: 199.99,
-                currency: 'USD',
-                status: 'succeeded',
-                capturedAt: new DateTimeImmutable()
-            ));
-
-        $this->handler->handle($event);
-
-        // Verify all context values are set (catches mutations #47-50)
-        $this->assertTrue($context->get('captureSuccess'));
-        $this->assertEquals('ch_direct_full_123', $context->get('captureId'));
-        $this->assertEquals(199.99, $context->get('capturedAmount'));
-        $this->assertEquals('USD', $context->get('captureCurrency'));
-        $this->assertNotNull($context->get('capturedAt'));
-    }
-
-    /**
      * Sprint 114.11b (S3): Handler delegates to CaptureService unconditionally.
      * Service owns PI ID resolution (getProviderOrderId or metadata fallback).
      */
@@ -670,44 +574,6 @@ class StripeCaptureRequestHandlerTest extends TestCase
 
         $this->assertFalse($context->get('captureSuccess'));
         $this->assertNotNull($context->get('error'));
-    }
-
-    /**
-     * Test direct capture with reason in metadata.
-     * Sprint 9: Verifies metadata is passed to CaptureService.processDirectCapture.
-     */
-    public function testDirectCapturePassesReasonInMetadata(): void
-    {
-        $context = new EventContext([
-            'paymentIntentId' => 'pi_direct_reason',
-            'orderId' => 'order_789',
-            'reason' => 'ship_order',
-            'initiator' => 'admin',
-        ]);
-        $event = new StripeCaptureRequestEvent($context);
-
-        // Verify reason is included in direct capture metadata
-        $this->captureService
-            ->expects($this->once())
-            ->method('processDirectCapture')
-            ->with(
-                'pi_direct_reason',
-                $this->anything(),
-                $this->callback(function ($metadata) {
-                    return isset($metadata['reason'])
-                        && $metadata['reason'] === 'ship_order';
-                })
-            )
-            ->willReturn(CaptureResponse::success(
-                providerPaymentId: 'pi_test',
-                captureId: 'ch_direct_reason',
-                amountCaptured: 100.00,
-                currency: 'EUR',
-                status: 'succeeded',
-                capturedAt: new DateTimeImmutable()
-            ));
-
-        $this->handler->handle($event);
     }
 
     // --- Sprint 82: Manual capture fix — capture on COMMITTED contracts ---

@@ -6,11 +6,10 @@ namespace OxidEsales\Payments\Tests\Unit\Stripe\Service;
 
 use OxidEsales\PaymentBase\Adapter\Request\CapturePaymentRequest;
 use OxidEsales\PaymentBase\Adapter\Response\CaptureResponse;
-use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
-use OxidEsales\PaymentBase\Contract\Transaction;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
+use OxidEsales\PaymentBase\Payment\CaptureBooking;
+use OxidEsales\PaymentBase\Payment\ProviderCaptureLedgerInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
@@ -33,8 +32,7 @@ class CaptureServiceTest extends TestCase
     private StripeAdapterFactoryInterface&MockObject $adapterFactory;
     private ContractRepositoryInterface&MockObject $repository;
     private ContractFulfillmentServiceInterface&MockObject $fulfillmentService;
-    private TransactionRepositoryInterface&MockObject $transactionRepository;
-    private ShopAdapterInterface&MockObject $shopAdapter;
+    private ProviderCaptureLedgerInterface&MockObject $captureLedger;
 
     protected function setUp(): void
     {
@@ -43,9 +41,8 @@ class CaptureServiceTest extends TestCase
         $this->adapterFactory->method('getStripeAdapter')->willReturn($this->adapter);
         $this->repository = $this->createMock(ContractRepositoryInterface::class);
         $this->fulfillmentService = $this->createMock(ContractFulfillmentServiceInterface::class);
-        $this->transactionRepository = $this->createMock(TransactionRepositoryInterface::class);
-        $this->shopAdapter = $this->createMock(ShopAdapterInterface::class);
-        $this->shopAdapter->method('getShopId')->willReturn('1');
+        $this->captureLedger = $this->createMock(ProviderCaptureLedgerInterface::class);
+        $this->captureLedger->method('book')->willReturn(CaptureBooking::booked(0.0));
     }
 
     private function createService(): CaptureService
@@ -54,10 +51,17 @@ class CaptureServiceTest extends TestCase
             $this->adapterFactory,
             $this->repository,
             $this->fulfillmentService,
-            $this->transactionRepository,
-            $this->shopAdapter,
+            $this->captureLedger,
             new NullLogger()
         );
+    }
+
+    /**
+     * The ledger saves the contract on its own instance; the service reads it back before it moves the state.
+     */
+    private function ledgerKeeps(PaymentContractInterface $contract): void
+    {
+        $this->repository->method('findById')->willReturn($contract);
     }
 
     public function testImplementsInterface(): void
@@ -92,11 +96,11 @@ class CaptureServiceTest extends TestCase
         }
     }
 
-    public function testNonPositiveDirectCaptureAmountIsRejected(): void
+    public function testNonPositiveCaptureAtStripeAmountIsRejected(): void
     {
         $this->adapter->expects($this->never())->method('capturePayment');
 
-        $result = $this->createService()->processDirectCapture('pi_123', -1.0, []);
+        $result = $this->createService()->captureAtStripe('pi_123', -1.0, 'EUR', []);
 
         $this->assertFalse($result->successful);
     }
@@ -119,6 +123,7 @@ class CaptureServiceTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_123');
+        $this->ledgerKeeps($contract);
         // Sprint 82: transitionContractState() now checks state before calling transition
         $contract->method('getState')->willReturn(
             \OxidEsales\PaymentBase\Contract\ContractState::authorized()
@@ -155,6 +160,7 @@ class CaptureServiceTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_123');
+        $this->ledgerKeeps($contract);
         // Sprint 82: transitionContractState() now checks state before calling transition
         $contract->method('getState')->willReturn(
             \OxidEsales\PaymentBase\Contract\ContractState::authorized()
@@ -186,6 +192,7 @@ class CaptureServiceTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_123');
+        $this->ledgerKeeps($contract);
         $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::authorized());
         // Sprint 127: over-capture guard reads getAmount()/getCapturedAmount().
         $contract->method('getAmount')->willReturn(100.0);
@@ -214,6 +221,7 @@ class CaptureServiceTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_123');
+        $this->ledgerKeeps($contract);
         $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::authorized());
 
         $service = $this->createService();
@@ -280,7 +288,7 @@ class CaptureServiceTest extends TestCase
         $this->assertFalse($result->isSuccessful());
     }
 
-    public function testProcessDirectCaptureWithoutContract(): void
+    public function testCaptureAtStripeOnlyAsksStripe(): void
     {
         $response = CaptureResponse::success(
             providerPaymentId: 'pi_123',
@@ -296,26 +304,37 @@ class CaptureServiceTest extends TestCase
             ->willReturn($response);
 
         $this->repository->expects($this->never())->method('save');
+        $this->captureLedger->expects($this->never())->method('book');
 
         $service = $this->createService();
 
-        $result = $service->processDirectCapture('pi_123', 10.00, ['order_id' => 'order_123']);
+        $result = $service->captureAtStripe('pi_123', 10.00, 'EUR', ['order_id' => 'order_123']);
 
         $this->assertTrue($result->isSuccessful());
         $this->assertSame('ch_123', $result->captureId);
     }
 
-    public function testProcessDirectCaptureReturnsFailureOnException(): void
+    public function testCaptureAtStripeReturnsFailureOnException(): void
     {
         $this->adapter->method('capturePayment')
             ->willThrowException(new \Exception('Direct capture failed'));
 
         $service = $this->createService();
 
-        $result = $service->processDirectCapture('pi_123', 10.00, []);
+        $result = $service->captureAtStripe('pi_123', 10.00, 'EUR', []);
 
         $this->assertFalse($result->isSuccessful());
         $this->assertSame('Direct capture failed', $result->errorMessage);
+    }
+
+    public function testCaptureAtStripeFailureCarriesStripesErrorCode(): void
+    {
+        $this->adapter->method('capturePayment')
+            ->willThrowException(new \OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException('declined', 'payment_intent_unexpected_state'));
+
+        $result = $this->createService()->captureAtStripe('pi_123', 10.00, 'EUR', []);
+
+        $this->assertSame('payment_intent_unexpected_state', $result->errorCode);
     }
 
     // --- Sprint 82: Manual capture fix — COMMITTED state support ---
@@ -340,6 +359,7 @@ class CaptureServiceTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_committed');
+        $this->ledgerKeeps($contract);
         $contract->method('getState')->willReturn(
             \OxidEsales\PaymentBase\Contract\ContractState::committed()
         );
@@ -364,10 +384,10 @@ class CaptureServiceTest extends TestCase
     }
 
     /**
-     * CFG-1 S8: an admin capture wrote the transaction row and moved the state but never the captured amount, so the
-     * contract (what the admin app's Payment tab sums up) said 0.00 captured for money Stripe had taken.
+     * CFG-1 S8: the contract (what the admin app's Payment tab sums up) must carry the captured amount before the
+     * fulfilment saves it. VR-22 A5: payment-base's ProviderCaptureLedger books it, under the PaymentIntent id.
      */
-    public function testProcessCaptureRecordsTheCapturedAmountOnTheContractBeforeItIsFulfilled(): void
+    public function testProcessCaptureBooksTheCaptureOnTheLedgerBeforeTheContractIsFulfilled(): void
     {
         $this->adapter->method('capturePayment')->willReturn(CaptureResponse::success(
             providerPaymentId: 'pi_committed',
@@ -378,14 +398,18 @@ class CaptureServiceTest extends TestCase
             capturedAt: new \DateTimeImmutable()
         ));
         $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getId')->willReturn('ctr-1');
         $contract->method('getProviderOrderId')->willReturn('pi_committed');
         $contract->method('getAmount')->willReturn(262.0);
         $contract->method('getCapturedAmount')->willReturn(null);
         $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::committed());
+        $this->ledgerKeeps($contract);
         $recorded = [];
-        $contract->expects($this->once())->method('setCapturedAmount')->with(131.0)
-            ->willReturnCallback(static function () use (&$recorded): void {
-                $recorded[] = 'amount';
+        $this->captureLedger->expects($this->once())->method('book')->with('ctr-1', 'pi_committed', 131.0, 'eur', 'event')
+            ->willReturnCallback(static function () use (&$recorded): CaptureBooking {
+                $recorded[] = 'booked';
+
+                return CaptureBooking::booked(131.0);
             });
         $this->fulfillmentService->expects($this->once())->method('fulfill')->with($contract)
             ->willReturnCallback(static function () use (&$recorded): bool {
@@ -396,8 +420,32 @@ class CaptureServiceTest extends TestCase
 
         $this->createService()->processCapture($contract, 131.0, []);
 
-        // the fulfilment saves the contract: the amount has to be on it by then
-        $this->assertSame(['amount', 'fulfilled'], $recorded);
+        $this->assertSame(['booked', 'fulfilled'], $recorded);
+    }
+
+    public function testTheStateMovesOnTheContractTheLedgerSaved(): void
+    {
+        $this->adapter->method('capturePayment')->willReturn(CaptureResponse::success(
+            providerPaymentId: 'pi_1',
+            captureId: 'ch_1',
+            amountCaptured: 10.0,
+            currency: 'eur',
+            status: 'succeeded',
+            capturedAt: new \DateTimeImmutable()
+        ));
+        $stale = $this->createMock(PaymentContractInterface::class);
+        $stale->method('getId')->willReturn('ctr-1');
+        $stale->method('getProviderOrderId')->willReturn('pi_1');
+        $stale->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::authorized());
+        $stale->expects($this->never())->method('captureAuthorization');
+        $fresh = $this->createMock(PaymentContractInterface::class);
+        $fresh->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::authorized());
+        $fresh->expects($this->once())->method('captureAuthorization');
+        $this->captureLedger->method('book')->willReturn(CaptureBooking::booked(10.0));
+        $this->repository->method('findById')->with('ctr-1')->willReturn($fresh);
+        $this->repository->expects($this->once())->method('save')->with($fresh);
+
+        $this->createService()->processCapture($stale, null, []);
     }
 
     /**
@@ -418,6 +466,7 @@ class CaptureServiceTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_authorized');
+        $this->ledgerKeeps($contract);
         $contract->method('getState')->willReturn(
             \OxidEsales\PaymentBase\Contract\ContractState::authorized()
         );
@@ -435,52 +484,31 @@ class CaptureServiceTest extends TestCase
         $this->assertTrue($result->isSuccessful());
     }
 
-    // --- Sprint 84: Transaction recording ---
+    // --- Sprint 84 / VR-22 A5: capture booking ---
 
-    /**
-     * Sprint 84: Successful capture records a transaction in the repository.
-     */
-    public function testProcessCaptureRecordsTransaction(): void
+    public function testProcessCaptureBooksTheCaptureUnderThePaymentIntentId(): void
     {
-        $response = CaptureResponse::success(
+        $this->adapter->method('capturePayment')->willReturn(CaptureResponse::success(
             providerPaymentId: 'pi_record',
             captureId: 'ch_record',
             amountCaptured: 99.99,
             currency: 'eur',
             status: 'succeeded',
             capturedAt: new \DateTimeImmutable()
-        );
-
-        $this->adapter->method('capturePayment')->willReturn($response);
-
+        ));
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_record');
         $contract->method('getId')->willReturn('contract_rec');
-        $contract->method('getOrderId')->willReturn('order_rec');
-        $contract->method('getState')->willReturn(
-            \OxidEsales\PaymentBase\Contract\ContractState::committed()
-        );
+        $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::committed());
+        $this->ledgerKeeps($contract);
+        $this->captureLedger->expects($this->once())->method('book')
+            ->with('contract_rec', 'pi_record', 99.99, 'eur', 'event')
+            ->willReturn(CaptureBooking::booked(99.99));
 
-        $this->transactionRepository->expects($this->once())
-            ->method('save')
-            ->with($this->callback(function (Transaction $tx) {
-                return $tx->getType() === 'capture'
-                    && $tx->getStatus() === 'completed'
-                    && $tx->getAmount() === 99.99
-                    && $tx->getCurrency() === 'eur'
-                    && $tx->getContractId() === 'contract_rec'
-                    && $tx->getOrderId() === 'order_rec'
-                    && $tx->getTransactionId() === 'ch_record';
-            }));
-
-        $service = $this->createService();
-        $service->processCapture($contract, null, []);
+        $this->createService()->processCapture($contract, null, []);
     }
 
-    /**
-     * Sprint 84: Failed capture does NOT record a transaction.
-     */
-    public function testProcessCaptureDoesNotRecordTransactionOnFailure(): void
+    public function testAFailedCaptureIsNotBooked(): void
     {
         $this->adapter->method('capturePayment')
             ->willThrowException(new \Exception('Capture failed'));
@@ -488,7 +516,7 @@ class CaptureServiceTest extends TestCase
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_fail');
 
-        $this->transactionRepository->expects($this->never())->method('save');
+        $this->captureLedger->expects($this->never())->method('book');
 
         $service = $this->createService();
         $service->processCapture($contract, 10.00, []);
@@ -517,6 +545,7 @@ class CaptureServiceTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_123');
+        $this->ledgerKeeps($contract);
         $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::authorized());
         // Sprint 127: over-capture guard reads getAmount()/getCapturedAmount().
         $contract->method('getAmount')->willReturn(100.0);
@@ -525,57 +554,6 @@ class CaptureServiceTest extends TestCase
         $service = $this->createService();
 
         $service->processCapture($contract, 10.00, $expectedMetadata);
-    }
-
-    // --- Sprint 114.1: Shop ID injection ---
-
-    /**
-     * Sprint 114.1: recordCaptureTransaction uses the injected shop id, not a hardcoded 1.
-     */
-    public function testCaptureTransactionUsesInjectedShopId(): void
-    {
-        $shopAdapterWithShopId5 = $this->createMock(ShopAdapterInterface::class);
-        $shopAdapterWithShopId5->method('getShopId')->willReturn('5');
-
-        $response = CaptureResponse::success(
-            providerPaymentId: 'pi_shop5',
-            captureId: 'ch_shop5',
-            amountCaptured: 20.00,
-            currency: 'eur',
-            status: 'succeeded',
-            capturedAt: new \DateTimeImmutable()
-        );
-
-        $this->adapter->method('capturePayment')->willReturn($response);
-
-        $contract = $this->createMock(PaymentContractInterface::class);
-        $contract->method('getProviderOrderId')->willReturn('pi_shop5');
-        $contract->method('getId')->willReturn('contract_s5');
-        $contract->method('getOrderId')->willReturn('order_s5');
-        $contract->method('getState')->willReturn(
-            \OxidEsales\PaymentBase\Contract\ContractState::committed()
-        );
-
-        $capturedTransaction = null;
-        $this->transactionRepository
-            ->expects($this->once())
-            ->method('save')
-            ->willReturnCallback(function (Transaction $tx) use (&$capturedTransaction): void {
-                $capturedTransaction = $tx;
-            });
-
-        $service = new CaptureService(
-            $this->adapterFactory,
-            $this->repository,
-            $this->fulfillmentService,
-            $this->transactionRepository,
-            $shopAdapterWithShopId5,
-            new NullLogger()
-        );
-        $service->processCapture($contract, null, []);
-
-        $this->assertNotNull($capturedTransaction);
-        $this->assertSame(5, $capturedTransaction->getShopId());
     }
 
     // --- Issue 2 (STRP-15123): Over-capture guard ---
@@ -624,6 +602,7 @@ class CaptureServiceTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_123');
+        $this->ledgerKeeps($contract);
         $contract->method('getState')->willReturn(
             \OxidEsales\PaymentBase\Contract\ContractState::authorized()
         );
@@ -657,6 +636,7 @@ class CaptureServiceTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_full');
+        $this->ledgerKeeps($contract);
         $contract->method('getState')->willReturn(
             \OxidEsales\PaymentBase\Contract\ContractState::authorized()
         );
@@ -731,6 +711,7 @@ class CaptureServiceTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_auth');
+        $this->ledgerKeeps($contract);
         $contract->method('getState')->willReturn(
             \OxidEsales\PaymentBase\Contract\ContractState::authorized()
         );
@@ -760,6 +741,7 @@ class CaptureServiceTest extends TestCase
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getProviderOrderId')->willReturn('pi_committed');
+        $this->ledgerKeeps($contract);
         $contract->method('getState')->willReturn(
             \OxidEsales\PaymentBase\Contract\ContractState::committed()
         );

@@ -108,7 +108,8 @@ class CapturedAmountBackfillService implements CapturedAmountBackfillServiceInte
 
         $this->captureRecorder->record(
             $contract,
-            AmountConverter::toMajorUnits($intent->amountReceived, $intent->currency)
+            AmountConverter::toMajorUnits($intent->amountReceived, $intent->currency),
+            $paymentIntentId
         );
 
         return null;

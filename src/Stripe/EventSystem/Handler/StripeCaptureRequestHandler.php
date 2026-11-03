@@ -85,25 +85,13 @@ class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
     {
         $contractId = $event->getContractId();
 
-        // Support two capture modes:
-        // 1. Direct capture (admin panel) - PaymentIntent ID provided directly, no contract
-        // 2. Contract-based capture (automated flows) - Contract ID provided
-
+        // VR-22 D-8: money is only captured for a contract; the PaymentIntent comes from the contract.
         if ($contractId === null) {
-            // Direct capture mode - use PaymentIntent ID directly
-            $paymentIntentId = $event->getPaymentIntentId();
-            if ($paymentIntentId === null || $paymentIntentId === '') {
-                $context->set('error', 'PaymentIntent ID is missing');
-                $context->set('captureSuccess', false);
-                return;
-            }
-
-            // Execute direct capture without contract
-            $this->executeDirectCapture($event, $paymentIntentId, $context);
+            $context->set('error', 'Contract ID is missing');
+            $context->set('captureSuccess', false);
             return;
         }
 
-        // Contract-based capture mode
         $contract = $this->contractRepository->findById($contractId);
         if ($contract === null) {
             $context->set('error', 'Contract not found: ' . $contractId);
@@ -142,29 +130,6 @@ class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
     }
 
     /**
-     * Execute direct capture via CaptureService (without contract).
-     *
-     * Sprint 9: Used for admin panel captures where we have PaymentIntent ID but no contract.
-     */
-    private function executeDirectCapture(
-        StripeCaptureRequestEvent $event,
-        string $paymentIntentId,
-        EventContext $context
-    ): void {
-        $this->logger->info('Executing Stripe direct capture (no contract)', [
-            'payment_intent_id' => $paymentIntentId,
-            'order_id' => $event->getOrderId(),
-            'amount' => $event->getAmount(),
-            'initiator' => $event->getInitiator(),
-        ]);
-
-        $metadata = $this->buildDirectCaptureMetadata($event);
-        $result = $this->captureService->processDirectCapture($paymentIntentId, $event->getAmount(), $metadata);
-
-        $this->handleCaptureResult($result, $event, $context);
-    }
-
-    /**
      * Build metadata for contract-based capture.
      *
      * @return array<string, string>
@@ -178,30 +143,6 @@ class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
         $contractId = $event->getContractId();
         if ($contractId !== null) {
             $metadata['contract_id'] = $contractId;
-        }
-
-        $reason = $event->getReason();
-        if ($reason !== null) {
-            $metadata['reason'] = $reason;
-        }
-
-        return $metadata;
-    }
-
-    /**
-     * Build metadata for direct capture (admin panel).
-     *
-     * @return array<string, string>
-     */
-    private function buildDirectCaptureMetadata(StripeCaptureRequestEvent $event): array
-    {
-        $metadata = [
-            'initiator' => $event->getInitiator(),
-        ];
-
-        $orderId = $event->getOrderId();
-        if ($orderId !== null) {
-            $metadata['order_id'] = $orderId;
         }
 
         $reason = $event->getReason();

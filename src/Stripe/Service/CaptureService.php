@@ -4,19 +4,16 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
-use OxidEsales\Payments\Stripe\Core\ShopId;
+use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Adapter\Request\CapturePaymentRequest;
 use OxidEsales\PaymentBase\Adapter\Response\CaptureResponse;
-use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
-use OxidEsales\PaymentBase\Contract\Transaction;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
+use OxidEsales\PaymentBase\Payment\ProviderCaptureLedgerInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
-use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -26,27 +23,22 @@ use Throwable;
  * Sprint 26: Changed to use factory for lazy adapter creation (module activation fix).
  * Sprint 82: Added ContractFulfillmentService for COMMITTED→FULFILLED transition.
  *
- * Handles both contract-based and direct captures:
- * - processCapture(): With contract, handles state transition
- * - processDirectCapture(): Without contract (admin panel)
- *
- * Follows existing patterns: NullLogger default, readonly properties, final class.
+ * - processCapture(): the broker's capture (a return's partial capture): asks Stripe, books the capture through
+ *   payment-base's ProviderCaptureLedger by Stripe's charge id, moves the contract's state.
+ * - captureAtStripe(): only asks Stripe. The admin's capture (VR-22 A5, {@see \OxidEsales\Payments\Stripe\Admin\StripeMoneyGateway})
+ *   is booked by payment-base's MoneyOperationRunner, and the contract's state follows Stripe's webhook.
  *
  * @since 2.0.0
  */
 class CaptureService implements CaptureServiceInterface
 {
-    private readonly LoggerInterface $logger;
-
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ContractFulfillmentServiceInterface $contractFulfillmentService,
-        private readonly TransactionRepositoryInterface $transactionRepository,
-        private readonly ShopAdapterInterface $shopAdapter,
-        ?LoggerInterface $logger = null
+        private readonly ProviderCaptureLedgerInterface $captureLedger,
+        private readonly LoggerInterface $logger
     ) {
-        $this->logger = $logger ?? new NullLogger();
     }
 
     public function processCapture(
@@ -89,12 +81,10 @@ class CaptureService implements CaptureServiceInterface
             return CaptureResponse::failure('Contract has no PaymentIntent ID');
         }
 
-        $result = $this->executeCapture($paymentIntentId, $amount, $metadata, $contract->getCurrency());
+        $result = $this->captureAtStripe($paymentIntentId, $amount, $contract->getCurrency(), $metadata);
 
         if ($result->isSuccessful()) {
-            $this->recordCaptureTransaction($contract, $result);
-            $this->recordCapturedAmount($contract, $result);
-            $this->transitionContractState($contract);
+            $this->transitionContractState($this->bookCapture($contract, $paymentIntentId, $result));
         }
 
         return $result;
@@ -119,29 +109,17 @@ class CaptureService implements CaptureServiceInterface
         return null;
     }
 
-    public function processDirectCapture(
+    public function captureAtStripe(
         string $paymentIntentId,
         ?float $amount,
+        string $currency,
         array $metadata
     ): CaptureResponse {
-        // Sprint 121 (STRP-129): same non-positive guard as processCapture.
+        // Sprint 121 (STRP-129): defense-in-depth - no caller may push a non-positive partial amount to Stripe.
         if ($amount !== null && $amount <= 0.0) {
             return CaptureResponse::failure('Capture amount must be greater than zero');
         }
 
-        // No currency available here without an extra API call — null falls back to 2-decimal behaviour.
-        return $this->executeCapture($paymentIntentId, $amount, $metadata);
-    }
-
-    /**
-     * @param array<string, mixed> $metadata
-     */
-    private function executeCapture(
-        string $paymentIntentId,
-        ?float $amount,
-        array $metadata,
-        ?string $currency = null
-    ): CaptureResponse {
         try {
             $request = new CapturePaymentRequest(
                 providerPaymentId: $paymentIntentId,
@@ -166,59 +144,35 @@ class CaptureService implements CaptureServiceInterface
                 'error' => $e->getMessage(),
             ]);
 
-            return CaptureResponse::failure($e->getMessage());
+            return CaptureResponse::failure(
+                $e->getMessage(),
+                $e instanceof PaymentAdapterException ? $e->getErrorCode() : null
+            );
         }
-    }
-
-    private function recordCaptureTransaction(
-        PaymentContractInterface $contract,
-        CaptureResponse $result
-    ): void {
-        // Sprint 133 · Story 9 (F9): `?? 0` here would have written an audit row
-        // claiming 0.00 was captured. It is unreachable by construction —
-        // CaptureResponse::success() requires a float amount and this method only
-        // runs on a successful response — so if the invariant ever breaks, say so
-        // instead of recording a fiction.
-        $capturedAmount = $result->amountCaptured;
-        if ($capturedAmount === null) {
-            $this->logger->error('Capture audit row skipped: successful capture reported no amount', [
-                'contract_id' => $contract->getId(),
-                'capture_id' => $result->captureId,
-            ]);
-
-            return;
-        }
-
-        $transaction = new Transaction(
-            id: 'cap_' . bin2hex(random_bytes(16)),
-            shopId: ShopId::of($this->shopAdapter->getShopId(), 'capture audit row'),
-            orderId: $contract->getOrderId() ?? '',
-            contractId: $contract->getId(),
-            provider: StripeDefinitions::PROVIDER,
-            type: StripeDefinitions::TRANSACTION_TYPE_CAPTURE,
-            status: StripeDefinitions::TRANSACTION_STATUS_COMPLETED,
-            amount: $capturedAmount,
-            // Sprint 133 (F7): fall back to the contract's own currency rather
-            // than a hardcoded 'EUR' — an audit row must not invent a currency.
-            currency: $result->currency ?? $contract->getCurrency()
-        );
-        $transaction->setTransactionId($result->captureId);
-        $transaction->setProviderOrderId($contract->getProviderOrderId());
-
-        $this->transactionRepository->save($transaction);
     }
 
     /**
-     * The contract carries what was captured (the admin sums it up and bounds a refund by it). Set before the state
-     * moves: both transitions below save the contract.
+     * The capture Stripe made, booked once under the PaymentIntent id (Stripe captures a PaymentIntent once; the webhook
+     * books the same id and is then a duplicate). The ledger saves the contract on its own instance, so the state moves on a fresh one: saving the
+     * caller's would write the old captured total back.
      */
-    private function recordCapturedAmount(PaymentContractInterface $contract, CaptureResponse $result): void
+    private function bookCapture(PaymentContractInterface $contract, string $paymentIntentId, CaptureResponse $result): PaymentContractInterface
     {
-        if ($result->amountCaptured === null) {
-            return;
+        $contractId = (string) $contract->getId();
+        $this->captureLedger->book(
+            $contractId,
+            $paymentIntentId,
+            (float) $result->amountCaptured,
+            (string) $result->currency,
+            'event'
+        );
+
+        $booked = $this->contractRepository->findById($contractId);
+        if ($booked === null) {
+            throw new RuntimeException('Contract ' . $contractId . ' vanished while its capture was booked.');
         }
-        $contract->setCapturedAmount(($contract->getCapturedAmount() ?? 0.0) + $result->amountCaptured);
-        $contract->setCapturedAt(new \DateTimeImmutable());
+
+        return $booked;
     }
 
     private function transitionContractState(PaymentContractInterface $contract): void

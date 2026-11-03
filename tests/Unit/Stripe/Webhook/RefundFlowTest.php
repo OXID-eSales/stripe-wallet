@@ -17,6 +17,7 @@ use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
+use OxidEsales\PaymentBase\Payment\ProviderCaptureLedgerInterface;
 use OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface;
 use OxidEsales\PaymentBase\Refund\RefundBooking;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
@@ -87,7 +88,7 @@ final class RefundFlowTest extends TestCase
             $this->createMock(ContractLinkedOrderUpdaterInterface::class),
             $transactions,
             $shop,
-            new ContractCaptureRecorder($contracts, $transactions, $shop),
+            new ContractCaptureRecorder($this->createMock(ProviderCaptureLedgerInterface::class), new NullLogger()),
             $this->ledger
         );
         $this->webhook = new ChargeRefundedWebhookHandler(

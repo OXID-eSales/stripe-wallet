@@ -9,80 +9,51 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
-use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
-use OxidEsales\PaymentBase\Contract\Transaction;
-use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
-use OxidEsales\Payments\Stripe\Core\ShopId;
+use OxidEsales\PaymentBase\Payment\CaptureBooking;
+use OxidEsales\PaymentBase\Payment\ProviderCaptureLedgerInterface;
 use OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
+/**
+ * VR-22 A5: a capture Stripe reports by webhook is booked through payment-base's ProviderCaptureLedger, keyed by the
+ * PaymentIntent id (Stripe makes at most one capture per PaymentIntent) - the same id the admin's capture is booked
+ * under, so whichever path reports first books it and the other changes nothing.
+ */
 #[\PHPUnit\Framework\Attributes\CoversClass(ContractCaptureRecorder::class)]
 final class ContractCaptureRecorderTest extends TestCase
 {
-    private ContractRepositoryInterface&MockObject $contractRepository;
-    private TransactionRepositoryInterface&MockObject $transactionRepository;
+    private ProviderCaptureLedgerInterface&MockObject $ledger;
     private LoggerInterface&MockObject $logger;
     private ContractCaptureRecorder $recorder;
 
     protected function setUp(): void
     {
-        $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
-        $this->transactionRepository = $this->createMock(TransactionRepositoryInterface::class);
+        $this->ledger = $this->createMock(ProviderCaptureLedgerInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
-        $shopAdapter = $this->createMock(ShopAdapterInterface::class);
-        $shopAdapter->method('getShopId')->willReturn('1');
-
-        $this->recorder = new ContractCaptureRecorder(
-            $this->contractRepository,
-            $this->transactionRepository,
-            $shopAdapter,
-            $this->logger
-        );
+        $this->recorder = new ContractCaptureRecorder($this->ledger, $this->logger);
     }
 
-    public function testRecord_SetsAmountAndWritesRow(): void
+    public function testRecordBooksWhatStripeCollectedUnderThePaymentIntentId(): void
     {
-        $contract = $this->fulfilledContract();
-        $this->transactionRepository->method('findByContractId')->willReturn([]);
-        $this->contractRepository->expects($this->once())->method('save')->with($contract);
-        $this->transactionRepository->expects($this->once())->method('save')
-            ->with($this->callback(static fn (Transaction $row): bool => $row->getType() === 'capture'
-                && $row->getAmount() === 19.99
-                && $row->getContractId() === 'ctr-1'));
+        $this->ledger->expects($this->once())->method('book')
+            ->with('ctr-1', 'pi_1', 19.99, 'EUR', 'webhook')
+            ->willReturn(CaptureBooking::booked(19.99));
 
-        $this->recorder->record($contract, 19.99);
-
-        $this->assertSame(19.99, $contract->getCapturedAmount());
+        $this->recorder->record($this->fulfilledContract(), 19.99, 'pi_1');
     }
 
-    public function testRecord_WhenRowExists_WritesNoSecondRow(): void
-    {
-        $contract = $this->fulfilledContract();
-        $this->transactionRepository->method('findByContractId')->willReturn([$this->captureRow()]);
-        $this->contractRepository->expects($this->once())->method('save');
-        $this->transactionRepository->expects($this->never())->method('save');
-
-        $this->recorder->record($contract, 30.00);
-
-        $this->assertSame(30.00, $contract->getCapturedAmount());
-    }
-
-    public function testRecord_WhenAmountKnown_IsNoOp(): void
+    public function testRecordLeavesAContractThatAlreadyCarriesACaptureAlone(): void
     {
         $contract = $this->fulfilledContract();
         $contract->setCapturedAmount(42.50);
-        $this->contractRepository->expects($this->never())->method('save');
-        $this->transactionRepository->expects($this->never())->method('save');
+        $this->ledger->expects($this->never())->method('book');
 
-        $this->recorder->record($contract, 99.00);
-
-        $this->assertSame(42.50, $contract->getCapturedAmount());
+        $this->recorder->record($contract, 99.00, 'pi_1');
     }
 
     /**
@@ -95,32 +66,13 @@ final class ContractCaptureRecorderTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('unusableAmounts')]
-    public function testRecord_WithZeroOrMissingAmount_LogsErrorAndChangesNothing(?float $amount): void
+    public function testRecordWithZeroOrMissingAmountLogsAnErrorAndBooksNothing(?float $amount): void
     {
-        $contract = $this->fulfilledContract();
         $this->logger->expects($this->once())->method('error')
-            ->with($this->stringContains('Capture audit row skipped'));
-        $this->contractRepository->expects($this->never())->method('save');
-        $this->transactionRepository->expects($this->never())->method('save');
+            ->with($this->stringContains('Capture not booked'));
+        $this->ledger->expects($this->never())->method('book');
 
-        $this->recorder->record($contract, $amount);
-
-        $this->assertNull($contract->getCapturedAmount());
-    }
-
-    private function captureRow(): Transaction
-    {
-        return new Transaction(
-            id: 'cap_manual',
-            shopId: ShopId::of(1, 'test'),
-            orderId: 'order-1',
-            contractId: 'ctr-1',
-            provider: 'stripe',
-            type: 'capture',
-            status: 'completed',
-            amount: 30.00,
-            currency: 'EUR'
-        );
+        $this->recorder->record($this->fulfilledContract(), $amount, 'pi_1');
     }
 
     private function fulfilledContract(): PaymentContract

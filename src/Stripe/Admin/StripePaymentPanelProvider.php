@@ -9,31 +9,23 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Admin;
 
-use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\PaymentBase\Admin\Contract\AdminActionBounds;
 use OxidEsales\PaymentBase\Admin\Contract\AdminActionBoundsProviderInterface;
-use OxidEsales\PaymentBase\Admin\Contract\AdminActionDispatcherInterface;
 use OxidEsales\PaymentBase\Admin\Contract\AdminActionOptions;
 use OxidEsales\PaymentBase\Admin\Contract\AdminActionOptionsProviderInterface;
 use OxidEsales\PaymentBase\Admin\Contract\PaymentPanelProviderInterface;
-use OxidEsales\PaymentBase\Admin\Panel\AdminActionRefusedException;
 use OxidEsales\PaymentBase\Admin\Panel\PaymentPanelContext;
 use OxidEsales\PaymentBase\Admin\Panel\PaymentPanelRenderable;
+use OxidEsales\PaymentBase\Admin\Panel\UnsupportedPaymentActionException;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
-use OxidEsales\Payments\Stripe\Service\FieldValidationFailure;
-use OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface;
-use Throwable;
 
 /**
  * Sprint I — Stripe's panel for payment-base's shared "Payment" tab.
  *
  * Thin shim: delegates view-data assembly to the existing
- * {@see \OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider}
- * (renamed target for dependency purposes only — see services.yaml for the
- * real binding) and dispatches refund / capture / cancel actions through
- * the existing {@see OrderActionDispatcher}. No new events; no new services;
- * no duplicated refund/capture logic.
+ * {@see \OxidEsales\Payments\Stripe\Controller\Admin\OrderRefundViewDataProvider}.
+ * Money actions are not the panel's: payment-base's MoneyOperationRunner runs them against {@see StripeMoneyGateway}.
  *
  * The panel body template (`@oe_payments_stripe_wallet/admin/panel/stripe_panel`)
  * is body-only — the shared wrapper in payment-base owns head / transfer
@@ -59,12 +51,8 @@ class StripePaymentPanelProvider implements
     private const PANEL_TEMPLATE = '@oe_payments_stripe_wallet/admin/panel/stripe_panel.html.twig';
 
     public function __construct(
-        private readonly AdminActionDispatcherInterface $actionDispatcher,
         private readonly StripePanelViewDataBuilder $viewDataBuilder,
         private readonly StripePanelOrderLoader $orderLoader,
-        private readonly UserDataValidatorInterface $userDataValidator,
-        private readonly AdminValidationFeedbackInterface $validationFeedback,
-        private readonly AdminAmountValidator $amountValidator,
         private readonly AdminActionBoundsInterface $actionBounds,
     ) {
     }
@@ -118,184 +106,14 @@ class StripePaymentPanelProvider implements
         );
     }
 
+    /**
+     * VR-22 A3/A5: capture, refund and cancel never reach a provider's panel - the classic admin hands them to
+     * payment-base's money runner, which ends in {@see StripeMoneyGateway}. The panel has no other action.
+     *
+     * @param array<string, mixed> $request
+     */
     public function handleAction(string $action, array $request, PaymentPanelContext $context): void
     {
-        $order = $this->orderLoader->loadById($context->orderId);
-        if ($order === null) {
-            return;
-        }
-
-        match ($action) {
-            'refund'  => $this->handleRefund($order, $request),
-            'capture' => $this->handleCapture($order, $request),
-            'cancel'  => $this->handleCancel($order, $request),
-            default   => null,
-        };
-    }
-
-    /**
-     * @param array<string, mixed> $request
-     */
-    private function handleRefund(Order $order, array $request): void
-    {
-        $description = $this->parseString($request['refund_description'] ?? null);
-
-        $failures = $this->collectTextFailures('refundDescription', $description);
-        $amountResult = $this->validateAmount($order, 'refund', $request['refund_amount'] ?? null);
-        if (!$amountResult->isOk()) {
-            $failures[] = $this->amountFailure('refundAmount', (string) $amountResult->code);
-        }
-
-        if ($failures !== []) {
-            $this->refuse($order, 'refund', $failures);
-        }
-
-        $this->actionDispatcher->refund(
-            $order,
-            $amountResult->amount,
-            $this->parseString($request['refund_reason'] ?? null),
-            ['description' => $description],
-        );
-
-        // Sprint 127 (STRP-15123): bust the per-request cache so the re-render
-        // in the same HTTP request (fnc=dispatchAction → OXID calls render())
-        // reads the post-refund charge from Stripe, not the stale pre-action data.
-        $this->viewDataBuilder->resetViewCache();
-    }
-
-    /**
-     * @param array<string, mixed> $request
-     */
-    private function handleCapture(Order $order, array $request): void
-    {
-        $reason = $this->parseString($request['capture_reason'] ?? null);
-
-        // Sprint 120/121 (STRP-129): pre-dispatch gate — on invalid input the
-        // capture event never fires (no contract transition, no Stripe call).
-        $failures = $this->collectTextFailures('captureReason', $reason);
-        $amountResult = $this->validateAmount($order, 'capture', $request['capture_amount'] ?? null);
-        if (!$amountResult->isOk()) {
-            $failures[] = $this->amountFailure('captureAmount', (string) $amountResult->code);
-        }
-
-        if ($failures !== []) {
-            $this->refuse($order, 'capture', $failures);
-        }
-
-        $this->actionDispatcher->capture(
-            $order,
-            $amountResult->amount,
-            $reason,
-            ['paymentIntentId' => $this->parseString($request['payment_intent_id'] ?? null)],
-        );
-
-        // Sprint 127 (STRP-15123): bust the per-request cache after capture so
-        // the same-request re-render reads fresh post-capture amounts.
-        $this->viewDataBuilder->resetViewCache();
-    }
-
-    /**
-     * The classic tab shows the recorded feedback; the admin API gets the first failure as a sentence. Either way
-     * nothing is dispatched.
-     *
-     * @param non-empty-array<FieldValidationFailure> $failures
-     */
-    private function refuse(Order $order, string $action, array $failures): never
-    {
-        $this->validationFeedback->store((string) $order->getId(), $action, $failures);
-
-        $first = array_values($failures)[0];
-
-        throw new AdminActionRefusedException(
-            AdminRefusalSentence::codeOf($first),
-            AdminRefusalSentence::of($first),
-            feedbackRecorded: true,
-        );
-    }
-
-    /**
-     * Character-level validation of an optional free-text field via the
-     * shared Sprint 119 chain (UserDataValidator -> ValidationBase ->
-     * validation-rules.php). Null (absent) input is valid.
-     *
-     * @return FieldValidationFailure[]
-     */
-    private function collectTextFailures(string $logicalField, ?string $value): array
-    {
-        if ($value === null) {
-            return [];
-        }
-
-        return $this->userDataValidator->validateFieldMap([$logicalField => $value], 'admin');
-    }
-
-    /**
-     * Semantic amount validation (Sprint 121, STRP-129). Absent input
-     * short-circuits to ok(null) = full action — no PSP bound lookup is
-     * wasted on it. Bound resolution failures FAIL CLOSED: a partial
-     * amount is never dispatched unchecked because the PSP was unreachable.
-     */
-    private function validateAmount(Order $order, string $action, mixed $raw): AmountValidationResult
-    {
-        if ($raw === null || $raw === '') {
-            return AmountValidationResult::ok(null);
-        }
-
-        try {
-            $bound = $action === 'capture'
-                ? $this->actionBounds->captureBound($order)
-                : $this->actionBounds->refundBound($order);
-        } catch (Throwable) {
-            return AmountValidationResult::failure(AmountValidationResult::CODE_BOUND_UNAVAILABLE);
-        }
-
-        return $this->amountValidator->validate($raw, $bound, $this->orderCurrency($order));
-    }
-
-    private function amountFailure(string $logicalField, string $code): FieldValidationFailure
-    {
-        return new FieldValidationFailure(
-            field: $logicalField,
-            addressKind: 'admin',
-            code: $code,
-            offendingChar: null,
-            oxidColumn: null,
-        );
-    }
-
-    /**
-     * Order currency for precision validation; '' (= 2-decimal default)
-     * when unavailable. Magic-wrapper read — getFieldData() warns on
-     * partially loaded models.
-     */
-    private function orderCurrency(Order $order): string
-    {
-        /** @phpstan-ignore-next-line OXID core magic property */
-        $wrapper = $order->oxorder__oxcurrency ?? null;
-        if (is_object($wrapper) && isset($wrapper->value) && is_string($wrapper->value)) {
-            return $wrapper->value;
-        }
-        return '';
-    }
-
-    /**
-     * @param array<string, mixed> $request
-     */
-    private function handleCancel(Order $order, array $request): void
-    {
-        $this->actionDispatcher->cancel(
-            $order,
-            $this->parseString($request['cancel_reason'] ?? null),
-            ['paymentIntentId' => $this->parseString($request['payment_intent_id'] ?? null)],
-        );
-
-        // Sprint 127 (STRP-15123): bust the per-request cache after cancel so
-        // the same-request re-render reads fresh post-cancellation amounts.
-        $this->viewDataBuilder->resetViewCache();
-    }
-
-    private function parseString(mixed $value): ?string
-    {
-        return is_string($value) && $value !== '' ? $value : null;
+        throw new UnsupportedPaymentActionException(sprintf('The Stripe panel has no action "%s".', $action));
     }
 }

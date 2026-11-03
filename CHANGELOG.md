@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed (VR-22 A5) - Stripe's admin capture, refund and void run on payment-base's MoneyOperationRunner
+- New `Admin\StripeMoneyGateway` (tag `oe.payment.gateway`, one class for `CaptureGatewayInterface`,
+  `RefundGatewayInterface`, `CancelGatewayInterface`). payment-base's `MoneyOperationRunner` now owns the admin API's
+  and the classic admin's capture, refund and void: rights, idempotency, per-order lock, amount policy
+  (capturable = authorized less captured, refundable = captured less refunded) and the booking. A Stripe refusal reaches
+  the admin as `AdminActionRefusedException` carrying the operation and Stripe's error code, never Stripe's text.
+- **Capture id = PaymentIntent id.** Stripe captures a PaymentIntent once (a partial capture releases the rest), so the
+  capture ledger (`ProviderCaptureLedger`) is keyed by the PaymentIntent id everywhere: the admin capture, the webhook
+  (`ContractCaptureRecorder`, also used by the backfill command, now `record($contract, $amount, $paymentIntentId)`
+  and constructed with the ledger and a logger) and the broker's capture (`CaptureService`). Whichever reports first
+  books it, the others change nothing. A contract that already carries a captured amount is left alone (its
+  redelivered webhook cannot add it again). The contract's state after an admin capture follows Stripe's
+  `payment_intent.succeeded` webhook, as before for the Twig flow.
+- `CaptureService::processDirectCapture()` (capture of a caller-given PaymentIntent without a contract, D-8) is gone;
+  `captureAtStripe()` only asks Stripe and books nothing. `StripeCaptureRequestHandler` captures only for a contract
+  (`Contract ID is missing` otherwise); a caller-provided PaymentIntent is never captured.
+  `CaptureService` takes the capture ledger instead of the transaction repository and the shop adapter.
+- Removed: `Controller\Admin\OrderActionDispatcher` (and its caller-provided PaymentIntent branch);
+  `StripePaymentPanelProvider::handleAction()` capture/refund/cancel branches (the method throws
+  `UnsupportedPaymentActionException`: the panel has no other action), its amount validation and reason checks;
+  `Admin\AdminAmountValidator`, `AmountValidationResult`, `AdminRefusalSentence`, `AdminValidationFeedback(Interface)`
+  and the panel's `validationErrors` block (refusals are payment-base's classic feedback now). The classic panel's
+  reasons and description limits stay (`actionOptions()`); `boundsFor()` stays as a read model.
+- **Merchant-visible:** the classic admin needs the payment right for capture and refund, audits them, and where the
+  shop requires a second factor (admin API MFA setting) refuses capture and refund and points at the admin API.
+  Character validation of the free-text fields is payment-base's. The broker handlers (`Stripe*RequestHandler`) stay for
+  opalreturns' refund intents.
+
 ### Changed (VR-24 H8) - ACP ownership guard
 - `StripeAcpCheckoutService` inherits payment-base's guard: get/update/cancel/complete serve only a contract this agent
   opened over ACP (`channel=acp`, `acp_agent_id`); the unit test fixtures carry both, and a test pins that another

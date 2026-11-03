@@ -14,8 +14,9 @@ use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\Payment\CaptureBooking;
+use OxidEsales\PaymentBase\Payment\ProviderCaptureLedgerInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripePaymentIntentDto;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Service\CapturedAmountBackfillService;
@@ -23,13 +24,14 @@ use OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 #[\PHPUnit\Framework\Attributes\CoversClass(CapturedAmountBackfillService::class)]
 final class CapturedAmountBackfillServiceTest extends TestCase
 {
     private Connection&MockObject $connection;
     private ContractRepositoryInterface&MockObject $contractRepository;
-    private TransactionRepositoryInterface&MockObject $transactionRepository;
+    private ProviderCaptureLedgerInterface&MockObject $captureLedger;
     private StripeAdapterInterface&MockObject $stripeAdapter;
     private StripeAdapterFactoryInterface&MockObject $adapterFactory;
     private CapturedAmountBackfillService $service;
@@ -38,8 +40,7 @@ final class CapturedAmountBackfillServiceTest extends TestCase
     {
         $this->connection = $this->createMock(Connection::class);
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
-        $this->transactionRepository = $this->createMock(TransactionRepositoryInterface::class);
-        $this->transactionRepository->method('findByContractId')->willReturn([]);
+        $this->captureLedger = $this->createMock(ProviderCaptureLedgerInterface::class);
         $this->stripeAdapter = $this->createMock(StripeAdapterInterface::class);
         $this->adapterFactory = $this->createMock(StripeAdapterFactoryInterface::class);
         $this->adapterFactory->method('getStripeAdapter')->willReturn($this->stripeAdapter);
@@ -50,7 +51,7 @@ final class CapturedAmountBackfillServiceTest extends TestCase
             $this->connection,
             $this->contractRepository,
             $this->adapterFactory,
-            new ContractCaptureRecorder($this->contractRepository, $this->transactionRepository, $shopAdapter),
+            new ContractCaptureRecorder($this->captureLedger, new NullLogger()),
             $shopAdapter
         );
     }
@@ -60,7 +61,7 @@ final class CapturedAmountBackfillServiceTest extends TestCase
         $this->candidates([['OXID' => 'ctr-1', 'OXPROVIDERORDERID' => 'pi_1']]);
         $this->stripeAdapter->expects($this->never())->method('retrievePaymentIntent');
         $this->contractRepository->expects($this->never())->method('save');
-        $this->transactionRepository->expects($this->never())->method('save');
+        $this->captureLedger->expects($this->never())->method('book');
 
         $report = $this->service->backfill(false);
 
@@ -95,11 +96,13 @@ final class CapturedAmountBackfillServiceTest extends TestCase
         $this->contractRepository->method('findById')->with('ctr-1')->willReturn($contract);
         $this->stripeAdapter->method('retrievePaymentIntent')->with('pi_1')
             ->willReturn($this->intent('pi_1', 'succeeded', 1999));
+        $this->captureLedger->expects($this->once())->method('book')
+            ->with('ctr-1', 'pi_1', 19.99, 'EUR', 'webhook')
+            ->willReturn(CaptureBooking::booked(19.99));
 
         $report = $this->service->backfill(true);
 
         $this->assertSame(1, $report->recorded);
-        $this->assertSame(19.99, $contract->getCapturedAmount());
     }
 
     public function testBackfill_WhenPaymentIntentNotSucceeded_SkipsAndReports(): void
@@ -135,11 +138,14 @@ final class CapturedAmountBackfillServiceTest extends TestCase
                 : $this->intent('pi_2', 'succeeded', 5000)
         );
 
+        $this->captureLedger->expects($this->once())->method('book')
+            ->with('ctr-2', 'pi_2', 50.0, 'EUR', 'webhook')
+            ->willReturn(CaptureBooking::booked(50.0));
+
         $report = $this->service->backfill(true);
 
         $this->assertSame(1, $report->recorded);
         $this->assertSame(['ctr-1' => 'stripe down'], $report->failed);
-        $this->assertSame(50.0, $second->getCapturedAmount());
     }
 
     public function testBackfill_WhenContractVanished_SkipsAndReports(): void

@@ -99,7 +99,7 @@ class StripeCancelAuthorizationRequestHandler extends AbstractStripeRequestHandl
     /**
      * Resolve the PaymentIntent ID for this cancel request via PaymentIntentResolver.
      *
-     * Admin Stripe-tab path sets paymentIntentId explicitly in the event (via OrderActionDispatcher).
+     * Callers may set paymentIntentId explicitly in the event.
      * Provider-agnostic paths (opalreturns) dispatch with only contractId;
      * the resolver falls back to contract providerOrderId.
      */

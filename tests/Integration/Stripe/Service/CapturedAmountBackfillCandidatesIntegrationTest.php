@@ -18,10 +18,11 @@ use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Repository\DoctrineContractRepository;
-use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\Payments\Stripe\Service\CapturedAmountBackfillService;
+use OxidEsales\PaymentBase\Payment\ProviderCaptureLedgerInterface;
 use OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
+use Psr\Log\NullLogger;
 
 /**
  * Sprint 137 · Story 2: the candidate query runs against the real
@@ -85,11 +86,7 @@ final class CapturedAmountBackfillCandidatesIntegrationTest extends IntegrationT
             $this->connection,
             $this->contractRepository,
             $this->createMock(StripeAdapterFactoryInterface::class),
-            new ContractCaptureRecorder(
-                $this->contractRepository,
-                $this->createMock(TransactionRepositoryInterface::class),
-                $shopAdapter
-            ),
+            new ContractCaptureRecorder($this->createMock(ProviderCaptureLedgerInterface::class), new NullLogger()),
             $shopAdapter
         );
     }

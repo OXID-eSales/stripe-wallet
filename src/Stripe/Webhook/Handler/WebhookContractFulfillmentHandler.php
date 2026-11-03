@@ -58,7 +58,7 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
 
         $contract = $this->findContractByProviderOrderId($providerOrderId);
         if ($contract !== null) {
-            $this->captureRecorder->record($contract, $amountReceived);
+            $this->captureRecorder->record($contract, $amountReceived, $providerOrderId);
         }
 
         return $result;
