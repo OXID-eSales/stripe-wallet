@@ -90,20 +90,18 @@ class CheckoutSessionCompletedWebhookHandler extends AbstractStripeWebhookHandle
 
         // GRAPH-QL / PS3: a paid session commits a PENDING contract right here,
         // so a headless shopper who never comes back still gets their order.
-        if (($object['payment_status'] ?? null) === 'paid') {
-            $sessionId = is_string($object['id'] ?? null) ? $object['id'] : $paymentIntentId;
-            $currency = is_string($object['currency'] ?? null) ? strtoupper($object['currency']) : '';
-            $ended = $this->commitOpenContract(
-                $contract,
-                $paymentIntentId,
-                $sessionId,
-                $amountTotal,
-                $currency,
-                ['checkoutSessionId' => $sessionId]
-            );
-            if ($ended !== null) {
-                return $ended;
-            }
+        $sessionId = is_string($object['id'] ?? null) ? $object['id'] : $paymentIntentId;
+        $currency = is_string($object['currency'] ?? null) ? strtoupper($object['currency']) : '';
+        $ended = $this->commitOpenContract(
+            $contract,
+            $paymentIntentId,
+            $sessionId,
+            $amountTotal,
+            $currency,
+            ['checkoutSessionId' => $sessionId]
+        );
+        if ($ended !== null) {
+            return $ended;
         }
 
         // Attempt fulfillment if in correct state

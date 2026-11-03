@@ -99,8 +99,7 @@ async function buildProduction() {
     ensureDirectories();
 
     const results = await Promise.all([
-        build(productionConfig.frontend, 'Frontend (Production)'),
-        build(productionConfig.admin, 'Admin (Production)')
+        build(productionConfig.frontend, 'Frontend (Production)')
     ]);
 
     if (results.every(r => r === true)) {

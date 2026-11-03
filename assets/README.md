@@ -11,7 +11,6 @@ assets/
 ├── js/
 │   ├── stripe-frontend.min.js              # Production bundle (minified)
 │   ├── stripe-frontend.js                  # Development bundle
-│   ├── stripe-admin.min.js                 # Admin bundle (minified)
 │   └── controllers/                        # Development controller files
 └── img/
     └── stripe_logo.png                     # Static images
@@ -223,14 +222,12 @@ ls -lh assets/js/
 # Should show:
 # stripe-frontend.min.js      - Minified bundle
 # stripe-frontend.min.js.map  - Source map
-# stripe-admin.min.js         - Admin bundle
 ```
 
 ### 3. Commit Built Files
 
 ```bash
 git add assets/js/stripe-frontend.min.js*
-git add assets/js/stripe-admin.min.js*
 git commit -m "Build Stripe module JavaScript"
 ```
 

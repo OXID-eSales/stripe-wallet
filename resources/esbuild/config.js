@@ -56,22 +56,6 @@ const productionConfig = {
             'process.env.NODE_ENV': '"production"'
         },
         pure: PRODUCTION_PURE_CONSOLE
-    },
-
-    // Admin bundle (if needed)
-    admin: {
-        entryPoints: [path.join(PATHS.build, 'js/app.js')],
-        bundle: true,
-        minify: true,
-        sourcemap: true,
-        outfile: path.join(PATHS.assets, 'js/stripe-admin.min.js'),
-        format: 'iife',
-        platform: 'browser',
-        target: ['es2017'],
-        define: {
-            'process.env.NODE_ENV': '"production"'
-        },
-        pure: PRODUCTION_PURE_CONSOLE
     }
 };
 

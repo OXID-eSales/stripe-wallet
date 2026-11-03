@@ -413,56 +413,6 @@ services:
       $logger: '@oxid_esales.monolog.logger'
     public: true
 
-  # ===========================================
-  # Event Handlers (Tagged for auto-registration)
-  # ===========================================
-  # Note: Handlers are commented out until their dependencies
-  # (ContractServiceInterface, ContractRepositoryInterface, etc.) are registered.
-  # They will be enabled in Sprint 2 when the orchestrator and services are ready.
-
-  # # Contract Creation Handler - Creates payment contracts on PaymentInitiatedEvent
-  # OxidEsales\PaymentBase\EventSystem\Handler\ContractCreationHandler:
-  #   tags:
-  #     - { name: payment.event_handler }
-  #   public: false
-
-  # # Contract Condition Resolver Handler - Transitions contracts to PENDING state
-  # OxidEsales\PaymentBase\EventSystem\Handler\ContractConditionResolverHandler:
-  #   tags:
-  #     - { name: payment.event_handler }
-  #   public: false
-
-  # # Contract Fulfillment Handler - Handles webhook-triggered fulfillment
-  # OxidEsales\PaymentBase\EventSystem\Handler\ContractFulfillmentHandler:
-  #   tags:
-  #     - { name: payment.event_handler }
-  #   public: false
-
-  # # Contract Cleanup Handler - Cleans up terminated contracts
-  # OxidEsales\PaymentBase\EventSystem\Handler\ContractCleanupHandler:
-  #   tags:
-  #     - { name: payment.event_handler }
-  #   public: false
-
-  # # Order Creation Handler - Creates orders from committed contracts
-  # OxidEsales\PaymentBase\EventSystem\Handler\OrderCreationHandler:
-  #   tags:
-  #     - { name: payment.event_handler }
-  #   public: false
-
-  # # Payment Authorization Handler - Handles payment authorization
-  # OxidEsales\PaymentBase\EventSystem\Handler\PaymentAuthorizationHandler:
-  #   tags:
-  #     - { name: payment.event_handler }
-  #   public: false
-
-  # ==========================================
-  # Early Order Creation Handler (Sprint STRP-74)
-  # ==========================================
-  # Handles ContractDraftCompletedEvent to create order early in the flow.
-  # New flow: DRAFT -> NOT_FINISHED (order created here) -> PENDING
-  # Priority 100: Runs early to ensure order is created before other handlers.
-
   OxidEsales\PaymentBase\EventSystem\Handler\EarlyOrderCreationHandler:
     arguments:
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
@@ -1334,11 +1284,6 @@ services:
     class: OxidEsales\PaymentBase\Service\WebhookLogService
     factory: ['@OxidEsales\Payments\Stripe\Service\Factory\WebhookDbLogServiceFactory', 'create']
     public: true
-
-  # Payment Order State Repository - DEPRECATED (No longer used)
-  # Sprint 8: PaymentOrderStateRepository DELETED
-  # Payment state now tracked via osc_payment_contract with capture/refund fields.
-  # osc_payment_order_state table has been dropped.
 
   # ==========================================
   # Twig Extensions
