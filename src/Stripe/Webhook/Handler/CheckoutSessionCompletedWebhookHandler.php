@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Webhook\Handler;
 
+use OxidEsales\PaymentBase\LateMoney\LateMoneyResolverInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
@@ -17,7 +18,6 @@ use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookOutcome;
-use OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -37,8 +37,8 @@ class CheckoutSessionCompletedWebhookHandler extends AbstractStripeWebhookHandle
         WebhookContractFulfillmentHandlerInterface $fulfillmentHandler,
         ContractRepositoryInterface $contractRepository,
         LoggerInterface $logger,
-        // OPC-175 / S2g: money on a replaced attempt goes back to the customer.
-        private readonly StripeLatePaymentRefunder $lateMoney,
+        // VR-23 T5: money on a contract that can no longer take it goes back to the customer.
+        private readonly LateMoneyResolverInterface $lateMoney,
         ?ContractCommitServiceInterface $contractCommit = null
     ) {
         parent::__construct($parser, $fulfillmentHandler, $contractRepository, $logger, $contractCommit);
@@ -63,8 +63,9 @@ class CheckoutSessionCompletedWebhookHandler extends AbstractStripeWebhookHandle
             return StripeWebhookOutcome::of(WebhookResult::skipped('No payment intent ID in checkout session'));
         }
 
-        if ($this->refundIfReplacedAttempt($event, $paymentIntentId, $this->lateMoney)) {
-            return StripeWebhookOutcome::of(WebhookResult::skipped('Payment on a replaced checkout attempt: given back'));
+        $lateOutcome = $this->resolveLateMoney($event, $paymentIntentId, $this->lateMoney);
+        if ($lateOutcome !== null) {
+            return $lateOutcome;
         }
 
         $this->logger->info('Processing checkout.session.completed', [

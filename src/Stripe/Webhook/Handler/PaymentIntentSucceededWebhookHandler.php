@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Webhook\Handler;
 
-use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\LateMoney\LateMoneyResolverInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
@@ -17,7 +17,6 @@ use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookOutcome;
-use OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -38,8 +37,8 @@ class PaymentIntentSucceededWebhookHandler extends AbstractStripeWebhookHandler
         WebhookContractFulfillmentHandlerInterface $fulfillmentHandler,
         ContractRepositoryInterface $contractRepository,
         LoggerInterface $logger,
-        // OPC-175 / S2g: money on a replaced attempt goes back to the customer.
-        private readonly StripeLatePaymentRefunder $lateMoney,
+        // VR-23 T5: money on a contract that can no longer take it goes back to the customer.
+        private readonly LateMoneyResolverInterface $lateMoney,
         ?ContractCommitServiceInterface $contractCommit = null
     ) {
         parent::__construct($parser, $fulfillmentHandler, $contractRepository, $logger, $contractCommit);
@@ -57,8 +56,9 @@ class PaymentIntentSucceededWebhookHandler extends AbstractStripeWebhookHandler
             return StripeWebhookOutcome::of(WebhookResult::failure('invalid_event', 'Missing payment intent ID'));
         }
 
-        if ($this->refundIfReplacedAttempt($event, $paymentIntentId, $this->lateMoney)) {
-            return StripeWebhookOutcome::of(WebhookResult::skipped('Payment on a replaced checkout attempt: given back'));
+        $lateOutcome = $this->resolveLateMoney($event, $paymentIntentId, $this->lateMoney);
+        if ($lateOutcome !== null) {
+            return $lateOutcome;
         }
 
         $this->logger->info('Processing payment_intent.succeeded', [
@@ -70,7 +70,7 @@ class PaymentIntentSucceededWebhookHandler extends AbstractStripeWebhookHandler
         // GRAPH-QL / PS3: a PENDING contract is committed from the paid intent
         // before the fulfilment; the return leg is no longer the only way.
         $ended = $this->commitOpenContract(
-            $this->findContract($event, $paymentIntentId),
+            $this->contractOfPaymentIntent($event, $paymentIntentId),
             $paymentIntentId,
             $paymentIntentId,
             $amountReceived,
@@ -93,22 +93,6 @@ class PaymentIntentSucceededWebhookHandler extends AbstractStripeWebhookHandler
             'contract_fulfilled',
             'Contract already fulfilled or not in COMMITTED state'
         );
-    }
-
-    /**
-     * The contract this intent belongs to: indexed by the intent id, or named
-     * in the intent's metadata (a Checkout Session contract before the id swap).
-     */
-    private function findContract(WebhookEvent $event, string $paymentIntentId): ?PaymentContractInterface
-    {
-        $contract = $this->contractRepository->findByProviderOrderId($paymentIntentId);
-        if ($contract !== null) {
-            return $contract;
-        }
-
-        $contractId = $this->parser->extractContractIdFromMetadata($event);
-
-        return $contractId !== null ? $this->contractOfCurrentAttempt($event, $contractId) : null;
     }
 
     /**

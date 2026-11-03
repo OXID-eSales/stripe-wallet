@@ -18,24 +18,21 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
 /**
- * The stale NOT_FINISHED sweep (STRP-100) ran inline BEFORE the 200 left the
- * shop. It costs up to two Stripe round trips per stale contract, and Stripe
- * - like its CLI - abandons a delivery that has not answered within its
- * timeout and retries it later; on the dev shop five stale contracts made
- * the endpoint answer in 32 s, so every webhook was "failed" at Stripe while
- * the shop had in fact handled it. The answer now leaves first; the sweep
- * runs on the released request.
+ * The stale NOT_FINISHED sweep (STRP-100) ran inline after every webhook. It costs up to two Stripe round trips per
+ * stale contract, and 66 % of the webhook traffic on pay1 was the shop's own sweep cancelling sessions and receiving
+ * their expiry back. VR-23 T3: the webhook answers and ends; the sweep is the cron command
+ * `oe:payments:stripe:sweep` (StaleCheckoutSweepCommand).
  */
 #[CoversClass(WebhookController::class)]
-final class WebhookControllerRespondsBeforeSweepTest extends TestCase
+final class WebhookControllerAnswersWithoutSweepTest extends TestCase
 {
-    public function testTheSuccessAnswerLeavesBeforeTheStaleSweepRuns(): void
+    public function testTheSuccessAnswerIsFollowedByTheEndAndNoSweep(): void
     {
         $controller = $this->controllerAnswering(WebhookResult::skipped('Unhandled event type: x'));
 
         $this->renderUntilTerminated($controller);
 
-        self::assertSame(['response 200 skipped', 'sweep', 'terminate'], $controller->sequence);
+        self::assertSame(['response 200 skipped', 'terminate'], $controller->sequence);
     }
 
     public function testAHandledEventIsAnsweredTheSameWay(): void
@@ -44,10 +41,10 @@ final class WebhookControllerRespondsBeforeSweepTest extends TestCase
 
         $this->renderUntilTerminated($controller);
 
-        self::assertSame(['response 200 contract_committed', 'sweep', 'terminate'], $controller->sequence);
+        self::assertSame(['response 200 contract_committed', 'terminate'], $controller->sequence);
     }
 
-    public function testAFailedResultIsAnsweredWithoutAnySweep(): void
+    public function testAFailedResultIsAnsweredWithAnError(): void
     {
         $controller = $this->controllerAnswering(WebhookResult::failure('handler_error', 'boom'));
 
@@ -79,7 +76,7 @@ final class WebhookControllerRespondsBeforeSweepTest extends TestCase
  * Testable subclass (module CLAUDE.md pattern): only seams are overridden,
  * render() and processWebhook() are the production ones. Every seam that
  * would touch the SAPI records itself instead, so the test can read the
- * order in which the request was answered, swept and ended.
+ * order in which the request was answered and ended.
  */
 class TestableWebhookControllerForOrdering extends WebhookController
 {
@@ -115,11 +112,6 @@ class TestableWebhookControllerForOrdering extends WebhookController
     protected function sendSuccessResponse(string $action): void
     {
         $this->sequence[] = "response 200 {$action}";
-    }
-
-    protected function cleanupStaleNotFinishedOrders(): void
-    {
-        $this->sequence[] = 'sweep';
     }
 
     protected function terminate(): never

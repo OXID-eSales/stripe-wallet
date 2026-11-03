@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed (VR-23 T1/T3/T5) - late money, Connect origin check, sweep as cron
+- **Provider payment gateway (T1).** New `Service\StripeProviderPaymentGateway` (tag
+  `oe.payment.provider_payment_gateway`): `statusOf()` (`succeeded` = paid, `requires_capture` = authorized, anything
+  else holds no money), `refund()` (the whole charge, idempotency key of the caller), `release()` (cancels the
+  PaymentIntent). payment-base's stale-order cleanup asks it before it cancels anything: an order Stripe holds money
+  for is committed instead of cancelled, and without the gateway the cleanup would throw per such order.
+- **Late money (T5).** `StripeLatePaymentRefunder` is removed. `checkout.session.completed`, `payment_intent.succeeded`
+  and `payment_intent.amount_capturable_updated` hand a payment on a contract that can no longer take it to
+  payment-base's `LateMoneyResolverInterface::resolve()`: an attempt the customer replaced (as before) **and now a
+  contract that is cancelled, expired or failed** (the stale-order cleanup, an admin). The money is refunded or the
+  authorization released once and Stripe is answered 200 (before, the paid event of a cancelled contract met a contract
+  that could not take it). A refusal raises the at-risk flag `late_money_not_returned` inside the resolver. Nothing
+  else raises a flag for Stripe (disputes are deleted on another branch, no dispute flag).
+- **Cancel/fail by metadata (T3).** `payment_intent.canceled` and `payment_intent.payment_failed` find their contract by
+  the PaymentIntent id and, while the contract still carries the Checkout Session id (`cs_...`), by the metadata
+  `contract_id` of the current attempt (`AbstractStripeWebhookHandler::applyToContractOfPaymentIntent()`); an event of
+  a replaced attempt does not touch the contract. The two PaymentIntent handlers share
+  `contractOfPaymentIntent()` (was a private copy each).
+- **Connect account and livemode (T3, S-2).** The platform's Connect endpoint receives the events of every connected
+  account, live and test. `StripeWebhookProcessor` now asks `WebhookOriginPolicyInterface`
+  (`ShopWebhookOriginPolicy`) before any handler: an event of the other mode (`ignored_livemode_mismatch`) or of another
+  account (`ignored_foreign_account`) is answered 200 with that action and touches nothing. The shop's account
+  (`acct_...`) is kept per mode in the oxconfig variables `sStripeShopAccountIdTest` / `...Live`: stored when the
+  webhook is created in the module settings, and for a shop registered before, asked of Stripe once with the shop's
+  key (`ShopStripeAccount`). Events without an `account` (a direct key) are judged by mode only.
+- **Sweep as cron (T3).** The stale NOT_FINISHED sweep no longer runs inline after every webhook (it was two Stripe round
+  trips per contract on the request Stripe waited for). `WebhookController` answers and ends; the sweep is the console
+  command `oe:payments:stripe:sweep [--batch=50]` (`StaleCheckoutSweepCommand`, stale horizon from the stale-checkout
+  setting): **schedule it every few minutes** (cron), or abandoned checkouts are only released by
+  `oe:payments:not_finished:cleanup`.
+- `StripeWebhookProcessor` takes the origin policy as its fifth constructor argument (wired in services.yaml).
+
 ### Changed (VR-22 A5) - Stripe's admin capture, refund and void run on payment-base's MoneyOperationRunner
 - New `Admin\StripeMoneyGateway` (tag `oe.payment.gateway`, one class for `CaptureGatewayInterface`,
   `RefundGatewayInterface`, `CancelGatewayInterface`). payment-base's `MoneyOperationRunner` now owns the admin API's

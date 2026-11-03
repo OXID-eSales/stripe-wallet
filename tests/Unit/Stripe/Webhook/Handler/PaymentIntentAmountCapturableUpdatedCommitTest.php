@@ -12,6 +12,8 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Webhook\Handler;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\LateMoney\LateMoneyOutcome;
+use OxidEsales\PaymentBase\LateMoney\LateMoneyResolverInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\Commit\CommitOutcome;
 use OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface;
@@ -133,6 +135,32 @@ final class PaymentIntentAmountCapturableUpdatedCommitTest extends TestCase
         self::assertSame('skipped', $outcome->result->action);
     }
 
+    /**
+     * VR-23 T5: an authorization on a contract the shop already cancelled is released, not committed.
+     */
+    public function testAnAuthorizationOnACancelledContractIsReleasedAndNothingIsCommitted(): void
+    {
+        $contract = $this->pendingContract();
+        $contract->cancel('stale');
+        $this->contracts->method('findByProviderOrderId')->with('pi_1')->willReturn(null);
+        $this->contracts->method('findById')->with('ctr-1')->willReturn($contract);
+        $lateMoney = $this->createMock(LateMoneyResolverInterface::class);
+        $lateMoney->expects($this->once())->method('resolve')->with($contract, 'pi_1')->willReturn(LateMoneyOutcome::released());
+        $this->commit->expects($this->never())->method('commit');
+
+        $outcome = (new PaymentIntentAmountCapturableUpdatedWebhookHandler(
+            new StripeWebhookEventParser(),
+            $this->fulfillment,
+            $this->contracts,
+            new NullLogger(),
+            $lateMoney,
+            $this->commit
+        ))->handle($this->event(['id' => 'pi_1', 'status' => 'requires_capture', 'amount_capturable' => 3090, 'currency' => 'eur', 'metadata' => ['contract_id' => 'ctr-1']]));
+
+        self::assertTrue($outcome->result->isSuccess());
+        self::assertSame('ctr-1', $outcome->contractId);
+    }
+
     private function handler(): PaymentIntentAmountCapturableUpdatedWebhookHandler
     {
         return new PaymentIntentAmountCapturableUpdatedWebhookHandler(
@@ -140,7 +168,7 @@ final class PaymentIntentAmountCapturableUpdatedCommitTest extends TestCase
             $this->fulfillment,
             $this->contracts,
             new NullLogger(),
-            $this->createMock(\OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder::class),
+            $this->createMock(\OxidEsales\PaymentBase\LateMoney\LateMoneyResolverInterface::class),
             $this->commit
         );
     }

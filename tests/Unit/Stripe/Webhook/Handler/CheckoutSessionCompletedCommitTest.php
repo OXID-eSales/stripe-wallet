@@ -12,6 +12,8 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Webhook\Handler;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\LateMoney\LateMoneyOutcome;
+use OxidEsales\PaymentBase\LateMoney\LateMoneyResolverInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\Commit\CommitOutcome;
 use OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface;
@@ -124,8 +126,9 @@ final class CheckoutSessionCompletedCommitTest extends TestCase
             [ContractCondition::TYPE_PAYMENT_AUTHORIZED]
         );
         $this->contracts->method('findById')->with('ctr-1')->willReturn($contract);
-        $lateMoney = $this->createMock(\OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder::class);
-        $lateMoney->expects($this->once())->method('settle')->with($contract, 0, 'pi_1');
+        $lateMoney = $this->createMock(LateMoneyResolverInterface::class);
+        $lateMoney->expects($this->once())->method('resolve')->with($contract, 'pi_1')
+            ->willReturn(LateMoneyOutcome::refunded('re_1'));
         $this->commit->expects($this->never())->method('commit');
         $handler = new CheckoutSessionCompletedWebhookHandler(
             new StripeWebhookEventParser(),
@@ -138,7 +141,51 @@ final class CheckoutSessionCompletedCommitTest extends TestCase
 
         $outcome = $handler->handle($this->event('paid'));
 
-        self::assertSame('Payment on a replaced checkout attempt: given back', $outcome->result->error);
+        self::assertTrue($outcome->result->isSuccess(), 'the shop answers 200: Stripe must not retry money that went back');
+        self::assertSame('Late payment on a contract that cannot take it: refunded', $outcome->result->error);
+    }
+
+    /**
+     * VR-23 T5: a payment on a contract the shop already cancelled (the stale-order cleanup, an admin) was answered
+     * with an error until Stripe gave up; it goes back to the customer like a replaced attempt's.
+     */
+    public function testAPaidSessionOfACancelledContract_IsGivenBackAndCommitsNothing(): void
+    {
+        $contract = $this->pendingContract();
+        $contract->cancel('stale');
+        $this->contracts->method('findById')->with('ctr-1')->willReturn($contract);
+        $lateMoney = $this->createMock(LateMoneyResolverInterface::class);
+        $lateMoney->expects($this->once())->method('resolve')->with($contract, 'pi_1')
+            ->willReturn(LateMoneyOutcome::refunded('re_1'));
+        $this->commit->expects($this->never())->method('commit');
+        $this->fulfillment->expects($this->never())->method('handlePaymentSucceeded');
+
+        $outcome = $this->handlerWith($lateMoney)->handle($this->event('paid'));
+
+        self::assertTrue($outcome->result->isSuccess());
+        self::assertSame('ctr-1', $outcome->contractId);
+    }
+
+    public function testAnOpenContractIsNotLateMoney(): void
+    {
+        $this->contracts->method('findById')->willReturn($this->pendingContract());
+        $lateMoney = $this->createMock(LateMoneyResolverInterface::class);
+        $lateMoney->expects($this->never())->method('resolve');
+        $this->commit->method('commit')->willReturn(CommitOutcome::refused('x'));
+
+        $this->handlerWith($lateMoney)->handle($this->event('paid'));
+    }
+
+    private function handlerWith(LateMoneyResolverInterface $lateMoney): CheckoutSessionCompletedWebhookHandler
+    {
+        return new CheckoutSessionCompletedWebhookHandler(
+            new StripeWebhookEventParser(),
+            $this->fulfillment,
+            $this->contracts,
+            new NullLogger(),
+            $lateMoney,
+            $this->commit
+        );
     }
 
     private function handler(): CheckoutSessionCompletedWebhookHandler
@@ -148,7 +195,7 @@ final class CheckoutSessionCompletedCommitTest extends TestCase
             $this->fulfillment,
             $this->contracts,
             new NullLogger(),
-            $this->createMock(\OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder::class),
+            $this->createMock(LateMoneyResolverInterface::class),
             $this->commit
         );
     }

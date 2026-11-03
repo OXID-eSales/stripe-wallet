@@ -16,7 +16,9 @@ use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\PaymentBase\Webhook\WebhookRequest;
 use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
+use OxidEsales\Payments\Stripe\Webhook\StripeEventEnvelope;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventHandlerInterface;
+use OxidEsales\Payments\Stripe\Webhook\WebhookOriginPolicyInterface;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookOutcome;
 use OxidEsales\PaymentBase\Logging\ThrowableSummary;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;
@@ -215,14 +217,79 @@ class StripeWebhookProcessorTest extends TestCase
     }
 
     /**
+     * VR-23 T3 (S-2): an event of another merchant's account never reaches a handler, and is answered 200 so
+     * Stripe does not retry it for days.
+     */
+    public function testAnEventTheOriginPolicyRefusesIsAnsweredSuccessfullyAndReachesNoHandler(): void
+    {
+        $handler = $this->createMock(StripeWebhookEventHandlerInterface::class);
+        $handler->expects($this->never())->method('handle');
+        $origin = $this->createMock(WebhookOriginPolicyInterface::class);
+        $event = new WebhookEvent('evt_foreign', 'payment_intent.canceled', StripeEventEnvelope::into(['object' => ['id' => 'pi_x']], 'acct_other', true), time());
+        $origin->method('refusalFor')->with($event)->willReturn('ignored_foreign_account');
+
+        $result = $this->invokeProtected($this->createProcessor([$handler], $origin), 'processEvent', $event);
+
+        $this->assertTrue($result->isSuccess());
+        $this->assertSame('ignored_foreign_account', $result->action);
+    }
+
+    public function testAnEventTheOriginPolicyAcceptsIsHandled(): void
+    {
+        $event = new WebhookEvent('evt_own', 'charge.refunded', StripeEventEnvelope::into(['object' => ['id' => 'ch_x']], null, true), time());
+        $handler = $this->createMock(StripeWebhookEventHandlerInterface::class);
+        $handler->method('supports')->willReturn(true);
+        $handler->expects($this->once())->method('handle')->willReturn(StripeWebhookOutcome::of(WebhookResult::success('charge_refunded')));
+        $origin = $this->createMock(WebhookOriginPolicyInterface::class);
+        $origin->method('refusalFor')->willReturn(null);
+
+        $result = $this->invokeProtected($this->createProcessor([$handler], $origin), 'processEvent', $event);
+
+        $this->assertSame('charge_refunded', $result->action);
+    }
+
+    /**
+     * What parseAndValidateRequest builds carries the envelope the policy judges: the Stripe account the event
+     * belongs to (Connect) and whether it is a live-mode event.
+     */
+    public function testAVerifiedEventCarriesItsAccountAndMode(): void
+    {
+        $secret = 'whsec_test_secret';
+        $this->config->method('getWebhookSecret')->willReturn($secret);
+        $payload = (string) json_encode([
+            'id' => 'evt_1', 'object' => 'event', 'type' => 'charge.refunded', 'created' => time(),
+            'livemode' => false, 'account' => 'acct_other',
+            'data' => ['object' => ['id' => 'ch_1']],
+        ]);
+        $timestamp = time();
+        $signature = 't=' . $timestamp . ',v1=' . hash_hmac('sha256', $timestamp . '.' . $payload, $secret);
+
+        $event = $this->invokeProtected(
+            $this->createProcessor(),
+            'parseAndValidateRequest',
+            new WebhookRequest($payload, $signature, '127.0.0.1', new DateTimeImmutable())
+        );
+
+        $envelope = StripeEventEnvelope::from($event);
+        $this->assertNotNull($envelope);
+        $this->assertSame('acct_other', $envelope->account);
+        $this->assertFalse($envelope->livemode);
+        $this->assertSame('ch_1', $event->getObjectId());
+    }
+
+    /**
      * @param list<StripeWebhookEventHandlerInterface> $handlers
      */
-    private function createProcessor(array $handlers = []): StripeWebhookProcessor
+    private function createProcessor(array $handlers = [], ?WebhookOriginPolicyInterface $origin = null): StripeWebhookProcessor
     {
+        $accepting = $this->createMock(WebhookOriginPolicyInterface::class);
+        $accepting->method('refusalFor')->willReturn(null);
+
         return new StripeWebhookProcessor(
             $this->logRepository,
             $this->logger,
             $this->config,
+            $origin ?? $accepting,
             $handlers,
             new ThrowableSummary([])
         );

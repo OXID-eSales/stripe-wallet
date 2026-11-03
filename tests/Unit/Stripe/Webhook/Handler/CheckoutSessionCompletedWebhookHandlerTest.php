@@ -37,7 +37,7 @@ final class CheckoutSessionCompletedWebhookHandlerTest extends TestCase
             $this->fulfillmentHandler,
             $this->contractRepository,
             $this->createMock(LoggerInterface::class),
-            $this->createMock(\OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder::class)
+            $this->createMock(\OxidEsales\PaymentBase\LateMoney\LateMoneyResolverInterface::class)
         );
     }
 

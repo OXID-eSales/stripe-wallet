@@ -9,7 +9,9 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Webhook\Handler;
 
+use Closure;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\LateMoney\LateMoneyResolverInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\Commit\CommitOutcome;
 use OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface;
@@ -17,7 +19,6 @@ use OxidEsales\PaymentBase\Service\Commit\PaymentConfirmation;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
-use OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventHandlerInterface;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookOutcome;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
@@ -147,6 +148,59 @@ abstract class AbstractStripeWebhookHandler implements StripeWebhookEventHandler
     }
 
     /**
+     * VR-23 T3 (S-2 / L-2) - applies a terminal transition (cancel, fail) to the contract a PaymentIntent belongs to:
+     * the one indexed by the intent id, else the one the intent's metadata names (a Checkout Session contract still
+     * carries the session id as its provider order id), and only while the event is of its current attempt.
+     * A contract that is not found is a skipped event, never an error.
+     *
+     * @param Closure(string): ?bool $apply the fulfilment handler's transition for a provider order id
+     */
+    protected function applyToContractOfPaymentIntent(
+        WebhookEvent $event,
+        string $paymentIntentId,
+        Closure $apply,
+        string $successAction,
+        string $skipReason
+    ): StripeWebhookOutcome {
+        $result = $apply($paymentIntentId);
+        if ($result !== null) {
+            return $this->mapHandlerResult($result, $paymentIntentId, $successAction, $skipReason);
+        }
+
+        $providerOrderId = $this->providerOrderIdNamedByMetadata($event);
+        if ($providerOrderId === null) {
+            return $this->mapHandlerResult(null, $paymentIntentId, $successAction, $skipReason);
+        }
+
+        return $this->mapHandlerResult($apply($providerOrderId), $providerOrderId, $successAction, $skipReason);
+    }
+
+    /**
+     * The contract of the current attempt a PaymentIntent belongs to: indexed by the intent id, or named by the
+     * intent's metadata (a Checkout Session contract still carries the session id as its provider order id).
+     */
+    protected function contractOfPaymentIntent(WebhookEvent $event, string $paymentIntentId): ?PaymentContractInterface
+    {
+        $contract = $this->contractRepository->findByProviderOrderId($paymentIntentId);
+        if ($contract !== null) {
+            return $contract;
+        }
+
+        $contractId = $this->parser->extractContractIdFromMetadata($event);
+
+        return $contractId !== null ? $this->contractOfCurrentAttempt($event, $contractId) : null;
+    }
+
+    private function providerOrderIdNamedByMetadata(WebhookEvent $event): ?string
+    {
+        $contractId = $this->parser->extractContractIdFromMetadata($event);
+        $contract = $contractId === null ? null : $this->contractOfCurrentAttempt($event, $contractId);
+        $providerOrderId = $contract?->getProviderOrderId();
+
+        return $providerOrderId === null || $providerOrderId === '' ? null : $providerOrderId;
+    }
+
+    /**
      * Look up the contract ID by providerOrderId (PaymentIntent ID).
      */
     /**
@@ -167,24 +221,50 @@ abstract class AbstractStripeWebhookHandler implements StripeWebhookEventHandler
     }
 
     /**
-     * OPC-175 / S2g — money that arrives on a replaced attempt goes back to the
-     * customer. True when the event belongs to a replaced attempt (it is then
-     * handled here and must not reach the contract).
+     * VR-23 T5 (OPC-175 / S2g) - a payment that lands on a contract that can no longer take it: an attempt the
+     * customer replaced, or a contract the shop already cancelled, expired or failed (the stale-order cleanup, an
+     * admin). payment-base's LateMoneyResolver gives the money back (refund, or release of an authorization) once;
+     * the answer is 200, Stripe must not retry it. Null when the payment belongs to a contract that can take it.
      */
-    protected function refundIfReplacedAttempt(
+    protected function resolveLateMoney(
         WebhookEvent $event,
         string $paymentIntentId,
-        StripeLatePaymentRefunder $lateMoney
-    ): bool {
-        $contractId = $this->parser->extractContractIdFromMetadata($event);
-        $contract = $contractId === null ? null : $this->contractRepository->findById($contractId);
-        if ($contract === null || !$this->isOfReplacedAttempt($event, $contract)) {
-            return false;
+        LateMoneyResolverInterface $lateMoney
+    ): ?StripeWebhookOutcome {
+        $contract = $this->contractOfPayment($event, $paymentIntentId);
+        if ($contract === null || !$this->cannotTakeMoney($event, $contract)) {
+            return null;
         }
 
-        $lateMoney->settle($contract, $this->parser->attemptOf($event), $paymentIntentId);
+        $outcome = $lateMoney->resolve($contract, $paymentIntentId);
 
-        return true;
+        return StripeWebhookOutcome::of(
+            WebhookResult::skipped('Late payment on a contract that cannot take it: ' . $outcome->kind->value),
+            (string) $contract->getId()
+        );
+    }
+
+    /**
+     * The contract a PaymentIntent belongs to, whatever its attempt: indexed by the intent id, or named by the
+     * metadata Stripe echoes (a Checkout Session contract still carries the session id as its provider order id).
+     */
+    private function contractOfPayment(WebhookEvent $event, string $paymentIntentId): ?PaymentContractInterface
+    {
+        $contract = $this->contractRepository->findByProviderOrderId($paymentIntentId);
+        if ($contract !== null) {
+            return $contract;
+        }
+
+        $contractId = $this->parser->extractContractIdFromMetadata($event);
+
+        return $contractId === null ? null : $this->contractRepository->findById($contractId);
+    }
+
+    private function cannotTakeMoney(WebhookEvent $event, PaymentContractInterface $contract): bool
+    {
+        $state = $contract->getState();
+
+        return $state->isCancelled() || $state->isExpired() || $state->isFailed() || $this->isOfReplacedAttempt($event, $contract);
     }
 
     protected function isOfReplacedAttempt(WebhookEvent $event, PaymentContractInterface $contract): bool

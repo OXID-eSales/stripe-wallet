@@ -11,7 +11,6 @@ namespace OxidEsales\Payments\Stripe\Controller\Webhook;
 
 use DateTimeImmutable;
 use Exception;
-use Throwable;
 use OxidEsales\Eshop\Application\Controller\FrontendController;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
@@ -20,8 +19,6 @@ use OxidEsales\PaymentBase\Webhook\Guard\WebhookGuardInterface;
 use OxidEsales\PaymentBase\Webhook\Guard\WebhookHttpRequest;
 use OxidEsales\PaymentBase\Webhook\WebhookRequest;
 use OxidEsales\Payments\Stripe\Adapter\Helper\ResponseHeaders;
-use OxidEsales\PaymentBase\Service\NotFinishedOrderCleanupSettingsInterface;
-use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use OxidEsales\Payments\Stripe\Service\WebhookLogServiceInterface;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;
 
@@ -39,22 +36,8 @@ use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;
  */
 class WebhookController extends FrontendController
 {
-    /**
-     * STRP-168 item 4: one sweep is bounded. It runs inline in this request, so
-     * an unbounded backlog would be paid for out of the webhook's response time
-     * — and a provider that times out retries, which grows the backlog it was
-     * already struggling with. The remainder waits for the next webhook or for
-     * oe:payments:not_finished:cleanup; nothing is dropped, only deferred.
-     */
-    protected const STALE_SWEEP_BATCH = 50;
-
-    /** Used when the module setting cannot be read; the value it had when hardcoded. */
-    protected const DEFAULT_STALE_MINUTES = 30;
-
     protected ?StripeWebhookProcessor $processor = null;
     protected ?WebhookLogServiceInterface $webhookLogger = null;
-    protected ?RetryCleanupService $cleanupService = null;
-    protected ?NotFinishedOrderCleanupSettingsInterface $cleanupSettings = null;
     private ?WebhookGuardInterface $guard = null;
     protected ?TrustedProxyClientIp $clientIp = null;
 
@@ -88,30 +71,6 @@ class WebhookController extends FrontendController
             Registry::getLogger()->error(
                 'Webhook guard chain unavailable — endpoint refuses to process',
                 ['error' => $e->getMessage()]
-            );
-        }
-
-        try {
-            /** @var RetryCleanupService $cleanupService */
-            $cleanupService = $container->get(RetryCleanupService::class);
-            $this->cleanupService = $cleanupService;
-        } catch (Exception $e) {
-            Registry::getLogger()->warning('Stale-order cleanup service unavailable', [
-                'error' => $e->getMessage(),
-            ]);
-        }
-
-        try {
-            /** @var NotFinishedOrderCleanupSettingsInterface $cleanupSettings */
-            $cleanupSettings = $container->get(NotFinishedOrderCleanupSettingsInterface::class);
-            $this->cleanupSettings = $cleanupSettings;
-        } catch (Exception $e) {
-            // The sweep still runs, on the default horizon — but say so, rather
-            // than letting a shop that raised the setting quietly keep sweeping
-            // at 30 minutes and cancelling checkouts its customers are still in.
-            Registry::getLogger()->warning(
-                'Stale-checkout timeout setting unavailable — sweeping on the default horizon',
-                ['error' => $e->getMessage(), 'defaultMinutes' => self::DEFAULT_STALE_MINUTES]
             );
         }
     }
@@ -187,18 +146,13 @@ class WebhookController extends FrontendController
         $this->logResult($payload, "SUCCESS: {$result->action}", 200);
         $this->sendSuccessResponse($result->action);
 
-        // STRP-100: sweep stale NOT_FINISHED orders after each webhook - on the
-        // released request, never before the answer. The sweep is up to two
-        // Stripe round trips per stale contract, and Stripe (like its CLI)
-        // abandons a delivery that has not answered within its timeout and
-        // retries it: with five stale contracts the dev shop took 32 s, so
-        // every webhook it had in fact handled counted as failed at Stripe.
-        $this->cleanupStaleNotFinishedOrders();
+        // VR-23 T3: the stale NOT_FINISHED sweep is no longer run here: it cost up to two Stripe round trips per stale
+        // contract on the request Stripe was waiting for. It is the cron command oe:payments:stripe:sweep.
         $this->terminate();
     }
 
     /**
-     * Answer 200 and release the client before any post-processing.
+     * Answer 200 and release the client.
      *
      * Protected seam for the testable subclass.
      */
@@ -220,7 +174,7 @@ class WebhookController extends FrontendController
     /**
      * Under PHP-FPM the request is finished outright and the worker keeps
      * running; elsewhere the sized body is flushed, so a client honouring
-     * Content-Length stops waiting while the sweep still runs.
+     * Content-Length stops waiting.
      */
     private function releaseClient(): void
     {
@@ -237,7 +191,7 @@ class WebhookController extends FrontendController
 
     /**
      * The production end of a handled webhook. Protected seam, so a test can
-     * observe the order of answer, sweep and end instead of losing the process.
+     * observe the answer and the end instead of losing the process.
      *
      * @return never
      */
@@ -364,47 +318,6 @@ class WebhookController extends FrontendController
         $remoteIp = is_string($remoteIp) ? $remoteIp : 'unknown';
 
         return [is_string($payload) ? $payload : '', $signature, $remoteIp];
-    }
-
-    /**
-     * Clean up stale NOT_FINISHED contracts/orders older than 30 minutes.
-     *
-     * Runs after each webhook to garbage-collect abandoned checkouts.
-     * Failures are logged but do not affect the webhook response.
-     *
-     * @since 2.0.0 STRP-100
-     */
-    /**
-     * How long a checkout may sit in flight before this sweep releases it.
-     *
-     * STRP-168 item 3: was a hardcoded 30, which a shop selling by bank transfer
-     * or Klarna could not raise without a code change — so the sweep cancelled
-     * checkouts its customers were still legitimately in.
-     */
-    protected function getStaleThresholdMinutes(): int
-    {
-        return $this->cleanupSettings?->getStaleCheckoutMinutes() ?? self::DEFAULT_STALE_MINUTES;
-    }
-
-    protected function cleanupStaleNotFinishedOrders(): void
-    {
-        if ($this->cleanupService === null) {
-            return;
-        }
-
-        try {
-            $cleaned = $this->cleanupService->cleanupStaleContracts(
-                $this->getStaleThresholdMinutes(),
-                self::STALE_SWEEP_BATCH
-            );
-            if ($cleaned > 0) {
-                Registry::getLogger()->info('Cleaned up ' . $cleaned . ' stale NOT_FINISHED order(s)');
-            }
-        } catch (Throwable $e) {
-            Registry::getLogger()->warning('Stale order cleanup failed', [
-                'error' => $e->getMessage(),
-            ]);
-        }
     }
 
     /**

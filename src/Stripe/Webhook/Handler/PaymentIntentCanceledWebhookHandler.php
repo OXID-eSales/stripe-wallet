@@ -46,19 +46,16 @@ class PaymentIntentCanceledWebhookHandler extends AbstractStripeWebhookHandler
             return StripeWebhookOutcome::of(WebhookResult::failure('invalid_event', 'Missing payment intent ID'));
         }
 
+        $reason = $this->parser->extractCancellationReason($event);
         $this->logger->info('Processing payment_intent.canceled', [
             'payment_intent_id' => $paymentIntentId,
-            'reason' => $this->parser->extractCancellationReason($event),
+            'reason' => $reason,
         ]);
 
-        $result = $this->fulfillmentHandler->handlePaymentCanceled(
+        return $this->applyToContractOfPaymentIntent(
+            $event,
             $paymentIntentId,
-            $this->parser->extractCancellationReason($event)
-        );
-
-        return $this->mapHandlerResult(
-            $result,
-            $paymentIntentId,
+            fn (string $providerOrderId): ?bool => $this->fulfillmentHandler->handlePaymentCanceled($providerOrderId, $reason),
             'contract_cancelled',
             'Contract already in terminal state'
         );

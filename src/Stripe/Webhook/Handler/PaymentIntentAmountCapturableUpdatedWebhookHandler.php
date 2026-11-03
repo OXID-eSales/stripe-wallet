@@ -9,14 +9,13 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Webhook\Handler;
 
-use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\LateMoney\LateMoneyResolverInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookOutcome;
-use OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -44,8 +43,8 @@ class PaymentIntentAmountCapturableUpdatedWebhookHandler extends AbstractStripeW
         WebhookContractFulfillmentHandlerInterface $fulfillmentHandler,
         ContractRepositoryInterface $contractRepository,
         LoggerInterface $logger,
-        // OPC-175 / S2g: money on a replaced attempt goes back to the customer.
-        private readonly StripeLatePaymentRefunder $lateMoney,
+        // VR-23 T5: money on a contract that can no longer take it goes back to the customer.
+        private readonly LateMoneyResolverInterface $lateMoney,
         ?ContractCommitServiceInterface $contractCommit = null
     ) {
         parent::__construct($parser, $fulfillmentHandler, $contractRepository, $logger, $contractCommit);
@@ -67,11 +66,12 @@ class PaymentIntentAmountCapturableUpdatedWebhookHandler extends AbstractStripeW
             return StripeWebhookOutcome::of(WebhookResult::skipped('Payment intent is not awaiting capture'));
         }
 
-        if ($this->refundIfReplacedAttempt($event, $paymentIntentId, $this->lateMoney)) {
-            return StripeWebhookOutcome::of(WebhookResult::skipped('Payment on a replaced checkout attempt: given back'));
+        $lateOutcome = $this->resolveLateMoney($event, $paymentIntentId, $this->lateMoney);
+        if ($lateOutcome !== null) {
+            return $lateOutcome;
         }
 
-        $contract = $this->findContract($event, $paymentIntentId);
+        $contract = $this->contractOfPaymentIntent($event, $paymentIntentId);
         if ($contract === null) {
             return StripeWebhookOutcome::of(WebhookResult::skipped('Contract not found for payment intent'));
         }
@@ -99,22 +99,6 @@ class PaymentIntentAmountCapturableUpdatedWebhookHandler extends AbstractStripeW
         return $wasOpen
             ? StripeWebhookOutcome::of(WebhookResult::success('contract_authorized'), (string) $contract->getId())
             : StripeWebhookOutcome::of(WebhookResult::skipped('Contract already committed'), (string) $contract->getId());
-    }
-
-    /**
-     * Indexed by the intent id, or named in the intent's metadata (a Checkout
-     * Session contract still carries the session id as its provider order id).
-     */
-    private function findContract(WebhookEvent $event, string $paymentIntentId): ?PaymentContractInterface
-    {
-        $contract = $this->contractRepository->findByProviderOrderId($paymentIntentId);
-        if ($contract !== null) {
-            return $contract;
-        }
-
-        $contractId = $this->parser->extractContractIdFromMetadata($event);
-
-        return $contractId !== null ? $this->contractOfCurrentAttempt($event, $contractId) : null;
     }
 
     private function currencyOf(WebhookEvent $event): string

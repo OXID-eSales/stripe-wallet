@@ -84,6 +84,71 @@ final class PaymentIntentCanceledWebhookHandlerTest extends TestCase
     }
 
     /**
+     * VR-23 T3 (S-2 / L-2): a Checkout Session contract still carries the session id as its provider order id
+     * when payment_intent.canceled arrives, so the intent id finds nothing. Stripe echoes the contract id in the intent's
+     * metadata: the contract is resolved by it, never left in flight for the stale sweep to cancel alone.
+     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function resolvesContractViaMetadataWhileProviderIdIsCheckoutSession(): void
+    {
+        $contract = $this->contractWithProviderId('cs_1');
+        $this->contractRepository->method('findByProviderOrderId')->willReturnMap([['pi_1', null], ['cs_1', $contract]]);
+        $this->contractRepository->method('findById')->with('ctr-1')->willReturn($contract);
+        $this->fulfillmentHandler->method('handlePaymentCanceled')->willReturnMap([
+            ['pi_1', 'requested_by_customer', null],
+            ['cs_1', 'requested_by_customer', true],
+        ]);
+
+        $outcome = $this->handler->handle($this->makeEvent([
+            'id' => 'pi_1',
+            'cancellation_reason' => 'requested_by_customer',
+            'metadata' => ['contract_id' => 'ctr-1'],
+        ]));
+
+        $this->assertSame('contract_cancelled', $outcome->result->action);
+        $this->assertSame('ctr-1', $outcome->contractId);
+    }
+
+    /**
+     * The customer changed the payment method: this event is of a replaced Stripe attempt and must not end the
+     * contract, which continues with another one.
+     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function anEventOfAReplacedAttemptDoesNotTouchTheContract(): void
+    {
+        $contract = $this->contractWithProviderId('cs_2');
+        $contract->reopenForNewAttempt(
+            \OxidEsales\PaymentBase\Contract\AttemptClosure::Closed,
+            $contract->getBasketSnapshot(),
+            [\OxidEsales\PaymentBase\Contract\ContractCondition::TYPE_PAYMENT_AUTHORIZED]
+        );
+        $this->contractRepository->method('findByProviderOrderId')->willReturn(null);
+        $this->contractRepository->method('findById')->with('ctr-1')->willReturn($contract);
+        $this->fulfillmentHandler->expects($this->once())->method('handlePaymentCanceled')->with('pi_1')->willReturn(null);
+
+        $outcome = $this->handler->handle($this->makeEvent([
+            'id' => 'pi_1',
+            'cancellation_reason' => 'requested_by_customer',
+            'metadata' => ['contract_id' => 'ctr-1', 'contract_attempt' => '0'],
+        ]));
+
+        $this->assertSame('skipped', $outcome->result->action);
+    }
+
+    private function contractWithProviderId(string $providerOrderId): \OxidEsales\PaymentBase\Contract\PaymentContract
+    {
+        $contract = new \OxidEsales\PaymentBase\Contract\PaymentContract(1, 'user-1', \OxidEsales\PaymentBase\Contract\BasketSnapshot::fromArray([
+            'items' => [], 'discounts' => [], 'totalGross' => 100.0, 'totalNet' => 84.03, 'totalVat' => 15.97, 'currency' => 'EUR',
+        ]), 'ctr-1');
+        $contract->addCondition(new \OxidEsales\PaymentBase\Contract\ContractCondition(\OxidEsales\PaymentBase\Contract\ContractCondition::TYPE_PAYMENT_AUTHORIZED));
+        $contract->transitionToNotFinished('order-1');
+        $contract->transitionToPending();
+        $contract->setProvider('stripe', $providerOrderId);
+
+        return $contract;
+    }
+
+    /**
      * @param array<string, mixed> $objectData
      */
     private function makeEvent(array $objectData): WebhookEvent

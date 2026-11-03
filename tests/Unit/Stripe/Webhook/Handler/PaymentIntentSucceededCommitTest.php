@@ -12,6 +12,8 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Webhook\Handler;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\LateMoney\LateMoneyOutcome;
+use OxidEsales\PaymentBase\LateMoney\LateMoneyResolverInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\Commit\CommitOutcome;
 use OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface;
@@ -128,6 +130,34 @@ final class PaymentIntentSucceededCommitTest extends TestCase
         self::assertStringContainsString('COMMITTED', (string) $outcome->result->error);
     }
 
+    /**
+     * VR-23 T5: the shop cancelled the contract (stale-order cleanup, admin) and Stripe then reports the payment.
+     * The money goes back through payment-base's resolver and Stripe is answered 200.
+     */
+    public function testAPaidIntentOfACancelledContractIsGivenBackAndNothingIsCommitted(): void
+    {
+        $contract = $this->pendingContract();
+        $contract->cancel('stale');
+        $this->contracts->method('findByProviderOrderId')->with('pi_1')->willReturn($contract);
+        $lateMoney = $this->createMock(LateMoneyResolverInterface::class);
+        $lateMoney->expects($this->once())->method('resolve')->with($contract, 'pi_1')
+            ->willReturn(LateMoneyOutcome::refunded('re_1'));
+        $this->commit->expects($this->never())->method('commit');
+        $this->fulfillment->expects($this->never())->method('handlePaymentSucceeded');
+
+        $outcome = (new PaymentIntentSucceededWebhookHandler(
+            new StripeWebhookEventParser(),
+            $this->fulfillment,
+            $this->contracts,
+            new NullLogger(),
+            $lateMoney,
+            $this->commit
+        ))->handle($this->event(['id' => 'pi_1', 'amount_received' => 10000, 'currency' => 'eur']));
+
+        self::assertTrue($outcome->result->isSuccess());
+        self::assertSame('ctr-1', $outcome->contractId);
+    }
+
     private function handler(bool $withCommit = true): PaymentIntentSucceededWebhookHandler
     {
         return new PaymentIntentSucceededWebhookHandler(
@@ -135,7 +165,7 @@ final class PaymentIntentSucceededCommitTest extends TestCase
             $this->fulfillment,
             $this->contracts,
             new NullLogger(),
-            $this->createMock(\OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder::class),
+            $this->createMock(\OxidEsales\PaymentBase\LateMoney\LateMoneyResolverInterface::class),
             $withCommit ? $this->commit : null
         );
     }

@@ -252,12 +252,12 @@ services:
   # session is committed, never cancelled. `decorates` is resolved when the
   # container is compiled, so the order of the imported services files does
   # not matter.
-  # OPC-175 / S2g: money on a replaced attempt goes back to the customer.
-  OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder:
+  # VR-23 T1: what payment-base's LateMoneyResolver and the stale-order cleanup ask Stripe about a PaymentIntent.
+  OxidEsales\Payments\Stripe\Service\StripeProviderPaymentGateway:
     arguments:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
-      $contracts: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
-      $logger: '@oxid_esales.monolog.logger'
+    tags:
+      - { name: oe.payment.provider_payment_gateway }
 
   # OPC-175: closes the Stripe payment page of an attempt the customer leaves.
   OxidEsales\Payments\Stripe\Service\StripeAttemptCloser:
@@ -1147,9 +1147,30 @@ services:
       $logRepository: '@OxidEsales\PaymentBase\Repository\WebhookLogRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
       $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+      $origin: '@OxidEsales\Payments\Stripe\Webhook\WebhookOriginPolicyInterface'
       $handlers: !tagged_iterator stripe.webhook_handler
       $throwableSummary: '@OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface'
     public: true
+
+  # VR-23 T3 (S-2): only an event of the shop's own mode and account reaches a handler.
+  OxidEsales\Payments\Stripe\Webhook\WebhookOriginPolicyInterface:
+    class: OxidEsales\Payments\Stripe\Webhook\ShopWebhookOriginPolicy
+    arguments:
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+      $shopAccount: '@OxidEsales\Payments\Stripe\Service\ShopStripeAccountInterface'
+    public: false
+
+  OxidEsales\Payments\Stripe\Service\ShopStripeAccountInterface:
+    class: OxidEsales\Payments\Stripe\Service\ShopStripeAccount
+    arguments:
+      $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
+      $api: '@OxidEsales\Payments\Stripe\Adapter\StripeWebhookEndpointApiInterface'
+      $store: '@OxidEsales\Payments\Stripe\Service\ShopStripeAccountStoreInterface'
+    public: true
+
+  OxidEsales\Payments\Stripe\Service\ShopStripeAccountStoreInterface:
+    class: OxidEsales\Payments\Stripe\Service\OxidShopStripeAccountStore
+    public: false
 
   # Sprint 114.4: Tagged stripe.webhook_handler services — one per event type.
   # Registered here; injected into StripeWebhookProcessor via !tagged_iterator.
@@ -1160,7 +1181,8 @@ services:
       $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
-      $lateMoney: '@OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder'
+      # VR-23 T5: money on a contract that can no longer take it goes back (payment-base's resolver)
+      $lateMoney: '@OxidEsales\PaymentBase\LateMoney\LateMoneyResolverInterface'
       # GRAPH-QL / PS3: a paid intent / session commits a PENDING contract
       # (payment-base ContractCommitService) - the return leg is no longer the
       # only way.
@@ -1176,7 +1198,8 @@ services:
       $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
-      $lateMoney: '@OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder'
+      # VR-23 T5: money on a contract that can no longer take it goes back (payment-base's resolver)
+      $lateMoney: '@OxidEsales\PaymentBase\LateMoney\LateMoneyResolverInterface'
       $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
     tags: [ { name: stripe.webhook_handler } ]
     public: false
@@ -1231,7 +1254,8 @@ services:
       $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
-      $lateMoney: '@OxidEsales\Payments\Stripe\Service\StripeLatePaymentRefunder'
+      # VR-23 T5: money on a contract that can no longer take it goes back (payment-base's resolver)
+      $lateMoney: '@OxidEsales\PaymentBase\LateMoney\LateMoneyResolverInterface'
       # GRAPH-QL / PS3: a paid intent / session commits a PENDING contract
       # (payment-base ContractCommitService) - the return leg is no longer the
       # only way.
@@ -1534,6 +1558,18 @@ services:
       $backfillService: '@OxidEsales\Payments\Stripe\Service\CapturedAmountBackfillServiceInterface'
     tags:
       - { name: 'console.command', command: 'stripe:backfill-captured-amount' }
+    public: true
+
+  # Console Command: oe:payments:stripe:sweep (VR-23 T3)
+  # The stale NOT_FINISHED sweep that ran inline after every webhook; schedule every few minutes.
+  OxidEsales\Payments\Stripe\Command\StaleCheckoutSweepCommand:
+    arguments:
+      $cleanup: '@OxidEsales\Payments\Stripe\Service\RetryCleanupService'
+      $settings: '@OxidEsales\PaymentBase\Service\NotFinishedOrderCleanupSettingsInterface'
+      $logger: '@oxid_esales.monolog.logger'
+      $throwableSummary: '@OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface'
+    tags:
+      - { name: 'console.command', command: 'oe:payments:stripe:sweep' }
     public: true
 
   # Console Command: stripe:prune-idempotency (Sprint 133, F8)

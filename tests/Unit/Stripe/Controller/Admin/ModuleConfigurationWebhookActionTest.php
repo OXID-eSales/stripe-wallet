@@ -101,6 +101,7 @@ final class ModuleConfigurationWebhookActionTest extends TestCase
             'https://shop.example.com/index.php?cl=StripeWebhookController',
             $decoded['webhookUrl']
         );
+        $this->assertSame(['account remembered'], $controller->events, 'VR-23 T3: the shop account is kept at registration');
         $this->assertSame('we_123', $stored['sStripeWebhookEndpointIdTest'] ?? null);
         $this->assertSame('whsec_abc', $stored['sStripeWebhookEndpointSecretTest'] ?? null);
         $this->assertSame(
@@ -456,6 +457,14 @@ final class ModuleConfigurationWebhookActionTest extends TestCase
                 // Skip ModuleConfiguration_parent::__construct to avoid OXID admin bootstrap.
                 $this->initializeWebhookCollaborators($registrar, $moduleConfig, $logger);
                 $this->oxConfigStore = &$oxConfigStore;
+            }
+
+            /** @var list<string> */
+            public array $events = [];
+
+            protected function rememberShopStripeAccount(): void
+            {
+                $this->events[] = 'account remembered';
             }
 
             public function getSavedModuleSetting(string $key): ?string

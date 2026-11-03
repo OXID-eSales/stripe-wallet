@@ -18,6 +18,7 @@ use OxidEsales\Payments\Stripe\Module;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\Exception\WebhookRegistrationException;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
+use OxidEsales\Payments\Stripe\Service\ShopStripeAccountInterface;
 use OxidEsales\Payments\Stripe\Service\WebhookEndpointRegistrarInterface;
 use OxidEsales\Payments\Stripe\Service\WebhookEndpointRegistrationResult;
 use Psr\Log\LoggerInterface;
@@ -86,6 +87,20 @@ class ModuleConfiguration extends ModuleConfiguration_parent
             $this->webhookRegistrar = $registrar;
         }
         return $this->webhookRegistrar;
+    }
+
+    /**
+     * VR-23 T3: the Stripe account of the shop's key is kept per mode; the webhook only handles its events.
+     *
+     * Overridable in test subclasses so unit tests do not depend on the OXID DI container.
+     */
+    protected function rememberShopStripeAccount(): void
+    {
+        /** @var ShopStripeAccountInterface $account */
+        $account = ContainerFactory::getInstance()
+            ->getContainer()
+            ->get(ShopStripeAccountInterface::class);
+        $account->remember();
     }
 
     private function getWebhookLogger(): LoggerInterface
@@ -247,6 +262,7 @@ class ModuleConfiguration extends ModuleConfiguration_parent
             // platform only when the account is a connected one AND the platform really
             // controls it; otherwise a message that tells the merchant what to do in the
             // Dashboard (WebhookEndpointRegistrar::registerForShop()).
+            $this->rememberShopStripeAccount();
             $result      = $this->getWebhookRegistrar()->registerForShop(
                 $moduleConfig->getToken(),
                 $moduleConfig->getPlatformKey(),

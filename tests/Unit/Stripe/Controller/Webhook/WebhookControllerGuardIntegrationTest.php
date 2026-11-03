@@ -222,7 +222,6 @@ class WebhookTestResponseSent extends \RuntimeException
  *   - extractWebhookInput()     — injects test payload/signature/IP (already protected)
  *   - setResponseContentType()  — no-op (avoids Registry::getUtils(); seam added Sprint 114.3)
  *   - sendErrorResponse()       — throws WebhookTestResponseSent instead of exit (never contract)
- *   - cleanupStaleNotFinishedOrders() — no-op (avoids ContainerFactory in tests)
  *
  * processor is promoted to protected in Sprint 114.3 so init() can set it.
  */
@@ -289,11 +288,5 @@ class TestableWebhookControllerForGuard extends WebhookController
         ?string $logAction = null
     ): never {
         throw new WebhookTestResponseSent($statusCode, json_encode(['error' => $message]));
-    }
-
-    /** Override: avoid ContainerFactory::getInstance() */
-    protected function cleanupStaleNotFinishedOrders(): void
-    {
-        // No-op in tests
     }
 }

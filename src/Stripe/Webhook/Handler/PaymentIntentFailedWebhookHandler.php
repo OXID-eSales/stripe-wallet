@@ -46,19 +46,16 @@ class PaymentIntentFailedWebhookHandler extends AbstractStripeWebhookHandler
             return StripeWebhookOutcome::of(WebhookResult::failure('invalid_event', 'Missing payment intent ID'));
         }
 
+        $reason = $this->parser->extractFailureReason($event);
         $this->logger->warning('Processing payment_intent.payment_failed', [
             'payment_intent_id' => $paymentIntentId,
-            'reason' => $this->parser->extractFailureReason($event),
+            'reason' => $reason,
         ]);
 
-        $result = $this->fulfillmentHandler->handlePaymentFailed(
+        return $this->applyToContractOfPaymentIntent(
+            $event,
             $paymentIntentId,
-            $this->parser->extractFailureReason($event)
-        );
-
-        return $this->mapHandlerResult(
-            $result,
-            $paymentIntentId,
+            fn (string $providerOrderId): ?bool => $this->fulfillmentHandler->handlePaymentFailed($providerOrderId, $reason),
             'contract_failed',
             'Contract already in terminal state'
         );

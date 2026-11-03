@@ -48,6 +48,7 @@ class StripeWebhookProcessor extends AbstractWebhookProcessor
         WebhookLogRepositoryInterface $logRepository,
         LoggerInterface $logger,
         private readonly ModuleConfigurationServiceInterface $config,
+        private readonly WebhookOriginPolicyInterface $origin,
         private readonly iterable $handlers,
         ThrowableSummaryInterface $throwableSummary
     ) {
@@ -73,11 +74,12 @@ class StripeWebhookProcessor extends AbstractWebhookProcessor
 
             /** @var array<string, mixed> $eventData */
             $eventData = $stripeEvent->data->toArray();
+            $account = $stripeEvent->toArray()['account'] ?? null;
 
             return new WebhookEvent(
                 id: $stripeEvent->id,
                 type: $stripeEvent->type,
-                data: $eventData,
+                data: StripeEventEnvelope::into($eventData, is_string($account) ? $account : null, (bool) $stripeEvent->livemode),
                 created: $stripeEvent->created
             );
         } catch (SignatureVerificationException $e) {
@@ -88,6 +90,17 @@ class StripeWebhookProcessor extends AbstractWebhookProcessor
     protected function processEvent(WebhookEvent $event): WebhookResult
     {
         $this->lastContractId = null;
+
+        $refusal = $this->origin->refusalFor($event);
+        if ($refusal !== null) {
+            $this->logger->warning('Stripe event is not this shop\'s: ignored', [
+                'eventId' => $event->id,
+                'eventType' => $event->type,
+                'reason' => $refusal,
+            ]);
+
+            return WebhookResult::success($refusal);
+        }
 
         foreach ($this->handlers as $handler) {
             if (!$handler->supports($event->type)) {
