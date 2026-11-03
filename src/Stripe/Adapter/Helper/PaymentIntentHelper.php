@@ -200,27 +200,6 @@ class PaymentIntentHelper
         }
     }
 
-    public function getRiskScore(StripeClient $client, string $paymentIntentId): ?float
-    {
-        try {
-            $paymentIntent = $client->paymentIntents->retrieve(
-                $paymentIntentId,
-                ['expand' => ['latest_charge']]
-            );
-
-            if ($paymentIntent->latest_charge === null) {
-                return null;
-            }
-
-            $outcome = $paymentIntent->latest_charge->outcome ?? null;
-            $riskScore = $outcome->risk_score ?? null;
-
-            return $riskScore !== null ? $riskScore / 100.0 : null;
-        } catch (ApiErrorException $e) {
-            throw StripeExceptionConverter::convert($e);
-        }
-    }
-
     /**
      * Build params array for PaymentIntent creation.
      *

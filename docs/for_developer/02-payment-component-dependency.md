@@ -106,7 +106,6 @@ How stripe implements payment-component interfaces:
 | `SessionAdapterInterface` | `OxidSessionAdapter` |
 | `ShopOrderServiceInterface` | `OxidShopOrderService` |
 | `PaymentAdapterFactoryInterface` | `StripeAdapterFactory` |
-| `FraudCheckServiceInterface` | `StripeRadarFraudCheckService` |
 | `StockRestorationServiceInterface` | `OxidStockRestorationService` |
 | `ReturnSecurityValidatorInterface` | `ReturnSessionSecurityService` |
 | `TokenServiceInterface` | `ContractTokenService` |
@@ -163,10 +162,6 @@ OxidEsales\PaymentComponent\EventSystem\Handler\EarlyOrderCreationHandler:
 OxidEsales\PaymentComponent\EventSystem\Handler\PaymentAuthorizedEventHandler:
     tags:
         - { name: payment.event_handler, priority: 90 }
-
-OxidEsales\PaymentComponent\EventSystem\Handler\FraudCheckHandler:
-    tags:
-        - { name: payment.event_handler, priority: 85 }
 ```
 
 ### EventListenerProvider Collects Tagged Handlers
@@ -191,14 +186,6 @@ stripe.payment.adapter.client:
 stripe.events.file_logger:
     class: OxidEsales\PaymentComponent\Service\FileLoggerInterface
     factory: ['@OxidEsales\Payments\Stripe\Service\Factory\EventFileLoggerFactory', 'create']
-```
-
-### Module Parameters
-
-```yaml
-parameters:
-    payment.fraud_check.enabled: true
-    payment.fraud_check.threshold: 0.7
 ```
 
 ---
@@ -270,7 +257,7 @@ private function validateType(string $type): void
 | Type | Constant | Used By |
 |------|----------|---------|
 | `payment_authorized` | `TYPE_PAYMENT_AUTHORIZED` | `PaymentAuthorizedEventHandler` — fulfilled when Stripe confirms payment |
-| `fraud_check` | `TYPE_FRAUD_CHECK` | `FraudCheckHandler` — fulfilled when Stripe Radar passes |
+| `fraud_check` | `TYPE_FRAUD_CHECK` | Reserved — the Stripe module no longer runs a fraud check (Radar removed) |
 | `compliance_check` | `TYPE_COMPLIANCE_CHECK` | Reserved — not currently used |
 | `address_validated` | `TYPE_ADDRESS_VALIDATED` | Reserved — not currently used |
 

@@ -1496,49 +1496,6 @@ services:
     public: true
 
   # ==========================================
-  # Sprint 2: Condition Handlers (Fraud Check)
-  # ==========================================
-  # Fraud check handler manages fraud checking as a contract condition.
-  # Can be disabled via admin configuration.
-  #
-  # Fraud Check:
-  # - ON: Checks Stripe Radar score after payment authorization
-  # - OFF: Fraud check condition immediately fulfilled
-  #
-  # Note: Stock management removed in Sprint 23.
-  # OXID handles stock automatically on order finalization.
-
-  # Fraud Check Handler - Checks fraud score on payment authorization
-  # Priority 85: Runs after stock reservation, before order creation
-  # Binary pass/fail only - no manual review
-  # On failure: contract is failed (will trigger stock release)
-  OxidEsales\PaymentBase\EventSystem\Handler\FraudCheckHandler:
-    arguments:
-      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
-      $fraudCheckService: '@OxidEsales\PaymentBase\Service\FraudCheckServiceInterface'
-      $enabled: '%payment.fraud_check.enabled%'
-      $failOpenOnCheckError: '%payment.fraud_check.fail_open_on_error%'
-    tags:
-      - { name: payment.event_handler, priority: 85 }
-    public: false
-
-  # Stripe Radar Fraud Check Service - Checks Stripe Radar score
-  # Default threshold: 0.7 (score >= 0.7 fails)
-  # Implementation in Stripe module, interface in payment-base
-  OxidEsales\PaymentBase\Service\FraudCheckServiceInterface:
-    class: OxidEsales\Payments\Stripe\Service\StripeRadarFraudCheckService
-    arguments:
-      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
-      $threshold: '%payment.fraud_check.threshold%'
-      $logger: '@oxid_esales.monolog.logger'
-    public: false
-
-# ==========================================
-# Parameters for Sprint 2 Condition Handlers
-# ==========================================
-# These can be overridden in shop configuration or environment
-
-  # ==========================================
   # Sprint 64d: Webhook Guard Chain (security hardening)
   # ==========================================
 
@@ -1624,19 +1581,6 @@ services:
     public: true
 
 parameters:
-  # Fraud check toggle (default: enabled)
-  payment.fraud_check.enabled: true
-
-  # Fraud check threshold (default: 0.7 = 70% risk score)
-  # Scores >= threshold fail the fraud check
-  payment.fraud_check.threshold: 0.7
-
-  # Sprint 133 (F1): may an order proceed when the fraud check could not run at
-  # all (Stripe outage, revoked key)? True preserves the historical outcome; the
-  # contract now records that no screening happened either way. Set false to
-  # block unscreenable orders instead.
-  payment.fraud_check.fail_open_on_error: true
-
   # Sprint 133 (F5): enforce the returning-session risk score? Rejecting happens
   # after Stripe authorised the payment, so a false positive strands a paying
   # customer with no order. Off by default: score is recorded and logged only.

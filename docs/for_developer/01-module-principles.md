@@ -189,7 +189,6 @@ The complete handler chain as registered in `services.yaml`:
 |---------|-------|----------|---------|
 | `EarlyOrderCreationHandler` | `ContractDraftCompletedEvent` | 100 | Creates OXID order early (NOT_FINISHED), stores order number |
 | `PaymentAuthorizedEventHandler` | `PaymentAuthorizedEvent` | 90 | Fulfills `payment_authorized` condition, checks if contract is ready |
-| `FraudCheckHandler` | `PaymentAuthorizedEvent` | 85 | Runs Stripe Radar fraud check, fulfills `fraud_check` condition |
 | `OrderPaymentCompletedHandler` | `ContractFulfilledEvent` | 0 | Updates OXID order payment state after fulfillment |
 
 ### Event Flow (Checkout Session)
@@ -210,7 +209,6 @@ StripeCheckoutReturnEvent
               → ContractReadyToCommitEvent
                   → StripeOrderCreationHandler (80)
                       → ContractCommittedEvent
-          → FraudCheckHandler (85)
 ```
 
 ---

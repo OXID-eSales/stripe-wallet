@@ -328,11 +328,6 @@ class StripeAdapter implements StripeAdapterInterface
         return StripeObjectMapper::fromPaymentIntent($raw);
     }
 
-    public function getPaymentIntentRiskScore(string $paymentIntentId): ?float
-    {
-        return $this->paymentIntentHelper->getRiskScore($this->stripeClient, $paymentIntentId);
-    }
-
     public function retrieveCharge(string $chargeId): StripeChargeDto
     {
         $raw = $this->refundHelper->retrieveCharge($this->stripeClient, $chargeId);

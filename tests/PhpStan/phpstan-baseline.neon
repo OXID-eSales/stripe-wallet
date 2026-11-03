@@ -168,8 +168,3 @@ parameters:
 			count: 1
 			path: ../../src/Stripe/Service/StripeOrderApiService.php
 
-		-
-			message: '#^Parameter \#1 \$paymentIntentId of method OxidEsales\\Payments\\Stripe\\Adapter\\StripeAdapterInterface\:\:getPaymentIntentRiskScore\(\) expects string, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: ../../src/Stripe/Service/StripeRadarFraudCheckService.php
