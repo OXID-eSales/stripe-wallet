@@ -16,6 +16,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `::getSessionPaymentIntentId()` and `StripeOrderController::processContextResults()`. A Stripe payment commits only
   through the Checkout Session return (`checkoutSuccess`, contract token + owner) and the webhook.
   `LegacyPaymentElementPathIsGoneTest` keeps the entry points from coming back.
+### Changed (VR-19 W4) - the webhook runs on payment-base's shared guard chain
+- The webhook guards are payment-base's `Webhook\Guard\*` classes, wired as `stripe.webhook.guard_chain` (payload size
+  64 KB -> HTTPS -> IP allow-list, empty by default -> rate limit 100/min). The module's copies (`WebhookGuardChain`,
+  `WebhookGuardResult`, `WebhookRequestGuardInterface`, `WebhookHttpsGuard`, `WebhookPayloadSizeGuard`,
+  `WebhookRateLimitGuard`, `WebhookIpAllowlistGuard`) and the APCu rate limiter service are removed.
+- The rate limit now counts in payment-base's shared store (`oe_payments_idempotency`, per provider `stripe`) and keys on
+  the caller as payment-base's `TrustedProxyClientIp` resolves it behind the shop's reverse proxies (payment-base
+  settings "Webhooks"). Without the chain or the resolver the endpoint answers 503, as it did without the chain.
+- The "minimal guard chain" degraded mode is gone: there is no second, weaker chain, the endpoint either has the shared
+  chain or refuses. Rejections now answer with the guard's reason code (`tls_required`, `payload_too_large`,
+  `rate_limited`, `ip_not_allowed`) instead of a sentence; the HTTP statuses are unchanged. The loopback exemptions of the
+  HTTPS and IP allow-list guards are removed (HTTPS is judged by `HTTPS` / `X-Forwarded-Proto` only). Requires
+  payment-base `b-7.4.x` from 2026-11-03 (`TrustedProxyClientIp` service). After upgrading clear the container cache.
 
 ### Fixed
 - **Every Stripe refund is booked once, by Stripe's refund id, for the amount Stripe refunded (VR-21 F5).** The admin

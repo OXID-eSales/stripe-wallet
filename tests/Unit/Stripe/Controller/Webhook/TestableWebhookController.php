@@ -9,8 +9,8 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller\Webhook;
 
+use OxidEsales\PaymentBase\Webhook\Guard\WebhookGuardInterface;
 use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookController;
-use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRequestGuardInterface;
 
 /**
  * Testable subclass (module CLAUDE.md pattern): OXID controllers cannot be
@@ -19,7 +19,7 @@ use OxidEsales\Payments\Stripe\Controller\Webhook\WebhookRequestGuardInterface;
  */
 class TestableWebhookController extends WebhookController
 {
-    public ?WebhookRequestGuardInterface $testGuard = null;
+    public ?WebhookGuardInterface $testGuard = null;
     public int $sentStatus = 0;
     public ?string $sentLogAction = null;
     public bool $processorWasUsed = false;
@@ -29,22 +29,12 @@ class TestableWebhookController extends WebhookController
     {
     }
 
-    public function exposedGuard(): ?WebhookRequestGuardInterface
+    public function exposedGuard(): ?WebhookGuardInterface
     {
         return $this->getGuard();
     }
 
-    public function installMinimalFallbackChain(): void
-    {
-        $this->testGuard = $this->buildMinimalGuardChain();
-    }
-
-    public function markDegraded(): void
-    {
-        $this->setGuardChainDegraded(true);
-    }
-
-    protected function getGuard(): ?WebhookRequestGuardInterface
+    protected function getGuard(): ?WebhookGuardInterface
     {
         return $this->testGuard;
     }

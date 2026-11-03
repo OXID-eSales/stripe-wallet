@@ -15,6 +15,9 @@ use Throwable;
 use OxidEsales\Eshop\Application\Controller\FrontendController;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
+use OxidEsales\PaymentBase\Webhook\Guard\TrustedProxyClientIp;
+use OxidEsales\PaymentBase\Webhook\Guard\WebhookGuardInterface;
+use OxidEsales\PaymentBase\Webhook\Guard\WebhookHttpRequest;
 use OxidEsales\PaymentBase\Webhook\WebhookRequest;
 use OxidEsales\Payments\Stripe\Adapter\Helper\ResponseHeaders;
 use OxidEsales\PaymentBase\Service\NotFinishedOrderCleanupSettingsInterface;
@@ -27,6 +30,7 @@ use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;
  *
  * Sprint 16: Refactored to use WebhookLogService for logging.
  * Sprint 64d: Added guard chain for rate limiting, payload size, IP allowlist.
+ * VR-19 W4: the chain is payment-base's shared one (stripe.webhook.guard_chain).
  * Controller only handles HTTP concerns (SRP).
  *
  * URL: /index.php?cl=stripe_webhook
@@ -51,8 +55,8 @@ class WebhookController extends FrontendController
     protected ?WebhookLogServiceInterface $webhookLogger = null;
     protected ?RetryCleanupService $cleanupService = null;
     protected ?NotFinishedOrderCleanupSettingsInterface $cleanupSettings = null;
-    private ?WebhookRequestGuardInterface $guard = null;
-    private bool $guardChainDegraded = false;
+    private ?WebhookGuardInterface $guard = null;
+    protected ?TrustedProxyClientIp $clientIp = null;
 
     /**
      * Initialize services.
@@ -73,21 +77,18 @@ class WebhookController extends FrontendController
         }
 
         try {
-            $guard = $container->get(WebhookRequestGuardInterface::class);
-            $this->guard = $guard instanceof WebhookRequestGuardInterface ? $guard : null;
+            $guard = $container->get('stripe.webhook.guard_chain');
+            $this->guard = $guard instanceof WebhookGuardInterface ? $guard : null;
+            // The caller behind the shop's reverse proxies (payment-base settings "Webhooks").
+            $clientIp = $container->get(TrustedProxyClientIp::class);
+            $this->clientIp = $clientIp instanceof TrustedProxyClientIp ? $clientIp : null;
         } catch (Exception $e) {
-            // Sprint 133 · Story 5 (F4): this used to log one warning and leave
-            // the guard null, and render()'s null-safe call then skipped HTTPS,
-            // IP allowlist, payload size AND rate limiting for every request.
-            // A security control that cannot be built fails the request, not
-            // the control: install the guards that need no container, and mark
-            // the endpoint degraded so it answers 503 instead of processing.
+            // Sprint 133 (F4): a security control that cannot be built fails the request, it is not
+            // skipped: getGuard() stays null and render() answers 503 instead of processing.
             Registry::getLogger()->error(
-                'Webhook guard chain unavailable — endpoint degraded, refusing to process',
+                'Webhook guard chain unavailable — endpoint refuses to process',
                 ['error' => $e->getMessage()]
             );
-            $this->guard = $this->buildMinimalGuardChain();
-            $this->guardChainDegraded = true;
         }
 
         try {
@@ -126,23 +127,17 @@ class WebhookController extends FrontendController
 
         [$payload, $signature, $remoteIp] = $this->extractWebhookInput();
 
-        // Sprint 64d: Run guard chain BEFORE any processing
+        // Sprint 64d: Run guard chain BEFORE any processing. Sprint 133 (F4): no chain means
+        // 503, so Stripe retries rather than the endpoint processing unguarded traffic.
         $guard = $this->getGuard();
-        $guardResult = $guard?->check($payload, $signature, $remoteIp);
-        if ($guardResult !== null) {
-            $this->sendErrorResponse($payload, $guardResult->message, $guardResult->httpStatusCode, $guardResult->reason);
+        if ($guard === null) {
+            $this->sendErrorResponse($payload, 'Webhook guards unavailable', 503, 'GUARD_CHAIN_UNAVAILABLE');
         }
 
-        // Sprint 133 (F4): no guards, or only the minimal fallback ones, means
-        // the endpoint is not fully protected — answer 503 so Stripe retries
-        // rather than processing unguarded traffic.
-        if ($guard === null || $this->guardChainDegraded) {
-            $this->sendErrorResponse(
-                $payload,
-                'Webhook guards unavailable',
-                503,
-                'GUARD_CHAIN_UNAVAILABLE'
-            );
+        $guardResult = $guard->check($this->buildGuardRequest($payload, $remoteIp));
+        if (!$guardResult->ok) {
+            $reason = $guardResult->reason ?? 'rejected';
+            $this->sendErrorResponse($payload, $reason, $guardResult->httpStatus, $reason);
         }
 
         $this->processWebhook($payload, $signature, $remoteIp);
@@ -284,26 +279,6 @@ class WebhookController extends FrontendController
     }
 
     /**
-     * Guards that need no container and no database, so the cheap invariants
-     * still hold when DI is broken.
-     */
-    /**
-     * Seam for the testable subclass; production sets this from init().
-     */
-    protected function setGuardChainDegraded(bool $degraded): void
-    {
-        $this->guardChainDegraded = $degraded;
-    }
-
-    protected function buildMinimalGuardChain(): WebhookRequestGuardInterface
-    {
-        return new WebhookGuardChain([
-            new WebhookHttpsGuard(),
-            new WebhookPayloadSizeGuard(),
-        ]);
-    }
-
-    /**
      * Set the HTTP response Content-Type header.
      *
      * Protected for testable subclass override (avoids Registry::getUtils() in tests).
@@ -321,10 +296,56 @@ class WebhookController extends FrontendController
 
     /**
      * Get the guard chain (protected for testable subclass override).
+     *
+     * Without the client-IP resolver the rate limit would key on the proxy: no guard at all.
      */
-    protected function getGuard(): ?WebhookRequestGuardInterface
+    protected function getGuard(): ?WebhookGuardInterface
     {
-        return $this->guard;
+        return $this->clientIp === null ? null : $this->guard;
+    }
+
+    /**
+     * What the shared guards look at. Protected for testable subclass override.
+     */
+    protected function buildGuardRequest(string $payload, string $remoteAddr): WebhookHttpRequest
+    {
+        $contentLength = $_SERVER['CONTENT_LENGTH'] ?? 0;
+
+        return new WebhookHttpRequest(
+            scheme: $this->resolveScheme(),
+            clientIp: $this->clientIp?->resolve($remoteAddr, $this->requestHeaders()) ?? $remoteAddr,
+            contentLength: is_numeric($contentLength) ? (int) $contentLength : 0,
+            rawBody: $payload,
+        );
+    }
+
+    /**
+     * TLS at this origin, or a proxy that terminated it (X-Forwarded-Proto), as the module's
+     * HTTPS guard always accepted.
+     */
+    private function resolveScheme(): string
+    {
+        $https = $_SERVER['HTTPS'] ?? '';
+        if (is_string($https) && $https !== '' && $https !== 'off') {
+            return 'https';
+        }
+
+        return ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https' ? 'https' : 'http';
+    }
+
+    /**
+     * @return array<string, string> request headers, as TrustedProxyClientIp reads them
+     */
+    private function requestHeaders(): array
+    {
+        $headers = [];
+        foreach ($_SERVER as $key => $value) {
+            if (is_string($key) && is_string($value) && str_starts_with($key, 'HTTP_')) {
+                $headers[str_replace('_', '-', substr($key, 5))] = $value;
+            }
+        }
+
+        return $headers;
     }
 
     /**
