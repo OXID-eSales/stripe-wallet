@@ -255,8 +255,6 @@ Module settings in `metadata.php` / YAML:
 - `StripeCaptureRequestEvent` - Admin capture action (supports partial via `?float amount`)
 - `StripeRefundRequestEvent` - Admin refund action (supports partial via `?float amount`)
 - `StripeCancelAuthorizationRequestEvent` - Admin cancel authorization
-- `StripePaymentExecuteEvent` - Payment execution
-- `StripePaymentReturnEvent` - Payment return
 - `Stripe3DSRequiredEvent` - 3D Secure required
 
 ### Contract Events (from payment-component)
