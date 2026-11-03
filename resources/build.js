@@ -40,8 +40,7 @@ function log(message, color = 'reset') {
  */
 function ensureDirectories() {
     const dirs = [
-        path.join(PATHS.assets, 'js'),
-        path.join(PATHS.assets, 'js/controllers')
+        path.join(PATHS.assets, 'js')
     ];
 
     dirs.forEach(dir => {
@@ -119,8 +118,7 @@ async function buildDevelopment() {
     ensureDirectories();
 
     const results = await Promise.all([
-        build(developmentConfig.frontend, 'Frontend (Development)'),
-        build(developmentConfig.controllers, 'Controllers (Development)')
+        build(developmentConfig.frontend, 'Frontend (Development)')
     ]);
 
     if (results.every(r => r === true)) {
@@ -140,8 +138,7 @@ async function startWatch() {
     ensureDirectories();
 
     const contexts = await Promise.all([
-        watch(developmentConfig.frontend, 'Frontend'),
-        watch(developmentConfig.controllers, 'Controllers')
+        watch(developmentConfig.frontend, 'Frontend')
     ]);
 
     if (contexts.every(ctx => ctx !== null)) {

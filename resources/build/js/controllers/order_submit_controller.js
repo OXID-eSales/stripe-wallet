@@ -175,31 +175,6 @@ export default class extends Controller {
   }
 
   /**
-   * Get the stripe-order controller instance
-   * @returns {Controller|null}
-   */
-  getStripeOrderController() {
-    const cardElement = document.getElementById('card-element')
-    if (!cardElement) {
-      console.error('Card element not found')
-      return null
-    }
-
-    const controller = this.application.getControllerForElementAndIdentifier(
-      cardElement,
-      'stripe-order'
-    )
-
-    if (!controller) {
-      console.error('Stripe order controller not found on card element')
-      return null
-    }
-
-    this._debug('Found stripe-order controller:', controller)
-    return controller
-  }
-
-  /**
    * Handle order submit button click
    * Routes to appropriate payment flow based on payment type
    * @param {Event} event - The click event
@@ -216,12 +191,7 @@ export default class extends Controller {
     this.showLoading()
 
     try {
-      // Route to appropriate payment flow
-      if (this.paymentTypeValue === 'wallet') {
-        await this.handleStripeCheckout()
-      } else {
-        await this.handlePaymentIntent()
-      }
+      await this.handleStripeCheckout()
     } catch (error) {
       console.error('Order submission failed', error)
       this.presentError(error)
@@ -361,88 +331,6 @@ export default class extends Controller {
     this.setStatus('')
     this.hideButton()
     this._debug('Embedded Checkout mounted (iframe mode)')
-  }
-
-  /**
-   * Handle Payment Intent flow (card element)
-   * Used for card payments
-   */
-  async handlePaymentIntent() {
-    // Get stripe-order controller instance
-    const stripeOrderController = this.getStripeOrderController()
-
-    if (!stripeOrderController) {
-      throw new Error(window.oStripe?.i18n?.CONTROLLER_NOT_FOUND || 'Stripe payment controller not found. Please refresh the page.')
-    }
-
-    // Verify card element and stripe are available
-    if (!stripeOrderController.card || !stripeOrderController.stripe) {
-      console.error('Payment form not ready:', {
-        hasCard: !!stripeOrderController.card,
-        hasStripe: !!stripeOrderController.stripe
-      })
-      throw new Error(window.oStripe?.i18n?.FORM_NOT_READY || 'Payment form not initialized. Please refresh the page.')
-    }
-
-    this._debug('Stripe controller ready:', {
-      hasCard: !!stripeOrderController.card,
-      hasStripe: !!stripeOrderController.stripe
-    })
-
-    const paymentIntentResponse = await this.handlePayment()
-    const clientSecret = paymentIntentResponse.clientSecret
-
-    const confirmPaymentResponse = await stripeOrderController.stripe.confirmCardPayment(clientSecret, {
-      payment_method: {
-        card: stripeOrderController.card
-      }
-    });
-
-    if (confirmPaymentResponse.error) {
-      throw new Error(confirmPaymentResponse.error.message)
-    } else if (confirmPaymentResponse.paymentIntent && confirmPaymentResponse.paymentIntent.status === 'succeeded') {
-      this._debug('Payment succeeded', confirmPaymentResponse.paymentIntent)
-      // TODO: Submit final order to backend
-    } else {
-      throw new Error(window.oStripe?.i18n?.PAYMENT_NOT_COMPLETED || 'Payment not completed')
-    }
-  }
-
-  /**
-   * Fetch payment intent creation URL and return response
-   * @returns {Promise<Object>} Payment intent response with clientSecret, amount, currency
-   * @throws {Error} If fetch fails or response is not ok
-   */
-  async handlePayment() {
-    if (!this.hasUrlValue) {
-      throw new Error(window.oStripe?.i18n?.URL_NOT_CONFIGURED || 'Payment URL is not configured')
-    }
-
-    this._debug('Creating payment intent via URL:', this.urlValue)
-
-    const response = await fetch(this.appendAgbState(this.buildUrlWithCsrfToken(this.urlValue)), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      credentials: 'same-origin'
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-
-    const responseData = await response.json()
-
-    if (responseData.error) {
-      throw new Error(responseData.error)
-    }
-
-    if (!responseData.success || !responseData.clientSecret) {
-      throw new Error(window.oStripe?.i18n?.INTENT_INVALID || 'Invalid payment intent response')
-    }
-
-    return responseData
   }
 
   /**

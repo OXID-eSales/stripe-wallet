@@ -77,20 +77,6 @@ const developmentConfig = {
         define: {
             'process.env.NODE_ENV': '"development"'
         }
-    },
-
-    // Individual controllers for development (unbundled)
-    controllers: {
-        entryPoints: [
-            path.join(PATHS.build, 'js/controllers/stripe_order_controller.js')
-        ],
-        bundle: false,
-        minify: false,
-        sourcemap: 'inline',
-        outdir: path.join(PATHS.assets, 'js/controllers'),
-        format: 'esm',
-        platform: 'browser',
-        target: ['es2017']
     }
 };
 
