@@ -68,6 +68,9 @@ final class StripeAcpCheckoutServiceTest extends TestCase
         $this->contract->transitionToNotFinished('order-1');
         $this->contract->transitionToPending();
         $this->contract->setMetadata('order_number', '1001');
+        // payment-base H8: only the agent that opened a checkout over ACP may complete it
+        $this->contract->setMetadata('channel', 'acp');
+        $this->contract->setMetadata('acp_agent_id', 'agent-1');
         $this->contracts->method('findById')->with('ctr-1')->willReturn($this->contract);
         $this->formatter->method('validationError')->willReturnCallback(
             static fn(string $message, ?string $param = null): array => ['error' => ['message' => $message, 'param' => $param]]
@@ -140,6 +143,19 @@ final class StripeAcpCheckoutServiceTest extends TestCase
 
         self::assertSame('order-1', $result['id']);
         self::assertSame('agent-1', $this->contract->getMetadata('acp_agent_id'));
+    }
+
+    public function testAnotherAgentsCheckoutIsNotChargedAndLooksUnknown(): void
+    {
+        $this->adapter->expects($this->never())->method('createPayment');
+        $this->commit->expects($this->never())->method('commit');
+        $this->formatter->expects($this->once())->method('notFoundError')->with('ctr-1')
+            ->willReturn(['error' => ['message' => 'not found', 'param' => null]]);
+
+        $result = $this->service()->completeCheckout('ctr-1', ['token' => 'spt_123'], new AgentContext('agent-2', 'tok'));
+
+        self::assertSame('not found', $result['error']['message']);
+        self::assertSame('agent-1', $this->contract->getMetadata('acp_agent_id'), 'a foreign agent must not take the contract over');
     }
 
     public function testAnAuthorizedIntentCommitsAsRequiringCapture(): void

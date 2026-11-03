@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed (VR-24 H8) - ACP ownership guard
+- `StripeAcpCheckoutService` inherits payment-base's guard: get/update/cancel/complete serve only a contract this agent
+  opened over ACP (`channel=acp`, `acp_agent_id`); the unit test fixtures carry both, and a test pins that another
+  agent's checkout is never charged and answers "not found". MCP/ACP is kept.
+
 ### Changed - Adopts payment-base VR wave 2 (F3/L1/A1)
 - **Stock is restored by payment-base, not by Stripe (VR-21 F3).** Removed: `Stripe\Service\OxidStockRestorationService`
   with its services.yaml binding and autowire exclude and `StockRestorationServiceTest`; `RefundService` no longer takes
