@@ -17,9 +17,6 @@ class StubControllerRequestHelper extends ControllerRequestHelper
     public ?string $contractIdFromRequest = null;
     public ?string $contractTokenFromRequest = null;
     public ?string $contractIdFromSession = null;
-    public ?string $paymentIntentIdFromRequest = null;
-    public ?string $sessionPaymentIntentId = null;
-    public ?string $redirectStatus = null;
     public bool $tokenValidationResult = true;
     public bool $sessionChallengeResult = true;
     public ?string $lastError = null;
@@ -57,21 +54,6 @@ class StubControllerRequestHelper extends ControllerRequestHelper
     public function getContractIdFromSession(): ?string
     {
         return $this->contractIdFromSession;
-    }
-
-    public function getPaymentIntentIdFromRequest(): ?string
-    {
-        return $this->paymentIntentIdFromRequest;
-    }
-
-    public function getSessionPaymentIntentId(): ?string
-    {
-        return $this->sessionPaymentIntentId;
-    }
-
-    public function getRedirectStatusFromRequest(): ?string
-    {
-        return $this->redirectStatus;
     }
 
     public function getBasketFromSession(): \OxidEsales\Eshop\Application\Model\Basket

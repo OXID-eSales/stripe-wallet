@@ -121,8 +121,6 @@ WebhookReceivedEvent
 ```
 StripeCheckoutSessionRequestEvent
 StripeCheckoutReturnEvent
-StripePaymentExecuteEvent
-StripePaymentReturnEvent
 StripeCaptureRequestEvent
 StripeCancelAuthorizationRequestEvent
 StripeRefundRequestEvent
@@ -159,8 +157,6 @@ tags:
 | StripeCheckoutSessionHandler | StripeCheckoutSessionRequestEvent | 0 |
 | StripeCheckoutReturnHandler | StripeCheckoutReturnEvent | 100 |
 | StripeOrderCreationHandler | ContractReadyToCommitEvent | 80 |
-| StripePaymentStatusHandler | StripePaymentExecuteEvent | default |
-| StripePaymentReturnHandler | StripePaymentReturnEvent | default |
 | StripeCaptureRequestHandler | StripeCaptureRequestEvent | default |
 | StripeCancelAuthorizationRequestHandler | StripeCancelAuthorizationRequestEvent | default |
 | StripeRefundRequestHandler | StripeRefundRequestEvent | default |

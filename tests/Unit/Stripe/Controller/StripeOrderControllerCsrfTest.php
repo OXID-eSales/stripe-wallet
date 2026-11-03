@@ -15,7 +15,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Sprint 64f: CSRF protection tests for frontend AJAX endpoints.
  *
- * Tests that createCheckoutSession and executeStripePayment reject
+ * Tests that createCheckoutSession rejects
  * when CSRF token validation fails. Uses testable subclass that overrides
  * validateSessionChallenge() and framework-dependent methods.
  */
@@ -54,30 +54,6 @@ final class StripeOrderControllerCsrfTest extends TestCase
 
         // CSRF passed, error is about basket/config, not session
         $this->assertNotSame(403, $controller->getLastHttpStatusCode());
-    }
-
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function executeStripePaymentRejectsWithoutCsrfToken(): void
-    {
-        $controller = new TestableStripeOrderControllerForCsrf();
-        $controller->setSessionChallengeResult(false);
-
-        $result = $controller->executeStripePayment();
-
-        $this->assertSame('payment', $result);
-        $this->assertStringContainsString('Session expired', $controller->getLastError());
-    }
-
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function executeStripePaymentProceedsWithValidCsrfToken(): void
-    {
-        $controller = new TestableStripeOrderControllerForCsrf();
-        $controller->setSessionChallengeResult(true);
-
-        $result = $controller->executeStripePayment();
-
-        // CSRF passed — fails on basket empty check, not session
-        $this->assertNotEquals('Session expired', $controller->getLastError());
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
@@ -156,18 +132,6 @@ class TestableStripeOrderControllerForCsrf extends StripeOrderController
 
         $this->lastHttpStatusCode = 200;
         echo json_encode(['id' => 'cs_test', 'url' => 'https://checkout.stripe.com/test']);
-    }
-
-    public function executeStripePayment(): string
-    {
-        if (!$this->validateSessionChallenge()) {
-            $this->lastError = 'Session expired. Please reload the page.';
-            return 'payment';
-        }
-
-        // Simulate basket empty
-        $this->lastError = 'Basket is empty';
-        return 'basket';
     }
 
     protected function setSessionVariable(string $key, mixed $value): void

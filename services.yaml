@@ -938,28 +938,6 @@ services:
       - { name: payment.event_handler }
     public: false
 
-  # Stripe Payment Return Handler - Handles return from Payment Element flow
-  # Sprint 25: Added event logger for debugging
-  OxidEsales\Payments\Stripe\EventSystem\Handler\StripePaymentReturnHandler:
-    arguments:
-      $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
-      $eventLogger: '@stripe.events.file_logger'
-    tags:
-      - { name: payment.event_handler }
-    public: false
-
-  # Stripe Payment Status Handler - Verifies payment status for Payment Element flow
-  # Sprint 25: Added event logger for debugging
-  OxidEsales\Payments\Stripe\EventSystem\Handler\StripePaymentStatusHandler:
-    arguments:
-      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
-      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
-      $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
-      $eventLogger: '@stripe.events.file_logger'
-    tags:
-      - { name: payment.event_handler }
-    public: false
-
   # ==========================================
   # Request Log Service (Sprint 8, refactored Sprint 15)
   # ==========================================
