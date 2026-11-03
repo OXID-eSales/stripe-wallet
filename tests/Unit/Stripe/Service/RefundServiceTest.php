@@ -499,6 +499,101 @@ class RefundServiceTest extends TestCase
         $this->assertTrue($result->isSuccessful());
     }
 
+    // --- VR-21 F2: restock only when a succeeded refund leaves nothing refundable ---
+
+    public function testPartialRefundKeepsStock(): void
+    {
+        $this->givenChargeCapturedAndRefunded(10000, 0);
+        $this->stripeAdapter->method('createRefundByCharge')
+            ->willReturn($this->buildRefundDto('re_part', 100, 'eur', 'succeeded'));
+
+        $this->stockRestorationService->expects($this->never())->method('restoreStockForOrder');
+
+        $result = $this->createService()->processRefund('order_part', 'pi_part', null, null, 'admin', 1.00);
+
+        $this->assertTrue($result->isSuccessful());
+    }
+
+    public function testPendingRefundKeepsStock(): void
+    {
+        $this->givenChargeCapturedAndRefunded(10000, 0);
+        $this->stripeAdapter->method('createRefundByCharge')
+            ->willReturn($this->buildRefundDto('re_pend', 10000, 'eur', 'pending'));
+
+        $this->stockRestorationService->expects($this->never())->method('restoreStockForOrder');
+
+        $result = $this->createService()->processRefund('order_pend', 'pi_pend');
+
+        $this->assertTrue($result->isSuccessful());
+        $this->assertSame('pending', $result->status);
+    }
+
+    public function testFullSucceededRefundRestocksOnce(): void
+    {
+        $this->givenChargeCapturedAndRefunded(10000, 0);
+        $this->stripeAdapter->method('createRefundByCharge')
+            ->willReturn($this->buildRefundDto('re_full', 10000, 'eur', 'succeeded'));
+
+        $this->stockRestorationService->expects($this->once())
+            ->method('restoreStockForOrder')->with('order_full')->willReturn(3);
+
+        $this->createService()->processRefund('order_full', 'pi_full');
+    }
+
+    public function testRefundOfTheRestRestocksOnce(): void
+    {
+        $this->givenChargeCapturedAndRefunded(10000, 4000);
+        $this->stripeAdapter->method('createRefundByCharge')
+            ->willReturn($this->buildRefundDto('re_rest', 6000, 'eur', 'succeeded'));
+
+        $this->stockRestorationService->expects($this->once())
+            ->method('restoreStockForOrder')->with('order_rest')->willReturn(3);
+
+        $this->createService()->processRefund('order_rest', 'pi_rest', null, null, 'admin', 60.00);
+    }
+
+    public function testPartialRefundWithoutExpandedChargeKeepsStock(): void
+    {
+        $this->stripeAdapter->method('retrievePaymentIntent')->willReturn($this->buildPiDto('pi_x', 'ch_x'));
+        $this->stripeAdapter->method('createRefundByCharge')
+            ->willReturn($this->buildRefundDto('re_x', 10000, 'eur', 'succeeded'));
+
+        $this->stockRestorationService->expects($this->never())->method('restoreStockForOrder');
+
+        $this->createService()->processRefund('order_x', 'pi_x', null, null, 'admin', 100.00);
+    }
+
+    public function testPendingRefundByChargeKeepsStock(): void
+    {
+        $this->stripeAdapter->method('createRefundByCharge')
+            ->willReturn($this->buildRefundDto('re_pc', 2500, 'eur', 'pending'));
+
+        $this->stockRestorationService->expects($this->never())->method('restoreStockForOrder');
+
+        $this->createService()->processRefundByCharge('ch_test', null, ['order_id' => 'order_pc']);
+    }
+
+    private function givenChargeCapturedAndRefunded(int $captured, int $refunded): void
+    {
+        $this->stripeAdapter->method('retrievePaymentIntent')->willReturn(new StripePaymentIntentDto(
+            id: 'pi_any',
+            status: 'succeeded',
+            amount: $captured,
+            currency: 'eur',
+            created: 1700000000,
+            latestChargeId: 'ch_any',
+            charge: new StripeChargeDto(
+                id: 'ch_any',
+                amount: $captured,
+                amountCaptured: $captured,
+                amountRefunded: $refunded,
+                currency: 'eur',
+                captured: true,
+                created: 1700000000,
+            ),
+        ));
+    }
+
     public function testRefundWithoutOrderIdSkipsStockRestoration(): void
     {
         // Arrange - no orderId in metadata

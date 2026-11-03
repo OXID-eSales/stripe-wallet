@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- **A partial or pending refund no longer restocks the order (VR-21 F2).** Every succeeded or pending refund, of any
+  amount, returned all order lines to stock and stornoed them. Stock now comes back only when the refund succeeded and
+  leaves nothing refundable on the charge (no amount, or captured minus already refunded). A pending refund that later
+  succeeds is not restocked by this path; the shared ledger (VR-21 F5) takes that over.
 - **A refund is booked once (CFG-1 S8).** An admin refund and Stripe's `charge.refunded` webhook for the same refund both
   booked it: the contract's refunded amount doubled and a second, reference-less refund row appeared. The webhook now
   books only refunds the module does not know, told apart by Stripe's refund id (the reference of the admin's row); an
