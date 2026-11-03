@@ -21,6 +21,8 @@ use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use OxidEsales\PaymentBase\Refund\ProviderRefundLedger;
+use OxidEsales\PaymentBase\Refund\RefundSettledPolicy;
+use OxidEsales\PaymentBase\Service\StockRestorationServiceInterface;
 use OxidEsales\PaymentBase\Repository\DoctrineContractRepository;
 use OxidEsales\PaymentBase\Repository\DoctrineTransactionRepository;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
@@ -69,7 +71,18 @@ final class RefundFlowIntegrationTest extends IntegrationTestCase
         $this->connection = $connectionProvider->get();
         $this->contracts = new DoctrineContractRepository($this->connection);
         $transactions = new DoctrineTransactionRepository($this->connection);
-        $ledger = new ProviderRefundLedger($this->connection, $this->contracts, $transactions, new NullLogger());
+        $ledger = new ProviderRefundLedger(
+            $this->connection,
+            $this->contracts,
+            $transactions,
+            new RefundSettledPolicy(new class implements StockRestorationServiceInterface {
+                public function restoreForFullRefund(string $orderId): int
+                {
+                    return 0;
+                }
+            }),
+            new NullLogger(),
+        );
 
         $runId = date('His') . substr(uniqid(), -4);
         $this->contractId = substr(self::TEST_PREFIX . $runId, 0, 32);
