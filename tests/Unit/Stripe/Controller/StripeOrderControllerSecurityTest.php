@@ -113,7 +113,11 @@ class StripeOrderControllerSecurityTest extends TestCase
 
         $tokenService = $this->createMock(\OxidEsales\PaymentBase\Service\TokenServiceInterface::class);
 
-        $helper = new ControllerRequestHelper($tokenService, $moduleConfig);
+        $helper = new ControllerRequestHelper(
+            $this->createMock(\OxidEsales\PaymentBase\Checkout\Return\ReturnAccessGuardInterface::class),
+            $tokenService,
+            $moduleConfig
+        );
 
         // Helper reads from config service, not from request params
         $this->assertEquals('automatic', $helper->getCaptureMode());
