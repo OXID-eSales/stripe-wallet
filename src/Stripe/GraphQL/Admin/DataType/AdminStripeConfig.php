@@ -41,8 +41,6 @@ final class AdminStripeConfig
     }
 
     #[Field]
-    #[Field]
-    #[Field]
     public function isProvideCustomerEmail(): bool
     {
         return $this->config->provideCustomerEmail;
