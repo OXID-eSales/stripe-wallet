@@ -7,26 +7,21 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Translation;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Sprint 91: Verifies all required frontend translation keys exist in EN and DE.
+ * Verifies all required frontend translation keys exist in EN and DE (Sprint 91; reduced to the live keys in VR-17 DC-S8).
  */
 #[\PHPUnit\Framework\Attributes\Group('sprint-91')]
 final class FrontendTranslationCompletenessTest extends TestCase
 {
-    /** Keys used in base_stripe_element_config.html.twig + payment.html.twig */
+    /** Keys read by stripe_i18n.html.twig (window.oStripe.i18n for the Stimulus controllers). */
     private const REQUIRED_KEYS = [
-        'OSC_STRIPE_CARD_NUMBER',
-        'OSC_STRIPE_CARD_EXDATE',
-        'OSC_STRIPE_CARD_CVC',
-        'OSC_STRIPE_CARD_NAME',
-        'OSC_STRIPE_ERROR_MISSING_NAME',
-        'OSC_STRIPE_ERROR_MISSING_NUMBER',
-        'OSC_STRIPE_ERROR_MISSING_CVC',
-        'OSC_STRIPE_ERROR_MISSING_EXDATE',
-        'OSC_STRIPE_ERROR_INBOX',
-        'OSC_STRIPE_UNKNOWN_ERROR',
-        'OSC_STRIPE_AUTHORIZATION_DENIED_ERROR',
-        'OSC_STRIPE_VAULTING_VAULTED_PAYMENTS',
-        'OSC_STRIPE_CONTINUE_TO_NEXT_STEP',
+        'STRIPE_JS_AGB_REQUIRED',
+        'STRIPE_JS_PAYMENT_FAILED',
+        'STRIPE_JS_NOT_LOADED',
+        'STRIPE_JS_KEY_NOT_CONFIGURED',
+        'STRIPE_JS_CREATING_SESSION',
+        'STRIPE_JS_SESSION_FAILED',
+        'STRIPE_JS_SESSION_INVALID',
+        'STRIPE_JS_PROCESSING',
     ];
 
     public function testAllRequiredKeysExistInEnglish(): void
