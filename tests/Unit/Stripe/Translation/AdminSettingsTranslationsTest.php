@@ -158,14 +158,20 @@ final class AdminSettingsTranslationsTest extends TestCase
         $this->assertSame('1', $setting['value'], 'blStripeLogWebhooks default must be "1" (on)');
     }
 
-    public function testLegacyTransactionInfoSettingStillExistsForBackCompat(): void
+    /** @return list<array{string}> */
+    public static function removedSettings(): array
     {
-        $setting = $this->findSetting('blStripeLogTransactionInfo');
+        return [
+            ['blStripeLogTransactionInfo'],
+            ['blStripeRemoveByBillingCountry'],
+            ['blStripeRemoveByBasketCurrency'],
+        ];
+    }
 
-        $this->assertNotNull(
-            $setting,
-            'blStripeLogTransactionInfo must remain in metadata.php for Phase 3 back-compat seeding'
-        );
+    #[\PHPUnit\Framework\Attributes\DataProvider('removedSettings')]
+    public function testRemovedSettingsAreNotDeclaredAnyMore(string $name): void
+    {
+        $this->assertNull($this->findSetting($name), $name . ' was removed (VR-17 DC-S9)');
     }
 
     /** @return array{name: string, group: string, type: string, value: string}|null */

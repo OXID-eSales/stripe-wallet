@@ -18,8 +18,7 @@ use PHPUnit\Framework\TestCase;
  * Design:
  * - getLogLevel(): returns the validated effective log level string.
  *   - When sStripeLogLevel is explicitly set to a known value → return it.
- *   - When sStripeLogLevel is unset/empty → seed from blStripeLogTransactionInfo:
- *       '1'/true → 'normal', '0'/false → 'off'.
+ *   - When sStripeLogLevel is unset/empty → the default 'normal'.
  *   - Unknown/garbage value → safe default 'normal'.
  * - Per-channel helpers derived from getLogLevel() (single resolution path, DRY):
  *   - isRequestLoggingEnabled()      → level ∈ {errors, normal, debug}
@@ -28,8 +27,6 @@ use PHPUnit\Framework\TestCase;
  *   - isWebhookLoggingEnabled()      → blStripeLogWebhooks AND level ∈ {normal, debug}
  *   - isFrontendDebugEnabled()       → level == debug
  * - isLoggingEnabled() REMOVED (dead method reading non-existent key).
- * - isTransactionLoggingEnabled() kept for legacy-seed source; its direct read
- *   is now superseded by getLogLevel() legacy-seed logic.
  */
 #[\PHPUnit\Framework\Attributes\CoversMethod(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::class, 'getLogLevel')]
 #[\PHPUnit\Framework\Attributes\CoversMethod(\OxidEsales\Payments\Stripe\Service\ModuleConfigurationService::class, 'isRequestLoggingEnabled')]
@@ -92,91 +89,24 @@ final class ModuleConfigurationServiceLogLevelTest extends TestCase
     }
 
     // =========================================================================
-    // getLogLevel() — legacy seed (sStripeLogLevel unset/empty)
+    // getLogLevel() — sStripeLogLevel unset/empty
     // =========================================================================
 
     /**
-     * Back-compat: legacy bool '1' (logging on) seeds to 'normal'.
-     * Once the merchant sets sStripeLogLevel explicitly, legacy bool is ignored.
+     * An unset or empty sStripeLogLevel gives 'normal' (safe production default); the removed legacy
+     * blStripeLogTransactionInfo toggle is not consulted any more.
      */
-    public function testGetLogLevelSeedsNormalFromLegacyBoolOneWhenSelectUnset(): void
+    public function testGetLogLevelDefaultsToNormalWhenUnsetOrEmpty(): void
     {
-        $service = $this->makeService([
-            // sStripeLogLevel absent → seed from legacy
-            'blStripeLogTransactionInfo' => '1',
-        ]);
-
-        $this->assertSame('normal', $service->getLogLevel());
+        $this->assertSame('normal', $this->makeService([])->getLogLevel());
+        $this->assertSame('normal', $this->makeService(['sStripeLogLevel' => ''])->getLogLevel());
+        $this->assertSame('normal', $this->makeService(['blStripeLogTransactionInfo' => '0'])->getLogLevel());
     }
 
-    /**
-     * Back-compat: legacy bool '0' (logging off) seeds to 'off'.
-     */
-    public function testGetLogLevelSeedsOffFromLegacyBoolZeroWhenSelectUnset(): void
+    public function testGetLogLevelReturnsAnExplicitKnownLevel(): void
     {
-        $service = $this->makeService([
-            'blStripeLogTransactionInfo' => '0',
-        ]);
-
-        $this->assertSame('off', $service->getLogLevel());
-    }
-
-    /**
-     * Back-compat: legacy bool integer 1 (truthy) → seeds to 'normal'.
-     */
-    public function testGetLogLevelSeedsNormalFromLegacyIntOneWhenSelectUnset(): void
-    {
-        $service = $this->makeService([
-            'blStripeLogTransactionInfo' => 1,
-        ]);
-
-        $this->assertSame('normal', $service->getLogLevel());
-    }
-
-    /**
-     * Back-compat: legacy bool integer 0 → seeds to 'off'.
-     */
-    public function testGetLogLevelSeedsOffFromLegacyIntZeroWhenSelectUnset(): void
-    {
-        $service = $this->makeService([
-            'blStripeLogTransactionInfo' => 0,
-        ]);
-
-        $this->assertSame('off', $service->getLogLevel());
-    }
-
-    /**
-     * When both sStripeLogLevel is unset AND blStripeLogTransactionInfo is empty
-     * (module not yet configured), default to 'normal' (safe production default).
-     */
-    public function testGetLogLevelDefaultsToNormalWhenBothSettingsAbsent(): void
-    {
-        $service = $this->makeService([]);
-
-        $this->assertSame('normal', $service->getLogLevel());
-    }
-
-    /**
-     * Explicit sStripeLogLevel takes precedence — legacy bool is NOT consulted.
-     */
-    public function testGetLogLevelUsesExplicitSelectAndIgnoresLegacyBoolWhenSelectIsSet(): void
-    {
-        $service = $this->makeService([
-            'sStripeLogLevel'            => 'debug',
-            'blStripeLogTransactionInfo' => '0', // would seed 'off' if consulted
-        ]);
-
-        $this->assertSame('debug', $service->getLogLevel());
-    }
-
-    public function testGetLogLevelUsesOffSelectAndIgnoresLegacyBoolWhenSelectIsOff(): void
-    {
-        $service = $this->makeService([
-            'sStripeLogLevel'            => 'off',
-            'blStripeLogTransactionInfo' => '1', // would seed 'normal' if consulted
-        ]);
-
-        $this->assertSame('off', $service->getLogLevel());
+        $this->assertSame('debug', $this->makeService(['sStripeLogLevel' => 'debug'])->getLogLevel());
+        $this->assertSame('off', $this->makeService(['sStripeLogLevel' => 'off'])->getLogLevel());
     }
 
     // =========================================================================
@@ -377,35 +307,6 @@ final class ModuleConfigurationServiceLogLevelTest extends TestCase
         $service = $this->makeService(['sStripeLogLevel' => 'debug']);
 
         $this->assertTrue($service->isFrontendDebugEnabled());
-    }
-
-    // =========================================================================
-    // Legacy-seed tests — coverage of the Phase 0 invariant preserved here
-    // =========================================================================
-
-    /**
-     * isTransactionLoggingEnabled() still works after refactor
-     * (used internally as seed source; public API kept for back-compat).
-     */
-    public function testIsTransactionLoggingEnabledReturnsTrueWhenValueIsOne(): void
-    {
-        $service = $this->makeService(['blStripeLogTransactionInfo' => '1']);
-
-        $this->assertTrue($service->isTransactionLoggingEnabled());
-    }
-
-    public function testIsTransactionLoggingEnabledReturnsFalseWhenValueIsZero(): void
-    {
-        $service = $this->makeService(['blStripeLogTransactionInfo' => '0']);
-
-        $this->assertFalse($service->isTransactionLoggingEnabled());
-    }
-
-    public function testIsTransactionLoggingEnabledReturnsFalseWhenValueAbsent(): void
-    {
-        $service = $this->makeService([]);
-
-        $this->assertFalse($service->isTransactionLoggingEnabled());
     }
 
     // =========================================================================

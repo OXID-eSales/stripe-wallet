@@ -21,8 +21,6 @@ final class ConfigFixtures
         return new StripeConfigSnapshot(...array_merge([
             'mode' => 'test',
             'captureMode' => 'automatic',
-            'removeByBillingCountry' => true,
-            'removeByBasketCurrency' => true,
             'provideCustomerEmail' => false,
             'logLevel' => 'normal',
             'logWebhooks' => true,

@@ -22,22 +22,13 @@ $aLang = array(
     'SHOP_MODULE_sStripeTestPk'                         => 'Test API Publishable Key',
     'SHOP_MODULE_sStripeLiveToken'                      => 'Live API  Access Token',
     'SHOP_MODULE_sStripeLivePk'                         => 'Live API Publishable Key',
-    'SHOP_MODULE_blStripeLogTransactionInfo'            => 'Log result of transaction handling',
     'SHOP_MODULE_blStripeRemoveDeactivatedMethods'      => 'Remove deactivated payment types',
-    'SHOP_MODULE_blStripeRemoveByBillingCountry'        => 'Remove not supported payment types by billing country',
-    'SHOP_MODULE_blStripeRemoveByBasketCurrency'        => 'Remove not supported payment types by basket currency',
     'SHOP_MODULE_GROUP_STRIPE_WEBHOOKS'                 => 'Webhooks',
     'SHOP_MODULE_sStripeWebhookEndpoint'                => 'Webhook Endpoint',
     'HELP_SHOP_MODULE_sStripeWebhookEndpoint'           => 'Paste your Stripe Webhook Endpoint URL here, or use the button below to create and register it automatically using your platform secret key.',
     'SHOP_MODULE_sStripeWebhookEndpointSecret'          => 'Webhook Endpoint secret',
     'SHOP_MODULE_blStripeProvideCustomerEmailAddress'   => 'Send customer email address to Stripe',
-    // Phase 2 (logging-control sprint): blStripeLogTransactionInfo is deprecated.
-    // The help text previously referenced a log file that no longer exists.
-    // Phase 3 will read this legacy bool as a seed for sStripeLogLevel.
-    'HELP_SHOP_MODULE_blStripeLogTransactionInfo'       => 'Deprecated. This setting is kept for back-compatibility only. Use the Logging group controls (sStripeLogLevel, blStripeLogWebhooks) instead. Stripe logs are written to log/stripe/stripe_*_&lt;date&gt;.log.',
     'HELP_SHOP_MODULE_blStripeRemoveDeactivatedMethods' => 'Removes the payment types from the frontend payment selection which are not activated in the Stripe Dashboard and thus would result in an error.',
-    'HELP_SHOP_MODULE_blStripeRemoveByBillingCountry'   => 'Removes the payment types from the frontend payment selection which are not supported for the billing country given by the customer and thus would result in an error.',
-    'HELP_SHOP_MODULE_blStripeRemoveByBasketCurrency'   => 'Removes the payment types from the frontend payment selection which are not supported for the basket currency given by the customer and thus would result in an error.',
 
     'HELP_SHOP_MODULE_blStripeProvideCustomerEmailAddress' => 'If this option is activated, the customer email address will also be passed on for a Stripe order. This overwrites the standard email settings in the Stripe account for this order. This means that notifications for this order are sent to the customer email address instead of to the Stripe account email address.',
 

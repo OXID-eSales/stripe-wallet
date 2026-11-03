@@ -29,7 +29,7 @@ use PHPUnit\Framework\Attributes\Group;
 #[Group('integration')]
 final class StripeAdminApiWiringTest extends IntegrationTestCase
 {
-    private const CONFIG_FIELDS = 'mode captureMode removeByBillingCountry removeByBasketCurrency provideCustomerEmail '
+    private const CONFIG_FIELDS = 'mode captureMode provideCustomerEmail '
         . 'logLevel logWebhooks testPublishableKey livePublishableKey webhookEndpointUrl testTokenSet liveTokenSet '
         . 'testPlatformKeySet livePlatformKeySet webhookSecretSet testConnected liveConnected keyValidationError version classicSettingsUrl';
     private const WEBHOOK_SECRET_VARS = ['sStripeWebhookEndpointSecretTest', 'sStripeWebhookEndpointSecretLive'];

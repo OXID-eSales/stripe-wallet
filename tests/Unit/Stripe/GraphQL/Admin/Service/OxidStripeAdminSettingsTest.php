@@ -31,8 +31,6 @@ final class OxidStripeAdminSettingsTest extends TestCase
         $this->module = new InMemoryModuleSettings([
             'sStripeMode' => 'test',
             'sStripeCaptureMode' => 'manual',
-            'blStripeRemoveByBillingCountry' => true,
-            'blStripeRemoveByBasketCurrency' => false,
             'blStripeProvideCustomerEmailAddress' => true,
             'sStripeLogLevel' => 'debug',
             'blStripeLogWebhooks' => false,
@@ -52,8 +50,6 @@ final class OxidStripeAdminSettingsTest extends TestCase
 
         self::assertSame('test', $snapshot->mode);
         self::assertSame('manual', $snapshot->captureMode);
-        self::assertTrue($snapshot->removeByBillingCountry);
-        self::assertFalse($snapshot->removeByBasketCurrency);
         self::assertTrue($snapshot->provideCustomerEmail);
         self::assertSame('debug', $snapshot->logLevel);
         self::assertFalse($snapshot->logWebhooks);
@@ -109,14 +105,12 @@ final class OxidStripeAdminSettingsTest extends TestCase
         self::assertStringNotContainsString('ZZZZZZZZZZ', $error, 'not even a part of a secret key');
     }
 
-    public function testSnapshot_AnUnsetLogLevel_FallsBackToTheLegacyToggle(): void
+    public function testSnapshot_AnUnsetLogLevel_IsTheDefault(): void
     {
         $this->module->values['sStripeLogLevel'] = '';
         $this->module->values['blStripeLogTransactionInfo'] = false;
-        self::assertSame('off', $this->settings()->snapshot()->logLevel);
 
-        unset($this->module->values['blStripeLogTransactionInfo']);
-        self::assertSame('normal', $this->settings()->snapshot()->logLevel);
+        self::assertSame('normal', $this->settings()->snapshot()->logLevel, 'the removed legacy toggle is not read');
     }
 
     public function testSnapshot_AnUnknownModeOrCaptureMode_IsTheDefault(): void

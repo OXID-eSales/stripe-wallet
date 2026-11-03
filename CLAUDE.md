@@ -242,8 +242,6 @@ Module settings in `metadata.php` / YAML:
 - `sStripeTestPk`/`sStripeLivePk` - Publishable keys
 - `sStripeWebhookEndpointSecret` - Webhook signing secret
 - `sStripeCaptureMode` - automatic/manual capture mode
-- `blStripeRemoveByBillingCountry` - Filter by billing country
-- `blStripeRemoveByBasketCurrency` - Filter by basket currency
 
 **Webhook URL:** `https://{shopUrl}/index.php?cl=StripeWebhookController`
 

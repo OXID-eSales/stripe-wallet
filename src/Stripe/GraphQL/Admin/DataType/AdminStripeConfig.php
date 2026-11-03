@@ -41,17 +41,7 @@ final class AdminStripeConfig
     }
 
     #[Field]
-    public function isRemoveByBillingCountry(): bool
-    {
-        return $this->config->removeByBillingCountry;
-    }
-
     #[Field]
-    public function isRemoveByBasketCurrency(): bool
-    {
-        return $this->config->removeByBasketCurrency;
-    }
-
     #[Field]
     public function isProvideCustomerEmail(): bool
     {

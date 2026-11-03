@@ -248,9 +248,6 @@ final class FileLoggerFactoryGatingTest extends TestCase
             public function getSecretKey(): string { return ''; }
             public function getWebhookSecret(): string { return ''; }
             public function getWebhookEndpoint(): string { return ''; }
-            public function isTransactionLoggingEnabled(): bool { return false; }
-            public function isRemoveByBillingCountry(): bool { return false; }
-            public function isRemoveByBasketCurrency(): bool { return false; }
             public function shouldProvideCustomerEmail(): bool { return false; }
             public function getWebhookUrl(): string { return ''; }
             public function getClassicSettingsUrl(): string { return ''; }

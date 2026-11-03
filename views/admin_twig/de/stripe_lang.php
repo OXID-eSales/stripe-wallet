@@ -22,23 +22,14 @@ $aLang = array(
     'SHOP_MODULE_sStripeTestPk'                         => 'Test API Publishable Key',
     'SHOP_MODULE_sStripeLiveToken'                      => 'Live API Key',
     'SHOP_MODULE_sStripeLivePk'                         => 'Live API Publishable Key',
-    'SHOP_MODULE_blStripeLogTransactionInfo'            => 'Ergebnisse von Transaktions-Verarbeitung loggen',
     'SHOP_MODULE_blStripeRemoveDeactivatedMethods'      => 'Deaktivierte Zahlarten entfernen',
-    'SHOP_MODULE_blStripeRemoveByBillingCountry'        => 'Für Rechnungsland nicht unterstützte Zahlarten entfernen',
-    'SHOP_MODULE_blStripeRemoveByBasketCurrency'        => 'Für Währung nicht unterstützte Zahlarten entfernen',
     'SHOP_MODULE_GROUP_STRIPE_WEBHOOKS'                 => 'Webhooks',
     'SHOP_MODULE_sStripeWebhookEndpoint'                => 'Webhook Endpoint',
     'HELP_SHOP_MODULE_sStripeWebhookEndpoint'           => 'Fügen Sie hier Ihre Stripe-Webhook-Endpoint-URL ein, oder nutzen Sie den Button unten, um den Endpunkt automatisch mit Ihrem Platform-Secret-Key zu erstellen und zu registrieren.',
     'SHOP_MODULE_sStripeWebhookEndpointSecret'          => 'Webhook Sicherheits-Schlüssel',
     'SHOP_MODULE_blStripeProvideCustomerEmailAddress'   => 'Kunden-E-Mail-Adresse an Stripe senden',
 
-    // Phase 2 (Logging-Steuerungs-Sprint): blStripeLogTransactionInfo ist veraltet.
-    // Der Hilfetext verwies bisher auf eine Log-Datei, die nicht mehr existiert.
-    // Phase 3 liest diesen Legacy-Bool als Ausgangswert für sStripeLogLevel.
-    'HELP_SHOP_MODULE_blStripeLogTransactionInfo'       => 'Veraltet. Diese Einstellung wird nur aus Kompatibilitätsgründen beibehalten. Verwenden Sie stattdessen die Logging-Gruppe (sStripeLogLevel, blStripeLogWebhooks). Stripe-Protokolldateien befinden sich unter log/stripe/stripe_*_&lt;Datum&gt;.log.',
     'HELP_SHOP_MODULE_blStripeRemoveDeactivatedMethods' => 'Entfernt in der Zahlart-Auswahl im Frontend die Zahlarten, die im Stripe Dashboard nicht aktiviert wurden und somit zu einem Fehler führen würden.',
-    'HELP_SHOP_MODULE_blStripeRemoveByBillingCountry'   => 'Entfernt in der Zahlart-Auswahl im Frontend die Zahlarten, die für das vom Kunden angegebene Rechnungsland nicht unterstützt sind und somit zu einem Fehler führen würden.',
-    'HELP_SHOP_MODULE_blStripeRemoveByBasketCurrency'   => 'Entfernt in der Zahlart-Auswahl im Frontend die Zahlarten, die für das vom Warenkorb angegebene Wärung nicht unterstützt sind und somit zu einem Fehler führen würden.',
     'HELP_SHOP_MODULE_blStripeProvideCustomerEmailAddress' => 'Ist diese Option aktiviert so, wird bei einer Stripe-Bestellung die Kunden-EMailadresse ebenfalls übergeben. Das überschreibt die Standard-E-Mail-Einstellungen im Stripe-Account für diese Bestellung. Somit werden die Benachrichtigungen zu dieser Bestellung an die Kunden-EMail-Adresse gesendet, statt an die Stripe-Account-EMail-Adresse.',
 
     // Erfassungsmodus-Einstellungen
