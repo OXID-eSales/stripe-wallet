@@ -29,7 +29,8 @@ class WebhookEndpointRegistrar implements WebhookEndpointRegistrarInterface
     ): WebhookEndpointRegistrationResult {
         $this->assertHttps($webhookUrl);
 
-        if ($existingEndpointId !== null && $existingEndpointId !== '') {
+        $existingEndpointId = $this->endpointToUpdate($accessToken, $webhookUrl, $existingEndpointId);
+        if ($existingEndpointId !== null) {
             return $this->api->update(
                 $accessToken,
                 $existingEndpointId,
@@ -89,6 +90,20 @@ class WebhookEndpointRegistrar implements WebhookEndpointRegistrarInterface
             $this->api->delete($accessToken, $id);
         }
         return count($ids);
+    }
+
+    /**
+     * The endpoint a registration updates: the one we hold, else the one of the account that already
+     * points at this URL - a second one would deliver every event twice, one of them with a signing
+     * secret nobody holds (VR-16 O6).
+     */
+    private function endpointToUpdate(string $accessToken, string $webhookUrl, ?string $heldEndpointId): ?string
+    {
+        if ($heldEndpointId !== null && $heldEndpointId !== '') {
+            return $heldEndpointId;
+        }
+
+        return $this->api->listAll($accessToken, $webhookUrl)[0] ?? null;
     }
 
     private function assertHttps(string $url): void

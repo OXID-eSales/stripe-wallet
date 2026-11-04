@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed (VR-16 O6) - webhook endpoint registration is idempotent
+- `WebhookEndpointRegistrar::register()` without a stored endpoint id looks for the account's endpoint with the same URL
+  and updates it (to `WebhookEventCatalog`) instead of creating a second one. Stripe never re-emits a signing secret on
+  update: a reused endpoint whose secret the shop does not hold needs "clear all" + register once.
+- `StripeWebhookEndpointApi::listAll()` follows `starting_after` pagination (it stopped at 100 endpoints).
+
 ### Changed - adopts payment-base VR wave 4 (H6/DC-PB7/D3/L1)
 - **H6**: `StripePaymentOwnershipProvider` (tag `oe.payment.ownership_provider`, owns `oe_payments_stripe_wallet`) and
   `StripeClientConfigSecretPatternProvider` (tag `payment_base.client_config_secret_pattern_provider`: `sk_`, `rk_`,

@@ -77,6 +77,39 @@ final class WebhookEndpointRegistrarTest extends TestCase
         $this->assertNull($result->secret);
     }
 
+    public function testCreateReusesEndpointForSameUrl(): void
+    {
+        $this->api->method('listAll')
+            ->with(self::ACCESS_TOKEN, self::WEBHOOK_URL)
+            ->willReturn([self::ENDPOINT_ID]);
+        $this->api->expects($this->never())->method('create');
+        $this->api->expects($this->once())
+            ->method('update')
+            ->with(self::ACCESS_TOKEN, self::ENDPOINT_ID, self::WEBHOOK_URL, $this->anything(), $this->anything())
+            ->willReturn(new WebhookEndpointRegistrationResult(self::ENDPOINT_ID, null));
+
+        $result = $this->registrar->register(self::ACCESS_TOKEN, self::WEBHOOK_URL, null);
+
+        $this->assertSame(self::ENDPOINT_ID, $result->endpointId);
+    }
+
+    public function testReusedEndpointIsUpdatedToTheEventCatalog(): void
+    {
+        $this->api->method('listAll')->willReturn([self::ENDPOINT_ID]);
+        $this->api->expects($this->once())
+            ->method('update')
+            ->with(
+                $this->anything(),
+                $this->anything(),
+                $this->anything(),
+                $this->identicalTo((new WebhookEventCatalog())->all()),
+                $this->anything()
+            )
+            ->willReturn(new WebhookEndpointRegistrationResult(self::ENDPOINT_ID, null));
+
+        $this->registrar->register(self::ACCESS_TOKEN, self::WEBHOOK_URL, null);
+    }
+
     public function testRegisterRefusesNonHttpsUrlWithoutCallingApi(): void
     {
         $this->api->expects($this->never())->method('create');

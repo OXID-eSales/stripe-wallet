@@ -28,6 +28,8 @@ use Stripe\StripeClient;
  */
 class StripeWebhookEndpointApi implements StripeWebhookEndpointApiInterface
 {
+    private const PAGE_SIZE = 100;
+
     public function __construct(
         private readonly StripeClientProviderInterface $clientProvider
     ) {
@@ -101,18 +103,8 @@ class StripeWebhookEndpointApi implements StripeWebhookEndpointApiInterface
 
     public function listAll(string $apiKey, ?string $urlFilter = null): array
     {
-        try {
-            $endpoints = $this->client($apiKey)->webhookEndpoints->all(['limit' => 100]);
-        } catch (ApiErrorException $e) {
-            throw WebhookRegistrationException::fromApiError(
-                (string) $e->getStripeCode(),
-                $e->getMessage(),
-                $e
-            );
-        }
-
         $ids = [];
-        foreach ($endpoints->data as $endpoint) {
+        foreach ($this->fetchAllEndpoints($apiKey) as $endpoint) {
             // Skip endpoints whose URL doesn't match the filter — preserves
             // endpoints belonging to OTHER shops that share the same Stripe key.
             if ($urlFilter !== null && (string) $endpoint->url !== $urlFilter) {
@@ -121,6 +113,39 @@ class StripeWebhookEndpointApi implements StripeWebhookEndpointApiInterface
             $ids[] = (string) $endpoint->id;
         }
         return $ids;
+    }
+
+    /**
+     * Every endpoint of the account: Stripe caps a page at 100, and a shop whose own endpoint sits
+     * on page two must still be found (VR-16 O6).
+     *
+     * @return list<\Stripe\WebhookEndpoint>
+     */
+    private function fetchAllEndpoints(string $apiKey): array
+    {
+        $endpoints = [];
+        $startingAfter = null;
+        do {
+            $params = ['limit' => self::PAGE_SIZE];
+            if ($startingAfter !== null) {
+                $params['starting_after'] = $startingAfter;
+            }
+            try {
+                $page = $this->client($apiKey)->webhookEndpoints->all($params);
+            } catch (ApiErrorException $e) {
+                throw WebhookRegistrationException::fromApiError(
+                    (string) $e->getStripeCode(),
+                    $e->getMessage(),
+                    $e
+                );
+            }
+            foreach ($page->data as $endpoint) {
+                $endpoints[] = $endpoint;
+                $startingAfter = (string) $endpoint->id;
+            }
+        } while ($page->has_more && $startingAfter !== null);
+
+        return $endpoints;
     }
 
     public function delete(string $apiKey, string $endpointId): void

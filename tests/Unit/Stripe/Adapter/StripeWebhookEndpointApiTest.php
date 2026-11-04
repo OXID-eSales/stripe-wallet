@@ -219,6 +219,22 @@ final class StripeWebhookEndpointApiTest extends TestCase
         $this->assertSame(['we_match'], $ids);
     }
 
+    public function testListAllFollowsPaginationPastTheFirstHundred(): void
+    {
+        $this->clientProvider->method('forKey')->willReturn($this->stripeClient);
+
+        $firstPage  = $this->buildCollection([$this->buildEndpointObject('we_1', null)], true);
+        $secondPage = $this->buildCollection([$this->buildEndpointObject('we_2', null)]);
+        $this->webhookEndpoints
+            ->expects($this->exactly(2))
+            ->method('all')
+            ->willReturnCallback(static fn(array $params): Collection => isset($params['starting_after']) && $params['starting_after'] === 'we_1'
+                ? $secondPage
+                : $firstPage);
+
+        $this->assertSame(['we_1', 'we_2'], $this->api->listAll('sk_test'));
+    }
+
     public function testListAllWrapsApiErrorExceptionInDomainException(): void
     {
         $this->clientProvider->method('forKey')->willReturn($this->stripeClient);
@@ -273,7 +289,7 @@ final class StripeWebhookEndpointApiTest extends TestCase
     /**
      * @param list<WebhookEndpoint> $items
      */
-    private function buildCollection(array $items): Collection
+    private function buildCollection(array $items, bool $hasMore = false): Collection
     {
         $data = array_map(
             static fn(WebhookEndpoint $ep): array => $ep->toArray(),
@@ -283,7 +299,7 @@ final class StripeWebhookEndpointApiTest extends TestCase
         return Collection::constructFrom([
             'object'   => 'list',
             'data'     => $data,
-            'has_more' => false,
+            'has_more' => $hasMore,
             'url'      => '/v1/webhook_endpoints',
         ]);
     }
