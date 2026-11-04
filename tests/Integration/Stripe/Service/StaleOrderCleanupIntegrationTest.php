@@ -62,14 +62,15 @@ final class StaleOrderCleanupIntegrationTest extends IntegrationTestCase
         // payment-base owns order finalization. Built on this test's connection: the container's service writes
         // through doctrine.dbal.connection, which would wait on the rows this test inserts inside its transaction.
         $throwableSummary = new ThrowableSummary([]);
+        $mailStore = new DoctrineContractOrderMailStore($this->connection, $throwableSummary);
         $orderService = new OxidShopOrderService(
-            new DoctrineNotFinishedOrderRepository(
-                $this->connection,
-                new DoctrineContractOrderMailStore($this->connection, $throwableSummary)
-            ),
+            new DoctrineNotFinishedOrderRepository($this->connection, $mailStore, $throwableSummary),
             new OrderShippingAddressCopier(),
             new OxidOrderRestock(),
             $throwableSummary,
+            ContainerFactory::getInstance()->getContainer()->get(\OxidEsales\PaymentBase\Checkout\Basket\CheckoutBasketProviderInterface::class),
+            ContainerFactory::getInstance()->getContainer()->get(\OxidEsales\PaymentBase\Checkout\Guard\CheckoutAttemptGuardInterface::class),
+            $mailStore,
         );
         // OPC-175: the settler is required. These contracts have no Stripe session.
         $paidSessions = new \OxidEsales\Payments\Stripe\Service\PaidSessionSettler(
