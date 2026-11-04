@@ -64,49 +64,9 @@ class StripeOrderController extends StripeOrderController_parent
 
     private ?ControllerRequestHelper $requestHelper = null;
 
-    /**
-     * Render the order confirmation page.
-     *
-     * STRP-105: Before rendering, detect if the user navigated back from
-     * Stripe Checkout without completing payment. If a stale contract exists
-     * in the session, clean it up — this releases vouchers that were marked
-     * as "used" during early order creation so OXID's basket recalculation
-     * won't invalidate them.
-     *
-     * @return string
-     */
-    public function render(): string
-    {
-        $this->cleanupStaleCheckoutOnRender();
-
-        return parent::render();
-    }
-
-    /**
-     * If the session holds a stripe_contract_id but the user is simply
-     * viewing the order page (not submitting), clear the Stripe session keys.
-     *
-     * OPC-175: the attempt itself is not cancelled any more. One order, one
-     * contract: the next start continues the same contract and order
-     * (payment-base ContractService); its voucher stays valid meanwhile
-     * (payment-base Voucher extension).
-     *
-     * @since 2.0.0 STRP-105
-     */
-    private function cleanupStaleCheckoutOnRender(): void
-    {
-        $helper = $this->getRequestHelper();
-        $contractId = $helper->getContractIdFromSession();
-
-        if ($contractId === null) {
-            return;
-        }
-
-        $helper->clearStripeSessionVariables();
-
-        // Sprint 88: a fresh sess_challenge for the next attempt.
-        $helper->setSessionVariable('sess_challenge', $this->generateNewSessChallenge());
-    }
+    // VR-24 H5: no render() override. Viewing the order page (a GET) used to clear the Stripe session keys and
+    // rotate `sess_challenge`; that cleanup belongs to the actions that end an attempt: checkoutCancel() and the
+    // payment step (PaymentController), which both still do it.
 
     /**
      * Create Stripe Checkout Session (AJAX endpoint).

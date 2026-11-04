@@ -157,7 +157,7 @@ class ControllerRequestHelper
      * Session key for the AGB consent flag.
      *
      * Deliberately NOT included in clearStripeSessionVariables() so it survives
-     * cleanupStaleCheckoutOnRender() on the back-to-order fresh-load render.
+     * the cleanup of a cancelled or restarted attempt (checkoutCancel(), payment step).
      * This survival is the core invariant of Sprint 128: the customer's
      * pre-redirect consent is re-applied on return so the button is re-enabled.
      *

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed (VR-24 H5) - `StripeOrderController::render()` has no side effects
+- The `render()` override (clear Stripe session keys + rotate `sess_challenge` on every GET of the order page) is gone.
+  The cleanup stays where an attempt ends: `checkoutCancel()` and the payment step (`PaymentController`).
+
 ### Changed (VR-16 O6) - webhook endpoint registration is idempotent
 - `WebhookEndpointRegistrar::register()` without a stored endpoint id looks for the account's endpoint with the same URL
   and updates it (to `WebhookEventCatalog`) instead of creating a second one. Stripe never re-emits a signing secret on

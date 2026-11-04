@@ -403,6 +403,36 @@ class StripeOrderControllerTest extends TestCase
     }
 
     // ==========================================
+    // VR-24 H5 - render() is a GET without side effects
+    // ==========================================
+
+    public function testRenderDoesNotRotateSessChallenge(): void
+    {
+        [$controller, $helper] = $this->createControllerWithMocks(
+            $this->createMock(EventDispatcherInterface::class),
+            ['contractIdFromSession' => 'contract_in_session']
+        );
+        $helper->sessionVars['sess_challenge'] = 'challenge_of_the_page';
+
+        $controller->render();
+
+        $this->assertSame('challenge_of_the_page', $helper->sessionVars['sess_challenge']);
+    }
+
+    public function testRenderKeepsTheStripeSessionKeys(): void
+    {
+        [$controller, $helper] = $this->createControllerWithMocks(
+            $this->createMock(EventDispatcherInterface::class),
+            ['contractIdFromSession' => 'contract_in_session']
+        );
+        $helper->sessionVars['stripe_contract_id'] = 'contract_in_session';
+
+        $controller->render();
+
+        $this->assertSame('contract_in_session', $helper->sessionVars['stripe_contract_id']);
+    }
+
+    // ==========================================
     // Helper infrastructure
     // ==========================================
 
