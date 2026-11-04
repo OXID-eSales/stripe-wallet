@@ -242,8 +242,6 @@ Module settings in `metadata.php` / YAML:
 - `sStripeTestPk`/`sStripeLivePk` - Publishable keys
 - `sStripeWebhookEndpointSecret` - Webhook signing secret
 - `sStripeCaptureMode` - automatic/manual capture mode
-- `blStripeRemoveByBillingCountry` - Filter by billing country
-- `blStripeRemoveByBasketCurrency` - Filter by basket currency
 
 **Webhook URL:** `https://{shopUrl}/index.php?cl=StripeWebhookController`
 
@@ -255,8 +253,6 @@ Module settings in `metadata.php` / YAML:
 - `StripeCaptureRequestEvent` - Admin capture action (supports partial via `?float amount`)
 - `StripeRefundRequestEvent` - Admin refund action (supports partial via `?float amount`)
 - `StripeCancelAuthorizationRequestEvent` - Admin cancel authorization
-- `StripePaymentExecuteEvent` - Payment execution
-- `StripePaymentReturnEvent` - Payment return
 - `Stripe3DSRequiredEvent` - 3D Secure required
 
 ### Contract Events (from payment-component)

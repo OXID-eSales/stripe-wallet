@@ -53,8 +53,6 @@ final class OxidStripeAdminSettings implements StripeAdminSettingsInterface
         return new StripeConfigSnapshot(
             mode: $mode,
             captureMode: $this->captureMode(),
-            removeByBillingCountry: $this->bool('blStripeRemoveByBillingCountry'),
-            removeByBasketCurrency: $this->bool('blStripeRemoveByBasketCurrency'),
             provideCustomerEmail: $this->bool('blStripeProvideCustomerEmailAddress'),
             logLevel: $this->logLevel(),
             logWebhooks: $this->bool('blStripeLogWebhooks'),
@@ -100,20 +98,13 @@ final class OxidStripeAdminSettings implements StripeAdminSettingsInterface
     }
 
     /**
-     * The same resolution as ModuleConfigurationService::getLogLevel(): an explicit known level, else the legacy
-     * toggle (off when it was switched off), else the default.
+     * The same resolution as ModuleConfigurationService::getLogLevel(): an explicit known level, else the default.
      */
     private function logLevel(): string
     {
         $explicit = $this->string('sStripeLogLevel');
-        if (in_array($explicit, self::LOG_LEVELS, true)) {
-            return $explicit;
-        }
-        $legacyName = 'blStripeLogTransactionInfo';
-        $legacyOff = $explicit === '' && $this->settings->exists($legacyName, Module::MODULE_ID)
-            && !$this->bool($legacyName);
 
-        return $legacyOff ? 'off' : self::DEFAULT_LOG_LEVEL;
+        return in_array($explicit, self::LOG_LEVELS, true) ? $explicit : self::DEFAULT_LOG_LEVEL;
     }
 
     private function isConnected(string $mode): bool

@@ -155,26 +155,6 @@ class ModuleConfiguration extends ModuleConfiguration_parent
     }
 
     /**
-     * @return bool
-     */
-    public function stripeIsTestMode(): bool
-    {
-        return $this->getModuleConfig()->isTestMode();
-    }
-
-    /**
-     * Check if the module is fully configured (API key + webhook secret).
-     *
-     * Delegates to the service's isConfigured() — the single canonical definition
-     * (D9). Using the full check ensures the admin UI reflects the same state that
-     * PaymentController uses when deciding whether to offer Stripe as a payment method.
-     */
-    public function stripeHasApiKeys(): bool
-    {
-        return $this->getModuleConfig()->isConfigured();
-    }
-
-    /**
      * Returns true when the admin edit context is the Stripe module itself.
      *
      * Used by the module_config template to conditionally render Stripe-specific

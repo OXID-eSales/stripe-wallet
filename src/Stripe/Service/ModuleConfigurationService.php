@@ -222,30 +222,6 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     }
 
     /**
-     * Check if transaction logging is enabled
-     */
-    public function isTransactionLoggingEnabled(): bool
-    {
-        return (bool) $this->get('blStripeLogTransactionInfo');
-    }
-
-    /**
-     * Check if payment method should be removed by billing country
-     */
-    public function isRemoveByBillingCountry(): bool
-    {
-        return (bool) $this->get('blStripeRemoveByBillingCountry');
-    }
-
-    /**
-     * Check if payment method should be removed by basket currency
-     */
-    public function isRemoveByBasketCurrency(): bool
-    {
-        return (bool) $this->get('blStripeRemoveByBasketCurrency');
-    }
-
-    /**
      * Check if customer email address should be provided to Stripe
      */
     public function shouldProvideCustomerEmail(): bool
@@ -317,14 +293,6 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     }
 
     /**
-     * Check if 3D Secure is enabled
-     */
-    public function is3DSecureEnabled(): bool
-    {
-        return (bool) $this->get('blStripe3DSecure');
-    }
-
-    /**
      * Get minimum order amount for Stripe
      * Returns 0.50 as default (Stripe minimum)
      */
@@ -337,23 +305,14 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     /**
      * Resolve the effective log level: off | errors | normal | debug.
      *
-     * Resolution order:
-     * 1. If sStripeLogLevel is set to a known value → return it.
-     * 2. If sStripeLogLevel is unset/empty → seed from legacy blStripeLogTransactionInfo:
-     *      truthy → 'normal', falsy → 'off'.
-     * 3. Unknown/garbage value → safe default 'normal'.
-     *
-     * Once a merchant sets sStripeLogLevel explicitly, the legacy bool is ignored.
+     * A known sStripeLogLevel is returned as is; unset, empty or unknown values give the
+     * default 'normal'.
      */
     public function getLogLevel(): string
     {
         $explicit = $this->get('sStripeLogLevel');
 
-        if (is_string($explicit) && $explicit !== '') {
-            return $this->validateLevel($explicit);
-        }
-
-        return $this->seedLevelFromLegacy();
+        return $this->validateLevel(is_string($explicit) ? $explicit : '');
     }
 
     /**
@@ -416,22 +375,6 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
     private function validateLevel(string $candidate): string
     {
         return isset(self::LEVEL_RANK[$candidate]) ? $candidate : 'normal';
-    }
-
-    /**
-     * Seeds level from the legacy blStripeLogTransactionInfo bool.
-     * truthy → 'normal', falsy/absent → 'off'. Unset → 'normal' (safe default).
-     */
-    private function seedLevelFromLegacy(): string
-    {
-        $legacy = $this->get('blStripeLogTransactionInfo');
-
-        // '' means the key was never set → fresh install → default to 'normal'
-        if ($legacy === '') {
-            return 'normal';
-        }
-
-        return (bool) $legacy ? 'normal' : 'off';
     }
 
     /**

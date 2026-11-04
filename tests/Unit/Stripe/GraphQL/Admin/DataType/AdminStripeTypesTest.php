@@ -23,7 +23,7 @@ final class AdminStripeTypesTest extends TestCase
         $fields = $this->fieldNamesOf(AdminStripeConfig::class);
 
         self::assertEqualsCanonicalizing([
-            'mode', 'captureMode', 'removeByBillingCountry', 'removeByBasketCurrency', 'provideCustomerEmail',
+            'mode', 'captureMode', 'provideCustomerEmail',
             'logLevel', 'logWebhooks', 'testPublishableKey', 'livePublishableKey', 'webhookEndpointUrl',
             'testTokenSet', 'liveTokenSet', 'testPlatformKeySet', 'livePlatformKeySet', 'webhookSecretSet',
             'testConnected', 'liveConnected', 'keyValidationError', 'version', 'classicSettingsUrl',
@@ -40,7 +40,6 @@ final class AdminStripeTypesTest extends TestCase
 
         self::assertSame('test', $config->getMode());
         self::assertSame('automatic', $config->getCaptureMode());
-        self::assertTrue($config->isRemoveByBillingCountry());
         self::assertFalse($config->isProvideCustomerEmail());
         self::assertSame('normal', $config->getLogLevel());
         self::assertTrue($config->isLogWebhooks());

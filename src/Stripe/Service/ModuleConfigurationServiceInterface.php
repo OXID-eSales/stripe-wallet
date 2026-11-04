@@ -46,12 +46,6 @@ interface ModuleConfigurationServiceInterface
 
     public function getWebhookEndpoint(): string;
 
-    public function isTransactionLoggingEnabled(): bool;
-
-    public function isRemoveByBillingCountry(): bool;
-
-    public function isRemoveByBasketCurrency(): bool;
-
     public function shouldProvideCustomerEmail(): bool;
 
     public function getWebhookUrl(): string;
@@ -77,17 +71,12 @@ interface ModuleConfigurationServiceInterface
 
     public function getCaptureMode(): string;
 
-    public function is3DSecureEnabled(): bool;
-
     public function getMinimumOrderAmount(): float;
 
     /**
      * Resolve the effective log level: off | errors | normal | debug.
      *
-     * When sStripeLogLevel is explicitly set to a known value → return it.
-     * When sStripeLogLevel is unset/empty → seed from legacy blStripeLogTransactionInfo:
-     *   '1'/truthy → 'normal', '0'/falsy → 'off'. Default: 'normal'.
-     * Unknown values → safe default 'normal'.
+     * A known sStripeLogLevel is returned as is; unset, empty or unknown values give the default 'normal'.
      */
     public function getLogLevel(): string;
 

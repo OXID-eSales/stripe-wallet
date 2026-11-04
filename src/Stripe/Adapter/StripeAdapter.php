@@ -263,26 +263,14 @@ class StripeAdapter implements StripeAdapterInterface
     // WEBHOOK PROCESSING
     // ==========================================
 
+    /**
+     * Not a Stripe webhook path: StripeWebhookProcessor verifies and parses incoming events.
+     * The method exists only because PaymentAdapterInterface declares it; failing loudly keeps
+     * a second, unverified parsing path from growing back.
+     */
     public function parseWebhook(string $payload, string $signature, string $secret): WebhookEvent
     {
-        try {
-            $event = Webhook::constructEvent($payload, $signature, $secret);
-            return new StripeWebhookEvent($event, $payload, verified: true);
-        } catch (\UnexpectedValueException $e) {
-            throw new PaymentAdapterException(
-                providerName: StripeDefinitions::PROVIDER,
-                errorCode: 'invalid_payload',
-                message: 'Invalid webhook payload',
-                previous: $e
-            );
-        } catch (\Stripe\Exception\SignatureVerificationException $e) {
-            throw new PaymentAdapterException(
-                providerName: StripeDefinitions::PROVIDER,
-                errorCode: 'invalid_signature',
-                message: 'Invalid webhook signature',
-                previous: $e
-            );
-        }
+        throw new \LogicException('Stripe webhooks are parsed by StripeWebhookProcessor, not the adapter.');
     }
 
     // ==========================================
@@ -340,11 +328,6 @@ class StripeAdapter implements StripeAdapterInterface
         return StripeObjectMapper::fromPaymentIntent($raw);
     }
 
-    public function getPaymentIntentRiskScore(string $paymentIntentId): ?float
-    {
-        return $this->paymentIntentHelper->getRiskScore($this->stripeClient, $paymentIntentId);
-    }
-
     public function retrieveCharge(string $chargeId): StripeChargeDto
     {
         $raw = $this->refundHelper->retrieveCharge($this->stripeClient, $chargeId);
@@ -378,16 +361,6 @@ class StripeAdapter implements StripeAdapterInterface
             return StripeObjectMapper::fromCustomer($raw);
         } catch (ApiErrorException $e) {
             throw StripeExceptionConverter::convert($e);
-        }
-    }
-
-    public function testConnection(): bool
-    {
-        try {
-            $this->stripeClient->balance->retrieve();
-            return true;
-        } catch (\Throwable $e) {
-            return false;
         }
     }
 

@@ -66,21 +66,6 @@ moduleSettings:
     type: str
     value: ''
     position: 31
-  blStripeLogTransactionInfo:
-    group: STRIPE_GENERAL
-    type: bool
-    value: true
-    position: 34
-  blStripeRemoveByBillingCountry:
-    group: STRIPE_GENERAL
-    type: bool
-    value: true
-    position: 35
-  blStripeRemoveByBasketCurrency:
-    group: STRIPE_GENERAL
-    type: bool
-    value: true
-    position: 36
   blStripeProvideCustomerEmailAddress:
     group: STRIPE_GENERAL
     type: bool

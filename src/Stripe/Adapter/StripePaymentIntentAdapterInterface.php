@@ -27,6 +27,4 @@ interface StripePaymentIntentAdapterInterface
     public function retrievePaymentIntent(string $paymentIntentId, array $expand = []): StripePaymentIntentDto;
 
     public function cancelPaymentIntent(string $paymentIntentId, ?string $cancellationReason = null): StripePaymentIntentDto;
-
-    public function getPaymentIntentRiskScore(string $paymentIntentId): ?float;
 }

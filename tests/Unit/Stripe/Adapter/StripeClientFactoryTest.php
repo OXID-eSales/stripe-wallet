@@ -101,90 +101,6 @@ final class StripeClientFactoryTest extends TestCase
         $this->assertFalse($this->factory->isTestMode());
     }
 
-    public function testIsValidSecretKeyReturnsTrueForTestKey(): void
-    {
-        $this->configurationService
-            ->method('getToken')
-            ->willReturn('sk_test_4242424242424242424242424242424242424242424242424242424242424242');
-        $this->configurationService
-            ->method('isTestMode')
-            ->willReturn(true);
-
-        $this->factory = new StripeClientFactory($this->configurationService);
-
-        $this->assertTrue($this->factory->isValidSecretKey());
-    }
-
-    public function testIsValidSecretKeyReturnsTrueForLiveKey(): void
-    {
-        $this->configurationService
-            ->method('getToken')
-            ->willReturn('sk_live_4242424242424242424242424242424242424242424242424242424242424242');
-        $this->configurationService
-            ->method('isTestMode')
-            ->willReturn(false);
-
-        $this->factory = new StripeClientFactory($this->configurationService);
-
-        $this->assertTrue($this->factory->isValidSecretKey());
-    }
-
-    public function testIsValidSecretKeyReturnsFalseForTestKeyInLiveMode(): void
-    {
-        $this->configurationService
-            ->method('getToken')
-            ->willReturn('sk_test_4242424242424242424242424242424242424242424242424242424242424242');
-        $this->configurationService
-            ->method('isTestMode')
-            ->willReturn(false);
-
-        $this->factory = new StripeClientFactory($this->configurationService);
-
-        $this->assertFalse($this->factory->isValidSecretKey());
-    }
-
-    public function testIsValidSecretKeyReturnsFalseForLiveKeyInTestMode(): void
-    {
-        $this->configurationService
-            ->method('getToken')
-            ->willReturn('sk_live_4242424242424242424242424242424242424242424242424242424242424242');
-        $this->configurationService
-            ->method('isTestMode')
-            ->willReturn(true);
-
-        $this->factory = new StripeClientFactory($this->configurationService);
-
-        $this->assertFalse($this->factory->isValidSecretKey());
-    }
-
-    public function testIsValidSecretKeyReturnsFalseForInvalidKeyFormat(): void
-    {
-        $this->configurationService
-            ->method('getToken')
-            ->willReturn('invalid_key_format');
-        $this->configurationService
-            ->method('isTestMode')
-            ->willReturn(true);
-
-        $this->factory = new StripeClientFactory($this->configurationService);
-
-        $this->assertFalse($this->factory->isValidSecretKey());
-    }
-
-    public function testIsValidSecretKeyReturnsFalseForEmptyKey(): void
-    {
-        $this->configurationService
-            ->method('getToken')
-            ->willReturn('');
-        $this->configurationService
-            ->method('isTestMode')
-            ->willReturn(true);
-
-        $this->factory = new StripeClientFactory($this->configurationService);
-
-        $this->assertFalse($this->factory->isValidSecretKey());
-    }
-
     public function testFactoryInitializesWithConfigurationValues(): void
     {
         $testKey = 'sk_test_4242424242424242424242424242424242424242424242424242424242424242';
@@ -200,6 +116,5 @@ final class StripeClientFactoryTest extends TestCase
 
         // Verify that the factory correctly uses the configuration
         $this->assertTrue($this->factory->isTestMode());
-        $this->assertTrue($this->factory->isValidSecretKey());
     }
 }

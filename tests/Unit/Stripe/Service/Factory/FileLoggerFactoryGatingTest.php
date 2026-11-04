@@ -248,9 +248,6 @@ final class FileLoggerFactoryGatingTest extends TestCase
             public function getSecretKey(): string { return ''; }
             public function getWebhookSecret(): string { return ''; }
             public function getWebhookEndpoint(): string { return ''; }
-            public function isTransactionLoggingEnabled(): bool { return false; }
-            public function isRemoveByBillingCountry(): bool { return false; }
-            public function isRemoveByBasketCurrency(): bool { return false; }
             public function shouldProvideCustomerEmail(): bool { return false; }
             public function getWebhookUrl(): string { return ''; }
             public function getClassicSettingsUrl(): string { return ''; }
@@ -258,7 +255,6 @@ final class FileLoggerFactoryGatingTest extends TestCase
             public function getPlatformKey(): string { return ''; }
             public function getModuleDescription(): string { return ''; }
             public function getCaptureMode(): string { return 'automatic'; }
-            public function is3DSecureEnabled(): bool { return false; }
             public function getMinimumOrderAmount(): float { return 0.5; }
             public function getLogLevel(): string { return 'off'; }
             public function isFrontendDebugEnabled(): bool { return false; }

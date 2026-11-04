@@ -422,56 +422,6 @@ services:
       $logger: '@oxid_esales.monolog.logger'
     public: true
 
-  # ===========================================
-  # Event Handlers (Tagged for auto-registration)
-  # ===========================================
-  # Note: Handlers are commented out until their dependencies
-  # (ContractServiceInterface, ContractRepositoryInterface, etc.) are registered.
-  # They will be enabled in Sprint 2 when the orchestrator and services are ready.
-
-  # # Contract Creation Handler - Creates payment contracts on PaymentInitiatedEvent
-  # OxidEsales\PaymentBase\EventSystem\Handler\ContractCreationHandler:
-  #   tags:
-  #     - { name: payment.event_handler }
-  #   public: false
-
-  # # Contract Condition Resolver Handler - Transitions contracts to PENDING state
-  # OxidEsales\PaymentBase\EventSystem\Handler\ContractConditionResolverHandler:
-  #   tags:
-  #     - { name: payment.event_handler }
-  #   public: false
-
-  # # Contract Fulfillment Handler - Handles webhook-triggered fulfillment
-  # OxidEsales\PaymentBase\EventSystem\Handler\ContractFulfillmentHandler:
-  #   tags:
-  #     - { name: payment.event_handler }
-  #   public: false
-
-  # # Contract Cleanup Handler - Cleans up terminated contracts
-  # OxidEsales\PaymentBase\EventSystem\Handler\ContractCleanupHandler:
-  #   tags:
-  #     - { name: payment.event_handler }
-  #   public: false
-
-  # # Order Creation Handler - Creates orders from committed contracts
-  # OxidEsales\PaymentBase\EventSystem\Handler\OrderCreationHandler:
-  #   tags:
-  #     - { name: payment.event_handler }
-  #   public: false
-
-  # # Payment Authorization Handler - Handles payment authorization
-  # OxidEsales\PaymentBase\EventSystem\Handler\PaymentAuthorizationHandler:
-  #   tags:
-  #     - { name: payment.event_handler }
-  #   public: false
-
-  # ==========================================
-  # Early Order Creation Handler (Sprint STRP-74)
-  # ==========================================
-  # Handles ContractDraftCompletedEvent to create order early in the flow.
-  # New flow: DRAFT -> NOT_FINISHED (order created here) -> PENDING
-  # Priority 100: Runs early to ensure order is created before other handlers.
-
   OxidEsales\PaymentBase\EventSystem\Handler\EarlyOrderCreationHandler:
     arguments:
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
@@ -567,29 +517,6 @@ services:
   # OXID Session Adapter - OXID eShop specific implementation
   OxidEsales\Payments\Stripe\Adapter\OxidSessionAdapter:
     alias: OxidEsales\PaymentBase\Adapter\SessionAdapterInterface
-
-  # ==========================================
-  # Shop Order Service (Order Operations)
-  # ==========================================
-  #
-  # Provides platform-agnostic interface for order operations.
-  # Phase 1 implements order creation from basket/cart.
-  #
-  # Key Features:
-  # - Creates orders via Order::finalizeOrder()
-  # - Maps OXID order states to normalized statuses
-  # - Associates payment transactions with orders
-  # - Stores order metadata
-  #
-
-  # 2026-09-01 — this module no longer binds ShopOrderServiceInterface.
-  # payment-base owns order finalization; four modules aliasing one container
-  # id meant a single winner finalized every provider's orders.
-  # The class stays registered under its own id so anything referencing it
-  # directly keeps resolving; it is no longer what the shared contract points at.
-  OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService:
-    class: OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService
-    public: true
 
   # ==========================================
   # Contract Repository (Data Access Layer)
@@ -1221,15 +1148,6 @@ services:
     tags: [ { name: stripe.webhook_handler } ]
     public: false
 
-  OxidEsales\Payments\Stripe\Webhook\Handler\ChargeDisputeCreatedWebhookHandler:
-    arguments:
-      $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
-      $fulfillmentHandler: '@OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandlerInterface'
-      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
-      $logger: '@oxid_esales.monolog.logger'
-    tags: [ { name: stripe.webhook_handler } ]
-    public: false
-
   OxidEsales\Payments\Stripe\Webhook\Handler\CheckoutSessionCompletedWebhookHandler:
     arguments:
       $parser: '@OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser'
@@ -1304,34 +1222,6 @@ services:
       $connection: '@doctrine.dbal.connection'
     public: true
 
-  # Payment Order State Repository - DEPRECATED (No longer used)
-  # Sprint 8: PaymentOrderStateRepository DELETED
-  # Payment state now tracked via osc_payment_contract with capture/refund fields.
-  # osc_payment_order_state table has been dropped.
-
-  # ==========================================
-  # Twig Extensions
-  # ==========================================
-
-  # Environment Checker - Determines dev/prod mode from Stripe test/live config
-  # Sprint 63d (STRP-99 H1): Used by DumpExtension to gate debug functions
-  OxidEsales\Payments\Stripe\Environment\DevelopmentEnvironmentCheckerInterface:
-    alias: OxidEsales\Payments\Stripe\Environment\ModuleConfigurationDevelopmentChecker
-    public: false
-
-  OxidEsales\Payments\Stripe\Environment\ModuleConfigurationDevelopmentChecker:
-    arguments:
-      - '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
-    public: false
-
-  # Dump Extension - Provides dump() for debugging templates (dev mode only)
-  # Sprint 63d (STRP-99 H1): Gated by DevelopmentEnvironmentCheckerInterface
-  OxidEsales\Payments\Stripe\Twig\DumpExtension:
-    arguments:
-      - '@OxidEsales\Payments\Stripe\Environment\DevelopmentEnvironmentCheckerInterface'
-    tags:
-      - { name: twig.extension }
-    public: false
 
   # ==========================================
   # Controllers
@@ -1544,49 +1434,6 @@ services:
     public: true
 
   # ==========================================
-  # Sprint 2: Condition Handlers (Fraud Check)
-  # ==========================================
-  # Fraud check handler manages fraud checking as a contract condition.
-  # Can be disabled via admin configuration.
-  #
-  # Fraud Check:
-  # - ON: Checks Stripe Radar score after payment authorization
-  # - OFF: Fraud check condition immediately fulfilled
-  #
-  # Note: Stock management removed in Sprint 23.
-  # OXID handles stock automatically on order finalization.
-
-  # Fraud Check Handler - Checks fraud score on payment authorization
-  # Priority 85: Runs after stock reservation, before order creation
-  # Binary pass/fail only - no manual review
-  # On failure: contract is failed (will trigger stock release)
-  OxidEsales\PaymentBase\EventSystem\Handler\FraudCheckHandler:
-    arguments:
-      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
-      $fraudCheckService: '@OxidEsales\PaymentBase\Service\FraudCheckServiceInterface'
-      $enabled: '%payment.fraud_check.enabled%'
-      $failOpenOnCheckError: '%payment.fraud_check.fail_open_on_error%'
-    tags:
-      - { name: payment.event_handler, priority: 85 }
-    public: false
-
-  # Stripe Radar Fraud Check Service - Checks Stripe Radar score
-  # Default threshold: 0.7 (score >= 0.7 fails)
-  # Implementation in Stripe module, interface in payment-base
-  OxidEsales\PaymentBase\Service\FraudCheckServiceInterface:
-    class: OxidEsales\Payments\Stripe\Service\StripeRadarFraudCheckService
-    arguments:
-      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
-      $threshold: '%payment.fraud_check.threshold%'
-      $logger: '@oxid_esales.monolog.logger'
-    public: false
-
-# ==========================================
-# Parameters for Sprint 2 Condition Handlers
-# ==========================================
-# These can be overridden in shop configuration or environment
-
-  # ==========================================
   # Sprint 64d: Webhook Guard Chain (security hardening)
   # ==========================================
 
@@ -1672,19 +1519,6 @@ services:
     public: true
 
 parameters:
-  # Fraud check toggle (default: enabled)
-  payment.fraud_check.enabled: true
-
-  # Fraud check threshold (default: 0.7 = 70% risk score)
-  # Scores >= threshold fail the fraud check
-  payment.fraud_check.threshold: 0.7
-
-  # Sprint 133 (F1): may an order proceed when the fraud check could not run at
-  # all (Stripe outage, revoked key)? True preserves the historical outcome; the
-  # contract now records that no screening happened either way. Set false to
-  # block unscreenable orders instead.
-  payment.fraud_check.fail_open_on_error: true
-
   # Sprint 133 (F5): enforce the returning-session risk score? Rejecting happens
   # after Stripe authorised the payment, so a false positive strands a paying
   # customer with no order. Off by default: score is recorded and logged only.

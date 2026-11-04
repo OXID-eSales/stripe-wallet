@@ -27,6 +27,4 @@ interface StripeCustomerAdapterInterface
     public function createStripeCustomer(array $params): StripeCustomerDto;
 
     public function retrieveStripeCustomer(string $customerId): StripeCustomerDto;
-
-    public function testConnection(): bool;
 }

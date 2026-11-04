@@ -16,7 +16,6 @@ use OxidEsales\PaymentBase\Repository\WebhookLogRepositoryInterface;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
-use OxidEsales\Payments\Stripe\Webhook\Handler\ChargeDisputeCreatedWebhookHandler;
 use OxidEsales\Payments\Stripe\Webhook\Handler\ChargeRefundedWebhookHandler;
 use OxidEsales\Payments\Stripe\Webhook\Handler\CheckoutSessionCompletedWebhookHandler;
 use OxidEsales\Payments\Stripe\Webhook\Handler\CheckoutSessionExpiredWebhookHandler;
@@ -47,7 +46,6 @@ use ReflectionClass;
  *   2. payment_intent.payment_failed (3 sub-branches)
  *   3. payment_intent.canceled  (3 sub-branches)
  *   4. charge.refunded  (4 sub-branches)
- *   5. charge.dispute.created  (1 sub-branch)
  *   6. checkout.session.completed  (5 sub-branches)
  *   7. checkout.session.expired  (3 sub-branches)
  *   8. unknown type → skipped default
@@ -405,26 +403,6 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
     }
 
     // =========================================================================
-    // 5. charge.dispute.created
-    // =========================================================================
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function chargeDisputeCreated_alwaysReturnsSuccessDisputeLogged(): void
-    {
-        $event = $this->makeEvent('charge.dispute.created', [
-            'id' => 'dp_abc',
-            'amount' => 5000,
-            'reason' => 'fraudulent',
-            'charge' => 'ch_xyz',
-        ]);
-
-        [$result, $contractId] = $this->processAndCapture($event);
-
-        $this->assertTrue($result->isSuccess());
-        $this->assertSame('dispute_logged', $result->action);
-        $this->assertNull($contractId);
-    }
-
-    // =========================================================================
     // 6. checkout.session.completed
     // =========================================================================
     #[\PHPUnit\Framework\Attributes\Test]
@@ -669,12 +647,6 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
                 $this->contractRepository,
                 $this->logger,
                 $this->createMock(\OxidEsales\Payments\Stripe\Webhook\ChargeRefundListerInterface::class)
-            ),
-            new ChargeDisputeCreatedWebhookHandler(
-                $parser,
-                $this->fulfillmentHandler,
-                $this->contractRepository,
-                $this->logger
             ),
             new CheckoutSessionCompletedWebhookHandler(
                 $parser,

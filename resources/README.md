@@ -34,7 +34,6 @@ node resources/build.js production
 
 **Outputs:**
 - `assets/js/stripe-frontend.min.js` - Minified frontend bundle
-- `assets/js/stripe-admin.min.js` - Minified admin bundle
 
 #### Development Build
 Outputs non-minified bundles with inline sourcemaps:

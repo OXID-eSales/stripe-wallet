@@ -179,6 +179,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   cache.
 
 ### Removed
+- **Dead code removal (VR-17).** Public classes: `Adapter\StripeWebhookEvent`, `Adapter\OxidShopOrderService` (the
+  module no longer ships an order service of its own; payment-base's `OxidShopOrderService` finalizes orders),
+  `Webhook\Handler\ChargeDisputeCreatedWebhookHandler` (the event was never subscribed), `Twig\DumpExtension`,
+  `Environment\DevelopmentEnvironmentCheckerInterface`, `Environment\ModuleConfigurationDevelopmentChecker`, and
+  `Service\StripeRadarFraudCheckService` with the `FraudCheckHandler` wiring and the `payment.fraud_check.enabled`,
+  `payment.fraud_check.threshold` and `payment.fraud_check.fail_open_on_error` container parameters (the check read a
+  metadata key nothing wrote, so it never screened anything; Stripe contracts carry no `fraud_check` condition).
+  Methods: `StripeAdapter::getPaymentIntentRiskScore()` and `PaymentIntentHelper::getRiskScore()` (also on
+  `StripePaymentIntentAdapterInterface`), `StripeAdapter::testConnection()` (also on `StripeCustomerAdapterInterface`),
+  `StripeClientFactory::isValidSecretKey()`, `StripeDefinitions::supportsCurrency()` / `::supportsCountry()`,
+  `ViewConfig::isStripeDebugEnabled()`, `Admin\ModuleConfiguration::stripeIsTestMode()` / `::stripeHasApiKeys()`,
+  `StripeCaptureRequestEvent::isFullCapture()` / `::getIdempotencyKey()`, and on `ModuleConfigurationService(Interface)`:
+  `is3DSecureEnabled()`, `isTransactionLoggingEnabled()`, `isRemoveByBillingCountry()`, `isRemoveByBasketCurrency()`.
+  `StripeAdapter::parseWebhook()` stays (payment-base's adapter interface declares it) but throws `LogicException`:
+  webhooks are parsed by `StripeWebhookProcessor` only.
+- **Settings:** `blStripeRemoveByBillingCountry` and `blStripeRemoveByBasketCurrency` (no runtime effect, only displayed in
+  the admin) and `blStripeLogTransactionInfo` (deprecated; it seeded `sStripeLogLevel` when that was unset: an unset level
+  is now `normal`, the legacy toggle is not read any more). Their lang keys are removed too.
+- **GraphQL:** the fields `removeByBillingCountry` and `removeByBasketCurrency` of `AdminStripeConfig`. Clients (the
+  oxid-fe-admin Stripe plugin) must stop selecting them. After upgrading: `bin/oe-console oe:graphql:cache-clear`.
+- **Frontend:** the Payment Element leftovers: the `select_payment` / `change_payment` overrides in
+  `page/checkout/payment.html.twig`, `frontend/stripe_card.html.twig`, `frontend/select_payment.html.twig`,
+  `frontend/base_stripe_element_config.html.twig`, `frontend/base_stripe_payment_controller_config.html.twig`,
+  `blocks/payment_stripe_form.html.twig`, the `stripe-order` Stimulus controller (and the card branch of `order-submit`),
+  `stripe_payment_element.css`, the unused `stripe-admin.min.js` bundle and its build target. `assets/js/stripe-frontend*.js`
+  are rebuilt.
+- **Translations:** 115 frontend and 52 admin lang keys per language that nothing references any more.
 - **`ContractRefundRecorder` (VR-21 F5):** payment-base's ledger records refunds on the contract.
 - **CFG-1: no GraphQL path changes the module's settings any more** (they change in the classic admin only):
   `adminStripeConfigModify`, `adminStripeWebhookRegister` and `adminStripeWebhookClearAll`, with `AdminStripeConfigInput`,

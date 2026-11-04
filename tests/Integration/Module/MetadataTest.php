@@ -234,12 +234,10 @@ class MetadataTest extends TestCase
         );
 
         // Logging and behavior settings
-        // blStripeLogTransactionInfo is kept for back-compat seeding (Phase 3 reads it).
-        $this->assertContains(
-            'blStripeLogTransactionInfo',
-            $settingNames,
-            'Transaction logging setting must remain defined (deprecated, kept for Phase 3 seeding)'
-        );
+        // blStripeLogTransactionInfo and blStripeRemoveBy* were removed (VR-17 DC-S9).
+        $this->assertNotContains('blStripeLogTransactionInfo', $settingNames);
+        $this->assertNotContains('blStripeRemoveByBillingCountry', $settingNames);
+        $this->assertNotContains('blStripeRemoveByBasketCurrency', $settingNames);
 
         // Phase 2 (logging-control sprint): new logging controls.
         $this->assertContains(

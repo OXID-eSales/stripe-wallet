@@ -80,15 +80,6 @@ $aModule = [
         // Sprint 110: platform secret key for registering Connect webhooks (paste from Stripe Dashboard → Developers → API keys).
         // Distinct from sStripeLiveToken (connected-account access_token from OAuth).
         ['group' => 'STRIPE_LIVE_CONFIG',       'name' => 'sStripeLiveKey',                     'type' => 'str',        'value' => '',          'position' => 32],
-        // Phase 2 (logging-control sprint): blStripeLogTransactionInfo is DEPRECATED.
-        // It is kept readable here so Phase 3 can seed sStripeLogLevel from it
-        // (legacy-bool==0 → effective 'off'; legacy-bool==1 → effective 'normal').
-        // It is intentionally moved out of the STRIPE_LOGGING group so it does not
-        // surface as an editable field alongside the new controls. Remove in the
-        // follow-up release once Phase 3 seeding lands.
-        ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeLogTransactionInfo',         'type' => 'bool',       'value' => '1',         'position' => 34],
-        ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeRemoveByBillingCountry',     'type' => 'bool',       'value' => '1',         'position' => 35],
-        ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeRemoveByBasketCurrency',     'type' => 'bool',       'value' => '1',         'position' => 36],
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeProvideCustomerEmailAddress','type' => 'bool',       'value' => '0',         'position' => 37],
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeCaptureMode',                 'type' => 'select',     'value' => 'automatic', 'position' => 39, 'constraints' => 'automatic|manual'],
         ['group' => 'STRIPE_WEBHOOKS',          'name' => 'sStripeWebhookEndpoint',             'type' => 'str',        'value' => '',          'position' => 130],
@@ -97,9 +88,7 @@ $aModule = [
         // (via saveShopConfVar with module: prefix) — NOT as module settings — so they do
         // not surface as editable form fields in the module_config admin view.
 
-        // Phase 2 (logging-control sprint): two new controls replace the orphaned
-        // blStripeLogTransactionInfo toggle.  The old bool stays in STRIPE_GENERAL
-        // (above) for back-compat seeding in Phase 3; these are the live controls.
+        // Logging controls (the former blStripeLogTransactionInfo toggle is gone).
         //
         // sStripeLogLevel options map to channels as follows (Phase 3 wires this):
         //   off    → all channels use NullFileLogger (no writes)

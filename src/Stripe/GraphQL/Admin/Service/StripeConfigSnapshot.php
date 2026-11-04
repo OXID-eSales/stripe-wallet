@@ -20,8 +20,6 @@ final readonly class StripeConfigSnapshot
     public function __construct(
         public string $mode,
         public string $captureMode,
-        public bool $removeByBillingCountry,
-        public bool $removeByBasketCurrency,
         public bool $provideCustomerEmail,
         public string $logLevel,
         public bool $logWebhooks,

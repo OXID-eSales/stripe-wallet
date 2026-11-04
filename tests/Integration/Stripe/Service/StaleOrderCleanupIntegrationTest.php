@@ -13,11 +13,16 @@ use Doctrine\DBAL\Connection;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Database\ConnectionProviderInterface;
 use OxidEsales\EshopCommunity\Tests\Integration\IntegrationTestCase;
+use OxidEsales\PaymentBase\Adapter\OxidShopOrderService;
+use OxidEsales\PaymentBase\Adapter\OrderShippingAddressCopier;
+use OxidEsales\PaymentBase\Adapter\OxidOrderRestock;
+use OxidEsales\PaymentBase\Logging\ThrowableSummary;
+use OxidEsales\PaymentBase\Repository\DoctrineContractOrderMailStore;
+use OxidEsales\PaymentBase\Repository\DoctrineNotFinishedOrderRepository;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Repository\DoctrineContractRepository;
-use OxidEsales\Payments\Stripe\Adapter\OxidShopOrderService;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use OxidEsales\PaymentBase\Logging\ThrowableSummary;
 use Psr\Log\NullLogger;
@@ -55,7 +60,18 @@ final class StaleOrderCleanupIntegrationTest extends IntegrationTestCase
 
         $this->contractRepository = new DoctrineContractRepository($this->connection, new NullLogger(), new ThrowableSummary([]));
 
-        $orderService = new OxidShopOrderService();
+        // payment-base owns order finalization. Built on this test's connection: the container's service writes
+        // through doctrine.dbal.connection, which would wait on the rows this test inserts inside its transaction.
+        $throwableSummary = new ThrowableSummary([]);
+        $orderService = new OxidShopOrderService(
+            new DoctrineNotFinishedOrderRepository(
+                $this->connection,
+                new DoctrineContractOrderMailStore($this->connection, $throwableSummary)
+            ),
+            new OrderShippingAddressCopier(),
+            new OxidOrderRestock(),
+            $throwableSummary,
+        );
         // OPC-175: the settler is required. These contracts have no Stripe session.
         $paidSessions = new \OxidEsales\Payments\Stripe\Service\PaidSessionSettler(
             new \OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard(),
