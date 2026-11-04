@@ -11,7 +11,6 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\EventSystem\Translator;
 
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContextInterface;
-use OxidEsales\PaymentBase\EventSystem\Event\Request\AbstractProviderRequestEvent;
 use OxidEsales\PaymentBase\EventSystem\Event\Request\CancelAuthorizationRequestedEvent;
 use OxidEsales\PaymentBase\EventSystem\Event\Request\CaptureRequestedEvent;
 use OxidEsales\PaymentBase\EventSystem\Event\Request\RefundRequestedEvent;
@@ -119,8 +118,7 @@ final class StripeEventTranslatorTest extends TestCase
     public function testTranslateUnmappedEventReturnsNull(): void
     {
         // A real subclass of AbstractProviderRequestEvent that has no Stripe mapping.
-        $unmapped = new readonly class ($this->context) extends AbstractProviderRequestEvent {
-        };
+        $unmapped = new UnmappedProviderRequestEvent($this->context);
 
         $result = $this->translator->translate($unmapped);
 
