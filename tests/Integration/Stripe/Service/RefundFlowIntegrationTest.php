@@ -99,7 +99,8 @@ final class RefundFlowIntegrationTest extends IntegrationTestCase
             $this->createMock(RequestLogServiceInterface::class),
             $shop,
             $ledger,
-            new PaymentIntentResolver($this->contracts)
+            new PaymentIntentResolver($this->contracts),
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([])
         );
         $this->webhook = new ChargeRefundedWebhookHandler(
             new StripeWebhookEventParser(),

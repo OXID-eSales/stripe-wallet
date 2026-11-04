@@ -41,7 +41,8 @@ class CheckoutReturnServiceTest extends TestCase
     {
         return new CheckoutReturnService(
             $this->adapterFactory,
-            $this->logger
+            $this->logger,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([])
         );
     }
 

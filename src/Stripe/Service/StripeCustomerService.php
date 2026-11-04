@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use DateTimeImmutable;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Contract\PaymentCustomer;
@@ -35,6 +36,7 @@ class StripeCustomerService implements StripeCustomerServiceInterface
         private readonly PaymentCustomerRepositoryInterface $customerRepository,
         private readonly StripeAdapterFactoryInterface $adapterFactory,
         private readonly CustomerDataSanitizer $sanitizer,
+        private readonly ThrowableSummaryInterface $throwableSummary,
         ?LoggerInterface $logger = null
     ) {
         $this->logger = $logger ?? new NullLogger();
@@ -115,7 +117,7 @@ class StripeCustomerService implements StripeCustomerServiceInterface
             $this->logger->error('Could not verify the Stripe Customer; refusing to assume it is gone', [
                 'customerId' => $customerId,
                 'errorCode' => $e->getErrorCode(),
-                'error' => $e->getMessage(),
+                'throwable' => $this->throwableSummary->fromThrowable($e),
             ]);
 
             throw $e;

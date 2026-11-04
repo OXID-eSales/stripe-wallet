@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed (VR-18 L4) - the webhook log says why; logs carry ids and summaries, never exception messages
+- **Webhook file log** (`WebhookLogService`): the `WEBHOOK_RESULT` line is payment-base's `WebhookDeliveryLogRecord`
+  (`provider, eventId, eventType, objectId, contractId, action, reason, httpCode, durationMs`). A skipped delivery now
+  logs `action: skipped` + the `WebhookResult` reason (before: `SUCCESS: skipped`, cause unknowable); a failure logs its
+  action and reason. `payment_intent_id` is now `objectId` and holds the id of the event's own object (`cs_`, `ch_`,
+  `pi_` ...). `WebhookLogServiceInterface::logResult()` takes the `WebhookResult`, status, duration and contract id;
+  `StripeWebhookProcessor::lastContractId()` exposes the contract the delivery touched.
+- `StripeWebhookPiiKeyProvider` (tag `payment_base.webhook_pii_key_provider`): `customer_details, customer_email,
+  customer_name, shipping, billing_details, receipt_email, metadata, last4, exp_month, exp_year`.
+- `StripeThrowableSummaryExtractor` (tag `payment_base.throwable_summary`): `stripeType`, `stripeCode`, `requestId`,
+  `httpStatus` of a Stripe API error (also behind the module's `PaymentAdapterException` wrapper).
+- Log contexts that held `$e->getMessage()` now hold `ThrowableSummaryInterface::fromThrowable()`: `WebhookController`,
+  `CheckoutReturnService`, `CaptureService`, `RefundService`, `CancelAuthorizationService`, `CheckoutSessionService`,
+  `StripeCustomerService`, `StripePaymentCaptureStatusQuery`, `OxpaidReconciliationService`, `OrderContractResolver`,
+  `RequestLogService` (`error_message` is now `throwable`), the capture / cancel / refund request handlers,
+  `StripeCheckoutSessionHandler`, `StripePaymentHandler::confirmPayment`, `Core\Events`, `ModuleConfiguration`,
+  `ControllerRequestHelper::logError` (its stack trace is gone too). The capture/cancel/refund handlers still put the
+  module's own refusal text into the event context: that is the answer to the authorised admin, not a log line.
+  Constructors of those services take `ThrowableSummaryInterface`.
+
 ### Security (VR-24 H4, stripe report S-5) - the Connect onboarding landing takes the keys from a POST body only
 - `StripeConnect::stripeFinishOnBoarding()` reads `access_token` / `publishable_key` / `shop_param` from the POST body
   (a key in a GET query string is ignored and nothing is saved), asks payment-base's classic admin door for the payment

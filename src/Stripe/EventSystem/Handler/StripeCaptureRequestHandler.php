@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
@@ -43,6 +44,7 @@ class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly RequestLogServiceInterface $requestLogService,
         private readonly ShopAdapterInterface $shopAdapter,
+        private readonly ThrowableSummaryInterface $throwableSummary,
         ?LoggerInterface $logger = null,
         ?FileLoggerInterface $eventLogger = null,
     ) {
@@ -75,7 +77,7 @@ class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
             $this->logEvent('StripeCaptureRequestHandler::handle() END - SUCCESS');
         } catch (Throwable $e) {
             $this->logEvent('StripeCaptureRequestHandler: EXCEPTION', [
-                'error' => $e->getMessage(),
+                'throwable' => $this->throwableSummary->fromThrowable($e),
             ]);
             $this->handleException($e, $context, $event);
         }
@@ -212,13 +214,13 @@ class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
         EventContext $context,
         StripeCaptureRequestEvent $event
     ): void {
+        // The answer to the (authorised) admin who asked: the module's own refusal text. Not a log line.
         $context->set('error', $e->getMessage());
         $context->set('captureSuccess', false);
 
         $this->logger->error('Capture handler exception', [
-            'error' => $e->getMessage(),
+            'throwable' => $this->throwableSummary->fromThrowable($e),
             'contract_id' => $event->getContractId(),
-            'trace' => $e->getTraceAsString(),
         ]);
 
         $this->logExceptionToRequestLog($e, $event);

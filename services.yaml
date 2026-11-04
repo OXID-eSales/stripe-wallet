@@ -230,6 +230,14 @@ services:
     tags: [ 'payment_base.client_config_secret_pattern_provider' ]
     public: true
 
+  # VR-18 L4: what a log line may say about a Stripe API error (type, code, request id - never the message).
+  OxidEsales\Payments\Stripe\Logging\StripeThrowableSummaryExtractor:
+    tags: [ 'payment_base.throwable_summary' ]
+
+  # VR-18 L4: the Stripe payload keys that hold personal or card data, for payment-base's WebhookPayloadSanitizer.
+  OxidEsales\Payments\Stripe\Webhook\StripeWebhookPiiKeyProvider:
+    tags: [ 'payment_base.webhook_pii_key_provider' ]
+
   # VR-24 H6: the payment rows payment-base's generic admin API must leave to Stripe.
   OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripePaymentOwnershipProvider:
     autowire: false
@@ -870,6 +878,7 @@ services:
     autowire: false
     arguments:
       $fileLogger: '@stripe.request_file_logger'
+      $throwableSummary: '@OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface'
       $fallbackLogger: '@oxid_esales.monolog.logger'
     public: false
 

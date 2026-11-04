@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use Doctrine\DBAL\Connection;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
@@ -40,7 +41,8 @@ class OxpaidReconciliationService implements OxpaidReconciliationServiceInterfac
         private readonly StripeAdapterFactoryInterface $adapterFactory,
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ContractFulfillmentServiceInterface $contractFulfillmentService,
-        private readonly FileLoggerInterface $fileLogger
+        private readonly FileLoggerInterface $fileLogger,
+        private readonly ThrowableSummaryInterface $throwableSummary
     ) {
     }
 
@@ -154,7 +156,7 @@ class OxpaidReconciliationService implements OxpaidReconciliationServiceInterfac
                 contractUpdated: $contractUpdated
             );
         } catch (\Throwable $e) {
-            $this->logReconciliation($orderId, $paymentIntentId, 'ERROR', false, $e->getMessage());
+            $this->logReconciliation($orderId, $paymentIntentId, 'ERROR', false, $this->throwableSummary->toLine($e));
 
             return new ReconciliationResult(
                 orderId: $orderId,

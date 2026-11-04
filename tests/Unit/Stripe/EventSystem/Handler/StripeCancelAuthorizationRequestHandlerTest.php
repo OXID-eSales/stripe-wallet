@@ -49,7 +49,8 @@ class StripeCancelAuthorizationRequestHandlerTest extends TestCase
             $this->cancelService,
             $this->requestLogService,
             $this->shopAdapter,
-            $this->contractRepository
+            $this->contractRepository,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([])
         );
     }
 

@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Service\PaymentCaptureStatusQueryInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
@@ -37,6 +38,7 @@ class StripePaymentCaptureStatusQuery implements PaymentCaptureStatusQueryInterf
 {
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,
+        private readonly ThrowableSummaryInterface $throwableSummary,
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {
     }
@@ -61,7 +63,7 @@ class StripePaymentCaptureStatusQuery implements PaymentCaptureStatusQueryInterf
                 [
                     'contract_id'       => $contract->getId(),
                     'provider_order_id' => $providerOrderId,
-                    'error'             => $e->getMessage(),
+                    'throwable'         => $this->throwableSummary->fromThrowable($e),
                 ],
             );
             return null;

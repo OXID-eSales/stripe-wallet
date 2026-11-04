@@ -75,7 +75,7 @@ final class ModuleConfigurationValidatorTest extends TestCase
                 private readonly ConfigurationValidatorInterface $stubValidator
             ) {
                 // Skip OXID admin bootstrap.
-                $this->initializeWebhookCollaborators($registrar, $moduleConfig, $logger);
+                $this->initializeWebhookCollaborators($registrar, $moduleConfig, $logger, new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
             }
 
             protected function getConfigurationValidator(): ConfigurationValidatorInterface

@@ -125,7 +125,8 @@ final class ManualCaptureIntegrationTest extends TestCase
             $this->contractRepository,
             $this->fulfillmentService,
             $this->captureLedger(),
-            new NullLogger()
+            new NullLogger(),
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([])
         );
 
         // Create handler with real CaptureService
@@ -134,6 +135,7 @@ final class ManualCaptureIntegrationTest extends TestCase
             $this->contractRepository,
             $this->requestLogService,
             $this->shopAdapter,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
             new NullLogger()
         );
 
@@ -200,7 +202,8 @@ final class ManualCaptureIntegrationTest extends TestCase
             $this->contractRepository,
             $this->fulfillmentService,
             $this->captureLedger(),
-            new NullLogger()
+            new NullLogger(),
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([])
         );
 
         $handler = new StripeCaptureRequestHandler(
@@ -208,6 +211,7 @@ final class ManualCaptureIntegrationTest extends TestCase
             $this->contractRepository,
             $this->requestLogService,
             $this->shopAdapter,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
             new NullLogger()
         );
 
@@ -250,7 +254,8 @@ final class ManualCaptureIntegrationTest extends TestCase
             $this->contractRepository,
             $this->fulfillmentService,
             $this->captureLedger(),
-            new NullLogger()
+            new NullLogger(),
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([])
         );
 
         $handler = new StripeCaptureRequestHandler(
@@ -258,6 +263,7 @@ final class ManualCaptureIntegrationTest extends TestCase
             $this->contractRepository,
             $this->requestLogService,
             $this->shopAdapter,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
             new NullLogger()
         );
 

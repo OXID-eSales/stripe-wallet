@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\PaymentHandler;
 
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\Payments\Stripe\Core\ShopId;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentBase\Adapter\ContractFirstPaymentHandlerInterface;
@@ -68,6 +69,7 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
         private readonly ContractReturnTokenServiceInterface $returnTokens,
         // OPC-175: the shared chain that creates the early order.
         private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly ThrowableSummaryInterface $throwableSummary,
         private readonly ?LoggerInterface $logger = null,
         ?LanguageResolverInterface $languageResolver = null,
         private readonly ?IframeCheckoutSettingsInterface $iframeSettings = null,
@@ -211,7 +213,7 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
         } catch (\Throwable $e) {
             $this->logger?->error('[StripePaymentHandler] confirmPayment failed', [
                 'transactionId' => $transactionId,
-                'error' => $e->getMessage(),
+                'throwable' => $this->throwableSummary->fromThrowable($e),
             ]);
 
             return PaymentHandlerResult::error(

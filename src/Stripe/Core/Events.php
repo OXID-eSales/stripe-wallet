@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Core;
 
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use Exception;
 use OxidEsales\Eshop\Application\Model\Shop;
 use OxidEsales\Eshop\Core\Exception\DatabaseConnectionException;
@@ -159,6 +160,17 @@ class Events
      * @param string $sPaymentId
      * @return void
      */
+    /**
+     * Static module event: no constructor to inject through, the container is the only door (framework constraint).
+     */
+    private static function throwableSummary(): ThrowableSummaryInterface
+    {
+        $summary = ContainerFactory::getInstance()->getContainer()->get(ThrowableSummaryInterface::class);
+        assert($summary instanceof ThrowableSummaryInterface);
+
+        return $summary;
+    }
+
     protected static function deletePaymentMethod(string $sPaymentId): void
     {
         try {
@@ -174,7 +186,7 @@ class Events
             // visible in admin with no trace of why.
             Registry::getLogger()->error('Failed to delete a removed Stripe payment method', [
                 'payment_id' => $sPaymentId,
-                'error' => $e->getMessage(),
+                'throwable' => self::throwableSummary()->fromThrowable($e),
             ]);
         }
     }

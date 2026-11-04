@@ -36,7 +36,7 @@ class CancelAuthorizationServiceTest extends TestCase
 
     private function createService(): CancelAuthorizationService
     {
-        return new CancelAuthorizationService($this->adapterFactory, new NullLogger());
+        return new CancelAuthorizationService($this->adapterFactory, new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]), new NullLogger());
     }
 
     public function testImplementsInterface(): void
@@ -48,7 +48,7 @@ class CancelAuthorizationServiceTest extends TestCase
 
     public function testConstructorAcceptsNullLogger(): void
     {
-        $service = new CancelAuthorizationService($this->adapterFactory, null);
+        $service = new CancelAuthorizationService($this->adapterFactory, new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]), null);
 
         $this->assertInstanceOf(CancelAuthorizationServiceInterface::class, $service);
     }

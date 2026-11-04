@@ -451,6 +451,7 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
             $config,
             $this->tokenService,
             $this->sharedChain(),
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
             $logger,
             $language,
             $iframe,

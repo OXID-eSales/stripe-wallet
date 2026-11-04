@@ -58,6 +58,7 @@ class StripePaymentHandlerTest extends TestCase
             new \OxidEsales\PaymentBase\EventSystem\EventDispatcher(
                 new \OxidEsales\PaymentBase\EventSystem\EventListenerProvider([])
             ),
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
             iframeSettings: $iframeSettings,
             adapterFactory: $adapterFactory
         );

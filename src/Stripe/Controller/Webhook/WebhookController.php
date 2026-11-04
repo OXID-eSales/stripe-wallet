@@ -17,10 +17,13 @@ use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\PaymentBase\Webhook\Guard\TrustedProxyClientIp;
 use OxidEsales\PaymentBase\Webhook\Guard\WebhookGuardInterface;
 use OxidEsales\PaymentBase\Webhook\Guard\WebhookHttpRequest;
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\PaymentBase\Webhook\WebhookRequest;
+use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Adapter\Helper\ResponseHeaders;
 use OxidEsales\Payments\Stripe\Service\WebhookLogServiceInterface;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookProcessor;
+use Psr\Container\ContainerInterface;
 
 /**
  * Webhook endpoint controller.
@@ -40,6 +43,8 @@ class WebhookController extends FrontendController
     protected ?WebhookLogServiceInterface $webhookLogger = null;
     private ?WebhookGuardInterface $guard = null;
     protected ?TrustedProxyClientIp $clientIp = null;
+    private ?ThrowableSummaryInterface $throwableSummary = null;
+    private float $startedAt = 0.0;
 
     /**
      * Initialize services.
@@ -49,13 +54,14 @@ class WebhookController extends FrontendController
         parent::init();
 
         $container = ContainerFactory::getInstance()->getContainer();
+        $this->throwableSummary = $this->resolveThrowableSummary($container);
 
         try {
             $this->processor = $container->get(StripeWebhookProcessor::class);
             $this->webhookLogger = $container->get(WebhookLogServiceInterface::class);
         } catch (Exception $e) {
             Registry::getLogger()->error('Webhook services not available', [
-                'error' => $e->getMessage(),
+                'throwable' => $this->summarize($e),
             ]);
         }
 
@@ -70,9 +76,35 @@ class WebhookController extends FrontendController
             // skipped: getGuard() stays null and render() answers 503 instead of processing.
             Registry::getLogger()->error(
                 'Webhook guard chain unavailable — endpoint refuses to process',
-                ['error' => $e->getMessage()]
+                ['throwable' => $this->summarize($e)]
             );
         }
+    }
+
+    /**
+     * The summary service is fetched first and on its own: the failures logged below are the ones that may
+     * come from a broken container, and they must still be logged without their message.
+     */
+    private function resolveThrowableSummary(ContainerInterface $container): ?ThrowableSummaryInterface
+    {
+        try {
+            $summary = $container->get(ThrowableSummaryInterface::class);
+        } catch (Exception) {
+            return null;
+        }
+
+        return $summary instanceof ThrowableSummaryInterface ? $summary : null;
+    }
+
+    /**
+     * What a log line may say about a failure (VR-18 L1): never its message. Without the summary service it
+     * is the class alone.
+     *
+     * @return array<string, scalar|null>
+     */
+    private function summarize(Exception $e): array
+    {
+        return $this->throwableSummary?->fromThrowable($e) ?? ['class' => $e::class];
     }
 
     /**
@@ -82,6 +114,7 @@ class WebhookController extends FrontendController
      */
     public function render(): string
     {
+        $this->startedAt = microtime(true);
         $this->setResponseContentType();
 
         [$payload, $signature, $remoteIp] = $this->extractWebhookInput();
@@ -140,10 +173,10 @@ class WebhookController extends FrontendController
         // Return response based on result
         if ($result->isFailure()) {
             $statusCode = $result->action === 'signature_invalid' ? 400 : 500;
-            $this->sendErrorResponse($payload, $result->error ?? $result->action, $statusCode);
+            $this->sendErrorResponse($payload, $result->error ?? $result->action, $statusCode, $result->action);
         }
 
-        $this->logResult($payload, "SUCCESS: {$result->action}", 200);
+        $this->logDelivery($payload, $result, 200, $this->processor->lastContractId());
         $this->sendSuccessResponse($result->action);
 
         // VR-23 T3: the stale NOT_FINISHED sweep is no longer run here: it cost up to two Stripe round trips per stale
@@ -219,17 +252,26 @@ class WebhookController extends FrontendController
         ]);
     }
 
-    private function logResult(string $payload, string $action, int $statusCode): void
+    /**
+     * The one webhook file-log line of a delivery (VR-18 L4): ids, action, reason, status, duration.
+     */
+    protected function logDelivery(string $payload, WebhookResult $result, int $statusCode, ?string $contractId): void
     {
         if ($this->webhookLogger !== null) {
-            $this->webhookLogger->logResult($payload, $action, $statusCode);
+            $this->webhookLogger->logResult($payload, $result, $statusCode, $this->elapsedMilliseconds(), $contractId);
             return;
         }
 
         Registry::getLogger()->warning('Webhook result not persisted: log service unavailable', [
-            'action' => $action,
+            'action' => $result->action,
+            'reason' => $result->error,
             'status' => $statusCode,
         ]);
+    }
+
+    private function elapsedMilliseconds(): int
+    {
+        return (int) round((microtime(true) - $this->startedAt) * 1000);
     }
 
     /**
@@ -329,7 +371,18 @@ class WebhookController extends FrontendController
      */
     protected function sendErrorResponse(string $payload, string $message, int $statusCode, ?string $logAction = null): never
     {
-        $this->logResult($payload, $logAction ?? "FAILED: {$message}", $statusCode);
+        $this->logDelivery($payload, WebhookResult::failure($logAction ?? 'failed', $message), $statusCode, null);
+        $this->emitError($message, $statusCode);
+    }
+
+    /**
+     * The production end of an error answer. Protected seam, so a test can observe the log line without losing
+     * the process.
+     *
+     * @return never
+     */
+    protected function emitError(string $message, int $statusCode): never
+    {
         http_response_code($statusCode);
         echo json_encode(['error' => $message]);
         exit;

@@ -44,6 +44,7 @@ class CheckoutSessionServiceTest extends TestCase
         return new CheckoutSessionService(
             $this->adapterFactory,
             $this->contractsWithAttempts(0),
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
             $this->logger
         );
     }
@@ -125,7 +126,7 @@ class CheckoutSessionServiceTest extends TestCase
                 return $this->buildSessionDto('cs_test_lang', 'https://checkout.stripe.com/pay/cs_test_lang');
             });
 
-        $service = new CheckoutSessionService($this->adapterFactory, $this->contractsWithAttempts(0), $this->logger, null, $resolver);
+        $service = new CheckoutSessionService($this->adapterFactory, $this->contractsWithAttempts(0), new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]), $this->logger, null, $resolver);
         $service->createSession(
             'contract_lang',
             $this->createBasketSnapshot(),
@@ -1044,7 +1045,7 @@ class CheckoutSessionServiceTest extends TestCase
         $factory = $this->createMock(\OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface::class);
         $factory->method('getStripeAdapter')->willReturn($adapter);
 
-        (new CheckoutSessionService($factory, $this->contractsWithAttempts(2), $this->logger))->createSession(
+        (new CheckoutSessionService($factory, $this->contractsWithAttempts(2), new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]), $this->logger))->createSession(
             'contract_1',
             $this->createBasketSnapshot(),
             'https://shop.example.com/success',

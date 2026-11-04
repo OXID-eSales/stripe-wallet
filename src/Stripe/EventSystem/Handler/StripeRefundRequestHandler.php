@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface;
@@ -46,6 +47,7 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
         private readonly ShopAdapterInterface $shopAdapter,
         private readonly ProviderRefundLedgerInterface $refundLedger,
         private readonly PaymentIntentResolver $paymentIntentResolver,
+        private readonly ThrowableSummaryInterface $throwableSummary,
         ?LoggerInterface $logger = null,
         ?FileLoggerInterface $eventLogger = null
     ) {
@@ -79,7 +81,7 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
             $this->logEvent('StripeRefundRequestHandler::handle() END - SUCCESS');
         } catch (Throwable $e) {
             $this->logEvent('StripeRefundRequestHandler: EXCEPTION', [
-                'error' => $e->getMessage(),
+                'throwable' => $this->throwableSummary->fromThrowable($e),
             ]);
             $this->handleException($e, $context, $event);
         }
@@ -250,11 +252,12 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
         EventContext $context,
         StripeRefundRequestEvent $event
     ): void {
+        // The answer to the (authorised) admin who asked: the module's own refusal text. Not a log line.
         $context->set('error', $e->getMessage());
         $context->set('refundSuccess', false);
 
         $this->logger->error('Refund handler exception', [
-            'error' => $e->getMessage(),
+            'throwable' => $this->throwableSummary->fromThrowable($e),
             'order_id' => $event->getOrderId(),
         ]);
 

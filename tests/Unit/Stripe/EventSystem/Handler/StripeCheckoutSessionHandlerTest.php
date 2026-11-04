@@ -79,6 +79,7 @@ class StripeCheckoutSessionHandlerTest extends TestCase
             $this->shopAdapter,
             $this->customerService,
             $this->config,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
             null,
             $iframeSettings
         );

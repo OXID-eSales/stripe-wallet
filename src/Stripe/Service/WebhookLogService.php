@@ -10,6 +10,9 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\PaymentBase\Service\FileLoggerInterface;
+use OxidEsales\PaymentBase\Webhook\WebhookDeliveryLogRecord;
+use OxidEsales\PaymentBase\Webhook\WebhookResult;
+use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 
 /**
  * Centralized webhook logging service.
@@ -21,6 +24,8 @@ use OxidEsales\PaymentBase\Service\FileLoggerInterface;
  */
 class WebhookLogService implements WebhookLogServiceInterface
 {
+    private const UNKNOWN = 'unknown';
+
     public function __construct(
         private readonly FileLoggerInterface $fileLogger
     ) {
@@ -32,9 +37,9 @@ class WebhookLogService implements WebhookLogServiceInterface
             $eventInfo = $this->parseEventInfo($payload);
 
             $this->fileLogger->log('WEBHOOK_RECEIVED', [
-                'event_id' => $eventInfo['eventId'],
-                'event_type' => $eventInfo['eventType'],
-                'payment_intent_id' => $eventInfo['paymentIntentId'],
+                'event_id' => $eventInfo['eventId'] ?? self::UNKNOWN,
+                'event_type' => $eventInfo['eventType'] ?? self::UNKNOWN,
+                'objectId' => $eventInfo['objectId'] ?? self::UNKNOWN,
                 'remote_ip' => $remoteIp,
                 'payload_size' => strlen($payload),
                 'has_signature' => $signature !== '',
@@ -44,59 +49,55 @@ class WebhookLogService implements WebhookLogServiceInterface
         }
     }
 
-    public function logResult(string $payload, string $result, int $httpCode): void
-    {
+    public function logResult(
+        string $payload,
+        WebhookResult $result,
+        int $httpCode,
+        int $durationMs,
+        ?string $contractId
+    ): void {
         try {
             $eventInfo = $this->parseEventInfo($payload);
 
-            $this->fileLogger->log('WEBHOOK_RESULT', [
-                'result' => $result,
-                'http_code' => $httpCode,
-                'event_type' => $eventInfo['eventType'],
-                'event_id' => $eventInfo['eventId'],
-            ]);
+            $this->fileLogger->log('WEBHOOK_RESULT', WebhookDeliveryLogRecord::fromResult(
+                StripeDefinitions::PROVIDER,
+                $eventInfo['eventId'],
+                $eventInfo['eventType'],
+                $eventInfo['objectId'],
+                $contractId,
+                $result,
+                $httpCode,
+                $durationMs
+            )->toContext());
         } catch (\Throwable $e) {
             // Silent fail - don't break webhook processing
         }
     }
 
     /**
-     * Parse webhook payload to extract event info.
+     * The ids the payload names. `objectId` is the id of the event's own object (`pi_`, `cs_`, `ch_`...), whatever
+     * its kind: the log line says which object the delivery was about, the contract id says which contract.
      *
-     * @return array{eventId: string, eventType: string, paymentIntentId: string}
+     * @return array{eventId: ?string, eventType: ?string, objectId: ?string}
      */
     private function parseEventInfo(string $payload): array
     {
-        $result = [
-            'eventId' => 'unknown',
-            'eventType' => 'unknown',
-            'paymentIntentId' => 'unknown',
-        ];
-
-        if ($payload === '') {
-            return $result;
-        }
-
         $data = json_decode($payload, true);
         if (!is_array($data)) {
-            return $result;
+            return ['eventId' => null, 'eventType' => null, 'objectId' => null];
         }
 
-        $result['eventId'] = is_string($data['id'] ?? null) ? $data['id'] : 'unknown';
-        $result['eventType'] = is_string($data['type'] ?? null) ? $data['type'] : 'unknown';
+        $object = is_array($data['data'] ?? null) ? ($data['data']['object'] ?? null) : null;
 
-        // Prefer the explicit payment_intent field (present on charge.* and
-        // checkout.session.* events) over the object's own id (which is the
-        // charge / session id, not a PI).
-        $dataObj = $data['data'] ?? null;
-        if (is_array($dataObj)) {
-            $object = $dataObj['object'] ?? null;
-            if (is_array($object)) {
-                $id = $object['payment_intent'] ?? $object['id'] ?? null;
-                $result['paymentIntentId'] = is_string($id) ? $id : 'unknown';
-            }
-        }
+        return [
+            'eventId' => $this->stringOrNull($data['id'] ?? null),
+            'eventType' => $this->stringOrNull($data['type'] ?? null),
+            'objectId' => is_array($object) ? $this->stringOrNull($object['id'] ?? null) : null,
+        ];
+    }
 
-        return $result;
+    private function stringOrNull(mixed $value): ?string
+    {
+        return is_string($value) ? $value : null;
     }
 }

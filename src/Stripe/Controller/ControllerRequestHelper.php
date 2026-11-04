@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Controller;
 
+use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessDecision;
 use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessGuardInterface;
@@ -240,8 +242,7 @@ class ControllerRequestHelper
     public function logError(string $message, \Throwable $e): void
     {
         $this->logger()->error($message, [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
+            'throwable' => $this->throwableSummary()->fromThrowable($e),
         ]);
     }
 
@@ -271,5 +272,17 @@ class ControllerRequestHelper
     protected function logger(): LoggerInterface
     {
         return Registry::getLogger();
+    }
+
+    /**
+     * Seam like logger(): the helper is built by OXID controllers, not by the container, so the shared summary
+     * service is fetched here (VR-18 L4).
+     */
+    protected function throwableSummary(): ThrowableSummaryInterface
+    {
+        $summary = ContainerFactory::getInstance()->getContainer()->get(ThrowableSummaryInterface::class);
+        assert($summary instanceof ThrowableSummaryInterface);
+
+        return $summary;
     }
 }

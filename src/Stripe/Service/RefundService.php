@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use DateTimeImmutable;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
@@ -34,6 +35,7 @@ class RefundService implements RefundServiceInterface
 
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,
+        private readonly ThrowableSummaryInterface $throwableSummary,
         ?LoggerInterface $logger = null
     ) {
         $this->logger = $logger ?? new NullLogger();
@@ -152,7 +154,7 @@ class RefundService implements RefundServiceInterface
         } catch (PaymentAdapterException $e) {
             $this->logger->error('Failed to retrieve payment intent', [
                 'payment_intent_id' => $paymentIntentId,
-                'error' => $e->getMessage(),
+                'throwable' => $this->throwableSummary->fromThrowable($e),
             ]);
             return null;
         }
@@ -258,7 +260,7 @@ class RefundService implements RefundServiceInterface
     private function handleRefundError(PaymentAdapterException $e, string $chargeId): RefundResponse
     {
         $this->logger->error('Refund failed', [
-            'error' => $e->getMessage(),
+            'throwable' => $this->throwableSummary->fromThrowable($e),
             'code' => $e->getErrorCode(),
             'charge_id' => $chargeId,
         ]);

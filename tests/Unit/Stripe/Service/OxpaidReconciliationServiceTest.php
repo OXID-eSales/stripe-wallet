@@ -59,8 +59,10 @@ class OxpaidReconciliationServiceTest extends TestCase
             $this->connection,
             $this->adapterFactory,
             $this->contractRepository,
-            $this->contractFulfillmentService,  // Sprint 18
-            $this->fileLogger  // Sprint 14: Inject mock - tests isolated from filesystem
+            $this->contractFulfillmentService,
+            // Sprint 18
+            $this->fileLogger,  // Sprint 14: Inject mock - tests isolated from filesystem
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([])
         );
     }
 

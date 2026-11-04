@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\Eshop\Application\Model\Order;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
@@ -24,7 +25,8 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 class OrderContractResolver
 {
     public function __construct(
-        private readonly ContractRepositoryInterface $contractRepository
+        private readonly ContractRepositoryInterface $contractRepository,
+        private readonly ThrowableSummaryInterface $throwableSummary
     ) {
     }
 
@@ -47,7 +49,7 @@ class OrderContractResolver
         } catch (\Exception $e) {
             Registry::getLogger()->warning('Failed to load contract for order', [
                 'orderId' => $order->getId(),
-                'error' => $e->getMessage(),
+                'throwable' => $this->throwableSummary->fromThrowable($e),
             ]);
             return null;
         }

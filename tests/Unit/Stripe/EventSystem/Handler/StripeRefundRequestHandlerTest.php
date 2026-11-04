@@ -63,6 +63,7 @@ class StripeRefundRequestHandlerTest extends TestCase
             $this->shopAdapter,
             $this->ledger,
             new PaymentIntentResolver($this->contractRepository),
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
             $this->logger,
             $this->eventLogger
         );

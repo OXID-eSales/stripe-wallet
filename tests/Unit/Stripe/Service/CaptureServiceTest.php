@@ -52,7 +52,8 @@ class CaptureServiceTest extends TestCase
             $this->repository,
             $this->fulfillmentService,
             $this->captureLedger,
-            new NullLogger()
+            new NullLogger(),
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([])
         );
     }
 
@@ -251,6 +252,36 @@ class CaptureServiceTest extends TestCase
 
         $this->assertFalse($result->isSuccessful());
         $this->assertSame('API Error', $result->errorMessage);
+    }
+
+    public function testAFailedCaptureLogsTheThrowableSummaryNotItsMessage(): void
+    {
+        $this->adapter->method('capturePayment')
+            ->willThrowException(new \RuntimeException('No such customer: buyer@example.com', 7));
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getProviderOrderId')->willReturn('pi_123');
+        $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::authorized());
+        $contract->method('getAmount')->willReturn(100.0);
+        $contract->method('getCapturedAmount')->willReturn(null);
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logged = [];
+        $logger->method('error')->willReturnCallback(static function (string $message, array $context) use (&$logged): void {
+            $logged = $context;
+        });
+        $service = new CaptureService(
+            $this->adapterFactory,
+            $this->repository,
+            $this->fulfillmentService,
+            $this->captureLedger,
+            $logger,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([])
+        );
+
+        $service->processCapture($contract, 10.00, []);
+
+        $this->assertSame(\RuntimeException::class, $logged['throwable']['class']);
+        $this->assertSame(7, $logged['throwable']['code']);
+        $this->assertStringNotContainsString('buyer@example.com', (string) json_encode($logged));
     }
 
     public function testProcessCaptureReturnsFailureWhenNoPaymentIntentId(): void

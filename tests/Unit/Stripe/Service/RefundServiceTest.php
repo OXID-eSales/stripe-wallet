@@ -44,6 +44,7 @@ class RefundServiceTest extends TestCase
     {
         return new RefundService(
             $this->adapterFactory,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
             $this->logger
         );
     }
@@ -483,7 +484,7 @@ class RefundServiceTest extends TestCase
             ->with(
                 $this->stringContains('Refund failed'),
                 $this->callback(function ($context) {
-                    return isset($context['error']) && isset($context['charge_id']);
+                    return isset($context['throwable']['class']) && !isset($context['error']) && isset($context['charge_id']);
                 })
             );
 

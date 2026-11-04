@@ -50,7 +50,7 @@ final class CheckoutReturnServiceDtoCharacterizationTest extends TestCase
         );
         $this->adapter->method('retrieveCheckoutSession')->willReturn($session);
 
-        $service = new CheckoutReturnService($this->adapterFactory, new \Psr\Log\NullLogger());
+        $service = new CheckoutReturnService($this->adapterFactory, new \Psr\Log\NullLogger(), new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
 
         // Act
         $result = $service->validateReturn('cs_test_auto', 'contract_42');
@@ -78,7 +78,7 @@ final class CheckoutReturnServiceDtoCharacterizationTest extends TestCase
         );
         $this->adapter->method('retrieveCheckoutSession')->willReturn($session);
 
-        $service = new CheckoutReturnService($this->adapterFactory, new \Psr\Log\NullLogger());
+        $service = new CheckoutReturnService($this->adapterFactory, new \Psr\Log\NullLogger(), new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
 
         // Act
         $result = $service->validateReturn('cs_test_manual', 'contract_99');
@@ -104,7 +104,7 @@ final class CheckoutReturnServiceDtoCharacterizationTest extends TestCase
         );
         $this->adapter->method('retrieveCheckoutSession')->willReturn($session);
 
-        $service = new CheckoutReturnService($this->adapterFactory, new \Psr\Log\NullLogger());
+        $service = new CheckoutReturnService($this->adapterFactory, new \Psr\Log\NullLogger(), new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
 
         // Act
         $result = $service->validateReturn('cs_test_invalid', 'contract_77');
@@ -128,7 +128,7 @@ final class CheckoutReturnServiceDtoCharacterizationTest extends TestCase
         );
         $this->adapter->method('retrieveCheckoutSession')->willReturn($session);
 
-        $service = new CheckoutReturnService($this->adapterFactory, new \Psr\Log\NullLogger());
+        $service = new CheckoutReturnService($this->adapterFactory, new \Psr\Log\NullLogger(), new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
 
         // Act
         $result = $service->validateReturn('cs_mismatch', 'contract_42');
@@ -144,7 +144,7 @@ final class CheckoutReturnServiceDtoCharacterizationTest extends TestCase
         $this->adapter->method('retrieveCheckoutSession')
             ->willThrowException(new PaymentAdapterException('stripe', 'err', 'API error'));
 
-        $service = new CheckoutReturnService($this->adapterFactory, new \Psr\Log\NullLogger());
+        $service = new CheckoutReturnService($this->adapterFactory, new \Psr\Log\NullLogger(), new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
 
         // Act
         $result = $service->validateReturn('cs_throw', 'contract_42');

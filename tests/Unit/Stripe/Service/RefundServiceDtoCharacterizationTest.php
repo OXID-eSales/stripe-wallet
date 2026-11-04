@@ -61,7 +61,7 @@ final class RefundServiceDtoCharacterizationTest extends TestCase
         $this->adapter->method('retrievePaymentIntent')->willReturn($piDto);
         $this->adapter->method('createRefundByCharge')->willReturn($refundDto);
 
-        $service = new RefundService($this->adapterFactory);
+        $service = new RefundService($this->adapterFactory, new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
 
         // Act
         $result = $service->processRefund('order_123', 'pi_refund_test', 'requested_by_customer');
@@ -88,7 +88,7 @@ final class RefundServiceDtoCharacterizationTest extends TestCase
 
         $this->adapter->method('retrievePaymentIntent')->willReturn($piDto);
 
-        $service = new RefundService($this->adapterFactory);
+        $service = new RefundService($this->adapterFactory, new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
 
         // Act
         $result = $service->processRefund('order_456', 'pi_no_charge');
@@ -121,7 +121,7 @@ final class RefundServiceDtoCharacterizationTest extends TestCase
         $this->adapter->method('retrievePaymentIntent')->willReturn($piDto);
         $this->adapter->method('createRefundByCharge')->willReturn($refundDto);
 
-        $service = new RefundService($this->adapterFactory);
+        $service = new RefundService($this->adapterFactory, new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
 
         // Act
         $result = $service->processRefund('order_jpy', 'pi_jpy_test');

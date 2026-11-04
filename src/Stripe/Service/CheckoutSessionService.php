@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ReplacedAttempts;
@@ -44,6 +45,7 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
         private readonly StripeAdapterFactoryInterface $adapterFactory,
         // OPC-175: each session is stamped with the attempt of its contract.
         private readonly ContractRepositoryInterface $contracts,
+        private readonly ThrowableSummaryInterface $throwableSummary,
         ?LoggerInterface $logger = null,
         private readonly ?EventDispatcherInterface $eventDispatcher = null,
         private readonly ?LanguageResolverInterface $languageResolver = null,
@@ -144,7 +146,7 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
         } catch (PaymentAdapterException $e) {
             $this->logger->error('Failed to create checkout session', [
                 'contract_id' => $contractId,
-                'error' => $e->getMessage(),
+                'throwable' => $this->throwableSummary->fromThrowable($e),
                 'code' => $e->getCode(),
             ]);
 

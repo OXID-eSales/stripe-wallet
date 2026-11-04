@@ -109,7 +109,8 @@ final class StripePaymentCaptureStatusQueryTest extends TestCase
     {
         return new StripePaymentCaptureStatusQuery(
             $this->adapterFactory,
-            $logger ?? new NullLogger(),
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
+            $logger ?? new NullLogger()
         );
     }
 

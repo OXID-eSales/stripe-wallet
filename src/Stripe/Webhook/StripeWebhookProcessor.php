@@ -115,6 +115,14 @@ class StripeWebhookProcessor extends AbstractWebhookProcessor
         return WebhookResult::skipped("Unhandled event type: {$event->type}");
     }
 
+    /**
+     * The contract the delivery processed last touched; the webhook file log carries it (VR-18 L4).
+     */
+    public function lastContractId(): ?string
+    {
+        return $this->lastContractId;
+    }
+
     protected function getContractIdFromResult(WebhookResult $result): ?string
     {
         return $this->lastContractId;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\Payments\Stripe\Core\ShopId;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
@@ -45,6 +46,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         private readonly ShopAdapterInterface $shopAdapter,
         private readonly StripeCustomerServiceInterface $customerService,
         private readonly ModuleConfigurationServiceInterface $config,
+        private readonly ThrowableSummaryInterface $throwableSummary,
         private readonly ?FileLoggerInterface $eventLogger = null,
         private readonly ?IframeCheckoutSettingsInterface $iframeSettings = null
     ) {
@@ -195,7 +197,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         } catch (\Throwable $e) {
             $this->logEvent('StripeCheckoutSessionHandler: Failed to resolve customer', [
                 'userId' => $customerData['userId'],
-                'error' => $e->getMessage(),
+                'throwable' => $this->throwableSummary->fromThrowable($e),
             ]);
             return null;
         }

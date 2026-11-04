@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Adapter\Request\CapturePaymentRequest;
 use OxidEsales\PaymentBase\Adapter\Response\CaptureResponse;
@@ -37,7 +38,8 @@ class CaptureService implements CaptureServiceInterface
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ContractFulfillmentServiceInterface $contractFulfillmentService,
         private readonly ProviderCaptureLedgerInterface $captureLedger,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly ThrowableSummaryInterface $throwableSummary
     ) {
     }
 
@@ -141,7 +143,7 @@ class CaptureService implements CaptureServiceInterface
         } catch (Throwable $e) {
             $this->logger->error('Capture failed', [
                 'payment_intent_id' => $paymentIntentId,
-                'error' => $e->getMessage(),
+                'throwable' => $this->throwableSummary->fromThrowable($e),
             ]);
 
             return CaptureResponse::failure(

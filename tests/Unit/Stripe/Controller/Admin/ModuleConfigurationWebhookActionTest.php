@@ -455,7 +455,7 @@ final class ModuleConfigurationWebhookActionTest extends TestCase
                 array &$oxConfigStore
             ) {
                 // Skip ModuleConfiguration_parent::__construct to avoid OXID admin bootstrap.
-                $this->initializeWebhookCollaborators($registrar, $moduleConfig, $logger);
+                $this->initializeWebhookCollaborators($registrar, $moduleConfig, $logger, new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
                 $this->oxConfigStore = &$oxConfigStore;
             }
 

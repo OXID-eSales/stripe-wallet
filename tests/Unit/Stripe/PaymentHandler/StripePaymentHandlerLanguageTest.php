@@ -166,6 +166,7 @@ final class StripePaymentHandlerLanguageTest extends TestCase
                     new \OxidEsales\PaymentBase\EventSystem\EventDispatcher(
                 new \OxidEsales\PaymentBase\EventSystem\EventListenerProvider([])
             ),
+                    new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
                     $logger,
                     $resolver
                 );

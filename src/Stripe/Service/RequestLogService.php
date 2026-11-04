@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
@@ -28,6 +29,7 @@ class RequestLogService implements RequestLogServiceInterface
 
     public function __construct(
         private readonly FileLoggerInterface $fileLogger,
+        private readonly ThrowableSummaryInterface $throwableSummary,
         ?LoggerInterface $fallbackLogger = null
     ) {
         $this->fallbackLogger = $fallbackLogger ?? new NullLogger();
@@ -52,7 +54,7 @@ class RequestLogService implements RequestLogServiceInterface
             $this->fallbackLogger->warning('Failed to log request', [
                 'action' => $action,
                 'reference_id' => $referenceId,
-                'error' => $e->getMessage(),
+                'throwable' => $this->throwableSummary->fromThrowable($e),
             ]);
         }
     }
@@ -68,15 +70,15 @@ class RequestLogService implements RequestLogServiceInterface
                 'reference_id' => $referenceId,
                 'shop_id' => $shopId,
                 'error_code' => $exception->getCode() ?: 500,
-                'error_message' => $exception->getMessage(),
+                'throwable' => $this->throwableSummary->fromThrowable($exception),
                 'timestamp' => date('Y-m-d H:i:s'),
             ]);
         } catch (\Throwable $e) {
             $this->fallbackLogger->warning('Failed to log exception', [
                 'action' => $action,
                 'reference_id' => $referenceId,
-                'original_error' => $exception->getMessage(),
-                'log_error' => $e->getMessage(),
+                'original_error' => $this->throwableSummary->fromThrowable($exception),
+                'log_error' => $this->throwableSummary->fromThrowable($e),
             ]);
         }
     }

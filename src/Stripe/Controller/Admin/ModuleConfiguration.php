@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Controller\Admin;
 
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Bridge\ModuleSettingBridgeInterface;
@@ -62,6 +63,7 @@ class ModuleConfiguration extends ModuleConfiguration_parent
     private ?ModuleConfigurationServiceInterface $moduleConfig = null;
     private ?WebhookEndpointRegistrarInterface $webhookRegistrar = null;
     private ?LoggerInterface $webhookLogger = null;
+    private ?ThrowableSummaryInterface $throwableSummary = null;
     private ?ConfigurationValidatorInterface $configurationValidator = null;
     private ?ModuleSettingBridgeInterface $moduleSettingBridge = null;
 
@@ -116,6 +118,17 @@ class ModuleConfiguration extends ModuleConfiguration_parent
         return $this->webhookLogger;
     }
 
+    private function getThrowableSummary(): ThrowableSummaryInterface
+    {
+        if ($this->throwableSummary === null) {
+            $summary = ContainerFactory::getInstance()->getContainer()->get(ThrowableSummaryInterface::class);
+            assert($summary instanceof ThrowableSummaryInterface);
+            $this->throwableSummary = $summary;
+        }
+
+        return $this->throwableSummary;
+    }
+
     protected function getConfigurationValidator(): ConfigurationValidatorInterface
     {
         if ($this->configurationValidator === null) {
@@ -147,11 +160,13 @@ class ModuleConfiguration extends ModuleConfiguration_parent
     protected function initializeWebhookCollaborators(
         WebhookEndpointRegistrarInterface $registrar,
         ModuleConfigurationServiceInterface $moduleConfig,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        ThrowableSummaryInterface $throwableSummary
     ): void {
         $this->webhookRegistrar = $registrar;
         $this->moduleConfig     = $moduleConfig;
         $this->webhookLogger    = $logger;
+        $this->throwableSummary = $throwableSummary;
     }
 
     /**
@@ -259,7 +274,7 @@ class ModuleConfiguration extends ModuleConfiguration_parent
             ]);
         } catch (WebhookRegistrationException $e) {
             $this->getWebhookLogger()->warning('Stripe webhook creation failed', [
-                'reason' => $e->getMessage(),
+                'throwable' => $this->getThrowableSummary()->fromThrowable($e),
                 'mode'   => $mode,
             ]);
             $this->respondJson(400, ['success' => false, 'message' => $e->getMessage()]);
@@ -301,7 +316,7 @@ class ModuleConfiguration extends ModuleConfiguration_parent
             $this->respondJson(200, ['success' => true, 'deleted' => $deleted]);
         } catch (WebhookRegistrationException $e) {
             $this->getWebhookLogger()->warning('Stripe webhook clear-all failed', [
-                'reason' => $e->getMessage(),
+                'throwable' => $this->getThrowableSummary()->fromThrowable($e),
             ]);
             $this->respondJson(400, ['success' => false, 'message' => $e->getMessage()]);
         }

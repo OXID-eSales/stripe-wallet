@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\Payments\Stripe\Core\ShopId;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
@@ -40,6 +41,7 @@ class StripeCancelAuthorizationRequestHandler extends AbstractStripeRequestHandl
         private readonly RequestLogServiceInterface $requestLogService,
         private readonly ShopAdapterInterface $shopAdapter,
         private readonly ContractRepositoryInterface $contractRepository,
+        private readonly ThrowableSummaryInterface $throwableSummary,
         ?LoggerInterface $logger = null,
         ?FileLoggerInterface $eventLogger = null,
         private readonly ?PaymentIntentResolver $paymentIntentResolver = null
@@ -73,7 +75,7 @@ class StripeCancelAuthorizationRequestHandler extends AbstractStripeRequestHandl
             $this->logEvent('StripeCancelAuthorizationRequestHandler::handle() END - SUCCESS');
         } catch (\Throwable $e) {
             $this->logEvent('StripeCancelAuthorizationRequestHandler: EXCEPTION', [
-                'error' => $e->getMessage(),
+                'throwable' => $this->throwableSummary->fromThrowable($e),
             ]);
             $this->handleException($e, $context, $event);
         }
@@ -165,11 +167,12 @@ class StripeCancelAuthorizationRequestHandler extends AbstractStripeRequestHandl
         EventContext $context,
         StripeCancelAuthorizationRequestEvent $event
     ): void {
+        // The answer to the (authorised) admin who asked: the module's own refusal text. Not a log line.
         $context->set('error', $e->getMessage());
         $context->set('cancelSuccess', false);
 
         $this->logger->error('Cancel authorization handler exception', [
-            'error' => $e->getMessage(),
+            'throwable' => $this->throwableSummary->fromThrowable($e),
             'payment_intent_id' => $event->getPaymentIntentId(),
         ]);
 

@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeCheckoutSessionDto;
 use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
@@ -33,7 +34,8 @@ class CheckoutReturnService implements CheckoutReturnServiceInterface
 {
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly ThrowableSummaryInterface $throwableSummary
     ) {
     }
 
@@ -109,7 +111,7 @@ class CheckoutReturnService implements CheckoutReturnServiceInterface
         } catch (PaymentAdapterException $e) {
             $this->logger->error('Failed to retrieve checkout session', [
                 'session_id' => $checkoutSessionId,
-                'error' => $e->getMessage(),
+                'throwable' => $this->throwableSummary->fromThrowable($e),
             ]);
             return null;
         }

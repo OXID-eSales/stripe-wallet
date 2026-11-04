@@ -49,6 +49,7 @@ class StripeCaptureRequestHandlerTest extends TestCase
             $this->contractRepository,
             $this->requestLogService,
             $this->shopAdapter,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
             new NullLogger()
         );
     }

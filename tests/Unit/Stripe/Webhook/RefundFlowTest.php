@@ -81,6 +81,7 @@ final class RefundFlowTest extends TestCase
             $shop,
             $this->ledger,
             new PaymentIntentResolver($contracts),
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([])
         );
         $fulfillment = new WebhookContractFulfillmentHandler(
             $contracts,

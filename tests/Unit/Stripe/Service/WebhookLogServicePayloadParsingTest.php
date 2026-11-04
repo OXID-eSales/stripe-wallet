@@ -10,73 +10,126 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use OxidEsales\PaymentBase\Service\FileLoggerInterface;
+use OxidEsales\PaymentBase\Webhook\WebhookResult;
 use OxidEsales\Payments\Stripe\Service\WebhookLogService;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Receipt-log payload parsing — verifies the WEBHOOK_RECEIVED log line
- * carries the actual payment-intent ID for every event family, instead of
- * defaulting to the nested object's own ID (which is e.g. ch_… for charge.*
- * events, making the log mislabel the field).
+ * Webhook file-log lines (VR-18 L4): the received line carries the id of the event's own object as `objectId` (the
+ * field used to be called `payment_intent_id` and held `cs_...` / `ch_...` ids), the result line is payment-base's
+ * WebhookDeliveryLogRecord with the reason the delivery was skipped or failed.
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Service\WebhookLogService::class)]
 class WebhookLogServicePayloadParsingTest extends TestCase
 {
-    public function testLogReceivedReportsPaymentIntentIdForChargeRefundedEvent(): void
+    public function testObjectIdIsTheIdOfTheEventObjectForAChargeEvent(): void
     {
-        $payload = (string) json_encode([
-            'id' => 'evt_charge_refund',
-            'type' => 'charge.refunded',
-            'data' => ['object' => ['id' => 'ch_abc', 'payment_intent' => 'pi_xyz']],
-        ]);
+        $recorder = $this->logReceived('evt_charge_refund', 'charge.refunded', ['id' => 'ch_abc', 'payment_intent' => 'pi_xyz']);
 
-        $recorder = new CapturingFileLogger();
-        (new WebhookLogService($recorder))->logReceived($payload, 'sig', '127.0.0.1');
-
-        $this->assertSame('pi_xyz', $recorder->lastContext['payment_intent_id']);
-        $this->assertNotSame('ch_abc', $recorder->lastContext['payment_intent_id']);
+        $this->assertSame('ch_abc', $recorder->lastContext['objectId']);
+        $this->assertArrayNotHasKey('payment_intent_id', $recorder->lastContext);
     }
 
-    public function testLogReceivedReportsObjectIdForPaymentIntentSucceededEvent(): void
+    public function testObjectIdIsTheCheckoutSessionIdForACheckoutSessionEvent(): void
     {
-        $payload = (string) json_encode([
-            'id' => 'evt_pi_succeeded',
-            'type' => 'payment_intent.succeeded',
-            'data' => ['object' => ['id' => 'pi_zzz']],
-        ]);
+        $recorder = $this->logReceived('evt_cs_completed', 'checkout.session.completed', ['id' => 'cs_qqq', 'payment_intent' => 'pi_target']);
 
-        $recorder = new CapturingFileLogger();
-        (new WebhookLogService($recorder))->logReceived($payload, 'sig', '127.0.0.1');
-
-        $this->assertSame('pi_zzz', $recorder->lastContext['payment_intent_id']);
+        $this->assertSame('cs_qqq', $recorder->lastContext['objectId']);
     }
 
-    public function testLogReceivedReportsPaymentIntentIdForCheckoutSessionCompletedEvent(): void
+    public function testObjectIdForPaymentIntentEvent(): void
     {
-        $payload = (string) json_encode([
-            'id' => 'evt_cs_completed',
-            'type' => 'checkout.session.completed',
-            'data' => ['object' => ['id' => 'cs_qqq', 'payment_intent' => 'pi_target']],
-        ]);
+        $recorder = $this->logReceived('evt_pi_succeeded', 'payment_intent.succeeded', ['id' => 'pi_zzz']);
 
-        $recorder = new CapturingFileLogger();
-        (new WebhookLogService($recorder))->logReceived($payload, 'sig', '127.0.0.1');
-
-        $this->assertSame('pi_target', $recorder->lastContext['payment_intent_id']);
+        $this->assertSame('pi_zzz', $recorder->lastContext['objectId']);
     }
 
-    public function testLogReceivedFallsBackToUnknownWhenNeitherFieldPresent(): void
+    public function testObjectIdIsUnknownWhenThePayloadHasNone(): void
     {
-        $payload = (string) json_encode([
-            'id' => 'evt_no_pi',
-            'type' => 'customer.created',
-            'data' => ['object' => []],
-        ]);
+        $recorder = $this->logReceived('evt_no_obj', 'customer.created', []);
 
+        $this->assertSame('unknown', $recorder->lastContext['objectId']);
+    }
+
+    public function testSkipReasonIsLogged(): void
+    {
         $recorder = new CapturingFileLogger();
-        (new WebhookLogService($recorder))->logReceived($payload, 'sig', '127.0.0.1');
 
-        $this->assertSame('unknown', $recorder->lastContext['payment_intent_id']);
+        (new WebhookLogService($recorder))->logResult(
+            $this->payload('evt_cancel', 'payment_intent.canceled', ['id' => 'pi_1']),
+            WebhookResult::skipped('Contract not found'),
+            200,
+            12,
+            null
+        );
+
+        $this->assertSame('skipped', $recorder->lastContext['action']);
+        $this->assertSame('Contract not found', $recorder->lastContext['reason']);
+    }
+
+    public function testResultLineIsTheDeliveryRecord(): void
+    {
+        $recorder = new CapturingFileLogger();
+
+        (new WebhookLogService($recorder))->logResult(
+            $this->payload('evt_1', 'checkout.session.completed', ['id' => 'cs_1']),
+            WebhookResult::success('contract_fulfilled'),
+            200,
+            34,
+            'contract-7'
+        );
+
+        $this->assertSame('WEBHOOK_RESULT', $recorder->lastMessage);
+        $this->assertSame(
+            [
+                'provider' => 'stripe',
+                'eventId' => 'evt_1',
+                'eventType' => 'checkout.session.completed',
+                'objectId' => 'cs_1',
+                'contractId' => 'contract-7',
+                'action' => 'contract_fulfilled',
+                'reason' => null,
+                'httpCode' => 200,
+                'durationMs' => 34,
+            ],
+            $recorder->lastContext
+        );
+    }
+
+    public function testAFailureLogsItsReason(): void
+    {
+        $recorder = new CapturingFileLogger();
+
+        (new WebhookLogService($recorder))->logResult(
+            $this->payload('evt_2', 'payment_intent.succeeded', ['id' => 'pi_2']),
+            WebhookResult::failure('processing_failed', 'Webhook processing failed'),
+            500,
+            5,
+            null
+        );
+
+        $this->assertSame('processing_failed', $recorder->lastContext['action']);
+        $this->assertSame('Webhook processing failed', $recorder->lastContext['reason']);
+        $this->assertSame(500, $recorder->lastContext['httpCode']);
+    }
+
+    /**
+     * @param array<string, mixed> $object
+     */
+    private function logReceived(string $eventId, string $type, array $object): CapturingFileLogger
+    {
+        $recorder = new CapturingFileLogger();
+        (new WebhookLogService($recorder))->logReceived($this->payload($eventId, $type, $object), 'sig', '127.0.0.1');
+
+        return $recorder;
+    }
+
+    /**
+     * @param array<string, mixed> $object
+     */
+    private function payload(string $eventId, string $type, array $object): string
+    {
+        return (string) json_encode(['id' => $eventId, 'type' => $type, 'data' => ['object' => $object]]);
     }
 }
 

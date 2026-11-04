@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use DateTimeImmutable;
 use OxidEsales\PaymentBase\Adapter\Response\CancellationResponse;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
@@ -24,6 +25,7 @@ class CancelAuthorizationService implements CancelAuthorizationServiceInterface
 
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,
+        private readonly ThrowableSummaryInterface $throwableSummary,
         ?LoggerInterface $logger = null
     ) {
         $this->logger = $logger ?? new NullLogger();
@@ -54,7 +56,7 @@ class CancelAuthorizationService implements CancelAuthorizationServiceInterface
         } catch (\Throwable $e) {
             $this->logger->error('Cancel authorization failed', [
                 'payment_intent_id' => $paymentIntentId,
-                'error' => $e->getMessage(),
+                'throwable' => $this->throwableSummary->fromThrowable($e),
             ]);
 
             return CancellationResponse::failure($e->getMessage());

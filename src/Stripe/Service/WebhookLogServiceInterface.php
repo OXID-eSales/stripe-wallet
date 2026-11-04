@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use OxidEsales\PaymentBase\Webhook\WebhookResult;
+
 /**
  * Interface for webhook logging service.
  *
@@ -28,11 +30,19 @@ interface WebhookLogServiceInterface
     public function logReceived(string $payload, string $signature, string $remoteIp): void;
 
     /**
-     * Log webhook processing result.
+     * Log what became of a delivery: one WebhookDeliveryLogRecord line with its ids, its action and the reason
+     * it was skipped or failed.
      *
-     * @param string $payload Raw webhook payload
-     * @param string $result Result description (e.g., "SUCCESS: payment_intent.succeeded")
+     * @param string $payload Raw webhook payload (only its ids are read)
      * @param int $httpCode HTTP response code
+     * @param int $durationMs time since the request started
+     * @param ?string $contractId the contract the delivery touched, when it touched one
      */
-    public function logResult(string $payload, string $result, int $httpCode): void;
+    public function logResult(
+        string $payload,
+        WebhookResult $result,
+        int $httpCode,
+        int $durationMs,
+        ?string $contractId
+    ): void;
 }
