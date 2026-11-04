@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed (VR-18 L1) - `StripeCheckoutFooter` logs failure summaries, not exception messages
+- The two error logs of the widget (allowed-symbols map, publishable-key lookup) carry `throwable` = payment-base's
+  `ThrowableSummaryInterface::fromThrowable()` (class alone when the container cannot even give the summary service),
+  not `$e->getMessage()`. The shop logger is a protected `errorLogger()` seam.
+
 ### Changed (VR-25 D3) - required collaborators: no `= null` constructor defaults, no `?? new X()`, no `?->` on injected services
 - **Required now** (were `?X $x = null` with a `?? new` / `?->` fallback or a silent skip): the loggers of `OpcModalCancelUrlHandler`,
   `OpcModalSuccessUrlHandler`, `StripePaymentHandler`, `CancelAuthorizationService`, `CheckoutSessionService`,

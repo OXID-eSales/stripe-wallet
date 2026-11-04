@@ -208,6 +208,20 @@ final class StripeCheckoutFooterTest extends TestCase
         return new TestableStripeCheckoutFooter($viewParams, $configService, 'https://localhost.local/', $iframeSettings);
     }
 
+    // --- failure logging (VR-18 L1) ---
+
+    public function testAFailedConfigLookupIsLoggedWithoutTheExceptionMessage(): void
+    {
+        $footer = $this->buildFooterWithThrowingConfig([]);
+
+        $footer->exposedGetStripeConfig();
+
+        $logged = json_encode($footer->loggedRecords(), JSON_THROW_ON_ERROR);
+        self::assertNotEmpty($footer->loggedRecords());
+        self::assertStringNotContainsString('Config not available', $logged);
+        self::assertStringContainsString(\RuntimeException::class, str_replace('\\\\', '\\', $logged));
+    }
+
     // --- helpers ---
 
     /**
@@ -317,6 +331,32 @@ final class TestableStripeCheckoutFooter extends StripeCheckoutFooter
         }
 
         return $this->configService;
+    }
+
+    /** @var list<array{message: string, context: array<mixed>}> */
+    private array $logged = [];
+
+    protected function errorLogger(): \Psr\Log\LoggerInterface
+    {
+        $records = &$this->logged;
+
+        return new class ($records) extends \Psr\Log\AbstractLogger {
+            /** @param list<array{message: string, context: array<mixed>}> $records */
+            public function __construct(private array &$records)
+            {
+            }
+
+            public function log($level, $message, array $context = []): void
+            {
+                $this->records[] = ['message' => (string) $message, 'context' => $context];
+            }
+        };
+    }
+
+    /** @return list<array{message: string, context: array<mixed>}> */
+    public function loggedRecords(): array
+    {
+        return $this->logged;
     }
 
     // Expose protected methods for direct testing

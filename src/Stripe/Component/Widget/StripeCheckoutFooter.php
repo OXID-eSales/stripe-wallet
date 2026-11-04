@@ -11,9 +11,11 @@ namespace OxidEsales\Payments\Stripe\Component\Widget;
 
 use OxidEsales\Eshop\Application\Component\Widget\WidgetController;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\PaymentBase\Adapter\ShopCurrency;
 use OxidEsales\Payments\Stripe\Module;
 use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
+use Psr\Log\LoggerInterface;
 
 /**
  * Stripe Checkout Footer Widget for one-page-checkout.
@@ -99,11 +101,34 @@ class StripeCheckoutFooter extends WidgetController
 
             return $allowed;
         } catch (\Throwable $e) {
-            Registry::getLogger()->error('[StripeCheckoutFooter] Failed to build allowed-symbols map', [
-                'error' => $e->getMessage(),
+            $this->errorLogger()->error('[StripeCheckoutFooter] Failed to build allowed-symbols map', [
+                'throwable' => $this->summarize($e),
             ]);
 
             return [];
+        }
+    }
+
+    /**
+     * Protected seam: the shop's logger is a static Registry lookup.
+     */
+    protected function errorLogger(): LoggerInterface
+    {
+        return Registry::getLogger();
+    }
+
+    /**
+     * What a log line may say about a failure (VR-18 L1): never its message. The summary service comes from the
+     * container, which may be what just failed, so without it the line carries the class alone.
+     *
+     * @return array<string, scalar|null>
+     */
+    private function summarize(\Throwable $e): array
+    {
+        try {
+            return $this->getServiceFromContainer(ThrowableSummaryInterface::class)->fromThrowable($e);
+        } catch (\Throwable) {
+            return ['class' => $e::class];
         }
     }
 
@@ -138,8 +163,8 @@ class StripeCheckoutFooter extends WidgetController
 
             return $configService->getPublishableKey();
         } catch (\Throwable $e) {
-            Registry::getLogger()->error('[StripeCheckoutFooter] Failed to get config', [
-                'error' => $e->getMessage(),
+            $this->errorLogger()->error('[StripeCheckoutFooter] Failed to get config', [
+                'throwable' => $this->summarize($e),
             ]);
 
             return '';
