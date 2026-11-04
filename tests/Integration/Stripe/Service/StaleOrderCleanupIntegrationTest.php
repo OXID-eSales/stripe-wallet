@@ -24,7 +24,6 @@ use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Repository\DoctrineContractRepository;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
-use OxidEsales\PaymentBase\Logging\ThrowableSummary;
 use Psr\Log\NullLogger;
 
 /**
