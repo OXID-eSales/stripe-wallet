@@ -24,7 +24,6 @@ use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\RequestLogService;
 use OxidEsales\Payments\Stripe\Service\WebhookLogService;
-use OxidEsales\Payments\Stripe\Tests\Helper\StripeWebhookTestHelper;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventHandlerInterface;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookOutcome;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookPiiKeyProvider;
@@ -164,7 +163,7 @@ final class NoPiiInLogsTest extends TestCase
 
         return $processor->process(new WebhookRequest(
             payload: $payload,
-            signature: StripeWebhookTestHelper::generateSignature($payload, self::WEBHOOK_SECRET),
+            signature: self::stripeSignature($payload),
             remoteIp: '203.0.113.7',
             receivedAt: new DateTimeImmutable()
         ));
@@ -297,5 +296,16 @@ final class RecordingFileLogger implements FileLoggerInterface
     public function dump(): string
     {
         return implode("\n", $this->lines);
+    }
+
+    /**
+     * Stripe's `Stripe-Signature` header for this payload (t=…,v1=HMAC-SHA256). Built here: the CI integration run
+     * does not autoload the module's tests/Helper namespace.
+     */
+    private static function stripeSignature(string $payload): string
+    {
+        $timestamp = time();
+
+        return 't=' . $timestamp . ',v1=' . hash_hmac('sha256', $timestamp . '.' . $payload, self::WEBHOOK_SECRET);
     }
 }
