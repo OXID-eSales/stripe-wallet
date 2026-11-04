@@ -87,7 +87,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function paymentIntentSucceeded_fulfillmentHandlerReturnsTrue_returnsContractFulfilled(): void
     {
-        $event = $this->makeEvent('payment_intent.succeeded', ['id' => 'pi_abc']);
+        $event = $this->makeEvent('payment_intent.succeeded', ['id' => 'pi_abc', 'amount_received' => 1000, 'currency' => 'eur']);
 
         $this->fulfillmentHandler->method('handlePaymentSucceeded')->with('pi_abc')->willReturn(true);
 
@@ -104,7 +104,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function paymentIntentSucceeded_fulfillmentHandlerReturnsFalse_returnsSkippedTerminalState(): void
     {
-        $event = $this->makeEvent('payment_intent.succeeded', ['id' => 'pi_abc_f']);
+        $event = $this->makeEvent('payment_intent.succeeded', ['id' => 'pi_abc_f', 'amount_received' => 1000, 'currency' => 'eur']);
 
         $this->fulfillmentHandler->method('handlePaymentSucceeded')->with('pi_abc_f')->willReturn(false);
 
@@ -122,7 +122,7 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function paymentIntentSucceeded_fulfillmentHandlerReturnsNull_noMetadata_returnsContractNotFound(): void
     {
-        $event = $this->makeEvent('payment_intent.succeeded', ['id' => 'pi_unknown']);
+        $event = $this->makeEvent('payment_intent.succeeded', ['id' => 'pi_unknown', 'amount_received' => 1000, 'currency' => 'eur']);
 
         $this->fulfillmentHandler->method('handlePaymentSucceeded')->with('pi_unknown')->willReturn(null);
         // No contract found by metadata lookup
@@ -134,53 +134,6 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
         $this->assertSame('skipped', $result->action);
         $this->assertSame('Contract not found', $result->error);
         $this->assertNull($contractId);
-    }
-
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function paymentIntentSucceeded_fulfillmentHandlerReturnsNull_metadataContractFulfilled_returnsAlreadyFulfilled(): void
-    {
-        $event = $this->makeEvent('payment_intent.succeeded', [
-            'id' => 'pi_meta',
-            'metadata' => ['contract_id' => 'ctr-fulfilled'],
-        ]);
-
-        $this->fulfillmentHandler->method('handlePaymentSucceeded')->with('pi_meta')->willReturn(null);
-
-        $contract = $this->createMock(PaymentContractInterface::class);
-        $contract->method('getId')->willReturn('ctr-fulfilled');
-        $contract->method('getState')->willReturn(ContractState::fulfilled());
-        $this->contractRepository->method('findById')->with('ctr-fulfilled')->willReturn($contract);
-
-        [$result, $contractId] = $this->processAndCapture($event);
-
-        $this->assertTrue($result->isSuccess());
-        $this->assertSame('skipped', $result->action);
-        $this->assertSame('Contract already fulfilled', $result->error);
-        $this->assertSame('ctr-fulfilled', $contractId);
-    }
-
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function paymentIntentSucceeded_fulfillmentHandlerReturnsNull_metadataContractCommitted_fulfilledSuccessfully(): void
-    {
-        $event = $this->makeEvent('payment_intent.succeeded', [
-            'id' => 'pi_meta2',
-            'metadata' => ['contract_id' => 'ctr-committed'],
-        ]);
-
-        $this->fulfillmentHandler->expects($this->exactly(2))
-            ->method('handlePaymentSucceeded')
-            ->willReturnOnConsecutiveCalls(null, true);
-
-        $contract = $this->createMock(PaymentContractInterface::class);
-        $contract->method('getId')->willReturn('ctr-committed');
-        $contract->method('getState')->willReturn(ContractState::committed());
-        $this->contractRepository->method('findById')->with('ctr-committed')->willReturn($contract);
-
-        [$result, $contractId] = $this->processAndCapture($event);
-
-        $this->assertTrue($result->isSuccess());
-        $this->assertSame('contract_fulfilled', $result->action);
-        $this->assertSame('ctr-committed', $contractId);
     }
 
     // =========================================================================
@@ -614,6 +567,8 @@ final class StripeWebhookProcessorCharacterizationTest extends TestCase
     {
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getId')->willReturn($id);
+        // A committed contract: the paid-intent webhook goes straight to the fulfilment, no commit.
+        $contract->method('getState')->willReturn(ContractState::committed());
         return $contract;
     }
 

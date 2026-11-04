@@ -73,12 +73,13 @@ final class PaymentIntentSucceededWebhookHandlerTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function fulfillmentHandlerReturnsTrue_returnsContractFulfilledOutcome(): void
     {
-        $event = $this->makeEvent(['id' => 'pi_ok']);
+        $event = $this->makeEvent(['id' => 'pi_ok', 'amount_received' => 1000, 'currency' => 'eur']);
 
         $this->fulfillmentHandler->method('handlePaymentSucceeded')->with('pi_ok')->willReturn(true);
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getId')->willReturn('ctr-abc');
+        $contract->method('getState')->willReturn(ContractState::committed());
         $this->contractRepository->method('findByProviderOrderId')->with('pi_ok')->willReturn($contract);
 
         $outcome = $this->handler->handle($event);
@@ -91,12 +92,13 @@ final class PaymentIntentSucceededWebhookHandlerTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function fulfillmentHandlerReturnsFalse_returnsSkippedWithContractId(): void
     {
-        $event = $this->makeEvent(['id' => 'pi_skip']);
+        $event = $this->makeEvent(['id' => 'pi_skip', 'amount_received' => 1000, 'currency' => 'eur']);
 
         $this->fulfillmentHandler->method('handlePaymentSucceeded')->willReturn(false);
 
         $contract = $this->createMock(PaymentContractInterface::class);
         $contract->method('getId')->willReturn('ctr-skip');
+        $contract->method('getState')->willReturn(ContractState::committed());
         $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
 
         $outcome = $this->handler->handle($event);
@@ -109,7 +111,7 @@ final class PaymentIntentSucceededWebhookHandlerTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function fulfillmentHandlerReturnsNull_noMetadata_returnsContractNotFoundSkipped(): void
     {
-        $event = $this->makeEvent(['id' => 'pi_nf']);
+        $event = $this->makeEvent(['id' => 'pi_nf', 'amount_received' => 1000, 'currency' => 'eur']);
 
         $this->fulfillmentHandler->method('handlePaymentSucceeded')->willReturn(null);
         $this->contractRepository->method('findById')->willReturn(null);
@@ -123,48 +125,33 @@ final class PaymentIntentSucceededWebhookHandlerTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function fulfillmentHandlerReturnsNull_metadataContractFulfilled_returnsAlreadyFulfilled(): void
+    public function unknownProviderOrderIdIsSkippedNotMatchedByMetadata(): void
     {
         $event = $this->makeEvent([
-            'id' => 'pi_meta',
-            'metadata' => ['contract_id' => 'ctr-done'],
+            'id' => 'pi_unknown',
+            'amount_received' => 1000,
+            'currency' => 'eur',
+            'metadata' => ['contract_id' => 'ctr-by-metadata'],
         ]);
 
-        $this->fulfillmentHandler->method('handlePaymentSucceeded')->willReturn(null);
+        $this->fulfillmentHandler->expects($this->once())->method('handlePaymentSucceeded')->willReturn(null);
 
         $contract = $this->createMock(PaymentContractInterface::class);
-        $contract->method('getId')->willReturn('ctr-done');
-        $contract->method('getState')->willReturn(ContractState::fulfilled());
+        $contract->method('getId')->willReturn('ctr-by-metadata');
+        $contract->method('getState')->willReturn(ContractState::committed());
+        $contract->expects($this->never())->method('setProvider');
         $this->contractRepository->method('findById')->willReturn($contract);
+        $this->contractRepository->expects($this->never())->method('save');
+        $this->logger->expects($this->atLeastOnce())->method('warning')->with(
+            $this->stringContains('no contract'),
+            $this->callback(static fn (array $c): bool => ($c['payment_intent_id'] ?? null) === 'pi_unknown')
+        );
 
         $outcome = $this->handler->handle($event);
 
         $this->assertSame('skipped', $outcome->result->action);
-        $this->assertSame('Contract already fulfilled', $outcome->result->error);
-        $this->assertSame('ctr-done', $outcome->contractId);
-    }
-
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function fulfillmentHandlerReturnsNull_metadataContractCommitted_fulfilledSuccessfully(): void
-    {
-        $event = $this->makeEvent([
-            'id' => 'pi_committed',
-            'metadata' => ['contract_id' => 'ctr-commit'],
-        ]);
-
-        $this->fulfillmentHandler->expects($this->exactly(2))
-            ->method('handlePaymentSucceeded')
-            ->willReturnOnConsecutiveCalls(null, true);
-
-        $contract = $this->createMock(PaymentContractInterface::class);
-        $contract->method('getId')->willReturn('ctr-commit');
-        $contract->method('getState')->willReturn(ContractState::committed());
-        $this->contractRepository->method('findById')->willReturn($contract);
-
-        $outcome = $this->handler->handle($event);
-
-        $this->assertSame('contract_fulfilled', $outcome->result->action);
-        $this->assertSame('ctr-commit', $outcome->contractId);
+        $this->assertSame('Contract not found', $outcome->result->error);
+        $this->assertNull($outcome->contractId);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
@@ -180,15 +167,28 @@ final class PaymentIntentSucceededWebhookHandlerTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function testHandle_FallsBackToAmountWhenAmountReceivedIsAbsent(): void
+    public function authorisedOnlyBooksNothing(): void
     {
-        $event = $this->makeEvent(['id' => 'pi_amt2', 'amount' => 2500, 'currency' => 'eur']);
-        $this->fulfillmentHandler->expects($this->once())
-            ->method('handlePaymentSucceeded')
-            ->with('pi_amt2', 25.0)
-            ->willReturn(true);
+        // An authorised-not-captured intent carries the authorised `amount` but received nothing yet.
+        $event = $this->makeEvent(['id' => 'pi_auth', 'amount' => 2500, 'amount_received' => 0, 'currency' => 'eur']);
+        $this->fulfillmentHandler->expects($this->never())->method('handlePaymentSucceeded');
 
-        $this->handler->handle($event);
+        $outcome = $this->handler->handle($event);
+
+        $this->assertSame('skipped', $outcome->result->action);
+        $this->assertSame('No amount received', $outcome->result->error);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function aPayloadWithoutAmountReceivedBooksNothing(): void
+    {
+        $event = $this->makeEvent(['id' => 'pi_noamt', 'amount' => 2500, 'currency' => 'eur']);
+        $this->fulfillmentHandler->expects($this->never())->method('handlePaymentSucceeded');
+
+        $outcome = $this->handler->handle($event);
+
+        $this->assertSame('skipped', $outcome->result->action);
+        $this->assertSame('No amount received', $outcome->result->error);
     }
 
     /**

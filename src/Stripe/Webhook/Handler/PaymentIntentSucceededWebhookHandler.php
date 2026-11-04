@@ -14,7 +14,6 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\PaymentBase\Webhook\WebhookResult;
-use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookOutcome;
 use Psr\Log\LoggerInterface;
@@ -22,9 +21,9 @@ use Psr\Log\LoggerInterface;
 /**
  * Handles payment_intent.succeeded webhook events.
  *
- * When the fulfillment handler finds the contract by providerOrderId, it returns
- * true/false/null and we map to a result. When null (contract not indexed by PI yet),
- * we attempt a metadata fallback: look up by contract_id from event metadata.
+ * The fulfilment looks the contract up by providerOrderId (= the PaymentIntent id) only: an intent no contract is
+ * indexed by is skipped with a logged reason, never matched by metadata. What counts as paid is `amount_received`
+ * alone; an authorised-only intent (0) books nothing.
  *
  * @since Sprint 114.4
  */
@@ -65,7 +64,14 @@ class PaymentIntentSucceededWebhookHandler extends AbstractCommittingStripeWebho
             'payment_intent_id' => $paymentIntentId,
         ]);
 
-        $amountReceived = $this->amountReceivedOf($event);
+        $amountReceived = $this->parser->extractAmountInCurrencyUnits($event, 'amount_received');
+        if ($amountReceived === null || $amountReceived <= 0.0) {
+            $this->logger->info('payment_intent.succeeded carries no received amount; nothing booked', [
+                'payment_intent_id' => $paymentIntentId,
+            ]);
+
+            return StripeWebhookOutcome::of(WebhookResult::skipped('No amount received'));
+        }
 
         // GRAPH-QL / PS3: a PENDING contract is committed from the paid intent
         // before the fulfilment; the return leg is no longer the only way.
@@ -84,7 +90,11 @@ class PaymentIntentSucceededWebhookHandler extends AbstractCommittingStripeWebho
         $result = $this->fulfillmentHandler->handlePaymentSucceeded($paymentIntentId, $amountReceived);
 
         if ($result === null) {
-            return $this->tryMetadataLookupOrLegacy($event, $paymentIntentId, $amountReceived);
+            $this->logger->warning('payment_intent.succeeded: no contract is indexed by this PaymentIntent id', [
+                'payment_intent_id' => $paymentIntentId,
+            ]);
+
+            return StripeWebhookOutcome::of(WebhookResult::skipped('Contract not found'));
         }
 
         return $this->mapHandlerResult(
@@ -95,56 +105,10 @@ class PaymentIntentSucceededWebhookHandler extends AbstractCommittingStripeWebho
         );
     }
 
-    /**
-     * What Stripe collected, in currency units: `amount_received`, or `amount`
-     * for payloads that omit it. Null when neither is usable.
-     */
-    private function amountReceivedOf(WebhookEvent $event): ?float
-    {
-        return $this->parser->extractAmountInCurrencyUnits($event, 'amount_received')
-            ?? $this->parser->extractAmountInCurrencyUnits($event, 'amount');
-    }
-
     private function currencyOf(WebhookEvent $event): string
     {
         $currency = $event->getObject()['currency'] ?? '';
 
         return is_string($currency) ? strtoupper($currency) : '';
-    }
-
-    /**
-     * Try metadata lookup or legacy fallback for orders without contracts indexed by PI.
-     */
-    private function tryMetadataLookupOrLegacy(
-        WebhookEvent $event,
-        string $paymentIntentId,
-        ?float $amountReceived
-    ): StripeWebhookOutcome {
-        $contractId = $this->parser->extractContractIdFromMetadata($event);
-        $contract = $contractId !== null ? $this->contractOfCurrentAttempt($event, $contractId) : null;
-
-        if ($contract === null) {
-            $this->logger->debug('No contract found, webhook processed without contract update', [
-                'payment_intent_id' => $paymentIntentId,
-            ]);
-            return StripeWebhookOutcome::of(WebhookResult::skipped('Contract not found'));
-        }
-
-        $contract->setProvider(StripeDefinitions::PROVIDER, $paymentIntentId);
-
-        if ($contract->getState()->isFulfilled()) {
-            $this->contractRepository->save($contract);
-            return StripeWebhookOutcome::of(WebhookResult::skipped('Contract already fulfilled'), $contractId);
-        }
-
-        if ($contract->getState()->isCommitted()) {
-            $fulfillResult = $this->fulfillmentHandler->handlePaymentSucceeded($paymentIntentId, $amountReceived);
-            return $fulfillResult === true
-                ? StripeWebhookOutcome::of(WebhookResult::success('contract_fulfilled'), $contractId)
-                : StripeWebhookOutcome::of(WebhookResult::skipped('Fulfillment skipped'), $contractId);
-        }
-
-        $this->contractRepository->save($contract);
-        return StripeWebhookOutcome::of(WebhookResult::skipped('Contract not in COMMITTED state'), $contractId);
     }
 }
