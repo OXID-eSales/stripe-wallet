@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed (VR D0 + A4) - one shop/session adapter, no provider-agnostic adapter interface
+- Removed `Adapter/OxidShopAdapter`, `Adapter/OxidSessionAdapter`, `Core/ShopCurrency`, `Core/ShopName` (+ their tests) and
+  the `ShopAdapterInterface` / `SessionAdapterInterface` bindings in `services.yaml`: payment-base binds both and owns
+  `Adapter\ShopCurrency` (`StripeCheckoutFooter`, `PaymentController` use it).
+- A4: `StripeAdapterInterface` no longer extends payment-base's `PaymentAdapterInterface` (deleted there); it declares
+  `createPayment`, `capturePayment`, `getPaymentDetails` itself. `StripeAdapterFactory(Interface)` no longer extend
+  `PaymentAdapterFactory(Interface)`; `createAdapter`, `isProviderSupported`, `getSupportedProviders` and the
+  `PaymentAdapterFactoryInterface` service id are gone (`StripeAdapterFactoryInterface` aliases `StripeAdapterFactory`).
+
 ### Added (VR-18 L6, stripe) - `NoPiiInLogsTest`
 - `tests/Integration/Stripe/Logging/NoPiiInLogsTest.php`: a signed `checkout.session.completed` delivery, a failing
   handler, a Stripe API error in an admin action and the request log of a failed action run with fixture e-mail, street,

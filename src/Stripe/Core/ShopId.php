@@ -22,7 +22,7 @@ use RuntimeException;
  * not a shop at all.
  *
  * Shop id is not optional context for a payment, so an unresolvable one throws.
- * Static pure function, same idiom as {@see ShopCurrency} and AmountConverter.
+ * Static pure function, same idiom as payment-base ShopCurrency and AmountConverter.
  *
  * @since 2.0.0
  */

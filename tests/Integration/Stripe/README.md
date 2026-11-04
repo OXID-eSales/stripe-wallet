@@ -216,7 +216,7 @@ This is normal for integration tests.
 - **Open/Closed**: Base test case is extensible via inheritance
 - **Liskov Substitution**: All tests extend `StripeIntegrationTestCase`
 - **Interface Segregation**: Tests use specific request/response DTOs
-- **Dependency Inversion**: Tests depend on `PaymentAdapterInterface`
+- **Dependency Inversion**: Tests depend on `StripeAdapterInterface`
 
 ### Clean Code
 - **Descriptive test names**: `testCreatesPaymentIntentWithManualCapture()`

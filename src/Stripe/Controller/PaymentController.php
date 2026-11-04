@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Controller;
 
-use OxidEsales\Payments\Stripe\Core\ShopCurrency;
+use OxidEsales\PaymentBase\Adapter\ShopCurrency;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessGuardInterface;

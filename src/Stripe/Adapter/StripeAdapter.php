@@ -51,8 +51,7 @@ use Stripe\Webhook;
  * Delegates to focused helper classes for each operation group.
  * Sprint 46: Refactored to reduce ECC from 93 to ~30.
  *
- * Implements StripeAdapterInterface (extends PaymentAdapterInterface from payment-base).
- * Each method is a thin delegation to focused helper classes. Method count is driven by the interface contract.
+ * Implements StripeAdapterInterface. Each method is a thin delegation to focused helper classes.
  *
  * @since 1.0.0
  */
@@ -265,7 +264,7 @@ class StripeAdapter implements StripeAdapterInterface
 
     /**
      * Not a Stripe webhook path: StripeWebhookProcessor verifies and parses incoming events.
-     * The method exists only because PaymentAdapterInterface declares it; failing loudly keeps
+     * The method is a leftover of payment-base's former adapter interface; failing loudly keeps
      * a second, unverified parsing path from growing back.
      */
     public function parseWebhook(string $payload, string $signature, string $secret): WebhookEvent

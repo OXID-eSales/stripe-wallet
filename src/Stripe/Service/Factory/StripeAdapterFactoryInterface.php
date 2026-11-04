@@ -9,20 +9,19 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service\Factory;
 
-use OxidEsales\PaymentBase\Service\Factory\PaymentAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 
 /**
  * Stripe-specific adapter factory interface.
  *
- * Extends the provider-agnostic PaymentAdapterFactoryInterface with
- * Stripe-specific methods. Use this interface in Stripe handlers
- * for proper TDD and dependency injection.
+ * Use this interface in Stripe handlers for proper TDD and dependency injection.
  *
  * @since 1.0.0
  */
-interface StripeAdapterFactoryInterface extends PaymentAdapterFactoryInterface
+interface StripeAdapterFactoryInterface
 {
+    public function createDefaultAdapter(): StripeAdapterInterface;
+
     /**
      * Get Stripe adapter with Stripe-specific methods.
      *

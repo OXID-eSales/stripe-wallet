@@ -11,7 +11,7 @@ namespace OxidEsales\Payments\Stripe\Component\Widget;
 
 use OxidEsales\Eshop\Application\Component\Widget\WidgetController;
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\Payments\Stripe\Core\ShopCurrency;
+use OxidEsales\PaymentBase\Adapter\ShopCurrency;
 use OxidEsales\Payments\Stripe\Module;
 use OxidEsales\Payments\Stripe\Traits\ServiceContainer;
 

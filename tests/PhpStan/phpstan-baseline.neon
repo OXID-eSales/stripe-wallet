@@ -73,12 +73,6 @@ parameters:
 			path: ../../src/Stripe/Adapter/Helper/StripeExceptionConverter.php
 
 		-
-			message: '#^Method OxidEsales\\Payments\\Stripe\\Adapter\\OxidShopAdapter\:\:getShopCurrency\(\) should return string but returns mixed\.$#'
-			identifier: return.type
-			count: 1
-			path: ../../src/Stripe/Adapter/OxidShopAdapter.php
-
-		-
 			message: '#^Cannot access property \$url on mixed\.$#'
 			identifier: property.nonObject
 			count: 1

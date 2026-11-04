@@ -479,52 +479,12 @@ services:
       $idempotencyRepository: '@OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface'
     public: false
 
-  # Payment Adapter Factory Interface - Bind to StripeAdapterFactory
-  # Sprint 46: IdempotentStripeAdapterFactory removed; idempotency handled by helpers.
-  OxidEsales\PaymentBase\Service\Factory\PaymentAdapterFactoryInterface:
-    class: OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactory
-    arguments:
-      $idempotencyRepository: '@OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface'
-    public: true
-
   # Stripe Adapter Factory Interface - Stripe-specific factory
   OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface:
-    alias: OxidEsales\PaymentBase\Service\Factory\PaymentAdapterFactoryInterface
+    alias: OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactory
     public: true
 
-  # ==========================================
-  # Shop Adapter Layer (Platform-Agnostic)
-  # ==========================================
-  #
-  # Provides abstraction layer for shop-specific operations like translations,
-  # configuration, session management, etc. This allows the Payment Component
-  # to remain platform-agnostic while working with different shop systems
-  # (OXID, Shopware, Magento, etc.)
-  #
-  # Key Features:
-  # - Platform-agnostic ShopAdapterInterface
-  # - Translation service (replaces deprecated Registry::getLang())
-  # - Shop configuration access
-  # - Language and currency management
-  #
-
-  # Shop Adapter Interface - Bind to OXID implementation
-  OxidEsales\PaymentBase\Adapter\ShopAdapterInterface:
-    class: OxidEsales\Payments\Stripe\Adapter\OxidShopAdapter
-    public: false
-
-  # OXID Shop Adapter - OXID eShop specific implementation
-  OxidEsales\Payments\Stripe\Adapter\OxidShopAdapter:
-    alias: OxidEsales\PaymentBase\Adapter\ShopAdapterInterface
-
-  # Session Adapter Interface - Sprint 27: Uses payment-base interface
-  OxidEsales\PaymentBase\Adapter\SessionAdapterInterface:
-    class: OxidEsales\Payments\Stripe\Adapter\OxidSessionAdapter
-    public: false
-
-  # OXID Session Adapter - OXID eShop specific implementation
-  OxidEsales\Payments\Stripe\Adapter\OxidSessionAdapter:
-    alias: OxidEsales\PaymentBase\Adapter\SessionAdapterInterface
+  # ShopAdapterInterface / SessionAdapterInterface (OXID implementations) are bound by payment-base.
 
   # ==========================================
   # Contract Repository (Data Access Layer)

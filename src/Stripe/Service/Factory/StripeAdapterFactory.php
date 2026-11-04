@@ -9,22 +9,18 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service\Factory;
 
-use OxidEsales\PaymentBase\Adapter\PaymentAdapterInterface;
 use OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface;
-use OxidEsales\PaymentBase\Service\Factory\PaymentAdapterFactory;
 use OxidEsales\Payments\Stripe\Adapter\Helper\PaymentIntentHelper;
 use OxidEsales\Payments\Stripe\Adapter\Helper\RefundHelper;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapter;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeClientFactory;
-use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 
 /**
  * Stripe-specific factory for creating payment adapter instances.
  *
- * Extends the provider-agnostic PaymentAdapterFactory base class
- * and implements StripeAdapterFactoryInterface for Stripe-specific methods.
+ * Implements StripeAdapterFactoryInterface (payment-base's generic factory is gone, VR A4).
  *
  * Sprint 46: Idempotency moved into helpers; factory injects repository directly.
  * Sprint 133 (F8): the repository is required — a null one silently produced
@@ -32,7 +28,7 @@ use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
  *
  * @since 1.0.0
  */
-class StripeAdapterFactory extends PaymentAdapterFactory implements StripeAdapterFactoryInterface
+class StripeAdapterFactory implements StripeAdapterFactoryInterface
 {
     public function __construct(
         private readonly ModuleConfigurationServiceInterface $configurationService,
@@ -41,37 +37,9 @@ class StripeAdapterFactory extends PaymentAdapterFactory implements StripeAdapte
     ) {
     }
 
-    /**
-     * @throws \InvalidArgumentException
-     */
-    public function createAdapter(string $providerName): PaymentAdapterInterface
-    {
-        if ($providerName !== StripeDefinitions::PROVIDER) {
-            throw new \InvalidArgumentException(
-                "Unsupported payment provider: {$providerName}. " .
-                "This factory only supports: " . StripeDefinitions::PROVIDER
-            );
-        }
-
-        return $this->createStripeAdapter();
-    }
-
-    public function createDefaultAdapter(): PaymentAdapterInterface
+    public function createDefaultAdapter(): StripeAdapterInterface
     {
         return $this->createStripeAdapter();
-    }
-
-    public function isProviderSupported(string $providerName): bool
-    {
-        return $providerName === StripeDefinitions::PROVIDER;
-    }
-
-    /**
-     * @return array<string>
-     */
-    public function getSupportedProviders(): array
-    {
-        return [StripeDefinitions::PROVIDER];
     }
 
     /**

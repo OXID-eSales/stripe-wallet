@@ -10,7 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Service;
 
 use Doctrine\DBAL\Connection;
-use OxidEsales\PaymentBase\Adapter\PaymentAdapterInterface;
+use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\PaymentBase\Adapter\Response\PaymentDetailsResponse;
 use OxidEsales\PaymentBase\Contract\ContractState;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
@@ -178,7 +178,7 @@ class OxpaidReconciliationServiceTest extends TestCase
             ->willReturn(true);
 
         // Mock adapter factory to return adapter
-        $adapter = $this->createMock(PaymentAdapterInterface::class);
+        $adapter = $this->createMock(StripeAdapterInterface::class);
         $this->adapterFactory
             ->method('createDefaultAdapter')
             ->willReturn($adapter);
@@ -236,7 +236,7 @@ class OxpaidReconciliationServiceTest extends TestCase
             ->with($paymentIntentId)
             ->willReturn($contract);
 
-        $adapter = $this->createMock(PaymentAdapterInterface::class);
+        $adapter = $this->createMock(StripeAdapterInterface::class);
         $this->adapterFactory
             ->method('createDefaultAdapter')
             ->willReturn($adapter);
@@ -286,7 +286,7 @@ class OxpaidReconciliationServiceTest extends TestCase
             ->with($paymentIntentId)
             ->willReturn($contract);
 
-        $adapter = $this->createMock(PaymentAdapterInterface::class);
+        $adapter = $this->createMock(StripeAdapterInterface::class);
         $this->adapterFactory
             ->method('createDefaultAdapter')
             ->willReturn($adapter);
@@ -309,7 +309,7 @@ class OxpaidReconciliationServiceTest extends TestCase
         $orderId = 'test_order_123';
         $paymentIntentId = 'pi_test_456';
 
-        $adapter = $this->createMock(PaymentAdapterInterface::class);
+        $adapter = $this->createMock(StripeAdapterInterface::class);
         $this->adapterFactory
             ->method('createDefaultAdapter')
             ->willReturn($adapter);
@@ -367,7 +367,7 @@ class OxpaidReconciliationServiceTest extends TestCase
         $orderId = 'test_order_123';
         $paymentIntentId = 'pi_test_456';
 
-        $adapter = $this->createMock(PaymentAdapterInterface::class);
+        $adapter = $this->createMock(StripeAdapterInterface::class);
         $this->adapterFactory
             ->method('createDefaultAdapter')
             ->willReturn($adapter);
@@ -439,7 +439,7 @@ class OxpaidReconciliationServiceTest extends TestCase
             ->method('findByProviderOrderId')
             ->willReturn($contract);
 
-        $adapter = $this->createMock(PaymentAdapterInterface::class);
+        $adapter = $this->createMock(StripeAdapterInterface::class);
         $this->adapterFactory
             ->method('createDefaultAdapter')
             ->willReturn($adapter);
@@ -546,7 +546,7 @@ class OxpaidReconciliationServiceTest extends TestCase
         $contract->method('getState')->willReturn(ContractState::committed());
         $this->contractRepository->method('findByProviderOrderId')->willReturn($contract);
 
-        $adapter = $this->createMock(PaymentAdapterInterface::class);
+        $adapter = $this->createMock(StripeAdapterInterface::class);
         $this->adapterFactory->method('createDefaultAdapter')->willReturn($adapter);
         $adapter->method('getPaymentDetails')->willReturn(new PaymentDetailsResponse(
             providerPaymentId: $paymentIntentId,
@@ -612,7 +612,7 @@ class OxpaidReconciliationServiceTest extends TestCase
         // Contract found, but fulfillment reports "nothing changed".
         $this->contractFulfillmentService->method('fulfill')->willReturn(false);
 
-        $adapter = $this->createMock(PaymentAdapterInterface::class);
+        $adapter = $this->createMock(StripeAdapterInterface::class);
         $this->adapterFactory->method('createDefaultAdapter')->willReturn($adapter);
         $adapter->method('getPaymentDetails')->willReturn(new PaymentDetailsResponse(
             providerPaymentId: 'pi_unchanged',
