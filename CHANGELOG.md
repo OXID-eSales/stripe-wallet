@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added (VR-18 L6, stripe) - `NoPiiInLogsTest`
+- `tests/Integration/Stripe/Logging/NoPiiInLogsTest.php`: a signed `checkout.session.completed` delivery, a failing
+  handler, a Stripe API error in an admin action and the request log of a failed action run with fixture e-mail, street,
+  `tkn_`, `contract_token=` and `client_secret` in the payload and in the exception messages; the PSR-3 log, the module
+  file logs, the webhook claim row's error column and the stored (sanitised) payload must hold none of them. Runs in
+  the Integration suite without a booted shop (the browser checkout is the e2e suite's).
+
 ### Changed (VR-18 L4) - the webhook log says why; logs carry ids and summaries, never exception messages
 - **Webhook file log** (`WebhookLogService`): the `WEBHOOK_RESULT` line is payment-base's `WebhookDeliveryLogRecord`
   (`provider, eventId, eventType, objectId, contractId, action, reason, httpCode, durationMs`). A skipped delivery now
