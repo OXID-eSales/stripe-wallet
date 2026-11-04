@@ -16,11 +16,11 @@ use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Controller\StripeOrderController;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCheckoutSessionRequestEvent;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
-use OxidEsales\Payments\Stripe\Service\FieldValidationFailure;
+use OxidEsales\PaymentBase\Validation\User\FieldValidationFailure;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
 use OxidEsales\Payments\Stripe\Service\UserDataValidationMessageFormatter;
-use OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface;
-use OxidEsales\Payments\Stripe\Service\UserFieldReaderInterface;
+use OxidEsales\PaymentBase\Validation\User\UserDataValidatorInterface;
+use OxidEsales\PaymentBase\Validation\User\UserFieldReaderInterface;
 use OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -294,13 +294,13 @@ final class StripeOrderControllerValidationTest extends TestCase
             {
             }
 
-            public function validateForUser(UserFieldReaderInterface $reader): array
+            public function validateForUser(string $pluginModuleId, UserFieldReaderInterface $reader): array
             {
                 return $this->failures;
             }
 
             /** @param array<string, string> $fields */
-            public function validateFieldMap(array $fields, string $addressKind = 'billing'): array
+            public function validateFieldMap(string $pluginModuleId, array $fields, string $addressKind = 'billing'): array
             {
                 return [];
             }

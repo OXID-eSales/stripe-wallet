@@ -11,13 +11,11 @@ namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Dao\ModuleConfigurationDaoInterface;
-use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\DataObject\ModuleConfiguration;
 use OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface;
+use OxidEsales\PaymentBase\Settings\AbstractModuleConfigurationService;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Module;
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
-use Throwable;
 
 /**
  * Service for managing Stripe module configuration settings.
@@ -31,36 +29,21 @@ use Throwable;
  * @package OxidEsales\Payments\Stripe\Service
  * @since 1.0.0
  */
-class ModuleConfigurationService implements ModuleConfigurationServiceInterface
+class ModuleConfigurationService extends AbstractModuleConfigurationService implements ModuleConfigurationServiceInterface
 {
-    private ?ModuleConfiguration $moduleConfig = null;
-
     public function __construct(
-        private ContextInterface $context,
-        private ModuleConfigurationDaoInterface $moduleConfigurationDao,
+        ContextInterface $context,
+        ModuleConfigurationDaoInterface $moduleConfigurationDao,
         private readonly StripeUrlBuilder $urlBuilder,
         private readonly ModuleDescriptionProvider $descriptionProvider,
-        private readonly LoggerInterface $logger = new NullLogger(),
+        private readonly LoggerInterface $logger,
     ) {
-        try {
-            $this->moduleConfig = $this->moduleConfigurationDao->get(Module::MODULE_ID, $this->context->getCurrentShopId());
-        } catch (Throwable $e) {
-            // Module not yet activated - configuration will be null
-            $this->moduleConfig = null;
-        }
+        parent::__construct($context, $moduleConfigurationDao, $logger);
     }
 
-    public function get(string $name): mixed
+    protected function moduleId(): string
     {
-        if ($this->moduleConfig === null) {
-            return '';
-        }
-
-        try {
-            return $this->moduleConfig->getModuleSetting($name)->getValue();
-        } catch (Throwable $e) {
-            return '';
-        }
+        return Module::MODULE_ID;
     }
 
     /**
@@ -73,10 +56,12 @@ class ModuleConfigurationService implements ModuleConfigurationServiceInterface
 
     /**
      * Returns the current mode string: 'test' or 'live'.
-     * Defaults to 'test' when not configured.
+     * Defaults to 'test' when the mode setting is unset; an unreadable configuration throws instead
+     * ({@see AbstractModuleConfigurationService::assertReadable()}), so test keys are never used by accident.
      */
     public function getMode(): string
     {
+        $this->assertReadable();
         $mode = $this->get('sStripeMode');
         if (is_string($mode) && $mode === StripeDefinitions::MODE_LIVE) {
             return StripeDefinitions::MODE_LIVE;

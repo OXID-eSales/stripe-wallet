@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed (VR D1 / sprint-25 D2) - Stripe uses payment-base's shared pieces instead of its own copies
+- **Deleted** (payment-base has them): `Service/{UserDataValidator, UserDataValidatorInterface, UserFieldReaderInterface,
+  OxidUserFieldReader, FieldValidationFailure, ContractLinkedOrderUpdaterInterface, OxidContractLinkedOrderUpdater,
+  OxpaidReconciliationService, OxpaidReconciliationServiceInterface}`, `Command/ReconcileOxpaidCommand`,
+  `Service/Result/ReconciliationResult` (+ tests), and the module's own `OrderPaymentStateServiceInterface` /
+  `ContractFulfillmentServiceInterface` bindings (payment-base defines both; no second binding of its ids).
+- **User-data validation**: `StripeOrderController` calls payment-base's `UserDataValidatorInterface::validateForUser(
+  'oe_payments_stripe_wallet', $reader)`. The rules file stays Stripe's (`src/Resources/validation-rules.php`); its content
+  tests moved to `StripeValidationRulesTest`. Shared validator also validates `email`.
+- **Reconciliation**: `oe:payments:reconcile-oxpaid [orderId] [--dry-run] [--max-age=7] [--provider=stripe]` replaces
+  `stripe:reconcile-oxpaid`. New `StripePaidStatusProvider` (tag `oe.payment.paid_status_provider`): paid = captured,
+  paid-at = Stripe's capture time; a capture without time is skipped, as before.
+- **Contract end**: `WebhookContractFulfillmentHandler` cancels / fails / expires through payment-base's
+  `ContractTerminationServiceInterface` (the audit rows and the "expiry of a committed contract is ignored" log stay here).
+- **Configuration**: `ModuleConfigurationService` extends payment-base's `AbstractModuleConfigurationService`; an
+  unreadable module configuration now throws `ModuleConfigurationUnreadableException` from `getMode()` (and so every
+  mode/key getter) instead of falling back to test mode. Its `$logger` argument is required.
+
+### Changed (VR D1 / sprint-25 D2) - Stripe uses payment-base's shared pieces instead of its own copies
+- **Deleted** (payment-base has them): `Service/{UserDataValidator, UserDataValidatorInterface, UserFieldReaderInterface,
+  OxidUserFieldReader, FieldValidationFailure, ContractLinkedOrderUpdaterInterface, OxidContractLinkedOrderUpdater,
+  OxpaidReconciliationService, OxpaidReconciliationServiceInterface}`, `Command/ReconcileOxpaidCommand`,
+  `Service/Result/ReconciliationResult` (+ tests), and the module's own `OrderPaymentStateServiceInterface` /
+  `ContractFulfillmentServiceInterface` bindings (payment-base defines both; no second binding of its ids).
+- **User-data validation**: `StripeOrderController` calls payment-base's `UserDataValidatorInterface::validateForUser(
+  'oe_payments_stripe_wallet', $reader)`. The rules file stays Stripe's (`src/Resources/validation-rules.php`); its content
+  tests moved to `StripeValidationRulesTest`. Shared validator also validates `email`.
+- **Reconciliation**: `oe:payments:reconcile-oxpaid [orderId] [--dry-run] [--max-age=7] [--provider=stripe]` replaces
+  `stripe:reconcile-oxpaid`. New `StripePaidStatusProvider` (tag `oe.payment.paid_status_provider`): paid = captured,
+  paid-at = Stripe's capture time; a capture without time is skipped, as before.
+- **Contract end**: `WebhookContractFulfillmentHandler` cancels / fails / expires through payment-base's
+  `ContractTerminationServiceInterface` (the audit rows and the "expiry of a committed contract is ignored" log stay here).
+- **Configuration**: `ModuleConfigurationService` extends payment-base's `AbstractModuleConfigurationService`; an
+  unreadable module configuration now throws `ModuleConfigurationUnreadableException` from `getMode()` (and so every
+  mode/key getter) instead of falling back to test mode. Its `$logger` argument is required.
+
 ### Changed (VR D0 + A4) - one shop/session adapter, no provider-agnostic adapter interface
 - Removed `Adapter/OxidShopAdapter`, `Adapter/OxidSessionAdapter`, `Core/ShopCurrency`, `Core/ShopName` (+ their tests) and
   the `ShopAdapterInterface` / `SessionAdapterInterface` bindings in `services.yaml`: payment-base binds both and owns

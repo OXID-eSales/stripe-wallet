@@ -139,18 +139,6 @@ parameters:
 			path: ../../src/Stripe/Service/CheckoutReturnService.php
 
 		-
-			message: '#^Part \$order\[''OXORDERDATE''\] \(mixed\) of encapsed string cannot be cast to string\.$#'
-			identifier: encapsedStringPart.nonString
-			count: 1
-			path: ../../src/Stripe/Service/OxpaidReconciliationService.php
-
-		-
-			message: '#^Part \$order\[''OXORDERNR''\] \(mixed\) of encapsed string cannot be cast to string\.$#'
-			identifier: encapsedStringPart.nonString
-			count: 1
-			path: ../../src/Stripe/Service/OxpaidReconciliationService.php
-
-		-
 			message: '#^Parameter \#1 \$userAgent of method OxidEsales\\Payments\\Stripe\\Service\\ReturnSessionSecurityService\:\:parseUserAgent\(\) expects string, mixed given\.$#'
 			identifier: argument.type
 			count: 2

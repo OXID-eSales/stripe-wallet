@@ -18,7 +18,7 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder;
-use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
+use OxidEsales\PaymentBase\Contract\ContractTerminationServiceInterface;
 use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -51,7 +51,7 @@ final class PaymentIntentSucceededAfterAdminCaptureTest extends TestCase
         $handler = new WebhookContractFulfillmentHandler(
             $contracts,
             $fulfillment,
-            $this->createMock(ContractLinkedOrderUpdaterInterface::class),
+            $this->createMock(ContractTerminationServiceInterface::class),
             $transactions,
             $shop,
             new ContractCaptureRecorder($captureLedger, new NullLogger()),

@@ -28,7 +28,7 @@ use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeRefundRequestEvent;
 use OxidEsales\Payments\Stripe\EventSystem\Handler\StripeRefundRequestHandler;
 use OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder;
-use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
+use OxidEsales\PaymentBase\Contract\ContractTerminationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\PaymentIntentResolver;
 use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
 use OxidEsales\Payments\Stripe\Webhook\ChargeRefund;
@@ -86,7 +86,7 @@ final class RefundFlowTest extends TestCase
         $fulfillment = new WebhookContractFulfillmentHandler(
             $contracts,
             $this->createMock(ContractFulfillmentServiceInterface::class),
-            $this->createMock(ContractLinkedOrderUpdaterInterface::class),
+            $this->createMock(ContractTerminationServiceInterface::class),
             $transactions,
             $shop,
             new ContractCaptureRecorder($this->createMock(ProviderCaptureLedgerInterface::class), new NullLogger()),

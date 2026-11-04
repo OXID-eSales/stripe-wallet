@@ -27,14 +27,14 @@ use OxidEsales\Payments\Stripe\Service\BuyabilityFailure;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessGuardInterface;
 use OxidEsales\Payments\Stripe\Service\LegacyReturnTokenValidator;
-use OxidEsales\Payments\Stripe\Service\FieldValidationFailure;
 use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\LanguageTranslatorInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\OxidLanguageTranslator;
-use OxidEsales\Payments\Stripe\Service\OxidUserFieldReader;
 use OxidEsales\Payments\Stripe\Service\UserDataValidationMessageFormatter;
-use OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface;
+use OxidEsales\PaymentBase\Validation\User\FieldValidationFailure;
+use OxidEsales\PaymentBase\Validation\User\OxidUserFieldReader;
+use OxidEsales\PaymentBase\Validation\User\UserDataValidatorInterface;
 
 /**
  * Thin Stripe Order Controller.
@@ -521,7 +521,7 @@ class StripeOrderController extends StripeOrderController_parent
     private function validateUserData(\OxidEsales\Eshop\Application\Model\User $user): void
     {
         $reader   = new OxidUserFieldReader($user);
-        $failures = $this->getUserDataValidator()->validateForUser($reader);
+        $failures = $this->getUserDataValidator()->validateForUser(StripeDefinitions::STRIPE_WALLET_PAYMENT_ID, $reader);
 
         if ($failures === []) {
             return;

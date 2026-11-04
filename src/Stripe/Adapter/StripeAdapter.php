@@ -184,6 +184,9 @@ class StripeAdapter implements StripeAdapterInterface
         return $this->paymentMethodHelper->createPaymentMethod($this->stripeClient, $request);
     }
 
+    /**
+     * @return array<PaymentMethodResponse>
+     */
     public function listPaymentMethods(string $customerId): array
     {
         return $this->paymentMethodHelper->listPaymentMethods($this->stripeClient, $customerId);
@@ -240,6 +243,9 @@ class StripeAdapter implements StripeAdapterInterface
     // PROVIDER METADATA & CAPABILITIES
     // ==========================================
 
+    /**
+     * @return array<int, string>
+     */
     public function getSupportedPaymentMethods(): array
     {
         return ['card', 'sepa_debit', 'ideal', 'giropay', 'sofort', 'bancontact', 'eps', 'p24'];

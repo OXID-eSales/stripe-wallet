@@ -19,7 +19,8 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder;
-use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
+use OxidEsales\PaymentBase\Adapter\ContractLinkedOrderUpdaterInterface;
+use OxidEsales\PaymentBase\Contract\ContractTerminationService;
 use OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -195,7 +196,7 @@ class WebhookContractFulfillmentHandlerCancelOrderTest extends TestCase
         return new WebhookContractFulfillmentHandler(
             $this->contractRepository,
             $this->contractFulfillmentService,
-            $this->orderUpdater,
+            new ContractTerminationService($this->contractRepository, $this->orderUpdater),
             $this->transactionRepository,
             $this->shopAdapter,
             new ContractCaptureRecorder($this->createMock(ProviderCaptureLedgerInterface::class), new NullLogger()),

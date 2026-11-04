@@ -179,12 +179,9 @@ services:
     exclude:
       - 'src/Stripe/Service/Result/*'
       - 'src/Stripe/Service/Exception/*'
-      - 'src/Stripe/Service/ReconciliationResult.php'
       - 'src/Stripe/Service/RequestLogService.php'
       - 'src/Stripe/Service/WebhookLogService.php'
       - 'src/Stripe/Service/WebhookEndpointRegistrationResult.php'
-      # Sprint 119 Phase B: VOs, interfaces, and OXID-model-bound readers excluded from autowire sweep
-      - 'src/Stripe/Service/FieldValidationFailure.php'
       # unbuyable-article-checkout Story 1: VO with scalar constructor args — not a service
       - 'src/Stripe/Service/BuyabilityFailure.php'
       # Checkout-return diagnostics: a VO with scalar constructor args and an enum.
@@ -192,9 +189,6 @@ services:
       # its value explicitly") and takes every page that touches the container with it.
       - 'src/Stripe/Service/Return/CheckoutReturnInputs.php'
       - 'src/Stripe/Service/Return/CheckoutReturnRejection.php'
-      - 'src/Stripe/Service/UserDataValidatorInterface.php'
-      - 'src/Stripe/Service/UserFieldReaderInterface.php'
-      - 'src/Stripe/Service/OxidUserFieldReader.php'
       # Sprint 119 Phase E: narrow translator interface excluded from autowire sweep
       - 'src/Stripe/Service/LanguageTranslatorInterface.php'
       # STRP-129: array-arg constructor — wired explicitly via ValidationRulesProvider factory
@@ -324,10 +318,6 @@ services:
     alias: OxidEsales\Payments\Stripe\Service\ConfigurationValidator
     public: true
 
-  OxidEsales\Payments\Stripe\Service\OxpaidReconciliationServiceInterface:
-    alias: OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService
-    public: true
-
   # Sprint 109: Webhook auto-registration during Connect onboarding.
   OxidEsales\Payments\Stripe\Service\WebhookEndpointRegistrarInterface:
     alias: OxidEsales\Payments\Stripe\Service\WebhookEndpointRegistrar
@@ -401,34 +391,7 @@ services:
       - '@OxidEsales\PaymentBase\EventSystem\EventListenerProviderInterface'
     public: true
 
-  # ===========================================
-  # Order Payment State Service (Sprint 16)
-  # ===========================================
-  # Consolidates all OXPAID/OXTRANSSTATUS/OXTRANSID updates
-  # DRY: Single location for payment state operations
-  # Previously duplicated in 4+ locations with inconsistent date handling
-
-  OxidEsales\PaymentBase\Service\OrderPaymentStateServiceInterface:
-    class: OxidEsales\PaymentBase\Service\OrderPaymentStateService
-    arguments:
-      $connection: '@doctrine.dbal.connection'
-      $logger: '@oxid_esales.monolog.logger'
-    public: true
-
-  # ===========================================
-  # Contract Fulfillment Service (Sprint 18)
-  # ===========================================
-  # Consolidates all contract fulfillment operations
-  # DRY: Single location for fulfill() logic previously duplicated in 8+ locations
-  # Guards: Only COMMITTED contracts can be fulfilled
-
-  OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface:
-    class: OxidEsales\PaymentBase\Service\ContractFulfillmentService
-    arguments:
-      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
-      $eventDispatcher: '@OxidEsales\PaymentBase\EventSystem\EventDispatcherInterface'
-      $logger: '@oxid_esales.monolog.logger'
-    public: true
+  # OrderPaymentStateServiceInterface and ContractFulfillmentServiceInterface are payment-base's (VR D1).
 
   OxidEsales\PaymentBase\EventSystem\Handler\EarlyOrderCreationHandler:
     arguments:
@@ -981,7 +944,8 @@ services:
     arguments:
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $contractFulfillmentService: '@OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface'
-      $orderUpdater: '@OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface'
+      # VR D1: cancel/fail/expire of a contract and the linked order's end are payment-base's.
+      $termination: '@OxidEsales\PaymentBase\Contract\ContractTerminationServiceInterface'
       $transactionRepository: '@OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface'
       $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
       # Sprint 137: books the capture through payment-base's ledger (shared with the backfill command).
@@ -990,17 +954,6 @@ services:
       $refundLedger: '@OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface'
       $logger: '@oxid_esales.monolog.logger'
     public: false
-
-  # Sprint 112 / G1: mirrors contract cancel/fail transitions onto linked oxorder.
-  OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface:
-    class: OxidEsales\Payments\Stripe\Service\OxidContractLinkedOrderUpdater
-    arguments:
-      # OPC-175 / S4 — the order ends the shared way: storno, stock and vouchers back.
-      $ending: '@OxidEsales\PaymentBase\Adapter\LinkedOrderEndingInterface'
-    public: false
-
-  OxidEsales\Payments\Stripe\Service\OxidContractLinkedOrderUpdater:
-    alias: OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface
 
   # Concrete implementation alias
   OxidEsales\Payments\Stripe\Webhook\Handler\WebhookContractFulfillmentHandler:
@@ -1329,31 +1282,12 @@ services:
       $config: '@OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface'
     public: false
 
-  # Reconciliation File Logger - Writes to log/osc/stripe_reconciliation.log
-  # Sprint 14: Injected logger for testability (prevents unit tests writing to production logs)
-  stripe.reconciliation.file_logger:
-    class: OxidEsales\PaymentBase\Service\FileLoggerInterface
-    factory: ['@OxidEsales\Payments\Stripe\Service\Factory\ReconciliationFileLoggerFactory', 'create']
-    public: false
-
-  # Reconciliation Service
-  # Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
-  OxidEsales\Payments\Stripe\Service\OxpaidReconciliationService:
-    arguments:
-      $connection: '@doctrine.dbal.connection'
-      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
-      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
-      $contractFulfillmentService: '@OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface'
-      $fileLogger: '@stripe.reconciliation.file_logger'
-    public: true
-
-  # Console Command: stripe:reconcile-oxpaid
-  OxidEsales\Payments\Stripe\Command\ReconcileOxpaidCommand:
-    arguments:
-      $reconciliationService: '@OxidEsales\Payments\Stripe\Service\OxpaidReconciliationServiceInterface'
+  # VR D1: OXPAID reconciliation is payment-base's (oe:payments:reconcile-oxpaid); Stripe only says whether a
+  # PaymentIntent is paid and since when.
+  OxidEsales\Payments\Stripe\Service\StripePaidStatusProvider:
     tags:
-      - { name: 'console.command', command: 'stripe:reconcile-oxpaid' }
-    public: true
+      - { name: oe.payment.paid_status_provider }
+    public: false
 
   # Sprint 137 · Story 2: books what a fulfilled-but-unrecorded capture received (VR-22 A5: through the capture ledger).
   OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder:
@@ -1460,14 +1394,7 @@ services:
   # Each provider gets an isolated instance with their specific module ID to avoid
   # conflicts when multiple providers are active in the same shop.
 
-  # UserDataValidator facade — stateless singleton; receives UserFieldReaderInterface
-  # as a validateForUser() method argument so it can be DI-singleton while the
-  # reader is request-scoped (bound to the live User object in Phase C controller).
-  OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface:
-    class: OxidEsales\Payments\Stripe\Service\UserDataValidator
-    arguments:
-      - '@OxidEsales\PaymentBase\Validation\ValidationBaseFactory'
-    public: true
+  # The user-data validator is payment-base's (UserDataValidatorInterface, module id as call argument).
 
   # Sprint 119 Phase E (STRP-129) — narrow language-translation seam for testability.
   OxidEsales\Payments\Stripe\Service\LanguageTranslatorInterface:

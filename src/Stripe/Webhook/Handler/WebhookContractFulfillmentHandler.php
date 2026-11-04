@@ -7,7 +7,9 @@ namespace OxidEsales\Payments\Stripe\Webhook\Handler;
 use OxidEsales\Payments\Stripe\Core\ShopId;
 use Psr\Log\LoggerInterface;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
+use OxidEsales\PaymentBase\Contract\ContractTerminationServiceInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
+use OxidEsales\PaymentBase\Contract\TerminationOutcome;
 use OxidEsales\PaymentBase\Contract\Transaction;
 use OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
@@ -15,7 +17,6 @@ use OxidEsales\PaymentBase\Repository\TransactionRepositoryInterface;
 use OxidEsales\PaymentBase\Service\ContractFulfillmentServiceInterface;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
-use OxidEsales\Payments\Stripe\Service\ContractLinkedOrderUpdaterInterface;
 use OxidEsales\Payments\Stripe\Service\ContractCaptureRecorder;
 use OxidEsales\Payments\Stripe\Webhook\ChargeRefund;
 
@@ -37,7 +38,7 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
     public function __construct(
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ContractFulfillmentServiceInterface $contractFulfillmentService,
-        private readonly ContractLinkedOrderUpdaterInterface $orderUpdater,
+        private readonly ContractTerminationServiceInterface $termination,
         private readonly TransactionRepositoryInterface $transactionRepository,
         private readonly ShopAdapterInterface $shopAdapter,
         private readonly ContractCaptureRecorder $captureRecorder,
@@ -111,15 +112,11 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
             return null;
         }
 
-        // Can only fail non-terminal contracts
-        if ($contract->getState()->isTerminal()) {
+        // Only non-terminal contracts can fail; the linked order is ended by payment-base.
+        if ($this->termination->fail($contract, $failureReason) !== TerminationOutcome::Terminated) {
             return false;
         }
 
-        // Mark contract as failed
-        $contract->fail($failureReason);
-        $this->contractRepository->save($contract);
-        $this->mirrorFailureOnLinkedOrder($contract, $failureReason);
         $this->recordAudit($contract, 'failure', 0.0);
         return true;
     }
@@ -138,15 +135,11 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
             return null;
         }
 
-        // Can only cancel non-terminal contracts
-        if ($contract->getState()->isTerminal()) {
+        // Only non-terminal contracts can be cancelled; the linked order is ended by payment-base.
+        if ($this->termination->cancel($contract, $cancellationReason) !== TerminationOutcome::Terminated) {
             return false;
         }
 
-        // Mark contract as cancelled
-        $contract->cancel($cancellationReason);
-        $this->contractRepository->save($contract);
-        $this->mirrorCancellationOnLinkedOrder($contract);
         $this->recordAudit($contract, 'cancellation', 0.0);
         return true;
     }
@@ -176,26 +169,6 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
         $this->transactionRepository->save($transaction);
     }
 
-    private function mirrorCancellationOnLinkedOrder(PaymentContractInterface $contract): void
-    {
-        $orderId = $contract->getOrderId();
-        if ($orderId === null || $orderId === '') {
-            return;
-        }
-
-        $this->orderUpdater->markCancelled($orderId);
-    }
-
-    private function mirrorFailureOnLinkedOrder(PaymentContractInterface $contract, string $reason): void
-    {
-        $orderId = $contract->getOrderId();
-        if ($orderId === null || $orderId === '') {
-            return;
-        }
-
-        $this->orderUpdater->markFailed($orderId, $reason);
-    }
-
     /**
      * @inheritDoc
      *
@@ -211,33 +184,18 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
             return null;
         }
 
-        // Can only expire non-terminal contracts
-        if ($contract->getState()->isTerminal()) {
-            return false;
-        }
+        $outcome = $this->termination->expire($contract);
 
-        // STRP-168: `committed` is not terminal. A late or duplicate expiry for
-        // a contract whose payment has already been taken must be skipped, not
-        // acted on — it would now throw from the state machine, and before the
-        // mirror was added it would have quietly stornoed a paid order.
-        if ($contract->getState()->isCommitted()) {
+        if ($outcome === TerminationOutcome::Committed) {
+            // STRP-168: `committed` is not terminal. A late or duplicate expiry for a contract whose payment
+            // has already been taken is skipped, never acted on.
             $this->logger?->info('Ignoring an expiry for a contract whose payment was already taken', [
                 'contract_id' => $contract->getId(),
                 'state' => $contract->getStateValue(),
             ]);
-
-            return false;
         }
 
-        // Mark contract as expired
-        $contract->expire();
-        $this->contractRepository->save($contract);
-        // STRP-168: mirror onto the order, exactly as the cancel and fail paths
-        // do. Without this the order stayed at NOT_FINISHED, and since every
-        // contract-keyed cleanup path skips terminal states, expiring the
-        // contract was what made the order unreachable.
-        $this->mirrorCancellationOnLinkedOrder($contract);
-        return true;
+        return $outcome === TerminationOutcome::Terminated;
     }
 
     /**

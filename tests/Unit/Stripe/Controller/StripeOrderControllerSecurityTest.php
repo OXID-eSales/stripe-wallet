@@ -20,8 +20,8 @@ use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\Return\StripeReturnResolver;
 use OxidEsales\Payments\Stripe\Service\RetryCleanupService;
-use OxidEsales\Payments\Stripe\Service\UserDataValidatorInterface;
-use OxidEsales\Payments\Stripe\Service\UserFieldReaderInterface;
+use OxidEsales\PaymentBase\Validation\User\UserDataValidatorInterface;
+use OxidEsales\PaymentBase\Validation\User\UserFieldReaderInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -452,13 +452,13 @@ class StripeOrderControllerSecurityTest extends TestCase
             protected function getUserDataValidator(): UserDataValidatorInterface
             {
                 return new class implements UserDataValidatorInterface {
-                    public function validateForUser(UserFieldReaderInterface $reader): array
+                    public function validateForUser(string $pluginModuleId, UserFieldReaderInterface $reader): array
                     {
                         return [];
                     }
 
                     /** @param array<string, string> $fields */
-                    public function validateFieldMap(array $fields, string $addressKind = 'billing'): array
+                    public function validateFieldMap(string $pluginModuleId, array $fields, string $addressKind = 'billing'): array
                     {
                         return [];
                     }
