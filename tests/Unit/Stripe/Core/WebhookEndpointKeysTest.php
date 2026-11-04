@@ -46,9 +46,9 @@ final class WebhookEndpointKeysTest extends TestCase
     }
 
     #[Test]
-    public function theLegacyModeAgnosticSecretHasItsOwnSetting(): void
+    public function theLegacyModeAgnosticEndpointUrlHasItsOwnSetting(): void
     {
-        $this->assertSame('sStripeWebhookEndpointSecret', WebhookEndpointKeys::LEGACY_SECRET);
+        $this->assertFalse(defined(WebhookEndpointKeys::class . '::LEGACY_SECRET'), 'VR-26 S1: no read path for the old secret');
         $this->assertSame('sStripeWebhookEndpoint', WebhookEndpointKeys::LEGACY_URL);
     }
 }

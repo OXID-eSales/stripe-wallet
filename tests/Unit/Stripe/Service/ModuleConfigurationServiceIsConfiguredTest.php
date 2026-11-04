@@ -40,11 +40,10 @@ class ModuleConfigurationServiceIsConfiguredTest extends TestCase
 
     public function testIsConfiguredReturnsTrueWhenAllKeysPresent(): void
     {
-        $service = $this->createServiceWithSettings([
-            'sStripeMode' => 'test',
-            'sStripeTestToken' => 'sk_test_123',
-            'sStripeWebhookEndpointSecret' => 'whsec_abc',
-        ]);
+        $service = $this->createServiceWithSettingsAndOxConfig(
+            ['sStripeMode' => 'test', 'sStripeTestToken' => 'sk_test_123'],
+            ['sStripeWebhookEndpointSecretTest' => 'whsec_abc']
+        );
 
         $this->assertTrue($service->isConfigured());
     }
@@ -74,9 +73,9 @@ class ModuleConfigurationServiceIsConfiguredTest extends TestCase
     /**
      * Sprint 109/Sprint 111 fix: per-mode secret is stored in oxconfig (not module settings)
      * so it does NOT surface in the module_config form as an editable field.
-     * The per-mode oxconfig value is preferred; legacy single-valued module setting is the fallback.
+     * Only the per-mode oxconfig value counts (VR-26 S1: the legacy single-valued module setting is not read).
      */
-    public function testGetWebhookSecretPrefersPerModeOxConfigValueOverLegacy(): void
+    public function testGetWebhookSecretIsThePerModeOxConfigValue(): void
     {
         $service = $this->createServiceWithSettingsAndOxConfig(
             ['sStripeMode' => 'test', 'sStripeWebhookEndpointSecret' => 'whsec_legacy'],
@@ -86,14 +85,14 @@ class ModuleConfigurationServiceIsConfiguredTest extends TestCase
         $this->assertSame('whsec_mode_specific', $service->getWebhookSecret());
     }
 
-    public function testGetWebhookSecretFallsBackToLegacyWhenOxConfigEmpty(): void
+    public function testGetWebhookSecretIgnoresTheLegacySettingWhenOxConfigEmpty(): void
     {
         $service = $this->createServiceWithSettingsAndOxConfig(
             ['sStripeMode' => 'test', 'sStripeWebhookEndpointSecret' => 'whsec_legacy_pasted'],
             [] // no per-mode oxconfig entry
         );
 
-        $this->assertSame('whsec_legacy_pasted', $service->getWebhookSecret());
+        $this->assertSame('', $service->getWebhookSecret());
     }
 
     public function testGetWebhookSecretPicksLiveOxConfigValueInLiveMode(): void

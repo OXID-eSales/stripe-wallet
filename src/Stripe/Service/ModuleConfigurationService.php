@@ -37,7 +37,7 @@ class ModuleConfigurationService extends AbstractModuleConfigurationService impl
         ModuleConfigurationDaoInterface $moduleConfigurationDao,
         private readonly StripeUrlBuilder $urlBuilder,
         private readonly ModuleDescriptionProvider $descriptionProvider,
-        private readonly LoggerInterface $logger,
+        LoggerInterface $logger,
     ) {
         parent::__construct($context, $moduleConfigurationDao, $logger);
     }
@@ -102,48 +102,15 @@ class ModuleConfigurationService extends AbstractModuleConfigurationService impl
     }
 
     /**
-     * Get the webhook secret based on current mode (test/live).
+     * Get the webhook secret of the current mode (test/live): the per-endpoint secret stored when the endpoint was
+     * registered. Kept in oxconfig (not module settings) so it does not surface as an editable form field.
      *
-     * Per-mode secrets are stored in oxconfig (not module settings) so they do not
-     * surface as editable form fields in the module_config admin form. The legacy
-     * single-valued module setting is kept as a fallback for existing installs that
-     * pasted a secret manually before auto-registration was available.
+     * VR-26 S1: the old mode-agnostic module setting is not read; activation moved a still-set value into this key once
+     * ({@see LegacyWebhookSecretMigration}).
      */
     public function getWebhookSecret(): string
     {
-        $modeSpecific = $this->readOxConfigVar(WebhookEndpointKeys::secret($this->getMode()));
-        if ($modeSpecific !== '') {
-            return $modeSpecific;
-        }
-
-        $legacy = $this->get(WebhookEndpointKeys::LEGACY_SECRET);
-        $legacy = is_string($legacy) ? $legacy : '';
-        if ($legacy === '') {
-            return '';
-        }
-
-        // Sprint 133 · Story 13 (F13): the legacy setting is mode-agnostic, while
-        // the per-mode key is chosen by isTestMode(). If the *other* mode already
-        // has its own secret, this shop has auto-registered before and the legacy
-        // value belongs to that earlier era — using it here would verify, say,
-        // live webhooks with a test secret. Every webhook would then 400, Stripe
-        // would retry and give up, and the symptom would not be an error in the
-        // shop but orders that silently never become paid. Refuse it loudly
-        // instead. Shops that never auto-registered keep working unchanged.
-        if ($this->readOxConfigVar(WebhookEndpointKeys::secret(WebhookEndpointKeys::otherMode($this->getMode()))) !== '') {
-            $this->logger->error(
-                'Refusing the legacy mode-agnostic webhook secret: the other mode has its own secret, '
-                . 'so this value cannot be trusted for the current mode. Configure the per-mode secret.',
-                [
-                    'mode' => $this->getMode(),
-                    'expected_setting' => WebhookEndpointKeys::secret($this->getMode()),
-                ]
-            );
-
-            return '';
-        }
-
-        return $legacy;
+        return $this->readOxConfigVar(WebhookEndpointKeys::secret($this->getMode()));
     }
 
     /**

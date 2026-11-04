@@ -76,7 +76,7 @@ final class NoSecretInAnyAnswerTest extends TestCase
 
     private function state(): OxidStripeWebhookState
     {
-        return new OxidStripeWebhookState($this->vars, $this->module);
+        return new OxidStripeWebhookState($this->vars);
     }
 
     private function configController(): StripeAdminConfigController

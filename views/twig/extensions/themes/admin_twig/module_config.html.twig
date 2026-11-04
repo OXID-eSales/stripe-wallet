@@ -133,8 +133,6 @@
                                 statusEl.innerHTML = '<span class="smc-status-ok">&#10003; {{ translate({ ident: "STRIPE_WEBHOOK_CONFIGURED" }) }}</span>';
                                 var urlInput = document.getElementById('stripe-webhook-endpoint-input');
                                 if (urlInput && data.webhookUrl) { urlInput.value = data.webhookUrl; }
-                                var secretInput = document.querySelector('input[name="confstrs[sStripeWebhookEndpointSecret]"]');
-                                if (secretInput && data.endpointSecret) { secretInput.value = data.endpointSecret; }
                                 return;
                             }
                             msg.style.color = 'red';
@@ -179,8 +177,6 @@
                                 statusEl.innerHTML = '<span class="smc-status-warn">&#9888; {{ translate({ ident: "STRIPE_WEBHOOK_NOT_CONFIGURED" }) }}</span>';
                                 var urlInput = document.getElementById('stripe-webhook-endpoint-input');
                                 if (urlInput) { urlInput.value = ''; }
-                                var secretInput = document.querySelector('input[name="confstrs[sStripeWebhookEndpointSecret]"]');
-                                if (secretInput) { secretInput.value = ''; }
                                 return;
                             }
                             msg.style.color = 'red';
@@ -205,29 +201,8 @@
             <div class="spacer"></div>
         </dl>
     {% elseif module_var == 'sStripeWebhookEndpointSecret' %}
-        <dl>
-            <dt>
-                {# Sprint 113: type=password by default + eye-toggle. #}
-                <span class="stripe-key-field">
-                    <input type="password" class="txt" style="width: 350px;" name="confstrs[{{ module_var }}]" value="{{ confstrs[module_var] }}" {{ readonly }} placeholder="whsec_..." data-stripe-secret autocomplete="off">
-                    <button type="button" class="stripe-key-toggle"
-                            aria-label="{{ translate({ ident: 'STRIPE_REVEAL_API_KEY' }) }}"
-                            data-label-reveal="{{ translate({ ident: 'STRIPE_REVEAL_API_KEY' }) }}"
-                            data-label-hide="{{ translate({ ident: 'STRIPE_HIDE_API_KEY' }) }}"
-                            aria-pressed="false">&#128065;</button>
-                </span>
-                {% include "inputhelp.html.twig" with {'sHelpId': help_id("HELP_SHOP_MODULE_" ~ module_var), 'sHelpText': help_text("HELP_SHOP_MODULE_" ~ module_var)} %}
-            </dt>
-            <dd>
-                <span class="smc-label">{{ translate({ ident: "SHOP_MODULE_" ~ module_var }) }}</span>
-                {% if confstrs[module_var] %}
-                    <span style="margin-left: 1em;" class="smc-status-ok">&#10003; {{ translate({ ident: "STRIPE_WEBHOOK_CONFIGURED" }) }}</span>
-                {% else %}
-                    <span style="margin-left: 1em;" class="smc-status-warn">&#9888; {{ translate({ ident: "STRIPE_WEBHOOK_NOT_SET" }) }}</span>
-                {% endif %}
-            </dd>
-            <div class="spacer"></div>
-        </dl>
+        {# VR-26 S1: the old mode-agnostic secret is no field of the form any more: activation moved it into the
+           per-mode key, the status above reads that key. The setting stays in metadata.php only for the migration. #}
     {% else %}
         {{ parent() }}
     {% endif %}

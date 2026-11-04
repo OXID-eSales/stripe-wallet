@@ -27,9 +27,9 @@ use Psr\Log\NullLogger;
  * extension.
  *
  * Per-mode endpoint metadata (ID + signing secret) lives in oxconfig — invisible
- * to the module_config form. The legacy single-valued module settings
- * (`sStripeWebhookEndpoint`, `sStripeWebhookEndpointSecret`) are ALSO written on
- * success, so the admin sees the registered URL + secret in the form on reload.
+ * to the module_config form. The registered URL setting
+ * (`sStripeWebhookEndpoint`) is ALSO written on
+ * success, so the admin sees the registered URL in the form on reload.
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(\OxidEsales\Payments\Stripe\Controller\Admin\ModuleConfiguration::class)]
 #[\PHPUnit\Framework\Attributes\Group('sprint-111')]
@@ -108,9 +108,9 @@ final class ModuleConfigurationWebhookActionTest extends TestCase
             'https://shop.example.com/index.php?cl=StripeWebhookController',
             $controller->getSavedModuleSetting('sStripeWebhookEndpoint')
         );
-        $this->assertSame(
-            'whsec_abc',
-            $controller->getSavedModuleSetting('sStripeWebhookEndpointSecret')
+        $this->assertNull(
+            $controller->getSavedModuleSetting('sStripeWebhookEndpointSecret'),
+            'VR-26 S1: the secret lives in the per-mode key only'
         );
     }
 
@@ -348,7 +348,7 @@ final class ModuleConfigurationWebhookActionTest extends TestCase
         $this->assertSame('', $stored['sStripeWebhookEndpointIdLive']);
         $this->assertSame('', $stored['sStripeWebhookEndpointSecretLive']);
         $this->assertSame('', $controller->getSavedModuleSetting('sStripeWebhookEndpoint'));
-        $this->assertSame('', $controller->getSavedModuleSetting('sStripeWebhookEndpointSecret'));
+        $this->assertNull($controller->getSavedModuleSetting('sStripeWebhookEndpointSecret'));
     }
 
     public function testClearAllReturnsErrorJsonWhenPlatformKeyMissing(): void

@@ -17,6 +17,9 @@ use OxidEsales\Eshop\Core\Exception\DatabaseErrorException;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Core\Di\ContainerFacade;
 use OxidEsales\EshopCommunity\Internal\Framework\Database\QueryBuilderFactoryInterface;
+use OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface;
+use OxidEsales\Payments\Stripe\GraphQL\Admin\Service\OxidModuleConfVars;
+use OxidEsales\Payments\Stripe\Service\LegacyWebhookSecretMigration;
 use OxidEsales\Payments\Stripe\Service\StaticContent;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use Psr\Container\ContainerExceptionInterface;
@@ -50,6 +53,7 @@ class Events
      */
     public static function onActivate(): void
     {
+        self::migrateLegacyWebhookSecret();
         self::ensureStripePaymentMethods();
         self::deleteRemovedPaymentMethods();
         self::regenerateViews();
@@ -97,6 +101,21 @@ class Events
     protected static function clearTmp(): void
     {
         Registry::getUtils()->oxResetFileCache();
+    }
+
+    /**
+     * VR-26 S1 / D3: moves the old mode-agnostic webhook secret into the per-endpoint key, once.
+     *
+     * Built by hand from core services: on a first activation the module's own services are not in the container yet
+     * (static module event, framework constraint). A failure stops the activation - the secret is not left half moved.
+     */
+    protected static function migrateLegacyWebhookSecret(): void
+    {
+        $container = ContainerFactory::getInstance()->getContainer();
+        $settings = $container->get(ModuleSettingServiceInterface::class);
+        assert($settings instanceof ModuleSettingServiceInterface);
+
+        (new LegacyWebhookSecretMigration($settings, new OxidModuleConfVars(), Registry::getLogger()))->migrate();
     }
 
     /**

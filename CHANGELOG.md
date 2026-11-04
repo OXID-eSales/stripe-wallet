@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed (VR-26 S1) - Stripe legacy second paths
+- `payment_intent.succeeded` finds the contract by the PaymentIntent id (`providerOrderId`) only: the metadata lookup
+  (`tryMetadataLookupOrLegacy`) is gone, an unknown intent is skipped with a logged reason. Only `amount_received` counts as
+  paid; an authorised-only intent (0, or no `amount_received`) books nothing - the `amount` fallback is gone.
+- `CaptureService` takes the PaymentIntent id from the contract's `providerOrderId` only (no `payment_intent_id` metadata).
+- The old mode-agnostic webhook secret (`sStripeWebhookEndpointSecret`, `WebhookEndpointKeys::LEGACY_SECRET`) is not read any
+  more - not by `ModuleConfigurationService::getWebhookSecret()`, not by the admin API's webhook state - and not written or
+  shown by the admin form. Module activation moves a still-set value once into the per-endpoint key of the current mode
+  (`LegacyWebhookSecretMigration`; only when that key is empty and the other mode has no secret of its own) and clears it.
+  Deploy note: run `oe:module:activate` (or deactivate + activate) once per shop; a shop that never activates again would
+  answer 400 to every webhook until "Create webhooks" is pressed.
+
 ### Added (VR-17 DC-5) - dead-code gate; Removed - what it found
 - `composer dead-code` (shipmonk/dead-code-detector ^1.4, `phpstan-dead-code.neon`, `tests/PhpStan/DeadCode/OxidEntryPointUsageProvider.php`)
   and `composer dead-assets` (`bin/dead-assets`, `dead-assets.allow`), run by the CI job `dead-code`. Baselines split into

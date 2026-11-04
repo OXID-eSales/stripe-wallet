@@ -53,4 +53,16 @@ final class EventsContractTest extends TestCase
         $this->assertStringContainsString('clearTmp', $onDeactivate);
         $this->assertStringNotContainsString('isAdmin', $onDeactivate);
     }
+
+    public function testActivationMovesTheLegacyWebhookSecretOnce(): void
+    {
+        // VR-26 S1 / D3: the old mode-agnostic secret is no longer read, so activation has to carry it over.
+        $source = (string) file_get_contents(
+            (string) (new ReflectionClass(Events::class))->getFileName()
+        );
+        $onActivate = substr($source, (int) strpos($source, 'function onActivate'));
+        $onActivate = substr($onActivate, 0, (int) strpos($onActivate, "\n    }"));
+
+        $this->assertStringContainsString('migrateLegacyWebhookSecret', $onActivate);
+    }
 }

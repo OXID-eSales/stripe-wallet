@@ -95,7 +95,6 @@ $aLang = array(
     // Connect Button & Webhook Status
     'STRIPE_CONNECT_WITH'                               => 'Connect with',
     'STRIPE_WEBHOOK_CONFIGURED'                         => 'Configured',
-    'STRIPE_WEBHOOK_NOT_SET'                            => 'Not set - copy from Stripe Dashboard',
 
     // Webhook setup (Create / Clear buttons in module_config)
     'STRIPE_WEBHOOK_CREATE_BUTTON'                      => 'Create webhooks',

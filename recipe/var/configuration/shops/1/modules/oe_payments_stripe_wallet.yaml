@@ -113,5 +113,5 @@ moduleSettings:
   sStripeWebhookEndpointSecret:
     group: STRIPE_WEBHOOKS
     type: str
-    value: whsec_replace_with_your_own_webhook_signing_secret
+    value: ''
     position: 140

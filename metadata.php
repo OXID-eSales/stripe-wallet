@@ -83,6 +83,8 @@ $aModule = [
         ['group' => 'STRIPE_GENERAL',           'name' => 'blStripeProvideCustomerEmailAddress','type' => 'bool',       'value' => '0',         'position' => 37],
         ['group' => 'STRIPE_GENERAL',           'name' => 'sStripeCaptureMode',                 'type' => 'select',     'value' => 'automatic', 'position' => 39, 'constraints' => 'automatic|manual'],
         ['group' => 'STRIPE_WEBHOOKS',          'name' => 'sStripeWebhookEndpoint',             'type' => 'str',        'value' => '',          'position' => 130],
+        // VR-26 S1: not read and not shown any more; kept only so a value set before this release survives until
+        // activation moves it into the per-mode key (LegacyWebhookSecretMigration). Remove once every shop has activated.
         ['group' => 'STRIPE_WEBHOOKS',          'name' => 'sStripeWebhookEndpointSecret',       'type' => 'str',        'value' => '',          'position' => 140],
         // Sprint 109/111: per-mode endpoint ID and signing secret are stored in oxconfig
         // (via saveShopConfVar with module: prefix) — NOT as module settings — so they do

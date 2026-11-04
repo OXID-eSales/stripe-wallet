@@ -43,9 +43,8 @@ use Psr\Log\NullLogger;
  *   - Per-mode endpoint ID + signing secret (`sStripeWebhookEndpointIdTest/Live`,
  *     `sStripeWebhookEndpointSecretTest/Live`) live in oxconfig (module-namespaced).
  *     This keeps them OUT of the editable module_config form.
- *   - The legacy single-valued module settings (`sStripeWebhookEndpoint`,
- *     `sStripeWebhookEndpointSecret`) are ALSO written so the admin sees the
- *     registered URL + secret in the form on the next reload.
+ *   - The registered URL (`sStripeWebhookEndpoint`) is ALSO written as a module
+ *     setting so the admin sees it in the form on the next reload. The secret is not.
  */
 class ModuleConfiguration extends ModuleConfiguration_parent
 {
@@ -330,7 +329,6 @@ class ModuleConfiguration extends ModuleConfiguration_parent
             $this->saveOxConfigVar(WebhookEndpointKeys::secret($mode), '');
         }
         $this->saveModuleSetting(WebhookEndpointKeys::LEGACY_URL, '');
-        $this->saveModuleSetting(WebhookEndpointKeys::LEGACY_SECRET, '');
     }
 
     // -------------------------------------------------------------------------
@@ -341,9 +339,8 @@ class ModuleConfiguration extends ModuleConfiguration_parent
      * Returns true when the shop has a usable webhook setup.
      *
      * "Usable" means signatures can be verified — so URL alone is not enough;
-     * the signing secret must also be present (either via the per-mode oxconfig
-     * entry set by the "Create webhooks" action, or via the legacy module settings
-     * a previous admin may have pasted by hand).
+     * the signing secret must also be present (the per-mode oxconfig
+     * entry set by the "Create webhooks" action).
      */
     public function stripeIsWebhookConfigured(): bool
     {
@@ -398,12 +395,9 @@ class ModuleConfiguration extends ModuleConfiguration_parent
             $this->saveOxConfigVar(WebhookEndpointKeys::secret($mode), $result->secret);
         }
 
-        // Legacy single-valued module settings: surfaced in the form, so the admin
-        // sees the registered URL + secret immediately on the next reload.
+        // The URL is shown in the form, so the admin sees the registered endpoint on the next reload. The secret is
+        // never shown: it is kept in the per-mode key above only.
         $this->saveModuleSetting(WebhookEndpointKeys::LEGACY_URL, $webhookUrl);
-        if ($result->secret !== null) {
-            $this->saveModuleSetting(WebhookEndpointKeys::LEGACY_SECRET, $result->secret);
-        }
     }
 
     /**

@@ -17,4 +17,6 @@ namespace OxidEsales\Payments\Stripe\GraphQL\Admin\Service;
 interface ModuleConfVarsInterface
 {
     public function read(string $name): string;
+
+    public function write(string $name, string $value): void;
 }

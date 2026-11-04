@@ -18,16 +18,8 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 /**
- * Sprint 133 · Story 13 (F13).
- *
- * getWebhookSecret() preferred the per-mode secret and fell back to the legacy
- * mode-agnostic module setting. The per-mode key is chosen by isTestMode(); the
- * legacy fallback was not. A shop that pasted a TEST signing secret into the
- * legacy setting before auto-registration existed and then switched to live
- * verified live webhooks with the test secret: every webhook 400s, Stripe
- * retries and gives up, and because verification is (correctly) fail-closed the
- * symptom is not an error in the shop but orders that silently never become
- * paid.
+ * VR-26 S1: the webhook signing secret is the per-mode, per-endpoint value only. The old mode-agnostic module setting
+ * (`sStripeWebhookEndpointSecret`) is not read any more - activation moves a still-set value into the per-mode key once.
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(ModuleConfigurationService::class)]
 final class ModuleConfigurationServiceWebhookSecretTest extends TestCase
@@ -62,56 +54,22 @@ final class ModuleConfigurationServiceWebhookSecretTest extends TestCase
         $this->assertSame('whsec_live', $service->getWebhookSecret());
     }
 
-    public function testFallsBackToTheLegacySecretWhenNoModeSpecificSecretWasEverConfigured(): void
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function legacySecretIsNotRead(): void
     {
-        // Existing installs that pasted a secret manually keep working.
         $service = $this->service(
             [],
-            ['sStripeMode' => 'live', 'sStripeWebhookEndpointSecret' => 'whsec_legacy']
-        );
-
-        $this->assertSame('whsec_legacy', $service->getWebhookSecret());
-    }
-
-    public function testRefusesTheLegacySecretWhenTheOtherModeHasItsOwnSecret(): void
-    {
-        // The shop has auto-registered for test, so the mode-agnostic legacy
-        // value belongs to that other era: using it for live would verify live
-        // webhooks with a test secret.
-        $service = $this->service(
-            ['sStripeWebhookEndpointSecretTest' => 'whsec_test'],
             ['sStripeMode' => 'live', 'sStripeWebhookEndpointSecret' => 'whsec_legacy']
         );
 
         $this->assertSame('', $service->getWebhookSecret());
     }
 
-    public function testLogsAnErrorNamingTheMissingSettingWhenItRefuses(): void
+    public function testTheOtherModesSecretIsNeverUsed(): void
     {
-        $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects($this->once())
-            ->method('error')
-            ->with(
-                $this->stringContains('webhook'),
-                $this->callback(static fn (array $c): bool =>
-                    ($c['mode'] ?? null) === 'live'
-                    && ($c['expected_setting'] ?? null) === 'sStripeWebhookEndpointSecretLive')
-            );
-
         $service = $this->service(
             ['sStripeWebhookEndpointSecretTest' => 'whsec_test'],
-            ['sStripeMode' => 'live', 'sStripeWebhookEndpointSecret' => 'whsec_legacy'],
-            $logger
-        );
-
-        $service->getWebhookSecret();
-    }
-
-    public function testTestModeIsSymmetricallyProtected(): void
-    {
-        $service = $this->service(
-            ['sStripeWebhookEndpointSecretLive' => 'whsec_live'],
-            ['sStripeMode' => 'test', 'sStripeWebhookEndpointSecret' => 'whsec_legacy']
+            ['sStripeMode' => 'live']
         );
 
         $this->assertSame('', $service->getWebhookSecret());

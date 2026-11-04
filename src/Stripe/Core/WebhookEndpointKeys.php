@@ -14,13 +14,13 @@ namespace OxidEsales\Payments\Stripe\Core;
  *
  * One place for them: the module configuration service (reads the secret), the admin form controller (writes id and
  * secret) and the admin API's webhook state (reads both) each carried their own copy of these strings.
- * Per-mode values live in the module's oxconfig variables, never in the settings form; the two LEGACY_* settings are
- * the mode-agnostic ones a merchant may have pasted by hand before auto-registration existed.
+ * Per-mode values live in the module's oxconfig variables, never in the settings form; LEGACY_URL is the mode-agnostic
+ * endpoint URL the settings form still shows (the old mode-agnostic secret was moved once by
+ * LegacyWebhookSecretMigration and is not read any more).
  */
 final class WebhookEndpointKeys
 {
     public const LEGACY_URL = 'sStripeWebhookEndpoint';
-    public const LEGACY_SECRET = 'sStripeWebhookEndpointSecret';
 
     private function __construct()
     {

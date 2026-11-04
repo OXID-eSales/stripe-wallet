@@ -57,7 +57,6 @@ services:
     autoconfigure: false
     arguments:
       - '@OxidEsales\Payments\Stripe\GraphQL\Admin\Service\ModuleConfVarsInterface'
-      - '@OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface'
 
   OxidEsales\Payments\Stripe\GraphQL\Admin\Service\StripeAdminSettingsInterface:
     class: OxidEsales\Payments\Stripe\GraphQL\Admin\Service\OxidStripeAdminSettings
