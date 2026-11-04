@@ -159,6 +159,9 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
      * When no discounts are present, items are sent individually for better
      * visibility on the Stripe Checkout page.
      */
+    /**
+     * @return array<int, array<string, mixed>> Stripe-formatted line items
+     */
     public function buildLineItems(BasketSnapshot $snapshot): array
     {
         $currency = strtolower($snapshot->getCurrency());

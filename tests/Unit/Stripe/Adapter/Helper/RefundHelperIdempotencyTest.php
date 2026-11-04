@@ -54,7 +54,6 @@ final class RefundHelperIdempotencyTest extends TestCase
     // ==========================================
     // refundPayment() idempotency tests
     // ==========================================
-    #[\PHPUnit\Framework\Attributes\Test]
     public function refundPaymentCallsStripeWhenNoExistingRecord(): void
     {
         $request = new RefundPaymentRequest('pi_abc123', 25.0);
@@ -79,7 +78,6 @@ final class RefundHelperIdempotencyTest extends TestCase
         $this->assertSame(25.0, $result->amountRefunded);
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
     public function refundPaymentReturnsCachedResultWhenCompleted(): void
     {
         $request = new RefundPaymentRequest('pi_abc123', 25.0);
@@ -120,7 +118,6 @@ final class RefundHelperIdempotencyTest extends TestCase
         $this->assertSame(25.0, $result->amountRefunded);
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
     public function refundPaymentThrowsWhenProcessing(): void
     {
         $request = new RefundPaymentRequest('pi_abc123');
@@ -146,7 +143,6 @@ final class RefundHelperIdempotencyTest extends TestCase
         $this->helper->refundPayment($this->stripeClient, $request);
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
     public function refundPaymentDeserializesFailedCachedResponse(): void
     {
         $request = new RefundPaymentRequest('pi_abc123');
@@ -193,7 +189,6 @@ final class RefundHelperIdempotencyTest extends TestCase
         new RefundHelper();
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
     public function refundPaymentPassesNativeIdempotencyKeyToStripe(): void
     {
         $this->repository->method('findByKey')->willReturn(null);
@@ -293,7 +288,6 @@ final class RefundHelperIdempotencyTest extends TestCase
     // Sprint 133 · Story 2 (F2) — request-scoped keys
     // ==========================================
 
-    #[\PHPUnit\Framework\Attributes\Test]
     public function refundPaymentUsesDifferentKeysForDifferentAmounts(): void
     {
         $seenKeys = [];
@@ -317,7 +311,6 @@ final class RefundHelperIdempotencyTest extends TestCase
         );
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
     public function refundPaymentUsesDifferentKeysForDifferentRequestReferences(): void
     {
         $seenKeys = [];

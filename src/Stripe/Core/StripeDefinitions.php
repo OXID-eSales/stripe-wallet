@@ -67,15 +67,6 @@ class StripeDefinitions
     /** Terminal status for a successfully processed transaction audit record. */
     public const TRANSACTION_STATUS_COMPLETED = 'completed';
 
-    /**
-     * Fallback currency used when a Stripe API response omits the currency field.
-     *
-     * A missing currency in a CaptureResponse or CheckoutSession represents a Stripe
-     * API anomaly. The EUR default is a last-resort guard — in production this branch
-     * should never be reached; log a warning if it is.
-     */
-    public const DEFAULT_CURRENCY = 'EUR';
-
     // Payment constraints
     private const PAYMENT_CONSTRAINTS_DEFAULT = [
         'oxfromamount' => 0.50,
@@ -155,38 +146,5 @@ class StripeDefinitions
     public static function isStripePayment(string $paymentId): bool
     {
         return isset(self::STRIPE_DEFINITIONS[$paymentId]);
-    }
-
-    /**
-     * Get payment method type for Stripe API
-     *
-     * @param string $paymentId
-     * @return string|null
-     */
-    public static function getPaymentType(string $paymentId): ?string
-    {
-        return self::STRIPE_DEFINITIONS[$paymentId]['paymenttype'] ?? null;
-    }
-
-    /**
-     * Get supported currencies for a payment method
-     *
-     * @param string $paymentId
-     * @return array<string>
-     */
-    public static function getSupportedCurrencies(string $paymentId): array
-    {
-        return self::STRIPE_DEFINITIONS[$paymentId]['currencies'] ?? [];
-    }
-
-    /**
-     * Get supported countries for a payment method
-     *
-     * @param string $paymentId
-     * @return array<string>
-     */
-    public static function getSupportedCountries(string $paymentId): array
-    {
-        return self::STRIPE_DEFINITIONS[$paymentId]['countries'] ?? [];
     }
 }

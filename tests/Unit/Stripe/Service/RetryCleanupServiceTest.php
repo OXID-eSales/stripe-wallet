@@ -59,7 +59,7 @@ class RetryCleanupServiceTest extends TestCase
         $contract = $this->createContract('contract_term');
         $contract->cancel('earlier');
 
-        $this->contractRepository->method('findById')->willReturn($contract);
+        $this->contractRepository->method('findStaleNotFinished')->willReturn([$contract]);
 
         $service = new RetryCleanupService(
             $this->contractRepository,
@@ -69,7 +69,7 @@ class RetryCleanupServiceTest extends TestCase
             $this->createMock(\OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard::class)
         );
 
-        $this->assertFalse($service->cleanupPreviousAttempt($contract->getId()));
+        $this->assertSame(0, $service->cleanupStaleContracts(30));
     }
 
     public function testCleanupWorksWithAnyPaymentContractInterfaceImplementation(): void
@@ -83,7 +83,7 @@ class RetryCleanupServiceTest extends TestCase
         $contract->method('getOrderId')->willReturn(null);
         $contract->expects($this->once())->method('cancel')->with('checkout_retry');
 
-        $this->contractRepository->method('findById')->willReturn($contract);
+        $this->contractRepository->method('findStaleNotFinished')->willReturn([$contract]);
 
         $service = new RetryCleanupService(
             $this->contractRepository,
@@ -93,7 +93,7 @@ class RetryCleanupServiceTest extends TestCase
             $this->createMock(\OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard::class)
         );
 
-        $this->assertTrue($service->cleanupPreviousAttempt('c1'));
+        $this->assertSame(1, $service->cleanupStaleContracts(30));
     }
 
     private function createContract(string $id = 'contract_123'): PaymentContract
@@ -120,9 +120,8 @@ class RetryCleanupServiceTest extends TestCase
         $contract->transitionToPending();
 
         $this->contractRepository
-            ->method('findById')
-            ->with('contract_123')
-            ->willReturn($contract);
+            ->method('findStaleNotFinished')
+            ->willReturn([$contract]);
 
         $this->orderService
             ->expects($this->once())
@@ -135,20 +134,10 @@ class RetryCleanupServiceTest extends TestCase
             ->method('save')
             ->with($contract);
 
-        $result = $this->service->cleanupPreviousAttempt('contract_123');
+        $result = $this->service->cleanupStaleContracts(30);
 
-        $this->assertTrue($result);
+        $this->assertSame(1, $result);
         $this->assertTrue($contract->getState()->isCancelled());
-    }
-
-    public function testCleanupSkipsNullContractId(): void
-    {
-        $this->contractRepository->expects($this->never())->method('findById');
-        $this->orderService->expects($this->never())->method('deleteNotFinishedOrder');
-
-        $result = $this->service->cleanupPreviousAttempt(null);
-
-        $this->assertFalse($result);
     }
 
     public function testCleanupSkipsTerminalContract(): void
@@ -161,16 +150,16 @@ class RetryCleanupServiceTest extends TestCase
         // Contract is now COMMITTED (terminal-ish, but not a terminal state)
 
         $this->contractRepository
-            ->method('findById')
-            ->willReturn($contract);
+            ->method('findStaleNotFinished')
+            ->willReturn([$contract]);
 
         // Committed contract should not be cleaned up
         $this->orderService->expects($this->never())->method('deleteNotFinishedOrder');
         $this->contractRepository->expects($this->never())->method('save');
 
-        $result = $this->service->cleanupPreviousAttempt('contract_123');
+        $result = $this->service->cleanupStaleContracts(30);
 
-        $this->assertFalse($result);
+        $this->assertSame(0, $result);
     }
 
     public function testCleanupHandlesContractWithoutOrder(): void
@@ -179,8 +168,8 @@ class RetryCleanupServiceTest extends TestCase
         // Contract in DRAFT state, no orderId
 
         $this->contractRepository
-            ->method('findById')
-            ->willReturn($contract);
+            ->method('findStaleNotFinished')
+            ->willReturn([$contract]);
 
         $this->orderService->expects($this->never())->method('deleteNotFinishedOrder');
 
@@ -189,23 +178,10 @@ class RetryCleanupServiceTest extends TestCase
             ->method('save')
             ->with($contract);
 
-        $result = $this->service->cleanupPreviousAttempt('contract_123');
+        $result = $this->service->cleanupStaleContracts(30);
 
-        $this->assertTrue($result);
+        $this->assertSame(1, $result);
         $this->assertTrue($contract->getState()->isCancelled());
-    }
-
-    public function testCleanupSkipsNonExistentContract(): void
-    {
-        $this->contractRepository
-            ->method('findById')
-            ->willReturn(null);
-
-        $this->orderService->expects($this->never())->method('deleteNotFinishedOrder');
-
-        $result = $this->service->cleanupPreviousAttempt('contract_nonexistent');
-
-        $this->assertFalse($result);
     }
 
     // ==========================================

@@ -1,0 +1,107 @@
+# Dead inside the whole constellation (the members were searched for in every repository under extensions/ and in
+# oxid-fe-admin): the DELETION BACKLOG of sprint 17 / sprint 25 D-Stripe, baselined only so that the gate can go live and stop NEW
+# dead code. Each needs a per-item decision (value-object getter kept for symmetry, interface method, or delete + CHANGELOG
+# "Removed"). Nothing may be added here: new code needs a caller. Shrink only. Ticket: VR-17 DC-5.
+
+parameters:
+    ignoreErrors:
+        -
+            message: '#^Property\ OxidEsales\\Payments\\Stripe\\Adapter\\Dto\\StripeCustomerDto::\$email\ is\ never\ read$#'
+            identifier: shipmonk.deadProperty.neverRead
+            count: 1
+            path: ../../src/Stripe/Adapter/Dto/StripeCustomerDto.php
+        -
+            message: '#^Property\ OxidEsales\\Payments\\Stripe\\Adapter\\Dto\\StripeCustomerDto::\$metadata\ is\ never\ read$#'
+            identifier: shipmonk.deadProperty.neverRead
+            count: 1
+            path: ../../src/Stripe/Adapter/Dto/StripeCustomerDto.php
+        -
+            message: '#^Property\ OxidEsales\\Payments\\Stripe\\Adapter\\Dto\\StripeRefundDto::\$reason\ is\ never\ read$#'
+            identifier: shipmonk.deadProperty.neverRead
+            count: 1
+            path: ../../src/Stripe/Adapter/Dto/StripeRefundDto.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\Controller\\Admin\\ModuleConfiguration::initializeWebhookCollaborators$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/Controller/Admin/ModuleConfiguration.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\EventSystem\\Event\\StripeCancelAuthorizationRequestEvent::getInitiator$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/EventSystem/Event/StripeCancelAuthorizationRequestEvent.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\EventSystem\\Event\\StripeCaptureRequestEvent::getPaymentIntentId$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/EventSystem/Event/StripeCaptureRequestEvent.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\EventSystem\\Event\\StripeSuccessUrlBuildEvent::getContractId$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/EventSystem/Event/StripeSuccessUrlBuildEvent.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\GraphQL\\Admin\\Service\\StripeAdminSettingsInterface::platformKey$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/GraphQL/Admin/Service/StripeAdminSettingsInterface.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\GraphQL\\Admin\\Service\\StripeAdminSettingsInterface::token$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/GraphQL/Admin/Service/StripeAdminSettingsInterface.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\GraphQL\\Admin\\Service\\StripeConfigSnapshot::platformKeySet$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/GraphQL/Admin/Service/StripeConfigSnapshot.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\GraphQL\\Admin\\Service\\StripeConfigSnapshot::publishableKey$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/GraphQL/Admin/Service/StripeConfigSnapshot.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\GraphQL\\Admin\\Service\\StripeConfigSnapshot::tokenSet$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/GraphQL/Admin/Service/StripeConfigSnapshot.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\Service\\Result\\CheckoutReturnResult::getAmountCents$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/Service/Result/CheckoutReturnResult.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\Service\\Result\\CheckoutReturnResult::getContractId$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/Service/Result/CheckoutReturnResult.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\Service\\Result\\CheckoutReturnResult::getPaymentIntentStatus$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/Service/Result/CheckoutReturnResult.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\Service\\Result\\CheckoutReturnResult::getPaymentStatus$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/Service/Result/CheckoutReturnResult.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\Service\\Result\\CheckoutReturnResult::getRedirectTarget$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/Service/Result/CheckoutReturnResult.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\Service\\Result\\CheckoutReturnResult::isCaptured$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/Service/Result/CheckoutReturnResult.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\Service\\StaticContentInterface::ensureStripePaymentMethods$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/Service/StaticContentInterface.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\Service\\WebhookEndpointRegistrarInterface::register$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/Service/WebhookEndpointRegistrarInterface.php

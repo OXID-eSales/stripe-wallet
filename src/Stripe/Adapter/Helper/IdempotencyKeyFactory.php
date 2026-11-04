@@ -43,15 +43,6 @@ final class IdempotencyKeyFactory
     /** Hard limit of the OXKEY column. */
     private const MAX_KEY_LENGTH = 128;
 
-    public static function forRefund(
-        string $paymentIntentId,
-        ?int $amountMinorUnits,
-        ?string $reason,
-        ?string $requestReference
-    ): string {
-        return self::build('refund', $paymentIntentId, $amountMinorUnits, $reason, $requestReference);
-    }
-
     public static function forRefundByCharge(
         string $chargeId,
         ?int $amountMinorUnits,

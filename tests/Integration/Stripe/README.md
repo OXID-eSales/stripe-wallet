@@ -16,51 +16,20 @@ tests/Integration/Stripe/
 ├── README.md (this file)
 ├── StripeIntegrationTestCase.php         # Base test case with helpers
 └── Adapter/
-    ├── StripeAdapterIntegrationTest.php           # Payment creation, capture, refund, void
-    ├── StripeAuthorizationFlowIntegrationTest.php # Two-step authorization flow
-    ├── StripePaymentMethodIntegrationTest.php     # Vaulting/tokenization
-    └── Stripe3DSecureIntegrationTest.php          # 3D Secure/SCA flow
+    └── StripeAdapterIntegrationTest.php           # Payment creation, capture, details
 ```
 
 ## Test Coverage
 
-### StripeAdapterIntegrationTest (13 tests)
+### StripeAdapterIntegrationTest
 - ✅ Payment creation (manual/automatic capture)
 - ✅ Payment with saved payment methods
 - ✅ Payment with metadata
 - ✅ Full and partial capture
-- ✅ Full and partial refunds
-- ✅ Refund reasons (customer_requested, fraudulent, duplicate)
-- ✅ Void/cancel payments
 - ✅ Get payment details
 
-### StripeAuthorizationFlowIntegrationTest (10 tests)
-- ✅ Authorization creation
-- ✅ Authorization with saved cards
-- ✅ Capture full/partial authorization
-- ✅ Void authorization (confirmed/unconfirmed)
-- ✅ Reauthorization (not supported, throws exception)
-- ✅ Complete authorization lifecycle
-- ✅ Authorization expiration date (7 days)
-
-### StripePaymentMethodIntegrationTest (12 tests)
-- ✅ Create card payment method
-- ✅ Attach payment method to customer
-- ✅ Payment method with billing address
-- ✅ Payment method with metadata
-- ✅ List customer payment methods
-- ✅ Delete payment methods
-- ✅ Complete payment method lifecycle
-- ✅ Payment method persistence across payments
-
-### Stripe3DSecureIntegrationTest (10 tests)
-- ✅ Initiate 3DS for payments requiring action
-- ✅ 3DS status mapping (authenticated, pending, not_required)
-- ✅ Verify 3DS result
-- ✅ 3DS with direct capture
-- ✅ 3DS data in payment response
-
-**Total: 45 integration tests**
+The adapter's two-step authorization, vaulting, 3D Secure, void and generic refund calls were removed with payment-base's
+`PaymentAdapterInterface` (they had no caller); their integration tests went with them.
 
 ## Configuration
 

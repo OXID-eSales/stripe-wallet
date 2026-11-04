@@ -31,28 +31,6 @@ use Psr\Container\NotFoundExceptionInterface;
 class Events
 {
     /**
-     * Lists of all custom-groups to add the payment-methods to
-     *
-     * @var array<string>
-     */
-    public static array $aGroupsToAdd = [
-        'oxidadmin',
-        'oxidcustomer',
-        'oxiddealer',
-        'oxidforeigncustomer',
-        'oxidgoodcust',
-        'oxidmiddlecust',
-        'oxidnewcustomer',
-        'oxidnewsletter',
-        'oxidnotyetordered',
-        'oxidpowershopper',
-        'oxidpricea',
-        'oxidpriceb',
-        'oxidpricec',
-        'oxidsmallcust',
-    ];
-
-    /**
      * List of all removed payment methods
      *
      * @var array<string>

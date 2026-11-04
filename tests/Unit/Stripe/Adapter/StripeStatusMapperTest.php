@@ -157,13 +157,10 @@ final class StripeStatusMapperTest extends TestCase
             StripeStatusMapper::STATUS_PENDING,
             StripeStatusMapper::STATUS_AUTHORIZED,
             StripeStatusMapper::STATUS_CAPTURED,
-            StripeStatusMapper::STATUS_FAILED,
             StripeStatusMapper::STATUS_CANCELLED,
-            StripeStatusMapper::STATUS_REFUNDED,
-            StripeStatusMapper::STATUS_PARTIALLY_REFUNDED,
         ];
 
-        $genericStatuses = ['pending', 'authorized', 'captured', 'failed', 'cancelled', 'refunded', 'partially_refunded'];
+        $genericStatuses = ['pending', 'authorized', 'captured', 'cancelled'];
 
         foreach ($normalizedStatuses as $status) {
             $this->assertContains($status, $genericStatuses);

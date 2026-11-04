@@ -51,8 +51,7 @@ final class StripeAdapterTest extends TestCase
             $this->stripeClient,
             new PaymentIntentHelper($idempotencyRepository),
             new RefundHelper($idempotencyRepository),
-            new \OxidEsales\Payments\Stripe\Adapter\Helper\CheckoutSessionHelper(),
-            new \OxidEsales\Payments\Stripe\Adapter\Helper\PaymentMethodHelper()
+            new \OxidEsales\Payments\Stripe\Adapter\Helper\CheckoutSessionHelper()
         );
     }
 
@@ -245,15 +244,5 @@ final class StripeAdapterTest extends TestCase
         $result = $this->adapter->createRefundByCharge($chargeId, $amount, null, $metadata);
 
         $this->assertInstanceOf(StripeRefundDto::class, $result);
-    }
-
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function parseWebhookIsNotThePathWebhooksRunThrough(): void
-    {
-        // Webhooks are verified and parsed by StripeWebhookProcessor; the adapter method only
-        // exists because payment-base's PaymentAdapterInterface declares it.
-        $this->expectException(\LogicException::class);
-
-        $this->adapter->parseWebhook('{}', 'sig', 'secret');
     }
 }

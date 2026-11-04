@@ -34,10 +34,7 @@ class StripeStatusMapper
     public const STATUS_PENDING = NormalizedPaymentStatus::PENDING;
     public const STATUS_AUTHORIZED = NormalizedPaymentStatus::AUTHORIZED;
     public const STATUS_CAPTURED = NormalizedPaymentStatus::CAPTURED;
-    public const STATUS_FAILED = NormalizedPaymentStatus::FAILED;
     public const STATUS_CANCELLED = NormalizedPaymentStatus::CANCELLED;
-    public const STATUS_REFUNDED = NormalizedPaymentStatus::REFUNDED;
-    public const STATUS_PARTIALLY_REFUNDED = NormalizedPaymentStatus::PARTIALLY_REFUNDED;
 
     /**
      * Stripe Checkout Session `payment_status` values (Sprint 114.12 C4).

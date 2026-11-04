@@ -12,12 +12,10 @@ namespace OxidEsales\Payments\Stripe\Service\Factory;
 use OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\Helper\CheckoutSessionHelper;
 use OxidEsales\Payments\Stripe\Adapter\Helper\PaymentIntentHelper;
-use OxidEsales\Payments\Stripe\Adapter\Helper\PaymentMethodHelper;
 use OxidEsales\Payments\Stripe\Adapter\Helper\RefundHelper;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapter;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeClientFactory;
-use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 
 /**
  * Stripe-specific factory for creating payment adapter instances.
@@ -32,7 +30,6 @@ use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 class StripeAdapterFactory implements StripeAdapterFactoryInterface
 {
     public function __construct(
-        private readonly ModuleConfigurationServiceInterface $configurationService,
         private readonly StripeClientFactory $clientFactory,
         private readonly IdempotencyRepositoryInterface $idempotencyRepository
     ) {
@@ -62,8 +59,7 @@ class StripeAdapterFactory implements StripeAdapterFactoryInterface
             $stripeClient,
             $paymentIntentHelper,
             $refundHelper,
-            new CheckoutSessionHelper(),
-            new PaymentMethodHelper()
+            new CheckoutSessionHelper()
         );
     }
 
@@ -76,15 +72,5 @@ class StripeAdapterFactory implements StripeAdapterFactoryInterface
     public function getStripeAdapter(): StripeAdapterInterface
     {
         return $this->createStripeAdapter();
-    }
-
-    /**
-     * Check if Stripe is in test mode.
-     *
-     * @return bool
-     */
-    public function isTestMode(): bool
-    {
-        return $this->configurationService->isTestMode();
     }
 }

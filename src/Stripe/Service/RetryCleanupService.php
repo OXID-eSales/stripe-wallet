@@ -31,24 +31,6 @@ class RetryCleanupService
     }
 
     /**
-     * Clean up a previous checkout attempt by contract ID.
-     *
-     * 1. Load contract, verify it's in a non-terminal, non-committed state
-     * 2. If contract has an orderId, delete the NOT_FINISHED order
-     * 3. Cancel the contract with reason 'checkout_retry'
-     */
-    public function cleanupPreviousAttempt(?string $contractId): bool
-    {
-        if ($contractId === null) {
-            return false;
-        }
-
-        $contract = $this->contractRepository->findById($contractId);
-
-        return $this->cancelContractAndDeleteOrder($contract);
-    }
-
-    /**
      * Clean up stale NOT_FINISHED contracts older than the given threshold.
      *
      * Called after webhook processing to garbage-collect abandoned checkouts

@@ -24,12 +24,6 @@ use OxidEsales\PaymentBase\Admin\Contract\AdminActionBounds;
  */
 interface AdminActionBoundsInterface
 {
-    /** Maximum capturable amount in major units (0.0 when nothing is capturable). */
-    public function captureBound(Order $order): float;
-
-    /** Maximum refundable amount in major units (0.0 when nothing is refundable). */
-    public function refundBound(Order $order): float;
-
     /**
      * Both bounds for the admin API; {@see AdminActionBounds::unavailable()} when Stripe cannot be read, so that a
      * limit that is unknown is never replaced by a guess.

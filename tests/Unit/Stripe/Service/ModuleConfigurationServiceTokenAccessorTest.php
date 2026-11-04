@@ -66,33 +66,6 @@ class ModuleConfigurationServiceTokenAccessorTest extends TestCase
     }
 
     /**
-     * D2: getSecretKey() must be a thin alias for getToken() — same value, same mode logic.
-     */
-    public function testGetSecretKeyReturnsSameValueAsGetToken(): void
-    {
-        $settings = [
-            'sStripeMode' => 'test',
-            'sStripeTestToken' => 'sk_test_alias_check',
-            'sStripeLiveToken' => 'sk_live_alias_check',
-        ];
-        $service = $this->makeService($settings);
-
-        $this->assertSame($service->getToken(), $service->getSecretKey());
-    }
-
-    public function testGetSecretKeyReturnsSameValueAsGetTokenInLiveMode(): void
-    {
-        $settings = [
-            'sStripeMode' => 'live',
-            'sStripeTestToken' => 'sk_test_alias_check',
-            'sStripeLiveToken' => 'sk_live_alias_check',
-        ];
-        $service = $this->makeService($settings);
-
-        $this->assertSame($service->getToken(), $service->getSecretKey());
-    }
-
-    /**
      * D2: the interface still declares getSecretKey() so any implementor satisfies it.
      */
     public function testServiceImplementsInterface(): void

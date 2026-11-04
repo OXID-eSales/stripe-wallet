@@ -73,48 +73,4 @@ final class StripeClientFactoryTest extends TestCase
         $this->assertNull($client);
     }
 
-    public function testIsTestModeReturnsTrueWhenConfiguredForTestMode(): void
-    {
-        $this->configurationService
-            ->method('getToken')
-            ->willReturn('sk_test_4242424242424242424242424242424242424242424242424242424242424242');
-        $this->configurationService
-            ->method('isTestMode')
-            ->willReturn(true);
-
-        $this->factory = new StripeClientFactory($this->configurationService);
-
-        $this->assertTrue($this->factory->isTestMode());
-    }
-
-    public function testIsTestModeReturnsFalseWhenConfiguredForLiveMode(): void
-    {
-        $this->configurationService
-            ->method('getToken')
-            ->willReturn('sk_live_4242424242424242424242424242424242424242424242424242424242424242');
-        $this->configurationService
-            ->method('isTestMode')
-            ->willReturn(false);
-
-        $this->factory = new StripeClientFactory($this->configurationService);
-
-        $this->assertFalse($this->factory->isTestMode());
-    }
-
-    public function testFactoryInitializesWithConfigurationValues(): void
-    {
-        $testKey = 'sk_test_4242424242424242424242424242424242424242424242424242424242424242';
-
-        $this->configurationService
-            ->method('getToken')
-            ->willReturn($testKey);
-        $this->configurationService
-            ->method('isTestMode')
-            ->willReturn(true);
-
-        $this->factory = new StripeClientFactory($this->configurationService);
-
-        // Verify that the factory correctly uses the configuration
-        $this->assertTrue($this->factory->isTestMode());
-    }
 }

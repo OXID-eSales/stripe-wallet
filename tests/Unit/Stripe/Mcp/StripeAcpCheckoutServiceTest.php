@@ -175,7 +175,7 @@ final class StripeAcpCheckoutServiceTest extends TestCase
 
     public function testAnUnconfirmedIntentIsAValidationErrorAndNothingIsCommitted(): void
     {
-        $this->adapter->method('createPayment')->willReturn(new PaymentResponse('pi_1', StripeStatusMapper::STATUS_FAILED, 100.0, 'EUR'));
+        $this->adapter->method('createPayment')->willReturn(new PaymentResponse('pi_1', \OxidEsales\PaymentBase\Adapter\Response\NormalizedPaymentStatus::FAILED, 100.0, 'EUR'));
         $this->commit->expects($this->never())->method('commit');
 
         $result = $this->service()->completeCheckout('ctr-1', ['token' => 'spt_bad'], new AgentContext('agent-1', 'tok'));

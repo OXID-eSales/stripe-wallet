@@ -417,6 +417,72 @@ jobs:
             source/test-module/tests/reports/phpstan.report.json
             source/test-module/tests/reports/phpmd.report.json
 
+  # ==========================================================================
+  # Dead-code gate (sprint 17 DC-5): no member without a production caller, no unreferenced
+  # language key / template / asset. Independent of the shop line, so it runs once, here.
+  # A new finding is fixed by deleting the code, never by growing tests/PhpStan/dead-code-baseline-*.neon.
+  # ==========================================================================
+  dead-code:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current module
+        uses: actions/checkout@v5
+        with:
+          path: source/test-module
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: gd, zip
+
+      - name: Checkout payment-base (private dependency)
+        uses: actions/checkout@v5
+        with:
+          repository: OXID-eSales/payment-base
+          ref: ${{ env.PAYMENT_BASE_BRANCH }}
+          path: source/payment-base
+          token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
+
+      - name: Checkout one-page-checkout (PHPStan symbol resolution)
+        uses: actions/checkout@v5
+        with:
+          repository: OXID-eSales/one-page-checkout
+          ref: ${{ env.ONE_PAGE_CHECKOUT_BRANCH }}
+          path: source/one-page-checkout
+          token: ${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}
+
+      - name: Configure path repository for payment-base
+        working-directory: source/test-module
+        run: |
+          composer config repositories --unset
+          composer config repositories.payment-base \
+            --json '{"type":"path","url":"../payment-base","options":{"symlink":true}}'
+
+      - name: Pin payment-base
+        working-directory: source/test-module
+        run: composer require "oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH}" --no-update --no-interaction
+
+      - name: Install module dependencies
+        working-directory: source/test-module
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.ENTERPRISE_GITHUB_TOKEN || secrets.GH_TOKEN }}"}}'
+        run: |
+          for attempt in 1 2 3; do
+            composer update --no-interaction && break
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            echo "composer update failed (attempt $attempt), retrying in 20 s"; sleep 20
+          done
+
+      - name: Dead PHP members (shipmonk/dead-code-detector)
+        working-directory: source/test-module
+        run: composer dead-code
+
+      - name: Dead language keys, templates and assets
+        working-directory: source/test-module
+        run: composer dead-assets
+
   isolated_unit_tests:
     strategy:
       fail-fast: false
@@ -619,19 +685,20 @@ jobs:
     # catching a defect. b-7.4.x went three days that way (7f76c18, 0ab1d57,
     # 0dafa6a): every unit and integration job skipped, nobody told. This job
     # exists only to name the case.
-    needs: [ styles, isolated_unit_tests, integration_tests ]
+    needs: [ styles, dead-code, isolated_unit_tests, integration_tests ]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Report which kind of red this run is
         run: |
           styles='${{ needs.styles.result }}'
+          deadcode='${{ needs.dead-code.result }}'
           unit='${{ needs.isolated_unit_tests.result }}'
           integration='${{ needs.integration_tests.result }}'
-          echo "styles=$styles isolated_unit_tests=$unit integration_tests=$integration"
+          echo "styles=$styles dead-code=$deadcode isolated_unit_tests=$unit integration_tests=$integration"
 
           never_ran=''
-          for pair in "styles:$styles" "isolated_unit_tests:$unit" "integration_tests:$integration"; do
+          for pair in "styles:$styles" "dead-code:$deadcode" "isolated_unit_tests:$unit" "integration_tests:$integration"; do
             case "${pair#*:}" in
               skipped|cancelled) never_ran="$never_ran ${pair%%:*}" ;;
             esac

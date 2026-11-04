@@ -192,20 +192,6 @@ class OrderRefundViewDataProvider
     }
 
     /**
-     * Get total captured amount, formatted.
-     */
-    public function getStripeCapturedAmount(Order $order): string
-    {
-        $charge = $this->getLastCharge($order, false);
-        if ($charge === null || $charge->amountCaptured === 0) {
-            return $this->formatPrice(0.0, $order);
-        }
-        $chargeCurrency = strtoupper($charge->currency);
-        $price = AmountConverter::toMajorUnits($charge->amountCaptured, $chargeCurrency);
-        return $this->formatPrice($price, $order);
-    }
-
-    /**
      * Format a price using order's currency.
      */
     public function formatPrice(float $price, Order $order): string
@@ -233,16 +219,6 @@ class OrderRefundViewDataProvider
         }
 
         return $this->historyBuilder->build($paymentIntent);
-    }
-
-    /**
-     * Reset cached API data (after capture/cancel/refund).
-     */
-    public function resetCache(): void
-    {
-        $this->apiOrder  = null;
-        $this->apiCharge = null;
-        $this->apiError  = null;
     }
 
     /**

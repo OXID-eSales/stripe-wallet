@@ -9,11 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Adapter\Helper;
 
-use DateTimeImmutable;
-use OxidEsales\PaymentBase\Adapter\Request\RefundPaymentRequest;
-use OxidEsales\PaymentBase\Adapter\Response\RefundResponse;
 use OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface;
-use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use Stripe\Charge;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Refund;
@@ -41,11 +37,6 @@ class RefundHelper
         int $ttlSeconds = self::DEFAULT_TTL_SECONDS
     ) {
         $this->idempotentExecutor = new IdempotentExecutor($idempotencyRepository, $ttlSeconds);
-    }
-
-    public function refundPayment(StripeClient $client, RefundPaymentRequest $request): RefundResponse
-    {
-        return $this->refundWithIdempotency($client, $request);
     }
 
     /**
@@ -98,50 +89,6 @@ class RefundHelper
         }
     }
 
-    private function executeRefundPayment(
-        StripeClient $client,
-        RefundPaymentRequest $request,
-        ?string $idempotencyKey = null
-    ): RefundResponse {
-        try {
-            $params = ['payment_intent' => $request->providerPaymentId];
-
-            if ($request->amount !== null) {
-                // Sprint 114.10a (§6.2): RefundPaymentRequest now carries an optional currency;
-                // use it for correct minor-unit conversion (zero-decimal currencies like JPY
-                // must NOT be multiplied by 100). Null/empty falls back to 2-decimal behaviour.
-                $params['amount'] = AmountConverter::toMinorUnits($request->amount, $request->currency ?? '');
-            }
-
-            if ($request->reason !== null) {
-                $params['reason'] = self::mapRefundReason($request->reason);
-            }
-
-            if (!empty($request->metadata)) {
-                $params['metadata'] = $request->metadata;
-            }
-
-            $refund = $client->refunds->create($params, self::requestOptions($idempotencyKey));
-
-            /** @var array<string, mixed> $providerData */
-            $providerData = $refund->toArray();
-
-            return RefundResponse::success(
-                providerPaymentId: $request->providerPaymentId,
-                refundId: $refund->id,
-                amountRefunded: AmountConverter::toMajorUnits($refund->amount, strtoupper($refund->currency)),
-                currency: strtoupper($refund->currency),
-                status: $refund->status ?? 'pending',
-                refundedAt: new DateTimeImmutable('@' . $refund->created),
-                reason: $request->reason,
-                providerData: $providerData,
-                metadata: $request->metadata
-            );
-        } catch (ApiErrorException $e) {
-            throw StripeExceptionConverter::convert($e);
-        }
-    }
-
     /**
      * @param array<string, string>|null $metadata
      */
@@ -172,34 +119,6 @@ class RefundHelper
         }
     }
 
-    private function refundWithIdempotency(StripeClient $client, RefundPaymentRequest $request): RefundResponse
-    {
-        /** @var IdempotentExecutor $executor */
-        $executor = $this->idempotentExecutor;
-        $key = IdempotencyKeyFactory::forRefund(
-            $request->providerPaymentId,
-            $this->refundAmountInMinorUnits($request),
-            $request->reason,
-            $request->idempotencyKey
-        );
-        $result = $executor->execute(
-            key: $key,
-            referenceId: $request->providerPaymentId,
-            operation: 'refund',
-            callable: fn () => $this->executeRefundPayment($client, $request, $key),
-            serialize: function (mixed $r): string {
-                assert($r instanceof RefundResponse);
-                return $this->serializeRefundResponse($r);
-            },
-            deserialize: fn (string $j) => $this->deserializeRefundResponse($j)
-        );
-        /** @var RefundResponse $result */
-        return $result;
-    }
-
-    /**
-     * @param array<string, string>|null $metadata
-     */
     /**
      * Sprint 133 · Story 2 (F2): routed through IdempotentExecutor like the
      * PaymentIntent path. It previously ran its own PROCESSING/COMPLETED/FAILED
@@ -266,20 +185,6 @@ class RefundHelper
     }
 
     /**
-     * The request carries the amount in major units; the idempotency key must
-     * use the same minor-unit value that reaches Stripe, so two refunds that
-     * differ only by sub-unit rounding cannot collide.
-     */
-    private function refundAmountInMinorUnits(RefundPaymentRequest $request): ?int
-    {
-        if ($request->amount === null) {
-            return null;
-        }
-
-        return AmountConverter::toMinorUnits($request->amount, $request->currency ?? '');
-    }
-
-    /**
      * Stripe's own idempotency layer. The local DB record cannot help when the
      * request reaches Stripe but the response is lost — Stripe replays the
      * original result for a repeated key instead of refunding twice.
@@ -289,52 +194,5 @@ class RefundHelper
     private static function requestOptions(?string $idempotencyKey): ?array
     {
         return $idempotencyKey === null ? null : ['idempotency_key' => $idempotencyKey];
-    }
-
-    private static function mapRefundReason(string $reason): string
-    {
-        return match ($reason) {
-            'requested_by_customer', 'fraudulent', 'duplicate' => $reason,
-            default => 'requested_by_customer',
-        };
-    }
-
-    private function serializeRefundResponse(RefundResponse $response): string
-    {
-        return (string) json_encode([
-            'successful' => $response->successful,
-            'providerPaymentId' => $response->providerPaymentId,
-            'refundId' => $response->refundId,
-            'amountRefunded' => $response->amountRefunded,
-            'currency' => $response->currency,
-            'status' => $response->status,
-            'refundedAt' => $response->refundedAt?->format('Y-m-d H:i:s'),
-            'reason' => $response->reason,
-            'errorMessage' => $response->errorMessage,
-            'errorCode' => $response->errorCode,
-        ]);
-    }
-
-    private function deserializeRefundResponse(string $json): RefundResponse
-    {
-        /** @var array{successful?: bool, providerPaymentId?: string, refundId?: string, amountRefunded?: float, currency?: string, status?: string, refundedAt?: string, reason?: string, errorMessage?: string, errorCode?: string} $data */
-        $data = json_decode($json, true);
-
-        if (!($data['successful'] ?? false)) {
-            return RefundResponse::failure(
-                $data['errorMessage'] ?? 'Unknown error',
-                $data['errorCode'] ?? null
-            );
-        }
-
-        return RefundResponse::success(
-            providerPaymentId: $data['providerPaymentId'] ?? '',
-            refundId: $data['refundId'] ?? '',
-            amountRefunded: $data['amountRefunded'] ?? 0.0,
-            currency: $data['currency'] ?? '',
-            status: $data['status'] ?? '',
-            refundedAt: new DateTimeImmutable($data['refundedAt'] ?? 'now'),
-            reason: $data['reason'] ?? null,
-        );
     }
 }

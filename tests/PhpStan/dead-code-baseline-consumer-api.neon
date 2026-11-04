@@ -1,0 +1,22 @@
+# Members that a framework or consumer calls but this repository's analysis cannot see: graphql-base (an optional package, not in
+# the module's vendor) calls the error category of StripeCheckoutError and the namespace mapper through its own interfaces, which
+# Stripe's glue must not implement (it mirrors them). Checked against all repositories under extensions/ and oxid-fe-admin:
+# no other caller. Ticket: VR-17 DC-5.
+
+parameters:
+    ignoreErrors:
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\GraphQL\\Exception\\StripeCheckoutError::getCategory$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/GraphQL/Exception/StripeCheckoutError.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\GraphQL\\Service\\NamespaceMapper::getControllerNamespaceMapping$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/GraphQL/Service/NamespaceMapper.php
+        -
+            message: '#^Unused\ OxidEsales\\Payments\\Stripe\\GraphQL\\Service\\NamespaceMapper::getTypeNamespaceMapping$#'
+            identifier: shipmonk.deadMethod
+            count: 1
+            path: ../../src/Stripe/GraphQL/Service/NamespaceMapper.php

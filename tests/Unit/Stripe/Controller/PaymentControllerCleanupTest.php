@@ -34,7 +34,7 @@ class PaymentControllerCleanupTest extends TestCase
         $helper->contractIdFromSession = null;
 
         $cleanupService = $this->createMock(RetryCleanupService::class);
-        $cleanupService->expects($this->never())->method('cleanupPreviousAttempt');
+        $cleanupService->expects($this->never())->method('cleanupStaleContracts');
 
         $controller = $this->makeController($helper, $cleanupService);
         $controller->triggerCleanup();
@@ -53,7 +53,7 @@ class PaymentControllerCleanupTest extends TestCase
         $helper->contractIdFromSession = 'contract_abc';
 
         $cleanupService = $this->createMock(RetryCleanupService::class);
-        $cleanupService->expects($this->never())->method('cleanupPreviousAttempt');
+        $cleanupService->expects($this->never())->method('cleanupStaleContracts');
 
         $controller = $this->makeController($helper, $cleanupService);
         $controller->triggerCleanup();

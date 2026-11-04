@@ -149,9 +149,4 @@ $aLang = array(
 
     // Sprint 121 (STRP-129) — semantische Betragsvalidierung + Erstattungsbeschreibung.
     'STRIPE_VALIDATION_LABEL_REFUNDDESCRIPTION'         => 'Erstattungsbeschreibung',
-    'STRIPE_VALIDATION_AMOUNT_MALFORMED'                => 'Der Betrag ist keine gültige Zahl. Verwenden Sie ein Format wie 12,50.',
-    'STRIPE_VALIDATION_AMOUNT_NOT_POSITIVE'             => 'Der Betrag muss größer als Null sein.',
-    'STRIPE_VALIDATION_AMOUNT_PRECISION'                => 'Der Betrag hat zu viele Nachkommastellen für diese Währung.',
-    'STRIPE_VALIDATION_AMOUNT_EXCEEDS_BOUND'            => 'Der Betrag überschreitet das verfügbare Maximum für diese Aktion.',
-    'STRIPE_VALIDATION_AMOUNT_BOUND_UNAVAILABLE'        => 'Der verfügbare Betrag konnte nicht mit Stripe verifiziert werden. Bitte versuchen Sie es erneut.',
 );

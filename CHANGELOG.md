@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added (VR-17 DC-5) - dead-code gate; Removed - what it found
+- `composer dead-code` (shipmonk/dead-code-detector ^1.4, `phpstan-dead-code.neon`, `tests/PhpStan/DeadCode/OxidEntryPointUsageProvider.php`)
+  and `composer dead-assets` (`bin/dead-assets`, `dead-assets.allow`), run by the CI job `dead-code`. Baselines split into
+  `tests/PhpStan/dead-code-baseline-{mcp-acp,consumer-api,unreviewed}.neon` (0 / 3 / 20 entries; each file's header says why).
+  Stripe's `src/Mcp` has no finding, MCP/ACP is kept by owner decision.
+- **Removed** (no caller in any repository under `extensions/` or `oxid-fe-admin`): the leftovers of payment-base's deleted
+  `PaymentAdapterInterface` on `StripeAdapter` (`refundPayment`, `authorizePayment`, `captureAuthorization`, `voidPayment`,
+  `voidAuthorization`, `reauthorizePayment`, vaulting, 3-D-Secure, `getProviderName`, `supportsFeature`, `parseWebhook`, ...), with
+  `PaymentMethodHelper`, `PaymentIntentHelper::authorizePayment`, the refund-by-payment-intent path of `RefundHelper` and
+  `IdempotencyKeyFactory::forRefund`; `StripeClientFactory::isTestMode` and `StripeAdapterFactory::isTestMode` (+ the unused
+  `$configurationService`); `ModuleConfigurationService::getSecretKey` / interface `getLogLevel`;
+  `RetryCleanupService::cleanupPreviousAttempt` (the OPC-175 flow no longer calls it; its tests now drive `cleanupStaleContracts`);
+  `OrderRefundViewDataProvider::getStripeCapturedAmount` / `resetCache`, `StripePanelViewDataBuilder::resetViewCache`,
+  `AdminActionBoundsInterface::captureBound` / `refundBound`, `AmountConverter::decimalsFor`, `Events::$aGroupsToAdd`,
+  `StripeDefinitions::DEFAULT_CURRENCY` / `getPaymentType` / `getSupportedCurrencies` / `getSupportedCountries`,
+  `StripeStatusMapper::STATUS_FAILED` / `REFUNDED` / `PARTIALLY_REFUNDED`, `CheckoutSessionServiceInterface::buildLineItems`;
+  five admin amount-validation language keys (de/en) and `assets/README.md`. Their unit tests went with them; the integration
+  tests of the removed adapter calls (authorization flow, vaulting, 3-D Secure, refund / void) were deleted.
+- `bin/dead-assets` also counts a constant named `...PREFIX` as a language-key prefix (`LABEL_KEY_PREFIX . strtoupper($field)`).
+
 ### Changed (VR-25 D6) - comment cleanup, comments and docs only
 - `CLAUDE.md`: source structure, admin panel, events, configuration and test-pattern sections describe what exists (no
   `LazyStripeAdapter`, `OxidShopAdapter`, `OrderRefund` controller, `Stripe3DSRequiredEvent`, stale counts; payment-base, not

@@ -1,0 +1,5 @@
+# Kept by the owner decision "MCP/ACP is kept" (sprint 17, owner decisions 1). Remove an entry only together with the code.
+# Stripe's src/Mcp has no finding at the moment: everything in it has a production caller. Ticket: VR-17 DC-5.
+
+parameters:
+    ignoreErrors: []

@@ -268,3 +268,12 @@ Handlers are registered via `payment.event_handler` tag in `services.yaml` and a
 - **Class extensions:** Registered in `metadata.php` `extend` array, resolved via virtual parent classes (`Order_parent`).
 - **DI container:** `services.yaml`, cleared via `oe:cache:clear`.
 - **Twig template cache:** Must be cleared manually (`rm -rf source/tmp/*`) after template changes.
+
+## Dead-code gate
+
+`composer dead-code` runs shipmonk/dead-code-detector over `src/` (`phpstan-dead-code.neon`; payment-base is scanned so the
+interface methods it calls count as used) and `composer dead-assets` checks language keys, templates and assets. CI runs both
+(job `dead-code`). A finding is fixed by deleting the code. The framework callers the detector cannot see (GraphQLite
+attributes, metadata.php, the shop's class extensions, Twig, the service container, payment-base's duck typing) are named in
+`tests/PhpStan/DeadCode/OxidEntryPointUsageProvider.php`. What was kept knowingly is in `tests/PhpStan/dead-code-baseline-*.neon`
+(owner decision / consumer API / unreviewed backlog); nothing may be added there, only removed.

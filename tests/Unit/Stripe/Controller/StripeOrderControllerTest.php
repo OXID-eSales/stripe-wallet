@@ -559,14 +559,9 @@ class StripeOrderControllerTest extends TestCase
                 }
                 if ($serviceName === RetryCleanupService::class) {
                     return new class {
-                        public function cleanupPreviousAttempt(?string $contractId): bool
+                        public function cleanupStaleContracts(int $minutesOld, ?int $limit = null): int
                         {
-                            return false;
-                        }
-
-                        public function cleanupForUser(string $userId): bool
-                        {
-                            return false;
+                            return 0;
                         }
                     };
                 }

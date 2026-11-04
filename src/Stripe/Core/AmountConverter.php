@@ -39,15 +39,6 @@ use OxidEsales\PaymentBase\Math\Money\MinorUnitConverter;
 class AmountConverter
 {
     /**
-     * Number of decimal places (exponent) for a given ISO-4217 currency code.
-     * Case-insensitive; 0 for zero-decimal, 3 for three-decimal, 2 otherwise.
-     */
-    public static function decimalsFor(string $currency): int
-    {
-        return MinorUnitConverter::decimalsFor($currency);
-    }
-
-    /**
      * Convert a major-unit amount to Stripe minor units (integer).
      *
      * Uses (int) round() internally — not truncation — to avoid IEEE-754 drift:

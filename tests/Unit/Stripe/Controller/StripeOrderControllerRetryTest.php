@@ -43,7 +43,7 @@ class StripeOrderControllerRetryTest extends TestCase
 
         $this->cleanupService
             ->expects($this->never())
-            ->method('cleanupPreviousAttempt');
+            ->method('cleanupStaleContracts');
 
         $this->eventDispatcher
             ->method('dispatch')
@@ -96,7 +96,7 @@ class StripeOrderControllerRetryTest extends TestCase
 
         $this->cleanupService
             ->expects($this->never())
-            ->method('cleanupPreviousAttempt');
+            ->method('cleanupStaleContracts');
 
         $this->eventDispatcher
             ->method('dispatch')
@@ -122,7 +122,7 @@ class StripeOrderControllerRetryTest extends TestCase
 
         $this->cleanupService
             ->expects($this->never())
-            ->method('cleanupPreviousAttempt');
+            ->method('cleanupStaleContracts');
 
         $controller = $this->createController($helper);
         $result = $controller->checkoutCancel();
@@ -141,7 +141,7 @@ class StripeOrderControllerRetryTest extends TestCase
 
         $this->cleanupService
             ->expects($this->never())
-            ->method('cleanupPreviousAttempt');
+            ->method('cleanupStaleContracts');
 
         $controller = $this->createController($helper);
         $result = $controller->checkoutCancel();

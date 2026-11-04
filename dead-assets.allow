@@ -1,0 +1,4 @@
+# Items that no code in this repository names literally but that are used (bin/dead-assets).
+# One path per line, the reason after "#".
+views/twig/frontend/stripe_wallet.html.twig  # chosen by name from the payment id in views/twig/extensions/themes/default/page/checkout/order.html.twig
+assets/js/stripe-frontend.min.js.map  # source map of the minified bundle (npm run build output), read by browser dev tools only

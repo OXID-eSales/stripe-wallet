@@ -13,7 +13,6 @@ use OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\Helper\RefundHelper;
 use OxidEsales\Payments\Stripe\Adapter\Helper\PaymentIntentHelper;
 use OxidEsales\PaymentBase\Adapter\Request\CreatePaymentRequest;
-use OxidEsales\PaymentBase\Adapter\Request\AuthorizePaymentRequest;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapter;
 use PHPUnit\Framework\TestCase;
@@ -62,8 +61,7 @@ final class StripeAdapterReturnUrlTest extends TestCase
             $this->stripeClient,
             new PaymentIntentHelper($idempotencyRepository),
             new RefundHelper($idempotencyRepository),
-            new \OxidEsales\Payments\Stripe\Adapter\Helper\CheckoutSessionHelper(),
-            new \OxidEsales\Payments\Stripe\Adapter\Helper\PaymentMethodHelper()
+            new \OxidEsales\Payments\Stripe\Adapter\Helper\CheckoutSessionHelper()
         );
     }
 
@@ -218,94 +216,6 @@ final class StripeAdapterReturnUrlTest extends TestCase
 
         // Assert - validation passed, no exception thrown
         $this->assertEquals('pi_test_456', $response->providerPaymentId);
-    }
-
-    /**
-     * Test that authorizePayment throws exception when return_url is missing
-     * but payment_method_id is provided (which triggers confirmation).
-     */
-    public function testAuthorizePaymentThrowsExceptionWhenReturnUrlMissingWithPaymentMethod(): void
-    {
-        // Arrange
-        $request = new AuthorizePaymentRequest(
-            amount: 150.00,
-            currency: 'USD',
-            orderId: 'ORDER-456',
-            shopId: '1',
-            paymentMethod: 'card',
-            paymentMethodId: 'pm_test_789', // This triggers confirmation
-            customerId: 'cus_test_456',
-            returnUrl: null, // Missing return_url - this should cause an error
-            metadata: ['test' => 'authorization']
-        );
-
-        // Act & Assert
-        $this->expectException(PaymentAdapterException::class);
-        $this->expectExceptionMessage('return_url is required when confirming a PaymentIntent');
-
-        $this->adapter->authorizePayment($request);
-    }
-
-    /**
-     * Test that authorizePayment does not throw when return_url is provided
-     * with payment_method_id (validation should pass).
-     */
-    public function testAuthorizePaymentValidationPassesWhenReturnUrlProvidedWithPaymentMethod(): void
-    {
-        // Arrange
-        $request = new AuthorizePaymentRequest(
-            amount: 150.00,
-            currency: 'USD',
-            orderId: 'ORDER-456',
-            shopId: '1',
-            paymentMethod: 'card',
-            paymentMethodId: 'pm_test_789',
-            customerId: 'cus_test_456',
-            returnUrl: 'https://example.com/return', // return_url provided - validation should pass
-            metadata: ['test' => 'authorization']
-        );
-
-        // Create a fake Stripe PaymentIntent object using anonymous class
-        $mockPaymentIntent = new class {
-            public string $id = 'pi_test_auth_123';
-            public string $status = 'requires_capture';
-            public int $amount = 15000;
-            public string $currency = 'usd';
-            public string $client_secret = 'pi_test_auth_123_secret';
-            public $next_action = null;
-            public int $created;
-
-            public function __construct() {
-                $this->created = time();
-            }
-
-            public function toArray(): array {
-                return [
-                    'id' => $this->id,
-                    'status' => $this->status,
-                    'amount' => $this->amount,
-                    'currency' => $this->currency,
-                ];
-            }
-        };
-
-        // Mock the StripeClient paymentIntents service
-        $mockPaymentIntentsService = $this->createMock(\Stripe\Service\PaymentIntentService::class);
-        $mockPaymentIntentsService->method('create')
-            ->with($this->callback(function ($params) {
-                // Verify that return_url is included in the API call
-                return isset($params['return_url'])
-                    && $params['return_url'] === 'https://example.com/return';
-            }))
-            ->willReturn($mockPaymentIntent);
-
-        $this->stripeClient->paymentIntents = $mockPaymentIntentsService;
-
-        // Act - should not throw exception
-        $response = $this->adapter->authorizePayment($request);
-
-        // Assert - validation passed, no exception thrown
-        $this->assertEquals('pi_test_auth_123', $response->authorizationId);
     }
 
     /**

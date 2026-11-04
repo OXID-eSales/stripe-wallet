@@ -149,9 +149,4 @@ $aLang = array(
 
     // Sprint 121 (STRP-129) — semantic amount validation + refund description.
     'STRIPE_VALIDATION_LABEL_REFUNDDESCRIPTION'         => 'refund description',
-    'STRIPE_VALIDATION_AMOUNT_MALFORMED'                => 'The amount is not a valid number. Use a format like 12.50.',
-    'STRIPE_VALIDATION_AMOUNT_NOT_POSITIVE'             => 'The amount must be greater than zero.',
-    'STRIPE_VALIDATION_AMOUNT_PRECISION'                => 'The amount has too many decimal places for this currency.',
-    'STRIPE_VALIDATION_AMOUNT_EXCEEDS_BOUND'            => 'The amount exceeds the maximum available for this action.',
-    'STRIPE_VALIDATION_AMOUNT_BOUND_UNAVAILABLE'        => 'The available amount could not be verified with Stripe. Please try again.',
 );

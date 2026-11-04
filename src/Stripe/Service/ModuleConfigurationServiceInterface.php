@@ -35,13 +35,6 @@ interface ModuleConfigurationServiceInterface
      */
     public function getToken(): string;
 
-    /**
-     * Alias for getToken() — kept for backward compatibility.
-     *
-     * @see getToken()
-     */
-    public function getSecretKey(): string;
-
     public function getWebhookSecret(): string;
 
     public function getWebhookEndpoint(): string;
@@ -72,13 +65,6 @@ interface ModuleConfigurationServiceInterface
     public function getCaptureMode(): string;
 
     public function getMinimumOrderAmount(): float;
-
-    /**
-     * Resolve the effective log level: off | errors | normal | debug.
-     *
-     * A known sStripeLogLevel is returned as is; unset, empty or unknown values give the default 'normal'.
-     */
-    public function getLogLevel(): string;
 
     /**
      * Requests channel: enabled when level ∈ {errors, normal, debug}.

@@ -10,7 +10,6 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use OxidEsales\Eshop\Core\Registry;
-use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeCheckoutSessionDto;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\PaymentHandler\ExistingCheckout;

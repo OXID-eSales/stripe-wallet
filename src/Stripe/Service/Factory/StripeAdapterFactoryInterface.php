@@ -27,11 +27,4 @@ interface StripeAdapterFactoryInterface
      * @throws \RuntimeException If Stripe API key is not configured
      */
     public function getStripeAdapter(): StripeAdapterInterface;
-
-    /**
-     * Check if Stripe is in test mode.
-     *
-     * @return bool
-     */
-    public function isTestMode(): bool;
 }

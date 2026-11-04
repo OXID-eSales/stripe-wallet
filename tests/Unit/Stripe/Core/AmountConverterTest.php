@@ -31,55 +31,6 @@ use PHPUnit\Framework\TestCase;
 final class AmountConverterTest extends TestCase
 {
     // ---------------------------------------------------------------
-    // decimalsFor
-    // ---------------------------------------------------------------
-    #[\PHPUnit\Framework\Attributes\DataProvider('decimalsProvider')]
-    public function testDecimalsFor(string $currency, int $expectedDecimals): void
-    {
-        self::assertSame($expectedDecimals, AmountConverter::decimalsFor($currency));
-    }
-
-    /**
-     * @return array<string, array{string, int}>
-     */
-    public static function decimalsProvider(): array
-    {
-        return [
-            'EUR → 2'        => ['EUR', 2],
-            'USD → 2'        => ['USD', 2],
-            'GBP → 2'        => ['GBP', 2],
-            'JPY → 0'        => ['JPY', 0],
-            'KRW → 0'        => ['KRW', 0],
-            'VND → 0'        => ['VND', 0],
-            'BIF → 0'        => ['BIF', 0],
-            'CLP → 0'        => ['CLP', 0],
-            'DJF → 0'        => ['DJF', 0],
-            'GNF → 0'        => ['GNF', 0],
-            'KMF → 0'        => ['KMF', 0],
-            'MGA → 0'        => ['MGA', 0],
-            'PYG → 0'        => ['PYG', 0],
-            'RWF → 0'        => ['RWF', 0],
-            'UGX → 0'        => ['UGX', 0],
-            'VUV → 0'        => ['VUV', 0],
-            'XAF → 0'        => ['XAF', 0],
-            'XOF → 0'        => ['XOF', 0],
-            'XPF → 0'        => ['XPF', 0],
-            'BHD → 3'        => ['BHD', 3],
-            'JOD → 3'        => ['JOD', 3],
-            'KWD → 3'        => ['KWD', 3],
-            'OMR → 3'        => ['OMR', 3],
-            'TND → 3'        => ['TND', 3],
-            // Case-insensitive
-            'jpy lower → 0'  => ['jpy', 0],
-            'eur lower → 2'  => ['eur', 2],
-            'Eur mixed → 2'  => ['Eur', 2],
-            // Unknown / empty → fallback 2
-            'unknown → 2'    => ['XXX', 2],
-            'empty → 2'      => ['', 2],
-        ];
-    }
-
-    // ---------------------------------------------------------------
     // toMinorUnits — EUR (2-decimal) correctness + rounding
     // ---------------------------------------------------------------
     #[\PHPUnit\Framework\Attributes\DataProvider('toMinorUnitsProvider')]
@@ -192,24 +143,6 @@ final class AmountConverterTest extends TestCase
     // ---------------------------------------------------------------
     // Zero-decimal set membership — pinned so future table edits are deliberate
     // ---------------------------------------------------------------
-
-    public function testZeroDecimalSetIsPinned(): void
-    {
-        $expected = ['BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'];
-
-        foreach ($expected as $currency) {
-            self::assertSame(0, AmountConverter::decimalsFor($currency), "Expected {$currency} to be zero-decimal");
-        }
-    }
-
-    public function testThreeDecimalSetIsPinned(): void
-    {
-        $expected = ['BHD', 'JOD', 'KWD', 'OMR', 'TND'];
-
-        foreach ($expected as $currency) {
-            self::assertSame(3, AmountConverter::decimalsFor($currency), "Expected {$currency} to be three-decimal");
-        }
-    }
 
     // ---------------------------------------------------------------
     // Sprint 114.10a (§6.2): currency field threading via request DTOs

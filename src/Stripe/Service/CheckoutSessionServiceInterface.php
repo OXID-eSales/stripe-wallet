@@ -55,13 +55,6 @@ interface CheckoutSessionServiceInterface
     ): CheckoutSessionResult;
 
     /**
-     * Build line items from basket snapshot.
-     *
-     * @return array<int, array<string, mixed>> Stripe-formatted line items
-     */
-    public function buildLineItems(BasketSnapshot $snapshot): array;
-
-    /**
      * Generate a secure success URL with contract token.
      *
      * @param string $shopUrl Base shop URL

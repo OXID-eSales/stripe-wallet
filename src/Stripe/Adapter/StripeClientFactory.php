@@ -26,7 +26,6 @@ use Stripe\StripeClient;
 class StripeClientFactory implements StripeClientProviderInterface
 {
     private string $secretKey;
-    private bool $testMode;
 
     /**
      * @param ModuleConfigurationServiceInterface $configurationService Module configuration service
@@ -35,7 +34,6 @@ class StripeClientFactory implements StripeClientProviderInterface
         private readonly ModuleConfigurationServiceInterface $configurationService
     ) {
         $this->secretKey = $this->configurationService->getToken();
-        $this->testMode = $this->configurationService->isTestMode();
     }
 
     /**
@@ -49,16 +47,6 @@ class StripeClientFactory implements StripeClientProviderInterface
             'api_key' => $this->secretKey,
             'stripe_version' => '2024-11-20.acacia', // Use latest API version
         ]) : null;
-    }
-
-    /**
-     * Check if factory is configured for test mode.
-     *
-     * @return bool True if test mode
-     */
-    public function isTestMode(): bool
-    {
-        return $this->testMode;
     }
 
     /**

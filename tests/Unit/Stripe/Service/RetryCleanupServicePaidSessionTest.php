@@ -71,7 +71,7 @@ final class RetryCleanupServicePaidSessionTest extends TestCase
     public function testAPaidSessionCommitsTheContractInsteadOfCancellingIt(): void
     {
         $contract = $this->pendingContract();
-        $this->contracts->method('findById')->willReturn($contract);
+        $this->contracts->method('findStaleNotFinished')->willReturn([$contract]);
         $this->orders->expects($this->never())->method('deleteNotFinishedOrder');
         $this->commit->expects($this->once())->method('commit')
             ->with($this->callback(function (PaymentConfirmation $c): bool {
@@ -88,29 +88,29 @@ final class RetryCleanupServicePaidSessionTest extends TestCase
             ->willReturn(CommitOutcome::committed('order-1'));
 
         $service = $this->service($this->session('paid'));
-        $cleaned = $service->cleanupPreviousAttempt('ctr-1');
+        $cleaned = $service->cleanupStaleContracts(30);
 
-        self::assertFalse($cleaned, 'nothing was cleaned up: the contract is money, not garbage');
+        self::assertSame(0, $cleaned, 'nothing was cleaned up: the contract is money, not garbage');
         self::assertFalse($contract->getState()->isCancelled());
     }
 
     public function testAUsableUnpaidSessionIsKeptAndTheOrderIsNeverDeleted(): void
     {
-        $this->contracts->method('findById')->willReturn($this->pendingContract());
+        $this->contracts->method('findStaleNotFinished')->willReturn([$this->pendingContract()]);
         $this->orders->expects($this->never())->method('deleteNotFinishedOrder');
         $this->commit->expects($this->never())->method('commit');
 
-        self::assertFalse($this->service($this->session('unpaid'))->cleanupPreviousAttempt('ctr-1'));
+        self::assertSame(0, $this->service($this->session('unpaid'))->cleanupStaleContracts(30));
     }
 
     public function testWithoutAUsableSessionTheAttemptIsRetiredAsBefore(): void
     {
         $contract = $this->pendingContract();
-        $this->contracts->method('findById')->willReturn($contract);
+        $this->contracts->method('findStaleNotFinished')->willReturn([$contract]);
         $this->orders->expects($this->once())->method('deleteNotFinishedOrder')->with('order-1')->willReturn(true);
         $this->commit->expects($this->never())->method('commit');
 
-        self::assertTrue($this->service(null)->cleanupPreviousAttempt('ctr-1'));
+        self::assertSame(1, $this->service(null)->cleanupStaleContracts(30));
         self::assertTrue($contract->getState()->isCancelled());
     }
 

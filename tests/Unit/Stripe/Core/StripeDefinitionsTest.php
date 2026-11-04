@@ -127,8 +127,4 @@ class StripeDefinitionsTest extends TestCase
         $this->assertSame('completed', StripeDefinitions::TRANSACTION_STATUS_COMPLETED);
     }
 
-    public function testDefaultCurrencyConstantHasCorrectValue(): void
-    {
-        $this->assertSame('EUR', StripeDefinitions::DEFAULT_CURRENCY);
-    }
 }

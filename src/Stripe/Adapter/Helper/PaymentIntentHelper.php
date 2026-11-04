@@ -16,7 +16,6 @@ use OxidEsales\PaymentBase\Adapter\Request\AuthorizePaymentRequest;
 use OxidEsales\PaymentBase\Adapter\Response\PaymentResponse;
 use OxidEsales\PaymentBase\Adapter\Response\CaptureResponse;
 use OxidEsales\PaymentBase\Adapter\Response\PaymentDetailsResponse;
-use OxidEsales\PaymentBase\Adapter\Response\AuthorizationResponse;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
@@ -125,40 +124,6 @@ class PaymentIntentHelper
                 createdAt: new DateTimeImmutable('@' . $paymentIntent->created),
                 capturedAt: $capturedAt,
                 providerData: $providerData
-            );
-        } catch (ApiErrorException $e) {
-            throw StripeExceptionConverter::convert($e);
-        }
-    }
-
-    public function authorizePayment(StripeClient $client, AuthorizePaymentRequest $request): AuthorizationResponse
-    {
-        try {
-            $amountInCents = AmountConverter::toMinorUnits($request->amount, $request->currency);
-
-            $params = $this->buildPaymentIntentParams($amountInCents, $request->currency, StripeDefinitions::CAPTURE_MODE_MANUAL, $request);
-
-            /** @phpstan-ignore argument.type (dynamic params built by buildPaymentIntentParams) */
-            $paymentIntent = $client->paymentIntents->create($params);
-
-            $expiresAt = new DateTimeImmutable('+7 days');
-
-            /** @var array<string, mixed> $providerData */
-            $providerData = $paymentIntent->toArray();
-
-            return new AuthorizationResponse(
-                authorizationId: $paymentIntent->id,
-                providerPaymentId: $paymentIntent->id,
-                status: StripeStatusMapper::toNormalized($paymentIntent->status),
-                amount: $request->amount,
-                currency: $request->currency,
-                authorizedAt: new DateTimeImmutable('@' . $paymentIntent->created),
-                expiresAt: $expiresAt,
-                requiresAction: StripeStatusMapper::requiresAction($paymentIntent->status),
-                clientSecret: $paymentIntent->client_secret,
-                redirectUrl: $paymentIntent->next_action->redirect_to_url->url ?? null,
-                providerData: $providerData,
-                metadata: $request->metadata
             );
         } catch (ApiErrorException $e) {
             throw StripeExceptionConverter::convert($e);

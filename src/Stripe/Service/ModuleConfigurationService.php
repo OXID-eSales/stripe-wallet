@@ -102,16 +102,6 @@ class ModuleConfigurationService extends AbstractModuleConfigurationService impl
     }
 
     /**
-     * Alias for getToken() — kept for backward compatibility.
-     *
-     * @see getToken()
-     */
-    public function getSecretKey(): string
-    {
-        return $this->getToken();
-    }
-
-    /**
      * Get the webhook secret based on current mode (test/live).
      *
      * Per-mode secrets are stored in oxconfig (not module settings) so they do not
