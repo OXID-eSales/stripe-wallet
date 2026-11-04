@@ -136,7 +136,8 @@ final class ManualCaptureIntegrationTest extends TestCase
             $this->requestLogService,
             $this->shopAdapter,
             new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
-            new NullLogger()
+            new NullLogger(),
+            $this->createStub(\OxidEsales\PaymentBase\Service\FileLoggerInterface::class)
         );
 
         // When: Admin triggers capture
@@ -212,7 +213,8 @@ final class ManualCaptureIntegrationTest extends TestCase
             $this->requestLogService,
             $this->shopAdapter,
             new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
-            new NullLogger()
+            new NullLogger(),
+            $this->createStub(\OxidEsales\PaymentBase\Service\FileLoggerInterface::class)
         );
 
         $context = new EventContext([
@@ -264,7 +266,8 @@ final class ManualCaptureIntegrationTest extends TestCase
             $this->requestLogService,
             $this->shopAdapter,
             new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
-            new NullLogger()
+            new NullLogger(),
+            $this->createStub(\OxidEsales\PaymentBase\Service\FileLoggerInterface::class)
         );
 
         $context = new EventContext([

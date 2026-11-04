@@ -80,7 +80,7 @@ class StripeCheckoutSessionHandlerTest extends TestCase
             $this->customerService,
             $this->config,
             new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
-            null,
+            $this->createStub(\OxidEsales\PaymentBase\Service\FileLoggerInterface::class),
             $iframeSettings
         );
     }

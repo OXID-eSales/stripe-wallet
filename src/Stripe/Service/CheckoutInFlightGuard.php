@@ -36,7 +36,7 @@ use Throwable;
 class CheckoutInFlightGuard
 {
     public function __construct(
-        private readonly ?StripeAdapterFactoryInterface $adapterFactory = null,
+        private readonly StripeAdapterFactoryInterface $adapterFactory,
     ) {
     }
 
@@ -93,7 +93,7 @@ class CheckoutInFlightGuard
 
     protected function retrieveSession(string $sessionId): ?StripeCheckoutSessionDto
     {
-        if ($sessionId === '' || $this->adapterFactory === null) {
+        if ($sessionId === '') {
             return null;
         }
 

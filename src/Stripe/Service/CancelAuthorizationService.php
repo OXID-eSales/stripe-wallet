@@ -9,7 +9,6 @@ use DateTimeImmutable;
 use OxidEsales\PaymentBase\Adapter\Response\CancellationResponse;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 
 /**
  * Service for canceling Stripe payment authorizations.
@@ -21,14 +20,11 @@ use Psr\Log\NullLogger;
  */
 class CancelAuthorizationService implements CancelAuthorizationServiceInterface
 {
-    private readonly LoggerInterface $logger;
-
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,
         private readonly ThrowableSummaryInterface $throwableSummary,
-        ?LoggerInterface $logger = null
+        private readonly LoggerInterface $logger,
     ) {
-        $this->logger = $logger ?? new NullLogger();
     }
 
     public function cancelAuthorization(

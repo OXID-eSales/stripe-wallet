@@ -57,11 +57,6 @@ use Stripe\Webhook;
  */
 class StripeAdapter implements StripeAdapterInterface
 {
-    private readonly PaymentIntentHelper $paymentIntentHelper;
-    private readonly RefundHelper $refundHelper;
-    private readonly CheckoutSessionHelper $checkoutSessionHelper;
-    private readonly PaymentMethodHelper $paymentMethodHelper;
-
     /**
      * Sprint 133 · Story 3 (F8): the two helpers that carry duplicate-charge
      * protection are required. They used to default to `new XHelper()`, i.e. an
@@ -71,15 +66,11 @@ class StripeAdapter implements StripeAdapterInterface
      */
     public function __construct(
         private readonly StripeClient $stripeClient,
-        PaymentIntentHelper $paymentIntentHelper,
-        RefundHelper $refundHelper,
-        ?CheckoutSessionHelper $checkoutSessionHelper = null,
-        ?PaymentMethodHelper $paymentMethodHelper = null
+        private readonly PaymentIntentHelper $paymentIntentHelper,
+        private readonly RefundHelper $refundHelper,
+        private readonly CheckoutSessionHelper $checkoutSessionHelper,
+        private readonly PaymentMethodHelper $paymentMethodHelper,
     ) {
-        $this->paymentIntentHelper = $paymentIntentHelper;
-        $this->refundHelper = $refundHelper;
-        $this->checkoutSessionHelper = $checkoutSessionHelper ?? new CheckoutSessionHelper();
-        $this->paymentMethodHelper = $paymentMethodHelper ?? new PaymentMethodHelper();
     }
 
     // ==========================================

@@ -20,8 +20,6 @@ use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
  */
 interface StripeAdapterFactoryInterface
 {
-    public function createDefaultAdapter(): StripeAdapterInterface;
-
     /**
      * Get Stripe adapter with Stripe-specific methods.
      *

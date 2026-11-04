@@ -142,8 +142,11 @@ final class StripePaymentHandlerLanguageTest extends TestCase
             $this->shopAdapter,
             $this->config,
             $this->tokenService,
-            null,
-            $resolver
+            new \Psr\Log\NullLogger(),
+            $resolver,
+            $this->createStub(\OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface::class),
+            $this->createStub(\OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface::class),
+            $this->createStub(\OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard::class)
         ) extends StripePaymentHandler {
             public function __construct(
                 ContractServiceInterface $contractService,
@@ -152,8 +155,11 @@ final class StripePaymentHandlerLanguageTest extends TestCase
                 ShopAdapterInterface $shopAdapter,
                 ModuleConfigurationServiceInterface $config,
                 ContractReturnTokenServiceInterface $tokenService,
-                ?LoggerInterface $logger,
-                LanguageResolverInterface $resolver
+                LoggerInterface $logger,
+                LanguageResolverInterface $resolver,
+                \OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface $iframeSettings,
+                \OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface $adapterFactory,
+                \OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard $inFlightGuard
             ) {
                 parent::__construct(
                     $contractService,
@@ -168,7 +174,10 @@ final class StripePaymentHandlerLanguageTest extends TestCase
             ),
                     new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
                     $logger,
-                    $resolver
+                    $resolver,
+                    $iframeSettings,
+                    $adapterFactory,
+                    $inFlightGuard
                 );
             }
 

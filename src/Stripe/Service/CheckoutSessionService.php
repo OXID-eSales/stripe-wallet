@@ -22,7 +22,6 @@ use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\Result\CheckoutSessionResult;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 
 /**
  * Service for creating Stripe checkout sessions.
@@ -39,18 +38,15 @@ use Psr\Log\NullLogger;
  */
 class CheckoutSessionService implements CheckoutSessionServiceInterface
 {
-    private LoggerInterface $logger;
-
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,
         // OPC-175: each session is stamped with the attempt of its contract.
         private readonly ContractRepositoryInterface $contracts,
         private readonly ThrowableSummaryInterface $throwableSummary,
-        ?LoggerInterface $logger = null,
-        private readonly ?EventDispatcherInterface $eventDispatcher = null,
-        private readonly ?LanguageResolverInterface $languageResolver = null,
+        private readonly LoggerInterface $logger,
+        private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly LanguageResolverInterface $languageResolver,
     ) {
-        $this->logger = $logger ?? new NullLogger();
     }
 
     /**
@@ -108,9 +104,7 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
             ];
 
             // Stripe renders in the session's locale; without one it follows the BROWSER's language.
-            if ($this->languageResolver !== null) {
-                $params['locale'] = StripeLocale::forLanguage($this->languageResolver->getActiveLanguageAbbreviation());
-            }
+            $params['locale'] = StripeLocale::forLanguage($this->languageResolver->getActiveLanguageAbbreviation());
 
             // Stripe Embedded Checkout renders inline in an iframe (ui_mode=embedded).
             // ui_mode/return_url and success_url/cancel_url are mutually exclusive.
@@ -314,11 +308,9 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
             $url .= '&force_sid=' . urlencode($sessionId);
         }
 
-        if ($this->eventDispatcher !== null) {
-            $event = new StripeSuccessUrlBuildEvent($url, $contractId);
-            $this->eventDispatcher->dispatch($event);
-            $url = $event->getUrl();
-        }
+        $event = new StripeSuccessUrlBuildEvent($url, $contractId);
+        $this->eventDispatcher->dispatch($event);
+        $url = $event->getUrl();
 
         return $url;
     }
@@ -328,11 +320,9 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
      */
     public function buildCancelUrl(string $cancelUrl): string
     {
-        if ($this->eventDispatcher !== null) {
-            $event = new StripeCancelUrlBuildEvent($cancelUrl);
-            $this->eventDispatcher->dispatch($event);
-            $cancelUrl = $event->getUrl();
-        }
+        $event = new StripeCancelUrlBuildEvent($cancelUrl);
+        $this->eventDispatcher->dispatch($event);
+        $cancelUrl = $event->getUrl();
 
         return $cancelUrl;
     }

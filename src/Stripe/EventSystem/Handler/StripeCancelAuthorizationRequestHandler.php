@@ -9,14 +9,12 @@ use OxidEsales\Payments\Stripe\Core\ShopId;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\EventSystem\Event\EventContext;
 use OxidEsales\PaymentBase\Adapter\Response\CancellationResponse;
-use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCancelAuthorizationRequestEvent;
 use OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\PaymentIntentResolver;
 use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 use RuntimeException;
 
 /**
@@ -34,20 +32,16 @@ use RuntimeException;
  */
 class StripeCancelAuthorizationRequestHandler extends AbstractStripeRequestHandler
 {
-    private LoggerInterface $logger;
-
     public function __construct(
         private readonly CancelAuthorizationServiceInterface $cancelService,
         private readonly RequestLogServiceInterface $requestLogService,
         private readonly ShopAdapterInterface $shopAdapter,
-        private readonly ContractRepositoryInterface $contractRepository,
         private readonly ThrowableSummaryInterface $throwableSummary,
-        ?LoggerInterface $logger = null,
-        ?FileLoggerInterface $eventLogger = null,
-        private readonly ?PaymentIntentResolver $paymentIntentResolver = null
+        private readonly LoggerInterface $logger,
+        FileLoggerInterface $eventLogger,
+        private readonly PaymentIntentResolver $paymentIntentResolver
     ) {
-        $this->logger = $logger ?? new NullLogger();
-        $this->eventLogger = $eventLogger;
+        parent::__construct($eventLogger);
     }
 
     public static function getHandledEventClass(): string
@@ -109,9 +103,8 @@ class StripeCancelAuthorizationRequestHandler extends AbstractStripeRequestHandl
         StripeCancelAuthorizationRequestEvent $event,
         EventContext $context
     ): ?string {
-        $resolver = $this->paymentIntentResolver ?? new PaymentIntentResolver($this->contractRepository);
         try {
-            return $resolver->resolve($event->getPaymentIntentId(), $event->getContractId());
+            return $this->paymentIntentResolver->resolve($event->getPaymentIntentId(), $event->getContractId());
         } catch (RuntimeException $e) {
             $context->set('error', $e->getMessage());
             $context->set('cancelSuccess', false);

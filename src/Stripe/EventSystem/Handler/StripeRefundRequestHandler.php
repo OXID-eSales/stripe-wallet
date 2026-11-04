@@ -15,7 +15,6 @@ use OxidEsales\Payments\Stripe\Service\PaymentIntentResolver;
 use OxidEsales\Payments\Stripe\Service\RefundServiceInterface;
 use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 use RuntimeException;
 use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use Throwable;
@@ -39,8 +38,6 @@ use Throwable;
  */
 class StripeRefundRequestHandler extends AbstractStripeRequestHandler
 {
-    private LoggerInterface $logger;
-
     public function __construct(
         private readonly RefundServiceInterface $refundService,
         private readonly RequestLogServiceInterface $requestLogService,
@@ -48,11 +45,10 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
         private readonly ProviderRefundLedgerInterface $refundLedger,
         private readonly PaymentIntentResolver $paymentIntentResolver,
         private readonly ThrowableSummaryInterface $throwableSummary,
-        ?LoggerInterface $logger = null,
-        ?FileLoggerInterface $eventLogger = null
+        private readonly LoggerInterface $logger,
+        FileLoggerInterface $eventLogger,
     ) {
-        $this->logger = $logger ?? new NullLogger();
-        $this->eventLogger = $eventLogger;
+        parent::__construct($eventLogger);
     }
 
     public static function getHandledEventClass(): string

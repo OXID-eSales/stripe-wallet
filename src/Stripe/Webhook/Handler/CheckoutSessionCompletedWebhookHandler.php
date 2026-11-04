@@ -28,7 +28,7 @@ use Psr\Log\LoggerInterface;
  *
  * @since Sprint 114.4
  */
-class CheckoutSessionCompletedWebhookHandler extends AbstractStripeWebhookHandler
+class CheckoutSessionCompletedWebhookHandler extends AbstractCommittingStripeWebhookHandler
 {
     private const EVENT_TYPE = 'checkout.session.completed';
 
@@ -39,7 +39,7 @@ class CheckoutSessionCompletedWebhookHandler extends AbstractStripeWebhookHandle
         LoggerInterface $logger,
         // VR-23 T5: money on a contract that can no longer take it goes back to the customer.
         private readonly LateMoneyResolverInterface $lateMoney,
-        ?ContractCommitServiceInterface $contractCommit = null
+        ContractCommitServiceInterface $contractCommit
     ) {
         parent::__construct($parser, $fulfillmentHandler, $contractRepository, $logger, $contractCommit);
     }

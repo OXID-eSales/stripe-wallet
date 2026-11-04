@@ -16,7 +16,6 @@ use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 
 /**
  * STRP-AUTOCAP-REFUND Sprint 06 — Stripe implementation of
@@ -39,7 +38,7 @@ class StripePaymentCaptureStatusQuery implements PaymentCaptureStatusQueryInterf
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,
         private readonly ThrowableSummaryInterface $throwableSummary,
-        private readonly LoggerInterface $logger = new NullLogger(),
+        private readonly LoggerInterface $logger,
     ) {
     }
 

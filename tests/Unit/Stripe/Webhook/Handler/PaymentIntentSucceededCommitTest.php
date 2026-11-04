@@ -119,17 +119,6 @@ final class PaymentIntentSucceededCommitTest extends TestCase
         self::assertStringContainsString('amount_mismatch', (string) $outcome->result->error);
     }
 
-    public function testWithoutACommitServiceTheOldBehaviourStays(): void
-    {
-        $this->contracts->method('findByProviderOrderId')->willReturn($this->pendingContract());
-        $this->fulfillment->method('handlePaymentSucceeded')->willReturn(false);
-
-        $outcome = $this->handler(withCommit: false)->handle($this->event(['id' => 'pi_1', 'amount_received' => 10000, 'currency' => 'eur']));
-
-        self::assertSame('skipped', $outcome->result->action, 'as before: nothing committed, fulfilment skipped');
-        self::assertStringContainsString('COMMITTED', (string) $outcome->result->error);
-    }
-
     /**
      * VR-23 T5: the shop cancelled the contract (stale-order cleanup, admin) and Stripe then reports the payment.
      * The money goes back through payment-base's resolver and Stripe is answered 200.
@@ -158,7 +147,7 @@ final class PaymentIntentSucceededCommitTest extends TestCase
         self::assertSame('ctr-1', $outcome->contractId);
     }
 
-    private function handler(bool $withCommit = true): PaymentIntentSucceededWebhookHandler
+    private function handler(): PaymentIntentSucceededWebhookHandler
     {
         return new PaymentIntentSucceededWebhookHandler(
             new StripeWebhookEventParser(),
@@ -166,7 +155,7 @@ final class PaymentIntentSucceededCommitTest extends TestCase
             $this->contracts,
             new NullLogger(),
             $this->createMock(\OxidEsales\PaymentBase\LateMoney\LateMoneyResolverInterface::class),
-            $withCommit ? $this->commit : null
+            $this->commit
         );
     }
 

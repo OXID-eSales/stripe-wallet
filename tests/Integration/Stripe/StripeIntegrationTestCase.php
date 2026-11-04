@@ -60,7 +60,9 @@ abstract class StripeIntegrationTestCase extends TestCase
         $this->adapter = new StripeAdapter(
             $this->stripeClient,
             new PaymentIntentHelper($idempotencyRepository),
-            new RefundHelper($idempotencyRepository)
+            new RefundHelper($idempotencyRepository),
+            new \OxidEsales\Payments\Stripe\Adapter\Helper\CheckoutSessionHelper(),
+            new \OxidEsales\Payments\Stripe\Adapter\Helper\PaymentMethodHelper()
         );
     }
 

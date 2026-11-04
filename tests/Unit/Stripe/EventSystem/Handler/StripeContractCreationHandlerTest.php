@@ -49,7 +49,8 @@ class StripeContractCreationHandlerTest extends TestCase
             $this->contractService,
             $this->eventDispatcher,
             $this->contractRepository,
-            $this->metadataService
+            $this->metadataService,
+            $this->createStub(\OxidEsales\PaymentBase\Service\FileLoggerInterface::class)
         );
     }
 

@@ -13,7 +13,6 @@ use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\PaymentBase\Service\FileLoggerInterface;
 use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 
 /**
  * Service for logging payment API requests to file.
@@ -25,14 +24,11 @@ use Psr\Log\NullLogger;
  */
 class RequestLogService implements RequestLogServiceInterface
 {
-    private readonly LoggerInterface $fallbackLogger;
-
     public function __construct(
         private readonly FileLoggerInterface $fileLogger,
         private readonly ThrowableSummaryInterface $throwableSummary,
-        ?LoggerInterface $fallbackLogger = null
+        private readonly LoggerInterface $fallbackLogger,
     ) {
-        $this->fallbackLogger = $fallbackLogger ?? new NullLogger();
     }
 
     public function logRequest(

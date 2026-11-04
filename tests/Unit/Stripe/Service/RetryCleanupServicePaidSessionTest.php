@@ -33,7 +33,7 @@ final class ScriptedInFlightGuard extends CheckoutInFlightGuard
 {
     public function __construct(private readonly ?StripeCheckoutSessionDto $session)
     {
-        parent::__construct(null);
+        parent::__construct(new \OxidEsales\Payments\Stripe\Tests\Support\UnreachableStripeAdapterFactory());
     }
 
     protected function retrieveSession(string $sessionId): ?StripeCheckoutSessionDto
@@ -122,7 +122,7 @@ final class RetryCleanupServicePaidSessionTest extends TestCase
             $this->contracts,
             $this->orders,
             new PaidSessionSettler($guard, $this->commit, new NullLogger()),
-            null,
+            new \Psr\Log\NullLogger(),
             $guard
         );
     }

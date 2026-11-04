@@ -55,7 +55,8 @@ final class PaymentIntentSucceededAfterAdminCaptureTest extends TestCase
             $transactions,
             $shop,
             new ContractCaptureRecorder($captureLedger, new NullLogger()),
-            $this->createMock(\OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface::class)
+            $this->createMock(\OxidEsales\PaymentBase\Refund\ProviderRefundLedgerInterface::class),
+            new \Psr\Log\NullLogger()
         );
 
         $handler->handlePaymentSucceeded('pi_capture', 40.0);

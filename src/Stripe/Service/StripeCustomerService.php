@@ -16,7 +16,6 @@ use OxidEsales\PaymentBase\Contract\PaymentCustomer;
 use OxidEsales\PaymentBase\Repository\PaymentCustomerRepositoryInterface;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 
 /**
  * Resolves or creates Stripe Customer objects for OXID users.
@@ -30,16 +29,14 @@ class StripeCustomerService implements StripeCustomerServiceInterface
     /** Stripe's error code for "this object does not exist". */
     private const STRIPE_ERROR_RESOURCE_MISSING = 'resource_missing';
 
-    private LoggerInterface $logger;
 
     public function __construct(
         private readonly PaymentCustomerRepositoryInterface $customerRepository,
         private readonly StripeAdapterFactoryInterface $adapterFactory,
         private readonly CustomerDataSanitizer $sanitizer,
         private readonly ThrowableSummaryInterface $throwableSummary,
-        ?LoggerInterface $logger = null
+        private readonly LoggerInterface $logger,
     ) {
-        $this->logger = $logger ?? new NullLogger();
     }
 
     public function resolveStripeCustomerId(string $userId, string $email, string $name): string

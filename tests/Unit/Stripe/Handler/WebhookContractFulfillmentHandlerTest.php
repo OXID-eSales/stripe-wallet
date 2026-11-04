@@ -67,7 +67,8 @@ class WebhookContractFulfillmentHandlerTest extends TestCase
             $this->transactionRepository,
             $this->shopAdapter,
             new ContractCaptureRecorder($this->createMock(ProviderCaptureLedgerInterface::class), new NullLogger()),
-            $this->refundLedger
+            $this->refundLedger,
+            new \Psr\Log\NullLogger()
         );
     }
 

@@ -27,7 +27,9 @@ use OxidEsales\PaymentBase\Service\FileLoggerInterface;
  */
 abstract class AbstractStripeRequestHandler implements HandlerInterface
 {
-    protected ?FileLoggerInterface $eventLogger = null;
+    public function __construct(protected readonly FileLoggerInterface $eventLogger)
+    {
+    }
 
     /**
      * Log event to file logger for debugging.
@@ -36,8 +38,6 @@ abstract class AbstractStripeRequestHandler implements HandlerInterface
      */
     protected function logEvent(string $message, array $context = []): void
     {
-        if ($this->eventLogger !== null) {
-            $this->eventLogger->log($message, $context);
-        }
+        $this->eventLogger->log($message, $context);
     }
 }

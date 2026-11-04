@@ -36,7 +36,7 @@ class StripeContractCreationHandler extends ContractCreationHandler
         EventDispatcherInterface $eventDispatcher,
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ContractMetadataServiceInterface $metadataService,
-        private readonly ?FileLoggerInterface $eventLogger = null
+        private readonly FileLoggerInterface $eventLogger
     ) {
         parent::__construct($contractService, $eventDispatcher);
     }
@@ -127,8 +127,6 @@ class StripeContractCreationHandler extends ContractCreationHandler
      */
     private function logEvent(string $message, array $context = []): void
     {
-        if ($this->eventLogger !== null) {
-            $this->eventLogger->log($message, $context);
-        }
+        $this->eventLogger->log($message, $context);
     }
 }

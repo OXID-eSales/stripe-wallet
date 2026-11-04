@@ -20,7 +20,7 @@ use PHPUnit\Framework\TestCase;
 final class AbstractStripeRequestHandlerTest extends TestCase
 {
     #[\PHPUnit\Framework\Attributes\Test]
-    public function logEventDelegatesToFileLoggerWhenProvided(): void
+    public function logEventDelegatesToTheFileLogger(): void
     {
         $logger = $this->createMock(FileLoggerInterface::class);
         $logger->expects($this->once())
@@ -30,18 +30,6 @@ final class AbstractStripeRequestHandlerTest extends TestCase
         $handler = new TestableAbstractHandler($logger);
         $handler->exposedLogEvent('test message', ['key' => 'val']);
     }
-
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function logEventIsNoOpWhenNoLoggerProvided(): void
-    {
-        $handler = new TestableAbstractHandler(null);
-        $handler->exposedLogEvent('test message');
-        // Guard: a handler with a real logger DOES log — confirming the null branch is distinct
-        $logger = $this->createMock(FileLoggerInterface::class);
-        $logger->expects($this->once())->method('log');
-        $handlerWithLogger = new TestableAbstractHandler($logger);
-        $handlerWithLogger->exposedLogEvent('test message');
-    }
 }
 
 /**
@@ -50,9 +38,9 @@ final class AbstractStripeRequestHandlerTest extends TestCase
  */
 final class TestableAbstractHandler extends AbstractStripeRequestHandler
 {
-    public function __construct(?FileLoggerInterface $eventLogger)
+    public function __construct(FileLoggerInterface $eventLogger)
     {
-        $this->eventLogger = $eventLogger;
+        parent::__construct($eventLogger);
     }
 
     public function exposedLogEvent(string $message, array $context = []): void

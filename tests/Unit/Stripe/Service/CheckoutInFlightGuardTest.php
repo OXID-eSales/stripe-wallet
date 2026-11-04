@@ -54,7 +54,7 @@ final class TestableCheckoutInFlightGuard extends CheckoutInFlightGuard
         private readonly ?StripeCheckoutSessionDto $session,
         private readonly array|string $basketTotal = [4897, 'EUR'],
     ) {
-        parent::__construct();
+        parent::__construct(new \OxidEsales\Payments\Stripe\Tests\Support\UnreachableStripeAdapterFactory());
     }
 
     protected function retrieveSession(string $sessionId): ?StripeCheckoutSessionDto

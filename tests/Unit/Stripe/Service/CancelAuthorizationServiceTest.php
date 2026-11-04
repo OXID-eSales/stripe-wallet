@@ -48,7 +48,11 @@ class CancelAuthorizationServiceTest extends TestCase
 
     public function testConstructorAcceptsNullLogger(): void
     {
-        $service = new CancelAuthorizationService($this->adapterFactory, new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]), null);
+        $service = new CancelAuthorizationService(
+            $this->adapterFactory,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
+            new \Psr\Log\NullLogger()
+        );
 
         $this->assertInstanceOf(CancelAuthorizationServiceInterface::class, $service);
     }

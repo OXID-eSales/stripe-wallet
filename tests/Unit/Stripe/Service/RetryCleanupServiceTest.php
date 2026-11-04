@@ -27,7 +27,13 @@ class RetryCleanupServiceTest extends TestCase
     {
         $this->contractRepository = $this->createMock(ContractRepositoryInterface::class);
         $this->orderService = $this->createMock(ShopOrderServiceInterface::class);
-        $this->service = new RetryCleanupService($this->contractRepository, $this->orderService, $this->unpaidSessions());
+        $this->service = new RetryCleanupService(
+            $this->contractRepository,
+            $this->orderService,
+            $this->unpaidSessions(),
+            new \Psr\Log\NullLogger(),
+            $this->createMock(\OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard::class)
+        );
     }
 
 
@@ -55,7 +61,13 @@ class RetryCleanupServiceTest extends TestCase
 
         $this->contractRepository->method('findById')->willReturn($contract);
 
-        $service = new RetryCleanupService($this->contractRepository, $this->orderService, $this->unpaidSessions(), $logger);
+        $service = new RetryCleanupService(
+            $this->contractRepository,
+            $this->orderService,
+            $this->unpaidSessions(),
+            $logger,
+            $this->createMock(\OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard::class)
+        );
 
         $this->assertFalse($service->cleanupPreviousAttempt($contract->getId()));
     }
@@ -73,7 +85,13 @@ class RetryCleanupServiceTest extends TestCase
 
         $this->contractRepository->method('findById')->willReturn($contract);
 
-        $service = new RetryCleanupService($this->contractRepository, $this->orderService, $this->unpaidSessions());
+        $service = new RetryCleanupService(
+            $this->contractRepository,
+            $this->orderService,
+            $this->unpaidSessions(),
+            new \Psr\Log\NullLogger(),
+            $this->createMock(\OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard::class)
+        );
 
         $this->assertTrue($service->cleanupPreviousAttempt('c1'));
     }

@@ -17,7 +17,6 @@ use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 use OxidEsales\Payments\Stripe\Service\Return\CheckoutReturnRejection;
 use Psr\Log\LoggerInterface;
-use OxidEsales\Payments\Stripe\Service\OxidLanguageResolver;
 
 /**
  * Helper for controller request/session/config access.
@@ -31,16 +30,13 @@ use OxidEsales\Payments\Stripe\Service\OxidLanguageResolver;
  */
 class ControllerRequestHelper
 {
-    private readonly LanguageResolverInterface $languageResolver;
-
     public function __construct(
         private readonly ReturnAccessGuardInterface $returnGuard,
         // VR-20 R5: Stripe's pre-shared-token validator, asked by the guard for old URLs while its switch is on.
         private readonly TokenServiceInterface $legacyTokens,
         private readonly ModuleConfigurationServiceInterface $moduleConfig,
-        ?LanguageResolverInterface $languageResolver = null
+        private readonly LanguageResolverInterface $languageResolver,
     ) {
-        $this->languageResolver = $languageResolver ?? new OxidLanguageResolver();
     }
 
     // ==========================================

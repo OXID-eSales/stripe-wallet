@@ -28,7 +28,7 @@ class OpcModalSuccessUrlHandler implements HandlerInterface
 {
     public function __construct(
         private readonly OpcModalSessionReader $sessionReader,
-        private readonly ?LoggerInterface $logger = null,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -41,7 +41,7 @@ class OpcModalSuccessUrlHandler implements HandlerInterface
     {
         if (!$event instanceof StripeSuccessUrlBuildEvent) {
             // Sprint 133 (F16): a wiring regression must not be silent.
-            $this->logger?->warning('OpcModalSuccessUrlHandler received an unexpected event type; skipping', [
+            $this->logger->warning('OpcModalSuccessUrlHandler received an unexpected event type; skipping', [
                 'expected' => StripeSuccessUrlBuildEvent::class,
                 'received' => $event::class,
             ]);

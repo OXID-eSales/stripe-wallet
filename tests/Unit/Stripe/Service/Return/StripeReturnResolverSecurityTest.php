@@ -78,7 +78,12 @@ final class StripeReturnResolverSecurityTest extends TestCase
             ->method('validateReturn')
             ->willReturn(new SecurityValidationResult(100, [], true));
 
-        $resolver = new StripeReturnResolver($this->successfulStripeReturn(), $validator);
+        $resolver = new StripeReturnResolver(
+            $this->successfulStripeReturn(),
+            $validator,
+            false,
+            new \Psr\Log\NullLogger()
+        );
 
         $resolver->resolve($this->contract(), $this->context());
     }
@@ -92,7 +97,12 @@ final class StripeReturnResolverSecurityTest extends TestCase
                 $recorded[$key] = $value;
             });
 
-        $resolver = new StripeReturnResolver($this->successfulStripeReturn(), $this->validator(45, false));
+        $resolver = new StripeReturnResolver(
+            $this->successfulStripeReturn(),
+            $this->validator(45, false),
+            false,
+            new \Psr\Log\NullLogger()
+        );
         $resolver->resolve($contract, $this->context());
 
         $this->assertSame(45, $recorded['return_security_score'] ?? null);
@@ -104,7 +114,8 @@ final class StripeReturnResolverSecurityTest extends TestCase
         $resolver = new StripeReturnResolver(
             $this->successfulStripeReturn(),
             $this->validator(10, false),
-            false
+            false,
+            new \Psr\Log\NullLogger()
         );
 
         $resolution = $resolver->resolve($this->contract(), $this->context());
@@ -118,7 +129,8 @@ final class StripeReturnResolverSecurityTest extends TestCase
         $resolver = new StripeReturnResolver(
             $this->successfulStripeReturn(),
             $this->validator(10, false),
-            true
+            true,
+            new \Psr\Log\NullLogger()
         );
 
         $resolution = $resolver->resolve($this->contract(), $this->context());
@@ -131,7 +143,8 @@ final class StripeReturnResolverSecurityTest extends TestCase
         $resolver = new StripeReturnResolver(
             $this->successfulStripeReturn(),
             $this->validator(95, true),
-            true
+            true,
+            new \Psr\Log\NullLogger()
         );
 
         $resolution = $resolver->resolve($this->contract(), $this->context());

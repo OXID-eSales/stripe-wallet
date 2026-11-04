@@ -43,7 +43,7 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
         private readonly ShopAdapterInterface $shopAdapter,
         private readonly ContractCaptureRecorder $captureRecorder,
         private readonly ProviderRefundLedgerInterface $refundLedger,
-        private readonly ?LoggerInterface $logger = null
+        private readonly LoggerInterface $logger
     ) {
     }
 
@@ -189,7 +189,7 @@ class WebhookContractFulfillmentHandler implements WebhookContractFulfillmentHan
         if ($outcome === TerminationOutcome::Committed) {
             // STRP-168: `committed` is not terminal. A late or duplicate expiry for a contract whose payment
             // has already been taken is skipped, never acted on.
-            $this->logger?->info('Ignoring an expiry for a contract whose payment was already taken', [
+            $this->logger->info('Ignoring an expiry for a contract whose payment was already taken', [
                 'contract_id' => $contract->getId(),
                 'state' => $contract->getStateValue(),
             ]);

@@ -33,7 +33,6 @@ use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
 use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
-use OxidEsales\Payments\Stripe\Service\OxidLanguageResolver;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -58,7 +57,6 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
     /** GRAPH-QL / PS1: the render modes a headless client may ask for; `custom` is phase 4 of the epic. */
     private const HEADLESS_UI_MODES = ['hosted', 'embedded'];
 
-    private readonly LanguageResolverInterface $languageResolver;
 
     public function __construct(
         private readonly ContractServiceInterface $contractService,
@@ -70,13 +68,12 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
         // OPC-175: the shared chain that creates the early order.
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly ThrowableSummaryInterface $throwableSummary,
-        private readonly ?LoggerInterface $logger = null,
-        ?LanguageResolverInterface $languageResolver = null,
-        private readonly ?IframeCheckoutSettingsInterface $iframeSettings = null,
-        private readonly ?StripeAdapterFactoryInterface $adapterFactory = null,
-        private readonly ?CheckoutInFlightGuard $inFlightGuard = null
+        private readonly LoggerInterface $logger,
+        private readonly LanguageResolverInterface $languageResolver,
+        private readonly IframeCheckoutSettingsInterface $iframeSettings,
+        private readonly StripeAdapterFactoryInterface $adapterFactory,
+        private readonly CheckoutInFlightGuard $inFlightGuard
     ) {
-        $this->languageResolver = $languageResolver ?? new OxidLanguageResolver();
     }
 
     public function getId(): string
@@ -137,7 +134,7 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
             if (!$sessionResult->isSuccessful()) {
                 // The provider's text may hold session ids and URLs and the result reaches
                 // the GraphQL error and so the shop log: the text stays at debug level.
-                $this->logger?->debug('[StripePaymentHandler] Stripe refused the checkout session', [
+                $this->logger->debug('[StripePaymentHandler] Stripe refused the checkout session', [
                     'contractId' => $contractId,
                     'providerCode' => $sessionResult->getErrorCode(),
                     'providerMessage' => $sessionResult->getErrorMessage(),
@@ -150,7 +147,7 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
             $contract->setProvider(StripeDefinitions::PROVIDER, $sessionResult->getSessionId() ?? '');
             $this->contractRepository->save($contract);
 
-            $this->logger?->info('[StripePaymentHandler] Checkout session created', [
+            $this->logger->info('[StripePaymentHandler] Checkout session created', [
                 'contractId' => $contractId,
                 'sessionId' => $sessionResult->getSessionId(),
                 'state' => $contract->getStateValue(),
@@ -173,11 +170,11 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
             );
         } catch (\Throwable $e) {
             // Exception text can carry provider ids and URLs: class at error level, text at debug.
-            $this->logger?->error('[StripePaymentHandler] processPayment failed', [
+            $this->logger->error('[StripePaymentHandler] processPayment failed', [
                 'contractId' => $contractId,
                 'exception' => $e::class,
             ]);
-            $this->logger?->debug('[StripePaymentHandler] processPayment failure detail', [
+            $this->logger->debug('[StripePaymentHandler] processPayment failure detail', [
                 'contractId' => $contractId,
                 'providerMessage' => $e->getMessage(),
             ]);
@@ -201,17 +198,10 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
      */
     public function confirmPayment(string $transactionId): PaymentHandlerResult
     {
-        if ($this->adapterFactory === null) {
-            return PaymentHandlerResult::error(
-                'Stripe confirmation unavailable: no payment adapter configured',
-                'STRIPE_CONFIRM_UNAVAILABLE'
-            );
-        }
-
         try {
             $details = $this->adapterFactory->getStripeAdapter()->getPaymentDetails($transactionId);
         } catch (\Throwable $e) {
-            $this->logger?->error('[StripePaymentHandler] confirmPayment failed', [
+            $this->logger->error('[StripePaymentHandler] confirmPayment failed', [
                 'transactionId' => $transactionId,
                 'throwable' => $this->throwableSummary->fromThrowable($e),
             ]);
@@ -263,7 +253,7 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
      */
     private function isIframeMode(): bool
     {
-        return $this->iframeSettings?->isEnabled() ?? false;
+        return $this->iframeSettings->isEnabled();
     }
 
     private function createContract(PaymentContextInterface $context, bool $headless): PaymentContractInterface
@@ -320,7 +310,7 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
 
         $this->assertEarlyOrderCreated($contract);
 
-        $this->logger?->info('[StripePaymentHandler] Early order created, contract in PENDING', [
+        $this->logger->info('[StripePaymentHandler] Early order created, contract in PENDING', [
             'contractId' => $contract->getId(),
             'orderId' => $contract->getOrderId(),
             'orderNumber' => $contract->getMetadata('order_number'),
@@ -380,7 +370,7 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
             return null;
         }
 
-        $this->logger?->info('[StripePaymentHandler] Reusing checkout session', [
+        $this->logger->info('[StripePaymentHandler] Reusing checkout session', [
             'contractId' => $contract->getId(),
             'sessionId' => $session->id,
         ]);
@@ -410,7 +400,7 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
 
     protected function checkoutInFlightGuard(): CheckoutInFlightGuard
     {
-        return $this->inFlightGuard ?? new CheckoutInFlightGuard($this->adapterFactory);
+        return $this->inFlightGuard;
     }
 
     private function createCheckoutSession(

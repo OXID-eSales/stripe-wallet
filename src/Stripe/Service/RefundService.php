@@ -19,7 +19,6 @@ use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 
 /**
  * Service for processing Stripe refunds (full and partial).
@@ -31,14 +30,12 @@ class RefundService implements RefundServiceInterface
     /** @var array<string> Valid Stripe refund reasons */
     private const VALID_REASONS = ['duplicate', 'fraudulent', 'requested_by_customer'];
 
-    private LoggerInterface $logger;
 
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,
         private readonly ThrowableSummaryInterface $throwableSummary,
-        ?LoggerInterface $logger = null
+        private readonly LoggerInterface $logger,
     ) {
-        $this->logger = $logger ?? new NullLogger();
     }
 
     public function processRefund(

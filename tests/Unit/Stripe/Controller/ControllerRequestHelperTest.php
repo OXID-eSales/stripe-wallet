@@ -110,14 +110,15 @@ final class ControllerRequestHelperTest extends TestCase
 
     private function helperInSession(string $sessionId): ControllerRequestHelper
     {
-        return new class ($this->returnGuard, $this->tokenService, $this->moduleConfig, $sessionId) extends ControllerRequestHelper {
+        return new class ($this->returnGuard, $this->tokenService, $this->moduleConfig, $this->languageResolver, $sessionId) extends ControllerRequestHelper {
             public function __construct(
                 ReturnAccessGuardInterface $returnGuard,
                 TokenServiceInterface $legacyTokens,
                 ModuleConfigurationServiceInterface $moduleConfig,
+                LanguageResolverInterface $languageResolver,
                 private readonly string $testSessionId
             ) {
-                parent::__construct($returnGuard, $legacyTokens, $moduleConfig);
+                parent::__construct($returnGuard, $legacyTokens, $moduleConfig, $languageResolver);
             }
 
             public function getSessionId(): string
@@ -134,7 +135,7 @@ final class ControllerRequestHelperTest extends TestCase
     public function testClearStripeSessionVariablesCallsDeleteForAllKeys(): void
     {
         $deletedKeys = [];
-        $helper = new class ($this->returnGuard, $this->tokenService, $this->moduleConfig, $deletedKeys) extends ControllerRequestHelper {
+        $helper = new class ($this->returnGuard, $this->tokenService, $this->moduleConfig, $this->languageResolver, $deletedKeys) extends ControllerRequestHelper {
             /** @var string[] */
             private array $deleted;
 
@@ -145,9 +146,10 @@ final class ControllerRequestHelperTest extends TestCase
                 ReturnAccessGuardInterface $returnGuard,
                 TokenServiceInterface $tokenService,
                 ModuleConfigurationServiceInterface $moduleConfig,
+                LanguageResolverInterface $languageResolver,
                 array &$deletedKeys
             ) {
-                parent::__construct($returnGuard, $tokenService, $moduleConfig);
+                parent::__construct($returnGuard, $tokenService, $moduleConfig, $languageResolver);
                 $this->deleted = &$deletedKeys;
             }
 

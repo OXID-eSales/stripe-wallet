@@ -15,7 +15,6 @@ use OxidEsales\Payments\Stripe\EventSystem\Event\StripeCaptureRequestEvent;
 use OxidEsales\Payments\Stripe\Service\CaptureServiceInterface;
 use OxidEsales\PaymentBase\Service\RequestLogServiceInterface;
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 use RuntimeException;
 use Throwable;
 
@@ -37,19 +36,16 @@ use Throwable;
  */
 class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
 {
-    private LoggerInterface $logger;
-
     public function __construct(
         private readonly CaptureServiceInterface $captureService,
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly RequestLogServiceInterface $requestLogService,
         private readonly ShopAdapterInterface $shopAdapter,
         private readonly ThrowableSummaryInterface $throwableSummary,
-        ?LoggerInterface $logger = null,
-        ?FileLoggerInterface $eventLogger = null,
+        private readonly LoggerInterface $logger,
+        FileLoggerInterface $eventLogger,
     ) {
-        $this->logger = $logger ?? new NullLogger();
-        $this->eventLogger = $eventLogger;
+        parent::__construct($eventLogger);
     }
 
     public static function getHandledEventClass(): string

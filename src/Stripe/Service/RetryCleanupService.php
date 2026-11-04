@@ -9,7 +9,6 @@ use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard;
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 
 /**
  * Handles cleanup of previous checkout attempts on retry.
@@ -21,17 +20,14 @@ use Psr\Log\NullLogger;
  */
 class RetryCleanupService
 {
-    private readonly LoggerInterface $logger;
-
     public function __construct(
         private readonly ContractRepositoryInterface $contractRepository,
         private readonly ShopOrderServiceInterface $orderService,
         // GRAPH-QL / PS3, OPC-175: a session Stripe reports as paid is committed, not cancelled.
         private readonly PaidSessionSettler $paidSessions,
-        ?LoggerInterface $logger = null,
-        private readonly ?CheckoutInFlightGuard $inFlightGuard = null
+        private readonly LoggerInterface $logger,
+        private readonly CheckoutInFlightGuard $inFlightGuard
     ) {
-        $this->logger = $logger ?? new NullLogger();
     }
 
     /**
@@ -124,7 +120,7 @@ class RetryCleanupService
         // checkout. Keep it while it still matches the basket and nobody has
         // paid it; the guard answers null whenever it cannot tell, which leaves
         // the old cancel-always behaviour in place.
-        if ($this->inFlightGuard?->inspect($contract) !== null) {
+        if ($this->inFlightGuard->inspect($contract) !== null) {
             $this->logger->info('Keeping the checkout in flight instead of cancelling it', [
                 'contractId' => $contract->getId(),
             ]);

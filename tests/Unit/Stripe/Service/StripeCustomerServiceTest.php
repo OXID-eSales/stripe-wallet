@@ -48,7 +48,8 @@ class StripeCustomerServiceTest extends TestCase
             $this->customerRepo,
             $this->adapterFactory,
             new \OxidEsales\Payments\Stripe\Service\CustomerDataSanitizer(),
-            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([])
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
+            new \Psr\Log\NullLogger()
         );
     }
 

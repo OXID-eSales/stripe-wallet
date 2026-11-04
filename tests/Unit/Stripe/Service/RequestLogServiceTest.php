@@ -31,7 +31,11 @@ class RequestLogServiceTest extends TestCase
 
     public function testImplementsInterface(): void
     {
-        $service = new RequestLogService($this->fileLogger, new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
+        $service = new RequestLogService(
+            $this->fileLogger,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
+            new \Psr\Log\NullLogger()
+        );
 
         $this->assertInstanceOf(RequestLogServiceInterface::class, $service);
     }
@@ -52,7 +56,11 @@ class RequestLogServiceTest extends TestCase
                 })
             );
 
-        $service = new RequestLogService($this->fileLogger, new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
+        $service = new RequestLogService(
+            $this->fileLogger,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
+            new \Psr\Log\NullLogger()
+        );
 
         // Act & Assert - no exception thrown
         $service->logRequest(
@@ -79,7 +87,11 @@ class RequestLogServiceTest extends TestCase
                 })
             );
 
-        $service = new RequestLogService($this->fileLogger, new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
+        $service = new RequestLogService(
+            $this->fileLogger,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
+            new \Psr\Log\NullLogger()
+        );
         $exception = new \Exception('Test error', 500);
 
         // Act & Assert - no exception thrown
@@ -160,7 +172,11 @@ class RequestLogServiceTest extends TestCase
                 $this->anything()
             );
 
-        $service = new RequestLogService($this->fileLogger, new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
+        $service = new RequestLogService(
+            $this->fileLogger,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
+            new \Psr\Log\NullLogger()
+        );
 
         $service->logRequest(
             action: 'capture',
@@ -180,7 +196,11 @@ class RequestLogServiceTest extends TestCase
                 $capturedContext = $context;
             });
 
-        $service = new RequestLogService($this->fileLogger, new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
+        $service = new RequestLogService(
+            $this->fileLogger,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
+            new \Psr\Log\NullLogger()
+        );
 
         // Test with exception that has code 0 - should default to 500
         $service->logException(
@@ -202,7 +222,11 @@ class RequestLogServiceTest extends TestCase
                 $capturedContext = $context;
             });
 
-        $service = new RequestLogService($this->fileLogger, new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
+        $service = new RequestLogService(
+            $this->fileLogger,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
+            new \Psr\Log\NullLogger()
+        );
 
         $service->logException(
             action: 'test',
@@ -227,7 +251,11 @@ class RequestLogServiceTest extends TestCase
                 })
             );
 
-        $service = new RequestLogService($this->fileLogger, new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
+        $service = new RequestLogService(
+            $this->fileLogger,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
+            new \Psr\Log\NullLogger()
+        );
 
         $service->logRequest(
             action: 'refund',
@@ -254,7 +282,11 @@ class RequestLogServiceTest extends TestCase
                 $capturedContext = $context;
             });
 
-        $service = new RequestLogService($this->fileLogger, new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
+        $service = new RequestLogService(
+            $this->fileLogger,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
+            new \Psr\Log\NullLogger()
+        );
 
         $service->logException(
             action: 'cancel_authorization',
@@ -280,7 +312,11 @@ class RequestLogServiceTest extends TestCase
                 $capturedContext = $context;
             });
 
-        $service = new RequestLogService($this->fileLogger, new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
+        $service = new RequestLogService(
+            $this->fileLogger,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
+            new \Psr\Log\NullLogger()
+        );
 
         $service->logRequest(
             action: 'test',
@@ -303,7 +339,11 @@ class RequestLogServiceTest extends TestCase
                 $capturedContext = $context;
             });
 
-        $service = new RequestLogService($this->fileLogger, new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]));
+        $service = new RequestLogService(
+            $this->fileLogger,
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
+            new \Psr\Log\NullLogger()
+        );
 
         $service->logException(
             action: 'test',

@@ -24,7 +24,10 @@ final class StripeClientConfigProviderTest extends TestCase
         $config = $this->createMock(ModuleConfigurationServiceInterface::class);
         $config->method('getPublishableKey')->willReturn($configuredKey);
 
-        return new StripeClientConfigProvider(new PublishableKeyProvider($config));
+        return new StripeClientConfigProvider(new PublishableKeyProvider(
+            $config,
+            new \Psr\Log\NullLogger()
+        ));
     }
 
     public function testIsTheStripeClientConfigProvider(): void

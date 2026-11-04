@@ -10,7 +10,6 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service;
 
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 
 /**
  * Resolves the Stripe publishable key for the frontend, or reports why it cannot.
@@ -29,15 +28,12 @@ use Psr\Log\NullLogger;
  */
 class PublishableKeyProvider
 {
-    private readonly LoggerInterface $logger;
-
     private bool $reported = false;
 
     public function __construct(
         private readonly ModuleConfigurationServiceInterface $config,
-        ?LoggerInterface $logger = null
+        private readonly LoggerInterface $logger,
     ) {
-        $this->logger = $logger ?? new NullLogger();
     }
 
     /**

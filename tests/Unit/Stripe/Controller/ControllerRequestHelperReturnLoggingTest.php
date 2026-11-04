@@ -25,7 +25,12 @@ final class LoggingControllerRequestHelper extends ControllerRequestHelper
         ModuleConfigurationServiceInterface $moduleConfig,
         private readonly LoggerInterface $testLogger,
     ) {
-        parent::__construct($returnGuard, $tokenService, $moduleConfig);
+        parent::__construct(
+            $returnGuard,
+            $tokenService,
+            $moduleConfig,
+            new \OxidEsales\Payments\Stripe\Tests\Support\FixedLanguageResolver()
+        );
     }
 
     protected function logger(): LoggerInterface

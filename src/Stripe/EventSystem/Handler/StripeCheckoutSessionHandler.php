@@ -47,8 +47,8 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         private readonly StripeCustomerServiceInterface $customerService,
         private readonly ModuleConfigurationServiceInterface $config,
         private readonly ThrowableSummaryInterface $throwableSummary,
-        private readonly ?FileLoggerInterface $eventLogger = null,
-        private readonly ?IframeCheckoutSettingsInterface $iframeSettings = null
+        private readonly FileLoggerInterface $eventLogger,
+        private readonly IframeCheckoutSettingsInterface $iframeSettings
     ) {
     }
 
@@ -90,7 +90,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
             'stripeCustomerId' => $stripeCustomerId,
         ]);
 
-        $embedded = $this->iframeSettings?->isEnabled() ?? false;
+        $embedded = $this->iframeSettings->isEnabled();
 
         $result = $this->checkoutSessionService->createSession(
             $params['contractId'],
@@ -268,8 +268,6 @@ class StripeCheckoutSessionHandler implements HandlerInterface
      */
     private function logEvent(string $message, array $context = []): void
     {
-        if ($this->eventLogger !== null) {
-            $this->eventLogger->log($message, $context);
-        }
+        $this->eventLogger->log($message, $context);
     }
 }

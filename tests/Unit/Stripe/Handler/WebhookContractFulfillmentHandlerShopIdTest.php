@@ -70,7 +70,8 @@ class WebhookContractFulfillmentHandlerShopIdTest extends TestCase
             $recordingRepo,
             $shopAdapter,
             new ContractCaptureRecorder($this->createMock(ProviderCaptureLedgerInterface::class), new NullLogger()),
-            $this->createMock(ProviderRefundLedgerInterface::class)
+            $this->createMock(ProviderRefundLedgerInterface::class),
+            new \Psr\Log\NullLogger()
         );
         $handler->handlePaymentFailed('pi_fail_shop7', 'card_declined');
 

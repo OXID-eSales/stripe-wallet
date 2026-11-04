@@ -33,7 +33,7 @@ use Psr\Log\LoggerInterface;
  *
  * GRAPH-QL / PS6 follow-up.
  */
-class PaymentIntentAmountCapturableUpdatedWebhookHandler extends AbstractStripeWebhookHandler
+class PaymentIntentAmountCapturableUpdatedWebhookHandler extends AbstractCommittingStripeWebhookHandler
 {
     private const EVENT_TYPE = 'payment_intent.amount_capturable_updated';
     private const REQUIRES_CAPTURE = 'requires_capture';
@@ -45,7 +45,7 @@ class PaymentIntentAmountCapturableUpdatedWebhookHandler extends AbstractStripeW
         LoggerInterface $logger,
         // VR-23 T5: money on a contract that can no longer take it goes back to the customer.
         private readonly LateMoneyResolverInterface $lateMoney,
-        ?ContractCommitServiceInterface $contractCommit = null
+        ContractCommitServiceInterface $contractCommit
     ) {
         parent::__construct($parser, $fulfillmentHandler, $contractRepository, $logger, $contractCommit);
     }

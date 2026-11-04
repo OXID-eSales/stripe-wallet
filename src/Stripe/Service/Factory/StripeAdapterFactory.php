@@ -10,7 +10,9 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\Service\Factory;
 
 use OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface;
+use OxidEsales\Payments\Stripe\Adapter\Helper\CheckoutSessionHelper;
 use OxidEsales\Payments\Stripe\Adapter\Helper\PaymentIntentHelper;
+use OxidEsales\Payments\Stripe\Adapter\Helper\PaymentMethodHelper;
 use OxidEsales\Payments\Stripe\Adapter\Helper\RefundHelper;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapter;
 use OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface;
@@ -37,11 +39,6 @@ class StripeAdapterFactory implements StripeAdapterFactoryInterface
     ) {
     }
 
-    public function createDefaultAdapter(): StripeAdapterInterface
-    {
-        return $this->createStripeAdapter();
-    }
-
     /**
      * Creates the Stripe adapter instance.
      *
@@ -62,7 +59,13 @@ class StripeAdapterFactory implements StripeAdapterFactoryInterface
         $paymentIntentHelper = new PaymentIntentHelper($this->idempotencyRepository);
         $refundHelper = new RefundHelper($this->idempotencyRepository);
 
-        return new StripeAdapter($stripeClient, $paymentIntentHelper, $refundHelper);
+        return new StripeAdapter(
+            $stripeClient,
+            $paymentIntentHelper,
+            $refundHelper,
+            new CheckoutSessionHelper(),
+            new PaymentMethodHelper()
+        );
     }
 
     /**

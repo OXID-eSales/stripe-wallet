@@ -100,7 +100,9 @@ final class RefundFlowIntegrationTest extends IntegrationTestCase
             $shop,
             $ledger,
             new PaymentIntentResolver($this->contracts),
-            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([])
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
+            new \Psr\Log\NullLogger(),
+            $this->createStub(\OxidEsales\PaymentBase\Service\FileLoggerInterface::class)
         );
         $this->webhook = new ChargeRefundedWebhookHandler(
             new StripeWebhookEventParser(),
@@ -111,7 +113,8 @@ final class RefundFlowIntegrationTest extends IntegrationTestCase
                 $transactions,
                 $shop,
                 new ContractCaptureRecorder($this->createMock(ProviderCaptureLedgerInterface::class), new NullLogger()),
-                $ledger
+                $ledger,
+                new \Psr\Log\NullLogger()
             ),
             $this->contracts,
             new NullLogger(),

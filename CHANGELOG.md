@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed (VR-25 D3) - required collaborators: no `= null` constructor defaults, no `?? new X()`, no `?->` on injected services
+- **Required now** (were `?X $x = null` with a `?? new` / `?->` fallback or a silent skip): the loggers of `OpcModalCancelUrlHandler`,
+  `OpcModalSuccessUrlHandler`, `StripePaymentHandler`, `CancelAuthorizationService`, `CheckoutSessionService`,
+  `PublishableKeyProvider`, `RefundService`, `RequestLogService` (`$fallbackLogger`), `RetryCleanupService`,
+  `StripeReturnResolver`, `StripeCustomerService`, `WebhookContractFulfillmentHandler`, `StripePaymentCaptureStatusQuery`,
+  the three request handlers; the event file logger of the five event handlers (`AbstractStripeRequestHandler` now owns it
+  through its constructor); `StripePaymentHandler`'s language resolver, iframe settings, adapter factory and in-flight guard;
+  `CheckoutSessionService`'s event dispatcher and language resolver (the success/cancel URL events always fire, the session
+  locale is always sent); `CheckoutInFlightGuard`'s adapter factory; `RetryCleanupService`'s in-flight guard;
+  `StripeCancelAuthorizationRequestHandler`'s `PaymentIntentResolver` (and its unused contract repository is gone);
+  `StripeAdapter`'s checkout-session and payment-method helpers (the factory passes them); `ControllerRequestHelper`'s language
+  resolver; `StripeReturnResolver::$enforceSecurityCheck`.
+- `AbstractStripeWebhookHandler` no longer carries payment-base's commit service: the three handlers that commit an open
+  contract (`PaymentIntentSucceeded`, `CheckoutSessionCompleted`, `PaymentIntentAmountCapturableUpdated`) extend the new
+  `AbstractCommittingStripeWebhookHandler`, where it is required; cancel / fail / expire / refund handlers never needed it.
+- Kept on purpose (allow-listed with a reason in `tests/Unit/Stripe/Smoke/RequiredCollaboratorsTest.php`):
+  `StripePaymentIntentDto::$charge` (a value), the container-lookup seam of `WebhookController` (OXID controller; a missing guard
+  answers 503), and the `@?` GraphQL references in `services.yaml` (the module must load without the GraphQL packages,
+  `AdminApiIsOptionalTest`); `StripeCheckout::$authentication` is `?Authentication` without a default.
+- Removed tests for the old "no collaborator" behaviours (`testWithoutACommitServiceTheOldBehaviourStays`,
+  `testWithoutALanguageResolverNoLocaleIsSent`, `testConfirmPaymentNeverReportsSuccessWithoutQueryingTheProvider`,
+  `logEventIsNoOpWhenNoLoggerProvided`).
+- `StripeAdapterFactory::createDefaultAdapter()` is gone (its only caller was the old reconciliation).
+
 ### Changed (VR D1 / sprint-25 D2) - Stripe uses payment-base's shared pieces instead of its own copies
 - **Deleted** (payment-base has them): `Service/{UserDataValidator, UserDataValidatorInterface, UserFieldReaderInterface,
   OxidUserFieldReader, FieldValidationFailure, ContractLinkedOrderUpdaterInterface, OxidContractLinkedOrderUpdater,

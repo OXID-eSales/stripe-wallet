@@ -29,7 +29,10 @@ final class PublishableKeyProviderTest extends TestCase
 
     public function testReturnsTheConfiguredKey(): void
     {
-        $provider = new PublishableKeyProvider($this->config('pk_live_123'));
+        $provider = new PublishableKeyProvider(
+            $this->config('pk_live_123'),
+            new \Psr\Log\NullLogger()
+        );
 
         $this->assertSame('pk_live_123', $provider->resolve());
         $this->assertTrue($provider->isAvailable());
@@ -37,7 +40,10 @@ final class PublishableKeyProviderTest extends TestCase
 
     public function testReturnsNullRatherThanAnEmptyStringWhenUnconfigured(): void
     {
-        $provider = new PublishableKeyProvider($this->config(''));
+        $provider = new PublishableKeyProvider(
+            $this->config(''),
+            new \Psr\Log\NullLogger()
+        );
 
         $this->assertNull($provider->resolve(), 'An empty key must not be handed to the frontend as a value.');
         $this->assertFalse($provider->isAvailable());

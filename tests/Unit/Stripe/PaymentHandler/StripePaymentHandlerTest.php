@@ -59,8 +59,11 @@ class StripePaymentHandlerTest extends TestCase
                 new \OxidEsales\PaymentBase\EventSystem\EventListenerProvider([])
             ),
             new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
+            logger: new \Psr\Log\NullLogger(),
+            languageResolver: $this->createStub(\OxidEsales\Payments\Stripe\Service\LanguageResolverInterface::class),
             iframeSettings: $iframeSettings,
-            adapterFactory: $adapterFactory
+            adapterFactory: $adapterFactory ?? $this->createStub(\OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface::class),
+            inFlightGuard: $this->createStub(\OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard::class)
         );
     }
 
@@ -283,14 +286,6 @@ class StripePaymentHandlerTest extends TestCase
         $factory->method('getStripeAdapter')->willReturn($adapter);
 
         $result = $this->createHandler(false, $factory)->confirmPayment('pi_boom');
-
-        $this->assertFalse($result->isSuccess());
-    }
-
-    public function testConfirmPaymentNeverReportsSuccessWithoutQueryingTheProvider(): void
-    {
-        // No adapter wired at all: an explicit failure, never a free yes.
-        $result = $this->createHandler()->confirmPayment('pi_whatever');
 
         $this->assertFalse($result->isSuccess());
     }

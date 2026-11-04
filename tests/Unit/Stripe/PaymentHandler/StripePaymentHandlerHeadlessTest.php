@@ -452,11 +452,11 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
             $this->tokenService,
             $this->sharedChain(),
             new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
-            $logger,
+            $logger ?? new \Psr\Log\NullLogger(),
             $language,
             $iframe,
-            null,
-            $this->inFlightGuard,
+            $this->createStub(\OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface::class),
+            $this->inFlightGuard ?? $this->createStub(CheckoutInFlightGuard::class),
         );
     }
 

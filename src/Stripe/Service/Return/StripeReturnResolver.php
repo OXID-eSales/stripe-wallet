@@ -16,7 +16,6 @@ use OxidEsales\PaymentBase\Return\ReturnResolverInterface;
 use OxidEsales\PaymentBase\Service\ReturnSecurityValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\CheckoutReturnServiceInterface;
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 use OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult;
 use Throwable;
 
@@ -36,8 +35,6 @@ use Throwable;
  */
 class StripeReturnResolver implements ReturnResolverInterface
 {
-    private readonly LoggerInterface $logger;
-
     /**
      * @param ReturnSecurityValidatorInterface $securityValidator Scores the returning
      *        session (IP / timing / user-agent). Sprint 133 · Story 5 (F5): this
@@ -52,10 +49,9 @@ class StripeReturnResolver implements ReturnResolverInterface
     public function __construct(
         private readonly CheckoutReturnServiceInterface $checkoutReturnService,
         private readonly ReturnSecurityValidatorInterface $securityValidator,
-        private readonly bool $enforceSecurityCheck = false,
-        ?LoggerInterface $logger = null,
+        private readonly bool $enforceSecurityCheck,
+        private readonly LoggerInterface $logger,
     ) {
-        $this->logger = $logger ?? new NullLogger();
     }
 
     public function resolve(

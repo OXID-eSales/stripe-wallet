@@ -39,7 +39,8 @@ final class PaymentIntentSucceededWebhookHandlerTest extends TestCase
             $this->fulfillmentHandler,
             $this->contractRepository,
             $this->logger,
-            $this->createMock(\OxidEsales\PaymentBase\LateMoney\LateMoneyResolverInterface::class)
+            $this->createMock(\OxidEsales\PaymentBase\LateMoney\LateMoneyResolverInterface::class),
+            $this->createMock(\OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface::class)
         );
     }
 

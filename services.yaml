@@ -767,9 +767,6 @@ services:
       $cancelService: '@OxidEsales\Payments\Stripe\Service\CancelAuthorizationServiceInterface'
       $requestLogService: '@OxidEsales\PaymentBase\Service\RequestLogServiceInterface'
       $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
-      # STRP-AUTOCAP-REFUND Sprint 05: contract fallback for opalreturns
-      # provider-agnostic dispatch (contractId in context, no paymentIntentId).
-      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $logger: '@oxid_esales.monolog.logger'
       $eventLogger: '@stripe.events.file_logger'
       $paymentIntentResolver: '@OxidEsales\Payments\Stripe\Service\PaymentIntentResolver'

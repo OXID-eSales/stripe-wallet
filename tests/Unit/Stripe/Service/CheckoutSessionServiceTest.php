@@ -45,7 +45,9 @@ class CheckoutSessionServiceTest extends TestCase
             $this->adapterFactory,
             $this->contractsWithAttempts(0),
             new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
-            $this->logger
+            $this->logger,
+            new \OxidEsales\PaymentBase\EventSystem\EventDispatcher(new \OxidEsales\PaymentBase\EventSystem\EventListenerProvider([])),
+            $this->createStub(\OxidEsales\Payments\Stripe\Service\LanguageResolverInterface::class)
         );
     }
 
@@ -109,13 +111,10 @@ class CheckoutSessionServiceTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private function sessionParamsFor(?string $language, bool $embedded): array
+    private function sessionParamsFor(string $language, bool $embedded): array
     {
-        $resolver = null;
-        if ($language !== null) {
-            $resolver = $this->createMock(LanguageResolverInterface::class);
-            $resolver->method('getActiveLanguageAbbreviation')->willReturn($language);
-        }
+        $resolver = $this->createMock(LanguageResolverInterface::class);
+        $resolver->method('getActiveLanguageAbbreviation')->willReturn($language);
 
         $captured = [];
         $this->stripeAdapter
@@ -126,7 +125,14 @@ class CheckoutSessionServiceTest extends TestCase
                 return $this->buildSessionDto('cs_test_lang', 'https://checkout.stripe.com/pay/cs_test_lang');
             });
 
-        $service = new CheckoutSessionService($this->adapterFactory, $this->contractsWithAttempts(0), new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]), $this->logger, null, $resolver);
+        $service = new CheckoutSessionService(
+            $this->adapterFactory,
+            $this->contractsWithAttempts(0),
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
+            $this->logger,
+            new \OxidEsales\PaymentBase\EventSystem\EventDispatcher(new \OxidEsales\PaymentBase\EventSystem\EventListenerProvider([])),
+            $resolver
+        );
         $service->createSession(
             'contract_lang',
             $this->createBasketSnapshot(),
@@ -156,11 +162,6 @@ class CheckoutSessionServiceTest extends TestCase
     public function testAnUnsupportedShopLanguageLetsStripeDecide(): void
     {
         $this->assertSame('auto', $this->sessionParamsFor('xx', false)['locale']);
-    }
-
-    public function testWithoutALanguageResolverNoLocaleIsSent(): void
-    {
-        $this->assertArrayNotHasKey('locale', $this->sessionParamsFor(null, false));
     }
 
     // --- createSession Tests ---
@@ -1045,7 +1046,14 @@ class CheckoutSessionServiceTest extends TestCase
         $factory = $this->createMock(\OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface::class);
         $factory->method('getStripeAdapter')->willReturn($adapter);
 
-        (new CheckoutSessionService($factory, $this->contractsWithAttempts(2), new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]), $this->logger))->createSession(
+        (new CheckoutSessionService(
+            $factory,
+            $this->contractsWithAttempts(2),
+            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
+            $this->logger,
+            new \OxidEsales\PaymentBase\EventSystem\EventDispatcher(new \OxidEsales\PaymentBase\EventSystem\EventListenerProvider([])),
+            $this->createStub(\OxidEsales\Payments\Stripe\Service\LanguageResolverInterface::class)
+        ))->createSession(
             'contract_1',
             $this->createBasketSnapshot(),
             'https://shop.example.com/success',

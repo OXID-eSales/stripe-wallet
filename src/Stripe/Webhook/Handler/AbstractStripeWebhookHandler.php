@@ -13,12 +13,8 @@ use Closure;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\LateMoney\LateMoneyResolverInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
-use OxidEsales\PaymentBase\Service\Commit\CommitOutcome;
-use OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface;
-use OxidEsales\PaymentBase\Service\Commit\PaymentConfirmation;
 use OxidEsales\PaymentBase\Webhook\WebhookEvent;
 use OxidEsales\PaymentBase\Webhook\WebhookResult;
-use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventHandlerInterface;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookOutcome;
 use OxidEsales\Payments\Stripe\Webhook\StripeWebhookEventParser;
@@ -35,90 +31,12 @@ use Psr\Log\LoggerInterface;
  */
 abstract class AbstractStripeWebhookHandler implements StripeWebhookEventHandlerInterface
 {
-    /**
-     * GRAPH-QL / PS3: the commit service is optional so a services.yaml that
-     * predates it keeps the old behaviour (commit only from the return leg).
-     */
     public function __construct(
         protected readonly StripeWebhookEventParser $parser,
         protected readonly WebhookContractFulfillmentHandlerInterface $fulfillmentHandler,
         protected readonly ContractRepositoryInterface $contractRepository,
-        protected readonly LoggerInterface $logger,
-        protected readonly ?ContractCommitServiceInterface $contractCommit = null
+        protected readonly LoggerInterface $logger
     ) {
-    }
-
-    /**
-     * GRAPH-QL / PS3 — Stripe says paid for a contract that is still open
-     * (the browser return leg never came, or has not come yet): commit it
-     * through payment-base's ContractCommitService - the same chain the return
-     * leg runs - before the fulfilment below. Answers null when there is
-     * nothing to do (no service, no contract, already settled, committed
-     * now) so the caller continues, or an outcome that ends the handling
-     * (commit refused or left pending: the fulfilment must not run).
-     *
-     * `$requiresCapture` marks a manual-capture authorization (PS6 follow-up):
-     * the contract is committed, the order is created but not marked paid
-     * (payment-base's ContractCommitmentHandler reads it from the context).
-     *
-     * @param array<string, mixed> $extraContext
-     */
-    protected function commitOpenContract(
-        ?PaymentContractInterface $contract,
-        string $authorizationId,
-        string $providerOrderId,
-        ?float $amount,
-        string $currency,
-        array $extraContext = [],
-        bool $requiresCapture = false
-    ): ?StripeWebhookOutcome {
-        if ($this->contractCommit === null || $contract === null) {
-            return null;
-        }
-
-        $state = $contract->getState();
-        if ($state->isCommitted() || $state->isFulfilled() || $state->isTerminal()) {
-            return null;
-        }
-
-        if ($amount === null || $currency === '') {
-            $this->logger->warning('Webhook names a paid contract but no amount; leaving the commit to the return leg', [
-                'contract_id' => $contract->getId(),
-                'authorization_id' => $authorizationId,
-            ]);
-
-            return null;
-        }
-
-        $outcome = $this->contractCommit->commit(new PaymentConfirmation(
-            contractId: (string) $contract->getId(),
-            providerName: StripeDefinitions::PROVIDER,
-            authorizationId: $authorizationId,
-            providerOrderId: $providerOrderId,
-            amount: $amount,
-            currency: $currency,
-            requiresCapture: $requiresCapture,
-            source: 'webhook',
-            extraContext: $extraContext,
-        ));
-
-        $this->logger->info('Webhook commit of an open contract', [
-            'contract_id' => $contract->getId(),
-            'outcome' => $outcome->outcome,
-            'order_id' => $outcome->orderId,
-            'reason' => $outcome->reason,
-        ]);
-
-        if ($outcome->isSettled()) {
-            return null;
-        }
-
-        return StripeWebhookOutcome::of(
-            $outcome->outcome === CommitOutcome::PENDING
-                ? WebhookResult::skipped('Commit pending: another condition is still open')
-                : WebhookResult::failure('commit_refused', 'Commit refused: ' . (string) $outcome->reason),
-            (string) $contract->getId()
-        );
     }
 
     /**

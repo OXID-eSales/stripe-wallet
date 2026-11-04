@@ -45,7 +45,7 @@ final class StripeCheckout
 {
     public function __construct(
         private readonly HeadlessCheckoutServiceInterface $checkout,
-        private readonly ?Authentication $authentication = null,
+        private readonly ?Authentication $authentication,
     ) {
     }
 
