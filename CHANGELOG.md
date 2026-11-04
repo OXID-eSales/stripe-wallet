@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed (VR-25 D5) - god-class splits (behaviour-preserving, public routes and `fnc` names untouched)
+- `Core/WebhookEndpointKeys`: the per-mode webhook endpoint id / secret setting names and the two legacy settings were
+  spelled out three times (`ModuleConfigurationService`, admin `ModuleConfiguration`, `OxidStripeWebhookState`); now one place.
+- `Controller/CheckoutRefusalPayloads`: the 422 (user-data) and 409 (unbuyable items) JSON bodies out of `StripeOrderController`
+  (610 -> 585 lines); the controller keeps the HTTP status and the echo.
+- `PaymentHandler/HeadlessCheckoutContext`: headless flag, UI mode, basket / session id and return URLs of a payment context
+  out of `StripePaymentHandler` (541 -> 500 lines).
+
 ### Changed (VR-18 L1) - `StripeCheckoutFooter` logs failure summaries, not exception messages
 - The two error logs of the widget (allowed-symbols map, publishable-key lookup) carry `throwable` = payment-base's
   `ThrowableSummaryInterface::fromThrowable()` (class alone when the container cannot even give the summary service),

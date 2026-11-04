@@ -95,12 +95,13 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
     {
         // GRAPH-QL / PS1: a headless context (payment-base's HeadlessCheckoutService)
         // has no PHP session and names its render mode up front.
-        $headless = $this->isHeadless($context);
-        if ($headless && !in_array($this->uiModeOf($context), self::HEADLESS_UI_MODES, true)) {
+        $request = new HeadlessCheckoutContext($context);
+        $headless = $request->isHeadless();
+        if ($headless && !in_array($request->uiMode(), self::HEADLESS_UI_MODES, true)) {
             return PaymentHandlerResult::error(
                 sprintf(
                     'Stripe does not support uiMode "%s" yet (supported: %s)',
-                    $this->uiModeOf($context),
+                    $request->uiMode(),
                     implode(', ', self::HEADLESS_UI_MODES)
                 ),
                 'STRIPE_UI_MODE_UNSUPPORTED'
@@ -295,7 +296,8 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
         PaymentContractInterface $contract,
         PaymentContextInterface $context
     ): void {
-        $headless = $this->isHeadless($context);
+        $request = new HeadlessCheckoutContext($context);
+        $headless = $request->isHeadless();
 
         if (!$headless) {
             // The OPC checkout lives in the PHP session: the session basket gets
@@ -328,12 +330,13 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
         PaymentContextInterface $context,
         bool $headless
     ): EventContext {
-        $basketId = $headless ? $this->basketIdOf($context) : null;
+        $request = new HeadlessCheckoutContext($context);
+        $basketId = $headless ? $request->basketId() : null;
         $data = [
             'providerName' => StripeDefinitions::PROVIDER,
             'paymentId' => $context->getPaymentMethodId(),
             'userId' => $contract->getUserId(),
-            'sessionId' => $headless ? $this->headlessSessionId($context, $basketId) : $this->sessionId(),
+            'sessionId' => $headless ? $request->sessionId() : $this->sessionId(),
         ];
 
         if ($basketId !== null) {
@@ -408,13 +411,14 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
         PaymentContextInterface $context
     ): \OxidEsales\Payments\Stripe\Service\Result\CheckoutSessionResult {
         $contractId = $contract->getId() ?? '';
-        $headless = $this->isHeadless($context);
+        $request = new HeadlessCheckoutContext($context);
+        $headless = $request->isHeadless();
 
         $rawOrderNumber = $contract->getMetadata('order_number');
         $orderNumber = is_string($rawOrderNumber) ? $rawOrderNumber : null;
 
         [$successUrl, $cancelUrl] = $headless
-            ? $this->headlessUrls($context)
+            ? $request->returnUrls()
             : $this->shopUrls($contract);
 
         return $this->checkoutSessionService->createSession(
@@ -426,7 +430,7 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
             captureMode: $this->config->getCaptureMode(),
             orderId: $contract->getOrderId(),
             orderNumber: $orderNumber,
-            embedded: $headless ? $this->uiModeOf($context) === 'embedded' : $this->isIframeMode(),
+            embedded: $headless ? $request->isEmbedded() : $this->isIframeMode(),
         );
     }
 
@@ -458,51 +462,6 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
         );
 
         return [$successUrl, $cancelUrl];
-    }
-
-    /**
-     * GRAPH-QL / PS1: the client's URLs, already validated by payment-base's
-     * return-URL policy. Stripe appends the Checkout Session id to the return
-     * URL so the client can hand it to `stripeCheckoutReturn`. Hosted mode uses
-     * success/cancel URLs, embedded mode a single return URL - the same string
-     * serves both. Without a cancel URL the shopper comes back to the return
-     * URL and the client reads the contract state.
-     *
-     * @return array{0: string, 1: string}
-     */
-    private function headlessUrls(PaymentContextInterface $context): array
-    {
-        $returnUrl = (string) $context->getReturnUrl();
-        $successUrl = $returnUrl . (str_contains($returnUrl, '?') ? '&' : '?') . 'session_id={CHECKOUT_SESSION_ID}';
-        $cancelUrl = $context->getCancelUrl();
-
-        return [$successUrl, is_string($cancelUrl) && $cancelUrl !== '' ? $cancelUrl : $returnUrl];
-    }
-
-    private function isHeadless(PaymentContextInterface $context): bool
-    {
-        return $context->getMetadataValue('headless') === true;
-    }
-
-    private function uiModeOf(PaymentContextInterface $context): string
-    {
-        $uiMode = $context->getMetadataValue('uiMode', 'hosted');
-
-        return is_string($uiMode) && $uiMode !== '' ? $uiMode : 'hosted';
-    }
-
-    private function basketIdOf(PaymentContextInterface $context): ?string
-    {
-        $basketId = $context->getMetadataValue('basketId');
-
-        return is_string($basketId) && $basketId !== '' ? $basketId : null;
-    }
-
-    private function headlessSessionId(PaymentContextInterface $context, ?string $basketId): string
-    {
-        $sessionId = $context->getMetadataValue('sessionId');
-
-        return is_string($sessionId) && $sessionId !== '' ? $sessionId : 'headless:' . (string) $basketId;
     }
 
     /**

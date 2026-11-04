@@ -14,6 +14,7 @@ use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Dao\Module
 use OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface;
 use OxidEsales\PaymentBase\Settings\AbstractModuleConfigurationService;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\Payments\Stripe\Core\WebhookEndpointKeys;
 use OxidEsales\Payments\Stripe\Module;
 use Psr\Log\LoggerInterface;
 
@@ -120,12 +121,12 @@ class ModuleConfigurationService extends AbstractModuleConfigurationService impl
      */
     public function getWebhookSecret(): string
     {
-        $modeSpecific = $this->readOxConfigVar($this->getWebhookSecretKey());
+        $modeSpecific = $this->readOxConfigVar(WebhookEndpointKeys::secret($this->getMode()));
         if ($modeSpecific !== '') {
             return $modeSpecific;
         }
 
-        $legacy = $this->get('sStripeWebhookEndpointSecret');
+        $legacy = $this->get(WebhookEndpointKeys::LEGACY_SECRET);
         $legacy = is_string($legacy) ? $legacy : '';
         if ($legacy === '') {
             return '';
@@ -139,13 +140,13 @@ class ModuleConfigurationService extends AbstractModuleConfigurationService impl
         // would retry and give up, and the symptom would not be an error in the
         // shop but orders that silently never become paid. Refuse it loudly
         // instead. Shops that never auto-registered keep working unchanged.
-        if ($this->readOxConfigVar($this->getOtherModeWebhookSecretKey()) !== '') {
+        if ($this->readOxConfigVar(WebhookEndpointKeys::secret(WebhookEndpointKeys::otherMode($this->getMode()))) !== '') {
             $this->logger->error(
                 'Refusing the legacy mode-agnostic webhook secret: the other mode has its own secret, '
                 . 'so this value cannot be trusted for the current mode. Configure the per-mode secret.',
                 [
                     'mode' => $this->getMode(),
-                    'expected_setting' => $this->getWebhookSecretKey(),
+                    'expected_setting' => WebhookEndpointKeys::secret($this->getMode()),
                 ]
             );
 
@@ -153,24 +154,6 @@ class ModuleConfigurationService extends AbstractModuleConfigurationService impl
         }
 
         return $legacy;
-    }
-
-    private function getWebhookSecretKey(): string
-    {
-        return $this->isTestMode()
-            ? 'sStripeWebhookEndpointSecretTest'
-            : 'sStripeWebhookEndpointSecretLive';
-    }
-
-    /**
-     * The per-mode secret key of the mode we are NOT in — used to tell a shop
-     * that has never auto-registered from one that has (Sprint 133, F13).
-     */
-    private function getOtherModeWebhookSecretKey(): string
-    {
-        return $this->isTestMode()
-            ? 'sStripeWebhookEndpointSecretLive'
-            : 'sStripeWebhookEndpointSecretTest';
     }
 
     /**
@@ -202,7 +185,7 @@ class ModuleConfigurationService extends AbstractModuleConfigurationService impl
      */
     public function getWebhookEndpoint(): string
     {
-        $endpoint = $this->get('sStripeWebhookEndpoint');
+        $endpoint = $this->get(WebhookEndpointKeys::LEGACY_URL);
         return is_string($endpoint) ? $endpoint : '';
     }
 

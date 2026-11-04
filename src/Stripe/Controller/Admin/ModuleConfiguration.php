@@ -15,6 +15,7 @@ use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Bridge\ModuleSettingBridgeInterface;
 use OxidEsales\Payments\Stripe\Adapter\Helper\ResponseHeaders;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\Payments\Stripe\Core\WebhookEndpointKeys;
 use OxidEsales\Payments\Stripe\Module;
 use OxidEsales\Payments\Stripe\Service\ConfigurationValidatorInterface;
 use OxidEsales\Payments\Stripe\Service\Exception\WebhookRegistrationException;
@@ -250,7 +251,7 @@ class ModuleConfiguration extends ModuleConfiguration_parent
         }
 
         try {
-            $existingId  = $this->readOxConfigVar($this->endpointIdKey($mode));
+            $existingId  = $this->readOxConfigVar(WebhookEndpointKeys::endpointId($mode));
             $webhookUrl  = $moduleConfig->getWebhookUrl();
             $description = $moduleConfig->getModuleDescription();
             // The shop's own key first (every ordinary account); a Connect webhook on the
@@ -325,11 +326,11 @@ class ModuleConfiguration extends ModuleConfiguration_parent
     private function forgetAllLocalEndpointMetadata(): void
     {
         foreach ([StripeDefinitions::MODE_TEST, StripeDefinitions::MODE_LIVE] as $mode) {
-            $this->saveOxConfigVar($this->endpointIdKey($mode), '');
-            $this->saveOxConfigVar($this->endpointSecretKey($mode), '');
+            $this->saveOxConfigVar(WebhookEndpointKeys::endpointId($mode), '');
+            $this->saveOxConfigVar(WebhookEndpointKeys::secret($mode), '');
         }
-        $this->saveModuleSetting('sStripeWebhookEndpoint', '');
-        $this->saveModuleSetting('sStripeWebhookEndpointSecret', '');
+        $this->saveModuleSetting(WebhookEndpointKeys::LEGACY_URL, '');
+        $this->saveModuleSetting(WebhookEndpointKeys::LEGACY_SECRET, '');
     }
 
     // -------------------------------------------------------------------------
@@ -348,7 +349,7 @@ class ModuleConfiguration extends ModuleConfiguration_parent
     {
         $config     = $this->getModuleConfig();
         $mode       = $config->getMode();
-        $endpointId = $this->readOxConfigVar($this->endpointIdKey($mode));
+        $endpointId = $this->readOxConfigVar(WebhookEndpointKeys::endpointId($mode));
         if ($endpointId !== null) {
             return true;
         }
@@ -386,32 +387,22 @@ class ModuleConfiguration extends ModuleConfiguration_parent
     // Private helpers
     // -------------------------------------------------------------------------
 
-    private function endpointIdKey(string $mode): string
-    {
-        return $mode === 'live' ? 'sStripeWebhookEndpointIdLive' : 'sStripeWebhookEndpointIdTest';
-    }
-
-    private function endpointSecretKey(string $mode): string
-    {
-        return $mode === 'live' ? 'sStripeWebhookEndpointSecretLive' : 'sStripeWebhookEndpointSecretTest';
-    }
-
     private function persistEndpoint(
         string $mode,
         WebhookEndpointRegistrationResult $result,
         string $webhookUrl
     ): void {
         // Per-mode tracking in oxconfig: internal state, never surfaced in the form.
-        $this->saveOxConfigVar($this->endpointIdKey($mode), $result->endpointId);
+        $this->saveOxConfigVar(WebhookEndpointKeys::endpointId($mode), $result->endpointId);
         if ($result->secret !== null) {
-            $this->saveOxConfigVar($this->endpointSecretKey($mode), $result->secret);
+            $this->saveOxConfigVar(WebhookEndpointKeys::secret($mode), $result->secret);
         }
 
         // Legacy single-valued module settings: surfaced in the form, so the admin
         // sees the registered URL + secret immediately on the next reload.
-        $this->saveModuleSetting('sStripeWebhookEndpoint', $webhookUrl);
+        $this->saveModuleSetting(WebhookEndpointKeys::LEGACY_URL, $webhookUrl);
         if ($result->secret !== null) {
-            $this->saveModuleSetting('sStripeWebhookEndpointSecret', $result->secret);
+            $this->saveModuleSetting(WebhookEndpointKeys::LEGACY_SECRET, $result->secret);
         }
     }
 

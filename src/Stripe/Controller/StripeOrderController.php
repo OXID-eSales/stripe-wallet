@@ -545,21 +545,7 @@ class StripeOrderController extends StripeOrderController_parent
     {
         $this->setHttpResponseCode(422);
 
-        $formatter = $this->getUserDataValidationMessageFormatter();
-        $errors    = array_map(
-            fn(FieldValidationFailure $f): array => [
-                'field'       => $f->field,
-                'code'        => $f->code,
-                'char'        => $f->offendingChar,
-                'addressKind' => $f->addressKind,
-                'message'     => $formatter !== null
-                    ? $formatter->format($f->field, $f->code, $f->offendingChar)
-                    : null,
-            ],
-            $failures,
-        );
-
-        echo json_encode(['valid' => false, 'errors' => $errors]);
+        echo json_encode(CheckoutRefusalPayloads::userData($failures, $this->getUserDataValidationMessageFormatter()));
     }
 
     /**
@@ -579,18 +565,7 @@ class StripeOrderController extends StripeOrderController_parent
     {
         $this->setHttpResponseCode(409);
 
-        $translator = $this->getLanguageTranslator();
-        $errors     = array_map(
-            fn(BuyabilityFailure $f): array => [
-                'code'         => 'article_not_buyable',
-                'articleId'    => $f->articleId,
-                'productTitle' => $f->productTitle,
-                'message'      => $translator->translateString($f->reason),
-            ],
-            $failures,
-        );
-
-        echo json_encode(['valid' => false, 'errors' => $errors]);
+        echo json_encode(CheckoutRefusalPayloads::buyability($failures, $this->getLanguageTranslator()));
     }
 
     /**

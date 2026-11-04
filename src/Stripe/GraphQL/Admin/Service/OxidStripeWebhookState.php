@@ -10,7 +10,7 @@ declare(strict_types=1);
 namespace OxidEsales\Payments\Stripe\GraphQL\Admin\Service;
 
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface;
-use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
+use OxidEsales\Payments\Stripe\Core\WebhookEndpointKeys;
 use OxidEsales\Payments\Stripe\Module;
 
 /**
@@ -20,8 +20,6 @@ use OxidEsales\Payments\Stripe\Module;
  */
 final class OxidStripeWebhookState implements StripeWebhookStateInterface
 {
-    private const LEGACY_SECRET_SETTING = 'sStripeWebhookEndpointSecret';
-
     public function __construct(
         private readonly ModuleConfVarsInterface $vars,
         private readonly ModuleSettingServiceInterface $settings,
@@ -30,33 +28,16 @@ final class OxidStripeWebhookState implements StripeWebhookStateInterface
 
     public function endpointId(string $mode): string
     {
-        return $this->vars->read($this->endpointIdName($mode));
+        return $this->vars->read(WebhookEndpointKeys::endpointId($mode));
     }
 
     public function hasSecret(string $mode): bool
     {
-        if ($this->vars->read($this->secretName($mode)) !== '') {
+        if ($this->vars->read(WebhookEndpointKeys::secret($mode)) !== '') {
             return true;
         }
-        $legacy = $this->settings->getString(self::LEGACY_SECRET_SETTING, Module::MODULE_ID)->toString();
+        $legacy = $this->settings->getString(WebhookEndpointKeys::LEGACY_SECRET, Module::MODULE_ID)->toString();
 
-        return $legacy !== '' && $this->vars->read($this->secretName($this->otherMode($mode))) === '';
-    }
-
-    private function endpointIdName(string $mode): string
-    {
-        return $mode === StripeDefinitions::MODE_LIVE ? 'sStripeWebhookEndpointIdLive' : 'sStripeWebhookEndpointIdTest';
-    }
-
-    private function secretName(string $mode): string
-    {
-        return $mode === StripeDefinitions::MODE_LIVE
-            ? 'sStripeWebhookEndpointSecretLive'
-            : 'sStripeWebhookEndpointSecretTest';
-    }
-
-    private function otherMode(string $mode): string
-    {
-        return $mode === StripeDefinitions::MODE_LIVE ? StripeDefinitions::MODE_TEST : StripeDefinitions::MODE_LIVE;
+        return $legacy !== '' && $this->vars->read(WebhookEndpointKeys::secret(WebhookEndpointKeys::otherMode($mode))) === '';
     }
 }
