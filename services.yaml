@@ -1296,6 +1296,12 @@ services:
     tags:
       - { name: 'oe.payment.admin_state_help' }
 
+  # VR-24 H4: the Connect landing page (a classic admin controller, built by OXID) asks payment-base's classic admin
+  # door for the payment CONFIG right. Public alias: the controller fetches it from the container.
+  stripe.admin_channel:
+    alias: OxidEsales\PaymentBase\Admin\ClassicAdminChannel
+    public: true
+
   # Sprint 121 (STRP-129): narrow bounds seam over OrderRefundViewDataProvider.
   OxidEsales\Payments\Stripe\Admin\AdminActionBoundsInterface:
     class: OxidEsales\Payments\Stripe\Admin\StripeAdminActionBounds

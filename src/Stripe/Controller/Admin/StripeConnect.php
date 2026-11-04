@@ -13,6 +13,9 @@ use OxidEsales\Eshop\Application\Controller\Admin\AdminController;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Bridge\ModuleSettingBridgeInterface;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\PaymentBase\GraphQL\Admin\Service\PaymentRightsProvider;
+use OxidEsales\PaymentBase\Payment\AdminAccessDeniedException;
+use OxidEsales\PaymentBase\Payment\AdminChannelInterface;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Module;
 
@@ -22,6 +25,9 @@ use OxidEsales\Payments\Stripe\Module;
  * This controller handles only the post-OAuth landing page: it receives the
  * access_token + publishable_key returned by the Stripe Connect flow and
  * persists them into module settings.
+ *
+ * VR-24 H4 (S-5): the keys are accepted from a POST body only (a GET query lands in access logs and browser
+ * history), only for an admin holding the payment CONFIG right, and only when their prefixes match the mode.
  *
  * Webhook registration (the "Create webhooks" button) lives in
  * ModuleConfiguration because its trigger is a button on the module_config
@@ -33,6 +39,7 @@ class StripeConnect extends AdminController
     protected $_sThisTemplate = '@oe_payments_stripe_wallet/admin/stripe_connect.html.twig';
 
     private ModuleSettingBridgeInterface $moduleSettingService;
+    private AdminChannelInterface $adminChannel;
 
     /**
      * Resolve collaborators once from the DI container.
@@ -52,7 +59,10 @@ class StripeConnect extends AdminController
         /** @var ModuleSettingBridgeInterface $moduleSettings */
         $moduleSettings = $container->get(ModuleSettingBridgeInterface::class);
 
-        $this->initializeCollaborators($moduleSettings);
+        /** @var AdminChannelInterface $adminChannel */
+        $adminChannel = $container->get('stripe.admin_channel');
+
+        $this->initializeCollaborators($moduleSettings, $adminChannel);
     }
 
     /**
@@ -60,9 +70,11 @@ class StripeConnect extends AdminController
      * this directly with mocked collaborators.
      */
     protected function initializeCollaborators(
-        ModuleSettingBridgeInterface $moduleSettingService
+        ModuleSettingBridgeInterface $moduleSettingService,
+        AdminChannelInterface $adminChannel
     ): void {
         $this->moduleSettingService = $moduleSettingService;
+        $this->adminChannel = $adminChannel;
     }
 
     /**
@@ -76,16 +88,7 @@ class StripeConnect extends AdminController
             return false;
         }
 
-        $accessToken    = $this->readRequestString('access_token');
-        $publishableKey = $this->readRequestString('publishable_key');
-        $mode           = $this->readRequestString('shop_param');
-
-        $blSuccess = false;
-
-        if ($this->isValidOnboardingPayload($accessToken, $mode)) {
-            $this->persistCredentials($mode, $accessToken, $publishableKey);
-            $blSuccess = true;
-        }
+        $blSuccess = $this->mayOnboard() && $this->persistPostedCredentials();
 
         $viewData = $this->getViewData();
         $viewData['blIsSuccess']    = $blSuccess;
@@ -93,18 +96,74 @@ class StripeConnect extends AdminController
         $this->setViewData($viewData);
     }
 
-    private function readRequestString(string $parameter): string
+    private function mayOnboard(): bool
     {
-        $value = Registry::getRequest()->getRequestEscapedParameter($parameter);
-        return is_string($value) ? $value : '';
-    }
-
-    private function isValidOnboardingPayload(string $accessToken, string $mode): bool
-    {
-        if ($accessToken === '') {
+        if ($this->requestMethod() !== 'POST') {
             return false;
         }
-        return $mode === StripeDefinitions::MODE_TEST || $mode === StripeDefinitions::MODE_LIVE;
+
+        try {
+            $this->adminChannel->requireRight(PaymentRightsProvider::CONFIG);
+        } catch (AdminAccessDeniedException) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function persistPostedCredentials(): bool
+    {
+        $accessToken    = $this->postedParameter('access_token');
+        $publishableKey = $this->postedParameter('publishable_key');
+        $mode           = $this->postedParameter('shop_param');
+
+        if (!$this->isValidOnboardingPayload($accessToken, $publishableKey, $mode)) {
+            return false;
+        }
+
+        $this->persistCredentials($mode, $accessToken, $publishableKey);
+
+        return true;
+    }
+
+    /**
+     * Protected seam: the HTTP method of the request.
+     */
+    protected function requestMethod(): string
+    {
+        $method = $_SERVER['REQUEST_METHOD'] ?? '';
+
+        return is_string($method) ? strtoupper($method) : '';
+    }
+
+    /**
+     * Protected seam: a field of the POST body. The merged request (GET + POST) is not read, so a key in the
+     * query string is never taken.
+     */
+    protected function postedParameter(string $name): string
+    {
+        $value = $_POST[$name] ?? '';
+
+        return is_string($value) ? trim($value) : '';
+    }
+
+    private function isValidOnboardingPayload(string $accessToken, string $publishableKey, string $mode): bool
+    {
+        if ($mode !== StripeDefinitions::MODE_TEST && $mode !== StripeDefinitions::MODE_LIVE) {
+            return false;
+        }
+
+        return $this->isSecretKeyOfMode($accessToken, $mode)
+            && str_starts_with($publishableKey, 'pk_' . $mode . '_');
+    }
+
+    /**
+     * A secret (`sk_`) or restricted (`rk_`) key of the mode, never a webhook secret or the other mode's key.
+     */
+    private function isSecretKeyOfMode(string $accessToken, string $mode): bool
+    {
+        return str_starts_with($accessToken, 'sk_' . $mode . '_')
+            || str_starts_with($accessToken, 'rk_' . $mode . '_');
     }
 
     private function persistCredentials(string $mode, string $accessToken, string $publishableKey): void

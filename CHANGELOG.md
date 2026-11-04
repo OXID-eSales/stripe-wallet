@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security (VR-24 H4, stripe report S-5) - the Connect onboarding landing takes the keys from a POST body only
+- `StripeConnect::stripeFinishOnBoarding()` reads `access_token` / `publishable_key` / `shop_param` from the POST body
+  (a key in a GET query string is ignored and nothing is saved), asks payment-base's classic admin door for the payment
+  `CONFIG` right (`stripe.admin_channel`, public alias of `ClassicAdminChannel`), and saves only keys whose prefixes
+  match the mode (`sk_`/`rk_` + `test_`/`live_`, `pk_` + the same mode). **The onboarding middleware must submit the
+  redirect as a POST** (auto-submitting form to the `shop_redirect_url`); until it does, onboarding shows the error page
+  and the keys are entered by hand.
+
 ### Changed (VR-24 H5) - `StripeOrderController::render()` has no side effects
 - The `render()` override (clear Stripe session keys + rotate `sess_challenge` on every GET of the order page) is gone.
   The cleanup stays where an attempt ends: `checkoutCancel()` and the payment step (`PaymentController`).
