@@ -15,9 +15,6 @@ use OxidEsales\Payments\Stripe\Core\AmountConverter;
 /**
  * Result object for checkout return validation.
  *
- * Sprint 21: Extract business logic from StripeCheckoutReturnHandler.
- * Sprint 25: Moved from DTO/ to Service/Result/ for consistent organization.
- *
  * Immutable DTO following the Result Object pattern:
  * - Named constructors for success/failure states
  * - Type-safe access to result data
@@ -116,7 +113,7 @@ readonly class CheckoutReturnResult
     /**
      * Get the amount in decimal (e.g., 25.50 for 2550 EUR cents; 1000.0 for 1000 JPY).
      *
-     * Sprint 114.7: uses AmountConverter so zero-decimal currencies are handled correctly.
+     * Uses AmountConverter so zero-decimal currencies are handled correctly.
      */
     public function getAmount(): ?float
     {

@@ -107,8 +107,7 @@ class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
     /**
      * Execute the capture via CaptureService.
      *
-     * Sprint 9: Delegates to CaptureService for capture execution and contract state transition.
-     * Sprint 114.11b (S3): no longer pre-resolves PI ID — service owns state check + PI lookup.
+     * Delegates to CaptureService for capture execution and contract state transition.
      */
     private function executeCapture(
         StripeCaptureRequestEvent $event,
@@ -154,7 +153,7 @@ class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
     /**
      * Handle capture result - set context and log.
      *
-     * Sprint 9: Centralized result handling for both capture modes.
+     * Centralized result handling for both capture modes.
      */
     private function handleCaptureResult(
         CaptureResponse $result,
@@ -224,8 +223,6 @@ class StripeCaptureRequestHandler extends AbstractStripeRequestHandler
 
     /**
      * Log exception to the request log.
-     *
-     * Sprint 8: Now delegates to RequestLogService (Facade pattern).
      */
     private function logExceptionToRequestLog(Throwable $e, StripeCaptureRequestEvent $event): void
     {

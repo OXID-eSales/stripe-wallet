@@ -16,8 +16,7 @@ use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 /**
  * Factory for creating the reconciliation file logger.
  *
- * Sprint 27: Extends AbstractFileLoggerFactory using Template Method Pattern.
- * Sprint 14: Logs to log/stripe/stripe_reconciliation.log for OXPAID reconciliation.
+ * Logs to log/stripe/stripe_reconciliation.log for OXPAID reconciliation.
  * Phase 3: Gated via ModuleConfigurationServiceInterface::isReconciliationLoggingEnabled().
  * Logs to log/stripe/stripe_reconciliation_<date>.log.
  *

@@ -24,7 +24,6 @@ use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
  *
  * Implements StripeAdapterFactoryInterface (payment-base's generic factory is gone, VR A4).
  *
- * Sprint 46: Idempotency moved into helpers; factory injects repository directly.
  * Sprint 133 (F8): the repository is required — a null one silently produced
  * helpers with no duplicate-charge protection.
  *
@@ -70,8 +69,6 @@ class StripeAdapterFactory implements StripeAdapterFactoryInterface
 
     /**
      * Get Stripe adapter with Stripe-specific methods.
-     *
-     * Sprint 19: Use this instead of getStripeClient() to route SDK calls through adapter.
      *
      * @return StripeAdapterInterface
      * @throws \RuntimeException If Stripe API key is not configured

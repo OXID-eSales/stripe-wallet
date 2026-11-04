@@ -13,9 +13,6 @@ use Psr\Log\LoggerInterface;
 /**
  * Service for canceling Stripe payment authorizations.
  *
- * Sprint 11: Extract from StripeCancelAuthorizationRequestHandler.
- * Sprint 26: Changed to use factory for lazy adapter creation (module activation fix).
- *
  * @since 2.0.0
  */
 class CancelAuthorizationService implements CancelAuthorizationServiceInterface

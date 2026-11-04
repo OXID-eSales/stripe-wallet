@@ -16,7 +16,7 @@ namespace OxidEsales\Payments\Stripe\Adapter\Dto;
  * the `latest_charge` expansion (expand: ['latest_charge'] or
  * expand: ['latest_charge.refunds']).
  *
- * Sprint 114.10b: seals the \Stripe\PaymentIntent type inside src/Stripe/Adapter/.
+ * Seals the \Stripe\PaymentIntent type inside src/Stripe/Adapter/.
  *
  * @since 2.0.0
  */

@@ -176,8 +176,6 @@ class Order extends Order_parent
      * $chargeCacheLoaded is required because null is a valid cached value
      * (non-Stripe orders, missing transaction ID). Without the flag, every
      * null result would trigger a re-fetch on the next call.
-     *
-     * Sprint 114.10b: type changed from \Stripe\Charge to StripeChargeDto.
      */
     private ?StripeChargeDto $cachedCharge = null;
     private bool $chargeCacheLoaded = false;
@@ -257,7 +255,7 @@ class Order extends Order_parent
     }
 
     /**
-     * Sprint 104: testability seam — performs the actual Stripe API fetch.
+     * Testability seam — performs the actual Stripe API fetch.
      *
      * Separated from getStripeCharge() so testable subclasses can override
      * this method to inject a fixture charge DTO while the memoisation in

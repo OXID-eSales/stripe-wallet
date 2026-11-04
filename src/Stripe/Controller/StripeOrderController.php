@@ -48,8 +48,6 @@ use OxidEsales\PaymentBase\Validation\User\UserDataValidatorInterface;
  * ALL business logic is in event handlers.
  * Request/session/config access is delegated to ControllerRequestHelper.
  *
- * Sprint 71: Extracted accessor methods to ControllerRequestHelper (PHPMD compliance).
- *
  * @since 2.0.0
  */
 class StripeOrderController extends StripeOrderController_parent

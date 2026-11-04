@@ -18,8 +18,6 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 /**
  * Resolves payment contracts for admin order views.
  *
- * Sprint 46: Extracted from OrderRefund controller to reduce ECC.
- *
  * @since 2.0.0
  */
 class OrderContractResolver

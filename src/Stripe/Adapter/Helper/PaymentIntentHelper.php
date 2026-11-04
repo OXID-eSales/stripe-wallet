@@ -29,9 +29,6 @@ use Stripe\StripeClient;
 /**
  * Helper for PaymentIntent operations.
  *
- * Sprint 46: Extracted from StripeAdapter to reduce ECC.
- * Sprint 46: Idempotency for capturePaymentIntent (moved from IdempotentStripeAdapter).
- *
  * @since 2.0.0
  */
 class PaymentIntentHelper

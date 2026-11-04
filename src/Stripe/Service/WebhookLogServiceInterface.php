@@ -14,7 +14,7 @@ use OxidEsales\PaymentBase\Webhook\WebhookResult;
 /**
  * Interface for webhook logging service.
  *
- * Sprint 16: Centralized webhook logging.
+ * Centralized webhook logging.
  *
  * @since 2.0.0
  */

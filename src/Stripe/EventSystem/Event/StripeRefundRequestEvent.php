@@ -10,11 +10,11 @@ use OxidEsales\PaymentBase\EventSystem\Event\EventInterface;
 /**
  * Event dispatched when a refund is requested from admin panel.
  *
- * This event is emitted by OrderRefund admin controller and handled by
- * StripeRefundRequestHandler which processes the refund via Stripe API.
+ * Payment-base's refund event is translated into this one by StripeEventTranslator; StripeRefundRequestHandler
+ * processes the refund via Stripe API.
  *
  * Multi-channel support: Same event can be emitted from:
- * - Admin backend (OrderRefund controller)
+ * - Admin backend (the Payment tab of the order)
  * - Webhook handler (for Stripe-initiated refunds)
  * - API controller (for external integrations)
  * - MCP handler (for AI assistant integrations)

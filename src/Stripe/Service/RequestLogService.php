@@ -17,10 +17,8 @@ use Psr\Log\LoggerInterface;
 /**
  * Service for logging payment API requests to file.
  *
- * Sprint 27: Implements payment-base RequestLogServiceInterface.
  * Sprint 15: Refactored to use FileLoggerInterface instead of database model.
  * Logs to log/stripe/stripe_requests.log via RequestFileLoggerFactory.
- *
  */
 class RequestLogService implements RequestLogServiceInterface
 {

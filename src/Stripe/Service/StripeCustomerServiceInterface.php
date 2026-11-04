@@ -12,7 +12,7 @@ namespace OxidEsales\Payments\Stripe\Service;
 /**
  * Service for resolving/creating Stripe Customer objects.
  *
- * Sprint 45: Stripe Customer lifecycle.
+ * Stripe Customer lifecycle.
  *
  * @since 2.0.0
  */

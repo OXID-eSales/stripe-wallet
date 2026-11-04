@@ -7,7 +7,7 @@ namespace OxidEsales\Payments\Stripe\Service;
 /**
  * Sanitizes customer data before sending to Stripe API.
  *
- * Sprint 90 (STRP-125): Prevents payment failures from special characters.
+ * Prevents payment failures from special characters.
  *
  * Rules:
  * - Ensures valid UTF-8 (replaces invalid sequences)

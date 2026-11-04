@@ -23,9 +23,6 @@ use OxidEsales\Payments\Stripe\Webhook\ChargeRefund;
 /**
  * Handles webhook events with contract-awareness.
  *
- * Sprint 6: Contract-Aware Webhook Processing
- * Sprint 18: Uses ContractFulfillmentService for DRY fulfillment
- *
  * This handler bridges Stripe webhooks to the contract state machine by:
  * 1. Looking up contract by providerOrderId (payment intent ID)
  * 2. Delegating fulfillment to ContractFulfillmentService

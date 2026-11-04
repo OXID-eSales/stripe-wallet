@@ -16,7 +16,7 @@ namespace OxidEsales\Payments\Stripe\Adapter\Dto;
  * `payment_intent` field of the raw Session (which can be a string ID or an
  * expanded PaymentIntent object). The mapper resolves both forms.
  *
- * Sprint 114.10b: seals the \Stripe\Checkout\Session type inside src/Stripe/Adapter/.
+ * Seals the \Stripe\Checkout\Session type inside src/Stripe/Adapter/.
  *
  * @since 2.0.0
  */

@@ -209,9 +209,6 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
 
     /**
      * Log refund request to request log.
-     *
-     * Sprint 8: Now delegates to RequestLogService (Facade pattern).
-     * Sprint 114.10a (A3): Uses orderId string directly; no longer requires Order object.
      */
     private function logRefundRequest(RefundResponse $result, string $orderId): void
     {
@@ -262,8 +259,6 @@ class StripeRefundRequestHandler extends AbstractStripeRequestHandler
 
     /**
      * Log exception to request log.
-     *
-     * Sprint 8: Now delegates to RequestLogService (Facade pattern).
      */
     private function logExceptionToRequestLog(Throwable $e, StripeRefundRequestEvent $event): void
     {

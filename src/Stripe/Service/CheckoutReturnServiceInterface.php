@@ -14,8 +14,6 @@ use OxidEsales\Payments\Stripe\Service\Result\CheckoutReturnResult;
 /**
  * Service interface for processing Stripe checkout returns.
  *
- * Sprint 21: Extract business logic from StripeCheckoutReturnHandler.
- *
  * @since 2.0.0
  */
 interface CheckoutReturnServiceInterface

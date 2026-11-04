@@ -17,7 +17,6 @@ use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 /**
  * Centralized webhook logging service.
  *
- * Sprint 16: Extracted from WebhookController for SRP compliance.
  * Provides consistent logging format across all webhook operations.
  *
  * @since 2.0.0

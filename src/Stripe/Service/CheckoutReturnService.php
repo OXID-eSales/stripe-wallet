@@ -21,8 +21,6 @@ use Psr\Log\LoggerInterface;
 /**
  * Service for processing Stripe checkout returns.
  *
- * Sprint 21: Extract business logic from StripeCheckoutReturnHandler.
- *
  * SOLID Principles:
  * - SRP: Only handles checkout return validation logic
  * - OCP: Can be extended for different checkout flows

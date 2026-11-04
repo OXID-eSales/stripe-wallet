@@ -17,7 +17,6 @@ use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 /**
  * Handles Stripe API interactions for admin order operations.
  *
- * Sprint 46: Extracted from OrderRefund controller to reduce ECC.
  * Sprint 114.10b: Return types migrated from raw \Stripe\* to StripePaymentIntentDto
  * (A1 boundary fix — seals Stripe SDK types inside src/Stripe/Adapter/).
  *

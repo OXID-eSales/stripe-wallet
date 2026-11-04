@@ -22,7 +22,6 @@ use OxidEsales\Payments\Stripe\Service\StripeOrderApiService;
 /**
  * Provides Stripe API view data for the OrderRefund admin template.
  *
- * Sprint 46: Extracted from OrderRefund to reduce ECC.
  * Sprint 114.10b: Migrated from raw \Stripe\* to StripePaymentIntentDto / StripeChargeDto
  * (A1 boundary fix — seals Stripe SDK types inside src/Stripe/Adapter/).
  *
@@ -87,7 +86,6 @@ class OrderRefundViewDataProvider
      *
      * Sprint 104: derives the Charge DTO from the expanded PI's charge field
      * instead of making a separate API call.
-     * Sprint 114.10b: returns StripeChargeDto instead of \Stripe\Charge.
      */
     public function getLastCharge(Order $order, bool $refresh = false): ?StripeChargeDto
     {
@@ -155,7 +153,7 @@ class OrderRefundViewDataProvider
      * Sprint 103: delegates to the resolver so partial-capture orders where
      * Stripe's auth-release is encoded as a refund are not incorrectly treated
      * as fully-refunded when the customer has not yet been refunded.
-     * Sprint 104: removed refresh=true — render-path reads the cached charge.
+     * Removed refresh=true — render-path reads the cached charge.
      */
     public function isOrderRefundable(Order $order): bool
     {
@@ -181,7 +179,7 @@ class OrderRefundViewDataProvider
      * Sprint 103: delegates to the resolver so partial-capture orders
      * return the correct available-for-refund value — the auth-release
      * encoded by Stripe on partial capture is excluded from the customer total.
-     * Sprint 104: removed refresh=true — render-path reads the cached charge.
+     * Removed refresh=true — render-path reads the cached charge.
      */
     public function getRemainingRefundableRaw(Order $order): float
     {
@@ -222,9 +220,8 @@ class OrderRefundViewDataProvider
      *
      * Covers all actions regardless of origin (admin, Stripe Dashboard, webhook).
      * Uses expanded PaymentIntent to include refunds (Stripe SDK v19+: Charge.refunds removed).
-     * Sprint 104: reads from the shared expanded-PI cache (populated by getPaymentIntent).
-     * Sprint 114.10b: reads StripePaymentIntentDto / StripeChargeDto / StripeRefundDto.
-     * Sprint 114.11b (S4): history assembly delegated to StripeTransactionHistoryBuilder.
+     * Reads from the shared expanded-PI cache (populated by getPaymentIntent).
+     * Reads StripePaymentIntentDto / StripeChargeDto / StripeRefundDto.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -249,13 +246,11 @@ class OrderRefundViewDataProvider
     }
 
     /**
-     * Sprint 104: testability seam — fetches the expanded PaymentIntent DTO.
+     * Testability seam — fetches the expanded PaymentIntent DTO.
      *
      * Separated from getPaymentIntent() so tests can override this single
      * method to count HTTP calls without mocking the final StripeOrderApiService.
      * All render-path reads flow through this one entry point.
-     *
-     * Sprint 114.10b: return type changed from ?PaymentIntent to ?StripePaymentIntentDto.
      */
     protected function fetchExpandedPaymentIntent(Order $order): ?StripePaymentIntentDto
     {

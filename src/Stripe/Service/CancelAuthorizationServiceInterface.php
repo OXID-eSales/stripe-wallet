@@ -9,9 +9,6 @@ use OxidEsales\PaymentBase\Adapter\Response\CancellationResponse;
 /**
  * Service interface for canceling Stripe payment authorizations.
  *
- * Sprint 11: Extract from handler.
- * Sprint 31: Returns CancellationResponse instead of CancellationResult.
- *
  * @since 2.0.0
  */
 interface CancelAuthorizationServiceInterface

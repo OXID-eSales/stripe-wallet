@@ -16,8 +16,6 @@ use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 /**
  * Factory for creating the webhook file logger.
  *
- * Sprint 27: Refactored to extend AbstractFileLoggerFactory using Template Method Pattern.
- * Sprint 16: Logs webhook requests/responses to file.
  * Phase 3: Gated via ModuleConfigurationServiceInterface::isWebhookLoggingEnabled().
  * Logs to log/stripe/stripe_webhooks_<date>.log.
  *

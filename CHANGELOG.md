@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed (VR-25 D6) - comment cleanup, comments and docs only
+- `CLAUDE.md`: source structure, admin panel, events, configuration and test-pattern sections describe what exists (no
+  `LazyStripeAdapter`, `OxidShopAdapter`, `OrderRefund` controller, `Stripe3DSRequiredEvent`, stale counts; payment-base, not
+  `payment-component`, owns the shared pieces).
+- 54 pure sprint-history docblock lines ("Sprint 46: Extracted from ... to reduce ECC", "Sprint 27: Extends ...") removed, 32
+  more lost their "Sprint N:" prefix and keep their content; multi-line comments that carry a reason were left as they were.
+- `services.yaml` adapter-layer header, the event docblocks that named the removed `OrderRefund` controller and
+  `docs/for_developer/README.md`'s directory tree are corrected. `docs/architecture/*` still describes the pre-payment-base
+  adapter classes (`PaymentAdapterInterface`, `LazyStripeAdapter`): to be rewritten, not patched.
+
 ### Changed (VR-25 D5) - god-class splits (behaviour-preserving, public routes and `fnc` names untouched)
 - `Core/WebhookEndpointKeys`: the per-mode webhook endpoint id / secret setting names and the two legacy settings were
   spelled out three times (`ModuleConfigurationService`, admin `ModuleConfiguration`, `OxidStripeWebhookState`); now one place.

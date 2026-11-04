@@ -16,8 +16,6 @@ use Stripe\StripeClient;
 /**
  * Helper for Stripe Checkout Session operations.
  *
- * Sprint 46: Extracted from StripeAdapter to reduce ECC.
- *
  * @since 2.0.0
  */
 class CheckoutSessionHelper

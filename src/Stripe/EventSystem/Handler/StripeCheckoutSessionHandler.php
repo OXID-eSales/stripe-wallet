@@ -24,8 +24,6 @@ use RuntimeException;
 /**
  * Creates Stripe Checkout Session for contract-first payment flow.
  *
- * Sprint 21: Refactored to delegate business logic to CheckoutSessionService.
- *
  * Key differences from Bartek's OrderController::createCheckoutSession():
  * - Uses CONTRACT ID in metadata instead of order ID
  * - No order is created at this point
@@ -175,7 +173,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
     /**
      * Resolve Stripe Customer ID from context user, if feature is enabled.
      *
-     * Sprint 45: Email prefill and saved cards.
+     * Email prefill and saved cards.
      */
     private function resolveCustomerId(EventContext $context): ?string
     {

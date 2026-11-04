@@ -20,7 +20,7 @@ use Psr\Log\LoggerInterface;
 /**
  * Resolves or creates Stripe Customer objects for OXID users.
  *
- * Sprint 45: Stripe Customer lifecycle.
+ * Stripe Customer lifecycle.
  *
  * @since 2.0.0
  */

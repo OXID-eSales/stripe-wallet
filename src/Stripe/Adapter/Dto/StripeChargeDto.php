@@ -15,7 +15,7 @@ namespace OxidEsales\Payments\Stripe\Adapter\Dto;
  * All amount fields carry Stripe minor units (int) — callers convert via AmountConverter.
  * This keeps the DTO currency-agnostic (JPY 1000 = ¥1000; EUR 10000 = €100.00).
  *
- * Sprint 114.10b: seals the \Stripe\Charge type inside src/Stripe/Adapter/.
+ * Seals the \Stripe\Charge type inside src/Stripe/Adapter/.
  *
  * @since 2.0.0
  */

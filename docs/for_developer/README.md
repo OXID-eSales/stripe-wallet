@@ -34,13 +34,13 @@ The **stripe** module never touches the database schema directly. All tables and
 
 ```
 src/Stripe/
-├── Adapter/            # StripeAdapter, OxidShopAdapter, OxidSessionAdapter
-├── Command/            # CLI commands (reconciliation)
+├── Adapter/            # StripeAdapter (+ sub-interfaces, DTOs, helpers); the shop/session adapters are payment-base's
+├── Command/            # CLI commands (backfill, idempotency prune, stale-checkout sweep); OXPAID reconciliation is payment-base's
 ├── Controller/         # Payment, Order, Webhook, Admin controllers
 ├── Core/               # Events (onActivate), ViewConfig, StripeDefinitions
 ├── EventSystem/
-│   ├── Event/          # Stripe-specific events (8 event classes)
-│   └── Handler/        # Stripe event handlers (9 handler classes)
+│   ├── Event/          # Stripe-specific events
+│   └── Handler/        # Stripe event handlers
 ├── Model/              # OXID model extensions (Order, Payment)
 ├── Service/            # Business logic services (checkout, capture, refund)
 ├── Webhook/            # Webhook parsing and processing

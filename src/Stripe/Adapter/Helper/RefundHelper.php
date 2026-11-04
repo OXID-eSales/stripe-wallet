@@ -22,9 +22,6 @@ use Stripe\StripeClient;
 /**
  * Helper for refund and charge operations.
  *
- * Sprint 46: Extracted from StripeAdapter to reduce ECC.
- * Sprint 46: Idempotency for refund operations (moved from IdempotentStripeAdapter).
- *
  * @since 2.0.0
  */
 class RefundHelper

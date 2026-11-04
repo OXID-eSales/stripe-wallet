@@ -20,8 +20,6 @@ use RuntimeException;
 /**
  * Handles cancel authorization requests for Stripe PaymentIntents.
  *
- * Sprint 11: Refactored to delegate to CancelAuthorizationService (SRP).
- *
  * Handler responsibilities (ONLY):
  * 1. Receive event and extract parameters
  * 2. Delegate to CancelAuthorizationService

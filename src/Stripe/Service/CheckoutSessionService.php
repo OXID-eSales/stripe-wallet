@@ -26,8 +26,6 @@ use Psr\Log\LoggerInterface;
 /**
  * Service for creating Stripe checkout sessions.
  *
- * Sprint 21: Extract business logic from StripeCheckoutSessionHandler.
- *
  * SOLID Principles:
  * - SRP: Handles checkout session creation only
  * - OCP: Can be extended for different checkout configurations

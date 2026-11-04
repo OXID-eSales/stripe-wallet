@@ -28,7 +28,6 @@ use Psr\Container\ContainerInterface;
 /**
  * Webhook endpoint controller.
  *
- * Sprint 16: Refactored to use WebhookLogService for logging.
  * Sprint 64d: Added guard chain for rate limiting, payload size, IP allowlist.
  * VR-19 W4: the chain is payment-base's shared one (stripe.webhook.guard_chain).
  * Controller only handles HTTP concerns (SRP).

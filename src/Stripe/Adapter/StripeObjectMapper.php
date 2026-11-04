@@ -30,7 +30,7 @@ use Stripe\Refund;
  * is simpler than a singleton service and removes a DI binding that adds no
  * value — callers inside Adapter/ already depend on the concrete Stripe SDK.
  *
- * Sprint 114.10b: single entry point for the A1 boundary fix.
+ * Single entry point for the A1 boundary fix.
  *
  * @since 2.0.0
  */

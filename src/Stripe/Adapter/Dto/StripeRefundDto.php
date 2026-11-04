@@ -15,7 +15,7 @@ namespace OxidEsales\Payments\Stripe\Adapter\Dto;
  * All amount fields carry Stripe minor units (int) — callers convert via AmountConverter.
  * This keeps the DTO currency-agnostic (JPY, EUR, GBP all store integers here).
  *
- * Sprint 114.10b: seals the \Stripe\Refund type inside src/Stripe/Adapter/.
+ * Seals the \Stripe\Refund type inside src/Stripe/Adapter/.
  *
  * @since 2.0.0
  */

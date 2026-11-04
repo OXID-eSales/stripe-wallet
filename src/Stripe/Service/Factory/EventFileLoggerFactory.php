@@ -16,8 +16,7 @@ use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
 /**
  * Factory for creating the event system file logger.
  *
- * Sprint 27: Extends AbstractFileLoggerFactory using Template Method Pattern.
- * Sprint 25: Logs to log/stripe/stripe_events.log for debugging event handler flow.
+ * Logs to log/stripe/stripe_events.log for debugging event handler flow.
  * Phase 3: Gated via ModuleConfigurationServiceInterface::isEventLoggingEnabled().
  * Logs to log/stripe/stripe_events_<date>.log.
  *

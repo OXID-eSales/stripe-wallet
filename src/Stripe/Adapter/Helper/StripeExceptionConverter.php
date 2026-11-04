@@ -16,7 +16,7 @@ use Stripe\Exception\ApiErrorException;
 /**
  * Converts Stripe SDK exceptions to PaymentAdapterException.
  *
- * Sprint 46: Shared utility for all adapter helpers.
+ * Shared utility for all adapter helpers.
  *
  * @since 2.0.0
  */

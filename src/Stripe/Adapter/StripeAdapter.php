@@ -49,7 +49,6 @@ use Stripe\Webhook;
  * Stripe adapter implementing the payment provider interface.
  *
  * Delegates to focused helper classes for each operation group.
- * Sprint 46: Refactored to reduce ECC from 93 to ~30.
  *
  * Implements StripeAdapterInterface. Each method is a thin delegation to focused helper classes.
  *

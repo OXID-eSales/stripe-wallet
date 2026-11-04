@@ -14,7 +14,7 @@ use OxidEsales\PaymentBase\EventSystem\Event\EventInterface;
  * a previously authorized payment (manual capture mode).
  *
  * Multi-channel support: Same event can be emitted from:
- * - Admin backend (OrderRefund controller capture button)
+ * - Admin backend (the capture form of the order's Payment tab)
  * - Webhook handler (for external capture triggers)
  * - API controller (for external integrations)
  * - Automated process (e.g., order shipped trigger)

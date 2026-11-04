@@ -24,8 +24,6 @@ use Psr\Log\LoggerInterface;
  * Extracts Registry-wrapping accessor methods from StripeOrderController
  * to reduce controller WMC (PHPMD ExcessiveClassComplexity).
  *
- * Sprint 71: All methods were previously protected on StripeOrderController.
- *
  * @since 2.0.0
  */
 class ControllerRequestHelper

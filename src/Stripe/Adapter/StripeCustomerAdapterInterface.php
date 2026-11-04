@@ -14,9 +14,6 @@ use OxidEsales\Payments\Stripe\Adapter\Dto\StripeCustomerDto;
 /**
  * Stripe Customer and connectivity operations.
  *
- * Sprint 46: ISP split from StripeAdapterInterface.
- * Sprint 114.10b: return types flipped to DTOs (A1 boundary fix).
- *
  * @since 2.0.0
  */
 interface StripeCustomerAdapterInterface

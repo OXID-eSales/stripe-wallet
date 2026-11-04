@@ -20,10 +20,6 @@ use Throwable;
 /**
  * Service for capturing Stripe payments.
  *
- * Sprint 9: Extracted from StripeCaptureRequestHandler.
- * Sprint 26: Changed to use factory for lazy adapter creation (module activation fix).
- * Sprint 82: Added ContractFulfillmentService for COMMITTED→FULFILLED transition.
- *
  * - processCapture(): the broker's capture (a return's partial capture): asks Stripe, books the capture through
  *   payment-base's ProviderCaptureLedger by Stripe's charge id, moves the contract's state.
  * - captureAtStripe(): only asks Stripe. The admin's capture (VR-22 A5, {@see \OxidEsales\Payments\Stripe\Admin\StripeMoneyGateway})

@@ -18,8 +18,6 @@ use OxidEsales\Payments\Stripe\Core\AmountConverter;
 /**
  * Extracts typed data from Stripe webhook events.
  *
- * Sprint 46: Extracted from StripeWebhookProcessor to reduce ECC.
- *
  * @since 2.0.0
  */
 class StripeWebhookEventParser

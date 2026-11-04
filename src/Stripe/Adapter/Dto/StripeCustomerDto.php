@@ -12,7 +12,7 @@ namespace OxidEsales\Payments\Stripe\Adapter\Dto;
 /**
  * Neutral value object representing a Stripe Customer at the adapter boundary.
  *
- * Sprint 114.10b: seals the \Stripe\Customer type inside src/Stripe/Adapter/.
+ * Seals the \Stripe\Customer type inside src/Stripe/Adapter/.
  *
  * @since 2.0.0
  */

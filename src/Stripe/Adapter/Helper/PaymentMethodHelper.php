@@ -19,8 +19,6 @@ use Stripe\StripeClient;
 /**
  * Helper for payment method and customer operations.
  *
- * Sprint 46: Extracted from StripeAdapter to reduce ECC.
- *
  * @since 2.0.0
  */
 class PaymentMethodHelper

@@ -23,8 +23,6 @@ interface StripeAdapterFactoryInterface
     /**
      * Get Stripe adapter with Stripe-specific methods.
      *
-     * Sprint 19: Use this instead of getStripeClient() to route SDK calls through adapter.
-     *
      * @return StripeAdapterInterface
      * @throws \RuntimeException If Stripe API key is not configured
      */

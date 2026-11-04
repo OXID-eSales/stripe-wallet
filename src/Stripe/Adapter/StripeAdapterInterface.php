@@ -22,9 +22,6 @@ use OxidEsales\PaymentBase\Adapter\Response\PaymentResponse;
  * details) on top of the Stripe-specific sub-interfaces (Interface Segregation).
  * payment-base no longer defines a provider-agnostic adapter interface (VR A4).
  *
- * Sprint 19: Route Stripe SDK calls through adapter.
- * Sprint 46: ISP split into focused sub-interfaces.
- *
  * @since 1.0.0
  */
 interface StripeAdapterInterface extends

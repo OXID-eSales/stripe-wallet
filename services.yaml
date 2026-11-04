@@ -407,20 +407,12 @@ services:
     public: false
 
   # ===========================================
-  # Payment Adapter Layer (Provider-Agnostic)
+  # Stripe adapter layer
   # ===========================================
   #
-  # This layer provides a provider-agnostic payment integration architecture
-  # that supports multiple payment providers (Stripe, Unzer, PayPal, etc.)
-  # through a unified interface.
-  #
-  # Key Features:
-  # - Provider-agnostic PaymentAdapterInterface
-  # - Request/Response objects (no domain leakage)
-  # - Two-step authorization (authorize → capture)
-  # - Vaulting/tokenization (saved cards)
-  # - 3D Secure/SCA support
-  # - Webhook signature verification
+  # Payment calls to Stripe go through StripeAdapter (StripeAdapterInterface and its sub-interfaces); payment-base
+  # request/response objects and the module's own DTOs (src/Stripe/Adapter/Dto) cross the boundary, the SDK's types do
+  # not. Webhook-endpoint management has its own StripeWebhookEndpointApi.
   #
 
   # Stripe Client Factory - Creates configured Stripe SDK clients

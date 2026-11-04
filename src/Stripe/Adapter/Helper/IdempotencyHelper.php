@@ -15,8 +15,6 @@ use OxidEsales\PaymentBase\Contract\IdempotencyRecord;
 /**
  * Shared idempotency record management.
  *
- * Sprint 46: Extracted from IdempotentStripeAdapter.
- *
  * @since 2.0.0
  */
 class IdempotencyHelper

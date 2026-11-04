@@ -15,9 +15,6 @@ use OxidEsales\Payments\Stripe\Adapter\Dto\StripeRefundDto;
 /**
  * Stripe refund and charge operations.
  *
- * Sprint 46: ISP split from StripeAdapterInterface.
- * Sprint 114.10b: return types flipped to DTOs (A1 boundary fix).
- *
  * @since 2.0.0
  */
 interface StripeRefundAdapterInterface
