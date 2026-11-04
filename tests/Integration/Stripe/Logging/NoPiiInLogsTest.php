@@ -256,6 +256,17 @@ final class NoPiiInLogsTest extends TestCase
             self::assertStringNotContainsString($needle, $log, "{$which} holds '{$needle}'");
         }
     }
+
+    /**
+     * Stripe's `Stripe-Signature` header for this payload (t=…,v1=HMAC-SHA256). Built here: the CI integration run
+     * does not autoload the module's tests/Helper namespace.
+     */
+    private static function stripeSignature(string $payload): string
+    {
+        $timestamp = time();
+
+        return 't=' . $timestamp . ',v1=' . hash_hmac('sha256', $timestamp . '.' . $payload, self::WEBHOOK_SECRET);
+    }
 }
 
 /**
@@ -296,16 +307,5 @@ final class RecordingFileLogger implements FileLoggerInterface
     public function dump(): string
     {
         return implode("\n", $this->lines);
-    }
-
-    /**
-     * Stripe's `Stripe-Signature` header for this payload (t=…,v1=HMAC-SHA256). Built here: the CI integration run
-     * does not autoload the module's tests/Helper namespace.
-     */
-    private static function stripeSignature(string $payload): string
-    {
-        $timestamp = time();
-
-        return 't=' . $timestamp . ',v1=' . hash_hmac('sha256', $timestamp . '.' . $payload, self::WEBHOOK_SECRET);
     }
 }
