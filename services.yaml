@@ -358,9 +358,6 @@ services:
       $returnTokens: '@OxidEsales\PaymentBase\Checkout\Return\ContractReturnTokenServiceInterface'
       # IFRAME-02: provider-agnostic "Use iframe instead of checkout button" flag (payment-base).
       $iframeSettings: '@OxidEsales\PaymentBase\Service\IframeCheckoutSettingsInterface'
-      # Sprint 133 (F6): confirmPayment() asks Stripe for the PaymentIntent state
-      # instead of returning an unconditional success.
-      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
       # One checkout, one Stripe session: hands back the session already in
       # flight instead of preparing another on every OPC processCheckout call.
       $inFlightGuard: '@OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard'

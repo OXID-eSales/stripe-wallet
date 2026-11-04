@@ -9,7 +9,6 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\PaymentHandler;
 
-use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\Payments\Stripe\Core\ShopId;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentBase\Adapter\ContractFirstPaymentHandlerInterface;
@@ -28,7 +27,6 @@ use OxidEsales\PaymentBase\Checkout\Return\ContractReturnTokenServiceInterface;
 use OxidEsales\PaymentBase\Checkout\Return\ReturnAccessGuard;
 use OxidEsales\Payments\Stripe\Controller\ControllerRequestHelper;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
-use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper;
 use OxidEsales\Payments\Stripe\Service\CheckoutSessionServiceInterface;
 use OxidEsales\Payments\Stripe\Service\LanguageResolverInterface;
@@ -67,11 +65,9 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
         private readonly ContractReturnTokenServiceInterface $returnTokens,
         // OPC-175: the shared chain that creates the early order.
         private readonly EventDispatcherInterface $eventDispatcher,
-        private readonly ThrowableSummaryInterface $throwableSummary,
         private readonly LoggerInterface $logger,
         private readonly LanguageResolverInterface $languageResolver,
         private readonly IframeCheckoutSettingsInterface $iframeSettings,
-        private readonly StripeAdapterFactoryInterface $adapterFactory,
         private readonly CheckoutInFlightGuard $inFlightGuard
     ) {
     }
@@ -182,58 +178,6 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
 
             return PaymentHandlerResult::error('Stripe payment processing failed', 'STRIPE_PAYMENT_FAILED');
         }
-    }
-
-    /**
-     * Confirm a payment by asking Stripe what state the PaymentIntent is in.
-     *
-     * Sprint 133 · Story 6 (F6): this returned success() unconditionally, with
-     * no provider call, while PaymentHandlerInterface documents it as "Confirm
-     * payment with provider / Result with confirmation status" — so any caller
-     * written to the interface received a confirmation that was structurally
-     * indistinguishable from a real one. Nothing called it yet, which is the
-     * only reason it was not already an incident.
-     *
-     * Reuses the normalized status mapping that StripePaymentCaptureStatusQuery
-     * already owns rather than deriving a second one.
-     */
-    public function confirmPayment(string $transactionId): PaymentHandlerResult
-    {
-        try {
-            $details = $this->adapterFactory->getStripeAdapter()->getPaymentDetails($transactionId);
-        } catch (\Throwable $e) {
-            $this->logger->error('[StripePaymentHandler] confirmPayment failed', [
-                'transactionId' => $transactionId,
-                'throwable' => $this->throwableSummary->fromThrowable($e),
-            ]);
-
-            return PaymentHandlerResult::error(
-                'Stripe confirmation failed: ' . $e->getMessage(),
-                'STRIPE_CONFIRM_FAILED'
-            );
-        }
-
-        $confirmed = in_array(
-            $details->status,
-            [StripeStatusMapper::STATUS_CAPTURED, StripeStatusMapper::STATUS_AUTHORIZED],
-            true
-        );
-
-        if (!$confirmed) {
-            return PaymentHandlerResult::error(
-                sprintf('Stripe payment not confirmed (status: %s)', $details->status),
-                'STRIPE_NOT_CONFIRMED'
-            );
-        }
-
-        return PaymentHandlerResult::success(
-            contractId: $transactionId,
-            metadata: [
-                'handler' => StripeDefinitions::PROVIDER,
-                'providerStatus' => $details->status,
-                'captured' => $details->status === StripeStatusMapper::STATUS_CAPTURED,
-            ]
-        );
     }
 
     public function getFrontendConfig(): array

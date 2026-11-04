@@ -43,7 +43,7 @@ class StripePaymentHandlerTest extends TestCase
         $this->config->method('isConfigured')->willReturn(true);
     }
 
-    private function createHandler(bool $iframeEnabled = false, ?\OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface $adapterFactory = null): StripePaymentHandler
+    private function createHandler(bool $iframeEnabled = false): StripePaymentHandler
     {
         $iframeSettings = $this->createMock(IframeCheckoutSettingsInterface::class);
         $iframeSettings->method('isEnabled')->willReturn($iframeEnabled);
@@ -58,11 +58,9 @@ class StripePaymentHandlerTest extends TestCase
             new \OxidEsales\PaymentBase\EventSystem\EventDispatcher(
                 new \OxidEsales\PaymentBase\EventSystem\EventListenerProvider([])
             ),
-            new \OxidEsales\PaymentBase\Logging\ThrowableSummary([]),
             logger: new \Psr\Log\NullLogger(),
             languageResolver: $this->createStub(\OxidEsales\Payments\Stripe\Service\LanguageResolverInterface::class),
             iframeSettings: $iframeSettings,
-            adapterFactory: $adapterFactory ?? $this->createStub(\OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface::class),
             inFlightGuard: $this->createStub(\OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard::class)
         );
     }
@@ -136,26 +134,6 @@ class StripePaymentHandlerTest extends TestCase
     }
 
     // ── confirmPayment() ──
-
-    /**
-     * Sprint 133 · Story 6 (F6) — DELIBERATE BEHAVIOUR CHANGE. This asserted
-     * that confirmPayment() reports success for any id without contacting
-     * Stripe, which was the defect: PaymentHandlerInterface documents the method
-     * as "Confirm payment with provider / Result with confirmation status".
-     * Confirmation now requires a provider round-trip; the contract id is still
-     * echoed back, but only on a genuinely confirmed payment.
-     */
-    public function testConfirmPaymentEchoesContractIdOnlyWhenProviderConfirms(): void
-    {
-        $handler = $this->createHandler(false, $this->adapterReturningStatus(
-            \OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper::STATUS_CAPTURED
-        ));
-
-        $result = $handler->confirmPayment('contract_abc');
-
-        $this->assertTrue($result->isSuccess());
-        $this->assertSame('contract_abc', $result->getContractId());
-    }
 
     // ── getFrontendConfig() ──
 
@@ -246,47 +224,4 @@ class StripePaymentHandlerTest extends TestCase
         return $factory;
     }
 
-    public function testConfirmPaymentWhenPaymentIntentCapturedReturnsSuccess(): void
-    {
-        $handler = $this->createHandler(false, $this->adapterReturningStatus(
-            \OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper::STATUS_CAPTURED
-        ));
-
-        $result = $handler->confirmPayment('pi_captured');
-
-        $this->assertTrue($result->isSuccess());
-    }
-
-    public function testConfirmPaymentWhenPaymentIntentAuthorizedReturnsSuccess(): void
-    {
-        $handler = $this->createHandler(false, $this->adapterReturningStatus(
-            \OxidEsales\Payments\Stripe\Adapter\StripeStatusMapper::STATUS_AUTHORIZED
-        ));
-
-        $result = $handler->confirmPayment('pi_authorized');
-
-        $this->assertTrue($result->isSuccess());
-    }
-
-    public function testConfirmPaymentWhenPaymentIntentNotCompletedReturnsFailure(): void
-    {
-        $handler = $this->createHandler(false, $this->adapterReturningStatus('requires_action'));
-
-        $result = $handler->confirmPayment('pi_pending');
-
-        $this->assertFalse($result->isSuccess(), 'An unconfirmed payment must not report success.');
-    }
-
-    public function testConfirmPaymentWhenAdapterThrowsReturnsFailure(): void
-    {
-        $adapter = $this->createMock(\OxidEsales\Payments\Stripe\Adapter\StripeAdapterInterface::class);
-        $adapter->method('getPaymentDetails')->willThrowException(new \RuntimeException('API down'));
-
-        $factory = $this->createMock(\OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface::class);
-        $factory->method('getStripeAdapter')->willReturn($adapter);
-
-        $result = $this->createHandler(false, $factory)->confirmPayment('pi_boom');
-
-        $this->assertFalse($result->isSuccess());
-    }
 }
