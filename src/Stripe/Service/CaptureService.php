@@ -89,22 +89,13 @@ class CaptureService implements CaptureServiceInterface
     }
 
     /**
-     * Resolves the PaymentIntent ID from the contract.
-     * Checks providerOrderId first, then falls back to metadata 'payment_intent_id'.
+     * The PaymentIntent ID is the contract's provider order id, nothing else: a contract without one is not captured.
      */
     private function resolvePaymentIntentId(PaymentContractInterface $contract): ?string
     {
         $providerOrderId = $contract->getProviderOrderId();
-        if (is_string($providerOrderId) && $providerOrderId !== '') {
-            return $providerOrderId;
-        }
 
-        $metadataId = $contract->getMetadata('payment_intent_id');
-        if (is_string($metadataId) && $metadataId !== '') {
-            return $metadataId;
-        }
-
-        return null;
+        return is_string($providerOrderId) && $providerOrderId !== '' ? $providerOrderId : null;
     }
 
     public function captureAtStripe(

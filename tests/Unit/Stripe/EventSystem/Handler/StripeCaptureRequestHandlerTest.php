@@ -229,7 +229,6 @@ class StripeCaptureRequestHandlerTest extends TestCase
         // Contract has no provider order ID, but event has paymentIntentId
         $contract = $this->createContractInState(ContractState::authorized());
         $contract->method('getProviderOrderId')->willReturn(null);
-        $contract->method('getMetadata')->with('payment_intent_id')->willReturn(null);
 
         $this->contractRepository
             ->method('findById')

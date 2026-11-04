@@ -304,6 +304,23 @@ class CaptureServiceTest extends TestCase
         $this->assertStringContainsString('PaymentIntent ID', $result->errorMessage);
     }
 
+    public function testThePaymentIntentIdIsNeverTakenFromContractMetadata(): void
+    {
+        $contract = $this->createMock(PaymentContractInterface::class);
+        $contract->method('getProviderOrderId')->willReturn(null);
+        $contract->method('getMetadata')->with('payment_intent_id')->willReturn('pi_from_metadata');
+        $contract->method('getState')->willReturn(\OxidEsales\PaymentBase\Contract\ContractState::authorized());
+        $contract->method('getAmount')->willReturn(100.0);
+        $contract->method('getCapturedAmount')->willReturn(null);
+
+        $this->adapter->expects($this->never())->method('capturePayment');
+
+        $result = $this->createService()->processCapture($contract, 10.00, []);
+
+        $this->assertFalse($result->isSuccessful());
+        $this->assertStringContainsString('PaymentIntent ID', $result->errorMessage);
+    }
+
     public function testProcessCaptureReturnsFailureWhenEmptyPaymentIntentId(): void
     {
         $contract = $this->createMock(PaymentContractInterface::class);
