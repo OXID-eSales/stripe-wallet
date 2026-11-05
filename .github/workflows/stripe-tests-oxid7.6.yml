@@ -20,7 +20,7 @@ env:
   # (GRAPH-QL / Sprint 15 was developed against b-7.4.x-GRAPH-QL and merged 2026-10-07.)
   PAYMENT_BASE_BRANCH: 'b-7.4.x'
   # payment-base's extra.branch-alias covers dev-b-7.4.x only; a feature
-  # branch needs an explicit alias to satisfy this module's `>=v1.2`
+  # branch needs an explicit alias to satisfy this module's `^v1.7`
   # constraint. Same version the branch alias resolves to, so nothing new to
   # keep in sync. Empty once PAYMENT_BASE_BRANCH is back on 'b-7.4.x'.
   PAYMENT_BASE_VERSION_ALIAS: ''
@@ -30,8 +30,8 @@ env:
   # while composer.json moved to ^1.1 with payment-base v1.1.0 (2026-08-11),
   # which is what broke every b-7.4.x run since.
   # No version alias here on purpose: payment-base declares
-  # extra.branch-alias (dev-b-7.4.x => 1.2.x-dev), so the branch under test
-  # satisfies this module's `>=v1.2` constraint on its own. An explicit
+  # extra.branch-alias (dev-b-7.4.x => 1.7.x-dev), so the branch under test
+  # satisfies this module's `^v1.7` constraint on its own. An explicit
   # `as <version>` would override that alias and go stale on every release.
   # Branch of OXID-eSales/one-page-checkout. Its source is scanned by PHPStan
   # (scanDirectories in tests/PhpStan/phpstan.neon) so the OPC integration

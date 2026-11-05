@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- **Requires payment-base `^v1.7`** (was `>=v1.5`). Everything this module adopted in the VR waves — the refund and
+  capture ledgers, the shared webhook pipeline and guards, the money operation runner, the return-access guard, the
+  late-money resolver, the throwable summary — ships with payment-base 1.7.0. Install payment-base 1.7.0 (or its
+  `b-7.4.x`, branch alias `1.7.x-dev`) before updating this module.
+
 ### Removed (VR-26 S1) - Stripe legacy second paths
 - `payment_intent.succeeded` finds the contract by the PaymentIntent id (`providerOrderId`) only: the metadata lookup
   (`tryMetadataLookupOrLegacy`) is gone, an unknown intent is skipped with a logged reason. Only `amount_received` counts as
