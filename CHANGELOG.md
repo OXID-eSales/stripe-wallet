@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [v3.5.0-rc3] - 2026-11-05
 
 ### Changed
 - **Requires payment-base `^v1.7`** (was `>=v1.5`). Everything this module adopted in the VR waves — the refund and
