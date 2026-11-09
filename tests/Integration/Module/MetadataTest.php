@@ -74,10 +74,11 @@ class MetadataTest extends TestCase
         );
 
         $version = $this->moduleData['version'];
+        // SemVer 2.0: MAJOR.MINOR.PATCH with an optional pre-release suffix (3.5.0-rc4); no build metadata.
         $this->assertMatchesRegularExpression(
-            '/^\d+\.\d+\.\d+$/',
+            '/^\d+\.\d+\.\d+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$/',
             $version,
-            'Module version must follow semantic versioning (e.g., 1.0.0)'
+            'Module version must follow semantic versioning (e.g., 1.0.0 or 1.0.0-rc1)'
         );
     }
 
