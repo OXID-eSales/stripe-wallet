@@ -51,7 +51,7 @@ if (!class_exists(\OxidEsales\Payments\Stripe\Controller\PaymentController_paren
         . '  public function validatePayment() { return null; } '
         . '  public function getUser() { return null; } '
         . '  public function getBasket() { return false; } '
-        . '  public function addTplParam($name, $value): void {} '
+        . '  public function addTplParam($name, $value) {} '
         . '}'
     );
 }
@@ -66,7 +66,7 @@ if (!class_exists(\OxidEsales\Payments\Stripe\Controller\StripeOrderController_p
         . '  public function getUser() { return null; } '
         . '  public function getBasket() { return false; } '
         . '  public function getPayment() { return false; } '
-        . '  public function addTplParam($name, $value): void {} '
+        . '  public function addTplParam($name, $value) {} '
         . '}'
     );
 }
@@ -78,7 +78,7 @@ if (!class_exists(\OxidEsales\Payments\Stripe\Controller\Admin\ModuleConfigurati
         . '  public function __construct() {} '
         . '  public function render() { return ""; } '
         . '  public function getEditObjectId(): string|bool { return false; } '
-        . '  public function addTplParam($name, $value): void {} '
+        . '  public function addTplParam($name, $value) {} '
         . '}'
     );
 }

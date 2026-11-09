@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+- **payment-base issue #3 — the class chain stays open.** `PaymentController::render()`,
+  `Order::validateDeliveryAddress()`, `StripeOrderController::getUser()` and `StripeOrderController::addTplParam()`
+  declared native return types although core declares none; the first module in the chain to declare a type forces
+  every other module extending the method to repeat it or PHP fatals. The types moved to the docblocks.
+  `tests/Integration/Module/ExtensionSignatureTest` guards the rule. Ship together with one-page-checkout's fix of the
+  same defect: a chain core → one-page-checkout (typed) → stripe (untyped) fatals.
+
 ## [v3.5.0-rc3] - 2026-11-05
 
 ### Changed

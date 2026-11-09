@@ -56,9 +56,14 @@ class PaymentController extends PaymentController_parent
      * (Stripe back arrow, browser back, direct URL) and ensures vouchers
      * consumed by NOT_FINISHED orders are released.
      *
+     *
+     * No native return type on purpose: core declares none, and the first module in the class chain to
+     * declare one forces every other module extending this method to repeat it or PHP fatals
+     * (payment-base issue #3). The type lives in the docblock.
+     *
      * @return string Template name
      */
-    public function render(): string
+    public function render()
     {
         $this->cleanupStaleCheckoutAttempt();
 

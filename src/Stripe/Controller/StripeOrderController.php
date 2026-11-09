@@ -389,9 +389,14 @@ class StripeOrderController extends StripeOrderController_parent
     /**
      * Get the current user from the basket session.
      *
+     *
+     * No native return type on purpose: core declares none, and the first module in the class chain to
+     * declare one forces every other module extending this method to repeat it or PHP fatals
+     * (payment-base issue #3). The type lives in the docblock.
+     *
      * @return \OxidEsales\Eshop\Application\Model\User|null
      */
-    public function getUser(): ?\OxidEsales\Eshop\Application\Model\User
+    public function getUser()
     {
         /** @var \OxidEsales\Eshop\Application\Model\User|false $user OXID returns false when not logged in */
         $user = $this->getRequestHelper()->getBasketFromSession()->getBasketUser();
@@ -399,7 +404,18 @@ class StripeOrderController extends StripeOrderController_parent
         return $user instanceof \OxidEsales\Eshop\Application\Model\User ? $user : null;
     }
 
-    public function addTplParam($name, $value): void
+    /**
+     * {@inheritDoc}
+     *
+     * No native return type on purpose: core declares none, and the first module in the class chain to
+     * declare one forces every other module extending this method to repeat it or PHP fatals
+     * (payment-base issue #3). The type lives in the docblock.
+     *
+     * @param string $name
+     * @param mixed $value
+     * @return void
+     */
+    public function addTplParam($name, $value)
     {
         /** @phpstan-ignore-next-line */
         parent::addTplParam($name, $value);

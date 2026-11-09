@@ -118,9 +118,14 @@ class Order extends Order_parent
      *   absent and OXID's tamper-detection runs normally.
      *
      * @param \OxidEsales\Eshop\Application\Model\User $oUser User object
+     *
+     * No native return type on purpose: core declares none, and the first module in the class chain to
+     * declare one forces every other module extending this method to repeat it or PHP fatals
+     * (payment-base issue #3). The type lives in the docblock.
+     *
      * @return int Validation state (0 = OK, 7 = address changed)
      */
-    public function validateDeliveryAddress($oUser): int
+    public function validateDeliveryAddress($oUser)
     {
         $paymentId = $this->getBasketPaymentId();
 
