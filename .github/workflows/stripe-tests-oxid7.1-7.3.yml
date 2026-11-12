@@ -29,7 +29,14 @@ env:
   MYSQL_VERSION: '8.0'
   TEMPLATE_ENGINE: 'twig'
   # Branch of OXID-eSales/payment-base to test against. Keep in sync with the 7.4-7.6 workflows.
-  PAYMENT_BASE_BRANCH: 'b-7.4.x'
+  # TEMPORARY for the v3.5.0 release: test against the payment-base release tag
+  # v1.8.0-rc1, which composer.json pins. The path repository has the higher
+  # priority, so a b-7.4.x checkout (1.8.x-dev) cannot satisfy that pin.
+  # After the release: set PAYMENT_BASE_BRANCH back to 'b-7.4.x' and
+  # PAYMENT_BASE_CONSTRAINT back to 'dev-b-7.4.x'.
+  PAYMENT_BASE_BRANCH: 'v1.8.0-rc1'
+  # Version that composer requires from the payment-base path repository.
+  PAYMENT_BASE_CONSTRAINT: 'v1.8.0-rc1'
   # ` as <version>` suffix for the payment-base require when a feature branch carries no usable
   # branch alias. b-7.4.x satisfies this module's `^v1.7` through its alias (1.7.x-dev), so empty.
   PAYMENT_BASE_VERSION_ALIAS: ''
@@ -190,7 +197,7 @@ jobs:
 
       - name: Install payment-base at shop level
         run: |
-          docker compose exec -T php composer require "oxid-esales/payment-base:dev-${PAYMENT_BASE_BRANCH}${PAYMENT_BASE_VERSION_ALIAS}" --no-interaction --no-update
+          docker compose exec -T php composer require "oxid-esales/payment-base:${PAYMENT_BASE_CONSTRAINT}${PAYMENT_BASE_VERSION_ALIAS}" --no-interaction --no-update
 
       - name: Install module
         run: |
