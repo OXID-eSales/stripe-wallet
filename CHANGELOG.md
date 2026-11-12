@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [v3.5.0-rc5 - 2026-11-12]
 
 ### Added
 - **CI on OXID 7.1 / 7.2 / 7.3 (PHP 8.3, PHPUnit 12).** Workflow `.github/workflows/stripe-tests-oxid7.1-7.3.yml`
