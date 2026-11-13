@@ -176,9 +176,9 @@ final class DoctrineIdempotencyRepositoryTest extends TestCase
         );
         $this->repository->save($activeRecord);
 
-        $deleted = $this->repository->deleteExpired();
-
-        $this->assertGreaterThanOrEqual(1, $deleted);
+        // payment-base 1.8 (Sprint 29 VRL): every insert purges expired rows, so saving the active record may already
+        // have removed the expired one; the full purge then finds nothing left. What counts is the end state below.
+        $this->repository->deleteExpired();
 
         $foundExpired = $this->connection->fetchOne(
             'SELECT COUNT(*) FROM ' . self::TABLE . ' WHERE OXID = :id',
