@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [v3.5.0-rc6 - 2026-11-13]
+
+### Changed
+- Idempotency requests processing
+
 ## [v3.5.0-rc5 - 2026-11-12]
 
 ### Added
