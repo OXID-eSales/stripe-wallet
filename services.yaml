@@ -1319,7 +1319,7 @@ services:
     public: true
 
   # Console Command: stripe:prune-idempotency (Sprint 133, F8)
-  # deleteExpired() had no production caller before this; schedule daily.
+  # Manual tool: payment-base >= 1.8 purges expired rows on every insert (Sprint 29 VRL), no cron needed.
   OxidEsales\Payments\Stripe\Command\PruneIdempotencyCommand:
     arguments:
       $idempotencyRepository: '@OxidEsales\PaymentBase\Repository\IdempotencyRepositoryInterface'

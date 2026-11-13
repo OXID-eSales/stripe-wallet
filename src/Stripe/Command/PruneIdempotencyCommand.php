@@ -21,7 +21,10 @@ use Throwable;
  *
  * Sprint 133 · Story 3 (F8): IdempotencyRepositoryInterface::deleteExpired()
  * existed since Sprint 42 but had no production caller — only a test — so
- * `oe_payments_idempotency` grew without bound. Schedule this from cron.
+ * `oe_payments_idempotency` grew without bound.
+ *
+ * Since payment-base 1.8 (Sprint 29 VRL) the table cleans itself on every insert;
+ * this command is a manual tool and no longer needs a cron entry.
  *
  * Usage:
  *   bin/oe-console stripe:prune-idempotency
@@ -51,7 +54,9 @@ Idempotency records protect against duplicate capture/refund calls for the
 length of their TTL. Once expired they are dead weight, and the table has a
 UNIQUE index on the key, so pruning keeps inserts cheap.
 
-<info>Example (daily cron):</info>
+Since payment-base 1.8 the table also cleans itself on every insert, so a
+cron entry is no longer needed; run this by hand to clear a backlog at once.
+<info>Example:</info>
   bin/oe-console stripe:prune-idempotency
 HELP
             );
