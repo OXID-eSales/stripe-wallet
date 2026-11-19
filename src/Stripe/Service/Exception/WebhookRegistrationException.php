@@ -30,10 +30,18 @@ class WebhookRegistrationException extends RuntimeException
      * *connected* account (Standard account onboarded through Connect): such accounts may
      * manage webhooks in their own Dashboard only; by API, only their platform can, with
      * a Connect webhook.
+     *
+     * STRP-180: the refusal does not always say "connected account". Listing
+     * endpoints with such a key answers code `oauth_not_supported` ("This
+     * application does not have the required permissions for this endpoint on
+     * account 'acct_…'", measured 2026-11-19) — classify by that code first,
+     * and keep the message match only for the create-refusal, which Stripe
+     * sends without any error code.
      */
     public function isConnectedAccountRefusal(): bool
     {
-        return stripos($this->getMessage(), 'connected account') !== false;
+        return $this->stripeCode === 'oauth_not_supported'
+            || stripos($this->getMessage(), 'connected account') !== false;
     }
 
     public function isMissingResource(): bool

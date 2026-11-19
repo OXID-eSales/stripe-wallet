@@ -111,6 +111,36 @@ final class WebhookEndpointRegistrarForShopTest extends TestCase
         $this->registrar->registerForShop('sk_shop', 'sk_platform', self::URL, null, 'desc');
     }
 
+    /**
+     * STRP-180, measured on pay1 2026-11-19: a FRESH tenant holds no endpoint id, so the
+     * registrar first LISTS the account's endpoints — and on a connected account that
+     * list is refused with code `oauth_not_supported` and a message that never says
+     * "connected account". The refusal must still route to the platform fallback,
+     * not surface as a raw API error.
+     */
+    public function testAFreshTenantOnAConnectedAccountFallsBackToThePlatformWhenTheListIsRefused(): void
+    {
+        $this->api->method('listAll')->willReturnCallback(function (string $key) {
+            if ($key === 'sk_shop') {
+                throw WebhookRegistrationException::fromApiError(
+                    'oauth_not_supported',
+                    "This application does not have the required permissions for this endpoint on account 'acct_shop'."
+                );
+            }
+            return [];
+        });
+        $this->api->expects($this->once())->method('create')
+            ->with('sk_platform', self::URL, $this->anything(), 'desc', true)
+            ->willReturn(new WebhookEndpointRegistrationResult('we_connect', 'whsec_c'));
+        $this->api->method('accountId')->willReturnMap([['sk_shop', 'acct_shop'], ['sk_platform', 'acct_platform']]);
+        $this->api->expects($this->once())->method('platformControlsAccount')->with('sk_platform', 'acct_shop')->willReturn(true);
+
+        $result = $this->registrar->registerForShop('sk_shop', 'sk_platform', self::URL, null, 'desc');
+
+        self::assertSame('we_connect', $result->endpointId);
+        self::assertSame('whsec_c', $result->secret);
+    }
+
     public function testAnEndpointIdFromTheOldPlatformFlowIsUpdatedOnThePlatformWhenTheAccountDoesNotKnowIt(): void
     {
         $this->api->method('update')->willReturnCallback(function (string $key, string $id) {
