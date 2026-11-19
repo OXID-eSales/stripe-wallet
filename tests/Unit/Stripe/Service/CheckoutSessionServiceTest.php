@@ -289,6 +289,60 @@ class CheckoutSessionServiceTest extends TestCase
         $this->assertEquals('1001', $capturedParams['payment_intent_data']['metadata']['order_number']);
     }
 
+    public function testCreateSessionPutsTheOrderNumberInThePaymentDescription(): void
+    {
+        // STRP-179: the old Stripe module showed the OXID order number in the payment's
+        // description field, which is the column the merchant scans in the Stripe admin's
+        // Payments list. Metadata (STRP-75) is not shown there; the description is.
+        $basketSnapshot = $this->createBasketSnapshot();
+        $session = $this->buildSessionDto('cs_desc', 'https://checkout.stripe.com/pay/cs_desc');
+
+        $capturedParams = null;
+        $this->stripeAdapter->method('createCheckoutSession')
+            ->willReturnCallback(function ($params) use ($session, &$capturedParams) {
+                $capturedParams = $params;
+                return $session;
+            });
+
+        $this->createService()->createSession(
+            'contract_123',
+            $basketSnapshot,
+            'https://shop.example.com/success',
+            'https://shop.example.com/cancel',
+            '1',
+            'automatic',
+            'order_abc',
+            '1001'
+        );
+
+        $this->assertArrayHasKey('description', $capturedParams['payment_intent_data']);
+        $this->assertStringContainsString('1001', $capturedParams['payment_intent_data']['description']);
+    }
+
+    public function testCreateSessionOmitsDescriptionWhenNoOrderNumber(): void
+    {
+        // No order number yet (e.g. session created before order finalisation) → no
+        // description rather than a misleading empty "Order " label.
+        $basketSnapshot = $this->createBasketSnapshot();
+        $session = $this->buildSessionDto('cs_nodesc', 'https://checkout.stripe.com/pay/cs_nodesc');
+
+        $capturedParams = null;
+        $this->stripeAdapter->method('createCheckoutSession')
+            ->willReturnCallback(function ($params) use ($session, &$capturedParams) {
+                $capturedParams = $params;
+                return $session;
+            });
+
+        $this->createService()->createSession(
+            'contract_456',
+            $basketSnapshot,
+            'https://shop.example.com/success',
+            'https://shop.example.com/cancel'
+        );
+
+        $this->assertArrayNotHasKey('description', $capturedParams['payment_intent_data']);
+    }
+
     public function testCreateSessionWithoutOrderNumberOmitsFromMetadata(): void
     {
         // Arrange

@@ -101,6 +101,14 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
                 ],
             ];
 
+            // STRP-179: surface the OXID order number in the PaymentIntent description —
+            // the field the merchant scans in the Stripe admin's Payments list (the old
+            // Stripe module did this). Metadata alone is not shown there. Omitted when the
+            // order number is not yet known, rather than labelling a payment "Order ".
+            if ($orderNumber !== null) {
+                $params['payment_intent_data']['description'] = 'Order ' . $orderNumber;
+            }
+
             // Stripe renders in the session's locale; without one it follows the BROWSER's language.
             $params['locale'] = StripeLocale::forLanguage($this->languageResolver->getActiveLanguageAbbreviation());
 
