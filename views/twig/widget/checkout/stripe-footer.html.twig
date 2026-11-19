@@ -761,6 +761,20 @@
       return (dom && dom.value) ? dom.value : this.csrfTokenValue;
     }
 
+    /**
+     * OPC-376: the tenant marker for a shared-domain EE subshop. The OPC module
+     * renders the active shop id into a single `data-opc-shop-id` attribute on
+     * the checkout / buy-now-modal root (the footer is AJAX-loaded inside it), so
+     * the footer reads it from the DOM rather than taking an OPC dependency.
+     * Returns '&shp=<id>' for a subshop, '' for shop 1 or when absent (the
+     * single-shop no-op; keeps behaviour identical on every single-shop install).
+     */
+    _shopParam() {
+      var el = document.querySelector('[data-opc-shop-id]');
+      var id = el ? (el.getAttribute('data-opc-shop-id') || '').trim() : '';
+      return (id === '' || id === '1') ? '' : ('&shp=' + encodeURIComponent(id));
+    }
+
     async _processCheckout() {
       // OPC-47 cross-module follow-up: the OPC CheckoutService since v1.3.9
       // server-side-rejects processCheckout when either consent flag is
@@ -776,7 +790,7 @@
       var termsAccepted = termsEl ? !!termsEl.checked : true;
       var privacyAccepted = privacyEl ? !!privacyEl.checked : true;
 
-      var resp = await fetch('/index.php?cl=OeCheckoutApi&fnc=processCheckout', {
+      var resp = await fetch('/index.php?cl=OeCheckoutApi&fnc=processCheckout' + this._shopParam(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

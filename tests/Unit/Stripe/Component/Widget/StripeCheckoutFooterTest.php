@@ -126,6 +126,31 @@ final class StripeCheckoutFooterTest extends TestCase
         self::assertStringStartsWith('https://shop.example.com/', $data['validationUrl']);
     }
 
+    public function testValidationUrlCarriesTheTenantOnASubshop(): void
+    {
+        // OPC-376 UC-03 — on a shared-domain subshop the validation endpoint must
+        // name the tenant, else it resolves to the default shop.
+        $configService = $this->createMock(ModuleConfigurationServiceInterface::class);
+        $configService->method('getPublishableKey')->willReturn('pk_test');
+        $footer = new TestableStripeCheckoutFooter(
+            ['csrfToken' => 'tok'],
+            $configService,
+            'https://shop.example.com/',
+            null,
+            2
+        );
+
+        self::assertStringContainsString('shp=2', $footer->exposedGetCheckoutData()['validationUrl']);
+    }
+
+    public function testValidationUrlHasNoTenantMarkerOnShopOne(): void
+    {
+        // Single-shop no-op: shop 1 stays byte-for-byte as before (no shp).
+        $footer = $this->buildFooterWithShopUrl(['csrfToken' => 'tok'], 'pk_test', 'https://shop.example.com/');
+
+        self::assertStringNotContainsString('shp=', $footer->exposedGetCheckoutData()['validationUrl']);
+    }
+
     public function testWidgetReusesExistingCsrfTokenKey(): void
     {
         $footer = $this->buildFooterWithShopUrl(
@@ -286,6 +311,7 @@ final class TestableStripeCheckoutFooter extends StripeCheckoutFooter
         private readonly ModuleConfigurationServiceInterface $configService,
         private readonly string $shopUrl = 'https://localhost.local/',
         private readonly ?IframeCheckoutSettingsInterface $iframeSettings = null,
+        private readonly int $shopId = 1,
     ) {
         // Skip OXID parent constructor
     }
@@ -293,6 +319,11 @@ final class TestableStripeCheckoutFooter extends StripeCheckoutFooter
     protected function getShopUrl(): string
     {
         return $this->shopUrl;
+    }
+
+    protected function activeShopId(): int
+    {
+        return $this->shopId;
     }
 
     public function render(): string

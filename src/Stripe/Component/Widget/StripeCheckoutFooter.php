@@ -56,7 +56,8 @@ class StripeCheckoutFooter extends WidgetController
             'totalPrice' => (float) $this->getViewParameter('totalPrice'),
             'currency' => $this->resolveCurrency(),
             'csrfToken' => (string) $this->getViewParameter('csrfToken'),
-            'validationUrl' => $this->getShopUrl() . 'index.php?cl=oepaymentvalidationapi&fnc=validate',
+            'validationUrl' => $this->getShopUrl() . 'index.php?cl=oepaymentvalidationapi&fnc=validate'
+                . $this->shopParam(),
             'pluginModuleId' => Module::MODULE_ID,
             'fieldAllowed' => $this->getValidationFieldAllowed(),
         ];
@@ -141,6 +142,29 @@ class StripeCheckoutFooter extends WidgetController
     protected function getShopUrl(): string
     {
         return Registry::getConfig()->getShopUrl();
+    }
+
+    /**
+     * OPC-376: the tenant marker for a shared-domain EE subshop — '&shp=<id>' for a
+     * subshop, '' for shop 1 (the single-shop no-op). getShopUrl() returns the bare
+     * domain, so without this the validation endpoint resolves to the default shop on
+     * a shared-domain subshop. The same marker the footer JS appends to processCheckout.
+     *
+     * Protected seam so tests can pin the shop id without the Registry.
+     */
+    protected function shopParam(): string
+    {
+        $shopId = $this->activeShopId();
+
+        return $shopId === 1 ? '' : '&shp=' . $shopId;
+    }
+
+    /**
+     * Registry seam for {@see self::shopParam()}; overridable in tests.
+     */
+    protected function activeShopId(): int
+    {
+        return (int) Registry::getConfig()->getShopId();
     }
 
     /**
