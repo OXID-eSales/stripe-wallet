@@ -35,11 +35,20 @@ class StripeUrlBuilder
      * WebhookEndpoint::create time, and getCurrentShopUrl()/getShopUrl() will
      * return whatever scheme the current request used — unreliable for an
      * outbound URL Stripe will dial back into.
+     *
+     * STRP-180: the URL names the tenant (shp). Stripe's dial-back carries no
+     * cookie and no session, so without shp an EE shop resolves the request to
+     * the default subshop and another tenant's events are processed there. The
+     * parameter also keeps two tenants on a shared domain from registering one
+     * and the same endpoint: the registrar matches endpoints by URL, and a
+     * URL that is identical across tenants makes every tenant adopt (and
+     * rewrite) the first one's endpoint. The base URL itself comes from the
+     * active shop's own configuration, so a tenant with its own domain keeps it.
      */
     public function getWebhookUrl(): string
     {
         $shopUrl = $this->getSslShopBaseUrl();
-        return rtrim($shopUrl, '/') . '/index.php?cl=StripeWebhookController';
+        return rtrim($shopUrl, '/') . '/index.php?cl=StripeWebhookController&shp=' . $this->getShopId();
     }
 
     /**

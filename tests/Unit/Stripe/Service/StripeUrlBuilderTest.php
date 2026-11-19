@@ -28,7 +28,7 @@ final class StripeUrlBuilderTest extends TestCase
 
         $url = $builder->getWebhookUrl();
 
-        $this->assertSame('https://shop.example.com/index.php?cl=StripeWebhookController', $url);
+        $this->assertSame('https://shop.example.com/index.php?cl=StripeWebhookController&shp=1', $url);
     }
 
     public function testGetWebhookUrlStripsTrailingSlash(): void
@@ -44,7 +44,7 @@ final class StripeUrlBuilderTest extends TestCase
 
         $url = $builder->getWebhookUrl();
 
-        $this->assertSame('https://shop.example.com/index.php?cl=StripeWebhookController', $url);
+        $this->assertSame('https://shop.example.com/index.php?cl=StripeWebhookController&shp=1', $url);
     }
 
     public function testGetWebhookUrlAlwaysUsesHttpsScheme(): void
@@ -52,6 +52,29 @@ final class StripeUrlBuilderTest extends TestCase
         $builder = $this->createBuilderWithSslUrl('https://shop.example.com/');
 
         $this->assertStringStartsWith('https://', $builder->getWebhookUrl());
+    }
+
+    /**
+     * STRP-180: the webhook URL must name the tenant it was registered for.
+     * Stripe's dial-back carries no cookie and no session — the shp parameter
+     * is the only thing that routes the event into the right EE subshop, and
+     * it is also what keeps two tenants on a shared domain from registering
+     * (and silently overwriting) one and the same endpoint.
+     */
+    public function testGetWebhookUrlCarriesTheTenant(): void
+    {
+        $builder = $this->createBuilderWithSslUrl('https://shop.example.com/', 2);
+
+        $this->assertSame('https://shop.example.com/index.php?cl=StripeWebhookController&shp=2', $builder->getWebhookUrl());
+    }
+
+    /** STRP-180: two tenants on a shared domain must not produce the same webhook URL. */
+    public function testGetWebhookUrlDiffersPerTenantOnASharedDomain(): void
+    {
+        $tenant1 = $this->createBuilderWithSslUrl('https://shop.example.com/', 1);
+        $tenant2 = $this->createBuilderWithSslUrl('https://shop.example.com/', 2);
+
+        $this->assertNotSame($tenant1->getWebhookUrl(), $tenant2->getWebhookUrl());
     }
 
     public function testGetClassicSettingsUrlPointsAtTheModuleConfigPageOfTheShop(): void
@@ -82,16 +105,23 @@ final class StripeUrlBuilderTest extends TestCase
     // Helpers
     // -------------------------------------------------------------------------
 
-    private function createBuilderWithSslUrl(string $sslUrl): StripeUrlBuilder
+    private function createBuilderWithSslUrl(string $sslUrl, int $shopId = 1): StripeUrlBuilder
     {
-        return new class ($sslUrl) extends StripeUrlBuilder {
-            public function __construct(private readonly string $stubbedSslUrl)
-            {
+        return new class ($sslUrl, $shopId) extends StripeUrlBuilder {
+            public function __construct(
+                private readonly string $stubbedSslUrl,
+                private readonly int $stubbedShopId,
+            ) {
             }
 
             protected function getSslShopBaseUrl(): string
             {
                 return $this->stubbedSslUrl;
+            }
+
+            protected function getShopId(): int
+            {
+                return $this->stubbedShopId;
             }
         };
     }
