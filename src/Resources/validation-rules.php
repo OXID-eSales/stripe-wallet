@@ -22,17 +22,23 @@ return [
         // houseNumber, postalCode, company, vatId) use UNICODE_LETTERS (\p{L}),
         // not ASCII-only LETTERS, so German umlauts (öäüß) and Polish letters
         // (ł ą ę …) pass. Block lists are unchanged; injection surface unchanged.
+        //
+        // STRP-178: street and additionalInfo additionally allow '&' — company
+        // names are legitimate address-line content ("Lohmann & Rauscher,
+        // 1 Wellington Court, …") and the company field has always allowed '&'
+        // through the identical downstream sinks (Stripe API JSON, parameterised
+        // DB writes, Twig-escaped output), so this widens no injection surface.
         [
             'field' => 'additionalInfo',
             'rules' => [
-                'allow' => "UNICODE_LETTERS NUMBERS SPACES ' - . , / #",
+                'allow' => "UNICODE_LETTERS NUMBERS SPACES ' - . , / # &",
                 'block' => '< > { } [ ] | \\ ~ ! @ $ % ^ * = +',
             ],
         ],
         [
             'field' => 'street',
             'rules' => [
-                'allow' => "UNICODE_LETTERS NUMBERS SPACES ' - . , /",
+                'allow' => "UNICODE_LETTERS NUMBERS SPACES ' - . , / &",
                 'block' => ': ; < > { } [ ] | \\ ~ ! @ $ % ^ * = +',
             ],
         ],

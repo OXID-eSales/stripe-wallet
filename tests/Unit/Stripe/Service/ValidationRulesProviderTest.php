@@ -71,8 +71,10 @@ final class ValidationRulesProviderTest extends TestCase
         // literals are unchanged.
         $map = $this->sut->getFieldAllowMap();
 
-        $this->assertSame("UNICODE_LETTERS NUMBERS SPACES ' - . , / #", $map['additionalInfo']);
-        $this->assertSame("UNICODE_LETTERS NUMBERS SPACES ' - . , /", $map['street']);
+        // STRP-178: street and additionalInfo additionally allow '&' (company
+        // names as address-line content, e.g. "Lohmann & Rauscher").
+        $this->assertSame("UNICODE_LETTERS NUMBERS SPACES ' - . , / # &", $map['additionalInfo']);
+        $this->assertSame("UNICODE_LETTERS NUMBERS SPACES ' - . , / &", $map['street']);
         $this->assertSame('NUMBERS UNICODE_LETTERS - /', $map['houseNumber']);
         $this->assertSame('UNICODE_LETTERS NUMBERS SPACES -', $map['postalCode']);
         $this->assertSame("UNICODE_LETTERS NUMBERS SPACES ' - . & ,", $map['company']);
