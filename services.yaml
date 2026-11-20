@@ -1306,6 +1306,29 @@ services:
       - { name: 'console.command', command: 'stripe:backfill-captured-amount' }
     public: true
 
+  # STRP-181: legacy-order migration. Defined under the class name for the same
+  # reason as the backfill service above — the sweep definition would autowire
+  # Doctrine\DBAL\Connection, which a bare shop container doesn't have.
+  OxidEsales\Payments\Stripe\Service\LegacyOrderMigrationServiceInterface:
+    alias: OxidEsales\Payments\Stripe\Service\LegacyOrderMigrationService
+    public: true
+
+  OxidEsales\Payments\Stripe\Service\LegacyOrderMigrationService:
+    arguments:
+      $connection: '@doctrine.dbal.connection'
+      $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
+      $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
+    public: true
+
+  # Console Command: stripe:migrate-legacy-orders (STRP-181)
+  # Dry run unless --apply is passed.
+  OxidEsales\Payments\Stripe\Command\MigrateLegacyOrdersCommand:
+    arguments:
+      $migrationService: '@OxidEsales\Payments\Stripe\Service\LegacyOrderMigrationServiceInterface'
+    tags:
+      - { name: 'console.command', command: 'stripe:migrate-legacy-orders' }
+    public: true
+
   # Console Command: oe:payments:stripe:sweep (VR-23 T3)
   # The stale NOT_FINISHED sweep that ran inline after every webhook; schedule every few minutes.
   OxidEsales\Payments\Stripe\Command\StaleCheckoutSweepCommand:
