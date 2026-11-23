@@ -144,7 +144,7 @@ Navigate to: **Extensions → Modules → Stripe Payment Gateway → Settings**
 2. Click **Add endpoint**
 3. Enter your webhook URL:
    ```
-   https://your-shop.com/index.php?cl=StripeWebhookController
+   https://your-shop.com/index.php?cl=StripeWebhookController&shp=1
    ```
 4. Select events to listen for:
    - `checkout.session.completed`

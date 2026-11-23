@@ -101,18 +101,14 @@ class StripeWebhookEndpointApi implements StripeWebhookEndpointApiInterface
         return new WebhookEndpointRegistrationResult((string) $endpoint->id, null);
     }
 
-    public function listAll(string $apiKey, ?string $urlFilter = null): array
+    public function endpointUrls(string $apiKey): array
     {
-        $ids = [];
+        $urls = [];
         foreach ($this->fetchAllEndpoints($apiKey) as $endpoint) {
-            // Skip endpoints whose URL doesn't match the filter — preserves
-            // endpoints belonging to OTHER shops that share the same Stripe key.
-            if ($urlFilter !== null && (string) $endpoint->url !== $urlFilter) {
-                continue;
-            }
-            $ids[] = (string) $endpoint->id;
+            $urls[(string) $endpoint->id] = (string) $endpoint->url;
         }
-        return $ids;
+
+        return $urls;
     }
 
     /**

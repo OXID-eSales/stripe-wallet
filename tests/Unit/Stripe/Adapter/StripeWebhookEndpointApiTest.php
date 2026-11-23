@@ -175,10 +175,10 @@ final class StripeWebhookEndpointApiTest extends TestCase
     }
 
     // -------------------------------------------------------------------------
-    // listAll()
+    // endpointUrls()
     // -------------------------------------------------------------------------
 
-    public function testListAllUsesClientProviderForKeyToObtainClient(): void
+    public function testEndpointUrls_ForAKey_UsesTheClientOfThatKey(): void
     {
         $apiKey = 'sk_test_list';
 
@@ -190,36 +190,24 @@ final class StripeWebhookEndpointApiTest extends TestCase
 
         $this->webhookEndpoints->method('all')->willReturn($this->buildCollection([]));
 
-        $this->api->listAll($apiKey);
+        $this->api->endpointUrls($apiKey);
     }
 
-    public function testListAllReturnsEndpointIds(): void
+    public function testEndpointUrls_WhenEndpointsExist_ReturnsIdToUrl(): void
     {
         $this->clientProvider->method('forKey')->willReturn($this->stripeClient);
 
         $ep1 = $this->buildEndpointObject('we_1', null, 'https://shop.example.com/webhook');
-        $ep2 = $this->buildEndpointObject('we_2', null, 'https://shop.example.com/webhook');
+        $ep2 = $this->buildEndpointObject('we_2', null, 'https://other-shop.example.com/webhook');
         $this->webhookEndpoints->method('all')->willReturn($this->buildCollection([$ep1, $ep2]));
 
-        $ids = $this->api->listAll('sk_test');
-
-        $this->assertSame(['we_1', 'we_2'], $ids);
+        $this->assertSame(
+            ['we_1' => 'https://shop.example.com/webhook', 'we_2' => 'https://other-shop.example.com/webhook'],
+            $this->api->endpointUrls('sk_test')
+        );
     }
 
-    public function testListAllFiltersEndpointsByUrl(): void
-    {
-        $this->clientProvider->method('forKey')->willReturn($this->stripeClient);
-
-        $matchingEp  = $this->buildEndpointObject('we_match', null, 'https://shop.example.com/webhook');
-        $differentEp = $this->buildEndpointObject('we_other', null, 'https://other-shop.example.com/webhook');
-        $this->webhookEndpoints->method('all')->willReturn($this->buildCollection([$matchingEp, $differentEp]));
-
-        $ids = $this->api->listAll('sk_test', 'https://shop.example.com/webhook');
-
-        $this->assertSame(['we_match'], $ids);
-    }
-
-    public function testListAllFollowsPaginationPastTheFirstHundred(): void
+    public function testEndpointUrls_WhenMoreThanOnePage_FollowsThePagination(): void
     {
         $this->clientProvider->method('forKey')->willReturn($this->stripeClient);
 
@@ -232,16 +220,16 @@ final class StripeWebhookEndpointApiTest extends TestCase
                 ? $secondPage
                 : $firstPage);
 
-        $this->assertSame(['we_1', 'we_2'], $this->api->listAll('sk_test'));
+        $this->assertSame(['we_1', 'we_2'], array_keys($this->api->endpointUrls('sk_test')));
     }
 
-    public function testListAllWrapsApiErrorExceptionInDomainException(): void
+    public function testEndpointUrls_WhenStripeRefuses_ThrowsTheDomainException(): void
     {
         $this->clientProvider->method('forKey')->willReturn($this->stripeClient);
         $this->webhookEndpoints->method('all')->willThrowException($this->buildApiError());
 
         $this->expectException(WebhookRegistrationException::class);
-        $this->api->listAll('sk_test');
+        $this->api->endpointUrls('sk_test');
     }
 
     // -------------------------------------------------------------------------

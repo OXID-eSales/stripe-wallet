@@ -16,7 +16,8 @@ class WebhookEndpointRegistrar implements WebhookEndpointRegistrarInterface
 {
     public function __construct(
         private readonly StripeWebhookEndpointApiInterface $api,
-        private readonly WebhookEventCatalog $eventCatalog
+        private readonly WebhookEventCatalog $eventCatalog,
+        private readonly WebhookUrlOwnership $urlOwnership
     ) {
     }
 
@@ -85,25 +86,59 @@ class WebhookEndpointRegistrar implements WebhookEndpointRegistrarInterface
 
     public function clearAll(string $accessToken, ?string $urlFilter = null): int
     {
-        $ids = $this->api->listAll($accessToken, $urlFilter);
+        $ids = $this->endpointIdsToClear($this->api->endpointUrls($accessToken), $urlFilter);
         foreach ($ids as $id) {
             $this->api->delete($accessToken, $id);
         }
+
         return count($ids);
+    }
+
+    /**
+     * The endpoints of this shop among those of the account: other shops can share the Stripe key. For
+     * shop 1 that includes the endpoint registered before the URL named the shop (STRP-180).
+     *
+     * @param array<string, string> $endpointUrls endpoint id => url
+     *
+     * @return list<string>
+     */
+    private function endpointIdsToClear(array $endpointUrls, ?string $shopWebhookUrl): array
+    {
+        if ($shopWebhookUrl === null) {
+            return array_keys($endpointUrls);
+        }
+
+        return array_keys(array_filter(
+            $endpointUrls,
+            fn (string $url): bool => $this->urlOwnership->owns($url, $shopWebhookUrl)
+        ));
     }
 
     /**
      * The endpoint a registration updates: the one we hold, else the one of the account that already
      * points at this URL - a second one would deliver every event twice, one of them with a signing
      * secret nobody holds (VR-16 O6).
+     *
+     * A held id is used only when its endpoint is this shop's (sprint 144 AW): a subshop that holds a
+     * copy of another shop's endpoint id would otherwise rewrite that endpoint to its own URL. An id
+     * the account does not list stays: it can be a Connect webhook on the platform (the old flow).
      */
     private function endpointToUpdate(string $accessToken, string $webhookUrl, ?string $heldEndpointId): ?string
     {
-        if ($heldEndpointId !== null && $heldEndpointId !== '') {
-            return $heldEndpointId;
+        $endpointUrls = $this->api->endpointUrls($accessToken);
+        $heldId = (string) $heldEndpointId;
+        if ($heldId !== '' && $this->isHeldEndpointOfThisShop($endpointUrls[$heldId] ?? null, $webhookUrl)) {
+            return $heldId;
         }
 
-        return $this->api->listAll($accessToken, $webhookUrl)[0] ?? null;
+        $sameUrl = array_search($webhookUrl, $endpointUrls, true);
+
+        return $sameUrl === false ? null : (string) $sameUrl;
+    }
+
+    private function isHeldEndpointOfThisShop(?string $heldEndpointUrl, string $webhookUrl): bool
+    {
+        return $heldEndpointUrl === null || $this->urlOwnership->owns($heldEndpointUrl, $webhookUrl);
     }
 
     private function assertHttps(string $url): void

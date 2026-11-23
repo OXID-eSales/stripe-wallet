@@ -238,7 +238,7 @@ Module settings in `metadata.php` / YAML:
 - Webhook signing secret and endpoint id: per mode in the module's oxconfig variables (`Core/WebhookEndpointKeys`); `sStripeWebhookEndpointSecret` is the legacy, mode-agnostic setting
 - `sStripeCaptureMode` - automatic/manual capture mode
 
-**Webhook URL:** `https://{shopUrl}/index.php?cl=StripeWebhookController`
+**Webhook URL:** `https://{shopUrl}/index.php?cl=StripeWebhookController&shp={shopId}` (STRP-180: the URL names the shop; after an update press "Create webhooks" once per shop)
 
 ## Event System
 
