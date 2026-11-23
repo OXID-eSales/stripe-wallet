@@ -33,6 +33,7 @@ use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Mcp\StripeAcpCheckoutService;
 use OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface;
 use OxidEsales\Payments\Stripe\Service\ModuleConfigurationServiceInterface;
+use Psr\Log\LoggerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -47,6 +48,7 @@ final class StripeAcpCheckoutServiceTest extends TestCase
 {
     private StripeAdapterInterface&MockObject $adapter;
     private ContractCommitServiceInterface&MockObject $commit;
+    private LoggerInterface&MockObject $logger;
     private AcpResponseFormatterInterface&MockObject $formatter;
     private ContractRepositoryInterface&MockObject $contracts;
     private ModuleConfigurationServiceInterface&MockObject $config;
@@ -59,6 +61,7 @@ final class StripeAcpCheckoutServiceTest extends TestCase
         $this->formatter = $this->createMock(AcpResponseFormatterInterface::class);
         $this->contracts = $this->createMock(ContractRepositoryInterface::class);
         $this->config = $this->createMock(ModuleConfigurationServiceInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
         $this->config->method('getCaptureMode')->willReturn(StripeDefinitions::CAPTURE_MODE_AUTOMATIC);
 
         $this->contract = new PaymentContract(1, 'user-1', BasketSnapshot::fromArray([
@@ -206,6 +209,37 @@ final class StripeAcpCheckoutServiceTest extends TestCase
         self::assertStringContainsString('pi_1', $result['error']['message'], 'the merchant must be able to find the money');
     }
 
+    /**
+     * Sprint 148 (AW): money moved and the shop has no order for it. That needs an error log line with
+     * the ids. The class had no logger: only the agent got the text.
+     */
+    public function testCompletePayment_WhenChargedAndTheCommitFails_LogsAnErrorWithContractAndPaymentIntent(): void
+    {
+        $this->adapter->method('createPayment')->willReturn(new PaymentResponse('pi_charged', StripeStatusMapper::STATUS_CAPTURED, 100.0, 'EUR'));
+        $this->commit->method('commit')->willReturn(CommitOutcome::refused('amount_mismatch'));
+        $this->logger->expects(self::once())->method('error')->with(
+            self::stringContains('charged'),
+            self::callback(static fn (array $context): bool => $context['contractId'] === 'ctr-1'
+                && $context['paymentIntentId'] === 'pi_charged'
+                && $context['reason'] === 'amount_mismatch')
+        );
+
+        $this->service()->completeCheckout('ctr-1', ['token' => 'spt_123'], new AgentContext('agent-1', 'tok'));
+    }
+
+    public function testCompletePayment_WhenTheChargeFails_LogsAnErrorWithTheContractAndTheExceptionClass(): void
+    {
+        $this->adapter->method('createPayment')->willThrowException(new \RuntimeException('card_declined'));
+        $this->logger->expects(self::once())->method('error')->with(
+            self::anything(),
+            self::callback(static fn (array $context): bool => $context['contractId'] === 'ctr-1'
+                && $context['exception'] === \RuntimeException::class
+                && !in_array('card_declined', $context, true))
+        );
+
+        $this->service()->completeCheckout('ctr-1', ['token' => 'spt_bad'], new AgentContext('agent-1', 'tok'));
+    }
+
     private function service(
         ?ContractOpeningServiceInterface $opening = null,
         ?UserBasketFactoryInterface $baskets = null,
@@ -228,7 +262,8 @@ final class StripeAcpCheckoutServiceTest extends TestCase
             $opening ?? $this->createMock(ContractOpeningServiceInterface::class),
             $baskets ?? $this->createMock(UserBasketFactoryInterface::class),
             $buyers ?? $this->createMock(GuestUserResolverInterface::class),
-            $this->commit
+            $this->commit,
+            $this->logger
         );
     }
 }

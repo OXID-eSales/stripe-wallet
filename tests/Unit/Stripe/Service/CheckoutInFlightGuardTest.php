@@ -53,8 +53,12 @@ final class TestableCheckoutInFlightGuard extends CheckoutInFlightGuard
     public function __construct(
         private readonly ?StripeCheckoutSessionDto $session,
         private readonly array|string $basketTotal = [4897, 'EUR'],
+        ?\Psr\Log\LoggerInterface $logger = null,
     ) {
-        parent::__construct(new \OxidEsales\Payments\Stripe\Tests\Support\UnreachableStripeAdapterFactory());
+        parent::__construct(
+            new \OxidEsales\Payments\Stripe\Tests\Support\UnreachableStripeAdapterFactory(),
+            $logger ?? new \Psr\Log\NullLogger()
+        );
     }
 
     protected function retrieveSession(string $sessionId): ?StripeCheckoutSessionDto
@@ -165,6 +169,22 @@ final class CheckoutInFlightGuardTest extends TestCase
     public function testStripeFailureMeansNoAnswer(): void
     {
         $guard = new TestableCheckoutInFlightGuard($this->session(), [4897, 'EUR']);
+
+        $this->assertNull($guard->inspect(new GuardProbeContract(providerOrderId: 'cs_throws')));
+    }
+
+    /**
+     * Sprint 148 (AW): "cannot tell" stays the answer, but it leaves a trace. A Stripe outage and an
+     * absent basket looked the same and neither was in a log.
+     */
+    public function testInspect_WhenStripeFails_LogsAWarningWithTheExceptionClass(): void
+    {
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())->method('warning')->with(
+            $this->stringContains('CheckoutInFlightGuard'),
+            $this->callback(static fn (array $context): bool => isset($context['exception']) && is_string($context['exception']))
+        );
+        $guard = new TestableCheckoutInFlightGuard($this->session(), [4897, 'EUR'], $logger);
 
         $this->assertNull($guard->inspect(new GuardProbeContract(providerOrderId: 'cs_throws')));
     }

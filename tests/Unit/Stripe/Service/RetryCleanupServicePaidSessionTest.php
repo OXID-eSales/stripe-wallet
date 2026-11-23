@@ -33,7 +33,10 @@ final class ScriptedInFlightGuard extends CheckoutInFlightGuard
 {
     public function __construct(private readonly ?StripeCheckoutSessionDto $session)
     {
-        parent::__construct(new \OxidEsales\Payments\Stripe\Tests\Support\UnreachableStripeAdapterFactory());
+        parent::__construct(
+            new \OxidEsales\Payments\Stripe\Tests\Support\UnreachableStripeAdapterFactory(),
+            new \Psr\Log\NullLogger()
+        );
     }
 
     protected function retrieveSession(string $sessionId): ?StripeCheckoutSessionDto

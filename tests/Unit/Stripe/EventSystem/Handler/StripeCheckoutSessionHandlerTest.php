@@ -197,6 +197,48 @@ class StripeCheckoutSessionHandlerTest extends TestCase
         $handler->handle($event);
     }
 
+    /**
+     * Sprint 148 (AW): StripeOrderController puts the shop id into the context as an integer
+     * (ControllerRequestHelper::getShopId(): int). The handler read it as a string and took '1'.
+     */
+    public function testHandle_WhenTheShopIdIsAnIntegerAboveOne_UsesItInTheReturnUrlsAndTheMetadata(): void
+    {
+        $contract = $this->createContractMock('contract_sub');
+        $context = $this->createContextWithContract($contract);
+        $context->set('shopId', 2);
+        $event = new StripeCheckoutSessionRequestEvent($context);
+
+        $this->checkoutSessionService->expects($this->once())->method('buildSuccessUrl')
+            ->with($this->anything(), 'contract_sub', $this->anything(), $this->anything(), $this->anything(), 2)
+            ->willReturn('https://shop.example.com/index.php?cl=order&fnc=checkoutSuccess&shp=2');
+        $this->checkoutSessionService->expects($this->once())->method('createSession')
+            ->with(
+                'contract_sub',
+                $this->anything(),
+                $this->anything(),
+                $this->stringContains('shp=2'),
+                '2',
+                $this->anything()
+            )
+            ->willReturn(CheckoutSessionResult::success('cs_sub', 'https://checkout.stripe.com/pay/cs_sub'));
+
+        $this->createHandler()->handle($event);
+    }
+
+    public function testHandle_WhenTheShopIdIsAbsent_FailsAndCreatesNoSession(): void
+    {
+        $contract = $this->createContractMock('contract_noshop');
+        $context = $this->createContextWithContract($contract);
+        $context->set('shopId', null);
+        $event = new StripeCheckoutSessionRequestEvent($context);
+
+        $this->checkoutSessionService->expects($this->never())->method('createSession');
+
+        $this->expectException(\RuntimeException::class);
+
+        $this->createHandler()->handle($event);
+    }
+
     public function testDoesNotCreateOrder(): void
     {
         $contract = $this->createContractMock('contract_789');

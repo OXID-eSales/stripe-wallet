@@ -167,6 +167,8 @@ services:
       $userBaskets: '@OxidEsales\PaymentBase\Checkout\Headless\UserBasketFactoryInterface'
       $buyers: '@OxidEsales\PaymentBase\Checkout\Headless\GuestUserResolverInterface'
       $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
+      # Sprint 148 (AW): 'charged, but not committed' needs a log line.
+      $logger: '@oxid_esales.monolog.logger'
     public: true
 
   OxidEsales\PaymentBase\Mcp\Acp\AcpCheckoutServiceInterface:
@@ -249,6 +251,7 @@ services:
   OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard:
     arguments:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
 
   # OPC-175: "is this attempt already money?" - asked by RetryCleanupService
   # and by StripeAwareAttemptCleaner below.
