@@ -31,6 +31,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Two parallel checkouts of one contract: the second answers "Your order is already being processed"
   (`STRIPE_ORDER_IN_PROGRESS`) and opens no Stripe session (MOL-39, needs payment-base with the order-creation claim).**
 
+### Fixed (sprint 148 AW)
+- **Standard checkout in a subshop named shop 1.** `StripeOrderController` sends the shop id as an integer; the
+  session handler read it as a string and took `'1'`. The success URL, the cancel URL and the Stripe metadata
+  `shop_id` of a subshop named shop 1. The handler now reads the id with its type and fails when none is given.
+- **A partial capture names its currency.** Without one the amount was converted with two decimals (100 times too
+  much for a zero-decimal currency such as JPY). Such a capture is refused before the Stripe call.
+- **A Stripe error with no error object (a connection error) converts with no read on null.**
+- **"Stripe charged, but the order was not committed" (ACP) and a refused payment token write an error log line.**
+- **The in-flight checkout check logs why it cannot tell** (Stripe outage or absent basket); its answer is unchanged.
+
 ### Changed
 - `StripeWebhookEndpointApiInterface::listAll()` is replaced by `endpointUrls()` (endpoint id => url).
 - `Core\ShopParameter` is the one place that spells the `shp` URL parameter.
