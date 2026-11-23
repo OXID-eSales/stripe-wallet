@@ -23,6 +23,7 @@ use OxidEsales\PaymentBase\Checkout\OpenCheckoutAttemptRegistry;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
 use OxidEsales\PaymentBase\Contract\ContractCondition;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
+use OxidEsales\PaymentBase\Checkout\Attempt\OrderCreationClaimInterface;
 use OxidEsales\PaymentBase\EventSystem\EventDispatcher;
 use OxidEsales\PaymentBase\EventSystem\EventListenerProvider;
 use OxidEsales\PaymentBase\Logging\ThrowableSummary;
@@ -479,9 +480,21 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
             $this->openAttempts ?? $this->registryRemembering(null),
             $dispatcher,
             new ThrowableSummary([]),
+            $this->wonOrderCreationClaim(),
         ));
 
         return $dispatcher;
+    }
+
+    /**
+     * MOL-39 (payment-base sprint 143): the order step claims the order creation; this request wins it.
+     */
+    private function wonOrderCreationClaim(): OrderCreationClaimInterface
+    {
+        $claims = $this->createMock(OrderCreationClaimInterface::class);
+        $claims->method('claim')->willReturn(true);
+
+        return $claims;
     }
 
     private function registryRemembering(?string $contractId): OpenCheckoutAttemptRegistry
