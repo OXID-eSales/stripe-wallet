@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\PaymentHandler;
 
+use OxidEsales\Payments\Stripe\Core\ShopParameter;
 use OxidEsales\Payments\Stripe\Core\ShopId;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentBase\Checkout\Attempt\OrderCreationAlreadyClaimedException;
@@ -408,7 +409,7 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
             $shopIdInt
         );
         $cancelUrl = $this->checkoutSessionService->buildCancelUrl(
-            $shopUrl . 'index.php?cl=payment&lang=' . $languageId . '&shp=' . $shopIdInt
+            $shopUrl . 'index.php?cl=payment&lang=' . $languageId . ShopParameter::always($shopIdInt)
         );
 
         return [$successUrl, $cancelUrl];

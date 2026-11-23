@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Controller\Admin;
 
+use OxidEsales\Payments\Stripe\Core\ShopParameter;
 use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
@@ -209,7 +210,7 @@ class ModuleConfiguration extends ModuleConfiguration_parent
         $redirectUrl = Registry::getConfig()->getShopUrl(0, true) . 'admin/index.php?cl=StripeConnect&fnc=stripeFinishOnBoarding';
         $redirectUrl .= '&stoken=' . Registry::getSession()->getSessionChallengeToken();
         $redirectUrl .= '&shop_param=' . $sMode;
-        $redirectUrl .= '&shp=' . Registry::getConfig()->getShopId();
+        $redirectUrl .= ShopParameter::always((int) Registry::getConfig()->getShopId());
 
         if ($sMode === StripeDefinitions::MODE_TEST) {
             return self::CONNECT_MIDDLEWARE_TEST_URL . '?shop_redirect_url=' . rawurlencode($redirectUrl);

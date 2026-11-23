@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use OxidEsales\Payments\Stripe\Core\ShopParameter;
 use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\PaymentBase\Adapter\Exception\PaymentAdapterException;
 use OxidEsales\PaymentBase\Contract\BasketSnapshot;
@@ -86,7 +87,7 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
                 $paymentIntentMetadata['order_id'] = $orderId;
             }
 
-            if ($orderNumber !== null) {
+            if ($this->isKnown($orderNumber)) {
                 $sessionMetadata['order_number'] = $orderNumber;
                 $paymentIntentMetadata['order_number'] = $orderNumber;
             }
@@ -105,7 +106,7 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
             // the field the merchant scans in the Stripe admin's Payments list (the old
             // Stripe module did this). Metadata alone is not shown there. Omitted when the
             // order number is not yet known, rather than labelling a payment "Order ".
-            if ($orderNumber !== null) {
+            if ($this->isKnown($orderNumber)) {
                 $params['payment_intent_data']['description'] = 'Order ' . $orderNumber;
             }
 
@@ -307,7 +308,7 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
     ): string {
         $url = $shopUrl . 'index.php?cl=order&fnc=checkoutSuccess'
             . '&lang=' . $languageId
-            . '&shp=' . $shopId
+            . ShopParameter::always($shopId)
             . '&session_id={CHECKOUT_SESSION_ID}'
             . '&contract_id=' . urlencode($contractId)
             . '&contract_token=' . urlencode($contractToken);
@@ -339,6 +340,14 @@ class CheckoutSessionService implements CheckoutSessionServiceInterface
     /**
      * The number of provider attempts the contract has replaced so far.
      */
+    /**
+     * An order number that is not known yet arrives as null or as an empty text; neither is a label.
+     */
+    private function isKnown(?string $orderNumber): bool
+    {
+        return $orderNumber !== null && $orderNumber !== '';
+    }
+
     private function attemptOf(string $contractId): string
     {
         $contract = $this->contracts->findById($contractId);

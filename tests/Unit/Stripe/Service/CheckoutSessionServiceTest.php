@@ -319,6 +319,36 @@ class CheckoutSessionServiceTest extends TestCase
         $this->assertStringContainsString('1001', $capturedParams['payment_intent_data']['description']);
     }
 
+    /**
+     * Sprint 144 (AW): an empty order number is no label either - no "Order " description, no empty
+     * metadata value.
+     */
+    public function testCreateSession_WhenOrderNumberIsEmpty_SetsNoDescriptionAndNoOrderNumberMetadata(): void
+    {
+        $session = $this->buildSessionDto('cs_empty', 'https://checkout.stripe.com/pay/cs_empty');
+        $capturedParams = null;
+        $this->stripeAdapter->method('createCheckoutSession')
+            ->willReturnCallback(function ($params) use ($session, &$capturedParams) {
+                $capturedParams = $params;
+                return $session;
+            });
+
+        $this->createService()->createSession(
+            'contract_456',
+            $this->createBasketSnapshot(),
+            'https://shop.example.com/success',
+            'https://shop.example.com/cancel',
+            '1',
+            'automatic',
+            'order-1',
+            ''
+        );
+
+        $this->assertArrayNotHasKey('description', $capturedParams['payment_intent_data']);
+        $this->assertArrayNotHasKey('order_number', $capturedParams['payment_intent_data']['metadata']);
+        $this->assertArrayNotHasKey('order_number', $capturedParams['metadata']);
+    }
+
     public function testCreateSessionOmitsDescriptionWhenNoOrderNumber(): void
     {
         // No order number yet (e.g. session created before order finalisation) → no

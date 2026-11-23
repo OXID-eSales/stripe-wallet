@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Component\Widget;
 
+use OxidEsales\Payments\Stripe\Core\ShopParameter;
 use OxidEsales\Eshop\Application\Component\Widget\WidgetController;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
@@ -154,9 +155,7 @@ class StripeCheckoutFooter extends WidgetController
      */
     protected function shopParam(): string
     {
-        $shopId = $this->activeShopId();
-
-        return $shopId === 1 ? '' : '&shp=' . $shopId;
+        return ShopParameter::forSubshop($this->activeShopId());
     }
 
     /**

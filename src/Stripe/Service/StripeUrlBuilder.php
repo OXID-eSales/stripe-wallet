@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use OxidEsales\Payments\Stripe\Core\ShopParameter;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Module;
 
@@ -48,7 +49,7 @@ class StripeUrlBuilder
     public function getWebhookUrl(): string
     {
         $shopUrl = $this->getSslShopBaseUrl();
-        return rtrim($shopUrl, '/') . '/index.php?cl=StripeWebhookController&shp=' . $this->getShopId();
+        return rtrim($shopUrl, '/') . '/index.php?cl=StripeWebhookController' . ShopParameter::always($this->getShopId());
     }
 
     /**
@@ -58,7 +59,7 @@ class StripeUrlBuilder
     public function getClassicSettingsUrl(): string
     {
         return rtrim($this->getAdminShopBaseUrl(), '/') . '/' . $this->getAdminDirectory()
-            . '/index.php?cl=module_config&oxid=' . Module::MODULE_ID . '&shp=' . $this->getShopId();
+            . '/index.php?cl=module_config&oxid=' . Module::MODULE_ID . ShopParameter::always($this->getShopId());
     }
 
     /**

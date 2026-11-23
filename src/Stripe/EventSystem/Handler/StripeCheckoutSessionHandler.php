@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\EventSystem\Handler;
 
+use OxidEsales\Payments\Stripe\Core\ShopParameter;
 use OxidEsales\PaymentBase\Logging\ThrowableSummaryInterface;
 use OxidEsales\Payments\Stripe\Core\ShopId;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
@@ -153,7 +154,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         // VR-20 R5: payment-base's shared return token, bound to the shopper and expiring.
         $contractToken = $this->returnTokens->generateToken($contractId, $contract->getUserId());
         $successUrl = $this->checkoutSessionService->buildSuccessUrl($shopUrl, $contractId, $contractToken, $sessionId, $languageId, $shopIdInt);
-        $cancelUrl = $shopUrl . 'index.php?cl=order&fnc=checkoutCancel&lang=' . $languageId . '&shp=' . $shopIdInt;
+        $cancelUrl = $shopUrl . 'index.php?cl=order&fnc=checkoutCancel&lang=' . $languageId . ShopParameter::always($shopIdInt);
 
         $orderId = $contract->getOrderId();
         $orderNumber = $contract->getMetadata('order_number');
