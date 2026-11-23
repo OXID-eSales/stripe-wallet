@@ -26,10 +26,9 @@ env:
   # TEMPORARY until the owner tags a payment-base release with the MOL-39 order-creation claim: the tests need it
   # (payment-base b-7.4.x since 2026-11-23), which the pinned tag v1.8.0-rc2 does not have. The alias
   # satisfies the exact pin of composer.json. After that tag (owner step): set both variables to it, as before.
-  # Sprints 147/148 (AW), temporary: payment-base afterworks/147-honest-failures. Back to 'b-7.4.x' before the merge.
-  PAYMENT_BASE_BRANCH: 'afterworks/147-honest-failures'
+  PAYMENT_BASE_BRANCH: 'b-7.4.x'
   # Version that composer requires from the payment-base path repository.
-  PAYMENT_BASE_CONSTRAINT: 'dev-afterworks/147-honest-failures as v1.8.0-rc2'
+  PAYMENT_BASE_CONSTRAINT: 'dev-b-7.4.x as v1.8.0-rc2'
   # payment-base's extra.branch-alias covers dev-b-7.4.x only; a feature
   # branch needs an explicit alias to satisfy this module's `^v1.7`
   # constraint. Same version the branch alias resolves to, so nothing new to
