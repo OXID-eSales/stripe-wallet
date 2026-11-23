@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Mcp;
 
+use Psr\Log\LoggerInterface;
 use OxidEsales\PaymentBase\Adapter\Request\CreatePaymentRequest;
 use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Checkout\Headless\ContractOpeningServiceInterface;
@@ -56,7 +57,8 @@ final class StripeAcpCheckoutService extends AbstractAcpCheckoutService
         ContractOpeningServiceInterface $contractOpening,
         UserBasketFactoryInterface $userBaskets,
         GuestUserResolverInterface $buyers,
-        ContractCommitServiceInterface $contractCommit
+        ContractCommitServiceInterface $contractCommit,
+        private readonly LoggerInterface $logger
     ) {
         parent::__construct(
             $contractService,
@@ -109,6 +111,13 @@ final class StripeAcpCheckoutService extends AbstractAcpCheckoutService
                 ],
             ));
         } catch (Throwable $e) {
+            // The exception text can carry provider ids and URLs: the class at error level, as
+            // StripePaymentHandler does. The agent gets the text; it needs the decline reason.
+            $this->logger->error('[StripeAcpCheckoutService] Stripe refused the delegated payment token', [
+                'contractId' => (string) $contract->getId(),
+                'exception' => $e::class,
+            ]);
+
             return $this->formatter->validationError(
                 'Stripe could not charge the delegated payment token: ' . $e->getMessage(),
                 'payment_data.token'
@@ -136,6 +145,13 @@ final class StripeAcpCheckoutService extends AbstractAcpCheckoutService
             $payment->status === StripeStatusMapper::STATUS_AUTHORIZED
         );
         if (!$outcome->isSettled()) {
+            // Money moved and the shop has no committed order for it: this must be found without the agent.
+            $this->logger->error('[StripeAcpCheckoutService] Stripe charged, but the order was not committed', [
+                'contractId' => (string) $contract->getId(),
+                'paymentIntentId' => $payment->providerPaymentId,
+                'reason' => (string) $outcome->reason,
+            ]);
+
             return $this->formatter->validationError(sprintf(
                 'Stripe charged PaymentIntent %s but the order could not be committed: %s',
                 $payment->providerPaymentId,

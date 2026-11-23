@@ -167,6 +167,8 @@ services:
       $userBaskets: '@OxidEsales\PaymentBase\Checkout\Headless\UserBasketFactoryInterface'
       $buyers: '@OxidEsales\PaymentBase\Checkout\Headless\GuestUserResolverInterface'
       $contractCommit: '@OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface'
+      # Sprint 148 (AW): 'charged, but not committed' needs a log line.
+      $logger: '@oxid_esales.monolog.logger'
     public: true
 
   OxidEsales\PaymentBase\Mcp\Acp\AcpCheckoutServiceInterface:
