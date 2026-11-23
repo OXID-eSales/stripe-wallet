@@ -18,7 +18,7 @@ final readonly class LegacyOrderMigrationReport
 {
     /**
      * @param list<string>          $candidateOrderIds Legacy Stripe orders without a payment contract
-     * @param int                   $migrated          Orders a contract was created for (0 in a dry run)
+     * @param int                   $migrated          Orders a contract was created for; in a dry run: would be created for
      * @param array<string, string> $skipped           order label => why no contract was created
      * @param array<string, string> $failed            order label => error that stopped the attempt
      */

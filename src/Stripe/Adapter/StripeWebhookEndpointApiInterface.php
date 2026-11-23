@@ -55,16 +55,13 @@ interface StripeWebhookEndpointApiInterface
     ): WebhookEndpointRegistrationResult;
 
     /**
-     * Lists webhook endpoints visible to $apiKey, returning their IDs.
+     * Every webhook endpoint visible to $apiKey, with the URL it delivers to. The caller decides which
+     * of them belong to its shop: several shops can share one Stripe key.
      *
-     * When $urlFilter is non-null, only endpoints whose `url` exactly equals
-     * $urlFilter are returned — used to scope deletion to a single shop when
-     * multiple shops share one Stripe key.
-     *
-     * @return list<string> Endpoint IDs (`we_…`).
+     * @return array<string, string> endpoint id (`we_…`) => url
      * @throws WebhookRegistrationException
      */
-    public function listAll(string $apiKey, ?string $urlFilter = null): array;
+    public function endpointUrls(string $apiKey): array;
 
     /**
      * Deletes the given endpoint. Stripe accepts deletion of any endpoint visible

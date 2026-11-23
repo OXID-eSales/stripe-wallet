@@ -21,7 +21,7 @@ use OxidEsales\Payments\Stripe\Service\Result\LegacyOrderMigrationReport;
 interface LegacyOrderMigrationServiceInterface
 {
     /**
-     * @param bool $apply false = dry run: list candidates, write nothing
+     * @param bool $apply false = dry run: assess every candidate as `true` does, write nothing
      */
     public function migrate(bool $apply): LegacyOrderMigrationReport;
 }

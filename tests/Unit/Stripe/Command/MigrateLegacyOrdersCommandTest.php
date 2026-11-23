@@ -40,6 +40,20 @@ final class MigrateLegacyOrdersCommandTest extends TestCase
         $this->assertStringContainsString('DRY RUN', $this->tester->getDisplay());
     }
 
+    public function testExecute_InDryRun_PrintsWhatWouldBeMigratedAndSkipped(): void
+    {
+        $this->service->method('migrate')->willReturn(
+            new LegacyOrderMigrationReport(['ord-1', 'ord-2'], 1, ['order 1043' => 'order is cancelled (storno)'], [])
+        );
+
+        $this->tester->execute([]);
+
+        $display = $this->tester->getDisplay();
+        $this->assertStringContainsString('Would migrate: 1', $display);
+        $this->assertStringContainsString('Skipped: 1', $display);
+        $this->assertStringContainsString('order 1043: order is cancelled (storno)', $display);
+    }
+
     public function testExecute_WithApplyFlag_Applies(): void
     {
         $this->service->expects($this->once())->method('migrate')->with(true)

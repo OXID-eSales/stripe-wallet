@@ -34,7 +34,7 @@ final class WebhookEndpointRegistrarForShopTest extends TestCase
     protected function setUp(): void
     {
         $this->api = $this->createMock(StripeWebhookEndpointApiInterface::class);
-        $this->registrar = new WebhookEndpointRegistrar($this->api, new WebhookEventCatalog());
+        $this->registrar = new WebhookEndpointRegistrar($this->api, new WebhookEventCatalog(), new \OxidEsales\Payments\Stripe\Service\WebhookUrlOwnership());
     }
 
     public function testAnOrdinaryAccountGetsAPlainEndpointWithItsOwnKey(): void
@@ -120,7 +120,7 @@ final class WebhookEndpointRegistrarForShopTest extends TestCase
      */
     public function testAFreshTenantOnAConnectedAccountFallsBackToThePlatformWhenTheListIsRefused(): void
     {
-        $this->api->method('listAll')->willReturnCallback(function (string $key) {
+        $this->api->method('endpointUrls')->willReturnCallback(function (string $key) {
             if ($key === 'sk_shop') {
                 throw WebhookRegistrationException::fromApiError(
                     'oauth_not_supported',

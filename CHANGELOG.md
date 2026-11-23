@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- **`stripe:migrate-legacy-orders` (STRP-181, Bartosz Sosnowski; sprint 144 AW).** Creates a FULFILLED payment
+  contract for each order paid through the legacy `oxid-esales/stripe-module`, so the admin Payment tab manages it.
+  Dry run by default, `--apply` writes; run once per subshop. The dry run asks Stripe the same questions as
+  `--apply` and lists what would be migrated and skipped. Captured and refunded amounts come from the PaymentIntent
+  (a Dashboard refund counts); an order whose PaymentIntent the configured Stripe account does not have, or that
+  Stripe does not report as paid, is skipped with a reason. The contract carries `order_number`.
+- **The OXID order number in the Stripe payment description (STRP-179, Bartosz Sosnowski).** `Order <number>` in
+  the Payments list of the Stripe Dashboard; omitted while the order number is unknown or empty.
+
+### Fixed
+- **OPC: `stoken` in the `processCheckout` request body (OPC-345, Bartosz Sosnowski).** OPC v1.6.270 reads the token
+  from the body only; every OPC Stripe payment failed with `INVALID_REQUEST_TOKEN`.
+- **EE multishop: the webhook URL names the shop, `&shp=<shopId>` (STRP-180, Bartosz Sosnowski).** Stripe's call has
+  no session, so every event reached the default shop and two shops shared one endpoint. **After the update press
+  "Create webhooks" once in each shop**; a webhook entered by hand in the Stripe Dashboard needs the new URL.
+- **A shop cannot rewrite another shop's webhook endpoint (sprint 144 AW).** A stored endpoint id is used only when
+  its endpoint delivers to this shop; a subshop that holds a copy of shop 1's id gets its own endpoint. "Clear all"
+  removes this shop's endpoints, for shop 1 including the one registered before the URL named the shop.
+- **Webhook setup on a connected account: `oauth_not_supported` routes to the platform (STRP-180, Bartosz Sosnowski).**
+- **OPC footer on a shared-domain subshop carries `shp` (OPC-376, Bartosz Sosnowski).**
+- **`&` in street and additional address line is accepted (STRP-178, Bartosz Sosnowski).**
+- **Two parallel checkouts of one contract: the second answers "Your order is already being processed"
+  (`STRIPE_ORDER_IN_PROGRESS`) and opens no Stripe session (MOL-39, needs payment-base with the order-creation claim).**
+
+### Changed
+- `StripeWebhookEndpointApiInterface::listAll()` is replaced by `endpointUrls()` (endpoint id => url).
+- `Core\ShopParameter` is the one place that spells the `shp` URL parameter.
+
 ## [v3.5.0-rc6 - 2026-11-13]
 
 ### Changed

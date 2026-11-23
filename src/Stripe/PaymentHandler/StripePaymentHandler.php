@@ -9,8 +9,10 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\PaymentHandler;
 
+use OxidEsales\Payments\Stripe\Core\ShopParameter;
 use OxidEsales\Payments\Stripe\Core\ShopId;
 use OxidEsales\Eshop\Core\Registry;
+use OxidEsales\PaymentBase\Checkout\Attempt\OrderCreationAlreadyClaimedException;
 use OxidEsales\PaymentBase\Adapter\ContractFirstPaymentHandlerInterface;
 use OxidEsales\PaymentBase\Adapter\PaymentContextInterface;
 use OxidEsales\PaymentBase\Adapter\PaymentHandlerResult;
@@ -165,6 +167,11 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
                     'sessionId' => $sessionResult->getSessionId(),
                 ]
             );
+        } catch (OrderCreationAlreadyClaimedException) {
+            // MOL-39: another request of this shopper creates the order right now. Nothing was created here.
+            $this->logger->info('[StripePaymentHandler] Order creation already in progress', ['contractId' => $contractId]);
+
+            return PaymentHandlerResult::error('Your order is already being processed', 'STRIPE_ORDER_IN_PROGRESS');
         } catch (\Throwable $e) {
             // Exception text can carry provider ids and URLs: class at error level, text at debug.
             $this->logger->error('[StripePaymentHandler] processPayment failed', [
@@ -402,7 +409,7 @@ class StripePaymentHandler implements ContractFirstPaymentHandlerInterface
             $shopIdInt
         );
         $cancelUrl = $this->checkoutSessionService->buildCancelUrl(
-            $shopUrl . 'index.php?cl=payment&lang=' . $languageId . '&shp=' . $shopIdInt
+            $shopUrl . 'index.php?cl=payment&lang=' . $languageId . ShopParameter::always($shopIdInt)
         );
 
         return [$successUrl, $cancelUrl];

@@ -24,9 +24,12 @@ env:
   # priority, so a b-7.4.x checkout (1.8.x-dev) cannot satisfy that pin.
   # After the release: set PAYMENT_BASE_BRANCH back to 'b-7.4.x' and
   # PAYMENT_BASE_CONSTRAINT back to 'dev-b-7.4.x'.
-  PAYMENT_BASE_BRANCH: 'v1.8.0-rc2'
+  # TEMPORARY until the owner tags a payment-base release with the MOL-39 order-creation claim: the tests need it
+  # (payment-base b-7.4.x since 2026-11-23), which the pinned tag v1.8.0-rc2 does not have. The alias
+  # satisfies the exact pin of composer.json. After that tag (owner step): set both variables to it, as before.
+  PAYMENT_BASE_BRANCH: 'b-7.4.x'
   # Version that composer requires from the payment-base path repository.
-  PAYMENT_BASE_CONSTRAINT: 'v1.8.0-rc2'
+  PAYMENT_BASE_CONSTRAINT: 'dev-b-7.4.x as v1.8.0-rc2'
   # payment-base's extra.branch-alias covers dev-b-7.4.x only; a feature
   # branch needs an explicit alias to satisfy this module's `^v1.7`
   # constraint. Same version the branch alias resolves to, so nothing new to

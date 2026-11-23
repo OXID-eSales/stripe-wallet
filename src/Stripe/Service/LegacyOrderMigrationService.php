@@ -19,6 +19,7 @@ use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
 use OxidEsales\Payments\Stripe\Core\ShopId;
 use OxidEsales\Payments\Stripe\Core\StripeDefinitions;
 use OxidEsales\Payments\Stripe\Service\Result\LegacyOrderMigrationReport;
+use OxidEsales\Payments\Stripe\Service\Result\LegacyOrderVerdict;
 use Throwable;
 
 /**
@@ -31,10 +32,9 @@ use Throwable;
  * matches on the contract's provider), so the order's oxpaymenttype is left
  * untouched — history and reporting keep the original method id.
  *
- * The contract is walked through the regular domain lifecycle to FULFILLED;
- * captured amount = the order total, refunded amount = the legacy module's
- * refund bookkeeping (order-level STRIPE*REFUNDED columns + per-article
- * STRIPEAMOUNTREFUNDED), read only when those columns exist.
+ * {@see LegacyOrderAssessment} decides per order; the dry run asks it too, so it
+ * lists what `--apply` will skip. The contract is walked through the regular
+ * domain lifecycle to FULFILLED with the amounts Stripe holds for the payment.
  *
  * STRP-181.
  */
@@ -57,42 +57,24 @@ class LegacyOrderMigrationService implements LegacyOrderMigrationServiceInterfac
     private const ARTICLES_SQL = "SELECT OXARTNUM, OXTITLE, OXAMOUNT, OXBPRICE, OXVAT
             FROM oxorderarticles WHERE OXORDERID = :orderId";
 
-    private const LEGACY_ORDER_REFUND_COLUMNS = [
-        'STRIPEDELCOSTREFUNDED',
-        'STRIPEPAYCOSTREFUNDED',
-        'STRIPEWRAPCOSTREFUNDED',
-        'STRIPEGIFTCARDREFUNDED',
-        'STRIPEVOUCHERDISCOUNTREFUNDED',
-        'STRIPEDISCOUNTREFUNDED',
-    ];
-
-    private const NEVER_PAID = '0000-00-00 00:00:00';
-
-    /** @var array<string, list<string>> */
-    private array $columnCache = [];
-
     public function __construct(
         private readonly Connection $connection,
         private readonly ContractRepositoryInterface $contractRepository,
-        private readonly ShopAdapterInterface $shopAdapter
+        private readonly ShopAdapterInterface $shopAdapter,
+        private readonly LegacyOrderAssessment $assessment
     ) {
     }
 
     public function migrate(bool $apply): LegacyOrderMigrationReport
     {
         $candidates = $this->findCandidates();
-        $orderIds = array_map(static fn (array $row): string => self::text($row, 'OXID'), $candidates);
-        if (!$apply) {
-            return new LegacyOrderMigrationReport($orderIds, 0, [], []);
-        }
-
         $migrated = 0;
         $skipped = [];
         $failed = [];
         foreach ($candidates as $row) {
             $label = $this->orderLabel($row);
             try {
-                $skipReason = $this->migrateOne($row);
+                $skipReason = $this->migrateOne($row, $apply);
             } catch (Throwable $error) {
                 $failed[$label] = $error->getMessage();
                 continue;
@@ -104,7 +86,12 @@ class LegacyOrderMigrationService implements LegacyOrderMigrationServiceInterfac
             $skipped[$label] = $skipReason;
         }
 
-        return new LegacyOrderMigrationReport($orderIds, $migrated, $skipped, $failed);
+        return new LegacyOrderMigrationReport(
+            array_map(static fn (array $row): string => LegacyOrderRow::text($row, 'OXID'), $candidates),
+            $migrated,
+            $skipped,
+            $failed
+        );
     }
 
     /**
@@ -125,40 +112,18 @@ class LegacyOrderMigrationService implements LegacyOrderMigrationServiceInterfac
     /**
      * @param array<string, mixed> $row
      *
-     * @return string|null why no contract was created; null when one was
+     * @return string|null why the order gets no contract; null when it gets one (dry run: would get one)
      */
-    private function migrateOne(array $row): ?string
+    private function migrateOne(array $row, bool $apply): ?string
     {
-        $transactionId = self::text($row, 'OXTRANSID');
-        if (!str_starts_with($transactionId, 'pi_')) {
-            return $transactionId === ''
-                ? 'no transaction id on the order'
-                : "transaction id '{$transactionId}' is not a PaymentIntent — the new module cannot manage it";
+        $verdict = $this->assessment->assess($row);
+        $paidAt = $verdict->paidAt;
+        if ($verdict->skipReason !== null || $paidAt === null) {
+            return $verdict->skipReason;
         }
-        if (self::text($row, 'OXSTORNO') === '1') {
-            return 'order is cancelled (storno)';
+        if ($apply) {
+            $this->contractRepository->save($this->buildContract($row, $verdict, $paidAt));
         }
-        $paidAt = $this->paidAt($row);
-        if ($paidAt === null) {
-            return 'order was never paid — nothing for the new module to manage';
-        }
-
-        $orderId = self::text($row, 'OXID');
-        $total = (float) ($row['OXTOTALORDERSUM'] ?? 0.0);
-        if ($total <= 0.0) {
-            return 'order total is zero — nothing to capture or refund';
-        }
-        $refunded = $this->legacyRefundedTotal($orderId);
-        if ($refunded > $total) {
-            return sprintf(
-                'legacy refund bookkeeping (%.2f) exceeds the order total (%.2f) — resolve manually',
-                $refunded,
-                $total
-            );
-        }
-
-        $contract = $this->buildContract($row, $orderId, $transactionId, $total, $refunded, $paidAt);
-        $this->contractRepository->save($contract);
 
         return null;
     }
@@ -166,22 +131,34 @@ class LegacyOrderMigrationService implements LegacyOrderMigrationServiceInterfac
     /**
      * @param array<string, mixed> $row
      */
-    private function buildContract(
-        array $row,
-        string $orderId,
-        string $transactionId,
-        float $total,
-        float $refunded,
-        DateTimeImmutable $paidAt
-    ): PaymentContract {
+    private function buildContract(array $row, LegacyOrderVerdict $verdict, DateTimeImmutable $paidAt): PaymentContract
+    {
+        $orderId = LegacyOrderRow::text($row, 'OXID');
         $contract = new PaymentContract(
             $this->shopId(),
-            self::text($row, 'OXUSERID'),
-            $this->basketSnapshot($row, $orderId, $total)
+            LegacyOrderRow::text($row, 'OXUSERID'),
+            $this->basketSnapshot($row, $orderId)
         );
 
-        // The regular lifecycle, replayed: the money already moved at Stripe,
-        // the walk only brings the contract's state machine up to that fact.
+        $this->walkToFulfilled($contract, $orderId, LegacyOrderRow::text($row, 'OXTRANSID'));
+        $this->bookMoney($contract, $verdict, $paidAt);
+
+        // The key the regular checkout writes (EarlyOrderCreationHandler) and the module reads.
+        $contract->setMetadata('order_number', LegacyOrderRow::text($row, 'OXORDERNR'));
+        $contract->setMetadata('legacyMigration', [
+            'migratedFrom' => 'oxid-esales/stripe-module',
+            'legacyPaymentType' => LegacyOrderRow::text($row, 'OXPAYMENTTYPE'),
+        ]);
+
+        return $contract;
+    }
+
+    /**
+     * The regular lifecycle, replayed: the money already moved at Stripe, the walk only brings the
+     * contract's state machine up to that fact.
+     */
+    private function walkToFulfilled(PaymentContract $contract, string $orderId, string $transactionId): void
+    {
         $contract->addCondition(new ContractCondition(ContractCondition::TYPE_PAYMENT_AUTHORIZED));
         $contract->transitionToNotFinished($orderId);
         $contract->transitionToPending();
@@ -191,29 +168,28 @@ class LegacyOrderMigrationService implements LegacyOrderMigrationServiceInterfac
         ]);
         $contract->commitToOrder($orderId);
         $contract->fulfill();
+    }
 
-        $contract->setCapturedAmount($total);
+    private function bookMoney(PaymentContract $contract, LegacyOrderVerdict $verdict, DateTimeImmutable $paidAt): void
+    {
+        $contract->setCapturedAmount($verdict->capturedAmount);
         $contract->setCapturedAt($paidAt);
-        if ($refunded > 0.0) {
-            $contract->addRefundedAmount($refunded);
-            $contract->setRefundedAt($paidAt);
+        if ($verdict->refundedAmount <= 0.0) {
+            return;
         }
 
-        $contract->setMetadata('legacyMigration', [
-            'migratedFrom' => 'oxid-esales/stripe-module',
-            'legacyPaymentType' => self::text($row, 'OXPAYMENTTYPE'),
-            'orderNumber' => self::text($row, 'OXORDERNR'),
-        ]);
-
-        return $contract;
+        // Stripe's charge carries no single refund date; the legacy data has none either.
+        $contract->addRefundedAmount($verdict->refundedAmount);
+        $contract->setRefundedAt($paidAt);
     }
 
     /**
      * @param array<string, mixed> $row
      */
-    private function basketSnapshot(array $row, string $orderId, float $total): BasketSnapshot
+    private function basketSnapshot(array $row, string $orderId): BasketSnapshot
     {
-        $net = (float) ($row['OXTOTALNETSUM'] ?? 0.0);
+        $total = LegacyOrderRow::number($row, 'OXTOTALORDERSUM');
+        $net = LegacyOrderRow::number($row, 'OXTOTALNETSUM');
 
         return BasketSnapshot::fromArray([
             'items' => $this->articleItems($orderId),
@@ -221,7 +197,7 @@ class LegacyOrderMigrationService implements LegacyOrderMigrationServiceInterfac
             'totalGross' => $total,
             'totalNet' => $net,
             'totalVat' => max(0.0, round($total - $net, 2)),
-            'currency' => self::text($row, 'OXCURRENCY'),
+            'currency' => LegacyOrderRow::text($row, 'OXCURRENCY'),
         ]);
     }
 
@@ -233,70 +209,12 @@ class LegacyOrderMigrationService implements LegacyOrderMigrationServiceInterfac
         $rows = $this->connection->fetchAllAssociative(self::ARTICLES_SQL, ['orderId' => $orderId]);
 
         return array_map(static fn (array $row): array => [
-            'artnum' => self::text($row, 'OXARTNUM'),
-            'title' => self::text($row, 'OXTITLE'),
-            'quantity' => (int) ($row['OXAMOUNT'] ?? 0),
-            'price' => (float) ($row['OXBPRICE'] ?? 0.0),
-            'vat' => (float) ($row['OXVAT'] ?? 0.0),
+            'artnum' => LegacyOrderRow::text($row, 'OXARTNUM'),
+            'title' => LegacyOrderRow::text($row, 'OXTITLE'),
+            'quantity' => LegacyOrderRow::number($row, 'OXAMOUNT'),
+            'price' => LegacyOrderRow::number($row, 'OXBPRICE'),
+            'vat' => LegacyOrderRow::number($row, 'OXVAT'),
         ], array_values($rows));
-    }
-
-    /**
-     * The legacy module's refund bookkeeping, or 0.0 when its columns were
-     * never installed (nothing was ever refunded through it then either).
-     */
-    private function legacyRefundedTotal(string $orderId): float
-    {
-        $orderColumns = $this->existingLegacyColumns('oxorder', self::LEGACY_ORDER_REFUND_COLUMNS);
-        $total = 0.0;
-
-        if ($orderColumns !== []) {
-            $sql = 'SELECT ' . implode(' + ', $orderColumns) . ' FROM oxorder WHERE OXID = :orderId';
-            $total += (float) $this->connection->fetchOne($sql, ['orderId' => $orderId]);
-        }
-
-        if ($this->existingLegacyColumns('oxorderarticles', ['STRIPEAMOUNTREFUNDED']) !== []) {
-            $total += (float) $this->connection->fetchOne(
-                'SELECT COALESCE(SUM(STRIPEAMOUNTREFUNDED), 0) FROM oxorderarticles WHERE OXORDERID = :orderId',
-                ['orderId' => $orderId]
-            );
-        }
-
-        return round($total, 2);
-    }
-
-    /**
-     * @param list<string> $columns
-     *
-     * @return list<string> the subset of $columns that exists on $table
-     */
-    private function existingLegacyColumns(string $table, array $columns): array
-    {
-        if (!isset($this->columnCache[$table])) {
-            $rows = $this->connection->fetchFirstColumn(
-                "SELECT COLUMN_NAME FROM information_schema.COLUMNS
-                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table AND COLUMN_NAME LIKE 'STRIPE%'",
-                ['table' => $table]
-            );
-            $this->columnCache[$table] = array_map('strtoupper', array_map('strval', $rows));
-        }
-
-        return array_values(array_intersect($columns, $this->columnCache[$table]));
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     */
-    private function paidAt(array $row): ?DateTimeImmutable
-    {
-        $paid = self::text($row, 'OXPAID');
-        if ($paid === '' || $paid === self::NEVER_PAID) {
-            return null;
-        }
-
-        $date = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $paid);
-
-        return $date === false ? null : $date;
     }
 
     /**
@@ -304,20 +222,10 @@ class LegacyOrderMigrationService implements LegacyOrderMigrationServiceInterfac
      */
     private function orderLabel(array $row): string
     {
-        $orderNumber = self::text($row, 'OXORDERNR');
+        $orderNumber = LegacyOrderRow::text($row, 'OXORDERNR');
 
         return $orderNumber !== '' && $orderNumber !== '0'
             ? 'order ' . $orderNumber
-            : self::text($row, 'OXID');
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     */
-    private static function text(array $row, string $column): string
-    {
-        $value = $row[$column] ?? '';
-
-        return is_string($value) ? $value : (is_scalar($value) ? (string) $value : '');
+            : LegacyOrderRow::text($row, 'OXID');
     }
 }
