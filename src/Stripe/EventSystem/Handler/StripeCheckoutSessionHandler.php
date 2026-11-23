@@ -144,12 +144,13 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         $captureMode = $this->getContextString($context, 'captureMode', StripeDefinitions::CAPTURE_MODE_AUTOMATIC);
         $shopUrl = $this->getContextString($context, 'shopUrl', $this->shopAdapter->getShopUrl());
         $sessionId = $this->getContextString($context, 'sessionId', '');
-        $shopId = $this->getContextString($context, 'shopId', '1');
 
         $rawLangId = $context->get('languageId');
         $languageId = is_numeric($rawLangId) ? (int) $rawLangId : 0;
-        // Sprint 133 (F14): no silent fallback to shop 1 on EE multishop.
-        $shopIdInt = ShopId::of($shopId, 'checkout session handler');
+        // Sprint 133 (F14): no silent fallback to shop 1 on EE multishop. Sprint 148 (AW): the controller
+        // sends the shop id as an integer and the OPC path as a string; a string-only read took '1' for
+        // the integer of a subshop, so the return URLs and the Stripe metadata named shop 1.
+        $shopIdInt = $this->shopIdOf($context);
 
         // VR-20 R5: payment-base's shared return token, bound to the shopper and expiring.
         $contractToken = $this->returnTokens->generateToken($contractId, $contract->getUserId());
@@ -163,7 +164,7 @@ class StripeCheckoutSessionHandler implements HandlerInterface
         return [
             'contractId' => $contractId,
             'captureMode' => $captureMode,
-            'shopId' => $shopId,
+            'shopId' => (string) $shopIdInt,
             'successUrl' => $successUrl,
             'cancelUrl' => $cancelUrl,
             'orderId' => $orderId,
@@ -232,6 +233,16 @@ class StripeCheckoutSessionHandler implements HandlerInterface
             'email' => $email,
             'name' => trim($firstName . ' ' . $lastName),
         ];
+    }
+
+    /**
+     * @throws RuntimeException when the context names no shop
+     */
+    private function shopIdOf(EventContext $context): int
+    {
+        $shopId = $context->get('shopId');
+
+        return ShopId::of(is_int($shopId) || is_string($shopId) ? $shopId : null, 'checkout session handler');
     }
 
     /**
