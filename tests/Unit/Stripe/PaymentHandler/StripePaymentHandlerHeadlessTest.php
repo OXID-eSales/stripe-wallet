@@ -90,6 +90,7 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
     private ?OpenCheckoutAttemptRegistry $openAttempts = null;
     private ?CheckoutInFlightGuard $inFlightGuard = null;
     private bool $wireTheSharedChain = true;
+    private bool $orderCreationClaimWon = true;
 
     protected function setUp(): void
     {
@@ -404,6 +405,23 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
         self::assertSame('STRIPE_PAYMENT_FAILED', $result->getErrorCode());
     }
 
+    /**
+     * MOL-39 / sprint 144 (AW): another request creates the order of this contract. This request opens no
+     * Stripe session and tells the shopper that the order is being processed.
+     */
+    public function testProcessPayment_WhenOrderCreationIsAlreadyClaimed_ReturnsTheInProgressResult(): void
+    {
+        $this->orderCreationClaimWon = false;
+        $this->shopOrderService->expects($this->never())->method('createOrder');
+        $this->checkoutSessionService->expects($this->never())->method('createSession');
+
+        $result = $this->handler()->processPayment($this->headlessContext());
+
+        self::assertFalse($result->isSuccess());
+        self::assertSame('STRIPE_ORDER_IN_PROGRESS', $result->getErrorCode());
+        self::assertSame('Your order is already being processed', $result->getErrorMessage());
+    }
+
     public function testOpcStart_WhenTheCheckoutInFlightIsReused_NoOrderIsWritten(): void
     {
         $inFlight = $this->createMock(CheckoutInFlightGuard::class);
@@ -480,19 +498,19 @@ final class StripePaymentHandlerHeadlessTest extends TestCase
             $this->openAttempts ?? $this->registryRemembering(null),
             $dispatcher,
             new ThrowableSummary([]),
-            $this->wonOrderCreationClaim(),
+            $this->orderCreationClaim(),
         ));
 
         return $dispatcher;
     }
 
     /**
-     * MOL-39 (payment-base sprint 143): the order step claims the order creation; this request wins it.
+     * MOL-39 (payment-base sprint 143): the order step claims the order creation.
      */
-    private function wonOrderCreationClaim(): OrderCreationClaimInterface
+    private function orderCreationClaim(): OrderCreationClaimInterface
     {
         $claims = $this->createMock(OrderCreationClaimInterface::class);
-        $claims->method('claim')->willReturn(true);
+        $claims->method('claim')->willReturn($this->orderCreationClaimWon);
 
         return $claims;
     }
