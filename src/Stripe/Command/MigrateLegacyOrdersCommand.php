@@ -52,13 +52,15 @@ FULFILLED contract for each one. With the contract in place the new module's
 admin panel (capture state, refunds, transaction history) manages the order;
 the order's payment id and history stay untouched.
 
-Skipped (and listed) are orders that were never paid, cancelled orders,
-orders whose transaction id is not a PaymentIntent, and orders whose legacy
-refund bookkeeping is inconsistent.
+Skipped (and listed) are orders that were never paid in the shop (this
+includes payments that were authorized and never captured), cancelled orders,
+orders whose transaction id is not a PaymentIntent, and orders whose
+PaymentIntent the configured Stripe account does not have or does not report
+as paid. Captured and refunded amounts come from Stripe.
 
-Without --apply nothing is written: the command only lists how many orders
-are affected. Re-running is safe — orders that already have a contract are
-never candidates again.
+Without --apply nothing is written: the command asks Stripe the same
+questions and lists what --apply would migrate and skip. Re-running is safe —
+orders that already have a contract are never candidates again.
 
 On an Enterprise multishop run the command once per subshop (the shop the
 console is bound to is the shop that is migrated).
@@ -82,16 +84,16 @@ HELP
         }
 
         $report = $this->migrationService->migrate($apply);
-        $this->printSummary($io, $report);
+        $this->printSummary($io, $report, $apply);
 
         return $report->failed === [] ? Command::SUCCESS : Command::FAILURE;
     }
 
-    private function printSummary(SymfonyStyle $io, LegacyOrderMigrationReport $report): void
+    private function printSummary(SymfonyStyle $io, LegacyOrderMigrationReport $report, bool $apply): void
     {
         $io->text([
             'Candidates: ' . count($report->candidateOrderIds),
-            'Migrated: ' . $report->migrated,
+            ($apply ? 'Migrated: ' : 'Would migrate: ') . $report->migrated,
             'Skipped: ' . count($report->skipped),
             'Failed: ' . count($report->failed),
         ]);

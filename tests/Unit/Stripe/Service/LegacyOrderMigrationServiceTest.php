@@ -14,7 +14,9 @@ use OxidEsales\PaymentBase\Adapter\ShopAdapterInterface;
 use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Repository\ContractRepositoryInterface;
+use OxidEsales\Payments\Stripe\Service\LegacyOrderAssessment;
 use OxidEsales\Payments\Stripe\Service\LegacyOrderMigrationService;
+use OxidEsales\Payments\Stripe\Service\Result\LegacyOrderVerdict;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -34,13 +36,8 @@ final class LegacyOrderMigrationServiceTest extends TestCase
     /** @var list<array<string, mixed>> */
     private array $candidateRows = [];
 
-    /** @var array<string, float> order id => legacy refunded total on oxorder columns */
-    private array $orderRefunds = [];
-
-    /** @var array<string, float> order id => legacy refunded total on article rows */
-    private array $articleRefunds = [];
-
-    private bool $legacyColumnsInstalled = true;
+    /** @var array<string, LegacyOrderVerdict> order id => what the assessment answers */
+    private array $verdicts = [];
 
     protected function setUp(): void
     {
@@ -54,49 +51,44 @@ final class LegacyOrderMigrationServiceTest extends TestCase
                 if (str_contains($sql, 'oe_payments_contract')) {
                     return $this->candidateRows;
                 }
-                if (str_contains($sql, 'oxorderarticles')) {
-                    return [
-                        ['OXARTNUM' => 'A-1', 'OXTITLE' => 'Widget', 'OXAMOUNT' => '2', 'OXBPRICE' => '9.99', 'OXVAT' => '19'],
-                    ];
-                }
-                return [];
+
+                return [['OXARTNUM' => 'A-1', 'OXTITLE' => 'Widget', 'OXAMOUNT' => '1.5', 'OXBPRICE' => '9.99', 'OXVAT' => '19']];
             }
         );
-        $this->connection->method('fetchFirstColumn')->willReturnCallback(
-            fn (): array => $this->legacyColumnsInstalled
-                ? [
-                    'STRIPEDELCOSTREFUNDED', 'STRIPEPAYCOSTREFUNDED', 'STRIPEWRAPCOSTREFUNDED',
-                    'STRIPEGIFTCARDREFUNDED', 'STRIPEVOUCHERDISCOUNTREFUNDED', 'STRIPEDISCOUNTREFUNDED',
-                    'STRIPEAMOUNTREFUNDED',
-                ]
-                : []
-        );
-        $this->connection->method('fetchOne')->willReturnCallback(
-            function (string $sql, array $params): float {
-                $orderId = (string) ($params['orderId'] ?? '');
-                if (str_contains($sql, 'oxorderarticles')) {
-                    return $this->articleRefunds[$orderId] ?? 0.0;
-                }
-                return $this->orderRefunds[$orderId] ?? 0.0;
-            }
+        $assessment = $this->createMock(LegacyOrderAssessment::class);
+        $assessment->method('assess')->willReturnCallback(
+            fn (array $row): LegacyOrderVerdict => $this->verdicts[$row['OXID']] ?? $this->paid(119.0)
         );
 
-        $this->service = new LegacyOrderMigrationService(
-            $this->connection,
-            $this->contractRepository,
-            $shopAdapter
-        );
+        $this->service = new LegacyOrderMigrationService($this->connection, $this->contractRepository, $shopAdapter, $assessment);
     }
 
-    public function testMigrate_InDryRun_ListsCandidatesAndWritesNothing(): void
+    /**
+     * Sprint 144 (AW): the dry run asks the same assessment as --apply and writes nothing.
+     */
+    public function testMigrate_InDryRun_ReportsTheSameSkipsAsApplyAndWritesNothing(): void
     {
-        $this->candidateRows = [$this->paidOrderRow('ord-1')];
+        $this->candidateRows = [$this->paidOrderRow('ord-1'), $this->paidOrderRow('ord-2', ['OXORDERNR' => '1043'])];
+        $this->verdicts['ord-2'] = LegacyOrderVerdict::skip('order is cancelled (storno)');
         $this->contractRepository->expects($this->never())->method('save');
 
-        $report = $this->service->migrate(false);
+        $dryRun = $this->service->migrate(false);
 
-        $this->assertSame(['ord-1'], $report->candidateOrderIds);
-        $this->assertSame(0, $report->migrated);
+        $this->assertSame(['ord-1', 'ord-2'], $dryRun->candidateOrderIds);
+        $this->assertSame(1, $dryRun->migrated, 'one order would be migrated');
+        $this->assertSame(['order 1043' => 'order is cancelled (storno)'], $dryRun->skipped);
+    }
+
+    public function testMigrate_WithApply_ReportsTheSameCountsAsTheDryRun(): void
+    {
+        $this->candidateRows = [$this->paidOrderRow('ord-1'), $this->paidOrderRow('ord-2', ['OXORDERNR' => '1043'])];
+        $this->verdicts['ord-2'] = LegacyOrderVerdict::skip('order is cancelled (storno)');
+
+        $dryRun = $this->service->migrate(false);
+        $applied = $this->service->migrate(true);
+
+        $this->assertSame($dryRun->migrated, $applied->migrated);
+        $this->assertSame($dryRun->skipped, $applied->skipped);
     }
 
     public function testMigrate_WithApply_CreatesAFulfilledStripeContractForThePaidLegacyOrder(): void
@@ -127,75 +119,44 @@ final class LegacyOrderMigrationServiceTest extends TestCase
         $this->assertIsArray($metadata);
         $this->assertSame('oxid-esales/stripe-module', $metadata['migratedFrom']);
         $this->assertSame('stripecreditcard', $metadata['legacyPaymentType']);
-        $this->assertSame('1042', $metadata['orderNumber']);
     }
 
-    public function testMigrate_CarriesTheLegacyRefundBookkeepingOntoTheContract(): void
+    /**
+     * The key the regular checkout writes and the module reads.
+     */
+    public function testMigrate_WithApply_WritesOrderNumberMetadata(): void
     {
         $this->candidateRows = [$this->paidOrderRow('ord-1')];
-        $this->orderRefunds['ord-1'] = 4.90;
-        $this->articleRefunds['ord-1'] = 19.98;
         $saved = $this->captureSavedContract();
 
-        $report = $this->service->migrate(true);
+        $this->service->migrate(true);
 
-        $this->assertSame(1, $report->migrated);
+        $this->assertSame('1042', $saved()->getMetadata('order_number'));
+    }
+
+    public function testMigrate_WithApply_TakesCapturedAndRefundedAmountsFromTheAssessment(): void
+    {
+        $this->candidateRows = [$this->paidOrderRow('ord-1')];
+        $this->verdicts['ord-1'] = $this->paid(110.0, 24.88);
+        $saved = $this->captureSavedContract();
+
+        $this->service->migrate(true);
+
+        $this->assertSame(110.0, $saved()->getCapturedAmount(), 'what Stripe collected, not OXTOTALORDERSUM');
         $this->assertSame(24.88, $saved()->getRefundedAmount());
         $this->assertNotNull($saved()->getRefundedAt());
     }
 
-    public function testMigrate_WithoutLegacyColumns_MigratesWithNoRefunds(): void
-    {
-        $this->legacyColumnsInstalled = false;
-        $this->candidateRows = [$this->paidOrderRow('ord-1')];
-        $saved = $this->captureSavedContract();
-
-        $report = $this->service->migrate(true);
-
-        $this->assertSame(1, $report->migrated);
-        $this->assertNull($saved()->getRefundedAmount());
-    }
-
-    public function testMigrate_SkipsOrderWhoseTransactionIdIsNotAPaymentIntent(): void
-    {
-        $this->candidateRows = [
-            $this->paidOrderRow('ord-1', ['OXTRANSID' => 'ch_oldcharge']),
-            $this->paidOrderRow('ord-2', ['OXTRANSID' => '', 'OXORDERNR' => '1043']),
-        ];
-        $this->contractRepository->expects($this->never())->method('save');
-
-        $report = $this->service->migrate(true);
-
-        $this->assertSame(0, $report->migrated);
-        $this->assertStringContainsString('not a PaymentIntent', $report->skipped['order 1042']);
-        $this->assertStringContainsString('no transaction id', $report->skipped['order 1043']);
-    }
-
-    public function testMigrate_SkipsCancelledAndUnpaidOrders(): void
-    {
-        $this->candidateRows = [
-            $this->paidOrderRow('ord-1', ['OXSTORNO' => '1']),
-            $this->paidOrderRow('ord-2', ['OXPAID' => '0000-00-00 00:00:00', 'OXORDERNR' => '1043']),
-        ];
-        $this->contractRepository->expects($this->never())->method('save');
-
-        $report = $this->service->migrate(true);
-
-        $this->assertSame(0, $report->migrated);
-        $this->assertStringContainsString('cancelled', $report->skipped['order 1042']);
-        $this->assertStringContainsString('never paid', $report->skipped['order 1043']);
-    }
-
-    public function testMigrate_SkipsOrderWhoseLegacyRefundsExceedTheTotal(): void
+    public function testMigrate_WhenTheAssessmentSkips_SavesNothingAndListsTheReason(): void
     {
         $this->candidateRows = [$this->paidOrderRow('ord-1')];
-        $this->orderRefunds['ord-1'] = 500.0;
+        $this->verdicts['ord-1'] = LegacyOrderVerdict::skip("Stripe reports the PaymentIntent as 'canceled', not paid");
         $this->contractRepository->expects($this->never())->method('save');
 
         $report = $this->service->migrate(true);
 
         $this->assertSame(0, $report->migrated);
-        $this->assertStringContainsString('resolve manually', $report->skipped['order 1042']);
+        $this->assertStringContainsString('not paid', $report->skipped['order 1042']);
     }
 
     public function testMigrate_WhenSaveFails_ContinuesWithTheNextOrderAndReportsTheFailure(): void
@@ -218,6 +179,11 @@ final class LegacyOrderMigrationServiceTest extends TestCase
 
         $this->assertSame(1, $report->migrated);
         $this->assertSame(['order 1042' => 'row is locked'], $report->failed);
+    }
+
+    private function paid(float $captured, float $refunded = 0.0): LegacyOrderVerdict
+    {
+        return LegacyOrderVerdict::migrate($captured, $refunded, new \DateTimeImmutable('2025-04-01 12:00:00'));
     }
 
     /**

@@ -1318,7 +1318,14 @@ services:
       $connection: '@doctrine.dbal.connection'
       $contractRepository: '@OxidEsales\PaymentBase\Repository\ContractRepositoryInterface'
       $shopAdapter: '@OxidEsales\PaymentBase\Adapter\ShopAdapterInterface'
+      $assessment: '@OxidEsales\Payments\Stripe\Service\LegacyOrderAssessment'
     public: true
+
+  OxidEsales\Payments\Stripe\Service\LegacyOrderAssessment:
+    arguments:
+      $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $chargeAmounts: '@OxidEsales\Payments\Stripe\Service\ChargeAmountResolverInterface'
+    public: false
 
   # Console Command: stripe:migrate-legacy-orders (STRP-181)
   # Dry run unless --apply is passed.
