@@ -75,7 +75,8 @@ final class StaleOrderCleanupIntegrationTest extends IntegrationTestCase
         // OPC-175: the settler is required. These contracts have no Stripe session.
         $paidSessions = new \OxidEsales\Payments\Stripe\Service\PaidSessionSettler(
             new \OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard(
-                $this->createMock(\OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface::class)
+                $this->createMock(\OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface::class),
+                new \Psr\Log\NullLogger()
             ),
             $this->createMock(\OxidEsales\PaymentBase\Service\Commit\ContractCommitServiceInterface::class),
             new \Psr\Log\NullLogger()
