@@ -31,7 +31,10 @@ final class SettlerScriptedInFlightGuard extends CheckoutInFlightGuard
         private readonly ?StripeCheckoutSessionDto $session,
         private readonly ?\Throwable $failure = null
     ) {
-        parent::__construct(new \OxidEsales\Payments\Stripe\Tests\Support\UnreachableStripeAdapterFactory());
+        parent::__construct(
+            new \OxidEsales\Payments\Stripe\Tests\Support\UnreachableStripeAdapterFactory(),
+            new \Psr\Log\NullLogger()
+        );
     }
 
     protected function retrieveSession(string $sessionId): ?StripeCheckoutSessionDto

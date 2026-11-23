@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Service;
 
+use Psr\Log\LoggerInterface;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\Payments\Stripe\Adapter\Dto\StripeCheckoutSessionDto;
 use OxidEsales\Payments\Stripe\Core\AmountConverter;
@@ -36,6 +37,7 @@ class CheckoutInFlightGuard
 {
     public function __construct(
         private readonly StripeAdapterFactoryInterface $adapterFactory,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -85,7 +87,14 @@ class CheckoutInFlightGuard
             );
 
             return PendingCheckoutReuse::allows($existing, $amountMinorUnits, $currency) ? $session : null;
-        } catch (Throwable) {
+        } catch (Throwable $failure) {
+            // "Cannot tell" is the documented answer (see the class comment). It still leaves a trace:
+            // a Stripe outage and an absent basket looked the same, and neither was in a log. The
+            // exception text can carry provider ids: only the class is logged.
+            $this->logger->warning('[CheckoutInFlightGuard] Could not inspect the checkout in flight', [
+                'exception' => $failure::class,
+            ]);
+
             return null;
         }
     }

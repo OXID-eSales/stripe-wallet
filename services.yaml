@@ -251,6 +251,7 @@ services:
   OxidEsales\Payments\Stripe\Service\CheckoutInFlightGuard:
     arguments:
       $adapterFactory: '@OxidEsales\Payments\Stripe\Service\Factory\StripeAdapterFactoryInterface'
+      $logger: '@oxid_esales.monolog.logger'
 
   # OPC-175: "is this attempt already money?" - asked by RetryCleanupService
   # and by StripeAwareAttemptCleaner below.
