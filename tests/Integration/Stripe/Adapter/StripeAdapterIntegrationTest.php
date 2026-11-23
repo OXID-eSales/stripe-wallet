@@ -280,7 +280,8 @@ final class StripeAdapterIntegrationTest extends StripeIntegrationTestCase
         $captureRequest = new CapturePaymentRequest(
             providerPaymentId: $createResponse->providerPaymentId,
             amount: 60.00,
-            metadata: ['capture_type' => 'partial']
+            metadata: ['capture_type' => 'partial'],
+            currency: 'EUR'
         );
 
         $captureResponse = $this->adapter->capturePayment($captureRequest);

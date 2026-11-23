@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OxidEsales\Payments\Stripe\Adapter\Helper;
 
+use InvalidArgumentException;
 use DateTimeImmutable;
 use OxidEsales\PaymentBase\Adapter\Request\CreatePaymentRequest;
 use OxidEsales\PaymentBase\Adapter\Request\CapturePaymentRequest;
@@ -80,6 +81,8 @@ class PaymentIntentHelper
 
     public function capturePaymentIntent(StripeClient $client, CapturePaymentRequest $request): CaptureResponse
     {
+        $this->assertPartialCaptureNamesItsCurrency($request);
+
         return $this->captureWithIdempotency($client, $request);
     }
 
@@ -210,6 +213,24 @@ class PaymentIntentHelper
     }
 
     /**
+     * Sprint 148 (AW): no guessed currency. Without one the amount was converted with two decimals,
+     * which is 100 times too much for a zero-decimal currency.
+     *
+     * @throws InvalidArgumentException
+     */
+    private function assertPartialCaptureNamesItsCurrency(CapturePaymentRequest $request): void
+    {
+        if ($request->amount === null) {
+            return;
+        }
+        if ($request->currency === null || $request->currency === '') {
+            throw new InvalidArgumentException(
+                'A partial capture needs its currency: payment ' . $request->providerPaymentId
+            );
+        }
+    }
+
+    /**
      * Stripe's own idempotency layer — the local DB record cannot protect
      * against a lost response, only against a duplicate local invocation.
      *
@@ -248,10 +269,9 @@ class PaymentIntentHelper
         try {
             $params = [];
             if ($request->amount !== null) {
-                // Sprint 114.10a (§6.2): CapturePaymentRequest now carries an optional currency;
-                // use it for correct minor-unit conversion (zero-decimal currencies like JPY
-                // must NOT be multiplied by 100). Null/empty falls back to 2-decimal behaviour.
-                $params['amount_to_capture'] = AmountConverter::toMinorUnits($request->amount, $request->currency ?? '');
+                // The currency decides the minor units: a zero-decimal currency such as JPY is not
+                // multiplied by 100. capturePaymentIntent() refused a partial capture without one.
+                $params['amount_to_capture'] = AmountConverter::toMinorUnits($request->amount, (string) $request->currency);
             }
             if (!empty($request->metadata)) {
                 $params['metadata'] = $request->metadata;

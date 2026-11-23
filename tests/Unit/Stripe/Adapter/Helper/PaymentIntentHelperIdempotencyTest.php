@@ -47,7 +47,7 @@ final class PaymentIntentHelperIdempotencyTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function captureCallsStripeWhenNoExistingRecord(): void
     {
-        $request = new CapturePaymentRequest('pi_abc123', 50.0);
+        $request = new CapturePaymentRequest('pi_abc123', 50.0, [], 'EUR');
 
         $this->repository
             ->expects($this->once())
@@ -72,7 +72,7 @@ final class PaymentIntentHelperIdempotencyTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function captureReturnsCachedResultWhenCompleted(): void
     {
-        $request = new CapturePaymentRequest('pi_abc123', 50.0);
+        $request = new CapturePaymentRequest('pi_abc123', 50.0, [], 'EUR');
 
         $cachedResult = json_encode([
             'successful' => true,
@@ -140,7 +140,7 @@ final class PaymentIntentHelperIdempotencyTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function captureCallsStripeWhenExpiredRecord(): void
     {
-        $request = new CapturePaymentRequest('pi_abc123', 50.0);
+        $request = new CapturePaymentRequest('pi_abc123', 50.0, [], 'EUR');
 
         $expiredRecord = new IdempotencyRecord(
             'id_expired',
@@ -243,7 +243,7 @@ final class PaymentIntentHelperIdempotencyTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function capturePassesNativeIdempotencyKeyToStripe(): void
     {
-        $request = new CapturePaymentRequest('pi_abc123', 50.0);
+        $request = new CapturePaymentRequest('pi_abc123', 50.0, [], 'EUR');
 
         $this->repository->method('findByKey')->willReturn(null);
 
