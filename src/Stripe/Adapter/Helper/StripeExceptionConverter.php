@@ -29,8 +29,8 @@ class StripeExceptionConverter
 
         return new PaymentAdapterException(
             providerName: StripeDefinitions::PROVIDER,
-            errorCode: $error?->code ?? 'unknown_error',
-            message: $error?->message ?? $e->getMessage(),
+            errorCode: $error->code ?? 'unknown_error',
+            message: $error->message ?? $e->getMessage(),
             code: $e->getCode(),
             previous: $e,
             context: [
