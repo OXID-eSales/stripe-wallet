@@ -24,18 +24,18 @@ class StripeExceptionConverter
 {
     public static function convert(ApiErrorException $e): PaymentAdapterException
     {
-        $errorCode = $e->getError()->code ?? 'unknown_error';
-        $message = $e->getError()->message ?? $e->getMessage();
+        // A connection error carries no error object: every read is null-safe.
+        $error = $e->getError();
 
         return new PaymentAdapterException(
             providerName: StripeDefinitions::PROVIDER,
-            errorCode: $errorCode,
-            message: $message,
+            errorCode: $error?->code ?? 'unknown_error',
+            message: $error?->message ?? $e->getMessage(),
             code: $e->getCode(),
             previous: $e,
             context: [
-                'type' => $e->getError()->type,
-                'param' => $e->getError()->param,
+                'type' => $error?->type,
+                'param' => $error?->param,
             ]
         );
     }

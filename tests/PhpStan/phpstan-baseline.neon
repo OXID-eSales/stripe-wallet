@@ -55,18 +55,6 @@ parameters:
 			path: ../../src/Stripe/Adapter/Helper/RefundHelper.php
 
 		-
-			message: '#^Cannot access property \$param on Stripe\\ErrorObject\|null\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: ../../src/Stripe/Adapter/Helper/StripeExceptionConverter.php
-
-		-
-			message: '#^Cannot access property \$type on Stripe\\ErrorObject\|null\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: ../../src/Stripe/Adapter/Helper/StripeExceptionConverter.php
-
-		-
 			message: '#^Cannot access property \$url on mixed\.$#'
 			identifier: property.nonObject
 			count: 1
