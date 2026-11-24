@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [v3.5.0-rc7 - 2026-11-24]
 
 ### Added
 - **`stripe:migrate-legacy-orders` (STRP-181, Bartosz Sosnowski; sprint 144 AW).** Creates a FULFILLED payment
