@@ -11,6 +11,7 @@ Documentation for merchants, shop administrators, and integration developers.
 | [01-installation-configuration.md](./01-installation-configuration.md) | Complete guide for installing, configuring, and using the Stripe payment module |
 | [02-headless-storefronts.md](./02-headless-storefronts.md) | Using Stripe from an app or a separate storefront over GraphQL: setup checklist (including the GraphQL schema cache clear), troubleshooting |
 | [02-security-headers.md](./02-security-headers.md) | Security headers for the shop's checkout pages |
+| [03-migrating-from-the-legacy-stripe-module.md](./03-migrating-from-the-legacy-stripe-module.md) | Switching from the old Stripe module (`oxid-esales/stripe-module`): keep managing its orders in the Payment tab, step by step, skip reasons, multishop, known limitation |
 
 **Topics covered:**
 - System requirements
@@ -30,6 +31,7 @@ Documentation for merchants, shop administrators, and integration developers.
 - **Configure API keys**: See [Configuration](./01-installation-configuration.md#configuration)
 - **Setup webhooks**: See [Stripe Dashboard Setup](./01-installation-configuration.md#stripe-dashboard-setup)
 - **Use an app or a separate storefront**: See [Headless Storefronts](./02-headless-storefronts.md#setup-checklist)
+- **Coming from the old Stripe module**: See [Moving from the old Stripe module](./03-migrating-from-the-legacy-stripe-module.md#step-by-step)
 
 ## Related Documentation
 
