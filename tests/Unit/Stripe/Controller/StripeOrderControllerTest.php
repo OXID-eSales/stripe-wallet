@@ -574,19 +574,7 @@ class StripeOrderControllerTest extends TestCase
                         public function findById(
                             string $id
                         ): ?\OxidEsales\PaymentBase\Contract\PaymentContractInterface {
-                            $contract = new \OxidEsales\PaymentBase\Contract\PaymentContract(
-                                1,
-                                'user_1',
-                                \OxidEsales\PaymentBase\Contract\BasketSnapshot::fromArray([
-                                    'items' => [],
-                                    'totalGross' => 1.0,
-                                    'totalNet' => 1.0,
-                                    'totalVat' => 0.0,
-                                    'currency' => 'EUR',
-                                ]),
-                                $id,
-                            );
-                            return $contract;
+                            return ReturningContract::pending($id, 'user_1');
                         }
                         public function findByUserId(string $userId): array
                         {

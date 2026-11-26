@@ -6,8 +6,6 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller;
 
 use OxidEsales\Eshop\Application\Model\Basket;
 use OxidEsales\Eshop\Application\Model\User;
-use OxidEsales\PaymentBase\Contract\BasketSnapshot;
-use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Controller\CheckoutReturnResponder;
 use OxidEsales\PaymentBase\Controller\SessionWriterInterface;
@@ -376,20 +374,9 @@ class StripeOrderControllerAgbConsentTest extends TestCase
 
                         public function findById(string $id): ?PaymentContractInterface
                         {
-                            return new PaymentContract(
-                                1,
-                                // must match the shopper getUser() returns — the
-                                // return path checks the contract is theirs
-                                'user_123',
-                                BasketSnapshot::fromArray([
-                                    'items'      => [],
-                                    'totalGross' => 1.0,
-                                    'totalNet'   => 1.0,
-                                    'totalVat'   => 0.0,
-                                    'currency'   => 'EUR',
-                                ]),
-                                $id,
-                            );
+                            // 'user_123' must match the shopper getUser() returns — the
+                            // return path checks the contract is theirs
+                            return ReturningContract::pending($id, 'user_123');
                         }
 
                         public function findByUserId(string $userId): array { return []; }
