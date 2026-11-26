@@ -406,7 +406,7 @@ jobs:
             -c /var/www/test-module/tests/phpunit.xml \
             --testsuite Integration \
             --bootstrap=/var/www/source/bootstrap.php \
-            --exclude-group webhook-e2e,graphql \
+            --exclude-group webhook-e2e --exclude-group graphql \
             --display-skipped | tee integration-tests.log
 
       # A test that skips itself for a missing GraphQL package here lacks #[Group('graphql')].
