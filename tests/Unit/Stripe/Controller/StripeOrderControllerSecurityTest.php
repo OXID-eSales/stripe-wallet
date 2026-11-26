@@ -6,8 +6,6 @@ namespace OxidEsales\Payments\Stripe\Tests\Unit\Stripe\Controller;
 
 use OxidEsales\Eshop\Application\Model\Basket;
 use OxidEsales\Eshop\Application\Model\User;
-use OxidEsales\PaymentBase\Contract\BasketSnapshot;
-use OxidEsales\PaymentBase\Contract\PaymentContract;
 use OxidEsales\PaymentBase\Contract\PaymentContractInterface;
 use OxidEsales\PaymentBase\Controller\CheckoutReturnResponder;
 use OxidEsales\PaymentBase\Controller\SessionWriterInterface;
@@ -340,12 +338,15 @@ class StripeOrderControllerSecurityTest extends TestCase
 
     /**
      * Branch B6: checkout return responder returns null → "Payment verification failed".
+     *
+     * STRP-182: the responder gives null for a contract that is still a draft (no order was created before the
+     * redirect). Before, this test got its null only because its draft fixture had no order id; the option
+     * `dispatchOrderId` it set was never read.
      */
     public function testCheckoutSuccessB6RejectsWhenDispatchReturnsFailed(): void
     {
         $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        // The responder dispatches events but returns no orderId (null)
-        $eventDispatcher->method('dispatch')->willReturnArgument(0);
+        $eventDispatcher->expects($this->never())->method('dispatch');
 
         [$controller, $helper] = $this->createCheckoutSuccessController($eventDispatcher, [
             'sessionId' => 'cs_test_b6',
@@ -354,7 +355,7 @@ class StripeOrderControllerSecurityTest extends TestCase
             'contractToken' => 'valid_token',
             'tokenValidationResult' => true,
             'contractExistsInRepo' => true,
-            'dispatchOrderId' => null,
+            'draftContract' => true,
         ]);
 
         $result = $controller->checkoutSuccess();
@@ -386,7 +387,6 @@ class StripeOrderControllerSecurityTest extends TestCase
             'contractToken' => 'valid_token',
             'tokenValidationResult' => true,
             'contractExistsInRepo' => true,
-            'dispatchOrderId' => 'order_success_123',
         ]);
 
         $result = $controller->checkoutSuccess();
@@ -538,29 +538,29 @@ class StripeOrderControllerSecurityTest extends TestCase
         }
 
         $contractExistsInRepo = $options['contractExistsInRepo'] ?? true;
-        $dispatchOrderId = $options['dispatchOrderId'] ?? 'order_123';
+        $draftContract = $options['draftContract'] ?? false;
 
         $controller = new class (
             $eventDispatcher,
             $helper,
             $contractExistsInRepo,
-            $dispatchOrderId
+            $draftContract
         ) extends StripeOrderController {
             private EventDispatcherInterface $mockDispatcher;
             private StubControllerRequestHelper $stubHelper;
             private bool $contractExistsInRepo;
-            private ?string $dispatchOrderId;
+            private bool $draftContract;
 
             public function __construct(
                 EventDispatcherInterface $dispatcher,
                 StubControllerRequestHelper $helper,
                 bool $contractExistsInRepo,
-                ?string $dispatchOrderId
+                bool $draftContract
             ) {
                 $this->mockDispatcher = $dispatcher;
                 $this->stubHelper = $helper;
                 $this->contractExistsInRepo = $contractExistsInRepo;
-                $this->dispatchOrderId = $dispatchOrderId;
+                $this->draftContract = $draftContract;
             }
 
             protected function getRequestHelper(): ControllerRequestHelper
@@ -575,7 +575,6 @@ class StripeOrderControllerSecurityTest extends TestCase
 
             protected function resolveCheckoutReturnResponder(): CheckoutReturnResponder
             {
-                $orderId = $this->dispatchOrderId;
                 $writer = new class implements SessionWriterInterface {
                     public function writeSessChallenge(string $orderId): void {}
                 };
@@ -585,9 +584,8 @@ class StripeOrderControllerSecurityTest extends TestCase
             protected function getServiceFromContainer(string $serviceName): object
             {
                 if ($serviceName === ContractRepositoryInterface::class) {
-                    $exists = $this->contractExistsInRepo;
-                    return new class ($exists) implements ContractRepositoryInterface {
-                        public function __construct(private readonly bool $exists)
+                    return new class ($this->contractExistsInRepo, $this->draftContract) implements ContractRepositoryInterface {
+                        public function __construct(private readonly bool $exists, private readonly bool $draft)
                         {
                         }
 
@@ -598,18 +596,10 @@ class StripeOrderControllerSecurityTest extends TestCase
                             if (!$this->exists) {
                                 return null;
                             }
-                            return new PaymentContract(
-                                1,
-                                'user_1',
-                                BasketSnapshot::fromArray([
-                                    'items' => [],
-                                    'totalGross' => 1.0,
-                                    'totalNet' => 1.0,
-                                    'totalVat' => 0.0,
-                                    'currency' => 'EUR',
-                                ]),
-                                $id,
-                            );
+                            if ($this->draft) {
+                                return ReturningContract::draft($id, 'user_1');
+                            }
+                            return ReturningContract::pending($id, 'user_1');
                         }
 
                         public function findByUserId(string $userId): array { return []; }
