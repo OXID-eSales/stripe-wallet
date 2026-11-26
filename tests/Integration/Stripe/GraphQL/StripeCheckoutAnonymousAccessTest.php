@@ -47,6 +47,7 @@ use TheCodingMachine\GraphQLite\SchemaFactory;
  * `PAYMENT_CHECKOUT` alone is the guard of the checkout mutations.
  */
 #[Group('integration')]
+#[Group('graphql')]
 final class StripeCheckoutAnonymousAccessTest extends TestCase
 {
     private const START = 'mutation { stripeCheckoutStart(basketId: "ub-1", confirmTermsAndConditions: true, returnUrl: "https://app.example.com/return") { contractId contractToken } }';
