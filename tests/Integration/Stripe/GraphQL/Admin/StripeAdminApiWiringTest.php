@@ -27,6 +27,8 @@ use PHPUnit\Framework\Attributes\Group;
  * The Stripe admin API in the real shop: wired, in the schema, and no secret value anywhere in what it returns.
  */
 #[Group('integration')]
+#[Group('graphql')]
+#[Group('graphql-admin')]
 final class StripeAdminApiWiringTest extends IntegrationTestCase
 {
     private const CONFIG_FIELDS = 'mode captureMode provideCustomerEmail '

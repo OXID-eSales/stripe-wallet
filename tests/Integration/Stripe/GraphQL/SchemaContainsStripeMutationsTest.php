@@ -37,6 +37,7 @@ use TheCodingMachine\GraphQLite\SchemaFactory;
  * test could skip.
  */
 #[Group('integration')]
+#[Group('graphql')]
 final class SchemaContainsStripeMutationsTest extends IntegrationTestCase
 {
     public function setUp(): void
