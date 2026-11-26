@@ -36,9 +36,9 @@ env:
   # PAYMENT_BASE_CONSTRAINT back to 'dev-b-7.4.x'.
   # The tests run against the payment-base b-7.4.x checkout. The alias satisfies the exact pin of
   # composer.json (v1.8.0-rc3 since v3.5.0-rc7): change the alias in the same commit as that pin.
-  PAYMENT_BASE_BRANCH: 'b-7.4.x-uncaught-exception-STRP-182'
+  PAYMENT_BASE_BRANCH: 'b-7.4.x'
   # Version that composer requires from the payment-base path repository.
-  PAYMENT_BASE_CONSTRAINT: 'dev-b-7.4.x-uncaught-exception-STRP-182 as v1.8.0-rc3'
+  PAYMENT_BASE_CONSTRAINT: 'dev-b-7.4.x as v1.8.0-rc3'
   # ` as <version>` suffix for the payment-base require when a feature branch carries no usable
   # branch alias. b-7.4.x satisfies this module's `^v1.7` through its alias (1.7.x-dev), so empty.
   PAYMENT_BASE_VERSION_ALIAS: ''
